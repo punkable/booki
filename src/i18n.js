@@ -163,7 +163,9 @@ const LOCALES = {
     "gist.pushed": "Backup pushed to Gist.",
     "gist.notoken": "No token saved yet.",
     "gist.connected": "Token saved",
-    "gist.lastpush": "last push"
+    "gist.lastpush": "last push",
+    "gist.connect": "Get a token from GitHub (1 click)",
+    "gist.connectHint": "Generate the token on GitHub, then paste it below."
   },
   es: {
     "app.name": "Booki",
@@ -329,7 +331,9 @@ const LOCALES = {
     "gist.pushed": "Copia subida al Gist.",
     "gist.notoken": "Aún no hay token guardado.",
     "gist.connected": "Token guardado",
-    "gist.lastpush": "última subida"
+    "gist.lastpush": "última subida",
+    "gist.connect": "Obtener token de GitHub (1 clic)",
+    "gist.connectHint": "Genera el token en GitHub y pégalo abajo."
   }
 };
 

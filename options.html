@@ -400,6 +400,12 @@
             </div>
             <p class="opt-desc" data-i18n="gist.desc">Back up to a private GitHub Gist using your own token — works across any browser or account, no app setup. On another device, paste the same token and the Gist ID, then Pull.</p>
             <p class="opt-note"><span data-i18n="gist.help">Create a token at github.com/settings/tokens with the “gist” scope.</span></p>
+            <div class="opt-row">
+              <button class="secondary-button" id="connectGithubButton" type="button">
+                <span class="svg-icon" data-icon="external" aria-hidden="true"></span>
+                <span data-i18n="gist.connect">Get a token from GitHub (1 click)</span>
+              </button>
+            </div>
             <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <input id="githubToken" type="password" placeholder="GitHub token (gist scope)" autocomplete="off" style="flex:1;min-width:160px;">
               <input id="githubGistId" type="text" placeholder="Gist ID (optional)" autocomplete="off" style="flex:1;min-width:120px;">

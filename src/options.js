@@ -40,6 +40,11 @@ function bindGist() {
 
   renderGistStatus();
 
+  document.getElementById("connectGithubButton")?.addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://github.com/settings/tokens/new?scopes=gist&description=Booki%20backup" });
+    toast(t("gist.connectHint", "Generate the token on GitHub, then paste it below."));
+  });
+
   saveBtn.addEventListener("click", async () => {
     const token = tokenInput.value.trim();
     const gistId = gistIdInput.value.trim();
