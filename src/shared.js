@@ -45,7 +45,10 @@ export async function getMeta() {
     tagsByBookmarkId: result.meta?.tagsByBookmarkId ?? {},
     starredIds: result.meta?.starredIds ?? [],
     folderColorsById: result.meta?.folderColorsById ?? {},
-    categoriesByBookmarkId: result.meta?.categoriesByBookmarkId ?? {}
+    categoriesByBookmarkId: result.meta?.categoriesByBookmarkId ?? {},
+    deadLinks: result.meta?.deadLinks ?? {},
+    pageContent: result.meta?.pageContent ?? {},
+    healthScores: result.meta?.healthScores ?? {}
   };
 }
 
@@ -67,12 +70,20 @@ export async function saveMeta(meta) {
 
 export async function pushSyncSnapshot() {
   const [settings, meta] = await Promise.all([getSettings(), getMeta()]);
+  /* Only sync portable metadata. pageContent (read-later, up to 50KB each)
+     and deadLinks (device-specific, regenerated daily) are excluded to stay
+     within the chrome.storage.sync quota. */
   const snapshot = {
     version: 2,
     savedAt: new Date().toISOString(),
     app: "booki",
     settings,
-    meta
+    meta: {
+      tagsByBookmarkId: meta.tagsByBookmarkId,
+      starredIds: meta.starredIds,
+      folderColorsById: meta.folderColorsById,
+      categoriesByBookmarkId: meta.categoriesByBookmarkId
+    }
   };
   await chrome.storage.sync.set({ bookiSnapshot: snapshot });
   return snapshot;
@@ -83,11 +94,21 @@ export async function pullSyncSnapshot() {
   const snapshot = result.bookiSnapshot;
   if (!snapshot) return null;
 
-  const currentSettings = await getSettings();
+  const [currentSettings, currentMeta] = await Promise.all([getSettings(), getMeta()]);
   const mergedSettings = { ...currentSettings, ...snapshot.settings };
+  /* Merge incoming portable meta over local, but preserve device-local
+     pageContent and deadLinks that the snapshot never carries. */
+  const incoming = snapshot.meta ?? {};
+  const mergedMeta = {
+    ...currentMeta,
+    tagsByBookmarkId: { ...currentMeta.tagsByBookmarkId, ...(incoming.tagsByBookmarkId ?? {}) },
+    starredIds: [...new Set([...currentMeta.starredIds, ...(incoming.starredIds ?? [])])],
+    folderColorsById: { ...currentMeta.folderColorsById, ...(incoming.folderColorsById ?? {}) },
+    categoriesByBookmarkId: { ...currentMeta.categoriesByBookmarkId, ...(incoming.categoriesByBookmarkId ?? {}) }
+  };
   await Promise.all([
     saveSettings(mergedSettings),
-    saveMeta(snapshot.meta ?? DEFAULT_META)
+    saveMeta(mergedMeta)
   ]);
 
   return snapshot;
@@ -128,6 +149,9 @@ export async function removeBookmarkMeta(bookmarkId) {
   delete meta.tagsByBookmarkId[bookmarkId];
   meta.starredIds = meta.starredIds.filter((id) => id !== bookmarkId);
   delete meta.categoriesByBookmarkId[bookmarkId];
+  delete meta.deadLinks[bookmarkId];
+  delete meta.pageContent[bookmarkId];
+  delete meta.healthScores[bookmarkId];
   await saveMeta(meta);
 }
 
@@ -448,7 +472,6 @@ export function computeHealth(bookmark, meta) {
   const dead = meta.deadLinks?.[bookmark.id];
   if (dead && dead.ok === false) { score -= 20; reasons.push("dead"); }
 
-  const dupes = findDuplicates([bookmark]); // fake check
   if ((bookmark.tags || []).length > 5) score -= 5;
 
   return {

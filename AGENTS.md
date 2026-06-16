@@ -65,7 +65,7 @@ Stored separately from Chrome bookmarks (which don't support custom fields):
   starredIds: ["123", "456"],
   folderColorsById: { "folderId": "mint" },
   categoriesByBookmarkId: { "123": "tech" },
-  deadLinks: { "123": 1700000000000 },  // timestamp of last dead check
+  deadLinks: { "123": { ok: false, status: 0, checked: 1700000000000 } },  // result + timestamp of last dead check
   pageContent: { "123": "stripped text content…" },
   healthScores: { "123": 85 } }
 ```
