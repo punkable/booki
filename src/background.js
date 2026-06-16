@@ -397,6 +397,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "restore-from-file") {
+    restoreFromPayload(message.payload).then(() => sendResponse({ ok: true })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
   if (message?.type === "capture-content") {
     capturePageContent(message.url).then((content) => sendResponse({ ok: true, content })).catch(() => sendResponse({ ok: false }));
     return true;

@@ -335,7 +335,7 @@ function handleImportFile(file) {
     try {
       const data = JSON.parse(e.target.result);
       if (data.version && data.app === "booki") {
-        const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code: data });
+        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload: data });
         if (resp?.ok) toast(t("toast.imported"));
         else toast("Could not restore from file.", "error");
       } else {
