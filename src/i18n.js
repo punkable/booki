@@ -147,7 +147,13 @@ const LOCALES = {
     "sync.backup.auto.weekly": "Every week",
     "sync.backup.auto.monthly": "Every month",
     "sync.backup.never": "No automatic backup yet.",
-    "sync.backup.last": "Last auto-backup"
+    "sync.backup.last": "Last auto-backup",
+    "bulk.select": "Select",
+    "bulk.selected": "selected",
+    "bulk.move": "Move to…",
+    "bulk.done": "Done",
+    "bulk.none": "Select some bookmarks first.",
+    "bulk.tagPrompt": "Add tags (comma separated):"
   },
   es: {
     "app.name": "Booki",
@@ -297,7 +303,13 @@ const LOCALES = {
     "sync.backup.auto.weekly": "Cada semana",
     "sync.backup.auto.monthly": "Cada mes",
     "sync.backup.never": "Aún no hay copia automática.",
-    "sync.backup.last": "Última copia automática"
+    "sync.backup.last": "Última copia automática",
+    "bulk.select": "Seleccionar",
+    "bulk.selected": "seleccionados",
+    "bulk.move": "Mover a…",
+    "bulk.done": "Listo",
+    "bulk.none": "Selecciona algunos marcadores primero.",
+    "bulk.tagPrompt": "Añadir etiquetas (separadas por comas):"
   }
 };
 

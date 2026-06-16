@@ -37,7 +37,8 @@ const state = {
   bookmarks: [], folders: [], filter: "all", folderFilter: "", query: "",
   settings: null, editingFolderId: "", stylingFolderId: "",
   selectedBookmarkId: "", organizeSuggestions: [], composerOpen: false,
-  previewBookmark: null, dragId: ""
+  previewBookmark: null, dragId: "",
+  selectionMode: false, selectedIds: new Set(), activeIndex: -1
 };
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
@@ -48,6 +49,10 @@ const el = {
   list: $("#bookmarkList"),
   empty: $("#emptyState"),
   badge: $("#bookmarkBadge"),
+  selectModeToggle: $("#selectModeToggle"),
+  bulkBar: $("#bulkBar"),
+  bulkCount: $("#bulkCount"),
+  bulkMoveSelect: $("#bulkMoveSelect"),
   onboardingCard: $("#onboardingCard"),
   onboardingRefresh: $("#onboardingRefresh"),
   onboardingImport: $("#onboardingImport"),
@@ -216,6 +221,10 @@ function bindEvents() {
   el.dropZone.addEventListener("drop", handleImportDrop);
   el.list.addEventListener("click", handleListClick);
   el.list.addEventListener("change", handleListChange);
+  el.selectModeToggle?.addEventListener("click", () => toggleSelectionMode());
+  el.bulkBar?.addEventListener("click", handleBulkClick);
+  el.bulkMoveSelect?.addEventListener("change", () => bulkMove(el.bulkMoveSelect.value));
+  document.addEventListener("keydown", handleGlobalKeys);
   el.list.addEventListener("dragstart", handleBookmarkDragStart);
   el.list.addEventListener("dragend", clearDragState);
   el.list.addEventListener("dragover", handleDragOver);
@@ -567,6 +576,8 @@ function renderBookmarks() {
   }
   el.list.innerHTML = items.map(renderBookmarkItem).join("");
   injectIcons();
+  if (state.activeIndex >= items.length) state.activeIndex = items.length - 1;
+  if (state.activeIndex >= 0) applyActiveHighlight(items);
   if (state.previewBookmark) {
     const stillExists = items.find((b) => b.id === state.previewBookmark.id);
     if (stillExists) showPreview(stillExists);
@@ -586,8 +597,11 @@ function renderBookmarkItem(b) {
     : showHealth && b.health?.level === "poor"
     ? `<span title="Needs attention" style="display:inline-block;width:6px;height:6px;border-radius:999px;background:var(--amber-gold);margin-right:4px;vertical-align:middle;"></span>`
     : "";
+  const cls = ["bookmark-item"];
+  if (state.selectionMode) cls.push("selectable");
+  if (state.selectedIds.has(b.id)) cls.push("is-selected");
   return `
-    <article class="bookmark-item" data-id="${esc(b.id)}" draggable="true"${selected}>
+    <article class="${cls.join(" ")}" data-id="${esc(b.id)}" draggable="${!state.selectionMode}"${selected}>
       <div class="bookmark-item-icon">
         <img src="${faviconUrl(b.url, 32)}" alt="" loading="lazy">
       </div>
@@ -877,6 +891,8 @@ async function handleListClick(e) {
   const bookmark = state.bookmarks.find((b) => b.id === item.dataset.id);
   if (!bookmark) return;
 
+  if (state.selectionMode) { toggleSelect(bookmark.id); return; }
+
   if (!btn) {
     await openBookmark(bookmark);
     return;
@@ -895,6 +911,137 @@ async function handleListClick(e) {
     renderBookmarks();
   }
   if (btn.dataset.action === "delete") { await deleteBookmark(bookmark); closePreview(); }
+}
+
+/* ─── Bulk actions ─── */
+
+function toggleSelectionMode(on) {
+  state.selectionMode = on ?? !state.selectionMode;
+  if (!state.selectionMode) state.selectedIds.clear();
+  document.body.classList.toggle("is-selecting", state.selectionMode);
+  el.selectModeToggle?.setAttribute("aria-pressed", String(state.selectionMode));
+  if (state.selectionMode) { closePreview(); populateBulkMove(); }
+  updateBulkBar();
+  renderBookmarks();
+}
+
+function toggleSelect(id) {
+  if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+  else state.selectedIds.add(id);
+  const node = el.list.querySelector(`.bookmark-item[data-id="${cssEscape(id)}"]`);
+  if (node) node.classList.toggle("is-selected", state.selectedIds.has(id));
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  if (!el.bulkBar) return;
+  el.bulkBar.hidden = !state.selectionMode;
+  if (el.bulkCount) el.bulkCount.textContent = String(state.selectedIds.size);
+}
+
+function populateBulkMove() {
+  if (!el.bulkMoveSelect) return;
+  const opts = state.folders.map((f) => `<option value="${esc(f.id)}">${esc(f.path || f.title)}</option>`).join("");
+  el.bulkMoveSelect.innerHTML = `<option value="">${esc(t("bulk.move", "Move to…"))}</option>` + opts;
+}
+
+function selectedBookmarks() {
+  return state.bookmarks.filter((b) => state.selectedIds.has(b.id));
+}
+
+async function handleBulkClick(e) {
+  const btn = e.target.closest("button[data-bulk]");
+  if (!btn) return;
+  const action = btn.dataset.bulk;
+  if (action === "done") { toggleSelectionMode(false); return; }
+  const targets = selectedBookmarks();
+  if (!targets.length) { toast(t("bulk.none", "Select some bookmarks first."), "error"); return; }
+
+  if (action === "star") {
+    const anyUnstarred = targets.some((b) => !b.starred);
+    for (const b of targets) {
+      if (anyUnstarred ? !b.starred : b.starred) await toggleStar(b.id);
+    }
+    toast(anyUnstarred ? "Starred." : "Unstarred.");
+  } else if (action === "tag") {
+    const input = prompt(t("bulk.tagPrompt", "Add tags (comma separated):"));
+    if (input == null) return;
+    const add = normalizeTags(input);
+    if (!add.length) return;
+    for (const b of targets) {
+      await setTags(b.id, [...new Set([...(b.tags || []), ...add])]);
+    }
+    toast("Tags added.");
+  } else if (action === "delete") {
+    if (state.settings.confirmDelete && !confirm(`Delete ${targets.length} bookmark(s)?`)) return;
+    for (const b of targets) {
+      try { await chrome.bookmarks.remove(b.id); await removeBookmarkMeta(b.id); } catch {}
+    }
+    toast(t("toast.deleted"));
+  } else {
+    return;
+  }
+  state.selectedIds.clear();
+  await loadLibrary();
+  updateBulkBar();
+}
+
+async function bulkMove(folderId) {
+  if (!folderId) return;
+  const targets = selectedBookmarks();
+  if (!targets.length) return;
+  for (const b of targets) { try { await moveBookmark(b.id, folderId); } catch {} }
+  el.bulkMoveSelect.value = "";
+  toast(t("toast.moved", "Moved."));
+  state.selectedIds.clear();
+  await loadLibrary();
+  updateBulkBar();
+}
+
+/* ─── Keyboard shortcuts ─── */
+
+function handleGlobalKeys(e) {
+  const target = e.target;
+  const tag = (target?.tagName || "").toLowerCase();
+  const typing = tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable;
+  if (e.key === "/" && !typing) { e.preventDefault(); el.search?.focus(); return; }
+  if (e.key === "Escape" && state.selectionMode) { toggleSelectionMode(false); return; }
+  if (typing || document.querySelector("dialog[open]")) return;
+  if ($(".view-tab.is-active")?.dataset.view !== "library") return;
+
+  const items = filteredBookmarks();
+  const key = e.key.toLowerCase();
+  if (e.key === "ArrowDown" || key === "j") { e.preventDefault(); moveActive(1, items); }
+  else if (e.key === "ArrowUp" || key === "k") { e.preventDefault(); moveActive(-1, items); }
+  else if (e.key === "Enter" && state.activeIndex >= 0) { const b = items[state.activeIndex]; if (b) openBookmark(b); }
+  else if (key === "e" && state.activeIndex >= 0) { const b = items[state.activeIndex]; if (b) { state.selectedBookmarkId = b.id; showPreview(b); renderBookmarks(); } }
+  else if (key === "s" && state.activeIndex >= 0) { const b = items[state.activeIndex]; if (b) quickStar(b); }
+  else if (key === "x" && state.activeIndex >= 0) { const b = items[state.activeIndex]; if (b) { if (!state.selectionMode) toggleSelectionMode(true); toggleSelect(b.id); } }
+}
+
+function moveActive(delta, items) {
+  if (!items.length) return;
+  const base = state.activeIndex < 0 ? (delta > 0 ? -1 : 0) : state.activeIndex;
+  state.activeIndex = Math.max(0, Math.min(items.length - 1, base + delta));
+  applyActiveHighlight(items);
+}
+
+function applyActiveHighlight(items) {
+  el.list.querySelectorAll(".bookmark-item.is-key-active").forEach((n) => n.classList.remove("is-key-active"));
+  const b = items[state.activeIndex];
+  if (!b) return;
+  const node = el.list.querySelector(`.bookmark-item[data-id="${cssEscape(b.id)}"]`);
+  if (node) { node.classList.add("is-key-active"); node.scrollIntoView({ block: "nearest" }); }
+}
+
+async function quickStar(b) {
+  const starred = await toggleStar(b.id);
+  b.starred = starred;
+  renderBookmarks();
+}
+
+function cssEscape(value) {
+  return (window.CSS && CSS.escape) ? CSS.escape(value) : String(value).replace(/"/g, '\\"');
 }
 
 async function handleListChange(e) {

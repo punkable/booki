@@ -129,18 +129,43 @@
       </section>
 
       <section class="view-panel" data-panel="library" aria-label="Bookmark library">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;min-height:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;min-height:0;gap:8px;">
           <span id="folderFilterBadge" style="font-size:12px;color:var(--muted);"></span>
-          <button class="ghost-button" id="clearFolderFilter" type="button" hidden style="font-size:12px;min-height:auto;padding:2px 8px;">
-            <span class="svg-icon" data-icon="folder" style="width:14px;height:14px;" aria-hidden="true"></span>
-            All folders
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="ghost-button" id="clearFolderFilter" type="button" hidden style="font-size:12px;min-height:auto;padding:2px 8px;">
+              <span class="svg-icon" data-icon="folder" style="width:14px;height:14px;" aria-hidden="true"></span>
+              All folders
+            </button>
+            <button class="ghost-button" id="selectModeToggle" type="button" aria-pressed="false" style="font-size:12px;min-height:auto;padding:2px 8px;" data-i18n="bulk.select" title="Select multiple">
+              <span class="svg-icon" data-icon="check" style="width:14px;height:14px;" aria-hidden="true"></span>
+              Select
+            </button>
+          </div>
         </div>
         <div id="emptyState" class="empty-state" hidden>
           <span class="svg-icon" data-icon="bookmark" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span>
           <p>No bookmarks yet. Save your first page!</p>
         </div>
         <div id="bookmarkList" class="bookmark-list" aria-live="polite"></div>
+
+        <div id="bulkBar" class="bulk-bar" hidden role="toolbar" aria-label="Bulk actions">
+          <span class="bulk-count"><strong id="bulkCount">0</strong> <span data-i18n="bulk.selected">selected</span></span>
+          <div class="bulk-actions">
+            <button class="ghost-button" type="button" data-bulk="star" title="Star/unstar">
+              <span class="svg-icon" data-icon="star" style="width:14px;height:14px;" aria-hidden="true"></span>
+            </button>
+            <button class="ghost-button" type="button" data-bulk="tag" title="Add tags">
+              <span class="svg-icon" data-icon="tag" style="width:14px;height:14px;" aria-hidden="true"></span>
+            </button>
+            <select id="bulkMoveSelect" title="Move to folder" aria-label="Move to folder">
+              <option value="" data-i18n="bulk.move">Move to…</option>
+            </select>
+            <button class="ghost-button bulk-danger" type="button" data-bulk="delete" title="Delete selected">
+              <span class="svg-icon" data-icon="trash" style="width:14px;height:14px;" aria-hidden="true"></span>
+            </button>
+            <button class="primary-button" type="button" data-bulk="done" style="min-height:auto;padding:4px 12px;" data-i18n="bulk.done">Done</button>
+          </div>
+        </div>
       </section>
 
       <section class="folder-section view-panel" data-panel="folders" aria-label="Bookmark folders" hidden>
