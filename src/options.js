@@ -25,7 +25,62 @@ async function refreshUI() {
   bindFolderColors(settings);
   bindSync();
   bindAutoBackup(settings);
+  bindGist();
   bindReset(settings);
+}
+
+function bindGist() {
+  const tokenInput = document.getElementById("githubToken");
+  const gistIdInput = document.getElementById("githubGistId");
+  const saveBtn = document.getElementById("saveGistButton");
+  const pushBtn = document.getElementById("gistPushButton");
+  const pullBtn = document.getElementById("gistPullButton");
+  if (!saveBtn || saveBtn.dataset.bound) return;
+  saveBtn.dataset.bound = "1";
+
+  renderGistStatus();
+
+  saveBtn.addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const gistId = gistIdInput.value.trim();
+    const resp = await chrome.runtime.sendMessage({ type: "gist-save", token, gistId });
+    if (resp?.ok) { tokenInput.value = ""; toast(t("toast.saved")); renderGistStatus(); }
+    else toast(resp?.error || "Could not save.", "error");
+  });
+
+  pushBtn.addEventListener("click", async () => {
+    pushBtn.disabled = true;
+    try {
+      const resp = await chrome.runtime.sendMessage({ type: "gist-push" });
+      if (resp?.ok) { if (gistIdInput) gistIdInput.value = resp.gistId; toast(t("gist.pushed", "Backup pushed to Gist.")); renderGistStatus(); }
+      else toast(resp?.error || "Push failed.", "error");
+    } finally { pushBtn.disabled = false; }
+  });
+
+  pullBtn.addEventListener("click", async () => {
+    pullBtn.disabled = true;
+    try {
+      const { importMode } = await getSettings();
+      const preview = await chrome.runtime.sendMessage({ type: "gist-pull", mode: importMode, dryRun: true });
+      if (!preview?.ok) { toast(preview?.error || "Pull failed.", "error"); return; }
+      if (!confirm(previewMessage(preview.stats))) return;
+      const resp = await chrome.runtime.sendMessage({ type: "gist-pull", mode: importMode });
+      if (resp?.ok) { toast(summarizeRestore(resp.stats)); refreshUI(); }
+      else toast(resp?.error || "Pull failed.", "error");
+    } finally { pullBtn.disabled = false; }
+  });
+}
+
+async function renderGistStatus() {
+  const status = document.getElementById("gistStatus");
+  const gistIdInput = document.getElementById("githubGistId");
+  if (!status) return;
+  const resp = await chrome.runtime.sendMessage({ type: "gist-status" });
+  if (!resp?.ok) { status.textContent = ""; return; }
+  if (gistIdInput && resp.gistId && !gistIdInput.value) gistIdInput.value = resp.gistId;
+  if (!resp.hasToken) { status.textContent = t("gist.notoken", "No token saved yet."); return; }
+  const when = resp.lastPushAt ? new Date(resp.lastPushAt).toLocaleString() : "never";
+  status.textContent = `${t("gist.connected", "Token saved")} · ${t("gist.lastpush", "last push")}: ${when}`;
 }
 
 async function bindAutoBackup(settings) {

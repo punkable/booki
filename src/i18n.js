@@ -153,7 +153,17 @@ const LOCALES = {
     "bulk.move": "Move to…",
     "bulk.done": "Done",
     "bulk.none": "Select some bookmarks first.",
-    "bulk.tagPrompt": "Add tags (comma separated):"
+    "bulk.tagPrompt": "Add tags (comma separated):",
+    "gist.title": "GitHub Gist (private cloud)",
+    "gist.desc": "Back up to a private GitHub Gist using your own token — works across any browser or account, no app setup. On another device, paste the same token and the Gist ID, then Pull.",
+    "gist.help": "Create a token at github.com/settings/tokens with the “gist” scope.",
+    "gist.save": "Save",
+    "gist.push": "Push to Gist",
+    "gist.pull": "Pull from Gist",
+    "gist.pushed": "Backup pushed to Gist.",
+    "gist.notoken": "No token saved yet.",
+    "gist.connected": "Token saved",
+    "gist.lastpush": "last push"
   },
   es: {
     "app.name": "Booki",
@@ -309,7 +319,17 @@ const LOCALES = {
     "bulk.move": "Mover a…",
     "bulk.done": "Listo",
     "bulk.none": "Selecciona algunos marcadores primero.",
-    "bulk.tagPrompt": "Añadir etiquetas (separadas por comas):"
+    "bulk.tagPrompt": "Añadir etiquetas (separadas por comas):",
+    "gist.title": "GitHub Gist (nube privada)",
+    "gist.desc": "Haz copia en un Gist privado de GitHub con tu propio token — funciona entre cualquier navegador o cuenta, sin configurar apps. En otro dispositivo, pega el mismo token y el ID del Gist, y pulsa Bajar.",
+    "gist.help": "Crea un token en github.com/settings/tokens con el permiso “gist”.",
+    "gist.save": "Guardar",
+    "gist.push": "Subir al Gist",
+    "gist.pull": "Bajar del Gist",
+    "gist.pushed": "Copia subida al Gist.",
+    "gist.notoken": "Aún no hay token guardado.",
+    "gist.connected": "Token guardado",
+    "gist.lastpush": "última subida"
   }
 };
 

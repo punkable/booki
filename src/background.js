@@ -551,6 +551,80 @@ async function sha256Hex(value) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* ─── GitHub Gist sync (private, per-user token — no app verification) ─── */
+
+const GIST_FILENAME = "booki-backup.json";
+const GIST_STATE_KEY = "bookiGist";
+
+async function getGistConfig() {
+  const result = await chrome.storage.local.get({ [GIST_STATE_KEY]: {} });
+  return result[GIST_STATE_KEY] || {};
+}
+
+async function setGistConfig(patch) {
+  const current = await getGistConfig();
+  const next = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) next[key] = value;
+  }
+  await chrome.storage.local.set({ [GIST_STATE_KEY]: next });
+  return next;
+}
+
+function gistHeaders(token) {
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json"
+  };
+}
+
+async function gistError(res) {
+  if (res.status === 401) return "Invalid GitHub token (it needs the 'gist' scope).";
+  if (res.status === 403) return "GitHub denied the request (rate limit or missing 'gist' scope).";
+  if (res.status === 404) return "Gist not found. Check the Gist ID.";
+  let detail = "";
+  try { detail = (await res.json())?.message || ""; } catch {}
+  return `GitHub error ${res.status}${detail ? ": " + detail : ""}.`;
+}
+
+export async function gistPush() {
+  const { token, gistId } = await getGistConfig();
+  if (!token) throw new Error("Add a GitHub token first.");
+  const { json } = await exportSyncFile();
+  const body = JSON.stringify({
+    description: "Booki bookmarks backup",
+    public: false,
+    files: { [GIST_FILENAME]: { content: json } }
+  });
+  const target = gistId ? `https://api.github.com/gists/${gistId}` : "https://api.github.com/gists";
+  let res = await fetch(target, { method: gistId ? "PATCH" : "POST", headers: gistHeaders(token), body });
+  if (res.status === 404 && gistId) {
+    /* the saved gist was deleted remotely — create a fresh one */
+    res = await fetch("https://api.github.com/gists", { method: "POST", headers: gistHeaders(token), body });
+  }
+  if (!res.ok) throw new Error(await gistError(res));
+  const data = await res.json();
+  await setGistConfig({ gistId: data.id, lastPushAt: Date.now() });
+  return { gistId: data.id, url: data.html_url };
+}
+
+export async function gistPull(options = {}) {
+  const { token, gistId } = await getGistConfig();
+  if (!token) throw new Error("Add a GitHub token first.");
+  if (!gistId) throw new Error("No Gist linked yet. Push from another device, then paste its Gist ID here.");
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: gistHeaders(token) });
+  if (!res.ok) throw new Error(await gistError(res));
+  const data = await res.json();
+  const file = data.files?.[GIST_FILENAME];
+  if (!file) throw new Error("This Gist has no Booki backup file.");
+  let content = file.content;
+  if (file.truncated && file.raw_url) content = await (await fetch(file.raw_url)).text();
+  const payload = JSON.parse(content);
+  return restoreFromPayload(payload, options);
+}
+
 /* ─── Dead link badge ─── */
 
 async function updateDeadLinkBadge() {
@@ -610,7 +684,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "restore-from-file") {
-    restoreFromPayload(message.payload, { mode: message.mode }).then((stats) => sendResponse({ ok: true, stats })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    restoreFromPayload(message.payload, { mode: message.mode, dryRun: message.dryRun }).then((stats) => sendResponse({ ok: true, stats })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  if (message?.type === "gist-status") {
+    getGistConfig().then((c) => sendResponse({ ok: true, hasToken: !!c.token, gistId: c.gistId || "", lastPushAt: c.lastPushAt || 0 })).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+
+  if (message?.type === "gist-save") {
+    setGistConfig({ token: message.token, gistId: message.gistId }).then(() => sendResponse({ ok: true })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  if (message?.type === "gist-push") {
+    gistPush().then((r) => sendResponse({ ok: true, ...r })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    return true;
+  }
+
+  if (message?.type === "gist-pull") {
+    gistPull({ mode: message.mode, dryRun: message.dryRun }).then((stats) => sendResponse({ ok: true, stats })).catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 

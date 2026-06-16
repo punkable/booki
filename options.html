@@ -393,6 +393,31 @@
             <small id="syncStatus" style="display:block;margin-top:4px;color:var(--muted);font-size:12px;"></small>
           </div>
 
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
+              <h2 data-i18n="gist.title">GitHub Gist (private cloud)</h2>
+            </div>
+            <p class="opt-desc" data-i18n="gist.desc">Back up to a private GitHub Gist using your own token — works across any browser or account, no app setup. On another device, paste the same token and the Gist ID, then Pull.</p>
+            <p class="opt-note"><span data-i18n="gist.help">Create a token at github.com/settings/tokens with the “gist” scope.</span></p>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <input id="githubToken" type="password" placeholder="GitHub token (gist scope)" autocomplete="off" style="flex:1;min-width:160px;">
+              <input id="githubGistId" type="text" placeholder="Gist ID (optional)" autocomplete="off" style="flex:1;min-width:120px;">
+              <button class="secondary-button" id="saveGistButton" type="button" data-i18n="gist.save">Save</button>
+            </div>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="primary-button" id="gistPushButton" type="button">
+                <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
+                <span data-i18n="gist.push">Push to Gist</span>
+              </button>
+              <button class="secondary-button" id="gistPullButton" type="button">
+                <span class="svg-icon" data-icon="import" aria-hidden="true"></span>
+                <span data-i18n="gist.pull">Pull from Gist</span>
+              </button>
+            </div>
+            <small id="gistStatus" style="display:block;margin-top:4px;color:var(--muted);font-size:12px;"></small>
+          </div>
+
           <div class="opt-card opt-card-danger">
             <div class="opt-card-header">
               <span class="svg-icon" data-icon="trash" aria-hidden="true" style="color:var(--danger);"></span>
