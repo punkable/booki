@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Booki</title>
+    <link rel="stylesheet" href="src/styles.css">
+  </head>
+  <body class="panel-shell">
+    <main class="studio" aria-label="Booki manager">
+      <header class="studio-header">
+        <div class="brand">
+          <picture>
+            <source srcset="media/SVG/logowhite.svg" media="(prefers-color-scheme: dark)">
+            <img class="brand-wordmark" src="media/SVG/logo.svg" alt="Booki">
+          </picture>
+          <span id="bookmarkBadge" style="color:var(--muted);font-weight:400;font-size:14px;"></span>
+        </div>
+        <div class="studio-header-actions">
+          <button class="icon-button" id="composerToggle" type="button" title="Add bookmark" aria-label="Add bookmark">
+            <span class="svg-icon" data-icon="plus" aria-hidden="true"></span>
+          </button>
+          <button class="icon-button" id="refreshButton" type="button" title="Refresh" aria-label="Refresh">
+            <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <section id="onboardingCard" class="onboarding-card" hidden>
+        <picture>
+          <source srcset="media/SVG/isotypewhite.svg" media="(prefers-color-scheme: dark)">
+          <img src="media/SVG/isotype.svg" alt="" aria-hidden="true">
+        </picture>
+        <div class="onboarding-copy">
+          <strong>Your bookmarks are ready when Chrome is.</strong>
+          <span>Refresh to read browser bookmarks, import an export file, or start with a new save.</span>
+        </div>
+        <div class="onboarding-actions">
+          <button class="secondary-button" id="onboardingRefresh" type="button">
+            <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+            Refresh
+          </button>
+          <button class="primary-button" id="onboardingImport" type="button">
+            <span class="svg-icon" data-icon="import" aria-hidden="true"></span>
+            Import
+          </button>
+        </div>
+      </section>
+
+      <section class="command-bar" aria-label="Search and filters">
+        <label class="search-field" for="searchInput">
+          <span class="svg-icon" data-icon="search" aria-hidden="true" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);"></span>
+          <input id="searchInput" type="search" placeholder="Search bookmarks…" style="padding-left:36px;">
+        </label>
+        <div class="segmented" role="tablist" aria-label="Filters">
+          <button class="segment is-active" type="button" data-filter="all" aria-pressed="true">
+            <span class="svg-icon segment-icon" data-icon="bookmark" aria-hidden="true"></span>
+            <span class="segment-label">All</span>
+            <span class="segment-count" data-count-for="all">0</span>
+          </button>
+          <button class="segment" type="button" data-filter="starred" aria-pressed="false">
+            <span class="svg-icon segment-icon" data-icon="star" aria-hidden="true"></span>
+            <span class="segment-label">Starred</span>
+            <span class="segment-count" data-count-for="starred">0</span>
+          </button>
+          <button class="segment" type="button" data-filter="recent" aria-pressed="false">
+            <span class="svg-icon segment-icon" data-icon="refresh" aria-hidden="true"></span>
+            <span class="segment-label">Recent</span>
+            <span class="segment-count" data-count-for="recent">0</span>
+          </button>
+        </div>
+      </section>
+
+      <nav class="view-tabs" aria-label="Views">
+        <button class="view-tab is-active" type="button" data-view="library">
+          <span class="svg-icon" data-icon="bookmark" aria-hidden="true"></span>
+          <span>Library</span>
+        </button>
+        <button class="view-tab" type="button" data-view="folders">
+          <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+          <span>Folders</span>
+        </button>
+        <button class="view-tab" type="button" data-view="organize">
+          <span class="svg-icon" data-icon="wand" aria-hidden="true"></span>
+          <span>Organize</span>
+        </button>
+        <button class="view-tab" type="button" data-view="tools">
+          <span class="svg-icon" data-icon="wrench" aria-hidden="true"></span>
+          <span>Tools</span>
+        </button>
+      </nav>
+
+      <section class="composer view-panel" data-panel="library" id="composerPanel" hidden>
+        <div class="composer-title">
+          <h2>
+            <span class="svg-icon" data-icon="plus" style="vertical-align:text-bottom;" aria-hidden="true"></span>
+            New bookmark
+          </h2>
+          <button class="icon-button" id="fillCurrentTab" type="button" title="Fill current tab" aria-label="Fill current tab">
+            <span class="svg-icon" data-icon="external" aria-hidden="true"></span>
+          </button>
+        </div>
+        <form id="bookmarkForm" class="bookmark-form">
+          <label>
+            <span class="svg-icon" data-icon="edit" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
+            Title
+            <input id="titleInput" name="title" type="text" required placeholder="Article or tool name">
+          </label>
+          <label>
+            <span class="svg-icon" data-icon="external" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
+            URL
+            <input id="urlInput" name="url" type="url" required placeholder="https://example.com">
+          </label>
+          <label>
+            <span class="svg-icon" data-icon="folder" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
+            Folder
+            <select id="folderSelect" name="folder"></select>
+          </label>
+          <label>
+            <span class="svg-icon" data-icon="tag" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
+            Tags
+            <input id="tagsInput" name="tags" type="text" placeholder="design, dev, inspiration">
+          </label>
+          <button class="primary-button wide" type="submit">
+            <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+            Save bookmark
+          </button>
+        </form>
+      </section>
+
+      <section class="view-panel" data-panel="library" aria-label="Bookmark library">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;min-height:0;">
+          <span id="folderFilterBadge" style="font-size:12px;color:var(--muted);"></span>
+          <button class="ghost-button" id="clearFolderFilter" type="button" hidden style="font-size:12px;min-height:auto;padding:2px 8px;">
+            <span class="svg-icon" data-icon="folder" style="width:14px;height:14px;" aria-hidden="true"></span>
+            All folders
+          </button>
+        </div>
+        <div id="emptyState" class="empty-state" hidden>
+          <span class="svg-icon" data-icon="bookmark" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span>
+          <p>No bookmarks yet. Save your first page!</p>
+        </div>
+        <div id="bookmarkList" class="bookmark-list" aria-live="polite"></div>
+      </section>
+
+      <section class="folder-section view-panel" data-panel="folders" aria-label="Bookmark folders" hidden>
+        <div class="section-head">
+          <h2>
+            <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+            Folders
+          </h2>
+          <button class="ghost-button" id="newFolderButton" type="button">
+            <span class="svg-icon" data-icon="plus" aria-hidden="true"></span>
+            New folder
+          </button>
+        </div>
+        <div id="folderList" class="folder-list" aria-label="Drop bookmarks onto a folder"></div>
+      </section>
+
+      <section class="view-panel" data-panel="organize" aria-label="Auto organization" hidden>
+        <div class="section-head" style="margin-bottom:8px;">
+          <div>
+            <h2>
+              <span class="svg-icon" data-icon="wand" aria-hidden="true"></span>
+              Auto organize
+            </h2>
+            <p style="margin:2px 0 0;color:var(--muted);font-size:12px;">Categorize bookmarks by content and move to matching folders.</p>
+          </div>
+          <button class="primary-button" id="analyzeButton" type="button">
+            <span class="svg-icon" data-icon="wand" aria-hidden="true"></span>
+            Analyze
+          </button>
+        </div>
+        <div id="categoryGrid" class="category-grid"></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <button class="secondary-button" id="previewOrganizeButton" type="button" style="flex:1;">
+            <span class="svg-icon" data-icon="bookmark" aria-hidden="true"></span>
+            Preview
+          </button>
+          <button class="primary-button" id="applyOrganizeButton" type="button" disabled style="flex:1;">
+            <span class="svg-icon" data-icon="check" aria-hidden="true"></span>
+            Apply
+          </button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <button class="small-button" id="findDupesButton" type="button" style="flex:1;">
+            <span class="svg-icon" data-icon="copy" aria-hidden="true"></span>
+            Find duplicates
+          </button>
+          <button class="small-button" id="checkDeadButton" type="button" style="flex:1;">
+            <span class="svg-icon" data-icon="alert-circle" aria-hidden="true"></span>
+            Check dead links
+          </button>
+        </div>
+        <div id="organizePreview" style="display:grid;gap:6px;" aria-live="polite"></div>
+      </section>
+
+      <section class="view-panel" data-panel="tools" aria-label="Import, export and sync" hidden>
+        <div class="section-head" style="margin-bottom:8px;">
+          <div>
+            <h2>
+              <span class="svg-icon" data-icon="wrench" aria-hidden="true"></span>
+              Tools
+            </h2>
+            <p style="margin:2px 0 0;color:var(--muted);font-size:12px;">Import, export, and sync across devices.</p>
+          </div>
+        </div>
+
+        <div class="step-wizard">
+          <div class="step-track">
+            <span class="step-dot is-active" data-step="0">
+              <span class="svg-icon" data-icon="export" style="width:12px;height:12px;vertical-align:text-bottom;" aria-hidden="true"></span>
+              Export
+            </span>
+            <span class="step-dot" data-step="1">
+              <span class="svg-icon" data-icon="copy" style="width:12px;height:12px;vertical-align:text-bottom;" aria-hidden="true"></span>
+              Code
+            </span>
+            <span class="step-dot" data-step="2">
+              <span class="svg-icon" data-icon="cloud" style="width:12px;height:12px;vertical-align:text-bottom;" aria-hidden="true"></span>
+              Cloud
+            </span>
+          </div>
+
+          <!-- Step 0: Export/Import -->
+          <div class="step-panel" data-step="0">
+            <div class="sync-section">
+              <div style="display:flex;gap:8px;">
+                <button class="secondary-button" id="exportJsonButton" type="button" style="flex:1;">
+                  <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+                  Export JSON
+                </button>
+                <button class="secondary-button" id="exportHtmlButton" type="button" style="flex:1;">
+                  <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
+                  Export HTML
+                </button>
+              </div>
+              <p id="importSummary" style="min-height:16px;margin:0;color:var(--muted);font-size:12px;" aria-live="polite"></p>
+            </div>
+
+            <div id="dropZone" class="drop-zone" style="margin-bottom:8px;">
+              <span class="svg-icon" data-icon="import" style="width:24px;height:24px;color:var(--muted);" aria-hidden="true"></span>
+              <strong style="color:var(--ink);font-size:13px;">Drop exported bookmarks here</strong>
+              <small style="font-size:11px;">Folders and tags are preserved.</small>
+            </div>
+
+            <label class="primary-button" for="importFile" style="display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:var(--radius-full);cursor:pointer;width:auto;">
+              <span class="svg-icon" data-icon="import" aria-hidden="true"></span>
+              Import file
+            </label>
+            <input id="importFile" class="visually-hidden" type="file" accept=".json,.html,.htm,text/html,application/json">
+          </div>
+
+          <!-- Step 1: Sync Code -->
+          <div class="step-panel" data-step="1" hidden>
+            <div class="sync-section">
+              <p style="margin:0;font-size:12px;color:var(--muted);">Generate a metadata code, then enter it on your other device (same Google account).</p>
+              <div class="sync-section-row">
+                <button class="secondary-button" id="generateSyncCode" type="button">
+                  <span class="svg-icon" data-icon="copy" aria-hidden="true"></span>
+                  Generate code
+                </button>
+                <button class="secondary-button" id="pushSyncButton" type="button">
+                  <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
+                  Push to cloud
+                </button>
+              </div>
+              <div class="sync-code-box">
+                <input id="syncCodeInput" type="text" readonly placeholder="····· ·····" style="flex:1;text-align:center;font-size:18px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;min-height:44px;">
+                <button class="icon-button" id="copySyncCode" type="button" title="Copy code" aria-label="Copy sync code">
+                  <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <input id="restoreSyncCode" type="text" placeholder="Enter code to apply..." style="flex:1;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
+                <button class="primary-button" id="restoreFromCode" type="button">
+                  <span class="svg-icon" data-icon="check" aria-hidden="true"></span>
+                  Apply
+                </button>
+              </div>
+              <div id="qrContainer"></div>
+              <p id="syncSummary" style="min-height:16px;margin:0;color:var(--muted);font-size:12px;" aria-live="polite"></p>
+            </div>
+          </div>
+
+          <!-- Step 2: Cloud sync -->
+          <div class="step-panel" data-step="2" hidden>
+            <div class="sync-section">
+              <p style="margin:0;font-size:12px;color:var(--muted);">Sync settings, tags, stars, categories, and folder styles via your Google account.</p>
+              <div class="sync-section-row">
+                <button class="secondary-button" id="pushSyncButton2" type="button">
+                  <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
+                  Push
+                </button>
+                <button class="secondary-button" id="pullSyncButton" type="button">
+                  <span class="svg-icon" data-icon="sync" aria-hidden="true"></span>
+                  Pull
+                </button>
+              </div>
+              <p id="cloudSyncSummary" style="min-height:16px;margin:0;color:var(--muted);font-size:12px;" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Preview overlay (within library) -->
+      <section id="previewPanel" hidden>
+        <div class="preview-header">
+          <div class="preview-favicon-area">
+            <img id="previewFavicon" src="" alt="">
+            <div class="preview-meta">
+              <h3 id="previewTitle"></h3>
+              <a id="previewUrl" href="#" target="_blank"></a>
+              <div class="preview-tags-row">
+                <span id="previewDomain"></span>
+                <span class="dot">·</span>
+                <span id="previewFolder"></span>
+                <span class="dot">·</span>
+                <span id="previewDate"></span>
+                <span class="dot">·</span>
+                <span id="previewHealth"></span>
+                <span id="previewDead" hidden>Dead link</span>
+              </div>
+            </div>
+          </div>
+          <button class="icon-button" id="previewClose" type="button" title="Close" aria-label="Close">
+            <span class="svg-icon" data-icon="x" aria-hidden="true"></span>
+          </button>
+        </div>
+        <label class="preview-tags-label">
+          <span>Tags</span>
+          <input id="previewTags" type="text" placeholder="tag1, tag2, tag3">
+        </label>
+        <label class="preview-tags-label">
+          <span>Move to folder</span>
+          <select id="previewFolderMove"></select>
+        </label>
+        <div class="preview-actions">
+          <button class="secondary-button" type="button" data-action="open"><span class="svg-icon" data-icon="external" aria-hidden="true"></span> Open</button>
+          <button class="secondary-button" type="button" data-action="star"><span class="svg-icon" data-icon="star" aria-hidden="true"></span> Star</button>
+          <button class="secondary-button" type="button" data-action="auto-tag"><span class="svg-icon" data-icon="tag" aria-hidden="true"></span> Tag</button>
+          <button class="secondary-button" type="button" data-action="capture"><span class="svg-icon" data-icon="download" aria-hidden="true"></span> Get</button>
+          <button class="secondary-button" type="button" data-action="reader"><span class="svg-icon" data-icon="bookmark" aria-hidden="true"></span> Read</button>
+          <button class="secondary-button" type="button" data-action="edit"><span class="svg-icon" data-icon="edit" aria-hidden="true"></span> Edit</button>
+          <button class="secondary-button" type="button" data-action="delete"><span class="svg-icon" data-icon="trash" aria-hidden="true"></span> Del</button>
+        </div>
+      </section>
+
+      <!-- Reader overlay (within library) -->
+      <section id="readerPanel" hidden>
+        <div class="reader-header">
+          <h3 id="readerTitle"></h3>
+          <button class="icon-button" id="readerClose" type="button" title="Close reader" aria-label="Close reader">
+            <span class="svg-icon" data-icon="x" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="readerBody"></div>
+      </section>
+
+      <dialog id="folderDialog" class="dialog">
+        <form method="dialog" id="folderForm">
+          <h2>
+            <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+            New folder
+          </h2>
+          <label>
+            Folder name
+            <input id="folderNameInput" type="text" required placeholder="Reading queue">
+          </label>
+          <div class="dialog-actions">
+            <button class="ghost-button" value="cancel" type="button" id="cancelFolder">Cancel</button>
+            <button class="primary-button" value="default" type="submit">Create</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="editFolderDialog" class="dialog">
+        <form method="dialog" id="editFolderForm">
+          <h2>
+            <span class="svg-icon" data-icon="edit" aria-hidden="true"></span>
+            Edit folder
+          </h2>
+          <label>
+            Folder name
+            <input id="editFolderNameInput" type="text" required placeholder="Research">
+          </label>
+          <div class="dialog-actions">
+            <button class="ghost-button" value="cancel" type="button" id="cancelEditFolder">Cancel</button>
+            <button class="primary-button" value="default" type="submit">Save</button>
+          </div>
+        </form>
+      </dialog>
+
+      <div id="folderStylePopover" class="folder-style-popover" hidden></div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </main>
+    <script type="module" src="src/sidepanel.js"></script>
+  </body>
+</html>
