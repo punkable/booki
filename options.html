@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title data-i18n="settings.title">Booki Settings</title>
+    <link rel="stylesheet" href="src/styles.css">
+  </head>
+  <body class="options-shell">
+    <main class="options-page">
+      <header class="options-header">
+        <div class="options-brand">
+          <span class="svg-icon" data-icon="bookmark" style="width:28px;height:28px;color:var(--blaze-orange);" aria-hidden="true"></span>
+          <div>
+            <h1 class="gradient-text" data-i18n="settings.title">Booki Settings</h1>
+            <p data-i18n="settings.desc">Tune your bookmark workflow.</p>
+          </div>
+        </div>
+        <label class="options-search">
+          <span class="svg-icon" data-icon="search" aria-hidden="true"></span>
+          <input id="settingsSearch" type="search" placeholder="Search settings…" autocomplete="off">
+        </label>
+      </header>
+
+      <nav class="options-nav" role="tablist" aria-label="Settings categories">
+        <button class="opt-tab is-active" data-tab="appearance" role="tab" aria-selected="true">
+          <span class="svg-icon" data-icon="palette" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.appearance">Appearance</span>
+        </button>
+        <button class="opt-tab" data-tab="behavior" role="tab" aria-selected="false">
+          <span class="svg-icon" data-icon="settings" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.behavior">Behavior</span>
+        </button>
+        <button class="opt-tab" data-tab="search" role="tab" aria-selected="false">
+          <span class="svg-icon" data-icon="search" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.search">Search & Tags</span>
+        </button>
+        <button class="opt-tab" data-tab="folders" role="tab" aria-selected="false">
+          <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.folders">Folders</span>
+        </button>
+        <button class="opt-tab" data-tab="sync" role="tab" aria-selected="false">
+          <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.sync">Data & Sync</span>
+        </button>
+        <button class="opt-tab" data-tab="language" role="tab" aria-selected="false">
+          <span class="svg-icon" data-icon="globe" aria-hidden="true"></span>
+          <span data-i18n="settings.tab.language">Language</span>
+        </button>
+      </nav>
+
+      <div class="options-content">
+        <!-- ─── APPEARANCE ─── -->
+        <section class="opt-panel is-active" data-panel="appearance" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="palette" aria-hidden="true"></span>
+              <h2 data-i18n="settings.accentColor">Accent Color</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.accentColor.desc">Override the section-based accent color with a single global hue.</p>
+            <div class="color-swatches" id="accentSwatches">
+              <label class="swatch is-active" data-color="auto" style="--swatch:var(--accent,var(--blaze-orange));background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);" tabindex="0" role="radio" aria-checked="true">
+                <span class="swatch-label" data-i18n="settings.accentColor.auto">Auto</span>
+              </label>
+              <label class="swatch" data-color="amber" style="--swatch:#ffbe0b;background:#ffbe0b;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Amber Gold</span>
+              </label>
+              <label class="swatch" data-color="blaze" style="--swatch:#fb5607;background:#fb5607;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Blaze Orange</span>
+              </label>
+              <label class="swatch" data-color="pink" style="--swatch:#ff006e;background:#ff006e;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Neon Pink</span>
+              </label>
+              <label class="swatch" data-color="violet" style="--swatch:#8338ec;background:#8338ec;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Blue Violet</span>
+              </label>
+              <label class="swatch" data-color="blue" style="--swatch:#3a86ff;background:#3a86ff;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Azure Blue</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="tab" aria-hidden="true"></span>
+              <h2 data-i18n="settings.display">Display</h2>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="tab" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.compactView">Compact list</strong>
+                  <small data-i18n="settings.compactView.desc">Denser bookmark list with smaller items.</small>
+                </span>
+                <input id="compactView" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="heart" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.showHealthBadges">Health badges</strong>
+                  <small data-i18n="settings.showHealthBadges.desc">Show health score badges in the bookmark list.</small>
+                </span>
+                <input id="showHealthBadges" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="alert-circle" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.deadLinkBadge">Dead link badge</strong>
+                  <small data-i18n="settings.deadLinkBadge.desc">Show dead link count on the extension icon.</small>
+                </span>
+                <input id="deadLinkBadge" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+          </div>
+
+          <div class="opt-preview" id="previewPane">
+            <div class="opt-preview-header">
+              <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
+              <span data-i18n="settings.preview">Live preview</span>
+            </div>
+            <div class="opt-preview-body">
+              <div class="preview-bookmark">
+                <img src="chrome://favicon/size/16@1x/https://example.com" alt="" class="preview-favicon">
+                <div class="preview-info">
+                  <span class="preview-title">Example Design Article</span>
+                  <span class="preview-url">example.com</span>
+                </div>
+                <span class="preview-health preview-health-great">85</span>
+              </div>
+              <div class="preview-bookmark">
+                <img src="chrome://favicon/size/16@1x/https://docs.google.com" alt="" class="preview-favicon">
+                <div class="preview-info">
+                  <span class="preview-title">Google Docs - Document</span>
+                  <span class="preview-url">docs.google.com</span>
+                </div>
+                <span class="preview-health preview-health-ok">62</span>
+              </div>
+              <div class="preview-bookmark">
+                <img src="chrome://favicon/size/16@1x/https://example.org" alt="" class="preview-favicon">
+                <div class="preview-info">
+                  <span class="preview-title">Old Blog Post</span>
+                  <span class="preview-url">example.org</span>
+                </div>
+                <span class="preview-dot"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── BEHAVIOR ─── -->
+        <section class="opt-panel" data-panel="behavior" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="tab" aria-hidden="true"></span>
+              <h2 data-i18n="settings.defaultView">Default view</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.defaultView.desc">Which tab to show when opening the manager.</p>
+            <div class="view-selector" id="defaultViewSelector">
+              <label class="view-option" data-view="library" tabindex="0" role="radio" aria-checked="false">
+                <span class="svg-icon" data-icon="library" aria-hidden="true"></span>
+                <span data-i18n="nav.library">Library</span>
+              </label>
+              <label class="view-option" data-view="folders" tabindex="0" role="radio" aria-checked="false">
+                <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+                <span data-i18n="nav.folders">Folders</span>
+              </label>
+              <label class="view-option" data-view="organize" tabindex="0" role="radio" aria-checked="false">
+                <span class="svg-icon" data-icon="wand" aria-hidden="true"></span>
+                <span data-i18n="nav.organize">Organize</span>
+              </label>
+              <label class="view-option" data-view="tools" tabindex="0" role="radio" aria-checked="false">
+                <span class="svg-icon" data-icon="wrench" aria-hidden="true"></span>
+                <span data-i18n="nav.tools">Tools</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="settings" aria-hidden="true"></span>
+              <h2 data-i18n="settings.general">General</h2>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="external" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.openInTab">Open in tab</strong>
+                  <small data-i18n="settings.openInTab.desc">Open the full manager in a new tab instead of the sidebar.</small>
+                </span>
+                <input id="openInTab" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="external" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.newtab">Open links in a new tab</strong>
+                  <small data-i18n="settings.newtab.desc">Keep the current page in place when launching bookmarks.</small>
+                </span>
+                <input id="openInNewTab" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="search" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.focus">Auto-focus search</strong>
+                  <small data-i18n="settings.focus.desc">Put the cursor in search when the manager opens.</small>
+                </span>
+                <input id="focusSearch" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.rememberView">Remember last view</strong>
+                  <small data-i18n="settings.rememberView.desc">Restore the last active tab when opening.</small>
+                </span>
+                <input id="rememberView" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="trash" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.confirmDelete">Confirm before delete</strong>
+                  <small data-i18n="settings.confirmDelete.desc">Ask for confirmation before deleting bookmarks.</small>
+                </span>
+                <input id="confirmDelete" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── SEARCH & TAGS ─── -->
+        <section class="opt-panel" data-panel="search" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="search" aria-hidden="true"></span>
+              <h2 data-i18n="settings.searchScope">Search scope</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.searchScope.desc">Which fields to search when filtering bookmarks.</p>
+            <div class="chip-selector" id="searchScopeSelector">
+              <label class="chip" data-value="all" tabindex="0" role="radio" aria-checked="false">
+                <span data-i18n="settings.searchScope.all">Title + URL + Tags</span>
+              </label>
+              <label class="chip" data-value="title" tabindex="0" role="radio" aria-checked="false">
+                <span data-i18n="settings.searchScope.title">Title only</span>
+              </label>
+              <label class="chip" data-value="url" tabindex="0" role="radio" aria-checked="false">
+                <span data-i18n="settings.searchScope.url">URL only</span>
+              </label>
+              <label class="chip" data-value="tags" tabindex="0" role="radio" aria-checked="false">
+                <span data-i18n="settings.searchScope.tags">Tags only</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
+              <h2 data-i18n="settings.autoTag">Auto-tagging</h2>
+            </div>
+            <div class="opt-row">
+              <label class="opt-toggle">
+                <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
+                <span class="opt-toggle-info">
+                  <strong data-i18n="settings.autoTagOnSave">Auto-tag on save</strong>
+                  <small data-i18n="settings.autoTagOnSave.desc">Automatically suggest tags when saving a bookmark.</small>
+                </span>
+                <input id="autoTagOnSave" type="checkbox" role="switch" class="switch">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── FOLDERS ─── -->
+        <section class="opt-panel" data-panel="folders" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+              <h2 data-i18n="folders.title">Folder Colors</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.folders.desc">Assign colors to folders for quick visual identification.</p>
+            <div id="folderColorList" class="folder-color-list">
+              <div class="folder-color-empty" data-i18n="settings.folders.loading">Loading folders…</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── DATA & SYNC ─── -->
+        <section class="opt-panel" data-panel="sync" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
+              <h2 data-i18n="tools.title">Import / Export</h2>
+            </div>
+            <div class="opt-row">
+              <div class="drop-zone" id="importDropZone">
+                <span class="svg-icon" data-icon="download" style="width:32px;height:32px;color:var(--muted);" aria-hidden="true"></span>
+                <p data-i18n="tools.import.drop">Drop exported bookmarks here</p>
+                <small data-i18n="tools.import.preserved">Folders and tags are preserved.</small>
+                <input type="file" id="importFileInput" accept=".json,.html" hidden>
+                <button class="secondary-button" id="importFileButton" type="button" style="margin-top:8px;">
+                  <span class="svg-icon" data-icon="download" aria-hidden="true"></span>
+                  <span data-i18n="tools.import.file">Import file</span>
+                </button>
+              </div>
+            </div>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="secondary-button" id="exportJsonButton" type="button">
+                <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+                <span data-i18n="tools.export.json">Export JSON</span>
+              </button>
+              <button class="secondary-button" id="exportHtmlButton" type="button">
+                <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+                <span data-i18n="tools.export.html">Export HTML</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+              <h2 data-i18n="tools.code.desc">Sync Code</h2>
+            </div>
+            <p class="opt-desc">Generate a code to sync metadata (tags, stars) between devices on the same Google account.</p>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="secondary-button" id="genCodeButton" type="button">
+                <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
+                <span data-i18n="tools.code.generate">Generate code</span>
+              </button>
+              <input id="syncCodeOutput" type="text" readonly placeholder="······" style="flex:1;min-width:120px;text-align:center;font-size:16px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">
+              <button class="icon-button" id="copyCodeButton" type="button" title="Copy" style="width:38px;height:38px;">
+                <span class="svg-icon" data-icon="copy" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+              <input id="restoreCodeInput" type="text" placeholder="Enter code to restore…" style="flex:1;min-width:120px;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
+              <button class="primary-button" id="restoreCodeButton" type="button" style="flex-shrink:0;">
+                <span data-i18n="tools.code.restore">Restore</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
+              <h2 data-i18n="step.cloud">Cloud Sync</h2>
+            </div>
+            <p class="opt-desc" data-i18n="tools.cloud.desc">Sync settings, tags, and stars via your Google account.</p>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="secondary-button" id="pushSyncButton" type="button">
+                <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
+                <span data-i18n="tools.cloud.push">Push</span>
+              </button>
+              <button class="secondary-button" id="pullSyncButton" type="button">
+                <span class="svg-icon" data-icon="import" aria-hidden="true"></span>
+                <span data-i18n="tools.cloud.pull">Pull</span>
+              </button>
+            </div>
+            <small id="syncStatus" style="display:block;margin-top:4px;color:var(--muted);font-size:12px;"></small>
+          </div>
+
+          <div class="opt-card opt-card-danger">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="trash" aria-hidden="true" style="color:var(--danger);"></span>
+              <h2 style="color:var(--danger);" data-i18n="settings.danger">Danger Zone</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.reset.desc">Reset all settings to their default values. This cannot be undone.</p>
+            <button class="secondary-button" id="resetDefaultsButton" type="button" style="border-color:var(--danger);color:var(--danger);">
+              <span class="svg-icon" data-icon="trash" aria-hidden="true"></span>
+              <span data-i18n="settings.reset">Reset to defaults</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- ─── LANGUAGE ─── -->
+        <section class="opt-panel" data-panel="language" role="tabpanel">
+          <div class="opt-card">
+            <div class="opt-card-header">
+              <span class="svg-icon" data-icon="globe" aria-hidden="true"></span>
+              <h2 data-i18n="settings.language">Language</h2>
+            </div>
+            <p class="opt-desc" data-i18n="settings.language.desc">Interface language (requires reload).</p>
+            <div class="lang-flags" id="langFlags">
+              <label class="lang-card" data-lang="en" tabindex="0" role="radio" aria-checked="false">
+                <span class="lang-flag">🇬🇧</span>
+                <span class="lang-name">English</span>
+                <span class="lang-native">English</span>
+              </label>
+              <label class="lang-card" data-lang="es" tabindex="0" role="radio" aria-checked="false">
+                <span class="lang-flag">🇪🇸</span>
+                <span class="lang-name">Español</span>
+                <span class="lang-native">Spanish</span>
+              </label>
+            </div>
+            <small style="display:block;margin-top:8px;color:var(--muted);font-size:12px;" data-i18n="settings.language.reload">(reload required)</small>
+          </div>
+        </section>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </main>
+    <script type="module" src="src/options.js"></script>
+  </body>
+</html>
