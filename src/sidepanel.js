@@ -5,7 +5,7 @@ import {
   normalizeTags, pullSyncSnapshot, pushSyncSnapshot, removeBookmarkMeta,
   setCategory, setFolderColor, setFolderEmoji, setTags, toast, toggleStar, updateFolder,
   buildTermIndex, suggestTags, findDuplicates, computeHealth,
-  savePageContent, getPageContent
+  savePageContent, getPageContent, parseNetscapeBookmarks
 } from "./shared.js";
 import { detectBrowserLanguage, setLanguage, t } from "./i18n.js";
 
@@ -1149,27 +1149,27 @@ async function importBookmarkFile(file) {
     el.importSummary.textContent = "Reading file...";
     const text = await file.text();
 
-    if (file.name.endsWith(".json")) {
-      const payload = JSON.parse(text);
-      if (payload?.app === "booki") {
-        const mode = state.settings?.importMode || "merge";
-        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode });
-        if (!resp?.ok) throw new Error(resp?.error || "Could not restore from file.");
-        const s = resp.stats || {};
-        const where = s.mode === "booki-folder" ? " · Booki folder" : "";
-        el.importSummary.textContent = `${s.bookmarksCreated ?? 0} imported · ${s.bookmarksSkipped ?? 0} already present${where}`;
-        toast(t("toast.imported"));
-        await loadLibrary();
-        return;
-      }
+    let payload = null;
+    if (file.name.toLowerCase().endsWith(".html") || /<dl/i.test(text)) {
+      payload = parseNetscapeBookmarks(text);
+    } else {
+      const data = JSON.parse(text);
+      if (data?.app === "booki") payload = data;
     }
+    if (!payload) throw new Error("Unrecognized file format.");
 
-    const parsed = parseBookmarkHtml(text);
-    if (!parsed.bookmarks) throw new Error("No bookmarks found.");
-    const destinationId = "1";
-    const existingUrls = new Set(state.bookmarks.map((b) => b.url));
-    const stats = await importNodes(parsed.children, destinationId, existingUrls);
-    el.importSummary.textContent = `${stats.created} imported, ${stats.skipped} duplicates, ${stats.folders} folders.`;
+    const mode = state.settings?.importMode || "merge";
+    const preview = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode, dryRun: true });
+    if (!preview?.ok) throw new Error(preview?.error || "Could not read file.");
+    const ps = preview.stats || {};
+    const where = ps.mode === "booki-folder" ? " inside a “Booki” folder" : "";
+    const ok = confirm(`Import preview:\n\n• ${ps.bookmarksCreated ?? 0} new bookmark(s)${where}\n• ${ps.bookmarksSkipped ?? 0} already present (skipped)\n• ${ps.foldersCreated ?? 0} new folder(s)\n\nApply now?`);
+    if (!ok) { el.importSummary.textContent = ""; return; }
+
+    const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode });
+    if (!resp?.ok) throw new Error(resp?.error || "Could not import.");
+    const s = resp.stats || {};
+    el.importSummary.textContent = `${s.bookmarksCreated ?? 0} imported · ${s.bookmarksSkipped ?? 0} already present`;
     toast(t("toast.imported"));
     await loadLibrary();
   } catch (e) {
@@ -1444,46 +1444,6 @@ function showQRCode(text) {
 
 /* ─── Import helpers ─── */
 
-async function importNodes(nodes, parentId, existingUrls) {
-  const stats = { created: 0, skipped: 0, folders: 0 };
-  for (const node of nodes) {
-    if (node.type === "folder") {
-      const folder = await createFolder(node.title || "Imported folder", parentId);
-      stats.folders += 1;
-      const childStats = await importNodes(node.children, folder.id, existingUrls);
-      stats.created += childStats.created; stats.skipped += childStats.skipped; stats.folders += childStats.folders;
-      continue;
-    }
-    if (existingUrls.has(node.url)) { stats.skipped += 1; continue; }
-    await createBookmark({ title: node.title || node.url, url: node.url, parentId, tags: ["imported"] });
-    existingUrls.add(node.url);
-    stats.created += 1;
-  }
-  return stats;
-}
-
-function parseBookmarkHtml(html) {
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const firstDl = doc.querySelector("dl");
-  return { children: firstDl ? parseBookmarkDl(firstDl) : [], bookmarks: countBookmarkNodes(firstDl ? parseBookmarkDl(firstDl) : []) };
-}
-
-function parseBookmarkDl(dl) {
-  const nodes = [];
-  for (const child of dl.children) {
-    if (child.tagName !== "DT") continue;
-    const a = directChild(child, "A");
-    const href = a?.getAttribute("href")?.trim();
-    if (href) { nodes.push({ type: "bookmark", title: a.textContent.trim() || href, url: href }); continue; }
-    const h3 = directChild(child, "H3");
-    const nested = directChild(child, "DL");
-    if (h3 || nested) nodes.push({ type: "folder", title: h3?.textContent.trim() || "Imported folder", children: nested ? parseBookmarkDl(nested) : [] });
-  }
-  return nodes;
-}
-
-function directChild(el, tag) { return [...el.children].find((c) => c.tagName === tag); }
-function countBookmarkNodes(nodes) { return nodes.reduce((t, n) => n.type === "bookmark" ? t + 1 : t + countBookmarkNodes(n.children), 0); }
 function folderSort(a, b) { return a.folderPath.localeCompare(b.folderPath); }
 function categoryLabel(id) { return CATEGORIES.find((c) => c.id === id)?.label ?? "Unsorted"; }
 function categoryColor(id) { return CATEGORIES.find((c) => c.id === id)?.color ?? "graphite"; }

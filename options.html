@@ -317,6 +317,17 @@
               </button>
             </div>
             <div class="opt-row">
+              <span class="opt-subtle-label" data-i18n="sync.backup.auto">Automatic backup to your Downloads folder</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="autoBackupSelect" style="flex:1;min-width:160px;">
+                  <option value="off" data-i18n="sync.backup.auto.off">Off</option>
+                  <option value="weekly" data-i18n="sync.backup.auto.weekly">Every week</option>
+                  <option value="monthly" data-i18n="sync.backup.auto.monthly">Every month</option>
+                </select>
+              </div>
+              <small id="lastBackupStatus" style="display:block;margin-top:6px;color:var(--muted);font-size:12px;"></small>
+            </div>
+            <div class="opt-row">
               <span class="opt-subtle-label" data-i18n="sync.import.destination">When importing, place bookmarks…</span>
               <div class="segmented import-mode" role="radiogroup">
                 <button class="import-mode-option is-active" type="button" data-mode="merge" role="radio" aria-checked="true" data-i18n="sync.import.merge">In my bookmarks (no duplicates)</button>

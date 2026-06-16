@@ -1,4 +1,4 @@
-import { applyAccentColor, getSettings, saveSettings, toast, getBookmarkTreeData, pushSyncSnapshot, pullSyncSnapshot, injectIcons } from "./shared.js";
+import { applyAccentColor, getSettings, saveSettings, toast, getBookmarkTreeData, pushSyncSnapshot, pullSyncSnapshot, injectIcons, parseNetscapeBookmarks, getBackupState } from "./shared.js";
 import { detectBrowserLanguage, setLanguage, t } from "./i18n.js";
 
 init();
@@ -24,7 +24,37 @@ async function refreshUI() {
   bindSearch();
   bindFolderColors(settings);
   bindSync();
+  bindAutoBackup(settings);
   bindReset(settings);
+}
+
+async function bindAutoBackup(settings) {
+  const select = document.getElementById("autoBackupSelect");
+  if (select) {
+    select.value = settings.autoBackupInterval || "off";
+    if (!select.dataset.bound) {
+      select.dataset.bound = "1";
+      select.addEventListener("change", async () => {
+        await saveSettings({ autoBackupInterval: select.value });
+        toast(t("toast.saved"));
+        renderBackupStatus();
+      });
+    }
+  }
+  renderBackupStatus();
+}
+
+async function renderBackupStatus() {
+  const status = document.getElementById("lastBackupStatus");
+  if (!status) return;
+  const state = await getBackupState();
+  if (!state.lastBackupAt) {
+    status.textContent = t("sync.backup.never", "No automatic backup yet.");
+    return;
+  }
+  const days = Math.floor((Date.now() - state.lastBackupAt) / 86400000);
+  const when = new Date(state.lastBackupAt).toLocaleDateString();
+  status.textContent = `${t("sync.backup.last", "Last auto-backup")}: ${when} (${days}d).`;
 }
 
 function setInitialState(settings) {
@@ -348,24 +378,37 @@ function buildExportHtml(data) {
   return html;
 }
 
-function handleImportFile(file) {
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (data.version && data.app === "booki") {
-        const { importMode } = await getSettings();
-        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload: data, mode: importMode });
-        if (resp?.ok) { toast(summarizeRestore(resp.stats)); refreshUI(); }
-        else toast(resp?.error || "Could not restore from file.", "error");
-      } else {
-        toast("Unrecognized file format.", "error");
-      }
-    } catch {
-      toast("Could not parse file.", "error");
+async function handleImportFile(file) {
+  try {
+    const text = await file.text();
+    let payload = null;
+    if (file.name.toLowerCase().endsWith(".html") || /<dl/i.test(text)) {
+      payload = parseNetscapeBookmarks(text);
+    } else {
+      const data = JSON.parse(text);
+      if (data.version && data.app === "booki") payload = data;
     }
-  };
-  reader.readAsText(file);
+    if (!payload) { toast("Unrecognized file format.", "error"); return; }
+
+    const { importMode } = await getSettings();
+    const preview = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode: importMode, dryRun: true });
+    if (!preview?.ok) { toast(preview?.error || "Could not read file.", "error"); return; }
+    if (!confirm(previewMessage(preview.stats))) return;
+
+    const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode: importMode });
+    if (resp?.ok) { toast(summarizeRestore(resp.stats)); refreshUI(); }
+    else toast(resp?.error || "Could not restore from file.", "error");
+  } catch {
+    toast("Could not parse file.", "error");
+  }
+}
+
+function previewMessage(stats) {
+  const add = stats?.bookmarksCreated ?? 0;
+  const skip = stats?.bookmarksSkipped ?? 0;
+  const folders = stats?.foldersCreated ?? 0;
+  const where = stats?.mode === "booki-folder" ? " inside a “Booki” folder" : "";
+  return `Import preview:\n\n• ${add} new bookmark(s)${where}\n• ${skip} already present (skipped)\n• ${folders} new folder(s)\n\nApply now?`;
 }
 
 function summarizeRestore(stats) {

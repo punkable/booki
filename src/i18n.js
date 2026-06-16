@@ -141,7 +141,13 @@ const LOCALES = {
     "sync.code.desc2": "Generate a short code on one device and enter it on another. Carries your full library when it is small enough; for large libraries use a backup file.",
     "sync.cloud.title": "Cloud auto-sync",
     "sync.cloud.desc2": "Mirrors metadata (tags, stars, categories, folder styles) through your browser account. Your bookmarks themselves must already be synced by the browser. Push from one device, then Pull on another.",
-    "sync.note.account": "⚠️ Works only between devices signed into the same Google account with browser sync on."
+    "sync.note.account": "⚠️ Works only between devices signed into the same Google account with browser sync on.",
+    "sync.backup.auto": "Automatic backup to your Downloads folder",
+    "sync.backup.auto.off": "Off",
+    "sync.backup.auto.weekly": "Every week",
+    "sync.backup.auto.monthly": "Every month",
+    "sync.backup.never": "No automatic backup yet.",
+    "sync.backup.last": "Last auto-backup"
   },
   es: {
     "app.name": "Booki",
@@ -285,7 +291,13 @@ const LOCALES = {
     "sync.code.desc2": "Genera un código corto en un dispositivo e ingrésalo en otro. Lleva toda tu biblioteca si es lo bastante pequeña; para bibliotecas grandes usa un archivo de copia.",
     "sync.cloud.title": "Sincronización en la nube",
     "sync.cloud.desc2": "Replica los metadatos (etiquetas, favoritos, categorías, estilos de carpeta) a través de la cuenta del navegador. Los marcadores en sí ya deben estar sincronizados por el navegador. Sube desde un dispositivo y luego Baja en otro.",
-    "sync.note.account": "⚠️ Solo funciona entre dispositivos con la misma cuenta de Google y la sincronización del navegador activada."
+    "sync.note.account": "⚠️ Solo funciona entre dispositivos con la misma cuenta de Google y la sincronización del navegador activada.",
+    "sync.backup.auto": "Copia de seguridad automática a tu carpeta de Descargas",
+    "sync.backup.auto.off": "Desactivado",
+    "sync.backup.auto.weekly": "Cada semana",
+    "sync.backup.auto.monthly": "Cada mes",
+    "sync.backup.never": "Aún no hay copia automática.",
+    "sync.backup.last": "Última copia automática"
   }
 };
 

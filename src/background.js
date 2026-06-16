@@ -9,7 +9,9 @@ import {
   getSettings,
   getLocalBookmarkTree,
   canonicalUrl,
-  folderPathKey
+  folderPathKey,
+  getBackupState,
+  setBackupState
 } from "./shared.js";
 
 /* ─── Init ─── */
@@ -19,8 +21,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   await setupSidePanelBehavior();
   await buildBookmarkIndex();
   chrome.alarms?.create?.("check-dead-links", { periodInMinutes: 1440 });
+  chrome.alarms?.create?.("auto-backup", { periodInMinutes: 720 });
   await checkDeadLinks();
   updateDeadLinkBadge();
+  runAutoBackupIfDue();
 });
 
 async function setupContextMenus() {
@@ -151,7 +155,34 @@ async function cleanupMetaForRemoved() {
 
 chrome.alarms?.onAlarm?.addListener(async (alarm) => {
   if (alarm.name === "check-dead-links") await checkDeadLinks();
+  if (alarm.name === "auto-backup") await runAutoBackupIfDue();
 });
+
+/* ─── Scheduled auto-backup ─── */
+
+const BACKUP_INTERVAL_DAYS = { weekly: 7, monthly: 30 };
+
+async function runAutoBackupIfDue() {
+  try {
+    const settings = await getSettings();
+    const days = BACKUP_INTERVAL_DAYS[settings.autoBackupInterval];
+    if (!days) return;
+    if (!chrome.downloads?.download) return;
+    const state = await getBackupState();
+    const due = Date.now() - (state.lastBackupAt || 0) > days * 86400000;
+    if (!due) return;
+
+    const { json, filename } = await exportSyncFile();
+    const dataUrl = "data:application/json;base64," + btoa(unescape(encodeURIComponent(json)));
+    await chrome.downloads.download({
+      url: dataUrl,
+      filename: `Booki Backups/${filename}`,
+      saveAs: false,
+      conflictAction: "uniquify"
+    });
+    await setBackupState({ lastBackupAt: Date.now() });
+  } catch { /* downloads may be blocked; reminder still nudges the user */ }
+}
 
 async function checkDeadLinks() {
   const index = await getBookmarkIndex();
@@ -321,12 +352,14 @@ const BOOKI_FOLDER_NAME = "Booki";
 export async function restoreFromPayload(payload, options = {}) {
   if (!payload || payload.app !== "booki") throw new Error("Invalid Booki file");
   const mode = options.mode === "booki-folder" ? "booki-folder" : "merge";
-  const stats = { foldersCreated: 0, foldersReused: 0, bookmarksCreated: 0, bookmarksSkipped: 0, mode };
+  const dryRun = !!options.dryRun;
+  const stats = { foldersCreated: 0, foldersReused: 0, bookmarksCreated: 0, bookmarksSkipped: 0, mode, dryRun };
 
   const payloadFolders = payload.folders ?? [];
   const payloadBookmarks = payload.bookmarks ?? [];
   const localTree = await getLocalBookmarkTree();
   const localFolderIdByPath = new Map(localTree.folders.map((f) => [folderPathKey(f.path), f.id]));
+  const simulatedFolderKeys = new Set();
 
   /* Resolve the base container and the path prefix used to match/create. */
   let baseParentId = "1";
@@ -336,7 +369,9 @@ export async function restoreFromPayload(payload, options = {}) {
     const existingBooki = localTree.folders.find((f) => folderPathKey(f.path) === folderPathKey(BOOKI_FOLDER_NAME));
     if (existingBooki) {
       baseParentId = existingBooki.id;
-      stats.foldersReused += 1;
+    } else if (dryRun) {
+      baseParentId = "sim:booki";
+      stats.foldersCreated += 1;
     } else {
       const created = await chrome.bookmarks.create({ parentId: "1", title: BOOKI_FOLDER_NAME });
       baseParentId = created.id;
@@ -386,6 +421,11 @@ export async function restoreFromPayload(payload, options = {}) {
     const key = folderPathKey(pathPrefix + pathFor(folder));
     const existingId = localFolderIdByPath.get(key);
     if (existingId) { idMap.set(folder.id, existingId); stats.foldersReused += 1; continue; }
+    if (dryRun) {
+      if (!simulatedFolderKeys.has(key)) { simulatedFolderKeys.add(key); stats.foldersCreated += 1; }
+      idMap.set(folder.id, `sim:${key}`);
+      continue;
+    }
     const localParent = idMap.get(folder.parentId) || baseParentId;
     try {
       const created = await chrome.bookmarks.create({ parentId: localParent, title: folder.title });
@@ -401,6 +441,7 @@ export async function restoreFromPayload(payload, options = {}) {
     if (!bm.url) continue;
     const canon = canonicalUrl(bm.url);
     if (existingUrls.has(canon)) { stats.bookmarksSkipped += 1; continue; }
+    if (dryRun) { existingUrls.add(canon); stats.bookmarksCreated += 1; continue; }
     const parentId = idMap.get(bm.parentId) || baseParentId;
     try {
       await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] });
@@ -408,6 +449,8 @@ export async function restoreFromPayload(payload, options = {}) {
       stats.bookmarksCreated += 1;
     } catch {}
   }
+
+  if (dryRun) return stats;
 
   await buildBookmarkIndex();
   await applyPortableMeta(payload);

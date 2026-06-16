@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS = {
   rememberView: true,
   searchScope: "all",
   deadLinkBadge: true,
-  importMode: "merge"
+  importMode: "merge",
+  autoBackupInterval: "off"
 };
 
 const DEFAULT_META = {
@@ -266,6 +267,58 @@ export async function removeFolderEmoji(folderId) {
   const meta = await getMeta();
   delete meta.folderEmojisById[folderId];
   await saveMeta(meta);
+}
+
+/* ─── Backup state ─── */
+
+export async function getBackupState() {
+  const result = await chrome.storage.local.get({ bookiBackupState: { lastBackupAt: 0 } });
+  return result.bookiBackupState || { lastBackupAt: 0 };
+}
+
+export async function setBackupState(patch) {
+  const current = await getBackupState();
+  const next = { ...current, ...patch };
+  await chrome.storage.local.set({ bookiBackupState: next });
+  return next;
+}
+
+/* ─── Netscape (browser HTML export) parsing ─── */
+
+/* Parses a standard Chrome / Firefox / Safari bookmarks HTML export into the
+   same payload shape Booki uses, so it can flow through the idempotent restore
+   engine (merge-by-URL, Booki-folder mode, dry-run preview). Page context only
+   — it relies on DOMParser. */
+export function parseNetscapeBookmarks(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const root = doc.querySelector("dl");
+  const folders = [];
+  const bookmarks = [];
+  let counter = 1;
+  const nextId = () => `h${counter++}`;
+
+  function walk(dl, parentId, path) {
+    if (!dl) return;
+    for (const dt of [...dl.children].filter((c) => c.tagName === "DT")) {
+      const anchor = [...dt.children].find((c) => c.tagName === "A");
+      const href = anchor?.getAttribute("href")?.trim();
+      if (href) {
+        bookmarks.push({ id: nextId(), parentId, title: (anchor.textContent || "").trim() || href, url: href });
+        continue;
+      }
+      const heading = [...dt.children].find((c) => c.tagName === "H3");
+      const sublist = [...dt.children].find((c) => c.tagName === "DL");
+      if (heading || sublist) {
+        const title = (heading?.textContent || "Imported folder").trim();
+        const id = nextId();
+        folders.push({ id, parentId, title, path: [...path, title].join(" / ") });
+        walk(sublist, id, [...path, title]);
+      }
+    }
+  }
+
+  walk(root, "1", []);
+  return { app: "booki", version: 3, source: "html", folders, bookmarks, meta: {} };
 }
 
 /* ─── Tab helpers ─── */
