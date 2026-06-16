@@ -2699,6 +2699,82 @@ body.options-shell {
   border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 
+/* ── Primary (recommended) sync card ── */
+
+.opt-card-primary {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    var(--surface);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.opt-pill {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.opt-note {
+  margin: -6px 0 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.opt-subtle-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* ── Import destination toggle ── */
+
+.segmented.import-mode {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.import-mode-option {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color 0.2s var(--ease-out), border-color 0.2s var(--ease-out),
+    background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.import-mode-option:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.import-mode-option.is-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
 /* ── Responsive options ── */
 
 @media (max-width: 540px) {

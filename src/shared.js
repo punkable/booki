@@ -11,7 +11,8 @@ const DEFAULT_SETTINGS = {
   showHealthBadges: true,
   rememberView: true,
   searchScope: "all",
-  deadLinkBadge: true
+  deadLinkBadge: true,
+  importMode: "merge"
 };
 
 const DEFAULT_META = {
@@ -677,11 +678,14 @@ async function portableBookmarkKey(bookmark) {
 }
 
 async function portableFolderPath(folder) {
-  const path = String(folder.path || folder.title || "").trim().replace(/\s*\/\s*/g, "/").toLowerCase();
-  return `path:${await sha256Hex(path)}`;
+  return `path:${await sha256Hex(folderPathKey(folder.path || folder.title || ""))}`;
 }
 
-function canonicalUrl(value) {
+export function folderPathKey(path) {
+  return String(path || "").trim().replace(/\s*\/\s*/g, "/").toLowerCase();
+}
+
+export function canonicalUrl(value) {
   try {
     const url = new URL(value);
     url.protocol = url.protocol.toLowerCase();

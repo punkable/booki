@@ -6,7 +6,10 @@ import {
   openSidePanelForCurrentWindow,
   getMeta,
   saveMeta,
-  getSettings
+  getSettings,
+  getLocalBookmarkTree,
+  canonicalUrl,
+  folderPathKey
 } from "./shared.js";
 
 /* ─── Init ─── */
@@ -289,50 +292,126 @@ chrome.commands?.onCommand?.addListener(async (command) => {
 
 /* ─── Cross-device sync helpers ─── */
 
-const SYNC_KEY = "bookiSyncData";
-
 export async function buildSyncPayload() {
   return buildPortableSyncPayload({ includeTree: true });
 }
 
 export async function exportSyncFile() {
   const payload = await buildSyncPayload();
-  return { json: JSON.stringify(payload, null, 2), filename: `booki-export-${Date.now()}.json` };
+  payload.kind = "full-backup";
+  payload.counts = {
+    bookmarks: (payload.bookmarks ?? []).length,
+    folders: (payload.folders ?? []).length
+  };
+  const stamp = new Date().toISOString().slice(0, 10);
+  return { json: JSON.stringify(payload, null, 2), filename: `booki-backup-${stamp}.json` };
 }
 
-export async function restoreFromPayload(payload) {
+const BOOKI_FOLDER_NAME = "Booki";
+
+/* Idempotent restore with two destinations:
+   - "merge"  (default): rebuilds the backup's folders by path and skips any
+     bookmark whose URL already exists anywhere, so it blends into your library
+     without ever duplicating.
+   - "booki-folder": puts everything inside a single top-level "Booki" folder,
+     mirroring the backup's tree there. Duplicates are only checked inside that
+     folder, so imported copies stay isolated from your bookmarks bar.
+   Either way, re-importing the same file never piles up duplicates.
+   Returns stats so the UI can report exactly what happened. */
+export async function restoreFromPayload(payload, options = {}) {
   if (!payload || payload.app !== "booki") throw new Error("Invalid Booki file");
-  const bookmarkMap = new Map();
-  async function createFolderTree(folders) {
-    for (const f of folders.filter((folder) => folder.parentId === "0")) {
-      bookmarkMap.set(f.id, ["1", "2", "3"].includes(f.id) ? f.id : "1");
+  const mode = options.mode === "booki-folder" ? "booki-folder" : "merge";
+  const stats = { foldersCreated: 0, foldersReused: 0, bookmarksCreated: 0, bookmarksSkipped: 0, mode };
+
+  const payloadFolders = payload.folders ?? [];
+  const payloadBookmarks = payload.bookmarks ?? [];
+  const localTree = await getLocalBookmarkTree();
+  const localFolderIdByPath = new Map(localTree.folders.map((f) => [folderPathKey(f.path), f.id]));
+
+  /* Resolve the base container and the path prefix used to match/create. */
+  let baseParentId = "1";
+  let pathPrefix = "";
+  let existingUrls;
+  if (mode === "booki-folder") {
+    const existingBooki = localTree.folders.find((f) => folderPathKey(f.path) === folderPathKey(BOOKI_FOLDER_NAME));
+    if (existingBooki) {
+      baseParentId = existingBooki.id;
+      stats.foldersReused += 1;
+    } else {
+      const created = await chrome.bookmarks.create({ parentId: "1", title: BOOKI_FOLDER_NAME });
+      baseParentId = created.id;
+      localFolderIdByPath.set(folderPathKey(BOOKI_FOLDER_NAME), created.id);
+      stats.foldersCreated += 1;
     }
-    const rootFolders = folders.filter((f) => f.parentId === "1" || f.parentId === "2" || f.parentId === "3");
-    for (const f of rootFolders) {
-      const created = await chrome.bookmarks.create({ parentId: f.parentId, title: f.title });
-      bookmarkMap.set(f.id, created.id);
-      await createChildFolders(f.id, folders);
+    pathPrefix = `${BOOKI_FOLDER_NAME} / `;
+    /* only consider duplicates already living inside the Booki folder */
+    const bookiKey = folderPathKey(BOOKI_FOLDER_NAME);
+    const bookiFolderIds = new Set(
+      localTree.folders
+        .filter((f) => { const k = folderPathKey(f.path); return k === bookiKey || k.startsWith(`${bookiKey}/`); })
+        .map((f) => f.id)
+    );
+    bookiFolderIds.add(baseParentId);
+    existingUrls = new Set(localTree.bookmarks.filter((b) => bookiFolderIds.has(b.parentId)).map((b) => canonicalUrl(b.url)));
+  } else {
+    existingUrls = new Set(localTree.bookmarks.map((b) => canonicalUrl(b.url)));
+  }
+
+  const payloadById = new Map(payloadFolders.map((f) => [f.id, f]));
+  const idMap = new Map();
+  /* payload roots resolve to the base container */
+  for (const rootId of ["0", "1", "2", "3"]) {
+    idMap.set(rootId, mode === "booki-folder" ? baseParentId : (rootId === "0" ? "1" : rootId));
+  }
+
+  function pathFor(folder) {
+    if (folder.path) return folder.path;
+    const parts = [];
+    const seen = new Set();
+    let cur = folder;
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      if (!["0", "1", "2", "3"].includes(cur.id)) parts.unshift(cur.title);
+      cur = payloadById.get(cur.parentId);
+    }
+    return parts.filter(Boolean).join(" / ");
+  }
+
+  /* create/reuse folders shallow-first so parents exist before children */
+  const sortedFolders = [...payloadFolders]
+    .filter((f) => !["0", "1", "2", "3"].includes(f.id))
+    .sort((a, b) => (pathFor(a).split("/").length) - (pathFor(b).split("/").length));
+
+  for (const folder of sortedFolders) {
+    const key = folderPathKey(pathPrefix + pathFor(folder));
+    const existingId = localFolderIdByPath.get(key);
+    if (existingId) { idMap.set(folder.id, existingId); stats.foldersReused += 1; continue; }
+    const localParent = idMap.get(folder.parentId) || baseParentId;
+    try {
+      const created = await chrome.bookmarks.create({ parentId: localParent, title: folder.title });
+      idMap.set(folder.id, created.id);
+      localFolderIdByPath.set(key, created.id);
+      stats.foldersCreated += 1;
+    } catch {
+      idMap.set(folder.id, localParent);
     }
   }
-  async function createChildFolders(parentId, folders) {
-    const children = folders.filter((f) => f.parentId === parentId);
-    for (const f of children) {
-      const mappedParent = bookmarkMap.get(parentId) || parentId;
-      const created = await chrome.bookmarks.create({ parentId: mappedParent, title: f.title });
-      bookmarkMap.set(f.id, created.id);
-      await createChildFolders(f.id, folders);
-    }
+
+  for (const bm of payloadBookmarks) {
+    if (!bm.url) continue;
+    const canon = canonicalUrl(bm.url);
+    if (existingUrls.has(canon)) { stats.bookmarksSkipped += 1; continue; }
+    const parentId = idMap.get(bm.parentId) || baseParentId;
+    try {
+      await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] });
+      existingUrls.add(canon);
+      stats.bookmarksCreated += 1;
+    } catch {}
   }
-  async function restoreBookmarks() {
-    for (const bm of payload.bookmarks ?? []) {
-      const parentId = bookmarkMap.get(bm.parentId) || bm.parentId || "1";
-      try { await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] }); } catch {}
-    }
-  }
-  await createFolderTree(payload.folders ?? []);
-  await restoreBookmarks();
+
   await buildBookmarkIndex();
   await applyPortableMeta(payload);
+  return stats;
 }
 
 /* ─── Generate sync code ─── */
@@ -342,9 +421,18 @@ const CODE_INDEX_KEY = "bookiCodeIndex";
 const CODE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const CODE_CHUNK_SIZE = 6000;
 
+/* chrome.storage.sync gives ~100KB total; a code that carries the full tree
+   must fit. Beyond this we tell the user to use a backup file instead. */
+const CODE_MAX_ENCODED = 90000;
+
 export async function generateSyncCode() {
-  const payload = await buildPortableSyncPayload();
+  /* include the bookmark tree so a fresh browser actually receives the
+     bookmarks, not just the metadata */
+  const payload = await buildPortableSyncPayload({ includeTree: true });
   const encoded = encodePayload(payload);
+  if (encoded.length > CODE_MAX_ENCODED) {
+    throw new Error("Your library is too large for a sync code. Use “Export backup file” instead — it has no size limit.");
+  }
   const sha256 = await sha256Hex(encoded);
   const code = generateShortCode();
   const chunks = [];
@@ -378,7 +466,7 @@ export async function generateSyncCode() {
   return { code, expiresAt: createdAt + CODE_TTL_MS, sha256 };
 }
 
-export async function restoreFromCode(code) {
+export async function restoreFromCode(code, options = {}) {
   const clean = code.trim().toUpperCase();
   const manifestKey = CHUNK_PREFIX + clean;
   const stored = await chrome.storage.sync.get(manifestKey);
@@ -394,8 +482,7 @@ export async function restoreFromCode(code) {
   const encoded = parts.join("");
   if (!legacyManifest && manifest.sha256 && await sha256Hex(encoded) !== manifest.sha256) throw new Error("Sync data integrity check failed. Generate the code again.");
   const payload = decodePayload(encoded);
-  await restoreFromPayload(payload);
-  return payload;
+  return restoreFromPayload(payload, options);
 }
 
 function generateShortCode() {
@@ -475,12 +562,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "restore-from-code") {
-    restoreFromCode(message.code).then(() => sendResponse({ ok: true })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    restoreFromCode(message.code, { mode: message.mode }).then((stats) => sendResponse({ ok: true, stats })).catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 
   if (message?.type === "restore-from-file") {
-    restoreFromPayload(message.payload).then(() => sendResponse({ ok: true })).catch((e) => sendResponse({ ok: false, error: e.message }));
+    restoreFromPayload(message.payload, { mode: message.mode }).then((stats) => sendResponse({ ok: true, stats })).catch((e) => sendResponse({ ok: false, error: e.message }));
     return true;
   }
 
@@ -491,14 +578,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "check-dead-links") {
     checkDeadLinks().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
-    return true;
-  }
-
-  if (message?.type === "get-bookmark-index-full") {
-    getBookmarkIndex().then((index) => {
-      const meta = getMeta();
-      return Promise.all([index, meta]);
-    }).then(([index, meta]) => sendResponse({ ok: true, index, meta })).catch(() => sendResponse({ ok: false }));
     return true;
   }
 

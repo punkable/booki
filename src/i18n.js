@@ -127,7 +127,21 @@ const LOCALES = {
     "settings.folders.direct": "Open Folders, then click a folder icon to choose a color or emoji.",
     "settings.danger": "Danger Zone",
     "settings.reset": "Reset to defaults",
-    "settings.reset.desc": "Reset all settings to their default values. This cannot be undone."
+    "settings.reset.desc": "Reset all settings to their default values. This cannot be undone.",
+    "sync.backup.title": "Backup & restore",
+    "sync.recommended": "Recommended",
+    "sync.backup.desc": "The most reliable way to move Booki to another browser or computer. One file holds every bookmark, folder, tag, star, color and emoji. Importing merges by URL, so it never creates duplicates — even if you import the same file twice.",
+    "sync.backup.export": "Export backup file",
+    "sync.backup.html": "Export as HTML",
+    "sync.backup.import": "Drop a Booki backup file here to restore",
+    "sync.import.destination": "When importing, place bookmarks…",
+    "sync.import.merge": "In my bookmarks (no duplicates)",
+    "sync.import.bookiFolder": "In a “Booki” folder",
+    "sync.code.title": "Sync code",
+    "sync.code.desc2": "Generate a short code on one device and enter it on another. Carries your full library when it is small enough; for large libraries use a backup file.",
+    "sync.cloud.title": "Cloud auto-sync",
+    "sync.cloud.desc2": "Mirrors metadata (tags, stars, categories, folder styles) through your browser account. Your bookmarks themselves must already be synced by the browser. Push from one device, then Pull on another.",
+    "sync.note.account": "⚠️ Works only between devices signed into the same Google account with browser sync on."
   },
   es: {
     "app.name": "Booki",
@@ -257,7 +271,21 @@ const LOCALES = {
     "settings.folders.direct": "Abre Carpetas y haz clic en el icono de una carpeta para elegir color o emoji.",
     "settings.danger": "Zona de Peligro",
     "settings.reset": "Restablecer valores",
-    "settings.reset.desc": "Restablece todos los ajustes a sus valores predeterminados. Esto no se puede deshacer."
+    "settings.reset.desc": "Restablece todos los ajustes a sus valores predeterminados. Esto no se puede deshacer.",
+    "sync.backup.title": "Copia de seguridad",
+    "sync.recommended": "Recomendado",
+    "sync.backup.desc": "La forma más fiable de llevar Booki a otro navegador u ordenador. Un solo archivo contiene todos tus marcadores, carpetas, etiquetas, favoritos, colores y emojis. Al importar se fusiona por URL, así que nunca crea duplicados — aunque importes el mismo archivo dos veces.",
+    "sync.backup.export": "Exportar copia de seguridad",
+    "sync.backup.html": "Exportar como HTML",
+    "sync.backup.import": "Suelta aquí un archivo de copia de Booki para restaurar",
+    "sync.import.destination": "Al importar, colocar los marcadores…",
+    "sync.import.merge": "En mis marcadores (sin duplicados)",
+    "sync.import.bookiFolder": "En una carpeta “Booki”",
+    "sync.code.title": "Código de sincronización",
+    "sync.code.desc2": "Genera un código corto en un dispositivo e ingrésalo en otro. Lleva toda tu biblioteca si es lo bastante pequeña; para bibliotecas grandes usa un archivo de copia.",
+    "sync.cloud.title": "Sincronización en la nube",
+    "sync.cloud.desc2": "Replica los metadatos (etiquetas, favoritos, categorías, estilos de carpeta) a través de la cuenta del navegador. Los marcadores en sí ya deben estar sincronizados por el navegador. Sube desde un dispositivo y luego Baja en otro.",
+    "sync.note.account": "⚠️ Solo funciona entre dispositivos con la misma cuenta de Google y la sincronización del navegador activada."
   }
 };
 

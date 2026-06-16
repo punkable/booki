@@ -299,41 +299,51 @@
 
         <!-- ─── DATA & SYNC ─── -->
         <section class="opt-panel" data-panel="sync" role="tabpanel">
-          <div class="opt-card">
+          <div class="opt-card opt-card-primary">
             <div class="opt-card-header">
-              <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
-              <h2 data-i18n="tools.title">Import / Export</h2>
+              <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+              <h2 data-i18n="sync.backup.title">Backup &amp; restore</h2>
+              <span class="opt-pill" data-i18n="sync.recommended">Recommended</span>
+            </div>
+            <p class="opt-desc" data-i18n="sync.backup.desc">The most reliable way to move Booki to another browser or computer. One file holds every bookmark, folder, tag, star, color and emoji. Importing merges by URL, so it never creates duplicates — even if you import the same file twice.</p>
+            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="primary-button" id="exportJsonButton" type="button">
+                <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
+                <span data-i18n="sync.backup.export">Export backup file</span>
+              </button>
+              <button class="secondary-button" id="exportHtmlButton" type="button">
+                <span class="svg-icon" data-icon="export" aria-hidden="true"></span>
+                <span data-i18n="sync.backup.html">Export as HTML</span>
+              </button>
+            </div>
+            <div class="opt-row">
+              <span class="opt-subtle-label" data-i18n="sync.import.destination">When importing, place bookmarks…</span>
+              <div class="segmented import-mode" role="radiogroup">
+                <button class="import-mode-option is-active" type="button" data-mode="merge" role="radio" aria-checked="true" data-i18n="sync.import.merge">In my bookmarks (no duplicates)</button>
+                <button class="import-mode-option" type="button" data-mode="booki-folder" role="radio" aria-checked="false" data-i18n="sync.import.bookiFolder">In a “Booki” folder</button>
+              </div>
             </div>
             <div class="opt-row">
               <div class="drop-zone" id="importDropZone">
                 <span class="svg-icon" data-icon="download" style="width:32px;height:32px;color:var(--muted);" aria-hidden="true"></span>
-                <p data-i18n="tools.import.drop">Drop exported bookmarks here</p>
+                <p data-i18n="sync.backup.import">Drop a Booki backup file here to restore</p>
                 <small data-i18n="tools.import.preserved">Folders and tags are preserved.</small>
                 <input type="file" id="importFileInput" accept=".json,.html" hidden>
                 <button class="secondary-button" id="importFileButton" type="button" style="margin-top:8px;">
                   <span class="svg-icon" data-icon="download" aria-hidden="true"></span>
-                  <span data-i18n="tools.import.file">Import file</span>
+                  <span data-i18n="tools.import.file">Choose file</span>
                 </button>
               </div>
-            </div>
-            <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="secondary-button" id="exportJsonButton" type="button">
-                <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
-                <span data-i18n="tools.export.json">Export JSON</span>
-              </button>
-              <button class="secondary-button" id="exportHtmlButton" type="button">
-                <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
-                <span data-i18n="tools.export.html">Export HTML</span>
-              </button>
             </div>
           </div>
 
           <div class="opt-card">
             <div class="opt-card-header">
               <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
-              <h2 data-i18n="tools.code.title">Sync Code</h2>
+              <h2 data-i18n="sync.code.title">Sync code</h2>
             </div>
-            <p class="opt-desc" data-i18n="tools.code.desc">Generate a short code to apply metadata (tags, stars, categories, folder styles) on another device using hashed URL and folder-path keys.</p>
+            <p class="opt-desc" data-i18n="sync.code.desc2">Generate a short code on one device and enter it on another. Carries your full library when it is small enough; for large libraries use a backup file.</p>
+            <p class="opt-note" data-i18n="sync.note.account">⚠️ Works only between devices signed into the same Google account with browser sync on.</p>
             <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="secondary-button" id="genCodeButton" type="button">
                 <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
@@ -355,9 +365,10 @@
           <div class="opt-card">
             <div class="opt-card-header">
               <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
-              <h2 data-i18n="step.cloud">Cloud Sync</h2>
+              <h2 data-i18n="sync.cloud.title">Cloud auto-sync</h2>
             </div>
-            <p class="opt-desc" data-i18n="tools.cloud.desc">Sync settings, tags, and stars via your Google account.</p>
+            <p class="opt-desc" data-i18n="sync.cloud.desc2">Mirrors metadata (tags, stars, categories, folder styles) through your browser account. Your bookmarks themselves must already be synced by the browser. Push from one device, then Pull on another.</p>
+            <p class="opt-note" data-i18n="sync.note.account">⚠️ Works only between devices signed into the same Google account with browser sync on.</p>
             <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="secondary-button" id="pushSyncButton" type="button">
                 <span class="svg-icon" data-icon="export" aria-hidden="true"></span>

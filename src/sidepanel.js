@@ -1,5 +1,4 @@
 import {
-  applyPortableMeta,
   applyAccentColor,
   createBookmark, createFolder, faviconUrl, formatDate, getBookmarkTreeData,
   getCurrentTab, injectIcons, getSettings, moveBookmark,
@@ -1153,8 +1152,12 @@ async function importBookmarkFile(file) {
     if (file.name.endsWith(".json")) {
       const payload = JSON.parse(text);
       if (payload?.app === "booki") {
-        await restoreFromJsonPayload(payload);
-        el.importSummary.textContent = "Import complete.";
+        const mode = state.settings?.importMode || "merge";
+        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload, mode });
+        if (!resp?.ok) throw new Error(resp?.error || "Could not restore from file.");
+        const s = resp.stats || {};
+        const where = s.mode === "booki-folder" ? " · Booki folder" : "";
+        el.importSummary.textContent = `${s.bookmarksCreated ?? 0} imported · ${s.bookmarksSkipped ?? 0} already present${where}`;
         toast(t("toast.imported"));
         await loadLibrary();
         return;
@@ -1175,35 +1178,6 @@ async function importBookmarkFile(file) {
   }
 }
 
-async function restoreFromJsonPayload(payload) {
-  const bookmarkMap = new Map();
-  async function createTree(folders, parentFallback) {
-    for (const f of folders.filter((folder) => folder.parentId === "0")) {
-      bookmarkMap.set(f.id, ["1", "2", "3"].includes(f.id) ? f.id : (parentFallback || "1"));
-    }
-    const roots = folders.filter((f) => f.parentId === "1" || f.parentId === "2" || f.parentId === "3");
-    for (const f of roots) {
-      const created = await chrome.bookmarks.create({ parentId: parentFallback || f.parentId, title: f.title });
-      bookmarkMap.set(f.id, created.id);
-      await createChildren(f.id, folders);
-    }
-  }
-  async function createChildren(parentId, folders) {
-    const children = folders.filter((f) => f.parentId === parentId);
-    for (const f of children) {
-      const mapped = bookmarkMap.get(parentId) || parentId;
-      const created = await chrome.bookmarks.create({ parentId: mapped, title: f.title });
-      bookmarkMap.set(f.id, created.id);
-      await createChildren(f.id, folders);
-    }
-  }
-  await createTree(payload.folders ?? [], "1");
-  for (const bm of payload.bookmarks ?? []) {
-    const parentId = bookmarkMap.get(bm.parentId) || bm.parentId || "1";
-    try { await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] }); } catch {}
-  }
-  await applyPortableMeta(payload);
-}
 
 /* ─── Organize ─── */
 
@@ -1451,9 +1425,11 @@ async function handleRestoreFromCode() {
   const code = el.restoreSyncCode.value.trim().toUpperCase();
   if (!code || code.length < 4) { toast("Enter a valid sync code.", "error"); return; }
   try {
-    const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code });
+    const mode = state.settings?.importMode || "merge";
+    const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code, mode });
     if (!resp?.ok) throw new Error(resp?.error || "Restore failed");
-    toast("Metadata applied.");
+    const s = resp.stats || {};
+    toast(s.bookmarksCreated ? `Restored ${s.bookmarksCreated} bookmarks.` : "Library applied.");
     el.restoreSyncCode.value = "";
     await loadLibrary();
   } catch (e) { toast(e.message || "Could not restore.", "error"); }

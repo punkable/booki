@@ -45,6 +45,12 @@ function setInitialState(settings) {
   document.querySelectorAll(`.lang-card[data-lang="${lang}"]`).forEach(c => {
     c.classList.add("is-active"); c.setAttribute("aria-checked", "true");
   });
+  const importMode = settings.importMode || "merge";
+  document.querySelectorAll(".import-mode-option").forEach(b => {
+    const active = b.dataset.mode === importMode;
+    b.classList.toggle("is-active", active);
+    b.setAttribute("aria-checked", String(active));
+  });
 }
 
 function applyOptionsSettings(settings) {
@@ -208,6 +214,15 @@ function bindSync() {
   const importInput = document.getElementById("importFileInput");
   const dropZone = document.getElementById("importDropZone");
 
+  document.querySelectorAll(".import-mode-option").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      document.querySelectorAll(".import-mode-option").forEach(b => { b.classList.remove("is-active"); b.setAttribute("aria-checked", "false"); });
+      btn.classList.add("is-active");
+      btn.setAttribute("aria-checked", "true");
+      await saveSettings({ importMode: btn.dataset.mode });
+    });
+  });
+
   document.getElementById("genCodeButton")?.addEventListener("click", async () => {
     try {
       const result = await chrome.runtime.sendMessage({ type: "generate-sync-code" });
@@ -228,8 +243,10 @@ function bindSync() {
     const code = restoreInput.value.trim();
     if (!code) return;
     try {
-      const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code });
-      if (resp?.ok) { toast(t("toast.imported")); restoreInput.value = ""; }
+      const { importMode } = await getSettings();
+      const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code, mode: importMode });
+      if (resp?.ok) { toast(summarizeRestore(resp.stats)); restoreInput.value = ""; refreshUI(); }
+      else toast(resp?.error || "Invalid code.", "error");
     } catch { toast("Invalid code.", "error"); }
   });
 
@@ -238,7 +255,7 @@ function bindSync() {
       const resp = await chrome.runtime.sendMessage({ type: "export-booki" });
       if (resp?.ok) {
         const blob = new Blob([resp.json], { type: "application/json" });
-        triggerDownload(blob, `booki-export-${Date.now()}.json`);
+        triggerDownload(blob, resp.filename || `booki-backup-${Date.now()}.json`);
         toast(t("toast.exported"));
       }
     } catch { toast("Export failed.", "error"); }
@@ -337,9 +354,10 @@ function handleImportFile(file) {
     try {
       const data = JSON.parse(e.target.result);
       if (data.version && data.app === "booki") {
-        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload: data });
-        if (resp?.ok) toast(t("toast.imported"));
-        else toast("Could not restore from file.", "error");
+        const { importMode } = await getSettings();
+        const resp = await chrome.runtime.sendMessage({ type: "restore-from-file", payload: data, mode: importMode });
+        if (resp?.ok) { toast(summarizeRestore(resp.stats)); refreshUI(); }
+        else toast(resp?.error || "Could not restore from file.", "error");
       } else {
         toast("Unrecognized file format.", "error");
       }
@@ -348,6 +366,15 @@ function handleImportFile(file) {
     }
   };
   reader.readAsText(file);
+}
+
+function summarizeRestore(stats) {
+  if (!stats) return t("toast.imported");
+  const added = stats.bookmarksCreated ?? 0;
+  const skipped = stats.bookmarksSkipped ?? 0;
+  const where = stats.mode === "booki-folder" ? " into the Booki folder" : "";
+  if (!added && skipped) return `Already up to date — ${skipped} already present${where}.`;
+  return `Imported ${added} new bookmark${added === 1 ? "" : "s"}${where}${skipped ? `, ${skipped} already present` : ""}.`;
 }
 
 function triggerDownload(blob, filename) {
