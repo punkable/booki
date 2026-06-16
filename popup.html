@@ -6,12 +6,14 @@
     <title>Booki</title>
     <link rel="stylesheet" href="src/styles.css">
   </head>
-  <body class="popup-shell" style="width:400px;min-width:400px;">
+  <body class="popup-shell">
     <main class="popup" aria-label="Booki quick actions">
       <header class="popup-header">
         <div class="brand">
-          <span class="svg-icon" data-icon="bookmark" style="width:22px;height:22px;color:var(--accent);" aria-hidden="true"></span>
-          <h1>Booki</h1>
+          <picture>
+            <source srcset="media/SVG/logowhite.svg" media="(prefers-color-scheme: dark)">
+            <img class="brand-wordmark" src="media/SVG/logo.svg" alt="Booki">
+          </picture>
         </div>
         <div style="display:flex;gap:4px;">
           <button class="icon-button" id="openPanel" type="button" title="Open full manager" aria-label="Open full manager">
@@ -35,14 +37,19 @@
         <form id="quickSaveForm" class="quick-save">
           <input id="quickTags" name="tags" type="text" autocomplete="off" placeholder="Tags (design, dev, inspiration)">
           <select id="folderSelect" name="folder" class="folder-select"></select>
-          <button class="primary-button" type="submit" style="flex-shrink:0;">
+          <button class="primary-button" id="quickSaveButton" type="submit" style="flex-shrink:0;">
             <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
-            Save
+            <span id="quickSaveLabel">Save</span>
           </button>
         </form>
+        <p id="quickSaveStatus" class="popup-status" aria-live="polite"></p>
       </div>
 
       <div class="popup-section">
+        <div class="popup-section-title">
+          <span id="resultsTitle">Recent bookmarks</span>
+          <span id="resultsCount"></span>
+        </div>
         <label class="popup-search">
           <span class="svg-icon" data-icon="search" aria-hidden="true"></span>
           <input id="popupSearch" type="search" placeholder="Search bookmarks…">

@@ -6,6 +6,7 @@ injectIcons();
 let activeTab;
 let allBookmarks = [];
 let allFolders = [];
+let currentBookmark = null;
 
 init();
 
@@ -75,25 +76,29 @@ async function loadBookmarksAndFolders() {
   try {
     const [root] = await chrome.bookmarks.getTree();
     allFolders = [];
-    walkFolders(root, 0, allFolders);
+    walkFolders(root, [], 0, allFolders);
     const select = document.querySelector("#folderSelect");
     select.innerHTML = allFolders.map(f =>
-      `<option value="${f.id}">${"\u00A0".repeat(f.depth * 2)}${f.title}</option>`
+      `<option value="${f.id}">${esc(f.path || f.title)}</option>`
     ).join("");
 
     const [bookmarkRoot] = await chrome.bookmarks.getTree();
     allBookmarks = [];
     walkBookmarksForList(bookmarkRoot, allBookmarks);
     allBookmarks.sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
+    syncCurrentBookmarkState();
     renderResults("");
   } catch { /* silent */ }
 }
 
-function walkFolders(node, depth, result) {
+function walkFolders(node, path, depth, result) {
   if (node.children) {
-    if (node.id === "1") result.push({ id: node.id, title: node.title || "Bookmarks bar", depth });
-    else if (node.id !== "0") result.push({ id: node.id, title: node.title, depth });
-    node.children.forEach(child => walkFolders(child, node.id === "0" ? depth : depth + 1, result));
+    const title = node.title || (node.id === "1" ? "Bookmarks bar" : "Bookmarks");
+    const nextPath = node.id === "0" ? path : [...path, title].filter(Boolean);
+    if (node.id !== "0") {
+      result.push({ id: node.id, title, path: nextPath.join(" / "), depth });
+    }
+    node.children.forEach(child => walkFolders(child, nextPath, node.id === "0" ? depth : depth + 1, result));
   }
 }
 
@@ -118,9 +123,13 @@ function renderTab(tab) {
 
 function renderResults(query) {
   const container = document.querySelector("#popupResults");
+  const title = document.querySelector("#resultsTitle");
+  const count = document.querySelector("#resultsCount");
   const items = query
     ? allBookmarks.filter(b => (b.title + " " + b.url).toLowerCase().includes(query)).slice(0, 8)
     : allBookmarks.slice(0, 5);
+  if (title) title.textContent = query ? "Search results" : "Recent bookmarks";
+  if (count) count.textContent = items.length ? String(items.length) : "";
 
   if (!items.length) {
     container.innerHTML = `<div class="popup-empty">${query ? "No results" : "No recent bookmarks"}</div>`;
@@ -168,8 +177,29 @@ async function saveCurrentTab(event) {
     return;
   }
   document.querySelector("#quickTags").value = "";
-  toast("Saved!");
+  const status = document.querySelector("#quickSaveStatus");
+  if (response.bookmark?.alreadyExisted) {
+    const message = response.bookmark.moved ? "Updated and moved to the selected folder." : "Already saved. Metadata updated.";
+    if (status) status.textContent = message;
+    toast("Updated!");
+  } else {
+    if (status) status.textContent = "Saved to the selected folder.";
+    toast("Saved!");
+  }
   await loadBookmarksAndFolders();
+}
+
+function syncCurrentBookmarkState() {
+  currentBookmark = activeTab?.url ? allBookmarks.find((bookmark) => bookmark.url === activeTab.url) || null : null;
+  const select = document.querySelector("#folderSelect");
+  const label = document.querySelector("#quickSaveLabel");
+  const status = document.querySelector("#quickSaveStatus");
+  if (currentBookmark && select) select.value = currentBookmark.parentId;
+  if (label) label.textContent = currentBookmark ? "Update" : "Save";
+  if (status) {
+    const folder = currentBookmark ? allFolders.find((f) => f.id === currentBookmark.parentId) : null;
+    status.textContent = currentBookmark ? `Already saved in ${folder?.path || folder?.title || "Bookmarks"}. Choose another folder to move it.` : "Choose a folder for the current tab.";
+  }
 }
 
 async function openManager() {
@@ -177,11 +207,7 @@ async function openManager() {
   if (settings.openInTab) {
     chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel.html") });
   } else {
-    try {
-      await chrome.sidePanel.open({ windowId: (await chrome.windows.getCurrent()).id });
-    } catch {
-      chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel.html") });
-    }
+    await openSidePanelForCurrentWindow();
   }
 }
 

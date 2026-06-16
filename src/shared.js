@@ -18,23 +18,50 @@ const DEFAULT_META = {
   tagsByBookmarkId: {},
   starredIds: [],
   folderColorsById: {},
+  folderEmojisById: {},
   categoriesByBookmarkId: {},
   deadLinks: {},
   pageContent: {},
   healthScores: {}
 };
 
+export const ACCENT_COLORS = {
+  amber: "#dfaa75",
+  copper: "#b9875f",
+  rose: "#c85f8b",
+  violet: "#7357c8",
+  blue: "#2d8ecf",
+  graphite: "#302f35"
+};
+
 /* ─── Settings ─── */
 
 export async function getSettings() {
   const result = await chrome.storage.local.get({ settings: DEFAULT_SETTINGS });
-  return { ...DEFAULT_SETTINGS, ...result.settings };
+  const settings = { ...DEFAULT_SETTINGS, ...result.settings };
+  if (settings.accentColor === "blaze") settings.accentColor = "copper";
+  if (settings.accentColor === "pink") settings.accentColor = "rose";
+  return settings;
 }
 
 export async function saveSettings(settings) {
   const current = await getSettings();
-  await chrome.storage.local.set({ settings: { ...current, ...settings } });
-  chrome.runtime.sendMessage({ type: "settings-changed" }).catch(() => {});
+  const next = { ...current, ...settings };
+  await chrome.storage.local.set({ settings: next });
+  chrome.runtime.sendMessage({ type: "settings-changed", settings: next }).catch(() => {});
+}
+
+export function applyAccentColor(settings, root = document.documentElement) {
+  const color = ACCENT_COLORS[settings?.accentColor];
+  if (!color || settings?.accentColor === "auto") {
+    root.style.removeProperty("--accent");
+    root.style.removeProperty("--section-accent");
+    root.style.removeProperty("--section-gradient");
+    return;
+  }
+  root.style.setProperty("--accent", color);
+  root.style.setProperty("--section-accent", color);
+  root.style.setProperty("--section-gradient", `linear-gradient(135deg, ${color}, #302f35)`);
 }
 
 /* ─── Meta ─── */
@@ -45,6 +72,7 @@ export async function getMeta() {
     tagsByBookmarkId: result.meta?.tagsByBookmarkId ?? {},
     starredIds: result.meta?.starredIds ?? [],
     folderColorsById: result.meta?.folderColorsById ?? {},
+    folderEmojisById: result.meta?.folderEmojisById ?? {},
     categoriesByBookmarkId: result.meta?.categoriesByBookmarkId ?? {},
     deadLinks: result.meta?.deadLinks ?? {},
     pageContent: result.meta?.pageContent ?? {},
@@ -58,6 +86,7 @@ export async function saveMeta(meta) {
       tagsByBookmarkId: meta.tagsByBookmarkId ?? {},
       starredIds: [...new Set(meta.starredIds ?? [])],
       folderColorsById: meta.folderColorsById ?? {},
+      folderEmojisById: meta.folderEmojisById ?? {},
       categoriesByBookmarkId: meta.categoriesByBookmarkId ?? {},
       deadLinks: meta.deadLinks ?? {},
       pageContent: meta.pageContent ?? {},
@@ -68,50 +97,95 @@ export async function saveMeta(meta) {
 
 /* ─── Sync (chrome.storage.sync) ─── */
 
+const SYNC_MANIFEST_KEY = "bookiSnapshotManifest";
+const SYNC_LEGACY_KEY = "bookiSnapshot";
+const SYNC_CHUNK_PREFIX = "bookiSnapshotChunk_";
+const SYNC_CHUNK_SIZE = 7000;
+
 export async function pushSyncSnapshot() {
-  const [settings, meta] = await Promise.all([getSettings(), getMeta()]);
-  /* Only sync portable metadata. pageContent (read-later, up to 50KB each)
-     and deadLinks (device-specific, regenerated daily) are excluded to stay
-     within the chrome.storage.sync quota. */
-  const snapshot = {
-    version: 2,
-    savedAt: new Date().toISOString(),
-    app: "booki",
-    settings,
-    meta: {
-      tagsByBookmarkId: meta.tagsByBookmarkId,
-      starredIds: meta.starredIds,
-      folderColorsById: meta.folderColorsById,
-      categoriesByBookmarkId: meta.categoriesByBookmarkId
-    }
-  };
-  await chrome.storage.sync.set({ bookiSnapshot: snapshot });
+  const snapshot = await buildPortableSyncPayload();
+  await writeChunkedSyncSnapshot(snapshot);
   return snapshot;
 }
 
 export async function pullSyncSnapshot() {
-  const result = await chrome.storage.sync.get({ bookiSnapshot: null });
-  const snapshot = result.bookiSnapshot;
+  const snapshot = await readChunkedSyncSnapshot();
   if (!snapshot) return null;
 
-  const [currentSettings, currentMeta] = await Promise.all([getSettings(), getMeta()]);
-  const mergedSettings = { ...currentSettings, ...snapshot.settings };
-  /* Merge incoming portable meta over local, but preserve device-local
-     pageContent and deadLinks that the snapshot never carries. */
-  const incoming = snapshot.meta ?? {};
-  const mergedMeta = {
-    ...currentMeta,
-    tagsByBookmarkId: { ...currentMeta.tagsByBookmarkId, ...(incoming.tagsByBookmarkId ?? {}) },
-    starredIds: [...new Set([...currentMeta.starredIds, ...(incoming.starredIds ?? [])])],
-    folderColorsById: { ...currentMeta.folderColorsById, ...(incoming.folderColorsById ?? {}) },
-    categoriesByBookmarkId: { ...currentMeta.categoriesByBookmarkId, ...(incoming.categoriesByBookmarkId ?? {}) }
-  };
+  const currentSettings = await getSettings();
+  const mergedSettings = { ...currentSettings, ...(snapshot.settings ?? {}) };
   await Promise.all([
     saveSettings(mergedSettings),
-    saveMeta(mergedMeta)
+    applyPortableMeta(snapshot)
   ]);
 
   return snapshot;
+}
+
+export async function buildPortableSyncPayload(options = {}) {
+  const [settings, meta, tree] = await Promise.all([getSettings(), getMeta(), getLocalBookmarkTree()]);
+  const savedAt = new Date().toISOString();
+  const payload = {
+    version: 3,
+    savedAt,
+    exportedAt: savedAt,
+    app: "booki",
+    settings,
+    portableMeta: await buildPortableMeta(meta, tree),
+    meta: {
+      tagsByBookmarkId: meta.tagsByBookmarkId,
+      starredIds: meta.starredIds,
+      folderColorsById: meta.folderColorsById,
+      folderEmojisById: meta.folderEmojisById,
+      categoriesByBookmarkId: meta.categoriesByBookmarkId
+    }
+  };
+  if (options.includeTree) {
+    payload.folders = tree.folders;
+    payload.bookmarks = tree.bookmarks;
+  }
+  return payload;
+}
+
+export async function applyPortableMeta(payload) {
+  const [meta, tree] = await Promise.all([getMeta(), getLocalBookmarkTree()]);
+  const incoming = payload?.portableMeta ?? await portableMetaFromLegacy(payload, tree);
+  if (!incoming) return;
+
+  const tagsByBookmarkId = { ...meta.tagsByBookmarkId };
+  const categoriesByBookmarkId = { ...meta.categoriesByBookmarkId };
+  const folderColorsById = { ...meta.folderColorsById };
+  const folderEmojisById = { ...meta.folderEmojisById };
+  const starred = new Set(meta.starredIds);
+
+  for (const bookmark of tree.bookmarks) {
+    const entry = incoming.bookmarksByUrl?.[await portableBookmarkKey(bookmark)];
+    if (!entry) continue;
+    if (Array.isArray(entry.tags)) {
+      const tags = normalizeTags(entry.tags);
+      if (tags.length) tagsByBookmarkId[bookmark.id] = tags;
+      else delete tagsByBookmarkId[bookmark.id];
+    }
+    if (entry.category) categoriesByBookmarkId[bookmark.id] = entry.category;
+    if (entry.starred) starred.add(bookmark.id);
+  }
+
+  for (const folder of tree.folders) {
+    const path = await portableFolderPath(folder);
+    const color = incoming.folderColorsByPath?.[path];
+    const emoji = incoming.folderEmojisByPath?.[path];
+    if (color) folderColorsById[folder.id] = color;
+    if (emoji) folderEmojisById[folder.id] = emoji;
+  }
+
+  await saveMeta({
+    ...meta,
+    tagsByBookmarkId,
+    starredIds: [...starred],
+    folderColorsById,
+    folderEmojisById,
+    categoriesByBookmarkId
+  });
 }
 
 /* ─── Tags ─── */
@@ -161,6 +235,16 @@ export async function setFolderColor(folderId, color) {
   await saveMeta(meta);
 }
 
+export async function setFolderEmoji(folderId, emoji) {
+  const meta = await getMeta();
+  if (emoji) {
+    meta.folderEmojisById[folderId] = emoji;
+  } else {
+    delete meta.folderEmojisById[folderId];
+  }
+  await saveMeta(meta);
+}
+
 export async function setCategory(bookmarkId, category) {
   const meta = await getMeta();
   if (category) {
@@ -177,6 +261,12 @@ export async function removeFolderColor(folderId) {
   await saveMeta(meta);
 }
 
+export async function removeFolderEmoji(folderId) {
+  const meta = await getMeta();
+  delete meta.folderEmojisById[folderId];
+  await saveMeta(meta);
+}
+
 /* ─── Tab helpers ─── */
 
 export async function getCurrentTab() {
@@ -187,7 +277,11 @@ export async function getCurrentTab() {
 export async function openSidePanelForCurrentWindow() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.windowId) return;
-  await chrome.sidePanel.open({ windowId: tab.windowId });
+  if (chrome.sidePanel?.open) {
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+  } else {
+    await chrome.tabs.create({ url: chrome.runtime.getURL("sidepanel.html") });
+  }
 }
 
 /* ─── Bookmark tree ─── */
@@ -206,6 +300,7 @@ export async function getBookmarkTreeData() {
   const enrichedFolders = resp.index.folders.map((f) => ({
     ...f,
     color: meta.folderColorsById[f.id] ?? "mint",
+    emoji: meta.folderEmojisById[f.id] ?? "",
     count: countByFolderId[f.id] ?? 0
   }));
 
@@ -496,6 +591,114 @@ export async function getPageContent(bookmarkId) {
 }
 
 /* ─── Private ─── */
+
+async function buildPortableMeta(meta, tree) {
+  const starred = new Set(meta.starredIds ?? []);
+  const bookmarksByUrl = {};
+  const folderColorsByPath = {};
+  const folderEmojisByPath = {};
+
+  for (const bookmark of tree.bookmarks) {
+    const tags = meta.tagsByBookmarkId?.[bookmark.id] ?? [];
+    const category = meta.categoriesByBookmarkId?.[bookmark.id] ?? "";
+    const isStarred = starred.has(bookmark.id);
+    if (!tags.length && !category && !isStarred) continue;
+    const key = await portableBookmarkKey(bookmark);
+    const current = bookmarksByUrl[key] ?? { tags: [], starred: false, category: "" };
+    bookmarksByUrl[key] = {
+      tags: [...new Set([...current.tags, ...normalizeTags(tags)])],
+      starred: current.starred || isStarred,
+      category: category || current.category
+    };
+  }
+
+  for (const folder of tree.folders) {
+    const path = await portableFolderPath(folder);
+    const color = meta.folderColorsById?.[folder.id];
+    const emoji = meta.folderEmojisById?.[folder.id];
+    if (color) folderColorsByPath[path] = color;
+    if (emoji) folderEmojisByPath[path] = emoji;
+  }
+
+  return { algorithm: "sha256-url-path-ledger-v1", bookmarksByUrl, folderColorsByPath, folderEmojisByPath };
+}
+
+async function portableMetaFromLegacy(payload, tree) {
+  const legacy = payload?.meta;
+  if (!legacy) return null;
+  return await buildPortableMeta({
+    tagsByBookmarkId: legacy.tagsByBookmarkId ?? {},
+    starredIds: legacy.starredIds ?? [],
+    folderColorsById: legacy.folderColorsById ?? {},
+    folderEmojisById: legacy.folderEmojisById ?? {},
+    categoriesByBookmarkId: legacy.categoriesByBookmarkId ?? {}
+  }, {
+    bookmarks: payload?.bookmarks ?? tree.bookmarks,
+    folders: payload?.folders ?? tree.folders
+  });
+}
+
+async function writeChunkedSyncSnapshot(snapshot) {
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(snapshot))));
+  const chunks = [];
+  for (let i = 0; i < encoded.length; i += SYNC_CHUNK_SIZE) {
+    chunks.push(encoded.slice(i, i + SYNC_CHUNK_SIZE));
+  }
+
+  const previous = await chrome.storage.sync.get({ [SYNC_MANIFEST_KEY]: null });
+  const oldKeys = previous[SYNC_MANIFEST_KEY]?.chunkKeys ?? [];
+  if (oldKeys.length) await chrome.storage.sync.remove(oldKeys);
+
+  const chunkKeys = chunks.map((_, i) => `${SYNC_CHUNK_PREFIX}${i}`);
+  const data = {};
+  chunks.forEach((chunk, i) => { data[chunkKeys[i]] = chunk; });
+  data[SYNC_MANIFEST_KEY] = {
+    version: snapshot.version,
+    app: "booki",
+    savedAt: snapshot.savedAt,
+    chunkKeys
+  };
+  await chrome.storage.sync.set(data);
+}
+
+async function readChunkedSyncSnapshot() {
+  const result = await chrome.storage.sync.get({ [SYNC_MANIFEST_KEY]: null, [SYNC_LEGACY_KEY]: null });
+  const manifest = result[SYNC_MANIFEST_KEY];
+  if (!manifest?.chunkKeys?.length) return result[SYNC_LEGACY_KEY] ?? null;
+
+  const chunksResult = await chrome.storage.sync.get(manifest.chunkKeys);
+  const chunks = manifest.chunkKeys.map((key) => chunksResult[key]);
+  if (chunks.some((chunk) => typeof chunk !== "string")) throw new Error("Incomplete cloud sync snapshot.");
+  return JSON.parse(decodeURIComponent(escape(atob(chunks.join("")))));
+}
+
+async function portableBookmarkKey(bookmark) {
+  return `url:${await sha256Hex(canonicalUrl(bookmark.url))}`;
+}
+
+async function portableFolderPath(folder) {
+  const path = String(folder.path || folder.title || "").trim().replace(/\s*\/\s*/g, "/").toLowerCase();
+  return `path:${await sha256Hex(path)}`;
+}
+
+function canonicalUrl(value) {
+  try {
+    const url = new URL(value);
+    url.protocol = url.protocol.toLowerCase();
+    url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    url.hash = "";
+    const text = url.toString();
+    return text.endsWith("/") ? text.slice(0, -1) : text;
+  } catch {
+    return String(value ?? "").trim().toLowerCase();
+  }
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 function cleanTag(tag) {
   return String(tag ?? "").trim().replace(/^#/, "").toLowerCase().replace(/\s+/g, "-").slice(0, 32);

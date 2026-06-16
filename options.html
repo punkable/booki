@@ -10,9 +10,12 @@
     <main class="options-page">
       <header class="options-header">
         <div class="options-brand">
-          <span class="svg-icon" data-icon="bookmark" style="width:28px;height:28px;color:var(--blaze-orange);" aria-hidden="true"></span>
+          <picture>
+            <source srcset="media/SVG/logowhite.svg" media="(prefers-color-scheme: dark)">
+            <img class="brand-logo" src="media/SVG/logo.svg" alt="Booki">
+          </picture>
           <div>
-            <h1 class="gradient-text" data-i18n="settings.title">Booki Settings</h1>
+            <h1 class="visually-hidden" data-i18n="settings.title">Booki Settings</h1>
             <p data-i18n="settings.desc">Tune your bookmark workflow.</p>
           </div>
         </div>
@@ -59,23 +62,23 @@
             </div>
             <p class="opt-desc" data-i18n="settings.accentColor.desc">Override the section-based accent color with a single global hue.</p>
             <div class="color-swatches" id="accentSwatches">
-              <label class="swatch is-active" data-color="auto" style="--swatch:var(--accent,var(--blaze-orange));background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);" tabindex="0" role="radio" aria-checked="true">
+              <label class="swatch is-active" data-color="auto" style="--swatch:linear-gradient(135deg,#dfaa75,#c85f8b,#2d8ecf);" tabindex="0" role="radio" aria-checked="true">
                 <span class="swatch-label" data-i18n="settings.accentColor.auto">Auto</span>
               </label>
-              <label class="swatch" data-color="amber" style="--swatch:#ffbe0b;background:#ffbe0b;" tabindex="0" role="radio" aria-checked="false">
-                <span class="swatch-label">Amber Gold</span>
+              <label class="swatch" data-color="amber" style="--swatch:#dfaa75;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Booki Gold</span>
               </label>
-              <label class="swatch" data-color="blaze" style="--swatch:#fb5607;background:#fb5607;" tabindex="0" role="radio" aria-checked="false">
-                <span class="swatch-label">Blaze Orange</span>
+              <label class="swatch" data-color="copper" style="--swatch:#b9875f;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Copper</span>
               </label>
-              <label class="swatch" data-color="pink" style="--swatch:#ff006e;background:#ff006e;" tabindex="0" role="radio" aria-checked="false">
-                <span class="swatch-label">Neon Pink</span>
+              <label class="swatch" data-color="rose" style="--swatch:#c85f8b;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Rose</span>
               </label>
-              <label class="swatch" data-color="violet" style="--swatch:#8338ec;background:#8338ec;" tabindex="0" role="radio" aria-checked="false">
-                <span class="swatch-label">Blue Violet</span>
+              <label class="swatch" data-color="violet" style="--swatch:#7357c8;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Violet</span>
               </label>
-              <label class="swatch" data-color="blue" style="--swatch:#3a86ff;background:#3a86ff;" tabindex="0" role="radio" aria-checked="false">
-                <span class="swatch-label">Azure Blue</span>
+              <label class="swatch" data-color="blue" style="--swatch:#2d8ecf;" tabindex="0" role="radio" aria-checked="false">
+                <span class="swatch-label">Blue</span>
               </label>
             </div>
           </div>
@@ -120,11 +123,12 @@
           <div class="opt-preview" id="previewPane">
             <div class="opt-preview-header">
               <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
-              <span data-i18n="settings.preview">Live preview</span>
+              <span data-i18n="settings.preview">List preview</span>
+              <small data-i18n="settings.preview.desc">Reflects compact mode and health badges.</small>
             </div>
             <div class="opt-preview-body">
               <div class="preview-bookmark">
-                <img src="chrome://favicon/size/16@1x/https://example.com" alt="" class="preview-favicon">
+                <span class="preview-favicon preview-favicon-brand"><span class="svg-icon" data-icon="bookmark" aria-hidden="true"></span></span>
                 <div class="preview-info">
                   <span class="preview-title">Example Design Article</span>
                   <span class="preview-url">example.com</span>
@@ -132,7 +136,7 @@
                 <span class="preview-health preview-health-great">85</span>
               </div>
               <div class="preview-bookmark">
-                <img src="chrome://favicon/size/16@1x/https://docs.google.com" alt="" class="preview-favicon">
+                <span class="preview-favicon preview-favicon-brand"><span class="svg-icon" data-icon="folder" aria-hidden="true"></span></span>
                 <div class="preview-info">
                   <span class="preview-title">Google Docs - Document</span>
                   <span class="preview-url">docs.google.com</span>
@@ -140,7 +144,7 @@
                 <span class="preview-health preview-health-ok">62</span>
               </div>
               <div class="preview-bookmark">
-                <img src="chrome://favicon/size/16@1x/https://example.org" alt="" class="preview-favicon">
+                <span class="preview-favicon preview-favicon-brand"><span class="svg-icon" data-icon="link" aria-hidden="true"></span></span>
                 <div class="preview-info">
                   <span class="preview-title">Old Blog Post</span>
                   <span class="preview-url">example.org</span>
@@ -284,9 +288,9 @@
           <div class="opt-card">
             <div class="opt-card-header">
               <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
-              <h2 data-i18n="folders.title">Folder Colors</h2>
+              <h2 data-i18n="folders.title">Folders</h2>
             </div>
-            <p class="opt-desc" data-i18n="settings.folders.desc">Assign colors to folders for quick visual identification.</p>
+            <p class="opt-desc" data-i18n="settings.folders.desc">Personalize folders directly from the folder icon in the Folders view.</p>
             <div id="folderColorList" class="folder-color-list">
               <div class="folder-color-empty" data-i18n="settings.folders.loading">Loading folders…</div>
             </div>
@@ -327,23 +331,23 @@
           <div class="opt-card">
             <div class="opt-card-header">
               <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
-              <h2 data-i18n="tools.code.desc">Sync Code</h2>
+              <h2 data-i18n="tools.code.title">Sync Code</h2>
             </div>
-            <p class="opt-desc">Generate a code to sync metadata (tags, stars) between devices on the same Google account.</p>
+            <p class="opt-desc" data-i18n="tools.code.desc">Generate a short code to apply metadata (tags, stars, categories, folder styles) on another device using hashed URL and folder-path keys.</p>
             <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="secondary-button" id="genCodeButton" type="button">
                 <span class="svg-icon" data-icon="spark" aria-hidden="true"></span>
                 <span data-i18n="tools.code.generate">Generate code</span>
               </button>
-              <input id="syncCodeOutput" type="text" readonly placeholder="······" style="flex:1;min-width:120px;text-align:center;font-size:16px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">
+              <input id="syncCodeOutput" type="text" readonly placeholder="····· ·····" style="flex:1;min-width:120px;text-align:center;font-size:16px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">
               <button class="icon-button" id="copyCodeButton" type="button" title="Copy" style="width:38px;height:38px;">
                 <span class="svg-icon" data-icon="copy" aria-hidden="true"></span>
               </button>
             </div>
             <div class="opt-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-              <input id="restoreCodeInput" type="text" placeholder="Enter code to restore…" style="flex:1;min-width:120px;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
+              <input id="restoreCodeInput" type="text" placeholder="Enter code to apply..." data-i18n="tools.code.restore.placeholder" style="flex:1;min-width:120px;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
               <button class="primary-button" id="restoreCodeButton" type="button" style="flex-shrink:0;">
-                <span data-i18n="tools.code.restore">Restore</span>
+                <span data-i18n="tools.code.restore">Apply</span>
               </button>
             </div>
           </div>

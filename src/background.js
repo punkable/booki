@@ -1,20 +1,56 @@
-import { createBookmark, getCurrentTab, openSidePanelForCurrentWindow, removeBookmarkMeta, getMeta, saveMeta, getSettings } from "./shared.js";
+import {
+  applyPortableMeta,
+  buildPortableSyncPayload,
+  createBookmark,
+  getCurrentTab,
+  openSidePanelForCurrentWindow,
+  getMeta,
+  saveMeta,
+  getSettings
+} from "./shared.js";
 
 /* ─── Init ─── */
 
 chrome.runtime.onInstalled.addListener(async () => {
-  chrome.contextMenus.create({
-    id: "save-to-booki",
-    title: "Save to Booki",
-    contexts: ["page", "link"]
-  });
-
-  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  await setupContextMenus();
+  await setupSidePanelBehavior();
   await buildBookmarkIndex();
-  chrome.alarms.create("check-dead-links", { periodInMinutes: 1440 });
+  chrome.alarms?.create?.("check-dead-links", { periodInMinutes: 1440 });
   await checkDeadLinks();
   updateDeadLinkBadge();
 });
+
+async function setupContextMenus() {
+  if (!chrome.contextMenus?.create) return;
+  try {
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({
+      id: "save-to-booki",
+      title: "Save to Booki",
+      contexts: ["page", "link"]
+    });
+    chrome.contextMenus.create({
+      id: "save-all-tabs-to-booki",
+      title: "Save all tabs to Booki Inbox",
+      contexts: ["page"]
+    });
+    chrome.contextMenus.create({
+      id: "open-booki",
+      title: "Open Booki",
+      contexts: ["action"]
+    });
+  } catch {
+    /* Some Chromium forks expose partial context menu support. */
+  }
+}
+
+async function setupSidePanelBehavior() {
+  try {
+    await chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false });
+  } catch {
+    /* The tab fallback in shared.js keeps Booki usable without sidePanel. */
+  }
+}
 
 /* ─── Bookmark index (live cache) ─── */
 
@@ -110,7 +146,7 @@ async function cleanupMetaForRemoved() {
 
 /* ─── Dead link checker ─── */
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
+chrome.alarms?.onAlarm?.addListener(async (alarm) => {
   if (alarm.name === "check-dead-links") await checkDeadLinks();
 });
 
@@ -143,7 +179,7 @@ async function checkDeadLinks() {
 
 /* ─── OmniBox ─── */
 
-chrome.omnibox.onInputChanged.addListener(async (text, suggest) => {
+chrome.omnibox?.onInputChanged?.addListener(async (text, suggest) => {
   if (!text.trim()) return;
   const index = await getBookmarkIndex();
   const q = text.toLowerCase();
@@ -156,7 +192,7 @@ chrome.omnibox.onInputChanged.addListener(async (text, suggest) => {
   })));
 });
 
-chrome.omnibox.onInputEntered.addListener((url, disposition) => {
+chrome.omnibox?.onInputEntered?.addListener((url, disposition) => {
   if (!url) return;
   if (!url.startsWith("http")) url = "https://" + url;
   if (disposition === "currentTab") chrome.tabs.update({ url });
@@ -165,13 +201,44 @@ chrome.omnibox.onInputEntered.addListener((url, disposition) => {
 
 /* ─── Context menus ─── */
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== "save-to-booki") return;
-  const url = info.linkUrl || tab?.url;
-  const title = info.linkText || tab?.title || url;
-  if (!url) return;
-  await createBookmark({ title, url, parentId: "1", tags: [] });
+chrome.contextMenus?.onClicked?.addListener(async (info, tab) => {
+  if (info.menuItemId === "open-booki") {
+    await openSidePanelForCurrentWindow();
+    return;
+  }
+  if (info.menuItemId === "save-all-tabs-to-booki") {
+    await saveAllTabsToInbox();
+    return;
+  }
+  if (info.menuItemId === "save-to-booki") {
+    const url = info.linkUrl || tab?.url;
+    const title = info.linkText || tab?.title || url;
+    if (!url) return;
+    await createBookmark({ title, url, parentId: "1", tags: [] });
+  }
 });
+
+async function saveAllTabsToInbox() {
+  const folder = await findOrCreateFolder("Booki Inbox");
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const existingUrls = new Set((await getBookmarkIndex()).bookmarks.map((b) => b.url));
+  for (const tab of tabs) {
+    if (!tab.url || !/^https?:/i.test(tab.url) || existingUrls.has(tab.url)) continue;
+    try {
+      await createBookmark({ title: tab.title || tab.url, url: tab.url, parentId: folder.id, tags: ["inbox"] });
+      existingUrls.add(tab.url);
+    } catch {}
+  }
+  await buildBookmarkIndex();
+  notifyPanels("bookmarks-changed");
+}
+
+async function findOrCreateFolder(title) {
+  const index = await getBookmarkIndex();
+  const existing = index.folders.find((folder) => folder.title.toLowerCase() === title.toLowerCase());
+  if (existing) return existing;
+  return chrome.bookmarks.create({ parentId: "1", title });
+}
 
 /* ─── Content capture (read-later) ─── */
 
@@ -208,7 +275,7 @@ function extractReadableText(html) {
 
 /* ─── Commands ─── */
 
-chrome.commands.onCommand.addListener(async (command) => {
+chrome.commands?.onCommand?.addListener(async (command) => {
   if (command === "open-studio") {
     const { getSettings } = await import("./shared.js");
     const settings = await getSettings();
@@ -225,21 +292,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 const SYNC_KEY = "bookiSyncData";
 
 export async function buildSyncPayload() {
-  const index = await getBookmarkIndex();
-  const meta = await getMeta();
-  return {
-    version: 2,
-    exportedAt: new Date().toISOString(),
-    app: "booki",
-    folders: index.folders,
-    bookmarks: index.bookmarks,
-    meta: {
-      tagsByBookmarkId: meta.tagsByBookmarkId || {},
-      starredIds: meta.starredIds || [],
-      folderColorsById: meta.folderColorsById || {},
-      categoriesByBookmarkId: meta.categoriesByBookmarkId || {}
-    }
-  };
+  return buildPortableSyncPayload({ includeTree: true });
 }
 
 export async function exportSyncFile() {
@@ -251,7 +304,10 @@ export async function restoreFromPayload(payload) {
   if (!payload || payload.app !== "booki") throw new Error("Invalid Booki file");
   const bookmarkMap = new Map();
   async function createFolderTree(folders) {
-    const rootFolders = folders.filter((f) => f.parentId === "1" || f.parentId === "0" || f.parentId === "2" || f.parentId === "3");
+    for (const f of folders.filter((folder) => folder.parentId === "0")) {
+      bookmarkMap.set(f.id, ["1", "2", "3"].includes(f.id) ? f.id : "1");
+    }
+    const rootFolders = folders.filter((f) => f.parentId === "1" || f.parentId === "2" || f.parentId === "3");
     for (const f of rootFolders) {
       const created = await chrome.bookmarks.create({ parentId: f.parentId, title: f.title });
       bookmarkMap.set(f.id, created.id);
@@ -268,67 +324,76 @@ export async function restoreFromPayload(payload) {
     }
   }
   async function restoreBookmarks() {
-    for (const bm of payload.bookmarks) {
+    for (const bm of payload.bookmarks ?? []) {
       const parentId = bookmarkMap.get(bm.parentId) || bm.parentId || "1";
       try { await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] }); } catch {}
     }
   }
-  await createFolderTree(payload.folders);
+  await createFolderTree(payload.folders ?? []);
   await restoreBookmarks();
-  if (payload.meta?.starredIds?.length) {
-    const newMeta = await getMeta();
-    newMeta.starredIds = [...new Set([...newMeta.starredIds, ...payload.meta.starredIds])];
-    if (payload.meta.folderColorsById) Object.assign(newMeta.folderColorsById, payload.meta.folderColorsById);
-    if (payload.meta.categoriesByBookmarkId) Object.assign(newMeta.categoriesByBookmarkId, payload.meta.categoriesByBookmarkId);
-    await saveMeta(newMeta);
-  }
   await buildBookmarkIndex();
+  await applyPortableMeta(payload);
 }
 
 /* ─── Generate sync code ─── */
 
 const CHUNK_PREFIX = "bookiChunk_";
 const CODE_INDEX_KEY = "bookiCodeIndex";
+const CODE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CODE_CHUNK_SIZE = 6000;
 
 export async function generateSyncCode() {
-  const payload = await buildSyncPayload();
-  const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+  const payload = await buildPortableSyncPayload();
+  const encoded = encodePayload(payload);
+  const sha256 = await sha256Hex(encoded);
   const code = generateShortCode();
-  const CHUNK_SIZE = 6000;
   const chunks = [];
-  for (let i = 0; i < encoded.length; i += CHUNK_SIZE) {
-    chunks.push(encoded.slice(i, i + CHUNK_SIZE));
+  for (let i = 0; i < encoded.length; i += CODE_CHUNK_SIZE) {
+    chunks.push(encoded.slice(i, i + CODE_CHUNK_SIZE));
   }
   const chunkKeys = chunks.map((_, i) => CHUNK_PREFIX + code + "_" + i);
+  const createdAt = Date.now();
   const store = {};
   chunks.forEach((chunk, i) => { store[chunkKeys[i]] = chunk; });
-  store[CHUNK_PREFIX + code] = chunks.length.toString();
+  store[CHUNK_PREFIX + code] = {
+    version: 3,
+    app: "booki",
+    algorithm: "portable-url-path-ledger-v1",
+    createdAt,
+    expiresAt: createdAt + CODE_TTL_MS,
+    chunks: chunks.length,
+    chunkKeys,
+    sha256
+  };
   const entries = Object.entries(store);
   for (let i = 0; i < entries.length; i += 10) {
     const batch = Object.fromEntries(entries.slice(i, i + 10));
     await chrome.storage.sync.set(batch);
   }
   const idx = await chrome.storage.sync.get({ [CODE_INDEX_KEY]: [] });
-  const index = [...idx[CODE_INDEX_KEY]];
-  index.push({ code, time: Date.now(), chunks: chunks.length });
-  const recent = index.slice(-20);
+  const index = [...idx[CODE_INDEX_KEY]].filter((entry) => !entry.expiresAt || entry.expiresAt > Date.now());
+  index.push({ code, time: createdAt, expiresAt: createdAt + CODE_TTL_MS, chunks: chunks.length, sha256 });
+  const recent = index.slice(-12);
   await chrome.storage.sync.set({ [CODE_INDEX_KEY]: recent });
-  return { code, data: encoded };
+  return { code, expiresAt: createdAt + CODE_TTL_MS, sha256 };
 }
 
 export async function restoreFromCode(code) {
   const clean = code.trim().toUpperCase();
   const manifestKey = CHUNK_PREFIX + clean;
-  const manifest = await chrome.storage.sync.get(manifestKey);
-  const chunkCount = parseInt(manifest[manifestKey], 10);
+  const stored = await chrome.storage.sync.get(manifestKey);
+  const manifest = stored[manifestKey];
+  const legacyManifest = typeof manifest === "string";
+  const chunkCount = legacyManifest ? parseInt(manifest, 10) : Number(manifest?.chunks);
   if (!chunkCount || isNaN(chunkCount)) throw new Error("Code not found. Generate it first on your source device (same Google account).");
-  const keys = Array.from({ length: chunkCount }, (_, i) => CHUNK_PREFIX + clean + "_" + i);
+  if (!legacyManifest && manifest.expiresAt && manifest.expiresAt < Date.now()) throw new Error("This sync code has expired. Generate a new one on the source device.");
+  const keys = legacyManifest ? Array.from({ length: chunkCount }, (_, i) => CHUNK_PREFIX + clean + "_" + i) : manifest.chunkKeys;
   const result = await chrome.storage.sync.get(keys);
   const parts = keys.map(k => result[k]);
   if (parts.some(p => !p)) throw new Error("Incomplete sync data. Try generating the code again.");
   const encoded = parts.join("");
-  const json = decodeURIComponent(atob(encoded));
-  const payload = JSON.parse(json);
+  if (!legacyManifest && manifest.sha256 && await sha256Hex(encoded) !== manifest.sha256) throw new Error("Sync data integrity check failed. Generate the code again.");
+  const payload = decodePayload(encoded);
   await restoreFromPayload(payload);
   return payload;
 }
@@ -336,21 +401,38 @@ export async function restoreFromCode(code) {
 function generateShortCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  for (const byte of bytes) code += chars[byte % chars.length];
   return code;
+}
+
+function encodePayload(payload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+function decodePayload(encoded) {
+  return JSON.parse(decodeURIComponent(escape(atob(encoded))));
+}
+
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 /* ─── Dead link badge ─── */
 
 async function updateDeadLinkBadge() {
   try {
+    if (!chrome.action?.setBadgeText) return;
     const settings = await getSettings();
     if (!settings.deadLinkBadge) { chrome.action.setBadgeText({ text: "" }); return; }
     const meta = await getMeta();
     const deadLinks = meta.deadLinks || {};
     const count = Object.values(deadLinks).filter((d) => d.ok === false).length;
     chrome.action.setBadgeText({ text: count > 0 ? String(count) : "" });
-    chrome.action.setBadgeBackgroundColor({ color: "#fb5607" });
+    chrome.action.setBadgeBackgroundColor?.({ color: "#fb5607" });
   } catch { /* background may not be fully ready */ }
 }
 
@@ -422,7 +504,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "settings-changed") {
     /* relay to all extension pages (options→sidepanel bridge) */
-    chrome.runtime.sendMessage({ type: "settings-changed" }).catch(() => {});
+    chrome.runtime.sendMessage({ type: "settings-changed-broadcast", settings: message.settings }).catch(() => {});
     return false;
   }
 
@@ -434,9 +516,23 @@ async function handleSaveCurrentTab(tags, parentId) {
   if (!tab?.url) throw new Error("No active tab found.");
   const existing = await chrome.bookmarks.search({ url: tab.url });
   if (existing[0]) {
-    const { setTags } = await import("./shared.js");
-    await setTags(existing[0].id, tags);
-    return existing[0];
+    const { normalizeTags, setTags } = await import("./shared.js");
+    const targetParentId = parentId || existing[0].parentId || "1";
+    const cleanTags = String(tags ?? "").trim();
+    if (cleanTags) {
+      const meta = await getMeta();
+      const mergedTags = [...new Set([...(meta.tagsByBookmarkId?.[existing[0].id] ?? []), ...normalizeTags(cleanTags)])];
+      await setTags(existing[0].id, mergedTags);
+    }
+    if (targetParentId && existing[0].parentId !== targetParentId) {
+      await chrome.bookmarks.move(existing[0].id, { parentId: targetParentId });
+    }
+    await buildBookmarkIndex();
+    notifyPanels("bookmarks-changed");
+    return { ...existing[0], parentId: targetParentId, alreadyExisted: true, moved: existing[0].parentId !== targetParentId };
   }
-  return createBookmark({ title: tab.title || tab.url, url: tab.url, parentId: parentId || "1", tags });
+  const bookmark = await createBookmark({ title: tab.title || tab.url, url: tab.url, parentId: parentId || "1", tags });
+  await buildBookmarkIndex();
+  notifyPanels("bookmarks-changed");
+  return { ...bookmark, alreadyExisted: false, moved: false };
 }

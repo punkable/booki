@@ -1,4 +1,4 @@
-import { getSettings, saveSettings, toast, getMeta, saveMeta, getBookmarkTreeData, pushSyncSnapshot, pullSyncSnapshot, injectIcons } from "./shared.js";
+import { applyAccentColor, getSettings, saveSettings, toast, getBookmarkTreeData, pushSyncSnapshot, pullSyncSnapshot, injectIcons } from "./shared.js";
 import { detectBrowserLanguage, setLanguage, t } from "./i18n.js";
 
 init();
@@ -13,6 +13,7 @@ async function refreshUI() {
   const lang = settings.language || detectBrowserLanguage();
   setLanguage(lang);
   applyI18n();
+  applyOptionsSettings(settings);
   setInitialState(settings);
   bindTabs();
   bindSettings(settings);
@@ -27,6 +28,10 @@ async function refreshUI() {
 }
 
 function setInitialState(settings) {
+  document.querySelectorAll(".swatch, .view-option, .chip, .lang-card").forEach(el => {
+    el.classList.remove("is-active");
+    el.setAttribute("aria-checked", "false");
+  });
   document.querySelectorAll(`.swatch[data-color="${settings.accentColor}"]`).forEach(s => {
     s.classList.add("is-active"); s.setAttribute("aria-checked", "true");
   });
@@ -42,8 +47,15 @@ function setInitialState(settings) {
   });
 }
 
+function applyOptionsSettings(settings) {
+  applyAccentColor(settings);
+  previewFromSettings(settings);
+}
+
 function bindTabs() {
   document.querySelectorAll(".opt-tab").forEach(tab => {
+    if (tab.dataset.bound) return;
+    tab.dataset.bound = "1";
     tab.addEventListener("click", () => {
       document.querySelectorAll(".opt-tab").forEach(t => { t.classList.remove("is-active"); t.setAttribute("aria-selected", "false"); });
       document.querySelectorAll(".opt-panel").forEach(p => p.classList.remove("is-active"));
@@ -64,16 +76,18 @@ function bindSettings(settings) {
     const el = document.getElementById(key);
     if (!el) continue;
     el.checked = !!settings[key];
+    if (el.dataset.bound) continue;
+    el.dataset.bound = "1";
     el.addEventListener("change", async () => {
-      await saveSettings({ [key]: el.checked });
-      if (key === "compactView" || key === "showHealthBadges") previewFromSettings();
+      const next = await saveAndReadSettings({ [key]: el.checked });
+      applyOptionsSettings(next);
       toast(t("toast.saved"));
     });
   }
 }
 
-async function previewFromSettings() {
-  const s = await getSettings();
+async function previewFromSettings(settings) {
+  const s = settings || await getSettings();
   const pane = document.getElementById("previewPane");
   if (!pane) return;
   pane.querySelectorAll(".preview-bookmark").forEach(bm => {
@@ -86,16 +100,17 @@ async function previewFromSettings() {
 }
 
 function bindColors(settings) {
-  previewFromSettings();
+  previewFromSettings(settings);
   document.querySelectorAll(".swatch").forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = "1";
     el.addEventListener("click", async () => {
       document.querySelectorAll(".swatch").forEach(s => { s.classList.remove("is-active"); s.setAttribute("aria-checked", "false"); });
       el.classList.add("is-active");
       el.setAttribute("aria-checked", "true");
       const color = el.dataset.color;
-      await saveSettings({ accentColor: color });
-      document.documentElement.style.setProperty("--accent", color === "auto" ? "" : el.style.getPropertyValue("--swatch"));
-      previewFromSettings();
+      const next = await saveAndReadSettings({ accentColor: color });
+      applyOptionsSettings(next);
       toast(t("toast.saved"));
     });
     el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
@@ -104,6 +119,8 @@ function bindColors(settings) {
 
 function bindViews() {
   document.querySelectorAll(".view-option").forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = "1";
     el.addEventListener("click", async () => {
       document.querySelectorAll(".view-option").forEach(v => { v.classList.remove("is-active"); v.setAttribute("aria-checked", "false"); });
       el.classList.add("is-active");
@@ -117,6 +134,8 @@ function bindViews() {
 
 function bindScope() {
   document.querySelectorAll(".chip").forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = "1";
     el.addEventListener("click", async () => {
       document.querySelectorAll(".chip").forEach(c => { c.classList.remove("is-active"); c.setAttribute("aria-checked", "false"); });
       el.classList.add("is-active");
@@ -130,6 +149,8 @@ function bindScope() {
 
 function bindLanguage() {
   document.querySelectorAll(".lang-card").forEach(el => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = "1";
     el.addEventListener("click", async () => {
       document.querySelectorAll(".lang-card").forEach(c => { c.classList.remove("is-active"); c.setAttribute("aria-checked", "false"); });
       el.classList.add("is-active");
@@ -148,6 +169,8 @@ function bindLanguage() {
 function bindSearch() {
   const input = document.getElementById("settingsSearch");
   if (!input) return;
+  if (input.dataset.bound) return;
+  input.dataset.bound = "1";
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();
     document.querySelectorAll(".opt-panel").forEach(panel => {
@@ -166,40 +189,8 @@ function bindSearch() {
 async function bindFolderColors() {
   const container = document.getElementById("folderColorList");
   try {
-    const data = await getBookmarkTreeData();
-    const folders = data.folders.filter(f => f.id !== "0" && f.id !== "1");
-    const meta = await getMeta();
-    const colorNames = ["mint","sky","rose","lavender","peach","amber","teal","coral","indigo","lime"];
-    const colorValues = ["#34d399","#38bdf8","#fb7185","#a78bfa","#fbbf24","#f59e0b","#2dd4bf","#f472b6","#6366f1","#84cc16"];
-
-    container.innerHTML = folders.length
-      ? folders.map(f => {
-          const currentColor = meta.folderColorsById[f.id] || "mint";
-          return `<div class="folder-color-row" data-id="${f.id}">
-            <span class="folder-color-name">${esc(f.title)}</span>
-            <div class="folder-color-picker" data-folder="${f.id}">
-              ${colorNames.map((name, i) => `
-                <span class="fcolor-dot ${currentColor === name ? 'is-active' : ''}" data-color="${name}" style="background:${colorValues[i]};" tabindex="0" role="radio" aria-checked="${currentColor === name}"></span>
-              `).join("")}
-            </div>
-          </div>`;
-        }).join("")
-      : `<div class="folder-color-empty" data-i18n="settings.folders.empty">No folders found.</div>`;
-
-    container.querySelectorAll(".fcolor-dot").forEach(dot => {
-      dot.addEventListener("click", async () => {
-        const folderId = dot.closest(".folder-color-picker").dataset.folder;
-        const color = dot.dataset.color;
-        dot.closest(".folder-color-picker").querySelectorAll(".fcolor-dot").forEach(d => { d.classList.remove("is-active"); d.setAttribute("aria-checked", "false"); });
-        dot.classList.add("is-active");
-        dot.setAttribute("aria-checked", "true");
-        const meta = await getMeta();
-        meta.folderColorsById[folderId] = color;
-        await saveMeta(meta);
-        toast("Folder color updated.");
-      });
-      dot.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); dot.click(); } });
-    });
+    await getBookmarkTreeData();
+    container.innerHTML = `<div class="folder-color-empty" data-i18n="settings.folders.direct">Open Folders, then click a folder icon to choose a color or emoji.</div>`;
     applyI18n();
   } catch {
     container.innerHTML = `<div class="folder-color-empty">Could not load folders.</div>`;
@@ -207,6 +198,9 @@ async function bindFolderColors() {
 }
 
 function bindSync() {
+  const syncRoot = document.querySelector("[data-panel='sync']");
+  if (syncRoot?.dataset.bound) return;
+  if (syncRoot) syncRoot.dataset.bound = "1";
   const syncCodeOutput = document.getElementById("syncCodeOutput");
   const copyBtn = document.getElementById("copyCodeButton");
   const restoreInput = document.getElementById("restoreCodeInput");
@@ -295,13 +289,21 @@ function bindSync() {
 }
 
 function bindReset(settings) {
-  document.getElementById("resetDefaultsButton")?.addEventListener("click", async () => {
+  const button = document.getElementById("resetDefaultsButton");
+  if (!button || button.dataset.bound) return;
+  button.dataset.bound = "1";
+  button.addEventListener("click", async () => {
     if (!confirm("Reset all settings to defaults? This cannot be undone.")) return;
     if (!confirm("Are you sure?")) return;
     await chrome.storage.local.remove("settings");
     toast("Settings reset. Reload the page.");
     refreshUI();
   });
+}
+
+async function saveAndReadSettings(partial) {
+  await saveSettings(partial);
+  return getSettings();
 }
 
 function buildExportHtml(data) {

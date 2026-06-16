@@ -1,8 +1,10 @@
 import {
+  applyPortableMeta,
+  applyAccentColor,
   createBookmark, createFolder, faviconUrl, formatDate, getBookmarkTreeData,
-  getCurrentTab, getMeta, injectIcons, saveMeta, getSettings, moveBookmark,
+  getCurrentTab, injectIcons, getSettings, moveBookmark,
   normalizeTags, pullSyncSnapshot, pushSyncSnapshot, removeBookmarkMeta,
-  setCategory, setFolderColor, setTags, toast, toggleStar, updateFolder,
+  setCategory, setFolderColor, setFolderEmoji, setTags, toast, toggleStar, updateFolder,
   buildTermIndex, suggestTags, findDuplicates, computeHealth,
   savePageContent, getPageContent
 } from "./shared.js";
@@ -11,10 +13,17 @@ import { detectBrowserLanguage, setLanguage, t } from "./i18n.js";
 injectIcons();
 
 const FOLDER_COLORS = [
-  { id: "mint", label: "Mint" }, { id: "blue", label: "Blue" },
-  { id: "rose", label: "Rose" }, { id: "amber", label: "Amber" },
-  { id: "violet", label: "Violet" }, { id: "graphite", label: "Graphite" }
+  { id: "mint", label: "Focus" },
+  { id: "blue", label: "Work" },
+  { id: "rose", label: "Ideas" },
+  { id: "amber", label: "Read" },
+  { id: "violet", label: "Build" },
+  { id: "graphite", label: "Archive" }
 ];
+
+const FOLDER_EMOJIS = ["📚", "🧠", "💼", "⭐", "🎨", "🛒", "💰", "🎬", "🔖", "🚀", "🧪", "🧭"];
+
+const RECENT_WINDOW_DAYS = 30;
 
 const CATEGORIES = [
   { id: "work", label: "Work", color: "blue", keywords: ["docs", "github", "jira", "slack", "notion", "workspace", "dashboard", "admin", "project", "client", "crm", "figma"] },
@@ -27,7 +36,7 @@ const CATEGORIES = [
 
 const state = {
   bookmarks: [], folders: [], filter: "all", folderFilter: "", query: "",
-  settings: null, editingFolderId: "", editingFolderColor: "mint",
+  settings: null, editingFolderId: "", stylingFolderId: "",
   selectedBookmarkId: "", organizeSuggestions: [], composerOpen: false,
   previewBookmark: null, dragId: ""
 };
@@ -40,6 +49,9 @@ const el = {
   list: $("#bookmarkList"),
   empty: $("#emptyState"),
   badge: $("#bookmarkBadge"),
+  onboardingCard: $("#onboardingCard"),
+  onboardingRefresh: $("#onboardingRefresh"),
+  onboardingImport: $("#onboardingImport"),
   folderFilterBadge: $("#folderFilterBadge"),
   folderSelect: $("#folderSelect"),
   importFile: $("#importFile"),
@@ -57,7 +69,7 @@ const el = {
   editFolderDialog: $("#editFolderDialog"),
   editFolderForm: $("#editFolderForm"),
   editFolderName: $("#editFolderNameInput"),
-  folderColorGrid: $("#folderColorGrid"),
+  folderStylePopover: $("#folderStylePopover"),
   composerPanel: $("#composerPanel"),
   composerToggle: $("#composerToggle"),
   panels: $$(".view-panel"),
@@ -84,6 +96,7 @@ const el = {
   stepPanels: $$(".step-panel"),
   previewPanel: $("#previewPanel"),
   previewClose: $("#previewClose"),
+  previewFolderMove: $("#previewFolderMove"),
   readerPanel: $("#readerPanel"),
   readerClose: $("#readerClose")
 };
@@ -97,6 +110,7 @@ async function init() {
   setLanguage(lang);
   applySettings();
   bindEvents();
+  enableDragScroll();
   const savedView = s.rememberView && localStorage.getItem("booki-last-view");
   const initialView = savedView && ["library","folders","organize","tools"].includes(savedView) ? savedView : s.defaultView;
   switchView(initialView);
@@ -111,24 +125,26 @@ async function init() {
   if (s.focusSearch && !queryParam) el.search.focus();
   else if (queryParam) el.search.focus();
   chrome.runtime.onMessage.addListener(onBackgroundMessage);
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.settings?.newValue) {
+      state.settings = { ...state.settings, ...changes.settings.newValue };
+      applySettings();
+      renderBookmarks();
+    }
+  });
 }
 
 function applySettings() {
   const s = state.settings;
   document.documentElement.classList.toggle("is-compact", !!s.compactView);
   document.documentElement.classList.toggle("show-health", !!s.showHealthBadges);
-  if (s.accentColor && s.accentColor !== "auto") {
-    const colorMap = { amber: "#ffbe0b", blaze: "#fb5607", pink: "#ff006e", violet: "#8338ec", blue: "#3a86ff" };
-    document.documentElement.style.setProperty("--accent", colorMap[s.accentColor] || "#ffbe0b");
-  } else {
-    document.documentElement.style.removeProperty("--accent");
-  }
+  applyAccentColor(s);
 }
 
 function onBackgroundMessage(msg) {
   if (msg?.type === "bookmarks-changed") loadLibrary();
-  if (msg?.type === "settings-changed") {
-    getSettings().then(s => { state.settings = s; applySettings(); });
+  if (msg?.type === "settings-changed" || msg?.type === "settings-changed-broadcast") {
+    Promise.resolve(msg.settings || getSettings()).then(s => { state.settings = s; applySettings(); });
   }
 }
 
@@ -141,15 +157,15 @@ function bindEvents() {
   });
 
   $$(".segment").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      $$(".segment").forEach((s) => s.classList.remove("is-active"));
-      btn.classList.add("is-active");
-      state.filter = btn.dataset.filter;
-      renderBookmarks();
-    });
+    btn.addEventListener("click", () => setFilter(btn.dataset.filter || "all"));
   });
 
   $("#refreshButton").addEventListener("click", loadLibrary);
+  el.onboardingRefresh?.addEventListener("click", loadLibrary);
+  el.onboardingImport?.addEventListener("click", () => {
+    switchView("tools");
+    el.importFile?.click();
+  });
   $("#fillCurrentTab").addEventListener("click", fillCurrentTab);
   $("#newFolderButton").addEventListener("click", () => el.folderDialog.showModal());
   $("#cancelFolder").addEventListener("click", () => el.folderDialog.close());
@@ -162,10 +178,18 @@ function bindEvents() {
     renderBookmarks();
   });
   el.folderList.addEventListener("click", handleFolderClick);
+  el.folderStylePopover?.addEventListener("click", handleFolderStyleClick);
+  document.addEventListener("click", (e) => {
+    if (el.folderStylePopover?.hidden) return;
+    if (e.target.closest("#folderStylePopover") || e.target.closest("[data-action='style-folder']")) return;
+    closeFolderStylePopover();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeFolderStylePopover();
+  });
   el.form.addEventListener("submit", saveBookmarkFromForm);
   el.folderForm.addEventListener("submit", saveFolder);
   el.editFolderForm.addEventListener("submit", saveFolderEdits);
-  el.folderColorGrid.addEventListener("click", chooseFolderColor);
   el.viewTabs.forEach((btn) => btn.addEventListener("click", () => switchView(btn.dataset.view)));
   el.analyzeButton.addEventListener("click", analyzeLibrary);
   el.previewOrganizeButton.addEventListener("click", renderOrganizePreview);
@@ -272,11 +296,42 @@ function bindEvents() {
         renderBookmarks();
         toast("Tags updated.");
       }
+      if (e.target.id === "previewFolderMove" && state.previewBookmark) {
+        await moveBookmark(state.previewBookmark.id, e.target.value);
+        toast("Moved.");
+        await loadLibrary();
+        const moved = state.bookmarks.find((b) => b.id === state.previewBookmark?.id);
+        if (moved) showPreview(moved);
+      }
     });
   }
   if (el.readerClose) el.readerClose.addEventListener("click", () => { el.readerPanel.hidden = true; });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { closePreview(); el.readerPanel.hidden = true; }
+  });
+}
+
+function enableDragScroll() {
+  let dragging = false;
+  let startY = 0;
+  let startScroll = 0;
+  document.addEventListener("mousedown", (e) => {
+    if (!document.body.classList.contains("panel-shell")) return;
+    if (e.button !== 0) return;
+    if (e.target.closest("button, input, select, textarea, a, dialog, .bookmark-item, .folder-bookmark, .folder-item, [draggable='true']")) return;
+    dragging = true;
+    startY = e.clientY;
+    startScroll = window.scrollY;
+    document.body.classList.add("is-drag-scrolling");
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    window.scrollTo(0, startScroll + (startY - e.clientY));
+  });
+  document.addEventListener("mouseup", () => {
+    dragging = false;
+    document.body.classList.remove("is-drag-scrolling");
   });
 }
 
@@ -304,6 +359,12 @@ function showPreview(bookmark) {
   p.querySelector("#previewDate").textContent = formatDate(bookmark.dateAdded);
   p.querySelector("#previewTags").value = (bookmark.tags || []).join(", ");
   p.querySelector("#previewTags").dataset.bookmarkId = bookmark.id;
+  const moveSelect = p.querySelector("#previewFolderMove");
+  if (moveSelect) {
+    moveSelect.innerHTML = state.folders
+      .map((f) => `<option value="${esc(f.id)}"${f.id === bookmark.parentId ? " selected" : ""}>${esc(f.path || f.title)}</option>`)
+      .join("");
+  }
 
   const health = bookmark.health || { score: 50, level: "ok" };
   const healthEl = p.querySelector("#previewHealth");
@@ -315,14 +376,14 @@ function showPreview(bookmark) {
   const deadEl = p.querySelector("#previewDead");
   deadEl.hidden = !(bookmark.dead?.ok === false);
 
-  const starBtn = p.querySelector("#previewStar");
-  starBtn.innerHTML = `<span class="svg-icon" data-icon="star" style="width:16px;height:16px;${bookmark.starred ? 'color:var(--amber-gold);fill:var(--amber-gold);' : ''}" aria-hidden="true"></span>`;
-  p.querySelector("#previewOpen").dataset.bookmarkId = bookmark.id;
-  p.querySelector("#previewCapture").dataset.bookmarkId = bookmark.id;
-  p.querySelector("#previewAutoTag").dataset.bookmarkId = bookmark.id;
-  p.querySelector("#previewDelete").dataset.bookmarkId = bookmark.id;
-  p.querySelector("#previewEdit").dataset.bookmarkId = bookmark.id;
-  p.querySelector("#previewReader").dataset.bookmarkId = bookmark.id;
+  p.querySelectorAll("[data-action]").forEach((button) => {
+    button.dataset.bookmarkId = bookmark.id;
+  });
+  const starBtn = p.querySelector("[data-action='star']");
+  if (starBtn) {
+    starBtn.classList.toggle("is-active", !!bookmark.starred);
+    starBtn.innerHTML = `<span class="svg-icon" data-icon="star" style="${bookmark.starred ? 'color:var(--amber-gold);fill:var(--amber-gold);' : ''}" aria-hidden="true"></span> ${bookmark.starred ? "Unstar" : "Star"}`;
+  }
   injectIcons();
 }
 
@@ -330,6 +391,8 @@ function closePreview() {
   state.previewBookmark = null;
   if (el.previewPanel) el.previewPanel.hidden = true;
   if (el.readerPanel) el.readerPanel.hidden = true;
+  const list = document.querySelector(".view-panel[data-panel='library']:not(#composerPanel)");
+  if (list) list.style.display = "";
 }
 
 function findFolderName(folderId) {
@@ -350,11 +413,17 @@ async function loadLibrary() {
   el.list.setAttribute("aria-busy", "true");
   try {
     const data = await getBookmarkTreeData();
-    state.bookmarks = data.bookmarks.sort((a, b) => folderSort(a, b) || (b.dateAdded ?? 0) - (a.dateAdded ?? 0));
+    /* Preserve each bookmark's natural position within its folder (the order
+       Chrome returns) so manual drag-to-reorder is visible and persists. The
+       Recent / Starred filters re-sort by date in filteredBookmarks(). */
+    data.bookmarks.forEach((b, i) => { b.ord = i; });
+    state.bookmarks = data.bookmarks.sort((a, b) => folderSort(a, b) || (a.ord - b.ord));
     state.folders = data.folders.filter((f) => f.id !== "0");
     updateBadge();
+    renderOnboarding();
     renderFolderSelects();
     renderFolders();
+    renderFilterTabs();
     renderBookmarks();
     renderCategories();
   } catch (e) {
@@ -366,17 +435,54 @@ async function loadLibrary() {
 
 function updateBadge() { el.badge.textContent = ` ${state.bookmarks.length}`; }
 
+function setFilter(filter) {
+  state.filter = ["all", "starred", "recent"].includes(filter) ? filter : "all";
+  closePreview();
+  renderFilterTabs();
+  renderBookmarks();
+}
+
+function renderFilterTabs() {
+  const stats = getFilterStats();
+  $$(".segment").forEach((btn) => {
+    const active = btn.dataset.filter === state.filter;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", String(active));
+    const count = btn.querySelector(".segment-count");
+    if (count) count.textContent = String(stats[btn.dataset.filter] ?? 0);
+  });
+}
+
+function getFilterStats() {
+  const now = Date.now();
+  return state.bookmarks.reduce((stats, bookmark) => {
+    stats.all += 1;
+    if (bookmark.starred) stats.starred += 1;
+    if (isRecentBookmark(bookmark, now)) stats.recent += 1;
+    return stats;
+  }, { all: 0, starred: 0, recent: 0 });
+}
+
+function renderOnboarding() {
+  if (!el.onboardingCard) return;
+  const seen = localStorage.getItem("booki-onboarding-seen") === "1";
+  const shouldShow = !seen || state.bookmarks.length === 0;
+  el.onboardingCard.hidden = !shouldShow;
+  if (state.bookmarks.length > 0) localStorage.setItem("booki-onboarding-seen", "1");
+  injectIcons();
+}
+
 function switchView(view) {
   closePreview();
   el.readerPanel.hidden = true;
   el.viewTabs.forEach((t) => {
     t.classList.toggle("is-active", t.dataset.view === view);
-    t.style.setProperty("--section-accent", "var(--blaze-orange)");
+    t.style.setProperty("--section-accent", state.settings.accentColor === "auto" ? "var(--brand-gold)" : "var(--accent)");
   });
   const activeTab = el.viewTabs.find((t) => t.dataset.view === view);
   if (activeTab) {
     const accentMap = { folders: "var(--blue-violet)", organize: "var(--azure-blue)", tools: "var(--neon-pink)" };
-    activeTab.style.setProperty("--section-accent", accentMap[view] || "var(--blaze-orange)");
+    activeTab.style.setProperty("--section-accent", state.settings.accentColor === "auto" ? (accentMap[view] || "var(--brand-gold)") : "var(--accent)");
   }
   el.panels.forEach((p) => { p.hidden = p.dataset.panel !== view; });
   if (view === "library" && !state.composerOpen) el.composerPanel.hidden = true;
@@ -404,10 +510,16 @@ function renderFolders() {
 function renderFolderItem(folder) {
   const active = state.folderFilter === folder.id ? " expanded" : "";
   const bookmarkCount = state.bookmarks.filter(b => b.parentId === folder.id).length;
+  const color = FOLDER_COLORS.some((c) => c.id === folder.color) ? folder.color : "mint";
+  const folderIcon = folder.emoji
+    ? `<span class="folder-avatar-emoji" aria-hidden="true">${esc(folder.emoji)}</span>`
+    : `<span class="svg-icon" data-icon="folder" aria-hidden="true"></span>`;
   return `
-    <article class="folder-item${active}" data-folder-id="${esc(folder.id)}">
+    <article class="folder-item${active}" data-folder-id="${esc(folder.id)}" style="--folder-color:var(--folder-${esc(color)});">
       <div class="folder-item-info" data-action="open-folder">
-        <span class="svg-icon" data-icon="folder" style="width:18px;height:18px;flex-shrink:0;color:var(--folder-${folder.color || 'mint'});" aria-hidden="true"></span>
+        <button class="folder-avatar" type="button" data-action="style-folder" title="Style folder" aria-label="Style ${esc(folder.title)}">
+          ${folderIcon}
+        </button>
         <span class="folder-item-title">${esc(folder.title)}</span>
         <span class="folder-item-count">${bookmarkCount}</span>
       </div>
@@ -440,14 +552,20 @@ function renderFolderContents(folderId, returnHtml = false) {
     : `<div class="folder-empty">Empty folder</div>`;
   if (returnHtml) return html;
   const container = document.querySelector(`.folder-contents[data-parent="${folderId}"]`);
-  if (container) container.innerHTML = html;
+  if (!container) return;
+  container.innerHTML = html;
   container.style.display = "";
   attachFolderBmEvents();
 }
 
 function renderBookmarks() {
+  renderFilterTabs();
   const items = filteredBookmarks();
   el.empty.hidden = items.length > 0;
+  if (!items.length) {
+    el.empty.innerHTML = getEmptyStateHtml();
+    injectIcons();
+  }
   el.list.innerHTML = items.map(renderBookmarkItem).join("");
   injectIcons();
   if (state.previewBookmark) {
@@ -482,6 +600,9 @@ function renderBookmarkItem(b) {
         <button class="icon-button" type="button" data-action="open" title="Open" aria-label="Open" style="width:28px;height:28px;">
           <span class="svg-icon" data-icon="external" style="width:16px;height:16px;" aria-hidden="true"></span>
         </button>
+        <button class="icon-button" type="button" data-action="details" title="Details" aria-label="Details" style="width:28px;height:28px;">
+          <span class="svg-icon" data-icon="edit" style="width:16px;height:16px;" aria-hidden="true"></span>
+        </button>
         <button class="icon-button" type="button" data-action="star" title="Star" aria-label="Star" style="width:28px;height:28px;">
           <span class="svg-icon" data-icon="star" style="width:16px;height:16px;${b.starred ? 'color:var(--amber-gold);fill:var(--amber-gold);' : ''}" aria-hidden="true"></span>
         </button>
@@ -495,19 +616,104 @@ function renderBookmarkItem(b) {
 function filteredBookmarks() {
   const now = Date.now();
   const scope = state.settings.searchScope || "all";
-  return state.bookmarks.filter((b) => {
+  let items = state.bookmarks.filter((b) => {
     if (state.folderFilter && b.parentId !== state.folderFilter) return false;
     if (state.filter === "starred" && !b.starred) return false;
-    if (state.filter === "recent" && now - (b.dateAdded ?? 0) > 86400000 * 14) return false;
-    if (!state.query) return true;
-    const parts = [];
-    if (scope === "all" || scope === "title") parts.push(b.title);
-    if (scope === "all" || scope === "url") parts.push(b.url);
-    if (scope === "all" || scope === "tags") parts.push(...b.tags);
-    parts.push(b.folderPath);
-    const haystack = parts.join(" ").toLowerCase();
-    return haystack.includes(state.query);
+    if (state.filter === "recent" && !isRecentBookmark(b, now)) return false;
+    return true;
   });
+  if (state.query) items = rankBookmarks(items, state.query, scope);
+  if (state.query) return items;
+  if (state.filter === "recent") return items.sort((a, b) => (b.dateAdded ?? 0) - (a.dateAdded ?? 0));
+  if (state.filter === "starred") return items.sort((a, b) => (b.dateAdded ?? 0) - (a.dateAdded ?? 0));
+  return items;
+}
+
+function isRecentBookmark(bookmark, now = Date.now()) {
+  const added = bookmark.dateAdded ?? 0;
+  return added > 0 && now - added <= 86400000 * RECENT_WINDOW_DAYS;
+}
+
+function rankBookmarks(bookmarks, query, scope) {
+  const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  if (!terms.length) return bookmarks;
+  return bookmarks
+    .map((bookmark) => ({ bookmark, score: scoreBookmark(bookmark, terms, scope) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || (b.bookmark.dateAdded ?? 0) - (a.bookmark.dateAdded ?? 0))
+    .map((entry) => entry.bookmark);
+}
+
+function scoreBookmark(bookmark, terms, scope) {
+  const fields = [];
+  if (scope === "all" || scope === "title") fields.push({ value: bookmark.title, weight: 9 });
+  if (scope === "all" || scope === "url") {
+    const domain = safeUrl(bookmark.url)?.hostname || "";
+    fields.push({ value: domain, weight: 8 }, { value: bookmark.url, weight: 4 });
+  }
+  if (scope === "all" || scope === "tags") fields.push({ value: (bookmark.tags || []).join(" "), weight: 8 });
+  if (scope === "all") fields.push({ value: bookmark.folderPath, weight: 5 });
+
+  let total = 0;
+  for (const term of terms) {
+    let best = 0;
+    for (const field of fields) {
+      best = Math.max(best, scoreSearchField(field.value, term) * field.weight);
+    }
+    if (best === 0) return 0;
+    total += best;
+  }
+  if (bookmark.starred) total += 2;
+  if (isRecentBookmark(bookmark)) total += 1;
+  return total;
+}
+
+function scoreSearchField(value, term) {
+  const text = normalizeSearchText(value);
+  if (!text || !term) return 0;
+  if (text === term) return 12;
+  if (text.startsWith(term)) return 9;
+  if (text.includes(` ${term}`) || text.includes(`/${term}`) || text.includes(`.${term}`)) return 7;
+  if (text.includes(term)) return 5;
+  return subsequenceScore(text, term);
+}
+
+function subsequenceScore(text, term) {
+  let ti = 0;
+  let streak = 0;
+  let score = 0;
+  for (let i = 0; i < text.length && ti < term.length; i += 1) {
+    if (text[i] !== term[ti]) {
+      streak = 0;
+      continue;
+    }
+    ti += 1;
+    streak += 1;
+    score += 0.35 + Math.min(streak * 0.15, 0.8);
+  }
+  return ti === term.length ? Math.min(score / Math.max(term.length, 1), 3) : 0;
+}
+
+function normalizeSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .trim();
+}
+
+function getEmptyStateHtml() {
+  if (state.query) {
+    return `<span class="svg-icon" data-icon="search" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span><p>No matches for this search.</p>`;
+  }
+  if (state.filter === "starred") {
+    return `<span class="svg-icon" data-icon="star" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span><p>No starred bookmarks yet. Use the star button on a bookmark to pin it here.</p>`;
+  }
+  if (state.filter === "recent") {
+    return `<span class="svg-icon" data-icon="refresh" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span><p>No bookmarks added in the last ${RECENT_WINDOW_DAYS} days.</p>`;
+  }
+  return `<span class="svg-icon" data-icon="bookmark" style="width:36px;height:36px;color:var(--muted);" aria-hidden="true"></span><p>No bookmarks yet. Save your first page!</p>`;
 }
 
 async function fillCurrentTab() {
@@ -551,7 +757,6 @@ async function saveFolderEdits(e) {
   e.preventDefault();
   try {
     await updateFolder(state.editingFolderId, el.editFolderName.value);
-    await setFolderColor(state.editingFolderId, state.editingFolderColor);
     el.editFolderDialog.close();
     toast("Folder updated.");
     await loadLibrary();
@@ -564,6 +769,12 @@ function handleFolderClick(e) {
   const info = e.target.closest("[data-action='open-folder']");
   const folder = card ? state.folders.find((f) => f.id === card.dataset.folderId) : null;
   if (!folder) return;
+
+  if (btn?.dataset.action === "style-folder") {
+    e.stopPropagation();
+    openFolderStylePopover(folder, btn);
+    return;
+  }
 
   if (info || (!btn && card)) {
     if (state.folderFilter === folder.id) {
@@ -590,25 +801,74 @@ function handleFolderClick(e) {
   }
   if (btn?.dataset.action === "edit-folder") {
     state.editingFolderId = folder.id;
-    state.editingFolderColor = folder.color;
     el.editFolderName.value = folder.title;
-    renderColorGrid();
     el.editFolderDialog.showModal();
   }
 }
 
-function chooseFolderColor(e) {
-  const btn = e.target.closest("button[data-color]");
-  if (!btn) return;
-  state.editingFolderColor = btn.dataset.color;
-  renderColorGrid();
+function openFolderStylePopover(folder, anchor) {
+  if (!el.folderStylePopover) return;
+  state.stylingFolderId = folder.id;
+  const colorButtons = FOLDER_COLORS.map((c) => {
+    const active = (folder.color || "mint") === c.id ? " is-selected" : "";
+    return `<button class="folder-style-choice color-choice${active}" type="button" data-color="${esc(c.id)}" aria-label="${esc(c.label)}" title="${esc(c.label)}" style="--choice-color:var(--folder-${esc(c.id)});"><span></span></button>`;
+  }).join("");
+  const emojiButtons = FOLDER_EMOJIS.map((emoji) => {
+    const active = folder.emoji === emoji ? " is-selected" : "";
+    return `<button class="folder-style-choice emoji-choice${active}" type="button" data-emoji="${esc(emoji)}" aria-label="Use ${esc(emoji)}">${esc(emoji)}</button>`;
+  }).join("");
+
+  el.folderStylePopover.innerHTML = `
+    <div class="folder-style-head">
+      <strong>${esc(folder.title)}</strong>
+      <button class="icon-button" type="button" data-action="clear-emoji" title="Use folder icon" aria-label="Use folder icon">
+        <span class="svg-icon" data-icon="folder" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div class="folder-style-group" aria-label="Folder colors">${colorButtons}</div>
+    <div class="folder-style-group emoji-grid" aria-label="Folder emojis">${emojiButtons}</div>
+  `;
+  injectIcons();
+
+  const rect = anchor.getBoundingClientRect();
+  const width = 256;
+  const left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left));
+  const top = Math.min(window.innerHeight - 12, rect.bottom + 8);
+  el.folderStylePopover.style.left = `${left}px`;
+  el.folderStylePopover.style.top = `${top}px`;
+  el.folderStylePopover.style.width = `${width}px`;
+  el.folderStylePopover.hidden = false;
 }
 
-function renderColorGrid() {
-  el.folderColorGrid.innerHTML = FOLDER_COLORS.map((c) => {
-    const active = state.editingFolderColor === c.id ? " is-selected" : "";
-    return `<button class="color-swatch${active}" type="button" data-color="${c.id}" aria-label="${c.label}" style="background:var(--folder-${c.id});"></button>`;
-  }).join("");
+function closeFolderStylePopover() {
+  if (!el.folderStylePopover) return;
+  el.folderStylePopover.hidden = true;
+  state.stylingFolderId = "";
+}
+
+async function handleFolderStyleClick(e) {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const folderId = state.stylingFolderId;
+  if (!folderId) return;
+  try {
+    if (btn.dataset.color) {
+      await setFolderColor(folderId, btn.dataset.color);
+      toast("Folder color updated.");
+    }
+    if (btn.dataset.emoji) {
+      await setFolderEmoji(folderId, btn.dataset.emoji);
+      toast("Folder icon updated.");
+    }
+    if (btn.dataset.action === "clear-emoji") {
+      await setFolderEmoji(folderId, "");
+      toast("Folder icon reset.");
+    }
+    closeFolderStylePopover();
+    await loadLibrary();
+  } catch (err) {
+    toast(err.message || "Could not update folder style.", "error");
+  }
 }
 
 async function handleListClick(e) {
@@ -619,13 +879,16 @@ async function handleListClick(e) {
   if (!bookmark) return;
 
   if (!btn) {
-    state.selectedBookmarkId = item.dataset.id;
-    showPreview(bookmark);
-    renderBookmarks();
+    await openBookmark(bookmark);
     return;
   }
 
   if (btn.dataset.action === "open") { await openBookmark(bookmark); closePreview(); }
+  if (btn.dataset.action === "details") {
+    state.selectedBookmarkId = item.dataset.id;
+    showPreview(bookmark);
+    renderBookmarks();
+  }
   if (btn.dataset.action === "star") {
     const starred = await toggleStar(bookmark.id);
     bookmark.starred = starred;
@@ -657,27 +920,23 @@ async function handleListChange(e) {
 
 /* ─── Drag & drop reorder ─── */
 
-let dragIndicator = null;
+/* A real flow element inserted between items — its position is always exact,
+   unlike an absolutely-positioned bar. */
+let dropLine = null;
+let dropContext = null;
 
-function ensureDragIndicator() {
-  if (!dragIndicator) {
-    dragIndicator = document.createElement("div");
-    dragIndicator.className = "drag-indicator";
-    dragIndicator.style.cssText = "height:3px;border-radius:999px;background:var(--section-accent,var(--accent));transform:scaleY(0);transition:transform 0.15s var(--ease-spring);pointer-events:none;position:absolute;left:8px;right:8px;z-index:10;";
-    el.list.style.position = "relative";
-    el.list.parentNode.insertBefore(dragIndicator, el.list.nextSibling);
+function getDropLine() {
+  if (!dropLine) {
+    dropLine = document.createElement("div");
+    dropLine.className = "drop-line";
+    dropLine.setAttribute("aria-hidden", "true");
   }
-  return dragIndicator;
+  return dropLine;
 }
 
-function getDropIndex(items, targetId, mouseY) {
-  for (let i = 0; i < items.length; i++) {
-    const el = document.querySelector(`.bookmark-item[data-id="${items[i].id}"]`);
-    if (!el || items[i].id === targetId) continue;
-    const rect = el.getBoundingClientRect();
-    if (mouseY < rect.top + rect.height / 2) return items[i] === items[0] ? 0 : i;
-  }
-  return items.length;
+function removeDropLine() {
+  if (dropLine?.parentNode) dropLine.parentNode.removeChild(dropLine);
+  dropContext = null;
 }
 
 function handleBookmarkDragStart(e) {
@@ -686,62 +945,93 @@ function handleBookmarkDragStart(e) {
   state.dragId = item.dataset.id;
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("text/bookmark-id", item.dataset.id);
-  item.style.opacity = "0.4";
+  el.list.classList.add("is-reordering");
+  /* defer so the native drag image is captured before the element dims */
+  requestAnimationFrame(() => item.classList.add("is-dragging"));
 }
 
 function clearDragState() {
-  document.querySelectorAll(".bookmark-item").forEach(el => el.style.opacity = "");
-  if (dragIndicator) dragIndicator.style.transform = "scaleY(0)";
+  document.querySelectorAll(".bookmark-item.is-dragging, .folder-bookmark.is-dragging")
+    .forEach((node) => node.classList.remove("is-dragging"));
+  el.list.classList.remove("is-reordering");
+  removeDropLine();
   state.dragId = "";
 }
 
 function handleDragOver(e) {
-  const item = e.target.closest(".bookmark-item");
-  if (!item || item.dataset.id === state.dragId) {
-    if (dragIndicator) dragIndicator.style.transform = "scaleY(0)";
-    return;
-  }
+  if (!state.dragId) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = "move";
+  const line = getDropLine();
+  const item = e.target.closest(".bookmark-item");
+
+  if (!item) {
+    if (el.list.lastElementChild !== line) el.list.appendChild(line);
+    dropContext = { append: true };
+    return;
+  }
+  if (item.dataset.id === state.dragId) { removeDropLine(); return; }
 
   const rect = item.getBoundingClientRect();
-  const y = e.clientY - rect.top;
-  const mid = rect.height / 2;
-  const ind = ensureDragIndicator();
-
-  const listRect = el.list.getBoundingClientRect();
-  if (y < mid) {
-    ind.style.transform = "scaleY(1)";
-    ind.style.top = (item.offsetTop - el.list.scrollTop) + "px";
-    ind.style.position = "absolute";
+  const before = e.clientY < rect.top + rect.height / 2;
+  if (before) {
+    el.list.insertBefore(line, item);
+    dropContext = { targetId: item.dataset.id, position: "before" };
   } else {
-    ind.style.transform = "scaleY(1)";
-    ind.style.top = (item.offsetTop + item.offsetHeight - el.list.scrollTop) + "px";
-    ind.style.position = "absolute";
+    el.list.insertBefore(line, item.nextElementSibling);
+    dropContext = { targetId: item.dataset.id, position: "after" };
   }
 }
 
 async function handleDrop(e) {
-  if (dragIndicator) dragIndicator.style.transform = "scaleY(0)";
   e.preventDefault();
   const bookmarkId = state.dragId || e.dataTransfer.getData("text/bookmark-id");
-  if (!bookmarkId) return;
-  const dragged = state.bookmarks.find(b => b.id === bookmarkId);
-  if (!dragged) return;
-  const items = filteredBookmarks();
-  const targetItem = e.target.closest(".bookmark-item");
-  const newIndex = targetItem
-    ? getDropIndex(items, bookmarkId, e.clientY)
-    : items.findIndex(b => b.id === bookmarkId);
-  const destinationFolder = targetItem
-    ? state.bookmarks.find(b => b.id === targetItem.dataset.id)?.parentId || dragged.parentId
-    : dragged.parentId;
+  const ctx = dropContext;
+  removeDropLine();
+  if (!bookmarkId || !ctx) { clearDragState(); return; }
+  const dragged = state.bookmarks.find((b) => b.id === bookmarkId);
+  if (!dragged) { clearDragState(); return; }
+
+  let parentId, refId, position;
+  if (ctx.append) {
+    parentId = state.folderFilter || dragged.parentId;
+    refId = null;
+    position = "end";
+  } else {
+    const target = state.bookmarks.find((b) => b.id === ctx.targetId);
+    parentId = target?.parentId || dragged.parentId;
+    refId = ctx.targetId;
+    position = ctx.position;
+  }
+
   try {
-    await moveBookmark(bookmarkId, destinationFolder, newIndex);
-    toast("Moved.");
+    await reorderBookmark(bookmarkId, parentId, refId, position);
+    toast(t("toast.moved", "Moved."));
     await loadLibrary();
-  } catch (err) { toast(err.message || "Could not move.", "error"); }
-  finally { clearDragState(); }
+  } catch (err) {
+    toast(err.message || "Could not move.", "error");
+    await loadLibrary();
+  } finally {
+    clearDragState();
+  }
+}
+
+/* Computes the authoritative destination index from the folder's real child
+   order in Chrome (not the filtered view), so the new position persists. */
+async function reorderBookmark(id, parentId, refId, position) {
+  const children = await chrome.bookmarks.getChildren(parentId);
+  const oldIndex = children.findIndex((c) => c.id === id);
+  let target;
+  if (position === "end" || !refId) {
+    target = children.length;
+  } else {
+    const refIndex = children.findIndex((c) => c.id === refId);
+    target = refIndex < 0 ? children.length : (position === "after" ? refIndex + 1 : refIndex);
+  }
+  /* moving down within the same folder: removing the node first shifts the
+     later indices by one */
+  if (oldIndex !== -1 && oldIndex < target) target -= 1;
+  await chrome.bookmarks.move(id, { parentId, index: target });
 }
 
 /* ─── Folder bookmark events ─── */
@@ -787,10 +1077,9 @@ function attachFolderBmEvents() {
 /* ─── Folder bookmark clicks ─── */
 
 document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-action='open-bm']");
-  if (!btn) return;
-  const article = btn.closest(".folder-bookmark");
+  const article = e.target.closest(".folder-bookmark");
   if (!article) return;
+  if (e.target.closest("button") && !e.target.closest("[data-action='open-bm']")) return;
   const bm = state.bookmarks.find(b => b.id === article.dataset.id);
   if (bm) openBookmark(bm);
 });
@@ -889,7 +1178,10 @@ async function importBookmarkFile(file) {
 async function restoreFromJsonPayload(payload) {
   const bookmarkMap = new Map();
   async function createTree(folders, parentFallback) {
-    const roots = folders.filter((f) => f.parentId === "1" || f.parentId === "0" || f.parentId === "2" || f.parentId === "3");
+    for (const f of folders.filter((folder) => folder.parentId === "0")) {
+      bookmarkMap.set(f.id, ["1", "2", "3"].includes(f.id) ? f.id : (parentFallback || "1"));
+    }
+    const roots = folders.filter((f) => f.parentId === "1" || f.parentId === "2" || f.parentId === "3");
     for (const f of roots) {
       const created = await chrome.bookmarks.create({ parentId: parentFallback || f.parentId, title: f.title });
       bookmarkMap.set(f.id, created.id);
@@ -905,16 +1197,12 @@ async function restoreFromJsonPayload(payload) {
       await createChildren(f.id, folders);
     }
   }
-  for (const bm of payload.bookmarks) {
+  await createTree(payload.folders ?? [], "1");
+  for (const bm of payload.bookmarks ?? []) {
     const parentId = bookmarkMap.get(bm.parentId) || bm.parentId || "1";
     try { await createBookmark({ title: bm.title, url: bm.url, parentId, tags: payload.meta?.tagsByBookmarkId?.[bm.id] || [] }); } catch {}
   }
-  if (payload.meta?.starredIds?.length) {
-    const meta = await getMeta();
-    meta.starredIds = [...new Set([...meta.starredIds, ...payload.meta.starredIds])];
-    if (payload.meta.folderColorsById) Object.assign(meta.folderColorsById, payload.meta.folderColorsById);
-    await saveMeta(meta);
-  }
+  await applyPortableMeta(payload);
 }
 
 /* ─── Organize ─── */
@@ -1148,7 +1436,7 @@ async function handleGenerateSyncCode() {
     const resp = await chrome.runtime.sendMessage({ type: "generate-sync-code" });
     if (!resp?.ok) throw new Error(resp?.error || "Failed to generate code");
     el.syncCodeInput.value = resp.code;
-    el.syncSummary.textContent = "Code generated. Use it on your other device within 30 days.";
+    el.syncSummary.textContent = "Metadata code generated. Use it on your other device within 30 days.";
     showQRCode(resp.code);
     toast(t("toast.code.generated"));
   } catch (e) { toast(e.message || "Could not generate code.", "error"); }
@@ -1165,7 +1453,7 @@ async function handleRestoreFromCode() {
   try {
     const resp = await chrome.runtime.sendMessage({ type: "restore-from-code", code });
     if (!resp?.ok) throw new Error(resp?.error || "Restore failed");
-    toast("Bookmarks restored!");
+    toast("Metadata applied.");
     el.restoreSyncCode.value = "";
     await loadLibrary();
   } catch (e) { toast(e.message || "Could not restore.", "error"); }
@@ -1175,113 +1463,7 @@ async function handleRestoreFromCode() {
 
 function showQRCode(text) {
   if (!el.qrContainer || !text) return;
-  const qr = generateQR(text);
-  if (!qr) { el.qrContainer.innerHTML = `<small style="color:var(--muted);">Code: ${text}</small>`; return; }
-  const canvas = document.createElement("canvas");
-  const size = qr.length;
-  const cellSize = 4;
-  canvas.width = (size + 2) * cellSize;
-  canvas.height = (size + 2) * cellSize;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "transparent";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const computed = getComputedStyle(document.body);
-  const fg = computed.getPropertyValue("--ink").trim() || "#1c1c1c";
-  ctx.fillStyle = fg;
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (qr[r][c]) ctx.fillRect((c + 1) * cellSize, (r + 1) * cellSize, cellSize, cellSize);
-    }
-  }
-  el.qrContainer.innerHTML = "";
-  el.qrContainer.appendChild(canvas);
-}
-
-function generateQR(text) {
-  if (!text) return null;
-  const len = text.length;
-  let version = 1;
-  if (len > 25) version = 2;
-  if (len > 47) version = 3;
-  if (len > 77) version = 4;
-  if (len > 114) version = 5;
-  const size = version * 4 + 17;
-  const qr = Array.from({ length: size }, () => Array(size).fill(0));
-  function drawFinder(row, col) {
-    for (let r = -1; r <= 7; r++) {
-      for (let c = -1; c <= 7; c++) {
-        if (row + r < 0 || row + r >= size || col + c < 0 || col + c >= size) continue;
-        const val = (r >= 0 && r <= 6 && c >= 0 && c <= 6) &&
-          (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) ? 1 : 0;
-        if (row + r >= 0 && col + c >= 0) qr[row + r][col + c] = val;
-      }
-    }
-  }
-  drawFinder(0, 0);
-  drawFinder(0, size - 7);
-  drawFinder(size - 7, 0);
-  for (let i = 8; i < size - 8; i++) {
-    qr[6][i] = i % 2 === 0 ? 1 : 0;
-    qr[i][6] = i % 2 === 0 ? 1 : 0;
-  }
-  qr[size - 8][8] = 1;
-  const dataBits = [];
-  const charMap = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-  for (let i = 0; i < text.length; i += 2) {
-    if (i + 1 < text.length) {
-      const val = charMap.indexOf(text[i]) * 45 + charMap.indexOf(text[i + 1]);
-      addBits(dataBits, val, 11);
-    } else {
-      addBits(dataBits, charMap.indexOf(text[i]), 6);
-    }
-  }
-  const modeBits = [0, 1, 0, 0];
-  const countBits = version < 10 ? 9 : version < 27 ? 11 : 13;
-  const charCount = text.length;
-  const allBits = [...modeBits, ...toBits(charCount, countBits), ...dataBits];
-  const maxBits = [152, 272, 440, 640, 864][version - 1];
-  const bits = [...allBits];
-  while (bits.length < maxBits) bits.push(0);
-  const padBytes = [0xEC, 0x11];
-  for (let i = allBits.length; i < maxBits; i++) {
-    bits[i] = ((padBytes[Math.floor((i - allBits.length) / 8) % 2] >> (7 - (i % 8))) & 1);
-  }
-  let bitIdx = 0;
-  let dir = -1;
-  let col = size - 1;
-  while (col > 0) {
-    if (col === 6) col--;
-    for (let row = dir === -1 ? size - 1 : 0; row >= 0 && row < size; row += dir) {
-      for (let c = 0; c < 2; c++) {
-        const x = col - c;
-        if (x < 0) continue;
-        if (qr[row][x] !== 0) continue;
-        if ((row < 9 && x < 9) || (row < 9 && x > size - 9) || (row > size - 9 && x < 9)) continue;
-        if (row === 6 || x === 6) continue;
-        qr[row][x] = bitIdx < bits.length ? bits[bitIdx++] : 0;
-      }
-    }
-    dir *= -1;
-    col -= 2;
-  }
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (qr[r][c] === -1) continue;
-      if ((r + c) % 2 === 0 && qr[r][c] > 0) qr[r][c] = 1;
-      if (qr[r][c] === -1) qr[r][c] = 0;
-    }
-  }
-  return qr;
-}
-
-function addBits(arr, val, n) {
-  for (let i = n - 1; i >= 0; i--) arr.push((val >> i) & 1);
-}
-
-function toBits(val, n) {
-  const bits = [];
-  for (let i = n - 1; i >= 0; i--) bits.push((val >> i) & 1);
-  return bits;
+  el.qrContainer.innerHTML = `<div class="sync-code-card" aria-label="Sync code">${esc(text)}</div>`;
 }
 
 /* ─── Import helpers ─── */

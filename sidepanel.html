@@ -10,8 +10,10 @@
     <main class="studio" aria-label="Booki manager">
       <header class="studio-header">
         <div class="brand">
-          <span class="svg-icon" data-icon="bookmark" style="width:24px;height:24px;color:var(--accent);" aria-hidden="true"></span>
-          <h1>Booki</h1>
+          <picture>
+            <source srcset="media/SVG/logowhite.svg" media="(prefers-color-scheme: dark)">
+            <img class="brand-wordmark" src="media/SVG/logo.svg" alt="Booki">
+          </picture>
           <span id="bookmarkBadge" style="color:var(--muted);font-weight:400;font-size:14px;"></span>
         </div>
         <div class="studio-header-actions">
@@ -24,20 +26,47 @@
         </div>
       </header>
 
+      <section id="onboardingCard" class="onboarding-card" hidden>
+        <picture>
+          <source srcset="media/SVG/isotypewhite.svg" media="(prefers-color-scheme: dark)">
+          <img src="media/SVG/isotype.svg" alt="" aria-hidden="true">
+        </picture>
+        <div class="onboarding-copy">
+          <strong>Your bookmarks are ready when Chrome is.</strong>
+          <span>Refresh to read browser bookmarks, import an export file, or start with a new save.</span>
+        </div>
+        <div class="onboarding-actions">
+          <button class="secondary-button" id="onboardingRefresh" type="button">
+            <span class="svg-icon" data-icon="refresh" aria-hidden="true"></span>
+            Refresh
+          </button>
+          <button class="primary-button" id="onboardingImport" type="button">
+            <span class="svg-icon" data-icon="import" aria-hidden="true"></span>
+            Import
+          </button>
+        </div>
+      </section>
+
       <section class="command-bar" aria-label="Search and filters">
         <label class="search-field" for="searchInput">
           <span class="svg-icon" data-icon="search" aria-hidden="true" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);"></span>
           <input id="searchInput" type="search" placeholder="Search bookmarks…" style="padding-left:36px;">
         </label>
         <div class="segmented" role="tablist" aria-label="Filters">
-          <button class="segment is-active" type="button" data-filter="all">All</button>
-          <button class="segment" type="button" data-filter="starred">
-            <span class="svg-icon" data-icon="star" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
-            Starred
+          <button class="segment is-active" type="button" data-filter="all" aria-pressed="true">
+            <span class="svg-icon segment-icon" data-icon="bookmark" aria-hidden="true"></span>
+            <span class="segment-label">All</span>
+            <span class="segment-count" data-count-for="all">0</span>
           </button>
-          <button class="segment" type="button" data-filter="recent">
-            <span class="svg-icon" data-icon="refresh" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
-            Recent
+          <button class="segment" type="button" data-filter="starred" aria-pressed="false">
+            <span class="svg-icon segment-icon" data-icon="star" aria-hidden="true"></span>
+            <span class="segment-label">Starred</span>
+            <span class="segment-count" data-count-for="starred">0</span>
+          </button>
+          <button class="segment" type="button" data-filter="recent" aria-pressed="false">
+            <span class="svg-icon segment-icon" data-icon="refresh" aria-hidden="true"></span>
+            <span class="segment-label">Recent</span>
+            <span class="segment-count" data-count-for="recent">0</span>
           </button>
         </div>
       </section>
@@ -184,7 +213,7 @@
               Export
             </span>
             <span class="step-dot" data-step="1">
-              <span class="svg-icon" data-icon="qr" style="width:12px;height:12px;vertical-align:text-bottom;" aria-hidden="true"></span>
+              <span class="svg-icon" data-icon="copy" style="width:12px;height:12px;vertical-align:text-bottom;" aria-hidden="true"></span>
               Code
             </span>
             <span class="step-dot" data-step="2">
@@ -225,10 +254,10 @@
           <!-- Step 1: Sync Code -->
           <div class="step-panel" data-step="1" hidden>
             <div class="sync-section">
-              <p style="margin:0;font-size:12px;color:var(--muted);">Generate a code, then enter it on your other device (same Google account).</p>
+              <p style="margin:0;font-size:12px;color:var(--muted);">Generate a metadata code, then enter it on your other device (same Google account).</p>
               <div class="sync-section-row">
                 <button class="secondary-button" id="generateSyncCode" type="button">
-                  <span class="svg-icon" data-icon="qr" aria-hidden="true"></span>
+                  <span class="svg-icon" data-icon="copy" aria-hidden="true"></span>
                   Generate code
                 </button>
                 <button class="secondary-button" id="pushSyncButton" type="button">
@@ -237,16 +266,16 @@
                 </button>
               </div>
               <div class="sync-code-box">
-                <input id="syncCodeInput" type="text" readonly placeholder="······" style="flex:1;text-align:center;font-size:18px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;min-height:44px;">
+                <input id="syncCodeInput" type="text" readonly placeholder="····· ·····" style="flex:1;text-align:center;font-size:18px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;min-height:44px;">
                 <button class="icon-button" id="copySyncCode" type="button" title="Copy code" aria-label="Copy sync code">
                   <span class="svg-icon" data-icon="save" aria-hidden="true"></span>
                 </button>
               </div>
               <div style="display:flex;gap:8px;">
-                <input id="restoreSyncCode" type="text" placeholder="Enter code to restore…" style="flex:1;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
+                <input id="restoreSyncCode" type="text" placeholder="Enter code to apply..." style="flex:1;text-align:center;letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">
                 <button class="primary-button" id="restoreFromCode" type="button">
                   <span class="svg-icon" data-icon="check" aria-hidden="true"></span>
-                  Restore
+                  Apply
                 </button>
               </div>
               <div id="qrContainer"></div>
@@ -257,7 +286,7 @@
           <!-- Step 2: Cloud sync -->
           <div class="step-panel" data-step="2" hidden>
             <div class="sync-section">
-              <p style="margin:0;font-size:12px;color:var(--muted);">Sync settings, tags, and stars via your Google account.</p>
+              <p style="margin:0;font-size:12px;color:var(--muted);">Sync settings, tags, stars, categories, and folder styles via your Google account.</p>
               <div class="sync-section-row">
                 <button class="secondary-button" id="pushSyncButton2" type="button">
                   <span class="svg-icon" data-icon="cloud" aria-hidden="true"></span>
@@ -301,6 +330,10 @@
         <label class="preview-tags-label">
           <span>Tags</span>
           <input id="previewTags" type="text" placeholder="tag1, tag2, tag3">
+        </label>
+        <label class="preview-tags-label">
+          <span>Move to folder</span>
+          <select id="previewFolderMove"></select>
         </label>
         <div class="preview-actions">
           <button class="secondary-button" type="button" data-action="open"><span class="svg-icon" data-icon="external" aria-hidden="true"></span> Open</button>
@@ -351,13 +384,6 @@
             Folder name
             <input id="editFolderNameInput" type="text" required placeholder="Research">
           </label>
-          <fieldset class="color-field">
-            <legend>
-              <span class="svg-icon" data-icon="folder" style="width:14px;height:14px;vertical-align:text-bottom;" aria-hidden="true"></span>
-              Color
-            </legend>
-            <div class="color-grid" id="folderColorGrid"></div>
-          </fieldset>
           <div class="dialog-actions">
             <button class="ghost-button" value="cancel" type="button" id="cancelEditFolder">Cancel</button>
             <button class="primary-button" value="default" type="submit">Save</button>
@@ -365,6 +391,7 @@
         </form>
       </dialog>
 
+      <div id="folderStylePopover" class="folder-style-popover" hidden></div>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </main>
     <script type="module" src="src/sidepanel.js"></script>
