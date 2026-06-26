@@ -1,0 +1,43 @@
+[package]
+name = "booki-dock"
+version = "0.1.0"
+description = "Booki — a modern, lightweight dock for Windows"
+authors = ["Booki"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "booki_dock_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+base64 = "0.22"
+
+# Windows-only native integration (Win32 bindings + icon encoding).
+[target.'cfg(windows)'.dependencies]
+png = "0.17"
+
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.58"
+features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Storage_FileSystem",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
