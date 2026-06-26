@@ -45,6 +45,11 @@ async function mockInvoke(cmd, args) {
       return null;
     case "list_windows":
       return [];
+    case "app_version":
+      return "0.1.0";
+    case "reset_config":
+      demoConfig = structuredClone(DEMO_CONFIG);
+      return structuredClone(demoConfig);
     default:
       return null;
   }
@@ -75,6 +80,19 @@ export function pickImageFile() {
   ]);
 }
 
+/** Close the current window (used by the settings window). */
+export async function closeSelf() {
+  if (T && T.window && T.window.getCurrentWindow) {
+    try {
+      await T.window.getCurrentWindow().close();
+      return;
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  window.close();
+}
+
 /** Broadcast that the config changed so other windows can live-refresh. */
 export async function emitConfigChanged() {
   if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed");
@@ -100,6 +118,7 @@ export async function onFileDrop({ onEnter, onLeave, onDrop } = {}) {
 export const config = {
   get: () => invoke("get_config"),
   save: (config) => invoke("save_config", { config }),
+  reset: () => invoke("reset_config"),
 };
 
 export const dock = {
@@ -113,4 +132,5 @@ export const dock = {
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
+  appVersion: () => invoke("app_version"),
 };

@@ -414,6 +414,26 @@ body.edge-right .sep-line {
   );
 }
 
+/* Empty-state hint tile */
+.tile.hint {
+  cursor: default;
+  opacity: 0.85;
+  animation: booki-breathe 2.6s var(--ease-spring) infinite;
+}
+.tile.hint img {
+  opacity: 0.8;
+  filter: none;
+}
+@keyframes booki-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 /* Drag state (pointer reorder) */
 .tile.dragging {
   opacity: 0.55;
@@ -646,11 +666,52 @@ input[type="range"] {
   color: var(--muted);
   font-style: italic;
 }
+.pin-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.pin-thumb {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: linear-gradient(150deg, var(--booki-tan), var(--booki-tan-deep));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+.pin-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .pin-name {
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.s-about {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.s-about-logo {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+.s-ver {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .pin-actions {
   display: flex;

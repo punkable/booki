@@ -6,6 +6,7 @@ import {
   dock as dockApi,
   pickAppFile,
   emitConfigChanged,
+  closeSelf,
 } from "./api.js";
 import { applyTheme } from "./theme.js";
 
@@ -29,6 +30,9 @@ async function boot() {
   bind();
   syncForm();
   renderPins();
+  dockApi.appVersion().then((v) => {
+    $("version").textContent = `v${v}`;
+  });
 }
 
 function buildSwatches() {
@@ -90,7 +94,20 @@ function bind() {
   $("autoHide").addEventListener("change", (e) => update({ autoHide: e.target.checked }));
   $("addApp").addEventListener("click", onAddApp);
   $("addSep").addEventListener("click", onAddSeparator);
+  $("resetCfg").addEventListener("click", onReset);
   $("quitApp").addEventListener("click", () => dockApi.quit());
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeSelf();
+  });
+}
+
+async function onReset() {
+  const fresh = await configApi.reset();
+  if (fresh) cfg = fresh;
+  applyTheme(cfg);
+  syncForm();
+  renderPins();
+  await emitConfigChanged();
 }
 
 async function update(patch) {
@@ -119,10 +136,15 @@ function renderPins() {
     const li = document.createElement("li");
     li.className = "pin-item" + (item.kind === "separator" ? " sep" : "");
 
+    const left = document.createElement("span");
+    left.className = "pin-left";
+    if (item.kind !== "separator") left.appendChild(pinThumb(item));
+
     const name = document.createElement("span");
     name.className = "pin-name";
     name.textContent = item.kind === "separator" ? "— separador —" : item.name;
     name.title = item.path || "";
+    left.appendChild(name);
 
     const actions = document.createElement("span");
     actions.className = "pin-actions";
@@ -130,9 +152,26 @@ function renderPins() {
     actions.appendChild(moveBtn("▼", i < cfg.pinned.length - 1, () => move(i, i + 1)));
     actions.appendChild(moveBtn("✕", true, () => removePin(i), "del"));
 
-    li.append(name, actions);
+    li.append(left, actions);
     list.appendChild(li);
   });
+}
+
+function pinThumb(item) {
+  const thumb = document.createElement("span");
+  thumb.className = "pin-thumb";
+  thumb.textContent = (item.name || "?").trim().charAt(0).toUpperCase();
+  const src = item.icon ? Promise.resolve(item.icon) : dockApi.appIcon(item.path);
+  Promise.resolve(src).then((uri) => {
+    if (uri) {
+      thumb.textContent = "";
+      const img = document.createElement("img");
+      img.src = uri;
+      img.alt = "";
+      thumb.appendChild(img);
+    }
+  });
+  return thumb;
 }
 
 function moveBtn(label, enabled, onClick, kind) {

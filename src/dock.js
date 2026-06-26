@@ -69,6 +69,17 @@ async function render() {
     );
   }
 
+  // Friendly empty state — nudge the user to add or drop apps.
+  if (!cfg.pinned.some((p) => p.kind !== "separator")) {
+    const hint = document.createElement("div");
+    hint.className = "tile hint";
+    hint.style.setProperty("--size", `${baseSize()}px`);
+    hint.innerHTML =
+      `<span class="label">Arrastra apps aquí o pulsa +</span>` +
+      `<img src="/brand/svg/isotype.svg" alt="Booki" />`;
+    dockEl.appendChild(hint);
+  }
+
   utilSep = document.createElement("div");
   utilSep.className = "tile separator util-sep";
   utilSep.innerHTML = `<span class="sep-line"></span>`;
@@ -309,6 +320,9 @@ function closeMenu() {
 }
 window.addEventListener("click", closeMenu);
 window.addEventListener("blur", closeMenu);
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMenu();
+});
 
 async function changeIcon(item) {
   const path = await pickImageFile();
@@ -342,8 +356,14 @@ async function removeItem(id) {
 
 // ─────────────────── Window frame (magnify headroom) ───────────────────
 
+let reframeTimer = null;
 function reframe() {
-  requestAnimationFrame(() => requestAnimationFrame(applyFrame));
+  // Coalesce rapid calls (render + settings changes) into one resize.
+  clearTimeout(reframeTimer);
+  reframeTimer = setTimeout(
+    () => requestAnimationFrame(() => requestAnimationFrame(applyFrame)),
+    50
+  );
 }
 
 let lastFull = null;
