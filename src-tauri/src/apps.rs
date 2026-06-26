@@ -27,6 +27,31 @@ pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
     shell_open(path, args)
 }
 
+/// Open the file's containing folder in the file manager (selecting it on Windows).
+pub fn reveal(path: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        Command::new("explorer")
+            .arg(format!("/select,{path}"))
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let parent = Path::new(path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| ".".into());
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        Command::new(opener)
+            .arg(parent)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[cfg(windows)]
 fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
     // `cmd /C start "" <path> [args...]` resolves shortcuts and file associations.

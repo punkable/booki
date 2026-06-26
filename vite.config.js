@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
 // Tauri expects a fixed port and serves the `src/` folder as the web root.
@@ -7,6 +8,8 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   root: "src",
   publicDir: resolve(process.cwd(), "assets"),
+  // The dock is vanilla JS; the settings window is React (JSX).
+  plugins: [react()],
   // Prevent Vite from obscuring Rust errors
   clearScreen: false,
   server: {

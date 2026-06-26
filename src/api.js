@@ -26,7 +26,10 @@ const DEMO_CONFIG = {
   showLabels: true,
   showIndicators: true,
   autoHide: false,
+  autoHideDelay: 650,
   alwaysOnTop: true,
+  magnifyStyle: "spring",
+  hotkey: "",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 
@@ -50,6 +53,10 @@ async function mockInvoke(cmd, args) {
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);
+    case "open_location":
+    case "set_hotkey":
+      console.info("[demo]", cmd, args);
+      return null;
     default:
       return null;
   }
@@ -152,4 +159,6 @@ export const dock = {
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
   appVersion: () => invoke("app_version"),
+  openLocation: (path) => invoke("open_location", { path }),
+  setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
 };
