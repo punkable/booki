@@ -14,3 +14,9 @@ pub fn list_windows() -> Vec<WindowInfo> {
 pub fn focus_window(_hwnd: isize) -> bool {
     false
 }
+
+/// Work area (excluding the taskbar) of the monitor under a point.
+/// No native info off-Windows → caller falls back to the full monitor.
+pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {
+    None
+}

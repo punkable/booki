@@ -7,9 +7,11 @@ use std::ffi::c_void;
 use base64::Engine;
 use windows::core::PCWSTR;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, TRUE};
+use windows::Win32::Foundation::POINT;
 use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO,
-    BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ,
+    CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
+    MonitorFromPoint, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
+    HGDIOBJ, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
@@ -181,6 +183,24 @@ unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
         title,
     });
     TRUE
+}
+
+/// Work area (screen minus the taskbar) of the monitor containing a point,
+/// as (left, top, width, height). Used to keep the dock off the taskbar.
+pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
+    unsafe {
+        let hmon = MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            let r = mi.rcWork;
+            Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
+        } else {
+            None
+        }
+    }
 }
 
 /// Bring a window to the foreground, restoring it if minimized.

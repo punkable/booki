@@ -109,6 +109,16 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+/// Lets the frontend write to the app log file (for diagnosing issues).
+#[tauri::command]
+fn frontend_log(level: String, message: String) {
+    match level.as_str() {
+        "error" => log::error!(target: "frontend", "{message}"),
+        "warn" => log::warn!(target: "frontend", "{message}"),
+        _ => log::info!(target: "frontend", "{message}"),
+    }
+}
+
 // ─────────────────────────────── Helpers ────────────────────────────────
 
 /// Anchor a window to a screen edge of its current monitor.
@@ -121,18 +131,25 @@ fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let msize = monitor.size();
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
 
+    // Use the monitor's WORK AREA (excludes the taskbar) so the dock never
+    // sits on top of the taskbar, wherever it is. Falls back to the full
+    // monitor off-Windows.
+    let (ax, ay, aw, ah) = win::work_area(
+        mpos.x + msize.width as i32 / 2,
+        mpos.y + msize.height as i32 / 2,
+    )
+    .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+
     let margin: i32 = 12;
-    let mw = msize.width as i32;
-    let mh = msize.height as i32;
     let ww = wsize.width as i32;
     let wh = wsize.height as i32;
 
     let (x, y) = match edge {
-        "top" => (mpos.x + (mw - ww) / 2, mpos.y + margin),
-        "left" => (mpos.x + margin, mpos.y + (mh - wh) / 2),
-        "right" => (mpos.x + mw - ww - margin, mpos.y + (mh - wh) / 2),
+        "top" => (ax + (aw - ww) / 2, ay + margin),
+        "left" => (ax + margin, ay + (ah - wh) / 2),
+        "right" => (ax + aw - ww - margin, ay + (ah - wh) / 2),
         // default: bottom
-        _ => (mpos.x + (mw - ww) / 2, mpos.y + mh - wh - margin),
+        _ => (ax + (aw - ww) / 2, ay + ah - wh - margin),
     };
 
     window
@@ -145,12 +162,22 @@ fn open_settings_window(app: &AppHandle) {
         let _ = existing.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .title("Booki — Ajustes")
-        .inner_size(560.0, 660.0)
-        .min_inner_size(460.0, 480.0)
+        .inner_size(580.0, 700.0)
+        .min_inner_size(480.0, 520.0)
         .resizable(true)
+        .transparent(true)
+        .decorations(true)
         .build();
+    #[cfg(windows)]
+    if let Ok(w) = built {
+        // Windows 11 system material for the settings window.
+        let _ = window_vibrancy::apply_mica(&w, None)
+            .or_else(|_| window_vibrancy::apply_acrylic(&w, Some((22, 22, 24, 180))));
+    }
+    #[cfg(not(windows))]
+    let _ = built;
 }
 
 fn toggle_dock(app: &AppHandle) {
@@ -169,6 +196,11 @@ fn toggle_dock(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -185,8 +217,10 @@ pub fn run() {
             reset_config,
             open_settings,
             quit,
+            frontend_log,
         ])
         .setup(|app| {
+            log::info!("Booki backend started");
             // System tray.
             let toggle = MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Ajustes…", true, None::<&str>)?;
@@ -220,6 +254,11 @@ pub fn run() {
 
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
+                // Windows 11 Acrylic material (frosted, translucent).
+                #[cfg(windows)]
+                {
+                    let _ = window_vibrancy::apply_acrylic(&dock, Some((22, 22, 24, 160)));
+                }
                 let cfg = config::load();
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);

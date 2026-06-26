@@ -7,8 +7,14 @@ import {
   pickAppFile,
   emitConfigChanged,
   closeSelf,
+  logMessage,
 } from "./api.js";
 import { applyTheme } from "./theme.js";
+
+window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
+window.addEventListener("unhandledrejection", (e) =>
+  logMessage("error", `settings: unhandled ${e.reason}`)
+);
 
 const ACCENTS = [
   { name: "Tan (Booki)", value: "#dfaa75" },
@@ -24,15 +30,19 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 let cfg = null;
 
 async function boot() {
-  cfg = await configApi.get();
-  applyTheme(cfg);
-  buildSwatches();
-  bind();
-  syncForm();
-  renderPins();
-  dockApi.appVersion().then((v) => {
-    $("version").textContent = `v${v}`;
-  });
+  try {
+    cfg = await configApi.get();
+    applyTheme(cfg);
+    buildSwatches();
+    bind();
+    syncForm();
+    renderPins();
+    dockApi.appVersion().then((v) => {
+      $("version").textContent = `v${v}`;
+    });
+  } catch (err) {
+    logMessage("error", `settings boot failed: ${err}`);
+  }
 }
 
 function buildSwatches() {

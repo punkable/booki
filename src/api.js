@@ -73,6 +73,25 @@ export function pickAppFile() {
   return pickFile([{ name: "Programas", extensions: ["exe", "lnk", "bat", "cmd"] }]);
 }
 
+/** Open a native folder picker for pinning a folder. */
+export async function pickFolder() {
+  if (T && T.dialog && T.dialog.open) {
+    return T.dialog.open({ multiple: false, directory: true });
+  }
+  const path = window.prompt("Ruta de la carpeta:", "C:/Users");
+  return path || null;
+}
+
+/** Write a line to the app log file (best-effort, for diagnostics). */
+export function logMessage(level, message) {
+  try {
+    if (isTauri) T.core.invoke("frontend_log", { level, message: String(message) });
+    else console[level === "error" ? "error" : "log"]("[booki]", message);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 /** Open a native file picker for choosing a custom icon image. */
 export function pickImageFile() {
   return pickFile([
