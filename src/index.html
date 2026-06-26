@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Booki</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="dock-body edge-bottom show-labels">
+    <nav class="dock" id="dock" aria-label="Booki dock"></nav>
+
+    <div class="drop-overlay" id="drop-overlay">
+      <div class="pill" id="drop-pill">Suelta para anclar a Booki</div>
+    </div>
+
+    <div class="reveal-handle" id="reveal-handle" aria-hidden="true"></div>
+
+    <div class="menu hidden" id="ctx-menu" role="menu"></div>
+
+    <script type="module" src="./dock.js"></script>
+  </body>
+</html>
