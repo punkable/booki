@@ -51,6 +51,12 @@ fn default_spacing() -> u32 {
 fn default_opacity() -> f32 {
     0.62
 }
+fn default_hide_delay() -> u32 {
+    650
+}
+fn default_anim() -> String {
+    "spring".into()
+}
 fn default_true() -> bool {
     true
 }
@@ -91,8 +97,17 @@ pub struct Config {
     pub show_indicators: bool,
     #[serde(default)]
     pub auto_hide: bool,
+    /// Auto-hide delay before sliding away, in ms.
+    #[serde(default = "default_hide_delay")]
+    pub auto_hide_delay: u32,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
+    /// Magnify animation style: "spring" | "smooth" | "off".
+    #[serde(default = "default_anim")]
+    pub magnify_style: String,
+    /// Global hotkey accelerator to toggle the dock (e.g. "Alt+Space"); empty = none.
+    #[serde(default)]
+    pub hotkey: String,
 }
 
 impl Default for Config {
@@ -110,7 +125,10 @@ impl Default for Config {
             show_labels: true,
             show_indicators: true,
             auto_hide: false,
+            auto_hide_delay: default_hide_delay(),
             always_on_top: true,
+            magnify_style: default_anim(),
+            hotkey: String::new(),
         }
     }
 }

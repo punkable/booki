@@ -109,6 +109,25 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+/// Open the containing folder of a pinned item (selecting it on Windows).
+#[tauri::command]
+fn open_location(path: String) -> Result<(), String> {
+    apps::reveal(&path)
+}
+
+/// (Re)register the global hotkey that toggles the dock. Empty = none.
+#[tauri::command]
+fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    if !accelerator.trim().is_empty() {
+        gs.register(accelerator.as_str())
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Lets the frontend write to the app log file (for diagnosing issues).
 #[tauri::command]
 fn frontend_log(level: String, message: String) {
@@ -201,6 +220,16 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .build(),
         )
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state() == ShortcutState::Pressed {
+                        toggle_dock(app);
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -216,6 +245,8 @@ pub fn run() {
             app_version,
             reset_config,
             open_settings,
+            open_location,
+            set_hotkey,
             quit,
             frontend_log,
         ])
@@ -263,6 +294,12 @@ pub fn run() {
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
+
+                // Register the global hotkey, if configured.
+                if !cfg.hotkey.trim().is_empty() {
+                    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                    let _ = app.global_shortcut().register(cfg.hotkey.as_str());
+                }
             }
 
             Ok(())

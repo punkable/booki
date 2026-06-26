@@ -68,6 +68,10 @@ function applyAll() {
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", !!cfg.autoHide);
+  // Magnify animation style → easing curve used for the size/lift transitions.
+  const style = cfg.magnifyStyle || "spring";
+  const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
+  root.style.setProperty("--mag-ease", ease);
 }
 
 async function persist() {
@@ -197,15 +201,22 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
+    t.classList.remove("focus");
   });
 }
 
+// Booki magnify — a focused spring "pop": the hovered tile pops up with a
+// lift + glow while neighbours grow only gently (tighter falloff than the
+// classic macOS ripple).
 function magnify(clientX, clientY) {
-  if (!cfg.magnification || dockEl.classList.contains("dragging")) return;
+  if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
+  if (dockEl.classList.contains("dragging")) return;
   const base = baseSize();
   const max = base * (cfg.zoom || 1.8);
-  const spread = base * 1.9;
+  const spread = base * 1.25; // tight → concentrated pop, not a wide ripple
   const vertical = isVertical();
+  let best = null;
+  let bestInf = 0;
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const sep = t.classList.contains("separator");
     const b = sep ? base * 0.5 : base;
@@ -216,10 +227,24 @@ function magnify(clientX, clientY) {
     const dist = Math.abs(pointer - center);
     const influence = Math.max(0, 1 - (dist / spread) ** 2);
     t.style.setProperty("--size", `${b + (m - b) * influence}px`);
+    if (!sep && influence > bestInf) {
+      bestInf = influence;
+      best = t;
+    }
   });
+  dockEl.querySelectorAll(".tile.focus").forEach((t) => t !== best && t.classList.remove("focus"));
+  if (best && bestInf > 0.4) best.classList.add("focus");
 }
 
-dockEl.addEventListener("pointermove", (e) => magnify(e.clientX, e.clientY));
+let magnifyRaf = 0;
+dockEl.addEventListener("pointermove", (e) => {
+  if (magnifyRaf) return;
+  const { clientX, clientY } = e;
+  magnifyRaf = requestAnimationFrame(() => {
+    magnifyRaf = 0;
+    magnify(clientX, clientY);
+  });
+});
 dockEl.addEventListener("pointerleave", () => setAllSizes(baseSize()));
 
 // ──────────────────────── Pointer reorder ────────────────────────
@@ -471,7 +496,7 @@ function scheduleHide() {
     setTimeout(() => {
       if (hiddenState) applyFrame();
     }, 340);
-  }, 650);
+  }, cfg.autoHideDelay ?? 650);
 }
 
 document.body.addEventListener("pointerenter", reveal);
