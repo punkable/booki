@@ -9,7 +9,7 @@ mod util;
 mod win;
 
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
@@ -83,6 +83,20 @@ fn image_data_uri(path: String) -> Option<String> {
 #[tauri::command]
 fn set_always_on_top(window: WebviewWindow, value: bool) -> Result<(), String> {
     window.set_always_on_top(value).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+/// Reset appearance/behavior to defaults, keeping the user's pinned items.
+#[tauri::command]
+fn reset_config() -> Result<Config, String> {
+    let mut c = Config::default();
+    c.pinned = config::load().pinned;
+    config::save(&c)?;
+    Ok(c)
 }
 
 #[tauri::command]
@@ -167,6 +181,8 @@ pub fn run() {
             set_dock_frame,
             image_data_uri,
             set_always_on_top,
+            app_version,
+            reset_config,
             open_settings,
             quit,
         ])
@@ -185,6 +201,19 @@ pub fn run() {
                     "toggle" => toggle_dock(app),
                     "settings" => open_settings_window(app),
                     "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| match event {
+                    // Left click toggles the dock; double click opens settings.
+                    TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } => toggle_dock(tray.app_handle()),
+                    TrayIconEvent::DoubleClick {
+                        button: MouseButton::Left,
+                        ..
+                    } => open_settings_window(tray.app_handle()),
                     _ => {}
                 })
                 .build(app)?;
