@@ -16,9 +16,11 @@
 
 ## Install
 
-1. Grab the latest **`Booki_x64-setup.exe`** (NSIS) or **`Booki_x64_en-US.msi`** from the
-   [Actions artifacts](https://github.com/punkable/booki/actions/workflows/build-windows.yml)
-   (or a GitHub Release, once published).
+1. Download the latest installer from the
+   [**Releases** page](https://github.com/punkable/booki/releases) —
+   `Booki_*_x64-setup.exe` (NSIS, recommended) or `Booki_*_x64_en-US.msi`.
+   (Every push is also built in [Actions](https://github.com/punkable/booki/actions); release
+   builds attach the installers to a downloadable Release.)
 2. Run the installer and launch **Booki** from the Start menu.
 3. The dock appears at the bottom of your screen; a tray icon gives you show/hide, settings and quit.
 
