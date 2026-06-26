@@ -5,20 +5,27 @@ import {
   config as configApi,
   dock as dockApi,
   pickAppFile,
+  pickFolder,
   pickImageFile,
   onFileDrop,
   onConfigChanged,
+  logMessage,
   isTauri,
 } from "./api.js";
-import { icon, injectIcons } from "./icons.js";
+import { icon } from "./icons.js";
 import { applyTheme, applyEdge } from "./theme.js";
+
+// Surface any runtime error to the app log (diagnostics on the user's machine).
+window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
+window.addEventListener("unhandledrejection", (e) =>
+  logMessage("error", `dock: unhandled ${e.reason}`)
+);
 
 const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 
 let cfg = null;
-let utilSep = null; // node marking where pinned tiles end
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
 const isVertical = () => cfg.edge === "left" || cfg.edge === "right";
@@ -27,14 +34,19 @@ const baseSize = () => cfg.iconSize || 48;
 // ───────────────────────────── Boot ─────────────────────────────
 
 async function boot() {
-  cfg = await configApi.get();
-  applyAll();
-  await render();
-  reframe();
-  setupAutoHide();
-  setupFileDrop();
-  startRunningPoll();
-  onConfigChanged(reloadConfig);
+  try {
+    cfg = await configApi.get();
+    applyAll();
+    await render();
+    reframe();
+    setupAutoHide();
+    setupFileDrop();
+    startRunningPoll();
+    onConfigChanged(reloadConfig);
+    logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
+  } catch (err) {
+    logMessage("error", `boot failed: ${err}`);
+  }
 }
 
 async function reloadConfig() {
@@ -49,7 +61,10 @@ function applyAll() {
   applyTheme(cfg);
   applyEdge(cfg);
   const root = document.documentElement;
-  root.style.setProperty("--glass-alpha", String(cfg.opacity ?? 0.62));
+  root.style.setProperty("--material", String(cfg.opacity ?? 0.55));
+  if (cfg.accent) {
+    root.style.setProperty("--accent", cfg.accent);
+  }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", !!cfg.autoHide);
@@ -69,24 +84,19 @@ async function render() {
     );
   }
 
-  // Friendly empty state — nudge the user to add or drop apps.
+  // Friendly empty state — the bar stays clean (no +/gear chrome); users add
+  // via drag-from-desktop or right-click.
   if (!cfg.pinned.some((p) => p.kind !== "separator")) {
-    const hint = document.createElement("div");
+    const hint = document.createElement("button");
     hint.className = "tile hint";
     hint.style.setProperty("--size", `${baseSize()}px`);
     hint.innerHTML =
-      `<span class="label">Arrastra apps aquí o pulsa +</span>` +
+      `<span class="label">Arrastra apps o carpetas aquí · clic derecho para añadir</span>` +
       `<img src="/brand/svg/isotype.svg" alt="Booki" />`;
+    hint.addEventListener("click", onAddApp);
+    hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
   }
-
-  utilSep = document.createElement("div");
-  utilSep.className = "tile separator util-sep";
-  utilSep.innerHTML = `<span class="sep-line"></span>`;
-  dockEl.appendChild(utilSep);
-
-  dockEl.appendChild(utilTile("plus", "Añadir app", onAddApp));
-  dockEl.appendChild(utilTile("settings", "Ajustes", () => dockApi.openSettings()));
 
   setAllSizes(baseSize());
 }
@@ -131,17 +141,6 @@ function separatorTile(item) {
   return el;
 }
 
-function utilTile(iconName, labelText, onClick) {
-  const el = document.createElement("button");
-  el.className = "tile util";
-  el.style.setProperty("--size", `${baseSize()}px`);
-  el.innerHTML = `<span class="label">${labelText}</span><span class="glyph">${icon(
-    iconName
-  )}</span>`;
-  el.addEventListener("click", onClick);
-  return el;
-}
-
 async function resolveIcon(item) {
   if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
   if (iconCache.has(item.path)) return iconCache.get(item.path);
@@ -168,6 +167,12 @@ function launch(el, item) {
 
 async function onAddApp() {
   const path = await pickAppFile();
+  if (!path) return;
+  await addPaths([path]);
+}
+
+async function onAddFolder() {
+  const path = await pickFolder();
   if (!path) return;
   await addPaths([path]);
 }
@@ -242,7 +247,7 @@ function onDragMove(e) {
   const vertical = isVertical();
   const pointer = vertical ? e.clientY : e.clientX;
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((t) => t !== drag.el);
-  let ref = utilSep;
+  let ref = null; // null → append at the end
   for (const s of sibs) {
     const r = s.getBoundingClientRect();
     const mid = vertical ? r.top + r.height / 2 : r.left + r.width / 2;
@@ -276,6 +281,7 @@ async function onDragUp() {
 
 function openMenu(e, item) {
   e.preventDefault();
+  e.stopPropagation();
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn) => {
     const b = document.createElement("button");
@@ -298,11 +304,40 @@ function openMenu(e, item) {
     if (item.icon) add("x", "Quitar icono personalizado", () => clearIcon(item));
     sep();
   }
-  add("plus", "Añadir separador", () => addSeparatorAfter(item.id));
+  add("plus", "Añadir app…", onAddApp);
+  add("app", "Añadir carpeta…", onAddFolder);
+  add("grid", "Añadir separador", () => addSeparatorAfter(item.id));
   add("trash", "Quitar del dock", () => removeItem(item.id));
   sep();
   add("settings", "Ajustes…", () => dockApi.openSettings());
 
+  placeMenu(e);
+}
+
+// Right-click on empty dock area / hint → add + settings.
+function openBackgroundMenu(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxMenu.innerHTML = "";
+  const add = (iconName, text, fn) => {
+    const b = document.createElement("button");
+    b.innerHTML = `${icon(iconName)}<span>${text}</span>`;
+    b.addEventListener("click", async () => {
+      closeMenu();
+      await fn();
+    });
+    ctxMenu.appendChild(b);
+  };
+  add("plus", "Añadir app…", onAddApp);
+  add("app", "Añadir carpeta…", onAddFolder);
+  const s = document.createElement("div");
+  s.className = "sep";
+  ctxMenu.appendChild(s);
+  add("settings", "Ajustes…", () => dockApi.openSettings());
+  placeMenu(e);
+}
+
+function placeMenu(e) {
   // Reveal first so we can measure, then clamp within the window.
   ctxMenu.style.left = "0px";
   ctxMenu.style.top = "0px";
@@ -318,6 +353,8 @@ function openMenu(e, item) {
 function closeMenu() {
   ctxMenu.classList.add("hidden");
 }
+// Right-click on the bar's empty space (tiles stopPropagation their own menu).
+dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
 window.addEventListener("blur", closeMenu);
 window.addEventListener("keydown", (e) => {
@@ -490,5 +527,4 @@ function startRunningPoll() {
   pollTimer = setInterval(tick, 4000);
 }
 
-injectIcons();
 boot();
