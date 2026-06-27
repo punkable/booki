@@ -178,6 +178,12 @@ function Appearance({ cfg, set }) {
 }
 
 function Behavior({ cfg, set }) {
+  const [monitors, setMonitors] = useState([]);
+  const [autostart, setAutostart] = useState(!!cfg.autostart);
+  useEffect(() => {
+    dockApi.listMonitors().then((m) => setMonitors(m || []));
+    dockApi.getAutostart().then((v) => setAutostart(!!v));
+  }, []);
   return (
     <>
       <h1>Comportamiento</h1>
@@ -199,20 +205,41 @@ function Behavior({ cfg, set }) {
       <Toggle label="Magnificar iconos al pasar el cursor" checked={cfg.magnification}
         onChange={(v) => set({ magnification: v })} />
       {cfg.magnification && (
-        <Row label="Intensidad del zoom">
-          <Slider value={Math.round(cfg.zoom * 100)} min={110} max={250} step={10}
+        <Row label="Intensidad del zoom" hint="Cuánto se agrandan los iconos">
+          <Slider value={Math.round(cfg.zoom * 100)} min={110} max={180} step={5}
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
+      <Row label="Pantalla (monitor)">
+        <select value={cfg.monitor} onChange={(e) => set({ monitor: Number(e.target.value) })}>
+          <option value={-1}>Automática</option>
+          {monitors.map((m) => (
+            <option key={m.index} value={m.index}>
+              {m.name}{m.primary ? " (principal)" : ""}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <Row label="Intensidad del material" hint="Acrylic / Mica">
+        <Slider value={cfg.materialStrength} min={0} max={100} step={5} fmt={(v) => `${v}%`}
+          onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
+      </Row>
       <Toggle label="Mostrar nombres al pasar el cursor" checked={cfg.showLabels}
         onChange={(v) => set({ showLabels: v })} />
       <Toggle label="Indicar apps en ejecución" checked={cfg.showIndicators}
         onChange={(v) => set({ showIndicators: v })} />
       <Toggle label="Mantener siempre visible" checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
-      <Toggle label="Ocultar automáticamente" checked={cfg.autoHide}
-        onChange={(v) => set({ autoHide: v })} />
-      {cfg.autoHide && (
+      <Toggle label="Iniciar con Windows" checked={autostart}
+        onChange={(v) => { setAutostart(v); set({ autostart: v }); dockApi.setAutostart(v); }} />
+      <Row label="Ocultar automáticamente">
+        <select value={cfg.autoHideMode} onChange={(e) => set({ autoHideMode: e.target.value })}>
+          <option value="off">Nunca</option>
+          <option value="smart">Inteligente (cuando una ventana lo tapa)</option>
+          <option value="edge">Siempre (revelar en el borde)</option>
+        </select>
+      </Row>
+      {cfg.autoHideMode === "edge" && (
         <Row label="Retraso para ocultar">
           <Slider value={cfg.autoHideDelay} min={0} max={2000} step={50}
             fmt={(v) => `${v}ms`} onChange={(v) => set({ autoHideDelay: v })} />
@@ -223,11 +250,36 @@ function Behavior({ cfg, set }) {
 }
 
 function Apps({ cfg, set }) {
-  const move = (i, j) => {
-    const p = [...cfg.pinned];
-    const [m] = p.splice(i, 1);
-    p.splice(j, 0, m);
-    set({ pinned: p });
+  const listRef = useRef(null);
+  const pinnedRef = useRef(cfg.pinned);
+  pinnedRef.current = cfg.pinned;
+  const drag = useRef(null);
+
+  const startDrag = (i) => (e) => {
+    e.preventDefault();
+    drag.current = { from: i };
+    const onMove = (ev) => {
+      const lis = [...listRef.current.querySelectorAll(".pin-item")];
+      let to = lis.findIndex((li) => {
+        const r = li.getBoundingClientRect();
+        return ev.clientY < r.top + r.height / 2;
+      });
+      if (to === -1) to = pinnedRef.current.length - 1;
+      const from = drag.current.from;
+      if (to >= 0 && to !== from) {
+        const p = [...pinnedRef.current];
+        const [m] = p.splice(from, 1);
+        p.splice(to, 0, m);
+        drag.current.from = to;
+        set({ pinned: p });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      drag.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
   };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
   const addApp = async () => {
@@ -245,11 +297,13 @@ function Apps({ cfg, set }) {
     <>
       <h1>Apps ancladas</h1>
       <p className="muted">Arrastra programas o carpetas desde el escritorio al dock, o añádelos aquí.</p>
-      <ul className="pin-list">
+      <ul className="pin-list" ref={listRef}>
         {cfg.pinned.length === 0 && <li className="pin-empty">Aún no hay nada anclado.</li>}
         {cfg.pinned.map((item, i) => (
           <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "")}>
             <span className="pin-left">
+              <button className="pin-handle" title="Arrastrar para reordenar"
+                onPointerDown={startDrag(i)}>⠿</button>
               {item.kind !== "separator" && <PinThumb item={item} />}
               <span className="pin-name" title={item.path}>
                 {item.kind === "separator" ? "— separador —" : item.name}
@@ -260,10 +314,7 @@ function Apps({ cfg, set }) {
                 <button className="pin-btn" title="Abrir ubicación"
                   onClick={() => dockApi.openLocation(item.path)}>↗</button>
               )}
-              <button className="pin-btn" disabled={i === 0} onClick={() => move(i, i - 1)}>▲</button>
-              <button className="pin-btn" disabled={i === cfg.pinned.length - 1}
-                onClick={() => move(i, i + 1)}>▼</button>
-              <button className="pin-btn del" onClick={() => remove(i)}>✕</button>
+              <button className="pin-btn del" title="Quitar" onClick={() => remove(i)}>✕</button>
             </span>
           </li>
         ))}

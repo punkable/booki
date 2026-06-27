@@ -6,7 +6,7 @@ use std::ffi::c_void;
 
 use base64::Engine;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, TRUE};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
@@ -16,9 +16,10 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyIcon, EnumWindows, GetIconInfo, GetWindow, GetWindowLongW, GetWindowTextLengthW,
-    GetWindowTextW, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GWL_EXSTYLE,
-    GW_OWNER, HICON, ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
+    DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
+    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsIconic, IsWindowVisible,
+    SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE,
+    WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -200,6 +201,35 @@ pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
         } else {
             None
         }
+    }
+}
+
+/// True if the foreground window (not the desktop, not our own dock) overlaps
+/// the given dock rectangle (left, top, right, bottom) — used for smart hide.
+pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize) -> bool {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() || hwnd.0 as isize == self_hwnd {
+            return false;
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if class == "Progman" || class == "WorkerW" {
+            return false; // desktop is in front
+        }
+        if IsIconic(hwnd).as_bool() {
+            return false;
+        }
+        let mut r = RECT::default();
+        if GetWindowRect(hwnd, &mut r).is_err() {
+            return false;
+        }
+        let ol = r.left.max(dl);
+        let ot = r.top.max(dt);
+        let or = r.right.min(dr);
+        let ob = r.bottom.min(db);
+        or > ol && ob > ot
     }
 }
 

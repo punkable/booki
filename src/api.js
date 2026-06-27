@@ -26,10 +26,15 @@ const DEMO_CONFIG = {
   showLabels: true,
   showIndicators: true,
   autoHide: false,
+  autoHideMode: "off",
   autoHideDelay: 650,
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
+  monitor: -1,
+  materialStrength: 70,
+  autostart: false,
+  language: "system",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 
@@ -53,8 +58,25 @@ async function mockInvoke(cmd, args) {
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);
+    case "list_monitors":
+      return [
+        { index: 0, name: "Pantalla principal", x: 0, y: 0, w: 1920, h: 1080, primary: true },
+        { index: 1, name: "Pantalla 2", x: 1920, y: 0, w: 1920, h: 1080, primary: false },
+      ];
+    case "get_autostart":
+      return demoConfig.autostart;
+    case "is_dir":
+      return false;
+    case "list_dir":
+      return [
+        { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
+        { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
+        { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
+      ];
     case "open_location":
     case "set_hotkey":
+    case "set_material":
+    case "set_autostart":
       console.info("[demo]", cmd, args);
       return null;
     default:
@@ -161,4 +183,16 @@ export const dock = {
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
+  listMonitors: () => invoke("list_monitors"),
+  setMaterial: (strength) => invoke("set_material", { strength }),
+  setAutostart: (enabled) => invoke("set_autostart", { enabled }),
+  getAutostart: () => invoke("get_autostart"),
+  listDir: (path) => invoke("list_dir", { path }),
+  isDir: (path) => invoke("is_dir", { path }),
 };
+
+/** Listen for the smart-hide occlusion signal from the backend. */
+export async function onOcclusion(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://occlusion", (e) => cb(!!e.payload));
+}

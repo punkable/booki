@@ -43,7 +43,19 @@ fn default_icon_size() -> u32 {
     48
 }
 fn default_zoom() -> f32 {
-    1.8
+    1.35
+}
+fn default_auto_hide_mode() -> String {
+    "off".into()
+}
+fn default_monitor() -> i32 {
+    -1
+}
+fn default_material() -> u32 {
+    70
+}
+fn default_language() -> String {
+    "system".into()
 }
 fn default_spacing() -> u32 {
     6
@@ -97,6 +109,9 @@ pub struct Config {
     pub show_indicators: bool,
     #[serde(default)]
     pub auto_hide: bool,
+    /// Auto-hide behaviour: "off" | "smart" (hide when a window covers it) | "edge".
+    #[serde(default = "default_auto_hide_mode")]
+    pub auto_hide_mode: String,
     /// Auto-hide delay before sliding away, in ms.
     #[serde(default = "default_hide_delay")]
     pub auto_hide_delay: u32,
@@ -108,6 +123,18 @@ pub struct Config {
     /// Global hotkey accelerator to toggle the dock (e.g. "Alt+Space"); empty = none.
     #[serde(default)]
     pub hotkey: String,
+    /// Monitor index to place the dock on (-1 = primary).
+    #[serde(default = "default_monitor")]
+    pub monitor: i32,
+    /// Native material (Acrylic/Mica) strength, 0–100.
+    #[serde(default = "default_material")]
+    pub material_strength: u32,
+    /// Start with Windows.
+    #[serde(default)]
+    pub autostart: bool,
+    /// UI language: "system" | "es" | "en".
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 impl Default for Config {
@@ -125,10 +152,15 @@ impl Default for Config {
             show_labels: true,
             show_indicators: true,
             auto_hide: false,
+            auto_hide_mode: default_auto_hide_mode(),
             auto_hide_delay: default_hide_delay(),
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),
+            monitor: default_monitor(),
+            material_strength: default_material(),
+            autostart: false,
+            language: default_language(),
         }
     }
 }

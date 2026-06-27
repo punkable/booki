@@ -179,17 +179,75 @@ body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform:
 body.edge-left .tile, body.edge-right .tile { transform-origin: center; }
 .tile:hover { background: var(--hover); }
 
-/* Focused tile — pops out with a lift + accent glow (distinct from macOS) */
+/* Focused tile — a gentle lift + accent glow (distinct from macOS, subtle) */
 .tile.focus { z-index: 5; }
-body.edge-bottom .tile.focus { transform: translateY(-8px); }
-body.edge-top .tile.focus { transform: translateY(8px); }
-body.edge-left .tile.focus { transform: translateX(8px); }
-body.edge-right .tile.focus { transform: translateX(-8px); }
+body.edge-bottom .tile.focus { transform: translateY(-5px); }
+body.edge-top .tile.focus { transform: translateY(5px); }
+body.edge-left .tile.focus { transform: translateX(5px); }
+body.edge-right .tile.focus { transform: translateX(-5px); }
 .tile.focus img,
 .tile.focus .glyph {
-  filter: drop-shadow(0 7px 13px rgba(0, 0, 0, 0.32))
-    drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 55%, transparent));
+  filter: drop-shadow(0 6px 11px rgba(0, 0, 0, 0.28))
+    drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent));
 }
+
+/* Window-count badge */
+.tile .badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: var(--accent);
+  border: 1.5px solid var(--layer-strong);
+  border-radius: var(--r-pill);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.tile .badge:not(:empty) { display: flex; }
+
+/* Remove (×) button — visible only in edit mode */
+.tile .rm {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 18px;
+  height: 18px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  background: #e23b3b;
+  border: 1.5px solid var(--layer-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 6;
+  padding: 0;
+}
+body.edit .tile:not(.separator):not(.hint) .rm { display: flex; }
+
+/* iOS-style jiggle in edit mode */
+@keyframes booki-jiggle {
+  0% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.6deg); }
+  100% { transform: rotate(-1.6deg); }
+}
+body.edit .tile:not(.separator):not(.hint) {
+  animation: booki-jiggle 0.32s ease-in-out infinite;
+}
+body.edit .tile:nth-child(even):not(.separator):not(.hint) {
+  animation-delay: -0.16s;
+}
+body.edit .dock { cursor: grab; }
 /* Press feedback (icon squishes in) */
 .tile:active img,
 .tile:active .glyph {
@@ -433,6 +491,8 @@ input[type="range"] { accent-color: var(--accent); }
 .pin-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pin-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .pin-btn { width: 26px; height: 26px; font-size: 12px; color: var(--ink); background: var(--hover); border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.pin-handle { border: 0; background: transparent; color: var(--ink-2); cursor: grab; font-size: 15px; padding: 0 2px; touch-action: none; }
+.pin-handle:active { cursor: grabbing; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: #e23b3b; color: #fff; }
 .pin-empty { color: var(--ink-2); font-size: 13px; padding: 6px 2px; }
