@@ -115,8 +115,14 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   list-style: none;
   overflow: visible;
   border-radius: var(--r-xl);
-  /* Tint over the native Acrylic; blur is a fallback where there's no material */
-  background: color-mix(in srgb, var(--layer) calc(var(--material) * 100%), transparent);
+  /* The dock window is transparent and carries NO native vibrancy (that showed
+     up as a gray box behind the bar). The frosted "mica" look is built here:
+     a substantial translucent fill + a soft top sheen, so only this rounded
+     bar is ever visible against the desktop. --material (0.28–0.96) is the
+     user's material-strength slider. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 42%),
+    color-mix(in srgb, var(--layer-strong) calc(var(--material) * 100%), transparent);
   border: 1px solid var(--stroke);
   box-shadow: var(--shadow), inset 0 1px 0 var(--stroke-light);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
@@ -134,25 +140,31 @@ body.autohide.hidden.edge-top .dock { transform: translateY(-135%); }
 body.autohide.hidden.edge-left .dock { transform: translateX(-135%); }
 body.autohide.hidden.edge-right .dock { transform: translateX(135%); }
 
-/* Reveal handle */
+/* Reveal handle — the "notch". Visible only while hidden; click/hover reveals
+   the dock. Accent-tinted so it's discoverable, with a comfortable hit area. */
 .reveal-handle {
   position: fixed;
   left: 50%;
   bottom: 3px;
   transform: translateX(-50%);
-  width: 96px;
-  height: 5px;
+  width: 116px;
+  height: 6px;
   border-radius: var(--r-pill);
-  background: var(--layer-strong);
+  background: color-mix(in srgb, var(--accent) 60%, var(--layer-strong));
   border: 1px solid var(--stroke);
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  cursor: pointer;
+  transition: opacity 0.2s ease, height 0.16s var(--ease), width 0.16s var(--ease);
   pointer-events: none;
 }
-body.autohide.hidden .reveal-handle { opacity: 1; }
+body.autohide.hidden .reveal-handle { opacity: 0.92; pointer-events: auto; }
+body.autohide.hidden .reveal-handle:hover { opacity: 1; height: 9px; width: 132px; }
 body.edge-top .reveal-handle { bottom: auto; top: 3px; }
-body.edge-left .reveal-handle { left: 3px; bottom: 50%; top: auto; transform: translateY(50%); width: 5px; height: 96px; }
-body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform: translateY(50%); width: 5px; height: 96px; }
+body.edge-left .reveal-handle { left: 3px; bottom: 50%; top: auto; transform: translateY(50%); width: 6px; height: 116px; }
+body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform: translateY(50%); width: 6px; height: 116px; }
+body.autohide.hidden.edge-left .reveal-handle:hover,
+body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 132px; }
 
 /* ───────────────────────────── Tiles ───────────────────────────── */
 
@@ -556,6 +568,59 @@ input[type="range"] { accent-color: var(--accent); }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: #e23b3b; color: #fff; }
 .pin-empty { color: var(--ink-2); font-size: 13px; padding: 6px 2px; }
+
+/* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
+.accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.accent-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.accent-sw, .accent-custom {
+  position: relative; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer; padding: 0;
+  background: var(--sw);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.12s var(--ease-bounce), box-shadow 0.12s ease;
+}
+.accent-sw:hover, .accent-custom:hover { transform: scale(1.12); }
+.accent-sw.active, .accent-custom.active {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 3px color-mix(in srgb, var(--sw) 40%, transparent);
+}
+.accent-check, .accent-plus {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 14px; font-weight: 800; opacity: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); transition: opacity 0.12s ease; pointer-events: none;
+}
+.accent-sw.active .accent-check { opacity: 1; }
+.accent-custom { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.accent-custom .accent-plus { opacity: 0.9; }
+.accent-custom input[type="color"] {
+  position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+  border: 0; padding: 0; background: transparent; opacity: 0; cursor: pointer;
+}
+.accent-hex { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 64px; text-align: right; }
+
+/* Installed-app suggestions */
+.sugg-search {
+  width: 100%; font: inherit; font-size: 13px; padding: 9px 12px; margin: 6px 0 12px;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+}
+.sugg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.sugg-item {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 12px 6px; border: 1px solid var(--stroke); background: var(--layer);
+  border-radius: var(--r-md); cursor: pointer; color: var(--ink); overflow: hidden;
+  transition: background 0.12s ease, transform 0.12s var(--ease), border-color 0.12s ease;
+}
+.sugg-item:hover { background: var(--hover); transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 40%, var(--stroke)); }
+.sugg-item.pinned { opacity: 0.45; cursor: default; }
+.sugg-item.pinned:hover { transform: none; }
+.sugg-thumb {
+  width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; font-size: 16px; font-weight: 700; color: #fff; overflow: hidden;
+  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+}
+.sugg-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.sugg-name { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .s-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .s-btn { font: inherit; font-size: 14px; font-weight: 600; padding: 9px 16px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--r-sm); cursor: pointer; transition: filter 0.15s ease; }

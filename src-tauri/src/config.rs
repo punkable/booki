@@ -46,7 +46,9 @@ fn default_zoom() -> f32 {
     1.35
 }
 fn default_auto_hide_mode() -> String {
-    "off".into()
+    // Smart by default: the dock hides to a notch when a window covers it and
+    // reappears on the desktop. (User-requested default.)
+    "smart".into()
 }
 fn default_monitor() -> i32 {
     -1

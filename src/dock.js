@@ -46,9 +46,7 @@ async function boot() {
     setupFileDrop();
     startRunningPoll();
     onConfigChanged(reloadConfig);
-    onOcclusion((occluded) => {
-      if (hideMode() === "smart") setHidden(occluded);
-    });
+    onOcclusion(onOcclusionSignal);
     checkUpdates();
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
@@ -69,7 +67,11 @@ function applyAll() {
   applyTheme(cfg);
   applyEdge(cfg);
   const root = document.documentElement;
-  root.style.setProperty("--material", String(cfg.opacity ?? 0.55));
+  // The bar's frosted material is CSS-only now (no native vibrancy on the dock
+  // window — that caused the gray box). Map material strength 0–100 → a sensible
+  // alpha range so the bar always reads as a solid-ish frosted panel.
+  const mat = (cfg.materialStrength ?? 70) / 100;
+  root.style.setProperty("--material", String(Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66))));
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -526,11 +528,13 @@ function applyFrame() {
   lastFull = full;
   const dpr = window.devicePixelRatio || 1;
   if (hiddenState) {
-    const strip = Math.ceil(8 * dpr);
-    if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, full.h);
-    else dockApi.setDockFrame(cfg.edge, full.w, strip);
+    // Shrink to a slim notch strip; pass hidden=true so the backend does NOT
+    // record this as the occlusion "home" rect (otherwise smart-hide flaps).
+    const strip = Math.ceil(14 * dpr);
+    if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, full.h, true);
+    else dockApi.setDockFrame(cfg.edge, full.w, strip, true);
   } else {
-    dockApi.setDockFrame(cfg.edge, full.w, full.h);
+    dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
   }
 }
 
@@ -540,6 +544,8 @@ function applyFrame() {
 
 let hiddenState = false;
 let hideTimer = null;
+let occluded = false; // last occlusion signal from the backend (smart mode)
+let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 
 function hideMode() {
   return cfg.autoHideMode || (cfg.autoHide ? "edge" : "off");
@@ -559,25 +565,59 @@ function setHidden(v) {
 
 function setupAutoHide() {
   clearTimeout(hideTimer);
-  hiddenState = hideMode() === "edge"; // edge starts hidden; off/smart start shown
+  manualReveal = false;
+  // edge mode starts hidden; off/smart start shown (smart hides only once the
+  // backend reports the dock is actually covered, so on the desktop it stays
+  // visible — never flapping).
+  hiddenState = hideMode() === "edge";
   document.body.classList.toggle("hidden", hiddenState);
   applyFrame();
 }
 
+// Pointer entered the dock / notch → reveal and hold it open.
 function reveal() {
   if (hideMode() === "off") return;
   clearTimeout(hideTimer);
+  manualReveal = true;
   setHidden(false);
 }
+
+// Pointer left → after the delay, hide again if the mode still wants to.
 function scheduleHide() {
-  if (hideMode() !== "edge" || dragging) return;
+  const mode = hideMode();
+  if (mode === "off" || dragging) return;
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => !dragging && setHidden(true), cfg.autoHideDelay ?? 650);
+  hideTimer = setTimeout(() => {
+    if (dragging) return;
+    manualReveal = false;
+    if (mode === "edge" || (mode === "smart" && occluded)) setHidden(true);
+  }, cfg.autoHideDelay ?? 650);
+}
+
+// Smart-hide: the backend tells us when a window covers the dock's home area.
+// We hide to the notch when covered and reappear when the desktop is clear —
+// measured against a stable rect in Rust, so it can no longer flap.
+function onOcclusionSignal(value) {
+  occluded = value;
+  if (hideMode() !== "smart") return;
+  if (!value) {
+    manualReveal = false;
+    setHidden(false); // desktop is clear → always visible
+  } else if (!manualReveal) {
+    setHidden(true);
+  }
 }
 
 document.body.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", scheduleHide);
+
+// The notch is a clickable handle to bring the dock back manually.
+const revealHandle = document.getElementById("reveal-handle");
+if (revealHandle) {
+  revealHandle.addEventListener("pointerenter", reveal);
+  revealHandle.addEventListener("click", reveal);
+}
 
 // ─────────────────── Desktop file drop ───────────────────
 
