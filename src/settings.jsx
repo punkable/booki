@@ -66,19 +66,174 @@ function Toggle({ checked, onChange, label }) {
 }
 
 function Slider({ value, min, max, step, onChange, fmt }) {
+  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  const fill = `linear-gradient(to right, var(--accent) ${pct}%, var(--track) ${pct}%)`;
   return (
     <div className="r-slider">
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <span className="r-val">{fmt ? fmt(value) : value}</span>
+      <div className="slider-wrap">
+        <input
+          type="range"
+          className="slider-input"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          style={{ background: fill }}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+        <span className="slider-bubble" style={{ left: `${pct}%` }}>
+          {fmt ? fmt(value) : value}
+        </span>
+      </div>
     </div>
   );
+}
+
+// Sliding segmented control (replaces small dropdowns). options: [{value,label,icon}]
+function SegmentedControl({ value, options, onChange }) {
+  const idx = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div className="seg" style={{ "--n": options.length, "--i": idx }}>
+      <span className="seg-thumb" />
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          className={"seg-item" + (o.value === value ? " active" : "")}
+          onClick={() => onChange(o.value)}
+          title={o.label}
+        >
+          {o.icon && <span className="seg-ico">{o.icon}</span>}
+          <span className="seg-lbl">{o.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Click an edge of a mini screen to anchor the dock there.
+function EdgePicker({ value, onChange }) {
+  const edges = ["top", "bottom", "left", "right"];
+  return (
+    <div className="edgepick">
+      <div className="edgepick-screen">
+        {edges.map((e) => (
+          <button
+            key={e}
+            type="button"
+            className={`edgepick-edge ep-${e}` + (value === e ? " active" : "")}
+            onClick={() => onChange(e)}
+            title={t(`edge.${e}`)}
+            aria-label={t(`edge.${e}`)}
+          />
+        ))}
+        <span className="edgepick-label">{t(`edge.${value}`)}</span>
+      </div>
+    </div>
+  );
+}
+
+// Pick a monitor from boxes scaled to their real geometry.
+function MonitorPicker({ value, monitors, onChange }) {
+  if (!monitors || monitors.length === 0) {
+    return <span className="muted">{t("mon.auto")}</span>;
+  }
+  const minX = Math.min(...monitors.map((m) => m.x));
+  const minY = Math.min(...monitors.map((m) => m.y));
+  const maxX = Math.max(...monitors.map((m) => m.x + m.w));
+  const maxY = Math.max(...monitors.map((m) => m.y + m.h));
+  const W = maxX - minX || 1;
+  const H = maxY - minY || 1;
+  const scale = Math.min(220 / W, 96 / H);
+  return (
+    <div className="monpick">
+      <button
+        type="button"
+        className={"monpick-auto" + (value === -1 ? " active" : "")}
+        onClick={() => onChange(-1)}
+      >
+        {t("mon.auto")}
+      </button>
+      <div className="monpick-stage" style={{ width: W * scale, height: H * scale }}>
+        {monitors.map((m) => (
+          <button
+            key={m.index}
+            type="button"
+            className={"monpick-box" + (value === m.index ? " active" : "") + (m.primary ? " primary" : "")}
+            style={{
+              position: "absolute",
+              left: (m.x - minX) * scale + 2,
+              top: (m.y - minY) * scale + 2,
+              width: m.w * scale - 4,
+              height: m.h * scale - 4,
+            }}
+            onClick={() => onChange(m.index)}
+            title={m.name}
+          >
+            <span>{m.index + 1}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Live miniature of the dock that reacts to every appearance/behavior change.
+function MiniDockPreview({ cfg }) {
+  const items = (cfg.pinned || []).filter((p) => p.kind !== "separator").slice(0, 7);
+  const count = items.length || 5;
+  const scale = 0.42;
+  const size = Math.round((cfg.iconSize || 48) * scale);
+  const gap = Math.round((cfg.spacing ?? 6) * scale + 2);
+  const vertical = cfg.edge === "left" || cfg.edge === "right";
+  const mat = (cfg.materialStrength ?? 70) / 100;
+  const alpha = Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66));
+  const mid = Math.floor(count / 2);
+  const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
+  return (
+    <div className={"preview prev-" + (cfg.edge || "bottom")}>
+      <div
+        className="preview-bar"
+        style={{
+          flexDirection: vertical ? "column" : "row",
+          gap,
+          background: `color-mix(in srgb, var(--layer-strong) ${alpha * 100}%, transparent)`,
+        }}
+      >
+        {Array.from({ length: count }).map((_, i) => {
+          const s = i === mid ? Math.round(size * zoom) : size;
+          return (
+            <span
+              key={i}
+              className="preview-tile"
+              style={{
+                width: s,
+                height: s,
+                transform: i === mid ? (vertical ? "translateX(-4px)" : "translateY(-4px)") : "none",
+              }}
+            >
+              <PreviewIcon item={items[i]} />
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PreviewIcon({ item }) {
+  const [src, setSrc] = useState(item && item.icon ? item.icon : null);
+  useEffect(() => {
+    let alive = true;
+    if (item && !item.icon && item.path) {
+      dockApi.appIcon(item.path).then((u) => alive && setSrc(u));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [item && item.path]);
+  if (src) return <img src={src} alt="" />;
+  return <span className="preview-glyph" />;
 }
 
 // A more intuitive accent picker: large tappable swatches with a check on the
@@ -236,19 +391,28 @@ function Appearance({ cfg, set }) {
   return (
     <>
       <h1>{t("ap.title")}</h1>
+      <MiniDockPreview cfg={cfg} />
       <Row label={t("ap.theme")}>
-        <select value={cfg.theme} onChange={(e) => set({ theme: e.target.value })}>
-          <option value="system">{t("theme.system")}</option>
-          <option value="light">{t("theme.light")}</option>
-          <option value="dark">{t("theme.dark")}</option>
-        </select>
+        <SegmentedControl
+          value={cfg.theme || "system"}
+          onChange={(v) => set({ theme: v })}
+          options={[
+            { value: "system", label: t("theme.system") },
+            { value: "light", label: t("theme.light"), icon: "☀" },
+            { value: "dark", label: t("theme.dark"), icon: "☾" },
+          ]}
+        />
       </Row>
       <Row label={t("ap.language")}>
-        <select value={cfg.language || "system"} onChange={(e) => set({ language: e.target.value })}>
-          <option value="system">{t("lang.system")}</option>
-          <option value="es">Español</option>
-          <option value="en">English</option>
-        </select>
+        <SegmentedControl
+          value={cfg.language || "system"}
+          onChange={(v) => set({ language: v })}
+          options={[
+            { value: "system", label: t("lang.system") },
+            { value: "es", label: "ES" },
+            { value: "en", label: "EN" },
+          ]}
+        />
       </Row>
       <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
         <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
@@ -279,20 +443,24 @@ function Behavior({ cfg, set }) {
   return (
     <>
       <h1>{t("be.title")}</h1>
+      <MiniDockPreview cfg={cfg} />
       <Row label={t("be.edge")}>
-        <select value={cfg.edge} onChange={(e) => set({ edge: e.target.value })}>
-          <option value="bottom">{t("edge.bottom")}</option>
-          <option value="top">{t("edge.top")}</option>
-          <option value="left">{t("edge.left")}</option>
-          <option value="right">{t("edge.right")}</option>
-        </select>
+        <EdgePicker value={cfg.edge || "bottom"} onChange={(v) => set({ edge: v })} />
+      </Row>
+      <Row label={t("be.monitor")}>
+        <MonitorPicker value={cfg.monitor} monitors={monitors}
+          onChange={(v) => set({ monitor: v })} />
       </Row>
       <Row label={t("be.anim")}>
-        <select value={cfg.magnifyStyle} onChange={(e) => set({ magnifyStyle: e.target.value })}>
-          <option value="spring">{t("anim.spring")}</option>
-          <option value="smooth">{t("anim.smooth")}</option>
-          <option value="off">{t("anim.off")}</option>
-        </select>
+        <SegmentedControl
+          value={cfg.magnifyStyle || "spring"}
+          onChange={(v) => set({ magnifyStyle: v })}
+          options={[
+            { value: "spring", label: t("anim.spring") },
+            { value: "smooth", label: t("anim.smooth") },
+            { value: "off", label: t("anim.off") },
+          ]}
+        />
       </Row>
       <Toggle label={t("be.magnify")} checked={cfg.magnification}
         onChange={(v) => set({ magnification: v })} />
@@ -302,19 +470,20 @@ function Behavior({ cfg, set }) {
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
-      <Row label={t("be.monitor")}>
-        <select value={cfg.monitor} onChange={(e) => set({ monitor: Number(e.target.value) })}>
-          <option value={-1}>{t("mon.auto")}</option>
-          {monitors.map((m) => (
-            <option key={m.index} value={m.index}>
-              {m.name}{m.primary ? t("mon.primary") : ""}
-            </option>
-          ))}
-        </select>
-      </Row>
       <Row label={t("be.material")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength} min={0} max={100} step={5} fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
+      </Row>
+      <Row label={t("be.autoHide")}>
+        <SegmentedControl
+          value={cfg.autoHideMode || "smart"}
+          onChange={(v) => set({ autoHideMode: v })}
+          options={[
+            { value: "off", label: t("hide.offShort") },
+            { value: "smart", label: t("hide.smartShort") },
+            { value: "edge", label: t("hide.edgeShort") },
+          ]}
+        />
       </Row>
       <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
         onChange={(v) => set({ showLabels: v })} />
@@ -324,13 +493,6 @@ function Behavior({ cfg, set }) {
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <Toggle label={t("be.autostart")} checked={autostart}
         onChange={(v) => { setAutostart(v); set({ autostart: v }); dockApi.setAutostart(v); }} />
-      <Row label={t("be.autoHide")}>
-        <select value={cfg.autoHideMode} onChange={(e) => set({ autoHideMode: e.target.value })}>
-          <option value="off">{t("hide.off")}</option>
-          <option value="smart">{t("hide.smart")}</option>
-          <option value="edge">{t("hide.edge")}</option>
-        </select>
-      </Row>
       {cfg.autoHideMode === "edge" && (
         <Row label={t("be.hideDelay")}>
           <Slider value={cfg.autoHideDelay} min={0} max={2000} step={50}
@@ -572,7 +734,8 @@ function App() {
           <img src="/brand/svg/isotype.svg" alt="" />
           <span>Booki</span>
         </div>
-        <nav>
+        <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
+          <span className="s-nav-indicator" aria-hidden="true" />
           {TABS.map(([id, label]) => (
             <button
               key={id}

@@ -412,21 +412,29 @@ fn open_settings_window(app: &AppHandle) {
         .min_inner_size(560.0, 560.0)
         .resizable(true)
         .center()
+        .transparent(true)
         .decorations(true)
         .build();
     #[cfg(windows)]
     if let Ok(w) = &built {
-        // Defeat the WebView2 initial-size race: on first
+        // Windows 11 system material (Mica) for the settings window, so the
+        // floating acrylic sidebar reads as a layer above it.
+        let _ = window_vibrancy::apply_mica(w, None)
+            .or_else(|_| window_vibrancy::apply_acrylic(w, Some((22, 22, 24, 180))));
+
+        // Defeat the WebView2 transparent-window initial-size race: on first
         // paint the webview can come up smaller than the window (content looks
-        // "cropped" until the user manually resizes). Nudge the size once after
-        // a beat so WebView2 re-lays-out to fill the client area.
+        // "cropped" until the user manually resizes). Nudge the size a couple of
+        // times so WebView2 re-lays-out to fill the client area.
         let w2 = w.clone();
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(140));
-            if let Ok(sz) = w2.inner_size() {
-                let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
-                std::thread::sleep(std::time::Duration::from_millis(40));
-                let _ = w2.set_size(sz);
+            for delay in [120u64, 350] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                if let Ok(sz) = w2.inner_size() {
+                    let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let _ = w2.set_size(sz);
+                }
             }
             let _ = w2.set_focus();
         });
