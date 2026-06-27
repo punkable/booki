@@ -1,159 +1,86 @@
-# Booki — Chrome Extension
+# Booki Dock — Agent Guide
 
-Privacy-focused, open-source bookmark manager with cross-device sync, auto-tagging, health scoring, dead link checker, read-later, and DnD reorder.
+A modern, lightweight **dock for Windows** (macOS-dock-style launcher), inspired by
+[Docky](https://github.com/josejuanqm/docky) but rebuilt from scratch for Windows.
+Booki Dock keeps the original Booki **brand** (capybara logo, tan accent) — it is **not**
+the old bookmark extension (that lives in this repo's git history on `main`).
 
-## Quick Start
+## Stack
+
+- **Shell:** Tauri 2 (system WebView2 — no bundled Chromium → tiny, low-RAM).
+- **Backend:** Rust + the official `windows` crate (Win32) for native dock behavior.
+- **Frontend:** vanilla HTML/CSS/JS, bundled with Vite. No framework.
+
+## Layout
+
+```
+src/                    # Frontend (WebView2)
+  index.html  dock.js   # the dock surface + logic (tiles, magnify, drag, launch)
+  settings.html .js     # settings window
+  api.js                # Tauri bridge wrapper, with browser fallbacks (demo data)
+  styles.css            # brand tokens + dock + settings styling
+  icons.js  theme.js
+src-tauri/              # Rust backend
+  src/lib.rs            # Tauri builder, tray, #[tauri::command]s, window positioning
+  src/config.rs         # JSON config (serde) at %APPDATA%\Booki\config.json
+  src/apps.rs           # launching apps (std::process)
+  src/win/              # Win32: windows_impl.rs (cfg windows) + stub.rs (others)
+  capabilities/         # Tauri v2 permissions
+  icons/                # app icons generated from assets/brand/png/isotype.png
+assets/brand/           # Booki brand kit (svg + png) — DO NOT delete
+```
+
+## Key conventions
+
+- **`$(id)`** in settings = `document.getElementById`. No jQuery.
+- **Frontend ↔ backend** only through commands defined in `src-tauri/src/lib.rs` and
+  wrapped in `src/api.js`. When you add a command, register it in `generate_handler!`
+  **and** add a wrapper in `api.js` (with a browser fallback in `mockInvoke`).
+- **`api.js` must keep working in a plain browser** — `window.__TAURI__` is absent during
+  `npm run dev`, so every call falls back to demo data. Preserve that for UI iteration.
+- **Native code is Windows-only.** Real impl in `src/win/windows_impl.rs` behind
+  `#[cfg(windows)]`; `src/win/stub.rs` provides no-op fallbacks for other targets so the
+  crate still `cargo check`s on Linux/macOS.
+- **Brand:** capybara logo + tan. Tokens in `styles.css` `:root`: `--booki-tan #dfaa75`,
+  `--booki-tan-deep #b9875f`, `--booki-ink #302f35`. Accent defaults to `--booki-tan`.
+
+## Config shape (`config.rs` ↔ `Config` ↔ JS)
+
+```jsonc
+{
+  "pinned": [{ "id": "x", "name": "Edge", "path": "C:/.../msedge.exe", "args": [] }],
+  "edge": "bottom",          // bottom | top | left | right
+  "accent": "#dfaa75",
+  "theme": "system",         // system | light | dark
+  "iconSize": 48,
+  "magnification": true,
+  "autoHide": false,
+  "alwaysOnTop": true
+}
+```
+Rust uses `#[serde(rename_all = "camelCase")]`, so JSON keys are camelCase.
+
+## Commands (lib.rs)
+
+`get_config`, `save_config`, `launch_app`, `app_icon` (native PNG data-URI, None off-Windows),
+`list_windows`, `focus_window`, `reposition_dock`, `set_always_on_top`, `open_settings`, `quit`.
+
+## Build & verify
 
 ```bash
-# Load in Chrome/Brave
-1. Go to chrome://extensions
-2. Enable "Developer mode"
-3. Click "Load unpacked"
-4. Select this folder
+npm install
+npm run dev          # browser UI preview (mock data) — fastest brand/UX loop
+npm run tauri:dev    # real app (Windows only)
+npm run tauri:build  # installers (.exe/.msi) — Windows only
 ```
 
-## Architecture
+- **On Linux**, validate native Rust without a Windows host:
+  `rustup target add x86_64-pc-windows-msvc && cargo check --target x86_64-pc-windows-msvc`
+  (run in `src-tauri/`; needs a `dist/` — run `npm run build` first so `generate_context!` finds assets).
+- **CI** (`.github/workflows/build-windows.yml`) builds installers on `windows-latest`
+  for every push; artifacts under the run's **Artifacts**.
 
-```
-├── manifest.json          # MV3 — permissions, omnibox, commands
-├── options.html + .js     # Settings page (6 tabs, swatches, sync, folder colors)
-├── popup.html + .js       # Toolbar popup (400×600px) — quick save, search, star
-├── sidepanel.html + .js   # Main manager — Library, Folders, Organize, Tools
-└── src/
-    ├── styles.css          # All CSS — glass aesthetic, responsive, dark mode
-    ├── icons.js            # 36 SVG icon functions (Lucide-style, 24×24, 1.5px stroke)
-    ├── i18n.js             # en/es translations (~120 keys), browser-detect, dynamic switch
-    ├── shared.js           # Settings, meta, bookmark CRUD, TF-IDF tagging, health, injectIcons
-    └── background.js       # Service worker — omnibox, alarms, dead links, sync, content capture
-```
+## Roadmap (not yet built)
 
-## Key Conventions
-
-- **No bundler/framework** — vanilla ES modules (type="module" in scripts)
-- **SVG icons via `data-icon`** — `<span class="svg-icon" data-icon="bookmark"></span>`, injected by `injectIcons()`
-- **i18n via `data-i18n`** — `<span data-i18n="nav.library">Library</span>`, rendered by `applyI18n()`
-- **Settings live in `chrome.storage.local`**, meta (tags, stars) also local. Sync via `chrome.storage.sync`
-- **All async** — `getSettings()`, `getMeta()`, `saveSettings()`, `saveMeta()` are async
-- **No jQuery** — `$(id)` = `document.querySelector(id)`, `$$(sel)` = `document.querySelectorAll(sel)`
-
-## Settings System
-
-DEFAULT_SETTINGS in `src/shared.js:1`:
-```js
-{ openInNewTab: true, openInTab: false, focusSearch: true, language: "",
-  defaultView: "library", autoTagOnSave: true, confirmDelete: true,
-  accentColor: "auto", compactView: false, showHealthBadges: true,
-  rememberView: true, searchScope: "all", deadLinkBadge: true }
-```
-
-Settings propagate via messaging: Options → `saveSettings()` broadcasts → background relays → sidepanel re-applies. Listen for `"settings-changed"` in `onBackgroundMessage()`.
-
-## i18n System
-
-- `LOCALES.en` and `LOCALES.es` objects in `src/i18n.js`
-- Keys use dot notation (e.g. `"nav.library"`, `"settings.compactView"`)
-- `t(key, fallback)` — returns translation or fallback or key itself
-- `detectBrowserLanguage()` — reads `navigator.language`, checks supported
-- `setLanguage(lang)` — sets current language, stored in settings + localStorage
-- Adding new keys: add to both `en` and `es` objects
-
-## Bookmark Meta
-
-Stored separately from Chrome bookmarks (which don't support custom fields):
-```js
-{ tagsByBookmarkId: { "123": ["design", "dev"] },
-  starredIds: ["123", "456"],
-  folderColorsById: { "folderId": "mint" },
-  categoriesByBookmarkId: { "123": "tech" },
-  deadLinks: { "123": { ok: false, status: 0, checked: 1700000000000 } },  // result + timestamp of last dead check
-  pageContent: { "123": "stripped text content…" },
-  healthScores: { "123": 85 } }
-```
-
-## DnD Implementation
-
-`src/sidepanel.js` — drag-and-drop reorder via native HTML5 Drag API:
-- `handleBookmarkDragStart()` — stores dragged bookmark id
-- `handleDragOver()` — shows `drag-indicator` line (3px colored bar) between items
-- `handleDrop()` — calculates target index from mouse Y relative to item center, calls `chrome.bookmarks.move()`
-- Folder view: `stopPropagation()` on folder bookmark drag to prevent double-handling
-
-## Health Scoring
-
-`computeHealth()` in `shared.js`:
-- Base: 50, Starred: +15, Tagged: +10, Categorized: +10, Fresh (<7d): +10, Aged (>365d): -10, Dead link: -20
-- Thresholds: great ≥80, ok ≥50, poor <50
-
-## Auto-Tagging
-
-`buildTermIndex()`/`suggestTags()` TF-IDF on titles/URLs/domains with stop word filter in `shared.js`.
-
-## Dead Link Checker
-
-Daily via `chrome.alarms.create("check-dead-links")` in background. HEAD fetch with 8s timeout, `no-cors` mode, batch of 50/day. Results in `meta.deadLinks`.
-
-## Sync
-
-Three mechanisms:
-1. **Push/Pull snapshots** via `chrome.storage.sync` (cross-device, same Google account)
-2. **Sync code** — generates short code, chunks payload across multiple sync keys (6KB per chunk)
-3. **Export/Import** — JSON file with full bookmark data + meta
-
-## Per-Section Accents
-
-View tabs set `--section-accent` via `style.setProperty()`:
-- Library → blaze-orange `#fb5607`
-- Folders → blue-violet `#8338ec`
-- Organize → azure-blue `#3a86ff`
-- Tools → neon-pink `#ff006e`
-
-## Color Palette
-
-Accent: amber-gold `#ffbe0b`, blaze-orange `#fb5607`, neon-pink `#ff006e`, blue-violet `#8338ec`, azure-blue `#3a86ff`
-Neutral: ghost-white `#fafaff`, platinum `#eef0f2`, soft-linen `#ecebe4`, alabaster-grey `#daddd8`, carbon-black `#1c1c1c`
-
-## Common Patterns
-
-```js
-// Getting elements
-const el = { search: $("#searchInput"), list: $("#bookmarkList") };
-
-// Rendering HTML safely
-function esc(v) { return String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;"); }
-
-// Toast notifications
-toast("Saved!");       // success (green)
-toast("Error!", "error"); // error (red)
-
-// Icon injection (call after rendering HTML with data-icon attributes)
-injectIcons();
-
-// i18n after language change
-applyI18n();
-
-// Getting bookmark data with meta enrichment
-const data = await getBookmarkTreeData();
-// => { folders: [...], bookmarks: [...], meta: {...}, deadLinks: {...} }
-// Each bookmark has: .tags, .category, .starred, .dead, .health
-```
-
-## Permission Notes
-
-- `bookmarks` — read/write Chrome bookmarks
-- `storage` — chrome.storage.local (settings, meta) + chrome.storage.sync (cross-device sync)
-- `sidePanel` — open sidepanel via `chrome.sidePanel.open()`
-- `favicon` — access `chrome://favicon/` for bookmark icons
-- `tabs` — get current tab, create tabs
-- `contextMenus` — right-click "Save to Booki"
-- `alarms` — daily dead link checker
-- `scripting` — content capture
-- `host_permissions` — fetch for dead link HEAD requests & content capture
-- `omnibox` keyword: `booki`
-
-## Adding Features
-
-1. Add setting key to `DEFAULT_SETTINGS` in `shared.js`
-2. Add UI control in `options.html` + bind in `options.js`
-3. Apply setting in `sidepanel.js:applySettings()`
-4. Use setting via `state.settings.yourKey`
-5. Add i18n keys in both `en` and `es` objects
+DWM live window previews, app folders + Launchpad, themes/profiles, multi-monitor &
+AppBar space reservation, widgets, custom icons, global hotkeys, auto-update.
