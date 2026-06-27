@@ -14,6 +14,7 @@ const DEMO_CONFIG = {
     { id: "d", name: "Notepad", path: "C:/Windows/notepad.exe", args: [], kind: "app" },
     { id: "e", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
     { id: "f", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
+    { id: "g", name: "Proyectos", path: "C:/Users/Proyectos", args: [], kind: "folder" },
   ],
   edge: "bottom",
   accent: "#dfaa75",
