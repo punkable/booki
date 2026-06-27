@@ -39,6 +39,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
     "publisher": "Booki",
     "copyright": "© 2026 Booki contributors. MIT licensed.",
     "category": "Utility",
