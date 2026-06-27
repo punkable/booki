@@ -16,6 +16,14 @@ use tauri::{
 };
 
 use config::Config;
+use std::sync::Mutex;
+
+/// The dock's anchored "home" rectangle (left, top, right, bottom) while it is
+/// shown at full size. The smart-hide occlusion watcher measures against THIS
+/// stable rect — never the live window rect — otherwise hiding shrinks the
+/// window, which stops it being occluded, which shows it again… an infinite
+/// flapping loop. Updated only when the dock is shown (not while hidden).
+static DOCK_HOME: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
@@ -58,12 +66,17 @@ fn reposition_dock(window: WebviewWindow, edge: String) -> Result<(), String> {
 
 /// Resize the dock window to fit its content (plus magnify headroom) and
 /// re-anchor it to the given edge. Called by the frontend after layout.
+///
+/// `hidden` tells us whether this frame is the small "notch" (auto-hidden) or
+/// the full dock. We only record the full-size geometry as the occlusion
+/// watcher's home rect, so smart-hide never measures the shrunken notch.
 #[tauri::command]
 fn set_dock_frame(
     window: WebviewWindow,
     edge: String,
     width: u32,
     height: u32,
+    hidden: Option<bool>,
 ) -> Result<(), String> {
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
@@ -71,7 +84,19 @@ fn set_dock_frame(
     window
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
-    position_dock(&window, &edge)
+    position_dock(&window, &edge)?;
+
+    if !hidden.unwrap_or(false) {
+        if let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) {
+            *DOCK_HOME.lock().unwrap() = Some((
+                p.x,
+                p.y,
+                p.x + s.width as i32,
+                p.y + s.height as i32,
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Convert an image file to a data URI (for custom tile icons).
@@ -153,16 +178,14 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Re-apply the native material with a new strength (0–100).
+/// Material strength is now applied entirely in CSS (the dock bar's `--material`
+/// alpha), driven live from the config. We deliberately do NOT apply native
+/// vibrancy to the dock window: vibrancy tints the whole window rectangle, and
+/// because the dock window is sized larger than the bar (magnify headroom), that
+/// showed up as a gray box behind the dock that resized with the zoom. Kept as a
+/// no-op command for frontend compatibility.
 #[tauri::command]
-fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        let a = ((strength.min(100) as f32 / 100.0) * 220.0) as u8;
-        let _ = window_vibrancy::apply_acrylic(&window, Some((22, 22, 24, a)));
-    }
-    #[cfg(not(windows))]
-    let _ = (&window, strength);
+fn set_material(_window: WebviewWindow, _strength: u32) -> Result<(), String> {
     Ok(())
 }
 
@@ -220,6 +243,91 @@ fn list_dir(path: String) -> Vec<DirItem> {
 #[tauri::command]
 fn is_dir(path: String) -> bool {
     std::path::Path::new(&path).is_dir()
+}
+
+/// Scan the Windows Start Menu for installed apps (.lnk shortcuts) so the
+/// settings UI can suggest things to pin without browsing the filesystem.
+/// Returns deduped, alphabetically-sorted shortcuts. Empty off-Windows.
+#[tauri::command]
+fn list_installed_apps() -> Vec<DirItem> {
+    #[cfg(windows)]
+    {
+        use std::collections::HashSet;
+        let mut roots: Vec<std::path::PathBuf> = Vec::new();
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            roots.push(
+                std::path::PathBuf::from(appdata)
+                    .join("Microsoft\\Windows\\Start Menu\\Programs"),
+            );
+        }
+        if let Ok(pd) = std::env::var("ProgramData") {
+            roots.push(
+                std::path::PathBuf::from(pd).join("Microsoft\\Windows\\Start Menu\\Programs"),
+            );
+        }
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut out: Vec<DirItem> = Vec::new();
+        for root in roots {
+            scan_lnks(&root, &mut out, &mut seen, 0);
+        }
+        out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        out.truncate(400);
+        out
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+#[cfg(windows)]
+fn scan_lnks(
+    dir: &std::path::Path,
+    out: &mut Vec<DirItem>,
+    seen: &mut std::collections::HashSet<String>,
+    depth: u8,
+) {
+    if depth > 4 {
+        return;
+    }
+    let rd = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(_) => return,
+    };
+    for e in rd.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            scan_lnks(&p, out, seen, depth + 1);
+            continue;
+        }
+        let is_lnk = p
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.eq_ignore_ascii_case("lnk"))
+            .unwrap_or(false);
+        if !is_lnk {
+            continue;
+        }
+        let name = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+        let lower = name.to_lowercase();
+        // Skip uninstallers / docs that aren't really "apps".
+        if lower.contains("uninstall") || lower.contains("readme") {
+            continue;
+        }
+        if seen.insert(lower) {
+            out.push(DirItem {
+                name,
+                path: p.to_string_lossy().to_string(),
+                is_dir: false,
+            });
+        }
+    }
 }
 
 /// (Re)register the global hotkey that toggles the dock. Empty = none.
@@ -300,20 +408,30 @@ fn open_settings_window(app: &AppHandle) {
     }
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .title("Booki — Ajustes")
-        .inner_size(580.0, 700.0)
-        .min_inner_size(480.0, 520.0)
+        .inner_size(760.0, 800.0)
+        .min_inner_size(560.0, 560.0)
         .resizable(true)
-        .transparent(true)
+        .center()
         .decorations(true)
         .build();
     #[cfg(windows)]
-    if let Ok(w) = built {
-        // Windows 11 system material for the settings window.
-        let _ = window_vibrancy::apply_mica(&w, None)
-            .or_else(|_| window_vibrancy::apply_acrylic(&w, Some((22, 22, 24, 180))));
+    if let Ok(w) = &built {
+        // Defeat the WebView2 initial-size race: on first
+        // paint the webview can come up smaller than the window (content looks
+        // "cropped" until the user manually resizes). Nudge the size once after
+        // a beat so WebView2 re-lays-out to fill the client area.
+        let w2 = w.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(140));
+            if let Ok(sz) = w2.inner_size() {
+                let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
+                std::thread::sleep(std::time::Duration::from_millis(40));
+                let _ = w2.set_size(sz);
+            }
+            let _ = w2.set_focus();
+        });
     }
-    #[cfg(not(windows))]
-    let _ = built;
+    let _ = &built;
 }
 
 fn toggle_dock(app: &AppHandle) {
@@ -376,6 +494,7 @@ pub fn run() {
             get_autostart,
             list_dir,
             is_dir,
+            list_installed_apps,
             quit,
             frontend_log,
         ])
@@ -414,11 +533,13 @@ pub fn run() {
 
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
-                // Windows 11 Acrylic material (frosted, translucent).
-                #[cfg(windows)]
-                {
-                    let _ = window_vibrancy::apply_acrylic(&dock, Some((22, 22, 24, 160)));
-                }
+                // NOTE: we intentionally do NOT apply native Acrylic/Mica to the
+                // dock window. Vibrancy tints the entire window rectangle, but the
+                // dock window is sized larger than the visible bar (to give the
+                // magnify-on-hover room to overflow), so the material showed up as
+                // a gray box behind the dock that grew/shrank with the zoom. The
+                // bar's frosted material is done entirely in CSS instead, so only
+                // the rounded bar is ever visible. The window stays transparent.
                 let cfg = config::load();
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
@@ -429,9 +550,6 @@ pub fn run() {
                     use tauri_plugin_global_shortcut::GlobalShortcutExt;
                     let _ = app.global_shortcut().register(cfg.hotkey.as_str());
                 }
-
-                // Apply the configured material strength.
-                let _ = set_material(dock.clone(), cfg.material_strength);
 
                 // Smart auto-hide watcher: emit `booki://occlusion` when the
                 // foreground window covers the dock area. The frontend decides
@@ -445,18 +563,17 @@ pub fn run() {
                         let mut last = false;
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(350));
-                            let pos = match watch.outer_position() {
-                                Ok(p) => p,
-                                Err(_) => continue,
+                            // Measure occlusion against the STABLE home rect, not
+                            // the live window (which shrinks to a notch when hidden
+                            // — measuring that would cause infinite hide/show
+                            // flapping).
+                            let home = *DOCK_HOME.lock().unwrap();
+                            let occ = match home {
+                                Some((l, t, r, b)) => {
+                                    win::foreground_occludes(l, t, r, b, self_hwnd)
+                                }
+                                None => false,
                             };
-                            let size = watch.outer_size().unwrap_or_default();
-                            let occ = win::foreground_occludes(
-                                pos.x,
-                                pos.y,
-                                pos.x + size.width as i32,
-                                pos.y + size.height as i32,
-                                self_hwnd,
-                            );
                             if occ != last {
                                 last = occ;
                                 let _ = handle.emit("booki://occlusion", occ);

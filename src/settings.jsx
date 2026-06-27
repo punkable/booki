@@ -81,6 +81,106 @@ function Slider({ value, min, max, step, onChange, fmt }) {
   );
 }
 
+// A more intuitive accent picker: large tappable swatches with a check on the
+// active one, plus a custom-color chip that shows the live value + hex.
+function AccentPicker({ value, onChange }) {
+  const v = (value || "").toLowerCase();
+  const isPreset = ACCENTS.some(([, val]) => val.toLowerCase() === v);
+  return (
+    <div className="accent-picker">
+      <div className="accent-swatches">
+        {ACCENTS.map(([name, val]) => (
+          <button
+            key={val}
+            type="button"
+            className={"accent-sw" + (v === val.toLowerCase() ? " active" : "")}
+            style={{ "--sw": val }}
+            title={name}
+            onClick={() => onChange(val)}
+          >
+            <span className="accent-check">✓</span>
+          </button>
+        ))}
+        <label
+          className={"accent-custom" + (!isPreset ? " active" : "")}
+          style={{ "--sw": value }}
+          title={t("ap.custom")}
+        >
+          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
+          <span className="accent-plus">{isPreset ? "+" : "✓"}</span>
+        </label>
+      </div>
+      <span className="accent-hex">{(value || "").toUpperCase()}</span>
+    </div>
+  );
+}
+
+// One installed-app suggestion icon (native icon, falls back to a letter).
+function SuggIcon({ path, name }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    dockApi.appIcon(path).then((u) => alive && setSrc(u));
+    return () => {
+      alive = false;
+    };
+  }, [path]);
+  return (
+    <span className="sugg-thumb">
+      {src ? <img src={src} alt="" /> : (name || "?").trim().charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+// Suggests apps installed on the PC (scanned from the Start Menu) so the user
+// can pin them with one click instead of browsing the filesystem.
+function Suggestions({ cfg, set }) {
+  const [apps, setApps] = useState(null);
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    dockApi.listInstalledApps().then((a) => setApps(a || []));
+  }, []);
+  if (!apps || apps.length === 0) return null;
+  const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
+  const filtered = apps
+    .filter((a) => a.name.toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 60);
+  const add = (a) => {
+    if (pinned.has((a.path || "").toLowerCase())) return;
+    set({ pinned: [...cfg.pinned, mkApp(a.path)] });
+  };
+  return (
+    <div className="s-card-inner">
+      <h3>{t("apps.suggest")}</h3>
+      <p className="muted">{t("apps.suggestHint")}</p>
+      <input
+        className="sugg-search"
+        placeholder={t("apps.search")}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      <div className="sugg-grid">
+        {filtered.map((a) => {
+          const isPinned = pinned.has((a.path || "").toLowerCase());
+          return (
+            <button
+              key={a.path}
+              type="button"
+              className={"sugg-item" + (isPinned ? " pinned" : "")}
+              title={a.name}
+              onClick={() => add(a)}
+              disabled={isPinned}
+            >
+              <SuggIcon path={a.path} name={a.name} />
+              <span className="sugg-name">{a.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PinThumb({ item }) {
   const [src, setSrc] = useState(item.icon || null);
   useEffect(() => {
@@ -150,24 +250,8 @@ function Appearance({ cfg, set }) {
           <option value="en">English</option>
         </select>
       </Row>
-      <Row label={t("ap.accent")}>
-        <div className="swatches">
-          {ACCENTS.map(([name, val]) => (
-            <button
-              key={val}
-              className={"swatch" + (cfg.accent === val ? " active" : "")}
-              style={{ background: val }}
-              title={name}
-              onClick={() => set({ accent: val })}
-            />
-          ))}
-          <input
-            type="color"
-            className="swatch-custom"
-            value={cfg.accent}
-            onChange={(e) => set({ accent: e.target.value })}
-          />
-        </div>
+      <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
+        <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
       </Row>
       <Row label={t("ap.iconSize")}>
         <Slider value={cfg.iconSize} min={32} max={80} step={4} fmt={(v) => `${v}px`}
@@ -332,6 +416,7 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
         <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
       </div>
+      <Suggestions cfg={cfg} set={set} />
     </>
   );
 }

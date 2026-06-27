@@ -21,13 +21,13 @@ const DEMO_CONFIG = {
   theme: "system",
   iconSize: 48,
   magnification: true,
-  zoom: 1.8,
+  zoom: 1.35,
   spacing: 6,
   opacity: 0.62,
   showLabels: true,
   showIndicators: true,
   autoHide: false,
-  autoHideMode: "off",
+  autoHideMode: "smart",
   autoHideDelay: 650,
   alwaysOnTop: true,
   magnifyStyle: "spring",
@@ -73,6 +73,13 @@ async function mockInvoke(cmd, args) {
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
         { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
         { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
+      ];
+    case "list_installed_apps":
+      return [
+        { name: "Microsoft Edge", path: "C:/Program Files/Edge/msedge.lnk", is_dir: false },
+        { name: "Spotify", path: "C:/Apps/Spotify.lnk", is_dir: false },
+        { name: "Visual Studio Code", path: "C:/Apps/Code.lnk", is_dir: false },
+        { name: "WhatsApp", path: "C:/Apps/WhatsApp.lnk", is_dir: false },
       ];
     case "open_location":
     case "set_hotkey":
@@ -175,7 +182,8 @@ export const dock = {
   appIcon: (path) => invoke("app_icon", { path }),
   imageDataUri: (path) => invoke("image_data_uri", { path }),
   reposition: (edge) => invoke("reposition_dock", { edge }),
-  setDockFrame: (edge, width, height) => invoke("set_dock_frame", { edge, width, height }),
+  setDockFrame: (edge, width, height, hidden = false) =>
+    invoke("set_dock_frame", { edge, width, height, hidden }),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -190,6 +198,7 @@ export const dock = {
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),
   isDir: (path) => invoke("is_dir", { path }),
+  listInstalledApps: () => invoke("list_installed_apps"),
 };
 
 /** Listen for the smart-hide occlusion signal from the backend. */
