@@ -178,6 +178,11 @@ async function resolveIcon(item) {
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
+  // Folder pins open a "stack" flyout instead of launching.
+  if (item.kind === "folder") {
+    toggleStack(el, item);
+    return;
+  }
   // Launcher + switcher: if the app already has a window, focus it;
   // otherwise launch a new instance.
   const hwnd = el.dataset.hwnd;
@@ -443,6 +448,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeMenu();
     exitEdit();
+    closeStack();
   }
 });
 
@@ -503,6 +509,12 @@ function computeFrame() {
   } else {
     wCss = r.width + grow * 2 + 56;
     hCss = r.height + grow + labelSpace + 20;
+  }
+  // Make room for an open folder-stack flyout.
+  if (stackOpen && stackEl) {
+    const sr = stackEl.getBoundingClientRect();
+    hCss += sr.height + 16;
+    wCss = Math.max(wCss, sr.width + 32);
   }
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
@@ -616,6 +628,73 @@ function startRunningPoll() {
   tick();
   pollTimer = setInterval(tick, 4000);
 }
+
+// ─────────────────── Folder stacks (flyout) ───────────────────
+
+const stackEl = document.getElementById("stack");
+let stackOpen = false;
+
+async function toggleStack(tileEl, item) {
+  if (stackOpen) {
+    closeStack();
+    return;
+  }
+  let items = [];
+  try {
+    items = await dockApi.listDir(item.path);
+  } catch (_) {}
+  stackEl.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "stack-head";
+  head.textContent = item.name;
+  stackEl.appendChild(head);
+  const grid = document.createElement("div");
+  grid.className = "stack-grid";
+  if (!items.length) {
+    grid.innerHTML = `<div class="stack-empty">Carpeta vacía</div>`;
+  }
+  for (const it of items) {
+    const cell = document.createElement("button");
+    cell.className = "stack-item";
+    cell.title = it.name;
+    const ic = await dockApi.appIcon(it.path);
+    cell.innerHTML =
+      (ic ? `<img src="${ic}" alt="" />` : `<span class="stack-glyph">${it.is_dir ? "📁" : (it.name[0] || "?").toUpperCase()}</span>`) +
+      `<span class="stack-name">${it.name}</span>`;
+    cell.addEventListener("click", () => {
+      dockApi.launch(it.path, []);
+      closeStack();
+    });
+    grid.appendChild(cell);
+  }
+  stackEl.appendChild(grid);
+
+  stackOpen = true;
+  document.body.classList.add("stack-open");
+  stackEl.classList.remove("hidden");
+  reframe();
+  // Center the flyout over the tile (horizontal edges).
+  requestAnimationFrame(() => {
+    if (!isVertical()) {
+      const r = tileEl.getBoundingClientRect();
+      const sw = stackEl.offsetWidth;
+      let left = r.left + r.width / 2 - sw / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
+      stackEl.style.left = `${left}px`;
+    }
+  });
+}
+
+function closeStack() {
+  if (!stackOpen) return;
+  stackOpen = false;
+  document.body.classList.remove("stack-open");
+  stackEl.classList.add("hidden");
+  reframe();
+}
+window.addEventListener("pointerdown", (e) => {
+  if (stackOpen && !e.target.closest("#stack") && !e.target.closest(".tile")) closeStack();
+});
 
 // ─────────────────── Update check ───────────────────
 
