@@ -50,6 +50,9 @@ const DICT = {
     "hide.off": "Nunca",
     "hide.smart": "Inteligente (cuando una ventana lo tapa)",
     "hide.edge": "Siempre (revelar en el borde)",
+    "hide.offShort": "Nunca",
+    "hide.smartShort": "Inteligente",
+    "hide.edgeShort": "Borde",
     "be.hideDelay": "Retraso para ocultar",
 
     "apps.title": "Apps ancladas",
@@ -152,6 +155,9 @@ const DICT = {
     "hide.off": "Never",
     "hide.smart": "Smart (when a window covers it)",
     "hide.edge": "Always (reveal at the edge)",
+    "hide.offShort": "Never",
+    "hide.smartShort": "Smart",
+    "hide.edgeShort": "Edge",
     "be.hideDelay": "Hide delay",
 
     "apps.title": "Pinned apps",

@@ -1,10 +1,10 @@
 /* Applies accent color, theme and dock edge to the document. */
 
+import { applyAccent } from "./util-color.js";
+
 export function applyTheme(cfg) {
   const root = document.documentElement;
-  if (cfg.accent) {
-    root.style.setProperty("--accent", cfg.accent);
-  }
+  applyAccent(root, cfg.accent);
   root.setAttribute("data-theme", cfg.theme || "system");
   if ((cfg.theme || "system") === "system") {
     root.removeAttribute("data-theme");
