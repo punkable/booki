@@ -16,6 +16,7 @@ import {
 import { icon } from "./icons.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
+import { t, setLang } from "./i18n.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -64,6 +65,7 @@ async function reloadConfig() {
 }
 
 function applyAll() {
+  setLang(cfg.language);
   applyTheme(cfg);
   applyEdge(cfg);
   const root = document.documentElement;
@@ -101,7 +103,7 @@ async function render() {
     hint.className = "tile hint";
     hint.style.setProperty("--size", `${baseSize()}px`);
     hint.innerHTML =
-      `<span class="label">Arrastra apps o carpetas aquí · clic derecho para añadir</span>` +
+      `<span class="label">${t("dock.empty")}</span>` +
       `<img src="/brand/svg/isotype.svg" alt="Booki" />`;
     hint.addEventListener("click", onAddApp);
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
@@ -386,17 +388,17 @@ function openMenu(e, item) {
   };
 
   if (item.kind !== "separator") {
-    add("app", "Abrir", () => dockApi.launch(item.path, item.args || []));
-    add("palette", "Cambiar icono…", () => changeIcon(item));
-    if (item.icon) add("x", "Quitar icono personalizado", () => clearIcon(item));
+    add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
+    add("palette", t("m.changeIcon"), () => changeIcon(item));
+    if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     sep();
   }
-  add("plus", "Añadir app…", onAddApp);
-  add("app", "Añadir carpeta…", onAddFolder);
-  add("grid", "Añadir separador", () => addSeparatorAfter(item.id));
-  add("trash", "Quitar del dock", () => removeItem(item.id));
+  add("plus", t("m.addApp"), onAddApp);
+  add("app", t("m.addFolder"), onAddFolder);
+  add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
+  add("trash", t("m.remove"), () => removeItem(item.id));
   sep();
-  add("settings", "Ajustes…", () => dockApi.openSettings());
+  add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
 }
@@ -415,12 +417,12 @@ function openBackgroundMenu(e) {
     });
     ctxMenu.appendChild(b);
   };
-  add("plus", "Añadir app…", onAddApp);
-  add("app", "Añadir carpeta…", onAddFolder);
+  add("plus", t("m.addApp"), onAddApp);
+  add("app", t("m.addFolder"), onAddFolder);
   const s = document.createElement("div");
   s.className = "sep";
   ctxMenu.appendChild(s);
-  add("settings", "Ajustes…", () => dockApi.openSettings());
+  add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
 
@@ -651,7 +653,7 @@ async function toggleStack(tileEl, item) {
   const grid = document.createElement("div");
   grid.className = "stack-grid";
   if (!items.length) {
-    grid.innerHTML = `<div class="stack-empty">Carpeta vacía</div>`;
+    grid.innerHTML = `<div class="stack-empty">${t("stack.empty")}</div>`;
   }
   for (const it of items) {
     const cell = document.createElement("button");
@@ -703,6 +705,7 @@ async function checkUpdates() {
   if (!pill) return;
   const update = await checkForUpdate();
   if (update) {
+    pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
     pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
   }

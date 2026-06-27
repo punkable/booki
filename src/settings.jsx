@@ -14,6 +14,7 @@ import {
 } from "./api.js";
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
+import { t, setLang } from "./i18n.js";
 
 window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
 window.addEventListener("unhandledrejection", (e) =>
@@ -33,11 +34,11 @@ const ACCENTS = [
 ];
 
 const TABS = [
-  ["appearance", "Apariencia", "palette"],
-  ["behavior", "Comportamiento", "settings"],
-  ["apps", "Apps ancladas", "grid"],
-  ["shortcuts", "Atajos", "app"],
-  ["about", "Acerca de", "heart"],
+  ["appearance", "tab.appearance"],
+  ["behavior", "tab.behavior"],
+  ["apps", "tab.apps"],
+  ["shortcuts", "tab.shortcuts"],
+  ["about", "tab.about"],
 ];
 
 // ── Reusable controls ──
@@ -117,12 +118,12 @@ function HotkeyInput({ value, onChange }) {
       <input
         readOnly
         value={value || ""}
-        placeholder="Pulsa una combinación…"
+        placeholder={t("sc.press")}
         onKeyDown={capture}
       />
       {value && (
         <button className="s-btn s-btn-soft" onClick={() => onChange("")}>
-          Borrar
+          {t("sc.clear")}
         </button>
       )}
     </div>
@@ -134,15 +135,22 @@ function HotkeyInput({ value, onChange }) {
 function Appearance({ cfg, set }) {
   return (
     <>
-      <h1>Apariencia</h1>
-      <Row label="Tema">
+      <h1>{t("ap.title")}</h1>
+      <Row label={t("ap.theme")}>
         <select value={cfg.theme} onChange={(e) => set({ theme: e.target.value })}>
-          <option value="system">Sistema</option>
-          <option value="light">Claro</option>
-          <option value="dark">Oscuro</option>
+          <option value="system">{t("theme.system")}</option>
+          <option value="light">{t("theme.light")}</option>
+          <option value="dark">{t("theme.dark")}</option>
         </select>
       </Row>
-      <Row label="Color de acento">
+      <Row label={t("ap.language")}>
+        <select value={cfg.language || "system"} onChange={(e) => set({ language: e.target.value })}>
+          <option value="system">{t("lang.system")}</option>
+          <option value="es">Español</option>
+          <option value="en">English</option>
+        </select>
+      </Row>
+      <Row label={t("ap.accent")}>
         <div className="swatches">
           {ACCENTS.map(([name, val]) => (
             <button
@@ -157,20 +165,19 @@ function Appearance({ cfg, set }) {
             type="color"
             className="swatch-custom"
             value={cfg.accent}
-            title="Color personalizado"
             onChange={(e) => set({ accent: e.target.value })}
           />
         </div>
       </Row>
-      <Row label="Tamaño de iconos">
+      <Row label={t("ap.iconSize")}>
         <Slider value={cfg.iconSize} min={32} max={80} step={4} fmt={(v) => `${v}px`}
           onChange={(v) => set({ iconSize: v })} />
       </Row>
-      <Row label="Espaciado">
+      <Row label={t("ap.spacing")}>
         <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
           onChange={(v) => set({ spacing: v })} />
       </Row>
-      <Row label="Translucidez">
+      <Row label={t("ap.translucency")}>
         <Slider value={Math.round(cfg.opacity * 100)} min={20} max={100} step={5}
           fmt={(v) => `${v}%`} onChange={(v) => set({ opacity: v / 100 })} />
       </Row>
@@ -187,61 +194,61 @@ function Behavior({ cfg, set }) {
   }, []);
   return (
     <>
-      <h1>Comportamiento</h1>
-      <Row label="Borde de anclaje">
+      <h1>{t("be.title")}</h1>
+      <Row label={t("be.edge")}>
         <select value={cfg.edge} onChange={(e) => set({ edge: e.target.value })}>
-          <option value="bottom">Abajo</option>
-          <option value="top">Arriba</option>
-          <option value="left">Izquierda</option>
-          <option value="right">Derecha</option>
+          <option value="bottom">{t("edge.bottom")}</option>
+          <option value="top">{t("edge.top")}</option>
+          <option value="left">{t("edge.left")}</option>
+          <option value="right">{t("edge.right")}</option>
         </select>
       </Row>
-      <Row label="Animación al ampliar">
+      <Row label={t("be.anim")}>
         <select value={cfg.magnifyStyle} onChange={(e) => set({ magnifyStyle: e.target.value })}>
-          <option value="spring">Resorte (pop + elevación)</option>
-          <option value="smooth">Suave</option>
-          <option value="off">Sin animación</option>
+          <option value="spring">{t("anim.spring")}</option>
+          <option value="smooth">{t("anim.smooth")}</option>
+          <option value="off">{t("anim.off")}</option>
         </select>
       </Row>
-      <Toggle label="Magnificar iconos al pasar el cursor" checked={cfg.magnification}
+      <Toggle label={t("be.magnify")} checked={cfg.magnification}
         onChange={(v) => set({ magnification: v })} />
       {cfg.magnification && (
-        <Row label="Intensidad del zoom" hint="Cuánto se agrandan los iconos">
+        <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
           <Slider value={Math.round(cfg.zoom * 100)} min={110} max={180} step={5}
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
-      <Row label="Pantalla (monitor)">
+      <Row label={t("be.monitor")}>
         <select value={cfg.monitor} onChange={(e) => set({ monitor: Number(e.target.value) })}>
-          <option value={-1}>Automática</option>
+          <option value={-1}>{t("mon.auto")}</option>
           {monitors.map((m) => (
             <option key={m.index} value={m.index}>
-              {m.name}{m.primary ? " (principal)" : ""}
+              {m.name}{m.primary ? t("mon.primary") : ""}
             </option>
           ))}
         </select>
       </Row>
-      <Row label="Intensidad del material" hint="Acrylic / Mica">
+      <Row label={t("be.material")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength} min={0} max={100} step={5} fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
-      <Toggle label="Mostrar nombres al pasar el cursor" checked={cfg.showLabels}
+      <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
         onChange={(v) => set({ showLabels: v })} />
-      <Toggle label="Indicar apps en ejecución" checked={cfg.showIndicators}
+      <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
         onChange={(v) => set({ showIndicators: v })} />
-      <Toggle label="Mantener siempre visible" checked={cfg.alwaysOnTop}
+      <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
-      <Toggle label="Iniciar con Windows" checked={autostart}
+      <Toggle label={t("be.autostart")} checked={autostart}
         onChange={(v) => { setAutostart(v); set({ autostart: v }); dockApi.setAutostart(v); }} />
-      <Row label="Ocultar automáticamente">
+      <Row label={t("be.autoHide")}>
         <select value={cfg.autoHideMode} onChange={(e) => set({ autoHideMode: e.target.value })}>
-          <option value="off">Nunca</option>
-          <option value="smart">Inteligente (cuando una ventana lo tapa)</option>
-          <option value="edge">Siempre (revelar en el borde)</option>
+          <option value="off">{t("hide.off")}</option>
+          <option value="smart">{t("hide.smart")}</option>
+          <option value="edge">{t("hide.edge")}</option>
         </select>
       </Row>
       {cfg.autoHideMode === "edge" && (
-        <Row label="Retraso para ocultar">
+        <Row label={t("be.hideDelay")}>
           <Slider value={cfg.autoHideDelay} min={0} max={2000} step={50}
             fmt={(v) => `${v}ms`} onChange={(v) => set({ autoHideDelay: v })} />
         </Row>
@@ -296,34 +303,34 @@ function Apps({ cfg, set }) {
 
   return (
     <>
-      <h1>Apps ancladas</h1>
-      <p className="muted">Arrastra programas o carpetas desde el escritorio al dock, o añádelos aquí.</p>
+      <h1>{t("apps.title")}</h1>
+      <p className="muted">{t("apps.hint")}</p>
       <ul className="pin-list" ref={listRef}>
-        {cfg.pinned.length === 0 && <li className="pin-empty">Aún no hay nada anclado.</li>}
+        {cfg.pinned.length === 0 && <li className="pin-empty">{t("apps.empty")}</li>}
         {cfg.pinned.map((item, i) => (
           <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "")}>
             <span className="pin-left">
-              <button className="pin-handle" title="Arrastrar para reordenar"
+              <button className="pin-handle" title={t("apps.drag")}
                 onPointerDown={startDrag(i)}>⠿</button>
               {item.kind !== "separator" && <PinThumb item={item} />}
               <span className="pin-name" title={item.path}>
-                {item.kind === "separator" ? "— separador —" : item.name}
+                {item.kind === "separator" ? t("apps.sep") : item.name}
               </span>
             </span>
             <span className="pin-actions">
               {item.kind !== "separator" && (
-                <button className="pin-btn" title="Abrir ubicación"
+                <button className="pin-btn" title={t("apps.openLoc")}
                   onClick={() => dockApi.openLocation(item.path)}>↗</button>
               )}
-              <button className="pin-btn del" title="Quitar" onClick={() => remove(i)}>✕</button>
+              <button className="pin-btn del" title={t("apps.remove")} onClick={() => remove(i)}>✕</button>
             </span>
           </li>
         ))}
       </ul>
       <div className="s-actions">
-        <button className="s-btn" onClick={addApp}>+ Añadir app…</button>
-        <button className="s-btn s-btn-soft" onClick={addFolder}>+ Carpeta…</button>
-        <button className="s-btn s-btn-soft" onClick={addSep}>+ Separador</button>
+        <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
+        <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
+        <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
       </div>
     </>
   );
@@ -337,8 +344,8 @@ function mkApp(path) {
 function Shortcuts({ cfg, set }) {
   return (
     <>
-      <h1>Atajos</h1>
-      <Row label="Mostrar / ocultar dock" hint="Atajo global del sistema">
+      <h1>{t("sc.title")}</h1>
+      <Row label={t("sc.toggle")} hint={t("sc.global")}>
         <HotkeyInput
           value={cfg.hotkey}
           onChange={(v) => {
@@ -348,12 +355,12 @@ function Shortcuts({ cfg, set }) {
         />
       </Row>
       <div className="s-card-inner">
-        <h3>Otras formas de controlar Booki</h3>
+        <h3>{t("sc.other")}</h3>
         <ul className="muted-list">
-          <li>Clic izquierdo en el icono de la bandeja: mostrar / ocultar el dock.</li>
-          <li>Doble clic en la bandeja: abrir Ajustes.</li>
-          <li>Clic derecho en el dock: añadir app o carpeta, ajustes.</li>
-          <li>Arrastrar del escritorio al dock: anclar.</li>
+          <li>{t("sc.w1")}</li>
+          <li>{t("sc.w2")}</li>
+          <li>{t("sc.w3")}</li>
+          <li>{t("sc.w4")}</li>
         </ul>
       </div>
     </>
@@ -387,46 +394,40 @@ function About({ version }) {
 
   return (
     <>
-      <h1>Acerca de</h1>
+      <h1>{t("ab.title")}</h1>
       <div className="s-about">
         <img className="s-about-logo" src="/brand/svg/isotype.svg" alt="Booki" />
         <div>
           <strong>Booki Dock</strong> <span className="s-ver">v{version}</span>
-          <p className="muted" style={{ marginTop: 4 }}>
-            Un dock alegre y ligero para Windows.
-          </p>
+          <p className="muted" style={{ marginTop: 4 }}>{t("ab.tagline")}</p>
         </div>
       </div>
 
       <div className="s-card-inner">
-        <h3>Actualizaciones</h3>
+        <h3>{t("ab.updates")}</h3>
         {status === "available" ? (
           <div className="upd-row">
-            <span>Nueva versión <strong>v{update.version}</strong> disponible.</span>
-            <button className="s-btn" onClick={install}>Actualizar e instalar</button>
+            <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
+            <button className="s-btn" onClick={install}>{t("ab.install")}</button>
           </div>
         ) : status === "downloading" ? (
           <div className="upd-row">
-            <span>Descargando… {Math.round(pct * 100)}%</span>
+            <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
             <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
           </div>
         ) : (
           <div className="upd-row">
             <button className="s-btn s-btn-soft" onClick={check} disabled={status === "checking"}>
-              {status === "checking" ? "Buscando…" : "Buscar actualizaciones"}
+              {status === "checking" ? t("ab.checking") : t("ab.check")}
             </button>
-            {status === "none" && <span className="muted">Ya tienes la última versión.</span>}
-            {status === "error" && <span className="muted">No se pudo actualizar.</span>}
+            {status === "none" && <span className="muted">{t("ab.upToDate")}</span>}
+            {status === "error" && <span className="muted">{t("ab.error")}</span>}
           </div>
         )}
-        <p className="muted" style={{ marginTop: 8 }}>
-          Las actualizaciones conservan tus apps ancladas y ajustes.
-        </p>
+        <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
       </div>
 
-      <p className="muted" style={{ marginTop: 14 }}>
-        Hecho con Tauri + Rust · MIT.
-      </p>
+      <p className="muted" style={{ marginTop: 14 }}>{t("ab.made")}</p>
     </>
   );
 }
@@ -441,6 +442,7 @@ function App() {
 
   useEffect(() => {
     configApi.get().then((c) => {
+      setLang(c.language);
       setCfg(c);
       applyTheme(c);
     });
@@ -450,6 +452,7 @@ function App() {
   const set = (patch) => {
     setCfg((prev) => {
       const next = { ...prev, ...patch };
+      setLang(next.language);
       applyTheme(next);
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
@@ -475,7 +478,7 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!cfg) return <div className="loading">Cargando…</div>;
+  if (!cfg) return <div className="loading">…</div>;
 
   return (
     <div className="s-shell">
@@ -491,13 +494,13 @@ function App() {
               className={"s-navitem" + (tab === id ? " active" : "")}
               onClick={() => setTab(id)}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </nav>
         <div className="s-sidebar-foot">
-          <button className="s-btn s-btn-soft" onClick={reset}>Restablecer</button>
-          <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>Salir</button>
+          <button className="s-btn s-btn-soft" onClick={reset}>{t("act.reset")}</button>
+          <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
         </div>
       </aside>
       <main className="s-content">
