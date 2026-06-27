@@ -52,6 +52,15 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # Derive the release tag from the app version (package.json), so bumping
+      # the version is all it takes to publish a new release — no hardcoded tag
+      # to forget. A push that doesn't change the version just re-uploads to the
+      # same tag (idempotent).
+      - name: Resolve release tag
+        id: ver
+        shell: bash
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -62,8 +71,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.2.0' }}
-          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.2.0' }}"
+          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
+          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
           releaseBody: |
             **Booki Dock** — a modern, lightweight dock for Windows. 🦫
 
