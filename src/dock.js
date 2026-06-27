@@ -9,6 +9,7 @@ import {
   pickImageFile,
   onFileDrop,
   onConfigChanged,
+  onOcclusion,
   logMessage,
   isTauri,
 } from "./api.js";
@@ -43,6 +44,9 @@ async function boot() {
     setupFileDrop();
     startRunningPoll();
     onConfigChanged(reloadConfig);
+    onOcclusion((occluded) => {
+      if (hideMode() === "smart") setHidden(occluded);
+    });
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -67,7 +71,7 @@ function applyAll() {
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
-  document.body.classList.toggle("autohide", !!cfg.autoHide);
+  document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
   const style = cfg.magnifyStyle || "spring";
   const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
@@ -116,6 +120,10 @@ async function appTile(item) {
   label.textContent = item.name;
   el.appendChild(label);
 
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  el.appendChild(badge);
+
   const src = await resolveIcon(item);
   if (src) {
     const img = document.createElement("img");
@@ -128,6 +136,18 @@ async function appTile(item) {
     glyph.textContent = (item.name || "?").trim().charAt(0).toUpperCase();
     el.appendChild(glyph);
   }
+
+  // Remove badge — only visible in edit mode.
+  const rm = document.createElement("button");
+  rm.className = "rm";
+  rm.textContent = "×";
+  rm.title = "Quitar";
+  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
+  rm.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removeItem(item.id);
+  });
+  el.appendChild(rm);
 
   el.addEventListener("contextmenu", (e) => openMenu(e, item));
   el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
@@ -178,12 +198,18 @@ async function onAddApp() {
 async function onAddFolder() {
   const path = await pickFolder();
   if (!path) return;
-  await addPaths([path]);
+  await addPaths([path], "folder");
 }
 
-async function addPaths(paths) {
+async function addPaths(paths, forceKind) {
   for (const path of paths) {
-    cfg.pinned.push({ id: uid(), name: baseName(path), path, args: [], kind: "app" });
+    let kind = forceKind || "app";
+    if (!forceKind) {
+      try {
+        if (await dockApi.isDir(path)) kind = "folder";
+      } catch (_) {}
+    }
+    cfg.pinned.push({ id: uid(), name: baseName(path), path, args: [], kind });
   }
   await persist();
   await render();
@@ -210,7 +236,7 @@ function setAllSizes(size) {
 // classic macOS ripple).
 function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
-  if (dockEl.classList.contains("dragging")) return;
+  if (dockEl.classList.contains("dragging") || editMode) return;
   const base = baseSize();
   const max = base * (cfg.zoom || 1.8);
   const spread = base * 1.25; // tight → concentrated pop, not a wide ripple
@@ -247,32 +273,52 @@ dockEl.addEventListener("pointermove", (e) => {
 });
 dockEl.addEventListener("pointerleave", () => setAllSizes(baseSize()));
 
-// ──────────────────────── Pointer reorder ────────────────────────
+// ─────────── Edit mode (iOS-style long-press) + reorder ───────────
 
-let drag = null;
+let editMode = false;
+let dragging = false;
+let press = null; // { el, item, startX, startY, longTimer, moved }
+
+function enterEdit() {
+  if (editMode) return;
+  editMode = true;
+  document.body.classList.add("edit");
+  setAllSizes(baseSize());
+}
+function exitEdit() {
+  if (!editMode) return;
+  editMode = false;
+  document.body.classList.remove("edit");
+}
 
 function onPointerDown(e, el, item) {
   if (e.button !== 0) return;
-  drag = { el, item, startX: e.clientX, startY: e.clientY, moved: false };
-  window.addEventListener("pointermove", onDragMove);
-  window.addEventListener("pointerup", onDragUp, { once: true });
+  press = { el, item, startX: e.clientX, startY: e.clientY, moved: false };
+  // Long-press on an app/folder enters edit mode (iOS-style).
+  if (item.kind !== "separator" && !editMode) {
+    press.longTimer = setTimeout(enterEdit, 550);
+  }
+  window.addEventListener("pointermove", onPressMove);
+  window.addEventListener("pointerup", onPressUp, { once: true });
 }
 
-function onDragMove(e) {
-  if (!drag) return;
-  const dx = e.clientX - drag.startX;
-  const dy = e.clientY - drag.startY;
-  if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-  if (!drag.moved) {
-    drag.moved = true;
+function onPressMove(e) {
+  if (!press) return;
+  const dx = e.clientX - press.startX;
+  const dy = e.clientY - press.startY;
+  if (!press.moved && Math.hypot(dx, dy) < 6) return;
+  press.moved = true;
+  clearTimeout(press.longTimer);
+  if (!editMode) return; // only reorder while editing
+  if (!dragging) {
+    dragging = true;
     dockEl.classList.add("dragging");
-    drag.el.classList.add("dragging");
-    setAllSizes(baseSize());
+    press.el.classList.add("dragging");
   }
   const vertical = isVertical();
   const pointer = vertical ? e.clientY : e.clientX;
-  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((t) => t !== drag.el);
-  let ref = null; // null → append at the end
+  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((t) => t !== press.el);
+  let ref = null;
   for (const s of sibs) {
     const r = s.getBoundingClientRect();
     const mid = vertical ? r.top + r.height / 2 : r.left + r.width / 2;
@@ -281,26 +327,35 @@ function onDragMove(e) {
       break;
     }
   }
-  dockEl.insertBefore(drag.el, ref);
+  dockEl.insertBefore(press.el, ref);
 }
 
-async function onDragUp() {
-  window.removeEventListener("pointermove", onDragMove);
-  const d = drag;
-  drag = null;
-  if (!d) return;
-  if (!d.moved) {
-    if (d.item.kind !== "separator") launch(d.el, d.item);
+async function onPressUp() {
+  window.removeEventListener("pointermove", onPressMove);
+  const p = press;
+  press = null;
+  if (!p) return;
+  clearTimeout(p.longTimer);
+  if (dragging) {
+    dragging = false;
+    dockEl.classList.remove("dragging");
+    p.el.classList.remove("dragging");
+    const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
+    cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+    await persist();
+    await render();
+    reframe();
     return;
   }
-  dockEl.classList.remove("dragging");
-  d.el.classList.remove("dragging");
-  const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
-  cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
-  await persist();
-  await render();
-  reframe();
+  if (!p.moved && !editMode && p.item.kind !== "separator") {
+    launch(p.el, p.item);
+  }
 }
+
+// Exit edit mode by clicking empty space or pressing Escape.
+window.addEventListener("pointerdown", (e) => {
+  if (editMode && !e.target.closest(".tile")) exitEdit();
+});
 
 // ───────────────────────── Context menu ─────────────────────────
 
@@ -383,7 +438,10 @@ dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
 window.addEventListener("blur", closeMenu);
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeMenu();
+  if (e.key === "Escape") {
+    closeMenu();
+    exitEdit();
+  }
 });
 
 async function changeIcon(item) {
@@ -451,7 +509,7 @@ function applyFrame() {
   const full = computeFrame();
   lastFull = full;
   const dpr = window.devicePixelRatio || 1;
-  if (cfg.autoHide && hiddenState) {
+  if (hiddenState) {
     const strip = Math.ceil(8 * dpr);
     if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, full.h);
     else dockApi.setDockFrame(cfg.edge, full.w, strip);
@@ -461,42 +519,44 @@ function applyFrame() {
 }
 
 // ───────────────────────── Auto-hide ─────────────────────────
+// Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
+// driven by the backend occlusion watcher) · "edge" (hide, reveal on hover).
 
 let hiddenState = false;
 let hideTimer = null;
 
-function setupAutoHide() {
-  clearTimeout(hideTimer);
-  if (cfg.autoHide) {
-    hiddenState = true;
+function hideMode() {
+  return cfg.autoHideMode || (cfg.autoHide ? "edge" : "off");
+}
+
+function setHidden(v) {
+  if (v === hiddenState) return;
+  hiddenState = v;
+  if (v) {
     document.body.classList.add("hidden");
-    applyFrame();
+    setTimeout(() => hiddenState && applyFrame(), 340); // shrink after the slide
   } else {
-    hiddenState = false;
-    document.body.classList.remove("hidden");
-    applyFrame();
+    applyFrame(); // grow first…
+    requestAnimationFrame(() => document.body.classList.remove("hidden")); // …then slide in
   }
 }
 
-function reveal() {
-  if (!cfg.autoHide) return;
+function setupAutoHide() {
   clearTimeout(hideTimer);
-  if (!hiddenState) return;
-  hiddenState = false;
-  applyFrame(); // grow the window first…
-  requestAnimationFrame(() => document.body.classList.remove("hidden")); // …then slide in
+  hiddenState = hideMode() === "edge"; // edge starts hidden; off/smart start shown
+  document.body.classList.toggle("hidden", hiddenState);
+  applyFrame();
+}
+
+function reveal() {
+  if (hideMode() === "off") return;
+  clearTimeout(hideTimer);
+  setHidden(false);
 }
 function scheduleHide() {
-  if (!cfg.autoHide || drag) return;
+  if (hideMode() !== "edge" || dragging) return;
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => {
-    if (drag) return;
-    hiddenState = true;
-    document.body.classList.add("hidden");
-    setTimeout(() => {
-      if (hiddenState) applyFrame();
-    }, 340);
-  }, cfg.autoHideDelay ?? 650);
+  hideTimer = setTimeout(() => !dragging && setHidden(true), cfg.autoHideDelay ?? 650);
 }
 
 document.body.addEventListener("pointerenter", reveal);
@@ -535,13 +595,16 @@ function startRunningPoll() {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator") return;
         const name = (app.name || "").toLowerCase();
-        const match = name && wins.find((w) => w.title.toLowerCase().includes(name));
-        if (match) {
+        const matches = name ? wins.filter((w) => w.title.toLowerCase().includes(name)) : [];
+        const badge = t.querySelector(".badge");
+        if (matches.length) {
           t.dataset.running = "true";
-          t.dataset.hwnd = String(match.hwnd);
+          t.dataset.hwnd = String(matches[0].hwnd);
+          if (badge) badge.textContent = matches.length > 1 ? String(matches.length) : "";
         } else {
           t.dataset.running = "false";
           delete t.dataset.hwnd;
+          if (badge) badge.textContent = "";
         }
       });
     } catch (_) {

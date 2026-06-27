@@ -11,7 +11,7 @@ mod win;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 
@@ -115,6 +115,113 @@ fn open_location(path: String) -> Result<(), String> {
     apps::reveal(&path)
 }
 
+#[derive(serde::Serialize)]
+struct MonitorInfo {
+    index: i32,
+    name: String,
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+    primary: bool,
+}
+
+/// List the available monitors so the user can choose where the dock lives.
+#[tauri::command]
+fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
+    let primary = window
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .and_then(|m| m.name().cloned());
+    window
+        .available_monitors()
+        .map(|ms| {
+            ms.iter()
+                .enumerate()
+                .map(|(i, m)| MonitorInfo {
+                    index: i as i32,
+                    name: m.name().cloned().unwrap_or_else(|| format!("Monitor {}", i + 1)),
+                    x: m.position().x,
+                    y: m.position().y,
+                    w: m.size().width,
+                    h: m.size().height,
+                    primary: m.name().cloned() == primary,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Re-apply the native material with a new strength (0–100).
+#[tauri::command]
+fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let a = ((strength.min(100) as f32 / 100.0) * 220.0) as u8;
+        let _ = window_vibrancy::apply_acrylic(&window, Some((22, 22, 24, a)));
+    }
+    #[cfg(not(windows))]
+    let _ = (&window, strength);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let m = app.autolaunch();
+    if enabled {
+        m.enable().map_err(|e| e.to_string())
+    } else {
+        m.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+fn get_autostart(app: AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[derive(serde::Serialize)]
+struct DirItem {
+    name: String,
+    path: String,
+    is_dir: bool,
+}
+
+/// List a folder's contents for the "stack" flyout.
+#[tauri::command]
+fn list_dir(path: String) -> Vec<DirItem> {
+    let mut out: Vec<DirItem> = Vec::new();
+    if let Ok(rd) = std::fs::read_dir(&path) {
+        for e in rd.flatten().take(80) {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let p = e.path();
+            let is_dir = p.is_dir();
+            out.push(DirItem {
+                name,
+                path: p.to_string_lossy().to_string(),
+                is_dir,
+            });
+        }
+    }
+    out.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    out
+}
+
+#[tauri::command]
+fn is_dir(path: String) -> bool {
+    std::path::Path::new(&path).is_dir()
+}
+
 /// (Re)register the global hotkey that toggles the dock. Empty = none.
 #[tauri::command]
 fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
@@ -140,12 +247,22 @@ fn frontend_log(level: String, message: String) {
 
 // ─────────────────────────────── Helpers ────────────────────────────────
 
-/// Anchor a window to a screen edge of its current monitor.
+/// Pick the configured monitor (config.monitor index, -1 = current/primary).
+fn pick_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
+    let idx = config::load().monitor;
+    if idx >= 0 {
+        if let Ok(mons) = window.available_monitors() {
+            if let Some(m) = mons.into_iter().nth(idx as usize) {
+                return Some(m);
+            }
+        }
+    }
+    window.current_monitor().ok().flatten()
+}
+
+/// Anchor a window to a screen edge of the chosen monitor.
 fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
-    let monitor = window
-        .current_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "no monitor found".to_string())?;
+    let monitor = pick_monitor(window).ok_or_else(|| "no monitor found".to_string())?;
     let mpos = monitor.position();
     let msize = monitor.size();
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
@@ -230,6 +347,10 @@ pub fn run() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -247,6 +368,12 @@ pub fn run() {
             open_settings,
             open_location,
             set_hotkey,
+            list_monitors,
+            set_material,
+            set_autostart,
+            get_autostart,
+            list_dir,
+            is_dir,
             quit,
             frontend_log,
         ])
@@ -299,6 +426,41 @@ pub fn run() {
                 if !cfg.hotkey.trim().is_empty() {
                     use tauri_plugin_global_shortcut::GlobalShortcutExt;
                     let _ = app.global_shortcut().register(cfg.hotkey.as_str());
+                }
+
+                // Apply the configured material strength.
+                let _ = set_material(dock.clone(), cfg.material_strength);
+
+                // Smart auto-hide watcher: emit `booki://occlusion` when the
+                // foreground window covers the dock area. The frontend decides
+                // whether to act (only in "smart" mode). Windows-only.
+                #[cfg(windows)]
+                {
+                    let watch = dock.clone();
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        let self_hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                        let mut last = false;
+                        loop {
+                            std::thread::sleep(std::time::Duration::from_millis(350));
+                            let pos = match watch.outer_position() {
+                                Ok(p) => p,
+                                Err(_) => continue,
+                            };
+                            let size = watch.outer_size().unwrap_or_default();
+                            let occ = win::foreground_occludes(
+                                pos.x,
+                                pos.y,
+                                pos.x + size.width as i32,
+                                pos.y + size.height as i32,
+                                self_hwnd,
+                            );
+                            if occ != last {
+                                last = occ;
+                                let _ = handle.emit("booki://occlusion", occ);
+                            }
+                        }
+                    });
                 }
             }
 

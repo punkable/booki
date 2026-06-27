@@ -17,9 +17,11 @@ pub struct WindowInfo {
 #[cfg(windows)]
 mod windows_impl;
 #[cfg(windows)]
-pub use windows_impl::{app_icon_data_uri, focus_window, list_windows, work_area};
+pub use windows_impl::{
+    app_icon_data_uri, focus_window, foreground_occludes, list_windows, work_area,
+};
 
 #[cfg(not(windows))]
 mod stub;
 #[cfg(not(windows))]
-pub use stub::{app_icon_data_uri, focus_window, list_windows, work_area};
+pub use stub::{app_icon_data_uri, focus_window, foreground_occludes, list_windows, work_area};
