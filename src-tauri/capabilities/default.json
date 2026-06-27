@@ -9,7 +9,6 @@
     "core:window:allow-hide",
     "core:window:allow-set-focus",
     "core:window:allow-close",
-    "dialog:default",
     "dialog:allow-open",
     "log:default",
     "global-shortcut:allow-register",
@@ -18,8 +17,8 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "updater:default",
-    "process:default",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
     "process:allow-restart"
   ]
 }
