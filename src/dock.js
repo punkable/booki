@@ -15,6 +15,7 @@ import {
 } from "./api.js";
 import { icon } from "./icons.js";
 import { applyTheme, applyEdge } from "./theme.js";
+import { checkForUpdate } from "./update.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -47,6 +48,7 @@ async function boot() {
     onOcclusion((occluded) => {
       if (hideMode() === "smart") setHidden(occluded);
     });
+    checkUpdates();
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -613,6 +615,18 @@ function startRunningPoll() {
   };
   tick();
   pollTimer = setInterval(tick, 4000);
+}
+
+// ─────────────────── Update check ───────────────────
+
+async function checkUpdates() {
+  const pill = document.getElementById("update-pill");
+  if (!pill) return;
+  const update = await checkForUpdate();
+  if (update) {
+    pill.classList.remove("hidden");
+    pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
+  }
 }
 
 boot();

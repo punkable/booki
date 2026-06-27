@@ -402,6 +402,31 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .menu .sep { height: 1px; margin: 5px 8px; background: var(--stroke); }
 .hidden { display: none !important; }
 
+/* Update-available pill (dock) */
+.update-pill {
+  position: fixed;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  animation: booki-breathe 2.4s var(--ease) infinite;
+}
+
+/* Update controls (settings) */
+.upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
+.upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.2s ease; }
+
 /* ═══════════════════════ Settings window (React) ═══════════════════════ */
 
 body.settings-body { background: var(--bg); overflow: hidden; }
