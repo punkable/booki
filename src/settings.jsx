@@ -13,6 +13,7 @@ import {
   logMessage,
 } from "./api.js";
 import { applyTheme } from "./theme.js";
+import { checkForUpdate, installUpdate } from "./update.js";
 
 window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
 window.addEventListener("unhandledrejection", (e) =>
@@ -360,6 +361,30 @@ function Shortcuts({ cfg, set }) {
 }
 
 function About({ version }) {
+  const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|error
+  const [update, setUpdate] = useState(null);
+  const [pct, setPct] = useState(0);
+
+  const check = async () => {
+    setStatus("checking");
+    const u = await checkForUpdate();
+    if (u) {
+      setUpdate(u);
+      setStatus("available");
+    } else {
+      setStatus("none");
+    }
+  };
+  const install = async () => {
+    setStatus("downloading");
+    try {
+      await installUpdate(update, (p) => setPct(p.pct || 0));
+    } catch (e) {
+      logMessage("error", `update install: ${e}`);
+      setStatus("error");
+    }
+  };
+
   return (
     <>
       <h1>Acerca de</h1>
@@ -372,6 +397,33 @@ function About({ version }) {
           </p>
         </div>
       </div>
+
+      <div className="s-card-inner">
+        <h3>Actualizaciones</h3>
+        {status === "available" ? (
+          <div className="upd-row">
+            <span>Nueva versión <strong>v{update.version}</strong> disponible.</span>
+            <button className="s-btn" onClick={install}>Actualizar e instalar</button>
+          </div>
+        ) : status === "downloading" ? (
+          <div className="upd-row">
+            <span>Descargando… {Math.round(pct * 100)}%</span>
+            <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
+          </div>
+        ) : (
+          <div className="upd-row">
+            <button className="s-btn s-btn-soft" onClick={check} disabled={status === "checking"}>
+              {status === "checking" ? "Buscando…" : "Buscar actualizaciones"}
+            </button>
+            {status === "none" && <span className="muted">Ya tienes la última versión.</span>}
+            {status === "error" && <span className="muted">No se pudo actualizar.</span>}
+          </div>
+        )}
+        <p className="muted" style={{ marginTop: 8 }}>
+          Las actualizaciones conservan tus apps ancladas y ajustes.
+        </p>
+      </div>
+
       <p className="muted" style={{ marginTop: 14 }}>
         Hecho con Tauri + Rust · MIT.
       </p>
