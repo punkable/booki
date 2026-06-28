@@ -201,6 +201,7 @@ function MiniDockPreview({ cfg }) {
   const alpha = Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66));
   const mid = Math.floor(count / 2);
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
+  const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   return (
     <div className={"preview prev-" + (cfg.edge || "bottom")}>
       <div
@@ -208,6 +209,7 @@ function MiniDockPreview({ cfg }) {
         style={{
           flexDirection: vertical ? "column" : "row",
           gap,
+          borderRadius: radius + 5,
           background: `color-mix(in srgb, var(--layer-strong) ${alpha * 100}%, transparent)`,
         }}
       >
@@ -220,6 +222,7 @@ function MiniDockPreview({ cfg }) {
               style={{
                 width: s,
                 height: s,
+                borderRadius: radius,
                 transform: i === mid ? (vertical ? "translateX(-4px)" : "translateY(-4px)") : "none",
               }}
             >
@@ -450,6 +453,10 @@ function Appearance({ cfg, set }) {
       <Row label={t("ap.spacing")}>
         <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
           onChange={(v) => set({ spacing: v })} />
+      </Row>
+      <Row label={t("ap.radius")} hint={t("ap.radiusHint")}>
+        <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
+          onChange={(v) => set({ cornerRadius: v })} />
       </Row>
       <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}

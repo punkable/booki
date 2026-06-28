@@ -81,6 +81,7 @@ fn set_dock_frame(
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
     let h = height.max(8);
+    let prev = window.outer_size().ok();
     window
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
@@ -95,7 +96,26 @@ fn set_dock_frame(
                 p.y + s.height as i32,
             ));
         }
+        // If we just expanded from the collapsed notch (a much smaller window),
+        // nudge the size once so WebView2 repaints its surface — otherwise the
+        // dock can come back blank/non-interactive after growing (same race the
+        // settings window had). Only on a big grow, so steady reframes don't flicker.
+        #[cfg(windows)]
+        if let Some(p) = prev {
+            if h > p.height + 40 || w > p.width + 40 {
+                let w2 = window.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(16));
+                    if let Ok(sz) = w2.inner_size() {
+                        let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
+                        let _ = w2.set_size(sz);
+                    }
+                });
+            }
+        }
     }
+    #[cfg(not(windows))]
+    let _ = prev;
     Ok(())
 }
 
