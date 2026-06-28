@@ -73,6 +73,8 @@ async function mockInvoke(cmd, args) {
       ];
     case "get_autostart":
       return demoConfig.autostart;
+    case "system_accent":
+      return "#3a86ff";
     case "is_dir":
       return false;
     case "list_dir":
@@ -201,6 +203,7 @@ export const dock = {
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (strength) => invoke("set_material", { strength }),
+  systemAccent: () => invoke("system_accent"),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),

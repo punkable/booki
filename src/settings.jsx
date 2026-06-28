@@ -275,6 +275,17 @@ function AccentPicker({ value, onChange }) {
           <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
           <span className="accent-plus">{isPreset ? "+" : "✓"}</span>
         </label>
+        <button
+          type="button"
+          className="accent-system"
+          title={t("ap.system")}
+          onClick={async () => {
+            const hex = await dockApi.systemAccent();
+            if (hex) onChange(hex);
+          }}
+        >
+          ⊙
+        </button>
       </div>
       <span className="accent-hex">{(value || "").toUpperCase()}</span>
     </div>
@@ -575,6 +586,12 @@ function Apps({ cfg, set }) {
   const [iconFor, setIconFor] = useState(-1);
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
+  // Dissolve a folder, spilling its items back to the dock (no data loss).
+  const ungroup = (i) => {
+    const grp = cfg.pinned[i];
+    if (!grp || grp.kind !== "group") return;
+    set({ pinned: cfg.pinned.flatMap((p, k) => (k === i ? grp.children || [] : [p])) });
+  };
 
   const startDrag = (i) => (e) => {
     e.preventDefault();
@@ -644,11 +661,15 @@ function Apps({ cfg, set }) {
               )}
             </span>
             <span className="pin-actions">
+              {item.kind === "group" && (
+                <button className="pin-btn" title={t("group.ungroup")}
+                  onClick={() => ungroup(i)}>⊟</button>
+              )}
               {item.kind !== "separator" && (
                 <button className="pin-btn" title={t("apps.changeIcon")}
                   onClick={() => setIconFor(i)}>◑</button>
               )}
-              {item.kind !== "separator" && (
+              {item.kind !== "separator" && item.kind !== "group" && (
                 <button className="pin-btn" title={t("apps.openLoc")}
                   onClick={() => dockApi.openLocation(item.path)}>↗</button>
               )}
