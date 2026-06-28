@@ -10,6 +10,7 @@ import {
   pickFolder,
   pickImageFile,
   emitConfigChanged,
+  onConfigChanged,
   closeSelf,
   logMessage,
 } from "./api.js";
@@ -842,6 +843,19 @@ function App() {
     const onKey = (e) => e.key === "Escape" && closeSelf();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Reflect changes made from the dock itself (e.g. drag-reorder or creating a
+  // folder) into the Apps list here. We only sync `pinned` so a slider being
+  // dragged in Settings isn't clobbered.
+  useEffect(() => {
+    let un;
+    onConfigChanged(() => {
+      configApi.get().then((c) =>
+        setCfg((prev) => (prev ? { ...prev, pinned: c.pinned } : c))
+      );
+    }).then((u) => (un = u));
+    return () => un && un();
   }, []);
 
   if (!cfg) return <div className="loading">…</div>;

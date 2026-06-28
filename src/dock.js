@@ -10,6 +10,8 @@ import {
   onFileDrop,
   onConfigChanged,
   onOcclusion,
+  onReveal,
+  emitConfigChanged,
   logMessage,
   isTauri,
 } from "./api.js";
@@ -80,8 +82,11 @@ function applyAll() {
     root.style.setProperty("--accent", cfg.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
-  // Tile/corner roundness (user-tunable). Drives tile, group and folder radii.
-  root.style.setProperty("--tile-r", `${cfg.cornerRadius ?? 12}px`);
+  // Tile/corner roundness (user-tunable). Drives tile, group and folder radii;
+  // the dock's own outer corner is a touch rounder so it frames the tiles.
+  const cr = cfg.cornerRadius ?? 12;
+  root.style.setProperty("--tile-r", `${cr}px`);
+  root.style.setProperty("--dock-r", `${cr + 8}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
@@ -455,7 +460,31 @@ function onPressMove(e) {
       break;
     }
   }
-  dockEl.insertBefore(press.el, ref);
+  // Skip if it's already in place (avoids resetting the FLIP transition).
+  if (press.el.nextElementSibling === ref) return;
+  flipReorder(() => dockEl.insertBefore(press.el, ref));
+}
+
+// FLIP: animate the OTHER tiles sliding to their new slots when the dragged tile
+// is reinserted, so reordering reads as a smooth shuffle (not an instant jump).
+function flipReorder(mutate) {
+  const tiles = [...dockEl.querySelectorAll(".tile")];
+  const first = new Map(tiles.map((t) => [t, t.getBoundingClientRect()]));
+  mutate();
+  for (const t of tiles) {
+    if (t === press?.el) continue; // the dragged tile follows the pointer itself
+    const a = first.get(t);
+    const b = t.getBoundingClientRect();
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    if (!dx && !dy) continue;
+    t.style.transition = "none";
+    t.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => {
+      t.style.transition = "transform 0.2s var(--ease)";
+      t.style.transform = "";
+    });
+  }
 }
 
 async function onPressUp() {
@@ -476,6 +505,7 @@ async function onPressUp() {
       const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
       cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       await persist();
+      await emitConfigChanged(); // keep the Settings list in sync with the new order
       await render();
       reframe();
     }
@@ -528,6 +558,7 @@ async function createGroup(draggedId, targetId) {
   cfg.pinned.splice(di, 1);
   exitEdit();
   await persist();
+  await emitConfigChanged();
   await render();
   reframe();
 }
@@ -733,15 +764,19 @@ function reframe() {
   );
 }
 
+// Transparent breathing room around the bar so the dock's drop shadow and the
+// magnified tiles have room to render without being clipped by the window edge.
+const SHADOW_PAD = 22;
+
 let lastFull = null;
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
-  // The window IS the bar (native Mica surface). The magnify scales from each
-  // tile's center into the bar's own padding, so nothing overflows the window —
-  // the name uses a native OS tooltip instead of an in-page one.
+  // The window is the bar plus a transparent shadow-pad margin. The dock surface
+  // is centered inside via body padding; magnify and the soft shadow live in the
+  // pad. The hover name uses the native OS tooltip (title attr).
   const r = dockEl.getBoundingClientRect();
-  let wCss = r.width + 2;
-  let hCss = r.height + 2;
+  let wCss = r.width + SHADOW_PAD * 2;
+  let hCss = r.height + SHADOW_PAD * 2;
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();
@@ -754,18 +789,10 @@ function computeFrame() {
 function applyFrame() {
   const full = computeFrame();
   lastFull = full;
-  const dpr = window.devicePixelRatio || 1;
-  if (hiddenState) {
-    // Shrink to a SMALL centered notch (not a full-width strip) so it reads as a
-    // clean rounded pill. hidden=true so the backend keeps the full home rect for
-    // occlusion (otherwise smart-hide flaps).
-    const strip = Math.ceil(20 * dpr);
-    const notch = Math.ceil(176 * dpr);
-    if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, notch, true);
-    else dockApi.setDockFrame(cfg.edge, notch, strip, true);
-  } else {
-    dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
-  }
+  // The dock window stays full-size at all times now; hiding is done by showing
+  // the separate notch window and hiding the dock window (no resize → no notch
+  // flap or repaint race). hidden=false keeps the home rect updated for occlusion.
+  dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
 }
 
 // ───────────────────────── Auto-hide ─────────────────────────
@@ -786,27 +813,35 @@ function setHidden(v) {
   if (v === hiddenState) return;
   hiddenState = v;
   if (v) {
+    // Slide/fade the bar out, then hand off to the notch window (and hide the
+    // dock window) once the animation has played.
     document.body.classList.add("hidden");
-    setTimeout(() => hiddenState && applyFrame(), 340); // shrink after the slide
+    setTimeout(() => {
+      if (hiddenState) dockApi.hideDock(cfg.edge);
+    }, 300);
   } else {
-    applyFrame(); // grow the window back first…
-    // …then slide in, but only AFTER the window has actually grown, so the bar
-    // never animates inside a still-collapsed window (which looked "cut").
+    // Show the dock window (and hide the notch), then slide the bar back in.
+    dockApi.revealDock();
     setTimeout(() => {
       if (!hiddenState) document.body.classList.remove("hidden");
-    }, 70);
+    }, 60);
   }
 }
 
 function setupAutoHide() {
   clearTimeout(hideTimer);
   manualReveal = false;
+  pinnedReveal = false;
   // edge mode starts hidden; off/smart start shown (smart hides only once the
   // backend reports the dock is actually covered, so on the desktop it stays
   // visible — never flapping).
   hiddenState = hideMode() === "edge";
   document.body.classList.toggle("hidden", hiddenState);
   applyFrame();
+  // Sync the two windows to the starting state (these don't emit, so this won't
+  // pin the dock open).
+  if (hiddenState) dockApi.hideDock(cfg.edge);
+  else dockApi.revealDock();
 }
 
 // Pointer entered the dock / notch → reveal and hold it open.
@@ -849,24 +884,19 @@ document.body.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", scheduleHide);
 
-// The notch is a clickable handle to bring the dock back manually. A CLICK pins
-// it open (so the user can actually launch something) until they click away or
-// launch an app; a hover just peeks.
-const revealHandle = document.getElementById("reveal-handle");
-if (revealHandle) {
-  revealHandle.addEventListener("pointerenter", reveal);
-  revealHandle.addEventListener("click", (e) => {
-    e.stopPropagation();
-    pinnedReveal = true;
-    reveal();
-  });
-}
+// The notch is now its own small window. Clicking it calls the backend, which
+// shows the dock window again and fires `booki://reveal` — we pin the dock open
+// (so the user can actually launch something) until they click away or launch.
+onReveal(() => {
+  pinnedReveal = true;
+  reveal();
+});
 
-// Clicking anywhere outside the dock/notch releases a pinned reveal and lets the
-// dock tuck back into the notch (when the mode wants it hidden).
+// Clicking anywhere outside the dock releases a pinned reveal and lets the dock
+// tuck back into the notch (when the mode wants it hidden).
 window.addEventListener("pointerdown", (e) => {
   if (!pinnedReveal) return;
-  if (e.target.closest("#dock") || e.target.closest("#reveal-handle")) return;
+  if (e.target.closest("#dock")) return;
   pinnedReveal = false;
   scheduleHide();
 });
@@ -1049,9 +1079,6 @@ async function checkUpdates() {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
     pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
-    // Give the notch a notification color/pulse so it's visible even when hidden.
-    const handle = document.getElementById("reveal-handle");
-    if (handle) handle.classList.add("notify");
   }
 }
 

@@ -194,6 +194,8 @@ export const dock = {
   reposition: (edge) => invoke("reposition_dock", { edge }),
   setDockFrame: (edge, width, height, hidden = false) =>
     invoke("set_dock_frame", { edge, width, height, hidden }),
+  hideDock: (edge) => invoke("hide_dock", { edge }),
+  revealDock: () => invoke("reveal_dock"),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -216,4 +218,10 @@ export const dock = {
 export async function onOcclusion(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://occlusion", (e) => cb(!!e.payload));
+}
+
+/** Listen for the "reveal the dock" signal (fired when the notch is clicked). */
+export async function onReveal(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://reveal", () => cb());
 }
