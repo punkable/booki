@@ -90,7 +90,7 @@ pub struct Config {
     pub theme: String,
     #[serde(default = "default_icon_size")]
     pub icon_size: u32,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub magnification: bool,
     /// Peak magnification scale (e.g. 1.8 = tiles grow up to 180%).
     #[serde(default = "default_zoom")]
@@ -145,7 +145,7 @@ impl Default for Config {
             accent: default_accent(),
             theme: default_theme(),
             icon_size: default_icon_size(),
-            magnification: true,
+            magnification: false,
             zoom: default_zoom(),
             spacing: default_spacing(),
             show_labels: true,
@@ -191,6 +191,13 @@ pub fn load() -> Config {
     if cfg.settings_rev < 2 {
         cfg.auto_hide_mode = "smart".into();
         cfg.settings_rev = 2;
+        let _ = save(&cfg);
+    }
+    // rev 3: Windows-native default — icons no longer magnify on hover by default
+    // (a subtle highlight is used instead). Users can re-enable it in settings.
+    if cfg.settings_rev < 3 {
+        cfg.magnification = false;
+        cfg.settings_rev = 3;
         let _ = save(&cfg);
     }
     cfg

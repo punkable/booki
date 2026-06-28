@@ -8,6 +8,7 @@ import {
   dock as dockApi,
   pickAppFile,
   pickFolder,
+  pickImageFile,
   emitConfigChanged,
   closeSelf,
   logMessage,
@@ -15,6 +16,16 @@ import {
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang } from "./i18n.js";
+import {
+  ICON_LIBRARY,
+  ICON_STYLES,
+  isLibIcon,
+  parseLibIcon,
+  libToken,
+  libIconDataUri,
+  resolveLibIcon,
+  currentAccentColors,
+} from "./icon-library.js";
 
 window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
 window.addEventListener("unhandledrejection", (e) =>
@@ -337,10 +348,14 @@ function Suggestions({ cfg, set }) {
 }
 
 function PinThumb({ item }) {
-  const [src, setSrc] = useState(item.icon || null);
+  const [src, setSrc] = useState(isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
   useEffect(() => {
     let alive = true;
-    if (!item.icon && item.path) {
+    if (isLibIcon(item.icon)) {
+      setSrc(resolveLibIcon(item.icon));
+    } else if (item.icon) {
+      setSrc(item.icon);
+    } else if (item.path) {
       dockApi.appIcon(item.path).then((u) => alive && setSrc(u));
     }
     return () => {
@@ -500,11 +515,66 @@ function Behavior({ cfg, set }) {
   );
 }
 
+// Modal to choose a pin's icon: built-in library (with styles), upload an image,
+// or reset to the app's real icon.
+function IconPickerModal({ item, onPick, onClose }) {
+  const [style, setStyle] = useState(isLibIcon(item.icon) ? parseLibIcon(item.icon).style : "badge");
+  const colors = currentAccentColors();
+  const upload = async () => {
+    const path = await pickImageFile();
+    if (!path) return;
+    const uri = (await dockApi.imageDataUri(path)) || path;
+    onPick(uri);
+  };
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <strong>{t("icon.title")}</strong>
+          <button className="pin-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="icon-styles">
+          {ICON_STYLES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={"seg-mini" + (style === s ? " active" : "")}
+              onClick={() => setStyle(s)}
+            >
+              {t("icon.style." + s)}
+            </button>
+          ))}
+        </div>
+        <div className="icon-grid">
+          {ICON_LIBRARY.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="icon-cell"
+              title={name}
+              onClick={() => onPick(libToken(name, style))}
+            >
+              <img src={libIconDataUri(name, style, colors)} alt={name} />
+            </button>
+          ))}
+        </div>
+        <div className="s-actions" style={{ marginTop: 14 }}>
+          <button className="s-btn s-btn-soft" onClick={upload}>{t("icon.upload")}</button>
+          <button className="s-btn s-btn-soft" onClick={() => onPick(null)}>{t("icon.reset")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
+  const [iconFor, setIconFor] = useState(-1);
+  const setIcon = (i, value) =>
+    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
 
   const startDrag = (i) => (e) => {
     e.preventDefault();
@@ -562,6 +632,10 @@ function Apps({ cfg, set }) {
             </span>
             <span className="pin-actions">
               {item.kind !== "separator" && (
+                <button className="pin-btn" title={t("apps.changeIcon")}
+                  onClick={() => setIconFor(i)}>◑</button>
+              )}
+              {item.kind !== "separator" && (
                 <button className="pin-btn" title={t("apps.openLoc")}
                   onClick={() => dockApi.openLocation(item.path)}>↗</button>
               )}
@@ -576,6 +650,13 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
       </div>
       <Suggestions cfg={cfg} set={set} />
+      {iconFor >= 0 && cfg.pinned[iconFor] && (
+        <IconPickerModal
+          item={cfg.pinned[iconFor]}
+          onClose={() => setIconFor(-1)}
+          onPick={(value) => { setIcon(iconFor, value); setIconFor(-1); }}
+        />
+      )}
     </>
   );
 }
