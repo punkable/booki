@@ -742,11 +742,13 @@ function applyFrame() {
   lastFull = full;
   const dpr = window.devicePixelRatio || 1;
   if (hiddenState) {
-    // Shrink to a slim notch strip; pass hidden=true so the backend does NOT
-    // record this as the occlusion "home" rect (otherwise smart-hide flaps).
-    const strip = Math.ceil(14 * dpr);
-    if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, full.h, true);
-    else dockApi.setDockFrame(cfg.edge, full.w, strip, true);
+    // Shrink to a SMALL centered notch (not a full-width strip) so it reads as a
+    // clean rounded pill. hidden=true so the backend keeps the full home rect for
+    // occlusion (otherwise smart-hide flaps).
+    const strip = Math.ceil(20 * dpr);
+    const notch = Math.ceil(176 * dpr);
+    if (isVertical()) dockApi.setDockFrame(cfg.edge, strip, notch, true);
+    else dockApi.setDockFrame(cfg.edge, notch, strip, true);
   } else {
     dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
   }
