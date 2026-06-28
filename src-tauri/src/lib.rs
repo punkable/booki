@@ -202,20 +202,30 @@ fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
 }
 
 /// Round a window's corners (Windows 11 DWM) so the acrylic reads as a rounded
-/// dock rather than a hard rectangle. Best-effort; no-op on older Windows.
+/// dock rather than a hard rectangle. Uses a raw `dwmapi` call (linked by
+/// window-vibrancy) to avoid the `windows`-crate version mismatch between our
+/// bindings and Tauri's. Best-effort; no-op on older Windows.
 #[cfg(windows)]
 fn round_window_corners(window: &WebviewWindow) {
-    use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
-    };
-    if let Ok(hwnd) = window.hwnd() {
-        let pref = DWMWCP_ROUND;
+    // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: isize,
+            dwattribute: u32,
+            pvattribute: *const core::ffi::c_void,
+            cbattribute: u32,
+        ) -> i32;
+    }
+    if let Ok(h) = window.hwnd() {
+        let hwnd = h.0 as isize;
+        let pref: u32 = 2; // DWMWCP_ROUND
         unsafe {
             let _ = DwmSetWindowAttribute(
                 hwnd,
-                DWMWA_WINDOW_CORNER_PREFERENCE,
+                33,
                 &pref as *const _ as *const core::ffi::c_void,
-                std::mem::size_of_val(&pref) as u32,
+                std::mem::size_of::<u32>() as u32,
             );
         }
     }
