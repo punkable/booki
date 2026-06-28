@@ -31,6 +31,7 @@ const DEMO_CONFIG = {
   magnification: false,
   zoom: 1.25,
   spacing: 6,
+  cornerRadius: 12,
   showLabels: true,
   showIndicators: true,
   autoHide: false,

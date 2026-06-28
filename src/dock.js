@@ -80,6 +80,8 @@ function applyAll() {
     root.style.setProperty("--accent", cfg.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
+  // Tile/corner roundness (user-tunable). Drives tile, group and folder radii.
+  root.style.setProperty("--tile-r", `${cfg.cornerRadius ?? 12}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
@@ -245,6 +247,10 @@ function launch(el, item) {
     toggleStack(el, item);
     return;
   }
+  // Launching/switching means the user is done with the dock for now — release
+  // any pinned reveal so smart-hide can tuck it back into the notch.
+  pinnedReveal = false;
+  scheduleHide();
   // Launcher + switcher: if the app already has a window, focus it;
   // otherwise launch a new instance.
   const hwnd = el.dataset.hwnd;
@@ -667,7 +673,15 @@ function closeMenu() {
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
-window.addEventListener("blur", closeMenu);
+window.addEventListener("blur", () => {
+  closeMenu();
+  // Focus moved to another app → release a pinned reveal so the dock can tuck
+  // back into the notch instead of lingering on top of whatever the user opened.
+  if (pinnedReveal) {
+    pinnedReveal = false;
+    scheduleHide();
+  }
+});
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeMenu();
@@ -762,6 +776,7 @@ let hiddenState = false;
 let hideTimer = null;
 let occluded = false; // last occlusion signal from the backend (smart mode)
 let manualReveal = false; // user hovered/clicked the notch → keep shown for now
+let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 
 function hideMode() {
   return cfg.autoHideMode || (cfg.autoHide ? "edge" : "off");
@@ -805,10 +820,12 @@ function reveal() {
 // Pointer left → after the delay, hide again if the mode still wants to.
 function scheduleHide() {
   const mode = hideMode();
-  if (mode === "off" || dragging) return;
+  // While the user is dragging or has explicitly pinned the dock open from the
+  // notch, never tuck it away — they're in the middle of using it.
+  if (mode === "off" || dragging || pinnedReveal) return;
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
-    if (dragging) return;
+    if (dragging || pinnedReveal) return;
     manualReveal = false;
     if (mode === "edge" || (mode === "smart" && occluded)) setHidden(true);
   }, cfg.autoHideDelay ?? 650);
@@ -832,12 +849,27 @@ document.body.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", scheduleHide);
 
-// The notch is a clickable handle to bring the dock back manually.
+// The notch is a clickable handle to bring the dock back manually. A CLICK pins
+// it open (so the user can actually launch something) until they click away or
+// launch an app; a hover just peeks.
 const revealHandle = document.getElementById("reveal-handle");
 if (revealHandle) {
   revealHandle.addEventListener("pointerenter", reveal);
-  revealHandle.addEventListener("click", reveal);
+  revealHandle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    pinnedReveal = true;
+    reveal();
+  });
 }
+
+// Clicking anywhere outside the dock/notch releases a pinned reveal and lets the
+// dock tuck back into the notch (when the mode wants it hidden).
+window.addEventListener("pointerdown", (e) => {
+  if (!pinnedReveal) return;
+  if (e.target.closest("#dock") || e.target.closest("#reveal-handle")) return;
+  pinnedReveal = false;
+  scheduleHide();
+});
 
 // ─────────────────── Desktop file drop ───────────────────
 
@@ -861,6 +893,8 @@ let pollTimer = null;
 function startRunningPoll() {
   if (!isTauri) return;
   const tick = async () => {
+    // Don't poll while tucked into the notch — saves CPU/IPC when idle.
+    if (hiddenState) return;
     if (cfg.showIndicators === false) {
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => (t.dataset.running = "false"));
       return;

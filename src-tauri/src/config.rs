@@ -66,6 +66,9 @@ fn default_language() -> String {
 fn default_spacing() -> u32 {
     6
 }
+fn default_radius() -> u32 {
+    12
+}
 fn default_hide_delay() -> u32 {
     650
 }
@@ -101,6 +104,9 @@ pub struct Config {
     /// Gap between tiles, in px.
     #[serde(default = "default_spacing")]
     pub spacing: u32,
+    /// Corner roundness of tiles (px). 0 = square, larger = rounder.
+    #[serde(default = "default_radius")]
+    pub corner_radius: u32,
     /// Show name tooltips on hover.
     #[serde(default = "default_true")]
     pub show_labels: bool,
@@ -151,6 +157,7 @@ impl Default for Config {
             magnification: false,
             zoom: default_zoom(),
             spacing: default_spacing(),
+            corner_radius: default_radius(),
             show_labels: true,
             show_indicators: true,
             auto_hide: false,

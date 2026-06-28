@@ -35,6 +35,11 @@
 
   /* Material strength (dock bg alpha), overridden at runtime */
   --material: 0.55;
+  /* Tint painted over the dock's Mica — its opacity follows --material so the
+     translucency slider visibly frosts/clears the bar. */
+  --surface-tint: #f4f4f7;
+  /* Tile corner roundness (user-tunable), overridden at runtime */
+  --tile-r: 12px;
 
   /* Radii (Fluent) */
   --r-sm: 6px;
@@ -64,6 +69,7 @@
     --track: rgba(255, 255, 255, 0.16);
     --acrylic: rgba(38, 38, 42, 0.55);
     --acrylic-soft: rgba(34, 34, 38, 0.42);
+    --surface-tint: #202024;
   }
 }
 [data-theme="light"] {
@@ -88,11 +94,13 @@
   --track: rgba(255, 255, 255, 0.16);
   --acrylic: rgba(38, 38, 42, 0.55);
   --acrylic-soft: rgba(34, 34, 38, 0.42);
+  --surface-tint: #202024;
 }
 [data-theme="light"] {
   --track: rgba(0, 0, 0, 0.12);
   --acrylic: rgba(255, 255, 255, 0.6);
   --acrylic-soft: rgba(255, 255, 255, 0.45);
+  --surface-tint: #f4f4f7;
 }
 
 * {
@@ -142,12 +150,14 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   margin: 0;
   list-style: none;
   overflow: visible;
-  /* The dock window itself carries native Windows 11 Mica and rounded corners,
-     so the bar surface is transparent — the Mica window IS the dock (one
-     surface, no CSS panel on top → no "double dock"). Symmetric padding gives
-     the contained magnify room and keeps a normal height. */
-  background: transparent;
-  transition: transform 0.34s var(--ease), opacity 0.3s ease;
+  /* The dock window carries native Windows 11 Mica and DWM-rounded corners. Over
+     that, a translucency tint whose opacity follows --material gives the bar a
+     real frosted-glass surface that the translucency slider can clear or thicken
+     — still one surface (no "double dock"), just a tunable frost. */
+  background: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke-light) 60%, transparent);
+  border-radius: calc(var(--tile-r) + 6px);
+  transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
@@ -210,7 +220,7 @@ body.autohide.hidden.edge-right .reveal-handle:hover { width: 10px; height: 140p
   padding: 0;
   background: transparent;
   cursor: pointer;
-  border-radius: var(--r-md);
+  border-radius: var(--tile-r);
   transform-origin: bottom center;
   transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
     background 0.12s ease;
