@@ -586,14 +586,68 @@ function IconPickerModal({ item, onPick, onClose }) {
   );
 }
 
+// Visually edit a widget's look: variant, accent color, motion and icon.
+function WidgetStyleModal({ item, accent, onChange, onClose }) {
+  const st = item.style || {};
+  const variant = st.variant || "glass";
+  const set1 = (patch) => onChange({ ...st, ...patch });
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <strong>{t("w.styleTitle")}</strong>
+          <button className="pin-btn" onClick={onClose}>✕</button>
+        </div>
+        <Row label={t("w.variant")}>
+          <SegmentedControl
+            value={variant}
+            onChange={(v) => set1({ variant: v })}
+            options={[
+              { value: "glass", label: t("w.v.glass") },
+              { value: "solid", label: t("w.v.solid") },
+              { value: "gradient", label: t("w.v.gradient") },
+              { value: "outline", label: t("w.v.outline") },
+              { value: "minimal", label: t("w.v.minimal") },
+            ]}
+          />
+        </Row>
+        <Row label={t("w.color")}>
+          <AccentPicker value={st.color || accent} onChange={(v) => set1({ color: v })} />
+        </Row>
+        <Toggle label={t("w.animated")} checked={!!st.animated} onChange={(v) => set1({ animated: v })} />
+        <Toggle label={t("w.showIcon")} checked={st.icon !== false} onChange={(v) => set1({ icon: v })} />
+        <div className="s-actions" style={{ marginTop: 14 }}>
+          <button className="s-btn" onClick={onClose}>{t("w.done")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
   const [iconFor, setIconFor] = useState(-1);
+  const [styleFor, setStyleFor] = useState(-1);
+  const [webUrl, setWebUrl] = useState("");
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
+  const setStyle = (i, value) =>
+    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, style: value } : p)) });
+  const addWebsite = async () => {
+    let url = webUrl.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    const host = url.replace(/^https?:\/\//i, "").split("/")[0].replace(/^www\./, "");
+    let icon = null;
+    try {
+      icon = await dockApi.fetchFavicon(url);
+    } catch (_) {}
+    set({ pinned: [...cfg.pinned, { id: uid(), name: host, path: url, args: [], kind: "app", icon }] });
+    setWebUrl("");
+  };
   // Dissolve a folder, spilling its items back to the dock (no data loss).
   const ungroup = (i) => {
     const grp = cfg.pinned[i];
@@ -675,6 +729,10 @@ function Apps({ cfg, set }) {
                 <button className="pin-btn" title={t("group.ungroup")}
                   onClick={() => ungroup(i)}>⊟</button>
               )}
+              {item.kind === "widget" && (
+                <button className="pin-btn" title={t("w.styleTitle")}
+                  onClick={() => setStyleFor(i)}>🎨</button>
+              )}
               {item.kind !== "separator" && item.kind !== "widget" && (
                 <button className="pin-btn" title={t("apps.changeIcon")}
                   onClick={() => setIconFor(i)}>◑</button>
@@ -701,12 +759,33 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={() => addWidget("ram", "RAM")}>＋ RAM</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("net", t("w.net"))}>＋ {t("w.net")}</button>
       </div>
+      <h2 className="s-subhead">{t("apps.web")}</h2>
+      <p className="muted">{t("apps.webHint")}</p>
+      <div className="web-add">
+        <input
+          className="r-hotkey-input web-url"
+          type="text"
+          placeholder={t("apps.webPlaceholder")}
+          value={webUrl}
+          onChange={(e) => setWebUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addWebsite()}
+        />
+        <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
+      </div>
       <Suggestions cfg={cfg} set={set} />
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
           item={cfg.pinned[iconFor]}
           onClose={() => setIconFor(-1)}
           onPick={(value) => { setIcon(iconFor, value); setIconFor(-1); }}
+        />
+      )}
+      {styleFor >= 0 && cfg.pinned[styleFor] && (
+        <WidgetStyleModal
+          item={cfg.pinned[styleFor]}
+          accent={cfg.accent}
+          onChange={(value) => setStyle(styleFor, value)}
+          onClose={() => setStyleFor(-1)}
         />
       )}
     </>
@@ -744,6 +823,20 @@ function Shortcuts({ cfg, set }) {
   );
 }
 
+// Easter egg: a little parade of capybaras tumbling down the window. 🦫
+function capybaraParade() {
+  for (let i = 0; i < 16; i++) {
+    const c = document.createElement("div");
+    c.className = "capy-egg";
+    c.textContent = "🦫";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.animationDelay = Math.random() * 0.9 + "s";
+    c.style.fontSize = 18 + Math.random() * 24 + "px";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4200);
+  }
+}
+
 function About({ version }) {
   const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|error
   const [update, setUpdate] = useState(null);
@@ -769,16 +862,43 @@ function About({ version }) {
     }
   };
 
+  const [eggs, setEggs] = useState(0);
+  const partying = eggs >= 5;
+  const bumpEgg = () => {
+    setEggs((e) => {
+      const n = e + 1;
+      if (n === 5) capybaraParade();
+      return n;
+    });
+  };
+
   return (
     <>
       <h1>{t("ab.title")}</h1>
       <div className="s-about">
-        <img className="s-about-logo" src="/brand/svg/isotype.svg" alt="Booki" />
+        <img
+          className={"s-about-logo" + (partying ? " spin" : "")}
+          src="/brand/svg/isotype.svg"
+          alt="Booki"
+          title={eggs > 0 && eggs < 5 ? "🦫".repeat(eggs) : "Booki"}
+          onClick={bumpEgg}
+        />
         <div>
-          <strong>Booki Dock</strong> <span className="s-ver">v{version}</span>
+          <strong>Booki Dock</strong> <span className="s-ver">v{version}</span>{" "}
+          <span className="s-beta">BETA</span>
           <p className="muted" style={{ marginTop: 4 }}>{t("ab.tagline")}</p>
         </div>
       </div>
+
+      <div className="s-credits">
+        <button className="s-link" onClick={() => dockApi.launch("https://github.com/punkable")}>
+          {t("ab.by")} <strong>Punkable</strong> · GitHub ↗
+        </button>
+        <button className="s-link" onClick={() => dockApi.launch("https://x.com/Punkabl3")}>
+          <strong>@Punkabl3</strong> · X ↗
+        </button>
+      </div>
+      {partying && <p className="s-egg">🦫 {t("ab.egg")} 🦫</p>}
 
       <div className="s-card-inner">
         <h3>{t("ab.updates")}</h3>

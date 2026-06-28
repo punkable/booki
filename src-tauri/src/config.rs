@@ -26,6 +26,10 @@ pub struct PinnedApp {
     /// For kind == "widget": which widget ("clock" | "cpu" | "ram" | "net").
     #[serde(default)]
     pub widget: Option<String>,
+    /// Free-form visual style for a widget (variant, color, animated, …). Kept as
+    /// JSON so the look can evolve without backend changes.
+    #[serde(default)]
+    pub style: Option<serde_json::Value>,
     /// Optional custom icon: a path to an image or a data URI overriding the
     /// native icon.
     #[serde(default)]

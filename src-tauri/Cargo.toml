@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.3.9"
+version = "0.4.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -28,6 +28,8 @@ base64 = "0.22"
 log = "0.4"
 # System metrics for the dock widgets (CPU / memory / network). Cross-platform.
 sysinfo = "0.32"
+# Tiny HTTP client to fetch a website's favicon when pinning it as a widget.
+ureq = "2"
 
 # Native window material (Acrylic/Mica on Windows; no-op elsewhere).
 [target.'cfg(windows)'.dependencies.window-vibrancy]

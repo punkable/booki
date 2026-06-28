@@ -243,6 +243,8 @@ function separatorTile(item) {
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
 const WIDGETS = ["clock", "cpu", "ram", "net"];
+const WIDGET_ICONS = { clock: "🕒", cpu: "🧠", ram: "🧊", net: "📶" };
+const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 
 function widgetLabel(type) {
   return (
@@ -252,20 +254,28 @@ function widgetLabel(type) {
 
 function widgetTile(item) {
   const type = item.widget || "clock";
+  const st = item.style || {};
   const el = document.createElement("button");
   el.className = "tile widget";
   el.dataset.id = item.id;
   el.dataset.widget = type;
+  el.dataset.variant = st.variant || "glass";
+  if (st.color) el.style.setProperty("--w-accent", st.color);
+  if (st.animated) el.classList.add("animated");
+  if (st.icon === false) el.classList.add("no-ico");
   el.style.setProperty("--size", `${baseSize()}px`);
   el.title = widgetLabel(type);
 
   const card = document.createElement("span");
   card.className = "w-card";
   card.innerHTML =
+    `<span class="w-ico">${WIDGET_ICONS[type] || "▦"}</span>` +
+    `<span class="w-main">` +
     `<span class="w-label"></span>` +
     `<span class="w-value">…</span>` +
     `<span class="w-bar"><i></i></span>` +
-    `<span class="w-sub"></span>`;
+    `<span class="w-sub"></span>` +
+    `</span>`;
   el.appendChild(card);
 
   const rm = document.createElement("button");
@@ -915,9 +925,11 @@ function computeFrame() {
   // The window is the bar plus a transparent shadow-pad margin. The dock surface
   // is centered inside via body padding; magnify and the soft shadow live in the
   // pad. The hover name uses the native OS tooltip (title attr).
-  const r = dockEl.getBoundingClientRect();
-  let wCss = r.width + SHADOW_PAD * 2;
-  let hCss = r.height + SHADOW_PAD * 2;
+  // Use offsetWidth/Height (layout size) — NOT getBoundingClientRect — so a dock
+  // that's currently scaled by the minimize animation doesn't size the window too
+  // small (which left the bar looking cut off after revealing, esp. at the top).
+  let wCss = dockEl.offsetWidth + SHADOW_PAD * 2;
+  let hCss = dockEl.offsetHeight + SHADOW_PAD * 2;
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();
@@ -961,8 +973,10 @@ function setHidden(v) {
       if (hiddenState) dockApi.hideDock(cfg.edge);
     }, 360); // let the minimize animation play before the window hides
   } else {
-    // Show the dock window (and hide the notch), then slide the bar back in.
+    // Show the dock window (and hide the notch), make sure it's sized to the full
+    // bar, then slide the bar back in.
     dockApi.revealDock();
+    applyFrame();
     setTimeout(() => {
       if (!hiddenState) document.body.classList.remove("tucked");
     }, 60);
@@ -1235,5 +1249,39 @@ async function checkUpdates() {
     pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
   }
 }
+
+// ─────────────────── Easter egg: Konami → party 🦫 ───────────────────
+const KONAMI = [
+  "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+  "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a",
+];
+let konami = [];
+window.addEventListener("keydown", (e) => {
+  konami.push(e.key);
+  if (konami.length > KONAMI.length) konami = konami.slice(-KONAMI.length);
+  if (konami.length === KONAMI.length && KONAMI.every((k, i) => k === konami[i])) {
+    konami = [];
+    partyMode();
+  }
+});
+function partyMode() {
+  document.body.classList.add("party");
+  const tiles = [...dockEl.querySelectorAll(".tile")];
+  tiles.forEach((t, i) => (t.style.animationDelay = `${i * 60}ms`));
+  setTimeout(() => {
+    document.body.classList.remove("party");
+    tiles.forEach((t) => (t.style.animationDelay = ""));
+  }, 4200);
+}
+
+// A friendly signature in the console for the curious. 🦫
+try {
+  // eslint-disable-next-line no-console
+  console.log(
+    "%c🦫 Booki Dock %c— hecho con cariño por Punkable (@Punkabl3). ¡Prueba el código Konami!",
+    "font-weight:700;color:#dfaa75",
+    "color:inherit"
+  );
+} catch (_) {}
 
 boot();
