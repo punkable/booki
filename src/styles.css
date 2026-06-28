@@ -125,29 +125,31 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   position: relative;
   display: flex;
   gap: var(--gap);
-  padding: 7px 9px;
-  margin: 9px;
+  padding: 8px 10px;
+  margin: 0;
   list-style: none;
   overflow: visible;
-  border-radius: var(--r-xl);
-  /* The dock window is transparent and carries NO native vibrancy (that showed
-     up as a gray box behind the bar). The frosted "mica" look is built here:
-     a substantial translucent fill + a soft top sheen, so only this rounded
-     bar is ever visible against the desktop. --material (0.28–0.96) is the
-     user's material-strength slider. */
+  border-radius: 14px;
+  /* The window is sized exactly to this bar and carries REAL Windows Acrylic
+     (native, frosted, blurs the desktop). This CSS layer is only a faint tint +
+     sheen on top of that glass; --material is kept low so the native acrylic
+     shows through. The magnify grows INTO the edge-side padding below, so the
+     bar never changes size and the icons never overflow → no clipping box. */
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 42%),
-    color-mix(in srgb, var(--layer-strong) calc(var(--material) * 100%), transparent);
-  border: 1px solid var(--stroke);
-  box-shadow: var(--shadow), inset 0 1px 0 var(--stroke-light);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  backdrop-filter: blur(20px) saturate(150%);
-  transition: transform 0.32s var(--ease), opacity 0.26s ease;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 46%),
+    color-mix(in srgb, var(--layer) calc(var(--material) * 100%), transparent);
+  box-shadow: inset 0 0 0 1px var(--stroke-light), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 0.34s var(--ease);
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
 body.edge-right .dock { align-items: flex-end; }
+/* Edge-side padding = headroom the magnified icon scales into (no overflow). */
+body.edge-bottom .dock { padding-top: calc(8px + var(--pad-grow, 12px)); }
+body.edge-top .dock { padding-bottom: calc(8px + var(--pad-grow, 12px)); }
+body.edge-left .dock { padding-right: calc(10px + var(--pad-grow, 12px)); }
+body.edge-right .dock { padding-left: calc(10px + var(--pad-grow, 12px)); }
 
 /* Auto-hide slide */
 body.autohide.hidden.edge-bottom .dock { transform: translateY(135%); }
@@ -173,8 +175,12 @@ body.autohide.hidden.edge-right .dock { transform: translateX(135%); }
   transition: opacity 0.2s ease, height 0.16s var(--ease), width 0.16s var(--ease);
   pointer-events: none;
 }
-body.autohide.hidden .reveal-handle { opacity: 0.92; pointer-events: auto; }
-body.autohide.hidden .reveal-handle:hover { opacity: 1; height: 9px; width: 132px; }
+@keyframes notch-glow {
+  0%, 100% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+  50% { box-shadow: 0 2px 16px color-mix(in srgb, var(--accent) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+}
+body.autohide.hidden .reveal-handle { opacity: 0.95; pointer-events: auto; animation: notch-glow 2.2s var(--ease) infinite; }
+body.autohide.hidden .reveal-handle:hover { opacity: 1; height: 9px; width: 132px; animation: none; }
 body.edge-top .reveal-handle { bottom: auto; top: 3px; }
 body.edge-left .reveal-handle { left: 3px; bottom: 50%; top: auto; transform: translateY(50%); width: 6px; height: 116px; }
 body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform: translateY(50%); width: 6px; height: 116px; }
@@ -198,20 +204,18 @@ body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 132px
   cursor: pointer;
   border-radius: var(--r-md);
   transform-origin: bottom center;
-  transition: width 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
-    height 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
-    transform 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
+  transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
     background 0.12s ease;
 }
-body.edge-left .tile, body.edge-right .tile { transform-origin: center; }
+/* Scale grows away from the anchored edge so it stays inside the bar padding. */
+body.edge-bottom .tile { transform-origin: bottom center; }
+body.edge-top .tile { transform-origin: top center; }
+body.edge-left .tile { transform-origin: left center; }
+body.edge-right .tile { transform-origin: right center; }
 .tile:hover { background: var(--hover); }
 
-/* Focused tile — a gentle lift + accent glow (distinct from macOS, subtle) */
+/* Focused tile — accent glow (the scale itself conveys the lift). */
 .tile.focus { z-index: 5; }
-body.edge-bottom .tile.focus { transform: translateY(-5px); }
-body.edge-top .tile.focus { transform: translateY(5px); }
-body.edge-left .tile.focus { transform: translateX(5px); }
-body.edge-right .tile.focus { transform: translateX(-5px); }
 .tile.focus img,
 .tile.focus .glyph {
   filter: drop-shadow(0 6px 11px rgba(0, 0, 0, 0.28))

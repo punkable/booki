@@ -21,7 +21,7 @@ const DEMO_CONFIG = {
   theme: "system",
   iconSize: 48,
   magnification: true,
-  zoom: 1.35,
+  zoom: 1.25,
   spacing: 6,
   opacity: 0.62,
   showLabels: true,

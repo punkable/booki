@@ -43,7 +43,7 @@ fn default_icon_size() -> u32 {
     48
 }
 fn default_zoom() -> f32 {
-    1.35
+    1.25
 }
 fn default_auto_hide_mode() -> String {
     // Smart by default: the dock hides to a notch when a window covers it and
