@@ -129,17 +129,11 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   margin: 0;
   list-style: none;
   overflow: visible;
-  border-radius: 16px;
-  /* CSS-only tinted glass. The dock window is transparent (no native vibrancy —
-     that painted a box behind the bar), so ONLY this rounded bar is visible; the
-     magnified icons and the name tooltip overflow into the invisible headroom
-     around it. Padding is symmetric so the bar reads at a normal height. */
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 44%, rgba(255, 255, 255, 0.01)),
-    color-mix(in srgb, var(--layer-strong) calc(var(--material) * 100%), transparent);
-  border: 1px solid var(--stroke-light);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  backdrop-filter: blur(22px) saturate(170%);
+  /* The dock window itself carries native Windows 11 Mica and rounded corners,
+     so the bar surface is transparent — the Mica window IS the dock (one
+     surface, no CSS panel on top → no "double dock"). Symmetric padding gives
+     the contained magnify room and keeps a normal height. */
+  background: transparent;
   transition: transform 0.34s var(--ease), opacity 0.3s ease;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
@@ -210,12 +204,12 @@ body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 150px
   transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
     background 0.12s ease;
 }
-/* Scale grows away from the anchored edge so it stays inside the bar padding. */
-body.edge-bottom .tile { transform-origin: bottom center; }
-body.edge-top .tile { transform-origin: top center; }
-body.edge-left .tile { transform-origin: left center; }
-body.edge-right .tile { transform-origin: right center; }
+/* Center origin → the icon scales symmetrically and stays inside the bar's
+   padding (contained magnify, no clipping in the bar-sized window). */
+.tile { transform-origin: center center; }
 .tile:hover { background: var(--hover); }
+/* The hover name uses the native OS tooltip (title attr); hide the in-page one. */
+.tile .label { display: none !important; }
 
 /* Focused tile — accent glow (the scale itself conveys the lift). */
 .tile.focus { z-index: 5; }
