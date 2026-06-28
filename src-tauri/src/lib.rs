@@ -178,15 +178,47 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Material strength is now applied entirely in CSS (the dock bar's `--material`
-/// alpha), driven live from the config. We deliberately do NOT apply native
-/// vibrancy to the dock window: vibrancy tints the whole window rectangle, and
-/// because the dock window is sized larger than the bar (magnify headroom), that
-/// showed up as a gray box behind the dock that resized with the zoom. Kept as a
-/// no-op command for frontend compatibility.
+/// Map material strength (0–100) to a Windows-acrylic tint. The dock window is
+/// now sized exactly to the bar with the magnify kept *inside* it, so applying
+/// native Acrylic gives a real tinted-glass dock (no surrounding gray box).
+/// Higher strength = more tint / less see-through.
+#[cfg(windows)]
+fn acrylic_tint(strength: u32) -> (u8, u8, u8, u8) {
+    let a = (40.0 + (strength.min(100) as f32 / 100.0) * 150.0) as u8; // 40..190
+    (26, 26, 30, a)
+}
+
+/// Re-apply the native material to the dock with a new strength (live from the
+/// translucency slider), so the tinted-glass effect actually changes.
 #[tauri::command]
-fn set_material(_window: WebviewWindow, _strength: u32) -> Result<(), String> {
+fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let _ = window_vibrancy::apply_acrylic(&window, Some(acrylic_tint(strength)));
+    }
+    #[cfg(not(windows))]
+    let _ = (&window, strength);
     Ok(())
+}
+
+/// Round a window's corners (Windows 11 DWM) so the acrylic reads as a rounded
+/// dock rather than a hard rectangle. Best-effort; no-op on older Windows.
+#[cfg(windows)]
+fn round_window_corners(window: &WebviewWindow) {
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+    };
+    if let Ok(hwnd) = window.hwnd() {
+        let pref = DWMWCP_ROUND;
+        unsafe {
+            let _ = DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                &pref as *const _ as *const core::ffi::c_void,
+                std::mem::size_of_val(&pref) as u32,
+            );
+        }
+    }
 }
 
 #[tauri::command]
@@ -541,14 +573,19 @@ pub fn run() {
 
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
-                // NOTE: we intentionally do NOT apply native Acrylic/Mica to the
-                // dock window. Vibrancy tints the entire window rectangle, but the
-                // dock window is sized larger than the visible bar (to give the
-                // magnify-on-hover room to overflow), so the material showed up as
-                // a gray box behind the dock that grew/shrank with the zoom. The
-                // bar's frosted material is done entirely in CSS instead, so only
-                // the rounded bar is ever visible. The window stays transparent.
                 let cfg = config::load();
+                // Real Windows tinted-glass: the dock window is sized exactly to
+                // the bar and the magnify stays inside it, so native Acrylic gives
+                // a proper frosted dock with no gray box around it. DWM rounds the
+                // corners so it reads as a rounded dock, not a rectangle.
+                #[cfg(windows)]
+                {
+                    let _ = window_vibrancy::apply_acrylic(
+                        &dock,
+                        Some(acrylic_tint(cfg.material_strength)),
+                    );
+                    round_window_corners(&dock);
+                }
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();

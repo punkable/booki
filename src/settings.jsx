@@ -425,9 +425,10 @@ function Appearance({ cfg, set }) {
         <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
           onChange={(v) => set({ spacing: v })} />
       </Row>
-      <Row label={t("ap.translucency")}>
-        <Slider value={Math.round(cfg.opacity * 100)} min={20} max={100} step={5}
-          fmt={(v) => `${v}%`} onChange={(v) => set({ opacity: v / 100 })} />
+      <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
+        <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
+          fmt={(v) => `${v}%`}
+          onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
     </>
   );
@@ -466,14 +467,10 @@ function Behavior({ cfg, set }) {
         onChange={(v) => set({ magnification: v })} />
       {cfg.magnification && (
         <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
-          <Slider value={Math.round(cfg.zoom * 100)} min={110} max={180} step={5}
+          <Slider value={Math.round(cfg.zoom * 100)} min={110} max={150} step={5}
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
-      <Row label={t("be.material")} hint={t("be.materialHint")}>
-        <Slider value={cfg.materialStrength} min={0} max={100} step={5} fmt={(v) => `${v}%`}
-          onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
-      </Row>
       <Row label={t("be.autoHide")}>
         <SegmentedControl
           value={cfg.autoHideMode || "smart"}

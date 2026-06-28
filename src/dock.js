@@ -71,11 +71,16 @@ function applyAll() {
   // window — that caused the gray box). Map material strength 0–100 → a sensible
   // alpha range so the bar always reads as a solid-ish frosted panel.
   const mat = (cfg.materialStrength ?? 70) / 100;
-  root.style.setProperty("--material", String(Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66))));
+  root.style.setProperty("--material", String(Math.max(0.06, Math.min(0.5, 0.06 + mat * 0.34))));
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
+  // Headroom (in the bar's padding, on the edge side) for the magnified icon to
+  // grow into WITHOUT overflowing the window — so it never gets clipped.
+  const base = baseSize();
+  const grow = Math.ceil((Math.max(1, cfg.zoom || 1.25) - 1) * base) + 6;
+  dockEl.style.setProperty("--pad-grow", `${grow}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
@@ -238,39 +243,49 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
+    t.style.transform = "";
     t.classList.remove("focus");
   });
 }
 
-// Booki magnify — a focused spring "pop": the hovered tile pops up with a
-// lift + glow while neighbours grow only gently (tighter falloff than the
-// classic macOS ripple).
+function resetMagnify() {
+  dockEl.querySelectorAll(".tile").forEach((t) => {
+    t.style.transform = "";
+    t.classList.remove("focus");
+  });
+}
+
+// Booki magnify — tasteful, CONTAINED scaling. Tiles keep their layout slot and
+// scale visually (CSS transform), growing into the bar's edge-side padding so
+// nothing overflows the window (no clipping, no resize per frame). The hovered
+// tile gets a subtle glow.
 function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || editMode) return;
   const base = baseSize();
-  const max = base * (cfg.zoom || 1.8);
-  const spread = base * 1.25; // tight → concentrated pop, not a wide ripple
+  const maxScale = Math.max(1, cfg.zoom || 1.25);
+  const spread = base * 1.5;
   const vertical = isVertical();
+  const dr = dockEl.getBoundingClientRect();
+  const pointer = vertical ? clientY - dr.top : clientX - dr.left;
   let best = null;
   let bestInf = 0;
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const sep = t.classList.contains("separator");
-    const b = sep ? base * 0.5 : base;
-    const m = sep ? base * 0.5 : max;
-    const r = t.getBoundingClientRect();
-    const center = vertical ? r.top + r.height / 2 : r.left + r.width / 2;
-    const pointer = vertical ? clientY : clientX;
+    const center = vertical
+      ? t.offsetTop + t.offsetHeight / 2
+      : t.offsetLeft + t.offsetWidth / 2;
     const dist = Math.abs(pointer - center);
     const influence = Math.max(0, 1 - (dist / spread) ** 2);
-    t.style.setProperty("--size", `${b + (m - b) * influence}px`);
+    const scale = sep ? 1 : 1 + (maxScale - 1) * influence;
+    t.style.transform = `scale(${scale.toFixed(3)})`;
     if (!sep && influence > bestInf) {
       bestInf = influence;
       best = t;
     }
   });
   dockEl.querySelectorAll(".tile.focus").forEach((t) => t !== best && t.classList.remove("focus"));
-  if (best && bestInf > 0.4) best.classList.add("focus");
+  if (best && bestInf > 0.45) best.classList.add("focus");
 }
 
 let magnifyRaf = 0;
@@ -282,7 +297,7 @@ dockEl.addEventListener("pointermove", (e) => {
     magnify(clientX, clientY);
   });
 });
-dockEl.addEventListener("pointerleave", () => setAllSizes(baseSize()));
+dockEl.addEventListener("pointerleave", resetMagnify);
 
 // ─────────── Edit mode (iOS-style long-press) + reorder ───────────
 
@@ -501,19 +516,11 @@ function reframe() {
 let lastFull = null;
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
+  // The window is sized to the bar itself (magnify is contained in the bar's
+  // padding now), so the native acrylic == the visible dock — no gray box.
   const r = dockEl.getBoundingClientRect();
-  const base = baseSize();
-  const max = base * (cfg.magnification ? cfg.zoom || 1.8 : 1);
-  const grow = max - base;
-  const labelSpace = cfg.showLabels !== false ? 36 : 10;
-  let wCss, hCss;
-  if (isVertical()) {
-    wCss = r.width + grow + labelSpace + 28;
-    hCss = r.height + grow + 28;
-  } else {
-    wCss = r.width + grow * 2 + 56;
-    hCss = r.height + grow + labelSpace + 20;
-  }
+  let wCss = r.width + 2;
+  let hCss = r.height + 2;
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();
