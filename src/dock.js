@@ -19,7 +19,7 @@ import { icon } from "./icons.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
-import { t, setLang } from "./i18n.js";
+import { t, setLang, curLang } from "./i18n.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -48,6 +48,7 @@ async function boot() {
     setupAutoHide();
     setupFileDrop();
     startRunningPoll();
+    startWidgetPoll();
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     checkUpdates();
@@ -63,6 +64,7 @@ async function reloadConfig() {
   await render();
   reframe();
   setupAutoHide();
+  startWidgetPoll();
 }
 
 function applyAll() {
@@ -107,6 +109,7 @@ async function render() {
     let tile;
     if (item.kind === "separator") tile = separatorTile(item);
     else if (item.kind === "group") tile = await groupTile(item);
+    else if (item.kind === "widget") tile = widgetTile(item);
     else tile = await appTile(item);
     dockEl.appendChild(tile);
   }
@@ -235,6 +238,135 @@ function separatorTile(item) {
   return el;
 }
 
+// ───────────────────────────── Widgets ─────────────────────────────
+// macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
+// throughput. Cheap by design — stats only poll while the dock is visible.
+
+const WIDGETS = ["clock", "cpu", "ram", "net"];
+
+function widgetLabel(type) {
+  return (
+    { clock: t("w.clock"), cpu: "CPU", ram: "RAM", net: t("w.net") }[type] || type
+  );
+}
+
+function widgetTile(item) {
+  const type = item.widget || "clock";
+  const el = document.createElement("button");
+  el.className = "tile widget";
+  el.dataset.id = item.id;
+  el.dataset.widget = type;
+  el.style.setProperty("--size", `${baseSize()}px`);
+  el.title = widgetLabel(type);
+
+  const card = document.createElement("span");
+  card.className = "w-card";
+  card.innerHTML =
+    `<span class="w-label"></span>` +
+    `<span class="w-value">…</span>` +
+    `<span class="w-bar"><i></i></span>` +
+    `<span class="w-sub"></span>`;
+  el.appendChild(card);
+
+  const rm = document.createElement("button");
+  rm.className = "rm";
+  rm.textContent = "×";
+  rm.title = t("apps.remove");
+  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
+  rm.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removeItem(item.id);
+  });
+  el.appendChild(rm);
+
+  el.addEventListener("contextmenu", (e) => openMenu(e, item));
+  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  if (type === "clock") tickClocks();
+  return el;
+}
+
+const fmtRate = (kbps) =>
+  kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
+
+function setMetric(el, label, val, sub) {
+  el.querySelector(".w-label").textContent = label;
+  el.querySelector(".w-value").textContent = `${val}%`;
+  const bar = el.querySelector(".w-bar");
+  bar.style.display = "";
+  bar.querySelector("i").style.width = `${Math.min(100, Math.max(0, val))}%`;
+  el.querySelector(".w-sub").textContent = sub || "";
+}
+
+function tickClocks() {
+  const now = new Date();
+  const time = now.toLocaleTimeString(curLang() === "en" ? "en-US" : "es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const date = now.toLocaleDateString(curLang() === "en" ? "en-US" : "es-ES", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  dockEl.querySelectorAll('.tile.widget[data-widget="clock"]').forEach((el) => {
+    el.querySelector(".w-label").textContent = date;
+    el.querySelector(".w-value").textContent = time;
+    el.querySelector(".w-bar").style.display = "none";
+    el.querySelector(".w-sub").textContent = "";
+  });
+}
+
+let statsTimer = null;
+let clockTimer = null;
+function startWidgetPoll() {
+  clearInterval(clockTimer);
+  clearInterval(statsTimer);
+  clockTimer = null;
+  statsTimer = null;
+  const hasClock = cfg.pinned.some((p) => p.kind === "widget" && p.widget === "clock");
+  const needStats = () =>
+    cfg.pinned.some((p) => p.kind === "widget" && ["cpu", "ram", "net"].includes(p.widget));
+  // Only run timers when there's actually a widget that needs them → zero idle
+  // cost when the dock has no widgets.
+  if (hasClock) {
+    tickClocks();
+    clockTimer = setInterval(tickClocks, 1000);
+  }
+  if (!needStats()) return;
+  const tick = async () => {
+    if (hiddenState) return;
+    let s;
+    try {
+      s = await dockApi.systemStats();
+    } catch (_) {
+      return;
+    }
+    if (!s) return;
+    dockEl.querySelectorAll(".tile.widget").forEach((el) => {
+      const tp = el.dataset.widget;
+      if (tp === "cpu") setMetric(el, "CPU", Math.round(s.cpu));
+      else if (tp === "ram")
+        setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} GB`);
+      else if (tp === "net") {
+        el.querySelector(".w-label").textContent = `↓ ${t("w.net")}`;
+        el.querySelector(".w-value").textContent = fmtRate(s.net_down_kbps);
+        el.querySelector(".w-bar").style.display = "none";
+        el.querySelector(".w-sub").textContent = `↑ ${fmtRate(s.net_up_kbps)}`;
+      }
+    });
+  };
+  tick();
+  statsTimer = setInterval(tick, 2500);
+}
+
+async function addWidget(type) {
+  cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
+  await persist();
+  await emitConfigChanged();
+  await render();
+  reframe();
+}
+
 async function resolveIcon(item) {
   if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
   if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
@@ -247,6 +379,8 @@ async function resolveIcon(item) {
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
+  // Widgets aren't launchers — clicking does nothing.
+  if (item.kind === "widget") return;
   // Folder pins and groups open a "stack"/folder flyout instead of launching.
   if (item.kind === "folder" || item.kind === "group") {
     toggleStack(el, item);
@@ -418,13 +552,13 @@ function onPressMove(e) {
 
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
 
-  // Hovering the CENTER of another tile → folder (merge) intent. Groups can't be
-  // nested, so a group being dragged only reorders.
-  const canMerge = press.item.kind !== "group";
+  // Hovering the CENTER of another tile → folder (merge) intent. Only apps merge
+  // into folders (groups can't nest; widgets/separators never form folders).
+  const canMerge = press.item.kind === "app";
   let centerTarget = null;
   if (canMerge) {
     for (const s of sibs) {
-      if (s.classList.contains("separator")) continue;
+      if (s.classList.contains("separator") || s.classList.contains("widget")) continue;
       const r = s.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         const cx = r.left + r.width / 2;
@@ -681,6 +815,13 @@ function openBackgroundMenu(e) {
   const s = document.createElement("div");
   s.className = "sep";
   ctxMenu.appendChild(s);
+  add("grid", t("w.add.clock"), () => addWidget("clock"));
+  add("grid", t("w.add.cpu"), () => addWidget("cpu"));
+  add("grid", t("w.add.ram"), () => addWidget("ram"));
+  add("grid", t("w.add.net"), () => addWidget("net"));
+  const s2 = document.createElement("div");
+  s2.className = "sep";
+  ctxMenu.appendChild(s2);
   add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
@@ -965,7 +1106,7 @@ function startRunningPoll() {
     }
   };
   tick();
-  pollTimer = setInterval(tick, 4000);
+  pollTimer = setInterval(tick, 5000);
 }
 
 // ─────────────────── Folder stacks (flyout) ───────────────────

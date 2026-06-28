@@ -178,6 +178,44 @@ body.autohide.tucked.edge-top .dock { transform-origin: top center; transform: t
 body.autohide.tucked.edge-left .dock { transform-origin: center left; transform: translateX(-80%) scale(0.45); }
 body.autohide.tucked.edge-right .dock { transform-origin: center right; transform: translateX(80%) scale(0.45); }
 
+/* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
+.s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+
+/* ─────────────────────────── Widget cards ─────────────────────────── */
+/* macOS-style live cards living inline in the dock (clock, CPU, RAM, network). */
+.tile.widget {
+  width: auto;
+  min-width: calc(var(--size) * 1.7);
+  height: var(--size);
+  background: transparent;
+}
+.tile.widget:hover { background: transparent; }
+.tile.widget .w-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 11px;
+  border-radius: var(--tile-r);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid var(--stroke);
+  text-align: left;
+  overflow: hidden;
+}
+.tile.widget:hover .w-card { background: color-mix(in srgb, var(--ink) 11%, transparent); }
+.w-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.w-value { font-size: 17px; font-weight: 700; line-height: 1.05; color: var(--ink); white-space: nowrap; }
+.w-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-bar { display: block; height: 4px; margin-top: 3px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-deep)); transition: width 0.4s var(--ease); }
+
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */

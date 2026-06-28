@@ -230,6 +230,56 @@ fn system_accent() -> Option<String> {
     None
 }
 
+/// Live system metrics for the dock widgets (CPU %, memory, network throughput).
+static SYS: Mutex<Option<sysinfo::System>> = Mutex::new(None);
+static NETS: Mutex<Option<(sysinfo::Networks, std::time::Instant)>> = Mutex::new(None);
+
+#[derive(serde::Serialize)]
+struct SystemStats {
+    cpu: f32,
+    mem: f32,
+    mem_used_mb: u64,
+    mem_total_mb: u64,
+    net_down_kbps: u64,
+    net_up_kbps: u64,
+}
+
+/// Sample CPU/memory/network. Keeps persistent handles so CPU usage and network
+/// deltas are measured between calls (the dock polls this every couple seconds,
+/// and only while it's visible — so idle cost stays near zero).
+#[tauri::command]
+fn system_stats() -> SystemStats {
+    let mut guard = SYS.lock().unwrap();
+    let sys = guard.get_or_insert_with(sysinfo::System::new);
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    let cpu = sys.global_cpu_usage();
+    let total = sys.total_memory().max(1);
+    let used = sys.used_memory();
+    let mem = (used as f64 / total as f64 * 100.0) as f32;
+
+    let mut nguard = NETS.lock().unwrap();
+    let entry = nguard.get_or_insert_with(|| {
+        (sysinfo::Networks::new_with_refreshed_list(), std::time::Instant::now())
+    });
+    entry.0.refresh();
+    let secs = entry.1.elapsed().as_secs_f64().max(0.001);
+    entry.1 = std::time::Instant::now();
+    let (mut down, mut up) = (0u64, 0u64);
+    for (_name, data) in entry.0.iter() {
+        down += data.received();
+        up += data.transmitted();
+    }
+    SystemStats {
+        cpu,
+        mem,
+        mem_used_mb: used / 1024 / 1024,
+        mem_total_mb: total / 1024 / 1024,
+        net_down_kbps: (down as f64 / secs / 1024.0) as u64,
+        net_up_kbps: (up as f64 / secs / 1024.0) as u64,
+    }
+}
+
 /// Hide the dock into the notch: show the small always-on, click-reliable notch
 /// window and hide the (full-size) dock window. No resizing of the dock window,
 /// so there's no WebView2 repaint race or erratic shrink.
@@ -622,6 +672,7 @@ pub fn run() {
             list_monitors,
             set_material,
             system_accent,
+            system_stats,
             set_autostart,
             get_autostart,
             list_dir,

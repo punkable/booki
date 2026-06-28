@@ -638,6 +638,8 @@ function Apps({ cfg, set }) {
   };
   const addSep = () =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
+  const addWidget = (widget, label) =>
+    set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
 
   return (
     <>
@@ -673,14 +675,14 @@ function Apps({ cfg, set }) {
                 <button className="pin-btn" title={t("group.ungroup")}
                   onClick={() => ungroup(i)}>⊟</button>
               )}
-              {item.kind !== "separator" && (
+              {item.kind !== "separator" && item.kind !== "widget" && (
                 <button className="pin-btn" title={t("apps.changeIcon")}
                   onClick={() => setIconFor(i)}>◑</button>
               )}
-              {item.kind !== "separator" && item.kind !== "group" && (
+              {item.kind === "app" || item.kind === "folder" ? (
                 <button className="pin-btn" title={t("apps.openLoc")}
                   onClick={() => dockApi.openLocation(item.path)}>↗</button>
-              )}
+              ) : null}
               <button className="pin-btn del" title={t("apps.remove")} onClick={() => remove(i)}>✕</button>
             </span>
           </li>
@@ -690,6 +692,14 @@ function Apps({ cfg, set }) {
         <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
         <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
         <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
+      </div>
+      <h2 className="s-subhead">{t("apps.widgets")}</h2>
+      <p className="muted">{t("apps.widgetsHint")}</p>
+      <div className="s-actions">
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("clock", t("w.clock"))}>＋ {t("w.clock")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("cpu", "CPU")}>＋ CPU</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("ram", "RAM")}>＋ RAM</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("net", t("w.net"))}>＋ {t("w.net")}</button>
       </div>
       <Suggestions cfg={cfg} set={set} />
       {iconFor >= 0 && cfg.pinned[iconFor] && (
