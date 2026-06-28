@@ -170,46 +170,13 @@ body.edge-top .dock { align-items: flex-start; }
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
 body.edge-right .dock { align-items: flex-end; }
 
-/* Auto-hide: slide away + fade into the notch (minimize animation) */
-body.autohide.hidden .dock { opacity: 0; }
-body.autohide.hidden.edge-bottom .dock { transform: translateY(120%); }
-body.autohide.hidden.edge-top .dock { transform: translateY(-120%); }
-body.autohide.hidden.edge-left .dock { transform: translateX(-120%); }
-body.autohide.hidden.edge-right .dock { transform: translateX(120%); }
-
-/* The "notch" — an iPhone-style home-indicator pill. Visible only while hidden;
-   click or hover reveals (expands) the dock. Calm neutral by default; turns the
-   accent color and pulses when there's a notification (e.g. an update). */
-.reveal-handle {
-  position: fixed;
-  left: 50%;
-  bottom: 6px;
-  transform: translateX(-50%);
-  width: 116px;
-  height: 7px;
-  border-radius: 999px;
-  /* Accent pill — clearly visible on any Mica/light/dark background. */
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
-  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  opacity: 0;
-  cursor: pointer;
-  pointer-events: none;
-  transition: opacity 0.22s ease, height 0.16s var(--ease-bounce),
-    width 0.16s var(--ease-bounce), box-shadow 0.2s ease;
-}
-@keyframes notch-glow {
-  0%, 100% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); }
-  50% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), 0 0 16px 2px color-mix(in srgb, var(--accent) 80%, transparent); }
-}
-body.autohide.hidden .reveal-handle { opacity: 1; pointer-events: auto; animation: notch-glow 2.4s var(--ease) infinite; }
-body.autohide.hidden .reveal-handle:hover { height: 10px; width: 140px; }
-/* Stronger pulse when there's a notification (update available, etc.) */
-body.autohide.hidden .reveal-handle.notify { animation: notch-glow 1.4s var(--ease) infinite; }
-body.edge-top .reveal-handle { bottom: auto; top: 6px; }
-body.edge-left .reveal-handle { left: 6px; bottom: 50%; top: auto; transform: translateY(50%); width: 7px; height: 116px; }
-body.edge-right .reveal-handle { left: auto; right: 6px; bottom: 50%; transform: translateY(50%); width: 7px; height: 116px; }
-body.autohide.hidden.edge-left .reveal-handle:hover,
-body.autohide.hidden.edge-right .reveal-handle:hover { width: 10px; height: 140px; }
+/* Auto-hide: shrink + fade toward the anchored edge so it reads as minimizing
+   into the notch (not an instant disappear). */
+body.autohide.tucked .dock { opacity: 0; }
+body.autohide.tucked.edge-bottom .dock { transform-origin: bottom center; transform: translateY(80%) scale(0.45); }
+body.autohide.tucked.edge-top .dock { transform-origin: top center; transform: translateY(-80%) scale(0.45); }
+body.autohide.tucked.edge-left .dock { transform-origin: center left; transform: translateX(-80%) scale(0.45); }
+body.autohide.tucked.edge-right .dock { transform-origin: center right; transform: translateX(80%) scale(0.45); }
 
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
@@ -234,10 +201,12 @@ body.notch-body.vertical { align-items: center; }
   cursor: pointer;
   border-radius: 999px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  animation: notch-glow 2.4s var(--ease) infinite;
-  transition: width 0.16s var(--ease-bounce), height 0.16s var(--ease-bounce);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  /* No pulsing animation — a steady pill (no blinking). */
+  transition: width 0.16s var(--ease-bounce), height 0.16s var(--ease-bounce),
+    box-shadow 0.16s ease, opacity 0.2s ease;
 }
+.notch-pill:active { cursor: grabbing; }
 .notch-pill:hover { width: 156px; height: 11px; }
 body.notch-body.vertical .notch-pill { width: 8px; height: 132px; }
 body.notch-body.vertical .notch-pill:hover { width: 11px; height: 156px; }

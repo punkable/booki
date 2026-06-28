@@ -250,20 +250,21 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
         let n = GetClassNameW(hwnd, &mut buf);
         let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
         if class == "Progman" || class == "WorkerW" {
-            return false; // desktop is in front
+            return false; // desktop is in front → show the dock
         }
-        if IsIconic(hwnd).as_bool() {
+        // The shell / taskbar don't count as "an app".
+        if class == "Shell_TrayWnd" || class == "Shell_SecondaryTrayWnd" {
             return false;
         }
-        let mut r = RECT::default();
-        if GetWindowRect(hwnd, &mut r).is_err() {
+        if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
             return false;
         }
-        let ol = r.left.max(dl);
-        let ot = r.top.max(dt);
-        let or = r.right.min(dr);
-        let ob = r.bottom.min(db);
-        or > ol && ob > ot
+        // The user is working in a real app window → tuck the dock away. We don't
+        // require the window to overlap the dock: it should stay out of the way
+        // whenever you're in another window, not only when physically covered. It
+        // returns on the desktop, or when the notch is clicked.
+        let _ = (dl, dt, dr, db);
+        true
     }
 }
 

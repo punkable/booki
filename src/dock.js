@@ -815,15 +815,15 @@ function setHidden(v) {
   if (v) {
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
-    document.body.classList.add("hidden");
+    document.body.classList.add("tucked");
     setTimeout(() => {
       if (hiddenState) dockApi.hideDock(cfg.edge);
-    }, 300);
+    }, 360); // let the minimize animation play before the window hides
   } else {
     // Show the dock window (and hide the notch), then slide the bar back in.
     dockApi.revealDock();
     setTimeout(() => {
-      if (!hiddenState) document.body.classList.remove("hidden");
+      if (!hiddenState) document.body.classList.remove("tucked");
     }, 60);
   }
 }
@@ -835,8 +835,11 @@ function setupAutoHide() {
   // edge mode starts hidden; off/smart start shown (smart hides only once the
   // backend reports the dock is actually covered, so on the desktop it stays
   // visible — never flapping).
-  hiddenState = hideMode() === "edge";
-  document.body.classList.toggle("hidden", hiddenState);
+  // edge mode starts hidden; smart starts hidden only if we're currently in an
+  // app (occluded) — so a config reload while you're working doesn't flash the
+  // dock open. off/smart-on-desktop start shown.
+  hiddenState = hideMode() === "edge" || (hideMode() === "smart" && occluded);
+  document.body.classList.toggle("tucked", hiddenState);
   applyFrame();
   // Sync the two windows to the starting state (these don't emit, so this won't
   // pin the dock open).
@@ -844,9 +847,14 @@ function setupAutoHide() {
   else dockApi.revealDock();
 }
 
-// Pointer entered the dock / notch → reveal and hold it open.
+// Pointer entered the dock → reveal and hold it open.
 function reveal() {
-  if (hideMode() === "off") return;
+  const mode = hideMode();
+  if (mode === "off") return;
+  // In smart mode, while you're working in another app, DON'T reveal on hover —
+  // the dock returns only on the desktop or when you click the notch. This keeps
+  // it out of the way instead of popping open as the cursor passes by.
+  if (mode === "smart" && occluded && !pinnedReveal) return;
   clearTimeout(hideTimer);
   manualReveal = true;
   setHidden(false);
@@ -873,9 +881,14 @@ function onOcclusionSignal(value) {
   occluded = value;
   if (hideMode() !== "smart") return;
   if (!value) {
+    // Back on the desktop → bring the dock out automatically.
+    pinnedReveal = false;
     manualReveal = false;
-    setHidden(false); // desktop is clear → always visible
-  } else if (!manualReveal) {
+    setHidden(false);
+  } else if (!pinnedReveal) {
+    // Working in an app → tuck away regardless of hover, unless the user pinned
+    // the dock open from the notch.
+    manualReveal = false;
     setHidden(true);
   }
 }

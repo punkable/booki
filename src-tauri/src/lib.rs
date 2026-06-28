@@ -264,6 +264,22 @@ fn notch_reveal(app: AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// Set the dock's anchored edge (used when the user drags the notch to a screen
+/// edge). Persists, repositions both windows, and tells the dock to re-read.
+#[tauri::command]
+fn set_dock_edge(app: AppHandle, edge: String) {
+    let mut cfg = config::load();
+    cfg.edge = edge.clone();
+    let _ = config::save(&cfg);
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = position_dock(&dock, &edge);
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = position_notch(&notch, &edge);
+    }
+    let _ = app.emit("booki://config-changed", ());
+}
+
 /// Place the small notch window centered on the dock's anchored edge.
 fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let monitor = pick_monitor(notch).ok_or_else(|| "no monitor found".to_string())?;
@@ -595,6 +611,7 @@ pub fn run() {
             hide_dock,
             reveal_dock,
             notch_reveal,
+            set_dock_edge,
             image_data_uri,
             set_always_on_top,
             app_version,
@@ -663,9 +680,9 @@ pub fn run() {
                     let _ = app.global_shortcut().register(cfg.hotkey.as_str());
                 }
 
-                // Smart auto-hide watcher: emit `booki://occlusion` when the
-                // foreground window covers the dock area. The frontend decides
-                // whether to act (only in "smart" mode). Windows-only.
+                // Smart auto-hide watcher: emit `booki://occlusion` when the user
+                // is working in another app (vs. on the desktop). The frontend
+                // decides whether to act (only in "smart" mode). Windows-only.
                 #[cfg(windows)]
                 {
                     let watch = dock.clone();
@@ -673,22 +690,25 @@ pub fn run() {
                     std::thread::spawn(move || {
                         let self_hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
                         let mut last = false;
+                        let mut candidate = false;
+                        let mut streak = 0u8;
                         loop {
-                            std::thread::sleep(std::time::Duration::from_millis(350));
-                            // Measure occlusion against the STABLE home rect, not
-                            // the live window (which shrinks to a notch when hidden
-                            // — measuring that would cause infinite hide/show
-                            // flapping).
-                            let home = *DOCK_HOME.lock().unwrap();
-                            let occ = match home {
-                                Some((l, t, r, b)) => {
-                                    win::foreground_occludes(l, t, r, b, self_hwnd)
-                                }
-                                None => false,
-                            };
-                            if occ != last {
-                                last = occ;
-                                let _ = handle.emit("booki://occlusion", occ);
+                            std::thread::sleep(std::time::Duration::from_millis(300));
+                            // foreground_occludes now means "the user is in an app"
+                            // (no overlap math, so the home rect is irrelevant).
+                            let occ = win::foreground_occludes(0, 0, 0, 0, self_hwnd);
+                            // Hysteresis: only flip after the new value has held
+                            // for two polls, so a momentary focus change can't make
+                            // the dock flap/blink.
+                            if occ == candidate {
+                                streak = streak.saturating_add(1);
+                            } else {
+                                candidate = occ;
+                                streak = 1;
+                            }
+                            if candidate != last && streak >= 2 {
+                                last = candidate;
+                                let _ = handle.emit("booki://occlusion", last);
                             }
                         }
                     });
