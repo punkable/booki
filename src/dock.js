@@ -14,6 +14,7 @@ import {
   isTauri,
 } from "./api.js";
 import { icon } from "./icons.js";
+import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang } from "./i18n.js";
@@ -178,6 +179,7 @@ function separatorTile(item) {
 }
 
 async function resolveIcon(item) {
+  if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
   if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
   if (iconCache.has(item.path)) return iconCache.get(item.path);
   const uri = await dockApi.appIcon(item.path);

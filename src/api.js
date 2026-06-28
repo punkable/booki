@@ -20,7 +20,7 @@ const DEMO_CONFIG = {
   accent: "#dfaa75",
   theme: "system",
   iconSize: 48,
-  magnification: true,
+  magnification: false,
   zoom: 1.25,
   spacing: 6,
   showLabels: true,
