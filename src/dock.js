@@ -97,9 +97,11 @@ async function persist() {
 async function render() {
   dockEl.innerHTML = "";
   for (const item of cfg.pinned) {
-    dockEl.appendChild(
-      item.kind === "separator" ? separatorTile(item) : await appTile(item)
-    );
+    let tile;
+    if (item.kind === "separator") tile = separatorTile(item);
+    else if (item.kind === "group") tile = await groupTile(item);
+    else tile = await appTile(item);
+    dockEl.appendChild(tile);
   }
 
   // Friendly empty state — the bar stays clean (no +/gear chrome); users add
@@ -167,6 +169,54 @@ async function appTile(item) {
   return el;
 }
 
+// A "folder"/group tile — shows up to four child icons in a mini grid (iOS-style)
+// and opens a flyout with its contents on click.
+async function groupTile(item) {
+  const el = document.createElement("button");
+  el.className = "tile group";
+  el.dataset.id = item.id;
+  el.style.setProperty("--size", `${baseSize()}px`);
+  el.title = item.name || "";
+
+  const grid = document.createElement("span");
+  grid.className = "group-grid";
+  const kids = (item.children || []).slice(0, 4);
+  for (const child of kids) {
+    const mini = document.createElement("span");
+    mini.className = "group-mini";
+    const src = await resolveIcon(child);
+    if (src) {
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = "";
+      mini.appendChild(img);
+    } else {
+      mini.textContent = (child.name || "?").trim().charAt(0).toUpperCase();
+    }
+    grid.appendChild(mini);
+  }
+  el.appendChild(grid);
+
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  el.appendChild(badge);
+
+  const rm = document.createElement("button");
+  rm.className = "rm";
+  rm.textContent = "×";
+  rm.title = "Quitar";
+  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
+  rm.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removeItem(item.id);
+  });
+  el.appendChild(rm);
+
+  el.addEventListener("contextmenu", (e) => openMenu(e, item));
+  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  return el;
+}
+
 function separatorTile(item) {
   const el = document.createElement("div");
   el.className = "tile separator";
@@ -190,8 +240,8 @@ async function resolveIcon(item) {
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
-  // Folder pins open a "stack" flyout instead of launching.
-  if (item.kind === "folder") {
+  // Folder pins and groups open a "stack"/folder flyout instead of launching.
+  if (item.kind === "folder" || item.kind === "group") {
     toggleStack(el, item);
     return;
   }
@@ -331,6 +381,15 @@ function onPointerDown(e, el, item) {
   window.addEventListener("pointerup", onPressUp, { once: true });
 }
 
+let mergeEl = null; // tile currently armed as a folder (merge) target
+let mergeArm = 0; // timestamp hovering the current target's center began
+
+function clearMerge() {
+  if (mergeEl) mergeEl.classList.remove("merge-target");
+  mergeEl = null;
+  mergeArm = 0;
+}
+
 function onPressMove(e) {
   if (!press) return;
   const dx = e.clientX - press.startX;
@@ -338,15 +397,45 @@ function onPressMove(e) {
   if (!press.moved && Math.hypot(dx, dy) < 6) return;
   press.moved = true;
   clearTimeout(press.longTimer);
-  if (!editMode) return; // only reorder while editing
+  // Direct drag — no edit mode needed (intuitive). A plain click still launches.
+  if (press.item.kind === "separator") return;
   if (!dragging) {
     dragging = true;
     dockEl.classList.add("dragging");
     press.el.classList.add("dragging");
   }
+
+  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
+
+  // Hovering the CENTER of another tile → folder (merge) intent.
+  let centerTarget = null;
+  for (const s of sibs) {
+    if (s.classList.contains("separator")) continue;
+    const r = s.getBoundingClientRect();
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
+        centerTarget = s;
+      }
+      break;
+    }
+  }
+
+  if (centerTarget) {
+    if (mergeEl !== centerTarget) {
+      clearMerge();
+      mergeEl = centerTarget;
+      mergeArm = Date.now();
+    }
+    if (Date.now() - mergeArm > 260) centerTarget.classList.add("merge-target");
+    return; // aiming at a merge → don't reorder
+  }
+
+  clearMerge();
+  // Reorder: place the dragged tile before the sibling under the pointer.
   const vertical = isVertical();
   const pointer = vertical ? e.clientY : e.clientX;
-  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((t) => t !== press.el);
   let ref = null;
   for (const s of sibs) {
     const r = s.getBoundingClientRect();
@@ -369,16 +458,50 @@ async function onPressUp() {
     dragging = false;
     dockEl.classList.remove("dragging");
     p.el.classList.remove("dragging");
-    const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
-    cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
-    await persist();
-    await render();
-    reframe();
+    const armed = mergeEl && mergeEl.classList.contains("merge-target") ? mergeEl.dataset.id : null;
+    clearMerge();
+    if (armed && armed !== p.item.id) {
+      await createGroup(p.item.id, armed);
+    } else {
+      const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
+      cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      await persist();
+      await render();
+      reframe();
+    }
     return;
   }
   if (!p.moved && !editMode && p.item.kind !== "separator") {
     launch(p.el, p.item);
   }
+}
+
+// Merge a dragged pin onto a target → create a folder/group (or add to one).
+async function createGroup(draggedId, targetId) {
+  const di = cfg.pinned.findIndex((a) => a.id === draggedId);
+  const ti = cfg.pinned.findIndex((a) => a.id === targetId);
+  if (di < 0 || ti < 0 || di === ti) return;
+  const dragged = cfg.pinned[di];
+  const target = cfg.pinned[ti];
+  if (target.kind === "group") {
+    target.children = target.children || [];
+    target.children.push(dragged);
+  } else {
+    cfg.pinned[ti] = {
+      id: uid(),
+      name: t("group.new"),
+      path: "",
+      args: [],
+      kind: "group",
+      icon: null,
+      children: [target, dragged],
+    };
+  }
+  cfg.pinned.splice(di, 1);
+  exitEdit();
+  await persist();
+  await render();
+  reframe();
 }
 
 // Exit edit mode by clicking empty space or pressing Escape.
@@ -696,10 +819,15 @@ async function toggleStack(tileEl, item) {
     closeStack();
     return;
   }
+  const isGroup = item.kind === "group";
   let items = [];
-  try {
-    items = await dockApi.listDir(item.path);
-  } catch (_) {}
+  if (isGroup) {
+    items = item.children || [];
+  } else {
+    try {
+      items = await dockApi.listDir(item.path);
+    } catch (_) {}
+  }
   stackEl.innerHTML = "";
   const head = document.createElement("div");
   head.className = "stack-head";
@@ -714,12 +842,13 @@ async function toggleStack(tileEl, item) {
     const cell = document.createElement("button");
     cell.className = "stack-item";
     cell.title = it.name;
-    const ic = await dockApi.appIcon(it.path);
+    const ic = isGroup ? await resolveIcon(it) : await dockApi.appIcon(it.path);
+    const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
     cell.innerHTML =
-      (ic ? `<img src="${ic}" alt="" />` : `<span class="stack-glyph">${it.is_dir ? "📁" : (it.name[0] || "?").toUpperCase()}</span>`) +
+      (ic ? `<img src="${ic}" alt="" />` : `<span class="stack-glyph">${isDir ? "📁" : (it.name[0] || "?").toUpperCase()}</span>`) +
       `<span class="stack-name">${it.name}</span>`;
     cell.addEventListener("click", () => {
-      dockApi.launch(it.path, []);
+      if (it.path) dockApi.launch(it.path, it.args || []);
       closeStack();
     });
     grid.appendChild(cell);

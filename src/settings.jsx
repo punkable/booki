@@ -626,9 +626,22 @@ function Apps({ cfg, set }) {
               <button className="pin-handle" title={t("apps.drag")}
                 onPointerDown={startDrag(i)}>⠿</button>
               {item.kind !== "separator" && <PinThumb item={item} />}
-              <span className="pin-name" title={item.path}>
-                {item.kind === "separator" ? t("apps.sep") : item.name}
-              </span>
+              {item.kind === "group" ? (
+                <input
+                  className="pin-name-edit"
+                  value={item.name}
+                  onChange={(e) =>
+                    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
+                  }
+                />
+              ) : (
+                <span className="pin-name" title={item.path}>
+                  {item.kind === "separator" ? t("apps.sep") : item.name}
+                </span>
+              )}
+              {item.kind === "group" && (
+                <span className="pin-count">{(item.children || []).length}</span>
+              )}
             </span>
             <span className="pin-actions">
               {item.kind !== "separator" && (

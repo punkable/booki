@@ -20,13 +20,16 @@ pub struct PinnedApp {
     pub path: String,
     #[serde(default)]
     pub args: Vec<String>,
-    /// "app" | "separator".
+    /// "app" | "separator" | "folder" | "group".
     #[serde(default = "default_kind")]
     pub kind: String,
     /// Optional custom icon: a path to an image or a data URI overriding the
     /// native icon.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Child items for a "group" pin (a folder/container of other pins).
+    #[serde(default)]
+    pub children: Vec<PinnedApp>,
 }
 
 fn default_edge() -> String {
