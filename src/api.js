@@ -15,6 +15,14 @@ const DEMO_CONFIG = {
     { id: "e", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
     { id: "f", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
     { id: "g", name: "Proyectos", path: "C:/Users/Proyectos", args: [], kind: "folder" },
+    {
+      id: "grp", name: "Diseño", path: "", args: [], kind: "group",
+      children: [
+        { id: "c1", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
+        { id: "c2", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
+        { id: "c3", name: "Editor", path: "C:/Apps/editor.exe", args: [], kind: "app", icon: "lib:palette:badge" },
+      ],
+    },
   ],
   edge: "bottom",
   accent: "#dfaa75",

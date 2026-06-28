@@ -111,6 +111,7 @@ const DICT = {
     "dock.empty": "Arrastra apps o carpetas aquí · clic derecho para añadir",
     "dock.update": "● Actualización disponible",
     "stack.empty": "Carpeta vacía",
+    "group.new": "Carpeta",
   },
   en: {
     "tab.appearance": "Appearance",
@@ -222,6 +223,7 @@ const DICT = {
     "dock.empty": "Drag apps or folders here · right-click to add",
     "dock.update": "● Update available",
     "stack.empty": "Empty folder",
+    "group.new": "Folder",
   },
 };
 
