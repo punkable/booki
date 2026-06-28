@@ -70,17 +70,15 @@ function applyAll() {
   // The bar's frosted material is CSS-only now (no native vibrancy on the dock
   // window — that caused the gray box). Map material strength 0–100 → a sensible
   // alpha range so the bar always reads as a solid-ish frosted panel.
+  // CSS-only glass (no native vibrancy on the transparent dock window). Map the
+  // material strength to a visible translucency range so the bar reads as a
+  // tinted glass panel.
   const mat = (cfg.materialStrength ?? 70) / 100;
-  root.style.setProperty("--material", String(Math.max(0.06, Math.min(0.5, 0.06 + mat * 0.34))));
+  root.style.setProperty("--material", String(Math.max(0.3, Math.min(0.92, 0.3 + mat * 0.6))));
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
-  // Headroom (in the bar's padding, on the edge side) for the magnified icon to
-  // grow into WITHOUT overflowing the window — so it never gets clipped.
-  const base = baseSize();
-  const grow = Math.ceil((Math.max(1, cfg.zoom || 1.25) - 1) * base) + 6;
-  dockEl.style.setProperty("--pad-grow", `${grow}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
@@ -516,11 +514,21 @@ function reframe() {
 let lastFull = null;
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
-  // The window is sized to the bar itself (magnify is contained in the bar's
-  // padding now), so the native acrylic == the visible dock — no gray box.
+  // The window is TRANSPARENT and larger than the bar so the magnified icons and
+  // the name tooltip overflow OUTSIDE the bar (into the invisible headroom) —
+  // never clipped, and no visible box because there's no native material.
   const r = dockEl.getBoundingClientRect();
-  let wCss = r.width + 2;
-  let hCss = r.height + 2;
+  const base = baseSize();
+  const grow = base * (cfg.magnification !== false ? Math.max(1, cfg.zoom || 1.25) - 1 : 0);
+  const labelSpace = cfg.showLabels !== false ? 42 : 14;
+  let wCss, hCss;
+  if (isVertical()) {
+    wCss = r.width + grow + labelSpace + 28;
+    hCss = r.height + grow * 2 + 48;
+  } else {
+    wCss = r.width + grow * 2 + 48;
+    hCss = r.height + grow + labelSpace + 18;
+  }
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();

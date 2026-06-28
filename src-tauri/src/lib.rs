@@ -178,61 +178,13 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Map material strength (0–100) to a Windows-acrylic tint. The dock window is
-/// now sized exactly to the bar with the magnify kept *inside* it, so applying
-/// native Acrylic gives a real tinted-glass dock (no surrounding gray box).
-/// Higher strength = more tint / less see-through.
-#[cfg(windows)]
-fn acrylic_tint(strength: u32) -> (u8, u8, u8, u8) {
-    let a = (40.0 + (strength.min(100) as f32 / 100.0) * 150.0) as u8; // 40..190
-    (26, 26, 30, a)
-}
-
-/// Re-apply the native material to the dock with a new strength (live from the
-/// translucency slider), so the tinted-glass effect actually changes.
+/// Material strength is applied in CSS now (the bar's `--material` alpha, driven
+/// live from the config on `booki://config-changed`). We don't use native
+/// vibrancy on the dock — it would paint the whole transparent window as a box.
+/// Kept as a no-op command for frontend compatibility.
 #[tauri::command]
-fn set_material(app: AppHandle, strength: u32) -> Result<(), String> {
-    // Always re-apply to the DOCK window (this command is usually invoked from
-    // the settings window, whose own handle must NOT receive the dock's glass).
-    #[cfg(windows)]
-    {
-        if let Some(dock) = app.get_webview_window("dock") {
-            let _ = window_vibrancy::apply_acrylic(&dock, Some(acrylic_tint(strength)));
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = (&app, strength);
+fn set_material(_app: AppHandle, _strength: u32) -> Result<(), String> {
     Ok(())
-}
-
-/// Round a window's corners (Windows 11 DWM) so the acrylic reads as a rounded
-/// dock rather than a hard rectangle. Uses a raw `dwmapi` call (linked by
-/// window-vibrancy) to avoid the `windows`-crate version mismatch between our
-/// bindings and Tauri's. Best-effort; no-op on older Windows.
-#[cfg(windows)]
-fn round_window_corners(window: &WebviewWindow) {
-    // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
-    #[link(name = "dwmapi")]
-    extern "system" {
-        fn DwmSetWindowAttribute(
-            hwnd: isize,
-            dwattribute: u32,
-            pvattribute: *const core::ffi::c_void,
-            cbattribute: u32,
-        ) -> i32;
-    }
-    if let Ok(h) = window.hwnd() {
-        let hwnd = h.0 as isize;
-        let pref: u32 = 2; // DWMWCP_ROUND
-        unsafe {
-            let _ = DwmSetWindowAttribute(
-                hwnd,
-                33,
-                &pref as *const _ as *const core::ffi::c_void,
-                std::mem::size_of::<u32>() as u32,
-            );
-        }
-    }
 }
 
 #[tauri::command]
@@ -585,18 +537,12 @@ pub fn run() {
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
                 let cfg = config::load();
-                // Real Windows tinted-glass: the dock window is sized exactly to
-                // the bar and the magnify stays inside it, so native Acrylic gives
-                // a proper frosted dock with no gray box around it. DWM rounds the
-                // corners so it reads as a rounded dock, not a rectangle.
-                #[cfg(windows)]
-                {
-                    let _ = window_vibrancy::apply_acrylic(
-                        &dock,
-                        Some(acrylic_tint(cfg.material_strength)),
-                    );
-                    round_window_corners(&dock);
-                }
+                // The dock window is transparent and SPACIOUS (larger than the
+                // bar) so tooltips and the magnify overflow *outside* the bar.
+                // We deliberately do NOT apply native Acrylic to it: vibrancy
+                // would tint the whole window rectangle, showing as a "box" /
+                // double-dock behind the bar. The bar's glass is done in CSS so
+                // only the bar is ever visible; the rest stays fully transparent.
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();

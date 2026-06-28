@@ -129,33 +129,30 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   margin: 0;
   list-style: none;
   overflow: visible;
-  border-radius: 14px;
-  /* The window is sized exactly to this bar and carries REAL Windows Acrylic
-     (native, frosted, blurs the desktop). This CSS layer is only a faint tint +
-     sheen on top of that glass; --material is kept low so the native acrylic
-     shows through. The magnify grows INTO the edge-side padding below, so the
-     bar never changes size and the icons never overflow → no clipping box. */
+  border-radius: 16px;
+  /* CSS-only tinted glass. The dock window is transparent (no native vibrancy —
+     that painted a box behind the bar), so ONLY this rounded bar is visible; the
+     magnified icons and the name tooltip overflow into the invisible headroom
+     around it. Padding is symmetric so the bar reads at a normal height. */
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 46%),
-    color-mix(in srgb, var(--layer) calc(var(--material) * 100%), transparent);
-  box-shadow: inset 0 0 0 1px var(--stroke-light), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: transform 0.34s var(--ease);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.03) 44%, rgba(255, 255, 255, 0.01)),
+    color-mix(in srgb, var(--layer-strong) calc(var(--material) * 100%), transparent);
+  border: 1px solid var(--stroke-light);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  transition: transform 0.34s var(--ease), opacity 0.3s ease;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
 body.edge-right .dock { align-items: flex-end; }
-/* Edge-side padding = headroom the magnified icon scales into (no overflow). */
-body.edge-bottom .dock { padding-top: calc(8px + var(--pad-grow, 12px)); }
-body.edge-top .dock { padding-bottom: calc(8px + var(--pad-grow, 12px)); }
-body.edge-left .dock { padding-right: calc(10px + var(--pad-grow, 12px)); }
-body.edge-right .dock { padding-left: calc(10px + var(--pad-grow, 12px)); }
 
-/* Auto-hide slide */
-body.autohide.hidden.edge-bottom .dock { transform: translateY(135%); }
-body.autohide.hidden.edge-top .dock { transform: translateY(-135%); }
-body.autohide.hidden.edge-left .dock { transform: translateX(-135%); }
-body.autohide.hidden.edge-right .dock { transform: translateX(135%); }
+/* Auto-hide: slide away + fade into the notch (minimize animation) */
+body.autohide.hidden .dock { opacity: 0; }
+body.autohide.hidden.edge-bottom .dock { transform: translateY(120%); }
+body.autohide.hidden.edge-top .dock { transform: translateY(-120%); }
+body.autohide.hidden.edge-left .dock { transform: translateX(-120%); }
+body.autohide.hidden.edge-right .dock { transform: translateX(120%); }
 
 /* Reveal handle — the "notch". Visible only while hidden; click/hover reveals
    the dock. Accent-tinted so it's discoverable, with a comfortable hit area. */
