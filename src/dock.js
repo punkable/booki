@@ -777,6 +777,9 @@ async function checkUpdates() {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
     pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
+    // Give the notch a notification color/pulse so it's visible even when hidden.
+    const handle = document.getElementById("reveal-handle");
+    if (handle) handle.classList.add("notify");
   }
 }
 

@@ -46,9 +46,10 @@ fn default_zoom() -> f32 {
     1.25
 }
 fn default_auto_hide_mode() -> String {
-    // Always visible by default — reliability first. Smart/edge hiding are opt-in
-    // from settings; the dock should never "disappear" out of the box.
-    "off".into()
+    // Smart by default: visible on the desktop, slides to the notch when a window
+    // covers the dock area, and reappears when the desktop is clear. Measured
+    // against a stable home rect so it can't flap.
+    "smart".into()
 }
 fn default_monitor() -> i32 {
     -1
@@ -184,12 +185,12 @@ pub fn load() -> Config {
         Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
         Err(_) => Config::default(),
     };
-    // One-time migration: earlier builds defaulted auto-hide to "smart", which
-    // could make the dock hide behind any window and appear to vanish. Force it
-    // visible once so upgrading users get a working dock back.
-    if cfg.settings_rev < 1 {
-        cfg.auto_hide_mode = "off".into();
-        cfg.settings_rev = 1;
+    // Migration: now that smart-hide is stable (measured against a fixed home
+    // rect, with a visible animated notch), make it the default for existing
+    // installs too — visible on the desktop, hides when a window covers it.
+    if cfg.settings_rev < 2 {
+        cfg.auto_hide_mode = "smart".into();
+        cfg.settings_rev = 2;
         let _ = save(&cfg);
     }
     cfg

@@ -154,35 +154,41 @@ body.autohide.hidden.edge-top .dock { transform: translateY(-120%); }
 body.autohide.hidden.edge-left .dock { transform: translateX(-120%); }
 body.autohide.hidden.edge-right .dock { transform: translateX(120%); }
 
-/* Reveal handle — the "notch". Visible only while hidden; click/hover reveals
-   the dock. Accent-tinted so it's discoverable, with a comfortable hit area. */
+/* The "notch" — an iPhone-style home-indicator pill. Visible only while hidden;
+   click or hover reveals (expands) the dock. Calm neutral by default; turns the
+   accent color and pulses when there's a notification (e.g. an update). */
 .reveal-handle {
   position: fixed;
   left: 50%;
-  bottom: 3px;
+  bottom: 5px;
   transform: translateX(-50%);
-  width: 116px;
+  width: 130px;
   height: 6px;
-  border-radius: var(--r-pill);
-  background: color-mix(in srgb, var(--accent) 60%, var(--layer-strong));
-  border: 1px solid var(--stroke);
-  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   opacity: 0;
   cursor: pointer;
-  transition: opacity 0.2s ease, height 0.16s var(--ease), width 0.16s var(--ease);
   pointer-events: none;
+  transition: opacity 0.2s ease, height 0.16s var(--ease-bounce),
+    width 0.16s var(--ease-bounce), background 0.2s ease, box-shadow 0.2s ease;
 }
 @keyframes notch-glow {
-  0%, 100% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
-  50% { box-shadow: 0 2px 16px color-mix(in srgb, var(--accent) 65%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+  0%, 100% { box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 45%, transparent); }
+  50% { box-shadow: 0 3px 18px color-mix(in srgb, var(--accent) 80%, transparent); }
 }
-body.autohide.hidden .reveal-handle { opacity: 0.95; pointer-events: auto; animation: notch-glow 2.2s var(--ease) infinite; }
-body.autohide.hidden .reveal-handle:hover { opacity: 1; height: 9px; width: 132px; animation: none; }
-body.edge-top .reveal-handle { bottom: auto; top: 3px; }
-body.edge-left .reveal-handle { left: 3px; bottom: 50%; top: auto; transform: translateY(50%); width: 6px; height: 116px; }
-body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform: translateY(50%); width: 6px; height: 116px; }
+body.autohide.hidden .reveal-handle { opacity: 0.96; pointer-events: auto; }
+body.autohide.hidden .reveal-handle:hover { height: 9px; width: 150px; background: rgba(255, 255, 255, 0.92); }
+/* Notification state (update available, etc.) */
+body.autohide.hidden .reveal-handle.notify {
+  background: var(--accent);
+  animation: notch-glow 1.8s var(--ease) infinite;
+}
+body.edge-top .reveal-handle { bottom: auto; top: 5px; }
+body.edge-left .reveal-handle { left: 5px; bottom: 50%; top: auto; transform: translateY(50%); width: 6px; height: 130px; }
+body.edge-right .reveal-handle { left: auto; right: 5px; bottom: 50%; transform: translateY(50%); width: 6px; height: 130px; }
 body.autohide.hidden.edge-left .reveal-handle:hover,
-body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 132px; }
+body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 150px; }
 
 /* ───────────────────────────── Tiles ───────────────────────────── */
 

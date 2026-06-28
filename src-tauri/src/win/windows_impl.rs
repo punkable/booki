@@ -5,7 +5,13 @@
 use std::ffi::c_void;
 
 use base64::Engine;
-use windows::core::PCWSTR;
+use windows::core::{Interface, PCWSTR};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER,
+    COINIT_APARTMENTTHREADED, STGM_READ,
+};
+use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
+use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::Graphics::Gdi::{
@@ -33,8 +39,36 @@ pub fn app_icon_data_uri(path: &str) -> Option<String> {
     Some(format!("data:image/png;base64,{b64}"))
 }
 
-unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
+/// Resolve a .lnk shortcut to its target path (so we can read the target's icon
+/// instead of the shell's shortcut icon, which carries the overlay arrow badge).
+unsafe fn resolve_shortcut_target(path: &str) -> Option<String> {
+    let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
+    let pf: IPersistFile = link.cast().ok()?;
     let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    pf.Load(PCWSTR(wide.as_ptr()), STGM_READ).ok()?;
+    let mut buf = [0u16; 260];
+    let mut fd = WIN32_FIND_DATAW::default();
+    link.GetPath(&mut buf, &mut fd, 0u32).ok()?;
+    let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    if end == 0 {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..end]))
+}
+
+unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
+    // For .lnk shortcuts, read the TARGET's icon so the shell's shortcut-arrow
+    // overlay badge doesn't appear on the dock tile.
+    let mut target = path.to_string();
+    if path.to_ascii_lowercase().ends_with(".lnk") {
+        if let Some(t) = resolve_shortcut_target(path) {
+            if !t.is_empty() {
+                target = t;
+            }
+        }
+    }
+    let wide: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
     let mut info = SHFILEINFOW::default();
     // Read the real icon of the file/exe/shortcut/folder on disk (no
     // USEFILEATTRIBUTES) so custom executable icons come through.
