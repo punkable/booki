@@ -27,7 +27,7 @@ const DEMO_CONFIG = {
   showLabels: true,
   showIndicators: true,
   autoHide: false,
-  autoHideMode: "smart",
+  autoHideMode: "off",
   autoHideDelay: 650,
   alwaysOnTop: true,
   magnifyStyle: "spring",
