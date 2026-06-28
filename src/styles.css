@@ -495,9 +495,16 @@ body.edge-top .stack { bottom: auto; top: 86px; }
 
 /* ═══════════════════════ Settings window (React) ═══════════════════════ */
 
-/* The settings window carries native Mica; keep the page transparent so it
-   shows, and float an acrylic sidebar + a content card on top of it. */
-body.settings-body { background: transparent; overflow: hidden; }
+/* The settings window is opaque (a transparent one rendered blank on real
+   Windows). A soft tinted background sits behind the floating acrylic-style
+   sidebar + content card so the layered look is preserved. */
+body.settings-body {
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%),
+    radial-gradient(120% 80% at 100% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 55%),
+    var(--bg);
+}
 #root { height: 100%; }
 .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); }
 

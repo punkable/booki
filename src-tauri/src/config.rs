@@ -46,9 +46,9 @@ fn default_zoom() -> f32 {
     1.25
 }
 fn default_auto_hide_mode() -> String {
-    // Smart by default: the dock hides to a notch when a window covers it and
-    // reappears on the desktop. (User-requested default.)
-    "smart".into()
+    // Always visible by default — reliability first. Smart/edge hiding are opt-in
+    // from settings; the dock should never "disappear" out of the box.
+    "off".into()
 }
 fn default_monitor() -> i32 {
     -1
@@ -137,6 +137,9 @@ pub struct Config {
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
+    /// Internal settings/migration revision (not user-facing).
+    #[serde(default)]
+    pub settings_rev: u32,
 }
 
 impl Default for Config {
@@ -163,6 +166,7 @@ impl Default for Config {
             material_strength: default_material(),
             autostart: false,
             language: default_language(),
+            settings_rev: 0,
         }
     }
 }
@@ -181,10 +185,19 @@ fn config_path() -> PathBuf {
 /// Load config from disk, falling back to defaults on any error.
 pub fn load() -> Config {
     let path = config_path();
-    match fs::read_to_string(&path) {
+    let mut cfg = match fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
         Err(_) => Config::default(),
+    };
+    // One-time migration: earlier builds defaulted auto-hide to "smart", which
+    // could make the dock hide behind any window and appear to vanish. Force it
+    // visible once so upgrading users get a working dock back.
+    if cfg.settings_rev < 1 {
+        cfg.auto_hide_mode = "off".into();
+        cfg.settings_rev = 1;
+        let _ = save(&cfg);
     }
+    cfg
 }
 
 /// Persist config to disk, creating the directory if needed.
