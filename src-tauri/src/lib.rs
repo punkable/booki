@@ -191,13 +191,17 @@ fn acrylic_tint(strength: u32) -> (u8, u8, u8, u8) {
 /// Re-apply the native material to the dock with a new strength (live from the
 /// translucency slider), so the tinted-glass effect actually changes.
 #[tauri::command]
-fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
+fn set_material(app: AppHandle, strength: u32) -> Result<(), String> {
+    // Always re-apply to the DOCK window (this command is usually invoked from
+    // the settings window, whose own handle must NOT receive the dock's glass).
     #[cfg(windows)]
     {
-        let _ = window_vibrancy::apply_acrylic(&window, Some(acrylic_tint(strength)));
+        if let Some(dock) = app.get_webview_window("dock") {
+            let _ = window_vibrancy::apply_acrylic(&dock, Some(acrylic_tint(strength)));
+        }
     }
     #[cfg(not(windows))]
-    let _ = (&window, strength);
+    let _ = (&app, strength);
     Ok(())
 }
 

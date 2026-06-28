@@ -62,9 +62,6 @@ fn default_language() -> String {
 fn default_spacing() -> u32 {
     6
 }
-fn default_opacity() -> f32 {
-    0.62
-}
 fn default_hide_delay() -> u32 {
     650
 }
@@ -100,9 +97,6 @@ pub struct Config {
     /// Gap between tiles, in px.
     #[serde(default = "default_spacing")]
     pub spacing: u32,
-    /// Dock background translucency (0.2–1.0).
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
     /// Show name tooltips on hover.
     #[serde(default = "default_true")]
     pub show_labels: bool,
@@ -153,7 +147,6 @@ impl Default for Config {
             magnification: true,
             zoom: default_zoom(),
             spacing: default_spacing(),
-            opacity: default_opacity(),
             show_labels: true,
             show_indicators: true,
             auto_hide: false,

@@ -722,14 +722,28 @@ async function toggleStack(tileEl, item) {
   document.body.classList.add("stack-open");
   stackEl.classList.remove("hidden");
   reframe();
-  // Center the flyout over the tile (horizontal edges).
+  // Place the flyout just past the bar, sized to the bar's real geometry (the
+  // dock window is tight now, so a hardcoded offset would clip it).
   requestAnimationFrame(() => {
+    const dr = dockEl.getBoundingClientRect();
+    const gap = 10;
+    stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
     if (!isVertical()) {
       const r = tileEl.getBoundingClientRect();
       const sw = stackEl.offsetWidth;
       let left = r.left + r.width / 2 - sw / 2;
       left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
       stackEl.style.left = `${left}px`;
+      if (cfg.edge === "top") stackEl.style.top = `${dr.height + gap}px`;
+      else stackEl.style.bottom = `${dr.height + gap}px`;
+    } else {
+      const r = tileEl.getBoundingClientRect();
+      const sh = stackEl.offsetHeight;
+      let top = r.top + r.height / 2 - sh / 2;
+      top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
+      stackEl.style.top = `${top}px`;
+      if (cfg.edge === "left") stackEl.style.left = `${dr.width + gap}px`;
+      else stackEl.style.right = `${dr.width + gap}px`;
     }
   });
 }

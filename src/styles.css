@@ -403,7 +403,7 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 
 .stack {
   position: fixed;
-  bottom: 86px;
+  /* vertical/edge offset is set inline from the bar's real size (dock.js) */
   z-index: 40;
   width: min(420px, 92vw);
   max-height: 320px;
@@ -417,7 +417,6 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
   backdrop-filter: blur(26px) saturate(170%);
   animation: stack-in 0.2s var(--ease);
 }
-body.edge-top .stack { bottom: auto; top: 86px; }
 @keyframes stack-in {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: none; }
@@ -471,7 +470,7 @@ body.edge-top .stack { bottom: auto; top: 86px; }
 /* Update-available pill (dock) */
 .update-pill {
   position: fixed;
-  top: 6px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
@@ -487,6 +486,10 @@ body.edge-top .stack { bottom: auto; top: 86px; }
   cursor: pointer;
   animation: booki-breathe 2.4s var(--ease) infinite;
 }
+/* Sit in the magnify-headroom side so it never overlaps the icons. */
+body.edge-top .update-pill { top: auto; bottom: 4px; }
+body.edge-left .update-pill { left: auto; right: 4px; top: 50%; transform: translateY(-50%); }
+body.edge-right .update-pill { left: 4px; right: auto; top: 50%; transform: translateY(-50%); }
 
 /* Update controls (settings) */
 .upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
