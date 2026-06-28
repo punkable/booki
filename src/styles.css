@@ -396,7 +396,14 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .tile.hint img { opacity: 0.85; }
 @keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
-.tile.dragging { opacity: 0.5; }
+/* Lifted dragged tile (micro-interaction) */
+.dock.dragging .tile.dragging {
+  opacity: 0.95;
+  transform: scale(1.14);
+  z-index: 10;
+  transition: transform 0.12s var(--ease-bounce);
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.45));
+}
 
 /* Drop overlay (covers the whole window for an easy target) */
 .drop-overlay {
