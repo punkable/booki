@@ -23,7 +23,6 @@ const DEMO_CONFIG = {
   magnification: true,
   zoom: 1.25,
   spacing: 6,
-  opacity: 0.62,
   showLabels: true,
   showIndicators: true,
   autoHide: false,
