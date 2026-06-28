@@ -407,18 +407,22 @@ function onPressMove(e) {
 
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
 
-  // Hovering the CENTER of another tile → folder (merge) intent.
+  // Hovering the CENTER of another tile → folder (merge) intent. Groups can't be
+  // nested, so a group being dragged only reorders.
+  const canMerge = press.item.kind !== "group";
   let centerTarget = null;
-  for (const s of sibs) {
-    if (s.classList.contains("separator")) continue;
-    const r = s.getBoundingClientRect();
-    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
-        centerTarget = s;
+  if (canMerge) {
+    for (const s of sibs) {
+      if (s.classList.contains("separator")) continue;
+      const r = s.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
+          centerTarget = s;
+        }
+        break;
       }
-      break;
     }
   }
 
@@ -475,6 +479,24 @@ async function onPressUp() {
     launch(p.el, p.item);
   }
 }
+
+// Cancel an in-progress drag (Escape / lost pointer / pointercancel): drop all
+// state and restore the original order — no reorder, no folder created.
+async function cancelDrag() {
+  if (!press && !dragging) return;
+  window.removeEventListener("pointermove", onPressMove);
+  const wasDragging = dragging;
+  press = null;
+  dragging = false;
+  clearMerge();
+  dockEl.classList.remove("dragging");
+  dockEl.querySelectorAll(".tile.dragging").forEach((t) => t.classList.remove("dragging"));
+  if (wasDragging) {
+    await render(); // rebuild from the unchanged cfg → original order
+    reframe();
+  }
+}
+window.addEventListener("pointercancel", cancelDrag);
 
 // Merge a dragged pin onto a target → create a folder/group (or add to one).
 async function createGroup(draggedId, targetId) {
@@ -594,6 +616,7 @@ window.addEventListener("keydown", (e) => {
     closeMenu();
     exitEdit();
     closeStack();
+    cancelDrag();
   }
 });
 
