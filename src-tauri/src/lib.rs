@@ -178,13 +178,59 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Material strength is applied in CSS now (the bar's `--material` alpha, driven
-/// live from the config on `booki://config-changed`). We don't use native
-/// vibrancy on the dock — it would paint the whole transparent window as a box.
-/// Kept as a no-op command for frontend compatibility.
+/// Re-apply the native Windows 11 material to the dock. The dock window is sized
+/// exactly to the bar (with the magnify/tooltip kept inside), so native Mica
+/// renders as a real rounded frosted dock with no surrounding box. Mica follows
+/// the system light/dark automatically. Strength is unused with Mica.
 #[tauri::command]
-fn set_material(_app: AppHandle, _strength: u32) -> Result<(), String> {
+fn set_material(app: AppHandle, _strength: u32) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        if let Some(dock) = app.get_webview_window("dock") {
+            apply_dock_material(&dock);
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = &app;
     Ok(())
+}
+
+/// Apply Mica (Windows 11) to the dock, falling back to Acrylic on Windows 10,
+/// then round the corners so it reads as a native rounded dock.
+#[cfg(windows)]
+fn apply_dock_material(dock: &WebviewWindow) {
+    // None = let Mica follow the system light/dark theme.
+    let _ = window_vibrancy::apply_mica(dock, None)
+        .or_else(|_| window_vibrancy::apply_acrylic(dock, Some((24, 24, 28, 180))));
+    round_window_corners(dock);
+}
+
+/// Round a window's corners (Windows 11 DWM). Raw `dwmapi` call (linked by
+/// window-vibrancy) to avoid the windows-crate version mismatch with Tauri.
+#[cfg(windows)]
+fn round_window_corners(window: &WebviewWindow) {
+    // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: isize,
+            dwattribute: u32,
+            pvattribute: *const core::ffi::c_void,
+            cbattribute: u32,
+        ) -> i32;
+    }
+    if let Ok(h) = window.hwnd() {
+        let hwnd = h.0 as isize;
+        let pref: u32 = 2; // DWMWCP_ROUND
+        unsafe {
+            let _ = DwmSetWindowAttribute(
+                hwnd,
+                33,
+                &pref as *const _ as *const core::ffi::c_void,
+                std::mem::size_of::<u32>() as u32,
+            );
+        }
+    }
 }
 
 #[tauri::command]
@@ -537,12 +583,12 @@ pub fn run() {
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
                 let cfg = config::load();
-                // The dock window is transparent and SPACIOUS (larger than the
-                // bar) so tooltips and the magnify overflow *outside* the bar.
-                // We deliberately do NOT apply native Acrylic to it: vibrancy
-                // would tint the whole window rectangle, showing as a "box" /
-                // double-dock behind the bar. The bar's glass is done in CSS so
-                // only the bar is ever visible; the rest stays fully transparent.
+                // Native Windows 11 Mica: the dock window is sized to the bar and
+                // the bar's CSS surface is transparent, so the Mica window itself
+                // IS the dock — one rounded frosted surface, system dark/light, no
+                // box. (The magnify and tooltip are kept inside the bar.)
+                #[cfg(windows)]
+                apply_dock_material(&dock);
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();

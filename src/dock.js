@@ -123,6 +123,9 @@ async function appTile(item) {
   el.className = "tile";
   el.dataset.id = item.id;
   el.style.setProperty("--size", `${baseSize()}px`);
+  // Native OS tooltip — shows the name OUTSIDE the (bar-sized Mica) window with
+  // no clipping, the Windows-native way.
+  el.title = item.name;
 
   const label = document.createElement("span");
   label.className = "label";
@@ -514,21 +517,12 @@ function reframe() {
 let lastFull = null;
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
-  // The window is TRANSPARENT and larger than the bar so the magnified icons and
-  // the name tooltip overflow OUTSIDE the bar (into the invisible headroom) —
-  // never clipped, and no visible box because there's no native material.
+  // The window IS the bar (native Mica surface). The magnify scales from each
+  // tile's center into the bar's own padding, so nothing overflows the window —
+  // the name uses a native OS tooltip instead of an in-page one.
   const r = dockEl.getBoundingClientRect();
-  const base = baseSize();
-  const grow = base * (cfg.magnification !== false ? Math.max(1, cfg.zoom || 1.25) - 1 : 0);
-  const labelSpace = cfg.showLabels !== false ? 42 : 14;
-  let wCss, hCss;
-  if (isVertical()) {
-    wCss = r.width + grow + labelSpace + 28;
-    hCss = r.height + grow * 2 + 48;
-  } else {
-    wCss = r.width + grow * 2 + 48;
-    hCss = r.height + grow + labelSpace + 18;
-  }
+  let wCss = r.width + 2;
+  let hCss = r.height + 2;
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();
@@ -573,8 +567,12 @@ function setHidden(v) {
     document.body.classList.add("hidden");
     setTimeout(() => hiddenState && applyFrame(), 340); // shrink after the slide
   } else {
-    applyFrame(); // grow first…
-    requestAnimationFrame(() => document.body.classList.remove("hidden")); // …then slide in
+    applyFrame(); // grow the window back first…
+    // …then slide in, but only AFTER the window has actually grown, so the bar
+    // never animates inside a still-collapsed window (which looked "cut").
+    setTimeout(() => {
+      if (!hiddenState) document.body.classList.remove("hidden");
+    }, 70);
   }
 }
 
