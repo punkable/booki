@@ -98,6 +98,15 @@
 * {
   box-sizing: border-box;
 }
+/* Respect the OS "reduce motion" setting — disable animations/transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 html,
 body {
   margin: 0;
@@ -838,6 +847,13 @@ select {
   position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
   border: 0; padding: 0; background: transparent; opacity: 0; cursor: pointer;
 }
+.accent-system {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 15px; color: var(--ink);
+  background: var(--layer); border: 1px dashed var(--stroke);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease;
+}
+.accent-system:hover { transform: scale(1.12); border-color: var(--accent); }
 .accent-hex { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 64px; text-align: right; }
 
 /* Installed-app suggestions */

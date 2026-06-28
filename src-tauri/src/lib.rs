@@ -195,6 +195,29 @@ fn set_material(app: AppHandle, _strength: u32) -> Result<(), String> {
     Ok(())
 }
 
+/// The Windows accent/colorization color as a `#rrggbb` hex string, so the user
+/// can match the dock to their system accent. None off-Windows / on failure.
+#[tauri::command]
+fn system_accent() -> Option<String> {
+    #[cfg(windows)]
+    {
+        #[link(name = "dwmapi")]
+        extern "system" {
+            fn DwmGetColorizationColor(pcrcolorization: *mut u32, pfopaqueblend: *mut i32) -> i32;
+        }
+        let mut color: u32 = 0;
+        let mut opaque: i32 = 0;
+        let hr = unsafe { DwmGetColorizationColor(&mut color, &mut opaque) };
+        if hr == 0 {
+            let r = (color >> 16) & 0xff;
+            let g = (color >> 8) & 0xff;
+            let b = color & 0xff;
+            return Some(format!("#{:02x}{:02x}{:02x}", r, g, b));
+        }
+    }
+    None
+}
+
 /// Apply Mica (Windows 11) to the dock, falling back to Acrylic on Windows 10,
 /// then round the corners so it reads as a native rounded dock.
 #[cfg(windows)]
@@ -539,6 +562,7 @@ pub fn run() {
             set_hotkey,
             list_monitors,
             set_material,
+            system_accent,
             set_autostart,
             get_autostart,
             list_dir,
