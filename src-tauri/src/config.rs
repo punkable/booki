@@ -20,9 +20,12 @@ pub struct PinnedApp {
     pub path: String,
     #[serde(default)]
     pub args: Vec<String>,
-    /// "app" | "separator" | "folder" | "group".
+    /// "app" | "separator" | "folder" | "group" | "widget".
     #[serde(default = "default_kind")]
     pub kind: String,
+    /// For kind == "widget": which widget ("clock" | "cpu" | "ram" | "net").
+    #[serde(default)]
+    pub widget: Option<String>,
     /// Optional custom icon: a path to an image or a data URI overriding the
     /// native icon.
     #[serde(default)]

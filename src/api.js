@@ -15,6 +15,8 @@ const DEMO_CONFIG = {
     { id: "e", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
     { id: "f", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
     { id: "g", name: "Proyectos", path: "C:/Users/Proyectos", args: [], kind: "folder" },
+    { id: "w1", name: "Reloj", path: "", args: [], kind: "widget", widget: "clock" },
+    { id: "w2", name: "CPU", path: "", args: [], kind: "widget", widget: "cpu" },
     {
       id: "grp", name: "Diseño", path: "", args: [], kind: "group",
       children: [
@@ -97,6 +99,17 @@ async function mockInvoke(cmd, args) {
     case "set_autostart":
       console.info("[demo]", cmd, args);
       return null;
+    case "system_stats": {
+      const r = (a, b) => a + Math.random() * (b - a);
+      return {
+        cpu: r(4, 38),
+        mem: r(40, 70),
+        mem_used_mb: Math.round(r(6000, 11000)),
+        mem_total_mb: 16384,
+        net_down_kbps: Math.round(r(0, 1500)),
+        net_up_kbps: Math.round(r(0, 400)),
+      };
+    }
     default:
       return null;
   }
@@ -207,6 +220,7 @@ export const dock = {
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (strength) => invoke("set_material", { strength }),
   systemAccent: () => invoke("system_accent"),
+  systemStats: () => invoke("system_stats"),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),

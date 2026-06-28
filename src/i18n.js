@@ -120,6 +120,15 @@ const DICT = {
     "group.new": "Carpeta",
     "group.ungroup": "Desagrupar",
     "group.takeOut": "Sacar de la carpeta",
+
+    "w.clock": "Reloj",
+    "w.net": "Red",
+    "w.add.clock": "Widget: Reloj",
+    "w.add.cpu": "Widget: CPU",
+    "w.add.ram": "Widget: Memoria",
+    "w.add.net": "Widget: Red",
+    "apps.widgets": "Widgets",
+    "apps.widgetsHint": "Tarjetas en vivo: reloj, CPU, memoria y red.",
   },
   en: {
     "tab.appearance": "Appearance",
@@ -240,6 +249,15 @@ const DICT = {
     "group.new": "Folder",
     "group.ungroup": "Ungroup",
     "group.takeOut": "Take out of folder",
+
+    "w.clock": "Clock",
+    "w.net": "Net",
+    "w.add.clock": "Widget: Clock",
+    "w.add.cpu": "Widget: CPU",
+    "w.add.ram": "Widget: Memory",
+    "w.add.net": "Widget: Network",
+    "apps.widgets": "Widgets",
+    "apps.widgetsHint": "Live cards: clock, CPU, memory and network.",
   },
 };
 
