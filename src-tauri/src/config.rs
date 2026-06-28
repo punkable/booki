@@ -178,6 +178,8 @@ fn config_path() -> PathBuf {
 /// Load config from disk, falling back to defaults on any error.
 pub fn load() -> Config {
     let path = config_path();
+    // Clean any leftover temp file from an interrupted atomic save (no junk).
+    let _ = fs::remove_file(config_dir().join("config.json.tmp"));
     let mut cfg = match fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
         Err(_) => Config::default(),
