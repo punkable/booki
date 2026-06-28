@@ -112,6 +112,8 @@ const DICT = {
     "dock.update": "● Actualización disponible",
     "stack.empty": "Carpeta vacía",
     "group.new": "Carpeta",
+    "group.ungroup": "Desagrupar",
+    "group.takeOut": "Sacar de la carpeta",
   },
   en: {
     "tab.appearance": "Appearance",
@@ -224,6 +226,8 @@ const DICT = {
     "dock.update": "● Update available",
     "stack.empty": "Empty folder",
     "group.new": "Folder",
+    "group.ungroup": "Ungroup",
+    "group.takeOut": "Take out of folder",
   },
 };
 

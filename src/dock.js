@@ -526,6 +526,55 @@ async function createGroup(draggedId, targetId) {
   reframe();
 }
 
+// ─── Folder management: rename, ungroup, pull a child out ───
+let renameTimer = null;
+function renameGroup(group, name) {
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  cfg.pinned[gi].name = name;
+  clearTimeout(renameTimer);
+  renameTimer = setTimeout(persist, 250);
+}
+
+// Dissolve a folder: spill its children back to the dock at its position.
+async function ungroup(group) {
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  const rest = cfg.pinned[gi].children || [];
+  cfg.pinned.splice(gi, 1, ...rest);
+  await persist();
+  closeStack();
+  await render();
+  reframe();
+}
+
+// Take one item out of a folder → back to the dock (auto-dissolves a folder that
+// would be left with a single item). Re-opens the folder if it survives.
+async function takeOutChild(group, childId) {
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  const grp = cfg.pinned[gi];
+  const ci = (grp.children || []).findIndex((c) => c.id === childId);
+  if (ci < 0) return;
+  const [child] = grp.children.splice(ci, 1);
+  cfg.pinned.splice(gi + 1, 0, child);
+  let reopenId = grp.id;
+  if ((grp.children || []).length < 2) {
+    const rest = grp.children || [];
+    cfg.pinned.splice(gi, 1, ...rest); // replace the folder with its leftover
+    reopenId = null;
+  }
+  await persist();
+  closeStack();
+  await render();
+  reframe();
+  if (reopenId) {
+    const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
+    const it = cfg.pinned.find((p) => p.id === reopenId);
+    if (tileEl && it) toggleStack(tileEl, it);
+  }
+}
+
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
   if (editMode && !e.target.closest(".tile")) exitEdit();
@@ -553,9 +602,17 @@ function openMenu(e, item) {
   };
 
   if (item.kind !== "separator") {
-    add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
+    add("app", t("m.open"), () => {
+      if (item.kind === "folder" || item.kind === "group") {
+        const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
+        if (tileEl) toggleStack(tileEl, item);
+      } else {
+        dockApi.launch(item.path, item.args || []);
+      }
+    });
     add("palette", t("m.changeIcon"), () => changeIcon(item));
     if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
+    if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
     sep();
   }
   add("plus", t("m.addApp"), onAddApp);
@@ -854,7 +911,22 @@ async function toggleStack(tileEl, item) {
   stackEl.innerHTML = "";
   const head = document.createElement("div");
   head.className = "stack-head";
-  head.textContent = item.name;
+  if (isGroup) {
+    const input = document.createElement("input");
+    input.className = "stack-rename";
+    input.value = item.name || "";
+    input.placeholder = t("group.new");
+    input.addEventListener("input", () => renameGroup(item, input.value));
+    head.appendChild(input);
+    const ung = document.createElement("button");
+    ung.className = "stack-ungroup";
+    ung.title = t("group.ungroup");
+    ung.textContent = "⊟";
+    ung.addEventListener("click", () => ungroup(item));
+    head.appendChild(ung);
+  } else {
+    head.textContent = item.name;
+  }
   stackEl.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "stack-grid";
@@ -874,6 +946,18 @@ async function toggleStack(tileEl, item) {
       if (it.path) dockApi.launch(it.path, it.args || []);
       closeStack();
     });
+    if (isGroup) {
+      // Pull this item out of the folder (back to the dock).
+      const out = document.createElement("span");
+      out.className = "stack-rm";
+      out.textContent = "×";
+      out.title = t("group.takeOut");
+      out.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        takeOutChild(item, it.id);
+      });
+      cell.appendChild(out);
+    }
     grid.appendChild(cell);
   }
   stackEl.appendChild(grid);
