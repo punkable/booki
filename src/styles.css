@@ -180,21 +180,56 @@ body.autohide.tucked.edge-right .dock { transform-origin: center right; transfor
 
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+.web-add { display: flex; gap: 8px; margin-top: 6px; }
+.web-url {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 11px;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+}
+
+/* About: beta badge, credits, and the capybara easter egg. */
+.s-beta {
+  display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px;
+  color: var(--accent-contrast); background: var(--accent);
+}
+.s-credits { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.s-link {
+  font: inherit; font-size: 13px; cursor: pointer; color: var(--ink);
+  background: var(--layer); border: 1px solid var(--stroke);
+  border-radius: var(--r-pill); padding: 6px 13px; transition: all 0.14s ease;
+}
+.s-link:hover { background: var(--hover); transform: translateY(-1px); }
+.s-about-logo { cursor: pointer; transition: transform 0.3s var(--ease-bounce); }
+.s-about-logo.spin { animation: capy-spin 0.9s var(--ease-bounce); }
+@keyframes capy-spin { to { transform: rotate(360deg) scale(1.1); } }
+.s-egg { margin-top: 12px; font-weight: 600; color: var(--accent); }
+.capy-egg { position: fixed; top: -44px; z-index: 9999; pointer-events: none;
+  animation: capy-fall 3.6s linear forwards; }
+@keyframes capy-fall { to { transform: translateY(112vh) rotate(360deg); } }
+
+/* Dock party mode (Konami code): a hue cycle + a little tile bounce. */
+body.party .dock { animation: party-hue 1.5s linear infinite; }
+body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
+@keyframes party-hue { to { filter: hue-rotate(360deg); } }
+@keyframes party-bounce { 0%, 100% { transform: translateY(0); } 42% { transform: translateY(-14px); } }
 
 /* ─────────────────────────── Widget cards ─────────────────────────── */
-/* macOS-style live cards living inline in the dock (clock, CPU, RAM, network). */
+/* macOS / Liquid-Glass-style live cards in the dock (clock, CPU, RAM, network).
+   Each card has a style: variant + accent color + optional motion. */
 .tile.widget {
+  --w-accent: var(--accent);
   width: auto;
-  min-width: calc(var(--size) * 1.7);
+  min-width: calc(var(--size) * 1.9);
   height: var(--size);
   background: transparent;
 }
 .tile.widget:hover { background: transparent; }
-.tile.widget .w-card {
+.w-card {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   height: 100%;
   padding: 6px 11px;
@@ -203,8 +238,12 @@ body.autohide.tucked.edge-right .dock { transform-origin: center right; transfor
   border: 1px solid var(--stroke);
   text-align: left;
   overflow: hidden;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--mag-ease);
 }
-.tile.widget:hover .w-card { background: color-mix(in srgb, var(--ink) 11%, transparent); }
+.tile.widget:hover .w-card { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.w-ico { flex: 0 0 auto; font-size: calc(var(--size) * 0.32); line-height: 1; }
+.tile.widget.no-ico .w-ico { display: none; }
+.w-main { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
 .w-label {
   font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
   text-transform: uppercase; color: var(--ink-2);
@@ -214,7 +253,30 @@ body.autohide.tucked.edge-right .dock { transform-origin: center right; transfor
 .w-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-bar { display: block; height: 4px; margin-top: 3px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent-deep)); transition: width 0.4s var(--ease); }
+  background: linear-gradient(90deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, black)); transition: width 0.4s var(--ease); }
+
+/* Variants */
+.tile.widget[data-variant="glass"] .w-card { -webkit-backdrop-filter: blur(8px) saturate(150%); backdrop-filter: blur(8px) saturate(150%); }
+.tile.widget[data-variant="solid"] .w-card { background: var(--w-accent); border-color: transparent; }
+.tile.widget[data-variant="gradient"] .w-card {
+  background: linear-gradient(135deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 50%, black));
+  border-color: transparent;
+}
+.tile.widget[data-variant="solid"] .w-value,
+.tile.widget[data-variant="gradient"] .w-value { color: #fff; }
+.tile.widget[data-variant="solid"] .w-label, .tile.widget[data-variant="solid"] .w-sub,
+.tile.widget[data-variant="gradient"] .w-label, .tile.widget[data-variant="gradient"] .w-sub { color: rgba(255, 255, 255, 0.82); }
+.tile.widget[data-variant="solid"] .w-bar, .tile.widget[data-variant="gradient"] .w-bar { background: rgba(255, 255, 255, 0.28); }
+.tile.widget[data-variant="solid"] .w-bar > i, .tile.widget[data-variant="gradient"] .w-bar > i { background: #fff; }
+.tile.widget[data-variant="outline"] .w-card { background: transparent; border: 1.5px solid var(--w-accent); }
+.tile.widget[data-variant="outline"] .w-value { color: var(--w-accent); }
+.tile.widget[data-variant="minimal"] .w-card { background: transparent; border-color: transparent; padding-left: 4px; }
+
+/* Animation (opt-in per widget) */
+.tile.widget.animated .w-ico { animation: w-bob 2.6s var(--ease) infinite; }
+.tile.widget.animated[data-variant="gradient"] .w-card { background-size: 220% 220%; animation: w-grad 7s linear infinite; }
+@keyframes w-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes w-grad { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
 
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the

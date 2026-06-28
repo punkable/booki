@@ -280,6 +280,41 @@ fn system_stats() -> SystemStats {
     }
 }
 
+/// Fetch a website's favicon as a PNG data URI, so a pinned website shows its
+/// real icon. Uses Google's favicon service (one well-known host) and caches the
+/// bytes into the pin's icon, so it only hits the network when you add the site.
+#[tauri::command]
+fn fetch_favicon(url: String) -> Option<String> {
+    use base64::Engine;
+    let host = url
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .to_string();
+    if host.is_empty() {
+        return None;
+    }
+    let api = format!("https://www.google.com/s2/favicons?sz=64&domain={host}");
+    let resp = ureq::get(&api)
+        .timeout(std::time::Duration::from_secs(6))
+        .call()
+        .ok()?;
+    let mut bytes: Vec<u8> = Vec::new();
+    use std::io::Read;
+    resp.into_reader()
+        .take(1_000_000)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() < 64 {
+        return None;
+    }
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Some(format!("data:image/png;base64,{b64}"))
+}
+
 /// Hide the dock into the notch: show the small always-on, click-reliable notch
 /// window and hide the (full-size) dock window. No resizing of the dock window,
 /// so there's no WebView2 repaint race or erratic shrink.
@@ -673,6 +708,7 @@ pub fn run() {
             set_material,
             system_accent,
             system_stats,
+            fetch_favicon,
             set_autostart,
             get_autostart,
             list_dir,

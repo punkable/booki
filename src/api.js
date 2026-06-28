@@ -99,6 +99,8 @@ async function mockInvoke(cmd, args) {
     case "set_autostart":
       console.info("[demo]", cmd, args);
       return null;
+    case "fetch_favicon":
+      return null; // browser demo can't fetch; the UI falls back to a letter tile
     case "system_stats": {
       const r = (a, b) => a + Math.random() * (b - a);
       return {
@@ -221,6 +223,7 @@ export const dock = {
   setMaterial: (strength) => invoke("set_material", { strength }),
   systemAccent: () => invoke("system_accent"),
   systemStats: () => invoke("system_stats"),
+  fetchFavicon: (url) => invoke("fetch_favicon", { url }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),
