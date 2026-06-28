@@ -167,35 +167,33 @@ body.autohide.hidden.edge-right .dock { transform: translateX(120%); }
 .reveal-handle {
   position: fixed;
   left: 50%;
-  bottom: 5px;
+  bottom: 6px;
   transform: translateX(-50%);
-  width: 130px;
-  height: 6px;
+  width: 116px;
+  height: 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  /* Accent pill — clearly visible on any Mica/light/dark background. */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   opacity: 0;
   cursor: pointer;
   pointer-events: none;
-  transition: opacity 0.2s ease, height 0.16s var(--ease-bounce),
-    width 0.16s var(--ease-bounce), background 0.2s ease, box-shadow 0.2s ease;
+  transition: opacity 0.22s ease, height 0.16s var(--ease-bounce),
+    width 0.16s var(--ease-bounce), box-shadow 0.2s ease;
 }
 @keyframes notch-glow {
-  0%, 100% { box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 45%, transparent); }
-  50% { box-shadow: 0 3px 18px color-mix(in srgb, var(--accent) 80%, transparent); }
+  0%, 100% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); }
+  50% { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.45), 0 0 16px 2px color-mix(in srgb, var(--accent) 80%, transparent); }
 }
-body.autohide.hidden .reveal-handle { opacity: 0.96; pointer-events: auto; }
-body.autohide.hidden .reveal-handle:hover { height: 9px; width: 150px; background: rgba(255, 255, 255, 0.92); }
-/* Notification state (update available, etc.) */
-body.autohide.hidden .reveal-handle.notify {
-  background: var(--accent);
-  animation: notch-glow 1.8s var(--ease) infinite;
-}
-body.edge-top .reveal-handle { bottom: auto; top: 5px; }
-body.edge-left .reveal-handle { left: 5px; bottom: 50%; top: auto; transform: translateY(50%); width: 6px; height: 130px; }
-body.edge-right .reveal-handle { left: auto; right: 5px; bottom: 50%; transform: translateY(50%); width: 6px; height: 130px; }
+body.autohide.hidden .reveal-handle { opacity: 1; pointer-events: auto; animation: notch-glow 2.4s var(--ease) infinite; }
+body.autohide.hidden .reveal-handle:hover { height: 10px; width: 140px; }
+/* Stronger pulse when there's a notification (update available, etc.) */
+body.autohide.hidden .reveal-handle.notify { animation: notch-glow 1.4s var(--ease) infinite; }
+body.edge-top .reveal-handle { bottom: auto; top: 6px; }
+body.edge-left .reveal-handle { left: 6px; bottom: 50%; top: auto; transform: translateY(50%); width: 7px; height: 116px; }
+body.edge-right .reveal-handle { left: auto; right: 6px; bottom: 50%; transform: translateY(50%); width: 7px; height: 116px; }
 body.autohide.hidden.edge-left .reveal-handle:hover,
-body.autohide.hidden.edge-right .reveal-handle:hover { width: 9px; height: 150px; }
+body.autohide.hidden.edge-right .reveal-handle:hover { width: 10px; height: 140px; }
 
 /* ───────────────────────────── Tiles ───────────────────────────── */
 
@@ -701,13 +699,14 @@ select {
   transition: transform 0.3s var(--ease-bounce);
 }
 .seg-item {
-  position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 7px 10px; font: inherit; font-size: 13px; color: var(--ink-2);
+  position: relative; z-index: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 8px; font: inherit; font-size: 13px; color: var(--ink-2);
   background: transparent; border: 0; cursor: pointer; border-radius: calc(var(--r-md) - 3px);
-  transition: color 0.15s ease; white-space: nowrap;
+  transition: color 0.15s ease; overflow: hidden;
 }
 .seg-item.active { color: var(--ink); font-weight: 600; }
-.seg-ico { font-size: 13px; }
+.seg-ico { flex: 0 0 auto; font-size: 13px; }
+.seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Edge picker (mini screen) */
 .edgepick { display: flex; justify-content: flex-end; }

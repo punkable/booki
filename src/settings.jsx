@@ -483,9 +483,9 @@ function Behavior({ cfg, set }) {
           value={cfg.magnifyStyle || "spring"}
           onChange={(v) => set({ magnifyStyle: v })}
           options={[
-            { value: "spring", label: t("anim.spring") },
-            { value: "smooth", label: t("anim.smooth") },
-            { value: "off", label: t("anim.off") },
+            { value: "spring", label: t("anim.springShort") },
+            { value: "smooth", label: t("anim.smoothShort") },
+            { value: "off", label: t("anim.offShort") },
           ]}
         />
       </Row>
