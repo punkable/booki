@@ -456,7 +456,25 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
-.stack-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); padding: 2px 4px 10px; }
+.stack-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); padding: 2px 4px 10px; }
+.stack-rename {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 8px;
+}
+.stack-rename:hover { background: var(--hover); }
+.stack-rename:focus { background: var(--layer-strong); border-color: var(--stroke); outline: none; }
+.stack-ungroup {
+  flex: 0 0 auto; font-size: 14px; line-height: 1; color: var(--ink-2); cursor: pointer;
+  background: var(--hover); border: 0; border-radius: var(--r-sm); padding: 5px 8px; transition: all 0.12s ease;
+}
+.stack-ungroup:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 24%, var(--hover)); }
+.stack-item { position: relative; }
+.stack-rm {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; display: none;
+  align-items: center; justify-content: center; font-size: 13px; line-height: 1; color: #fff;
+  background: #e23b3b; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.stack-item:hover .stack-rm { display: flex; }
 .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
 .stack-empty { grid-column: 1 / -1; color: var(--ink-2); font-size: 13px; padding: 14px; text-align: center; }
 .stack-item {
