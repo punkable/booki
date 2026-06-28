@@ -135,6 +135,9 @@ body.dock-body {
   background: transparent;
   overflow: hidden;
   display: flex;
+  /* Transparent breathing room around the bar for the drop shadow + magnified
+     tiles (must match SHADOW_PAD in dock.js so the window is sized to fit). */
+  padding: 22px;
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
@@ -150,13 +153,16 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   margin: 0;
   list-style: none;
   overflow: visible;
-  /* The dock window carries native Windows 11 Mica and DWM-rounded corners. Over
-     that, a translucency tint whose opacity follows --material gives the bar a
-     real frosted-glass surface that the translucency slider can clear or thicken
-     — still one surface (no "double dock"), just a tunable frost. */
+  /* The dock surface is a custom CSS acrylic painted on a transparent window:
+     a backdrop blur + a tint whose opacity follows --material (the translucency
+     slider), with a fully tunable corner radius (--dock-r). No native Mica, so
+     the OUTER corner rounds exactly as the slider says — no fixed system corner. */
   background: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke-light) 60%, transparent);
-  border-radius: calc(var(--tile-r) + 6px);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
+  border-radius: var(--dock-r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
@@ -204,6 +210,37 @@ body.edge-left .reveal-handle { left: 6px; bottom: 50%; top: auto; transform: tr
 body.edge-right .reveal-handle { left: auto; right: 6px; bottom: 50%; transform: translateY(50%); width: 7px; height: 116px; }
 body.autohide.hidden.edge-left .reveal-handle:hover,
 body.autohide.hidden.edge-right .reveal-handle:hover { width: 10px; height: 140px; }
+
+/* ─────────── Notch window (the always-reliable "home pill") ─────────── */
+/* Its own tiny window shown when the dock is tucked away; clicking it brings the
+   dock back. A real window → the click target and repaint are rock-solid. */
+body.notch-body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100vh;
+  padding: 4px;
+}
+body.notch-body.vertical { align-items: center; }
+.notch-pill {
+  flex: 0 0 auto;
+  width: 132px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  animation: notch-glow 2.4s var(--ease) infinite;
+  transition: width 0.16s var(--ease-bounce), height 0.16s var(--ease-bounce);
+}
+.notch-pill:hover { width: 156px; height: 11px; }
+body.notch-body.vertical .notch-pill { width: 8px; height: 132px; }
+body.notch-body.vertical .notch-pill:hover { width: 11px; height: 156px; }
 
 /* ───────────────────────────── Tiles ───────────────────────────── */
 

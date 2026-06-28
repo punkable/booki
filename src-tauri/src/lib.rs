@@ -198,20 +198,12 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Re-apply the native Windows 11 material to the dock. The dock window is sized
-/// exactly to the bar (with the magnify/tooltip kept inside), so native Mica
-/// renders as a real rounded frosted dock with no surrounding box. Mica follows
-/// the system light/dark automatically. Strength is unused with Mica.
+/// Kept for IPC compatibility; the dock's translucency is now CSS-only.
 #[tauri::command]
-fn set_material(app: AppHandle, _strength: u32) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        if let Some(dock) = app.get_webview_window("dock") {
-            apply_dock_material(&dock);
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = &app;
+fn set_material(_app: AppHandle, _strength: u32) -> Result<(), String> {
+    // No-op: the dock's translucency is now a pure-CSS acrylic driven by the
+    // `--material` variable in the frontend (see styles.css / dock.js). Kept so
+    // the existing IPC call from settings stays valid.
     Ok(())
 }
 
@@ -238,42 +230,69 @@ fn system_accent() -> Option<String> {
     None
 }
 
-/// Apply Mica (Windows 11) to the dock, falling back to Acrylic on Windows 10,
-/// then round the corners so it reads as a native rounded dock.
-#[cfg(windows)]
-fn apply_dock_material(dock: &WebviewWindow) {
-    // None = let Mica follow the system light/dark theme.
-    let _ = window_vibrancy::apply_mica(dock, None)
-        .or_else(|_| window_vibrancy::apply_acrylic(dock, Some((24, 24, 28, 180))));
-    round_window_corners(dock);
+/// Hide the dock into the notch: show the small always-on, click-reliable notch
+/// window and hide the (full-size) dock window. No resizing of the dock window,
+/// so there's no WebView2 repaint race or erratic shrink.
+#[tauri::command]
+fn hide_dock(app: AppHandle, edge: String) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = position_notch(&notch, &edge);
+        let _ = notch.show();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
+    }
 }
 
-/// Round a window's corners (Windows 11 DWM). Raw `dwmapi` call (linked by
-/// window-vibrancy) to avoid the windows-crate version mismatch with Tauri.
-#[cfg(windows)]
-fn round_window_corners(window: &WebviewWindow) {
-    // DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2.
-    #[link(name = "dwmapi")]
-    extern "system" {
-        fn DwmSetWindowAttribute(
-            hwnd: isize,
-            dwattribute: u32,
-            pvattribute: *const core::ffi::c_void,
-            cbattribute: u32,
-        ) -> i32;
+/// Bring the dock back: hide the notch window and show the dock window. Called by
+/// the dock frontend itself (it then slides the bar back in). Does NOT emit, so a
+/// boot/config-reload window-sync never spuriously pins the dock open.
+#[tauri::command]
+fn reveal_dock(app: AppHandle) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
     }
-    if let Ok(h) = window.hwnd() {
-        let hwnd = h.0 as isize;
-        let pref: u32 = 2; // DWMWCP_ROUND
-        unsafe {
-            let _ = DwmSetWindowAttribute(
-                hwnd,
-                33,
-                &pref as *const _ as *const core::ffi::c_void,
-                std::mem::size_of::<u32>() as u32,
-            );
-        }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.show();
     }
+}
+
+/// Fired by the notch window when the user clicks it: just signal the dock to
+/// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
+#[tauri::command]
+fn notch_reveal(app: AppHandle) {
+    let _ = app.emit("booki://reveal", ());
+}
+
+/// Place the small notch window centered on the dock's anchored edge.
+fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
+    let monitor = pick_monitor(notch).ok_or_else(|| "no monitor found".to_string())?;
+    let mpos = monitor.position();
+    let msize = monitor.size();
+    let dpr = notch.scale_factor().unwrap_or(1.0);
+    let (ax, ay, aw, ah) = win::work_area(
+        mpos.x + msize.width as i32 / 2,
+        mpos.y + msize.height as i32 / 2,
+    )
+    .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+
+    // A wide pill on top/bottom, a tall pill on left/right.
+    let vertical = edge == "left" || edge == "right";
+    let (lw, lh): (f64, f64) = if vertical { (26.0, 184.0) } else { (184.0, 26.0) };
+    let ww = (lw * dpr).round() as i32;
+    let wh = (lh * dpr).round() as i32;
+    let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
+
+    let margin: i32 = 3;
+    let (x, y) = match edge {
+        "top" => (ax + (aw - ww) / 2, ay + margin),
+        "left" => (ax + margin, ay + (ah - wh) / 2),
+        "right" => (ax + aw - ww - margin, ay + (ah - wh) / 2),
+        _ => (ax + (aw - ww) / 2, ay + ah - wh - margin),
+    };
+    notch
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -573,6 +592,9 @@ pub fn run() {
             focus_window,
             reposition_dock,
             set_dock_frame,
+            hide_dock,
+            reveal_dock,
+            notch_reveal,
             image_data_uri,
             set_always_on_top,
             app_version,
@@ -627,12 +649,10 @@ pub fn run() {
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
                 let cfg = config::load();
-                // Native Windows 11 Mica: the dock window is sized to the bar and
-                // the bar's CSS surface is transparent, so the Mica window itself
-                // IS the dock — one rounded frosted surface, system dark/light, no
-                // box. (The magnify and tooltip are kept inside the bar.)
-                #[cfg(windows)]
-                apply_dock_material(&dock);
+                // The dock surface is a custom CSS acrylic (blur + tint) painted on
+                // a transparent window — this gives full control of the corner
+                // radius and translucency and avoids the native-Mica corner/resize
+                // quirks. So no Mica/DWM rounding is applied to the window here.
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
