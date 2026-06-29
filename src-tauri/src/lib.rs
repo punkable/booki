@@ -18,13 +18,6 @@ use tauri::{
 use config::Config;
 use std::sync::Mutex;
 
-/// The dock's anchored "home" rectangle (left, top, right, bottom) while it is
-/// shown at full size. The smart-hide occlusion watcher measures against THIS
-/// stable rect — never the live window rect — otherwise hiding shrinks the
-/// window, which stops it being occluded, which shows it again… an infinite
-/// flapping loop. Updated only when the dock is shown (not while hidden).
-static DOCK_HOME: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
-
 // ─────────────────────────────── Commands ───────────────────────────────
 
 #[tauri::command]
@@ -85,12 +78,7 @@ fn set_dock_frame(
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
     position_dock(&window, &edge)?;
-
-    if !hidden.unwrap_or(false) {
-        if let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) {
-            *DOCK_HOME.lock().unwrap() = Some((p.x, p.y, p.x + s.width as i32, p.y + s.height as i32));
-        }
-    }
+    let _ = hidden;
     Ok(())
 }
 
@@ -422,23 +410,80 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    // A wide pill on top/bottom, a tall pill on left/right.
+    let cfg = config::load();
     let vertical = edge == "left" || edge == "right";
-    let (lw, lh): (f64, f64) = if vertical { (26.0, 184.0) } else { (184.0, 26.0) };
+    // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
+    // slightly larger pill with a small margin.
+    let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
+        (true, true) => (22.0, 150.0),
+        (true, false) => (150.0, 22.0),
+        (false, true) => (26.0, 184.0),
+        (false, false) => (184.0, 26.0),
+    };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
-    let margin: i32 = 3;
+    let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
+    // Offset along the anchored edge so it can dodge subtitles / chat boxes.
+    let along = |start: i32, span: i32, win: i32| -> i32 {
+        let want = match cfg.notch_position.as_str() {
+            "start" => start + span / 6 - win / 2,
+            "end" => start + span - span / 6 - win / 2,
+            _ => start + (span - win) / 2,
+        };
+        // Keep on-screen without panicking when the span is tiny (lo>hi → clamp panics).
+        let lo = start + 4;
+        let hi = (start + span - win - 4).max(lo);
+        want.max(lo).min(hi)
+    };
     let (x, y) = match edge {
-        "top" => (ax + (aw - ww) / 2, ay + margin),
-        "left" => (ax + margin, ay + (ah - wh) / 2),
-        "right" => (ax + aw - ww - margin, ay + (ah - wh) / 2),
-        _ => (ax + (aw - ww) / 2, ay + ah - wh - margin),
+        "top" => (along(ax, aw, ww), ay + margin),
+        "left" => (ax + margin, along(ay, ah, wh)),
+        "right" => (ax + aw - ww - margin, along(ay, ah, wh)),
+        _ => (along(ax, aw, ww), ay + ah - wh - margin),
     };
     notch
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
+}
+
+/// Briefly show a message on the notch window (used for "Booki se ocultó …").
+#[tauri::command]
+fn notch_toast(app: AppHandle, text: String) {
+    // The toast replaces the bar — hide the dock window while it shows.
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        if let Ok(Some(mon)) = notch.current_monitor() {
+            let dpr = notch.scale_factor().unwrap_or(1.0);
+            let mpos = mon.position();
+            let msize = mon.size();
+            let (ax, ay, aw, ah) = win::work_area(
+                mpos.x + msize.width as i32 / 2,
+                mpos.y + msize.height as i32 / 2,
+            )
+            .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+            let ww = (320.0 * dpr).round() as i32;
+            let wh = (48.0 * dpr).round() as i32;
+            let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
+            let _ = notch.set_position(PhysicalPosition::new(ax + (aw - ww) / 2, ay + ah - wh - 14));
+        }
+        let _ = notch.show();
+        let _ = app.emit("booki://notch-toast", text);
+    }
+}
+
+/// Hide both windows (full blackout, e.g. while a fullscreen app is running).
+#[tauri::command]
+fn hide_all(app: AppHandle) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
+    }
 }
 
 #[tauri::command]
@@ -796,6 +841,8 @@ pub fn run() {
             hide_dock,
             reveal_dock,
             notch_reveal,
+            notch_toast,
+            hide_all,
             set_dock_edge,
             open_changelog,
             export_config,
@@ -879,26 +926,33 @@ pub fn run() {
                     let handle = app.handle().clone();
                     std::thread::spawn(move || {
                         let self_hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                        let mut last = false;
-                        let mut candidate = false;
-                        let mut streak = 0u8;
+                        // (last, candidate, streak) for each debounced signal.
+                        let mut occ = (false, false, 0u8);
+                        let mut fs = (false, false, 0u8);
+                        // Debounce helper: returns Some(new) when the value has held
+                        // for two polls (so momentary changes can't make it flap).
+                        fn debounce(s: &mut (bool, bool, u8), v: bool) -> Option<bool> {
+                            if v == s.1 {
+                                s.2 = s.2.saturating_add(1);
+                            } else {
+                                s.1 = v;
+                                s.2 = 1;
+                            }
+                            if s.1 != s.0 && s.2 >= 2 {
+                                s.0 = s.1;
+                                return Some(s.0);
+                            }
+                            None
+                        }
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(300));
-                            // foreground_occludes now means "the user is in an app"
-                            // (no overlap math, so the home rect is irrelevant).
-                            let occ = win::foreground_occludes(0, 0, 0, 0, self_hwnd);
-                            // Hysteresis: only flip after the new value has held
-                            // for two polls, so a momentary focus change can't make
-                            // the dock flap/blink.
-                            if occ == candidate {
-                                streak = streak.saturating_add(1);
-                            } else {
-                                candidate = occ;
-                                streak = 1;
+                            // foreground_occludes = "the user is in an app".
+                            if let Some(v) = debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd)) {
+                                let _ = handle.emit("booki://occlusion", v);
                             }
-                            if candidate != last && streak >= 2 {
-                                last = candidate;
-                                let _ = handle.emit("booki://occlusion", last);
+                            // fullscreen game / movie / presentation → get out of the way.
+                            if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
+                                let _ = handle.emit("booki://fullscreen", v);
                             }
                         }
                     });

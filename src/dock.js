@@ -11,6 +11,7 @@ import {
   onConfigChanged,
   onOcclusion,
   onReveal,
+  onFullscreen,
   emitConfigChanged,
   logMessage,
   isTauri,
@@ -55,6 +56,7 @@ async function boot() {
     startWidgetPoll();
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
+    onFullscreen(onFullscreenSignal);
     checkUpdates();
     checkChangelog();
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
@@ -1059,6 +1061,30 @@ let hideTimer = null;
 let occluded = false; // last occlusion signal from the backend (smart mode)
 let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
+let fullscreen = false; // a fullscreen game/movie is running → blackout everything
+let blackoutTimer = null;
+
+// Fullscreen game/movie/presentation → get completely out of the way: flash a
+// brief toast, then hide BOTH the bar and the notch. Restore when it ends.
+function onFullscreenSignal(value) {
+  fullscreen = value;
+  clearTimeout(blackoutTimer);
+  if (value) {
+    pinnedReveal = false;
+    manualReveal = false;
+    hiddenState = true;
+    document.body.classList.add("tucked");
+    dockApi.notchToast(t("fs.hidden")); // hides the dock + shows the toast on the notch
+    blackoutTimer = setTimeout(() => {
+      if (fullscreen) dockApi.hideAll(); // then hide the notch too (full blackout)
+    }, 2600);
+  } else {
+    // Back to normal: re-evaluate smart-hide and show the right window.
+    document.body.classList.remove("tucked");
+    hiddenState = false;
+    setupAutoHide();
+  }
+}
 
 function hideMode() {
   return cfg.autoHideMode || (cfg.autoHide ? "edge" : "off");
@@ -1106,6 +1132,7 @@ function setupAutoHide() {
 
 // Pointer entered the dock → reveal and hold it open.
 function reveal() {
+  if (fullscreen) return; // stay out of the way during fullscreen
   const mode = hideMode();
   if (mode === "off") return;
   // In smart mode, while you're working in another app, DON'T reveal on hover —
@@ -1136,6 +1163,7 @@ function scheduleHide() {
 // measured against a stable rect in Rust, so it can no longer flap.
 function onOcclusionSignal(value) {
   occluded = value;
+  if (fullscreen) return; // blackout owns the visibility while fullscreen
   if (hideMode() !== "smart") return;
   if (!value) {
     // Back on the desktop → bring the dock out automatically.
@@ -1308,9 +1336,11 @@ async function toggleStack(tileEl, item) {
   if (!items.length) {
     grid.innerHTML = `<div class="stack-empty">${t("stack.empty")}</div>`;
   }
+  let cellIdx = 0;
   for (const it of items) {
     const cell = document.createElement("button");
     cell.className = "stack-item";
+    cell.style.setProperty("--i", cellIdx++); // staggered entry
     cell.title = it.name;
     const ic = isGroup ? await resolveIcon(it) : await dockApi.appIcon(it.path);
     const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;

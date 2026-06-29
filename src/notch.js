@@ -3,7 +3,7 @@
    move the dock (and notch) there. It's its own small window (never resized
    mid-flight) so the click target and repaint stay rock-solid. */
 
-import { config as configApi, invoke, onConfigChanged } from "./api.js";
+import { config as configApi, invoke, onConfigChanged, onNotchToast } from "./api.js";
 import { applyAccent } from "./util-color.js";
 
 const root = document.documentElement;
@@ -23,6 +23,19 @@ applyLook();
 onConfigChanged(applyLook);
 
 const pill = document.getElementById("notch-pill");
+const textEl = document.getElementById("notch-text");
+
+// Brief toast message (e.g. "Booki se ocultó · pantalla completa").
+let toastTimer = null;
+onNotchToast((text) => {
+  document.body.classList.add("toast");
+  if (textEl) textEl.textContent = text;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    document.body.classList.remove("toast");
+    if (textEl) textEl.textContent = "";
+  }, 2600);
+});
 
 // Click = reveal the dock. Drag to a screen edge = move the dock there.
 let drag = null;

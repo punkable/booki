@@ -24,3 +24,7 @@ pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {
 pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: isize) -> bool {
     false
 }
+
+pub fn is_fullscreen() -> bool {
+    false
+}
