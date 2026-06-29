@@ -242,6 +242,10 @@ struct SystemStats {
     mem_total_mb: u64,
     net_down_kbps: u64,
     net_up_kbps: u64,
+    disk: f32,
+    disk_used_gb: u64,
+    disk_total_gb: u64,
+    uptime_secs: u64,
 }
 
 /// Sample CPU/memory/network. Keeps persistent handles so CPU usage and network
@@ -270,6 +274,17 @@ fn system_stats() -> SystemStats {
         down += data.received();
         up += data.transmitted();
     }
+    // Disk usage (aggregate across mounted disks) + system uptime.
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let (mut dtotal, mut davail) = (0u64, 0u64);
+    for d in disks.iter() {
+        dtotal += d.total_space();
+        davail += d.available_space();
+    }
+    let dused = dtotal.saturating_sub(davail);
+    let disk = if dtotal > 0 { (dused as f64 / dtotal as f64 * 100.0) as f32 } else { 0.0 };
+    let gb = 1024 * 1024 * 1024;
+
     SystemStats {
         cpu,
         mem,
@@ -277,6 +292,10 @@ fn system_stats() -> SystemStats {
         mem_total_mb: total / 1024 / 1024,
         net_down_kbps: (down as f64 / secs / 1024.0) as u64,
         net_up_kbps: (up as f64 / secs / 1024.0) as u64,
+        disk,
+        disk_used_gb: dused / gb,
+        disk_total_gb: dtotal / gb,
+        uptime_secs: sysinfo::System::uptime(),
     }
 }
 
@@ -523,8 +542,18 @@ fn scan_lnks(
             continue;
         }
         let lower = name.to_lowercase();
-        // Skip uninstallers / docs that aren't really "apps".
-        if lower.contains("uninstall") || lower.contains("readme") {
+        // Skip the noise that clutters the Start Menu: uninstallers, docs, help,
+        // website links, changelogs, license/EULA, "report a bug", etc. — so the
+        // suggestions are real, useful apps, not junk.
+        const JUNK: &[&str] = &[
+            "uninstall", "readme", "read me", "help", "manual", "documentation",
+            "docs", "license", "licence", "eula", "changelog", "release notes",
+            "what's new", "whats new", "website", "web site", "home page",
+            "homepage", "visit ", "report", "feedback", "support", "faq",
+            "register", "activate", "modify", "repair", "update", "updater",
+            "command prompt", "powershell", "terminal here",
+        ];
+        if JUNK.iter().any(|j| lower.contains(j)) {
             continue;
         }
         if seen.insert(lower) {

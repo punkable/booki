@@ -180,6 +180,13 @@ body.autohide.tucked.edge-right .dock { transform-origin: center right; transfor
 
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+/* Folder editing in the Apps list: indented child rows + chevron. */
+.pin-chevron { font-size: 11px; }
+.pin-handle.ghost { opacity: 0; pointer-events: none; }
+.pin-item.pin-child { margin-left: 26px; background: var(--layer); }
+.pin-item.pin-add-row { border-style: dashed; }
+.pin-item.pin-add-row .s-btn { width: 100%; }
+
 .web-add { display: flex; gap: 8px; margin-top: 6px; }
 .web-url {
   flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 11px;
@@ -249,7 +256,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   text-transform: uppercase; color: var(--ink-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.w-value { font-size: 17px; font-weight: 700; line-height: 1.05; color: var(--ink); white-space: nowrap; }
+.w-value { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-bar { display: block; height: 4px; margin-top: 3px; border-radius: 999px; background: var(--track); overflow: hidden; }
 .w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
