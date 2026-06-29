@@ -88,10 +88,23 @@ async function mockInvoke(cmd, args) {
       ];
     case "list_installed_apps":
       return [
-        { name: "Microsoft Edge", path: "C:/Program Files/Edge/msedge.lnk", is_dir: false },
-        { name: "Spotify", path: "C:/Apps/Spotify.lnk", is_dir: false },
-        { name: "Visual Studio Code", path: "C:/Apps/Code.lnk", is_dir: false },
-        { name: "WhatsApp", path: "C:/Apps/WhatsApp.lnk", is_dir: false },
+        {
+          name: "Microsoft Office",
+          items: [
+            { name: "Word", path: "C:/Apps/Office/Word.lnk", is_dir: false },
+            { name: "Excel", path: "C:/Apps/Office/Excel.lnk", is_dir: false },
+            { name: "PowerPoint", path: "C:/Apps/Office/PowerPoint.lnk", is_dir: false },
+          ],
+        },
+        {
+          name: "",
+          items: [
+            { name: "Microsoft Edge", path: "C:/Program Files/Edge/msedge.lnk", is_dir: false },
+            { name: "Spotify", path: "C:/Apps/Spotify.lnk", is_dir: false },
+            { name: "Visual Studio Code", path: "C:/Apps/Code.lnk", is_dir: false },
+            { name: "WhatsApp", path: "C:/Apps/WhatsApp.lnk", is_dir: false },
+          ],
+        },
       ];
     case "open_location":
     case "set_hotkey":

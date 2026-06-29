@@ -23,9 +23,9 @@ use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
-    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsIconic, IsWindowVisible,
-    SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE,
-    WS_EX_TOOLWINDOW,
+    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+    IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON,
+    ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -244,6 +244,14 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
     unsafe {
         let hwnd = GetForegroundWindow();
         if hwnd.0.is_null() || hwnd.0 as isize == self_hwnd {
+            return false;
+        }
+        // Any window belonging to Booki itself (dock, notch, settings) doesn't
+        // count as "another app" — so editing Settings keeps the dock visible for
+        // live preview instead of tucking it away.
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
             return false;
         }
         let mut buf = [0u16; 64];

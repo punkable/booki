@@ -180,6 +180,16 @@ body.autohide.tucked.edge-right .dock { transform-origin: center right; transfor
 
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+/* Grouped app suggestions (by Start-menu folder). */
+.sugg-group { margin-top: 12px; }
+.sugg-group-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; }
+.sugg-group-name { font-size: 12px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.03em; }
+.sugg-group-add {
+  font: inherit; font-size: 11px; cursor: pointer; color: var(--accent);
+  background: transparent; border: 0; padding: 2px 6px; border-radius: var(--r-sm);
+}
+.sugg-group-add:hover { background: var(--hover); }
+
 /* Folder editing in the Apps list: indented child rows + chevron. */
 .pin-chevron { font-size: 11px; }
 .pin-handle.ghost { opacity: 0; pointer-events: none; }
@@ -439,22 +449,27 @@ body.edit .dock { cursor: grab; }
   filter: none;
 }
 
-/* Folder / group tile — iOS-style 2×2 mini grid of child icons */
+/* Folder / group tile — iOS-style mini grid of child icons. A centered flex
+   wrap so 1–4 icons always sit balanced in the middle (no top-left clumping). */
 .tile.group .group-grid {
   width: 84%;
   height: 84%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
-  padding: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px;
   border-radius: 26%;
   background: color-mix(in srgb, var(--layer-strong) 60%, transparent);
   box-shadow: inset 0 0 0 1px var(--stroke-light);
 }
 .tile.group .group-mini {
+  flex: 0 0 auto;
+  width: calc(50% - 4px);
+  height: calc(50% - 4px);
   display: flex; align-items: center; justify-content: center; overflow: hidden;
-  border-radius: 24%; font-size: 8px; font-weight: 700; color: var(--ink-2);
+  border-radius: 22%; font-size: 8px; font-weight: 700; color: var(--ink-2);
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -575,17 +590,30 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
   overflow-y: auto;
   padding: 12px;
   background: var(--layer-strong);
-  border: 1px solid var(--stroke);
+  border: 1px solid var(--stroke-light);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(26px) saturate(170%);
-  backdrop-filter: blur(26px) saturate(170%);
-  animation: stack-in 0.2s var(--ease);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  /* Open/close via transition (reliable in WebView2) — grows from the tile. */
+  transform-origin: bottom center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.94);
+  transition: opacity 0.18s var(--ease), transform 0.24s var(--ease-bounce),
+    visibility 0s linear 0.24s;
 }
-@keyframes stack-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to { opacity: 1; transform: none; }
+.stack.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 0.18s var(--ease), transform 0.26s var(--ease-bounce);
 }
+body.edge-top .stack { transform-origin: top center; }
+body.edge-left .stack { transform-origin: center left; }
+body.edge-right .stack { transform-origin: center right; }
 .stack-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); padding: 2px 4px 10px; }
 .stack-rename {
   flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0;
@@ -611,10 +639,16 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 6px; border: 0; background: transparent; border-radius: var(--r-md);
   cursor: pointer; color: var(--ink); overflow: hidden;
+  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
 }
-.stack-item:hover { background: var(--hover); }
+.stack-item:hover { background: var(--hover); transform: translateY(-2px) scale(1.04); }
+.stack-item:active { transform: scale(0.96); }
 .stack-item img, .stack-item .stack-glyph { width: 38px; height: 38px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 26px; }
 .stack-name { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* In-flyout "add app to folder" cell — optimized for adding several programs. */
+.stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+.stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
+.stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
 /* ───────────────────────── Context menu ───────────────────────── */
 

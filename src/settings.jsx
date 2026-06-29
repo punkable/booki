@@ -316,50 +316,74 @@ function SuggIcon({ path, name }) {
 // Suggests apps installed on the PC (scanned from the Start Menu) so the user
 // can pin them with one click instead of browsing the filesystem.
 function Suggestions({ cfg, set }) {
-  const [apps, setApps] = useState(null);
+  const [groups, setGroups] = useState(null);
   const [q, setQ] = useState("");
   useEffect(() => {
-    dockApi.listInstalledApps().then((a) => setApps(a || []));
+    dockApi.listInstalledApps().then((a) => setGroups(normalizeGroups(a)));
   }, []);
-  if (!apps || apps.length === 0) return null;
+  if (!groups || groups.length === 0) return null;
   const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
-  const filtered = apps
-    .filter((a) => a.name.toLowerCase().includes(q.toLowerCase()))
-    .slice(0, 60);
   const add = (a) => {
     if (pinned.has((a.path || "").toLowerCase())) return;
     set({ pinned: [...cfg.pinned, mkApp(a.path)] });
   };
+  const addGroup = (g) => {
+    const fresh = g.items.filter((a) => !pinned.has((a.path || "").toLowerCase()));
+    if (!fresh.length) return;
+    set({
+      pinned: [
+        ...cfg.pinned,
+        { id: uid(), name: g.name || t("apps.suggestGeneral"), path: "", args: [], kind: "group", children: fresh.map(mkApp) },
+      ],
+    });
+  };
+  const ql = q.trim().toLowerCase();
+  // While searching, show a flat list of matches across every group.
+  const view = ql
+    ? [{ name: "", items: groups.flatMap((g) => g.items).filter((a) => a.name.toLowerCase().includes(ql)).slice(0, 60) }]
+    : groups;
+
+  const Tile = (a) => {
+    const isPinned = pinned.has((a.path || "").toLowerCase());
+    return (
+      <button key={a.path} type="button" className={"sugg-item" + (isPinned ? " pinned" : "")}
+        title={a.name} onClick={() => add(a)} disabled={isPinned}>
+        <SuggIcon path={a.path} name={a.name} />
+        <span className="sugg-name">{a.name}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="s-card-inner">
       <h3>{t("apps.suggest")}</h3>
       <p className="muted">{t("apps.suggestHint")}</p>
-      <input
-        className="sugg-search"
-        placeholder={t("apps.search")}
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <div className="sugg-grid">
-        {filtered.map((a) => {
-          const isPinned = pinned.has((a.path || "").toLowerCase());
-          return (
-            <button
-              key={a.path}
-              type="button"
-              className={"sugg-item" + (isPinned ? " pinned" : "")}
-              title={a.name}
-              onClick={() => add(a)}
-              disabled={isPinned}
-            >
-              <SuggIcon path={a.path} name={a.name} />
-              <span className="sugg-name">{a.name}</span>
-            </button>
-          );
-        })}
-      </div>
+      <input className="sugg-search" placeholder={t("apps.search")} value={q}
+        onChange={(e) => setQ(e.target.value)} />
+      {view.map((g, gi) => (
+        <div key={g.name || "general-" + gi} className="sugg-group">
+          {!ql && (
+            <div className="sugg-group-head">
+              <span className="sugg-group-name">{g.name || t("apps.suggestGeneral")}</span>
+              {g.name && g.items.length > 1 && (
+                <button className="sugg-group-add" onClick={() => addGroup(g)}>
+                  {t("apps.pinFolder")}
+                </button>
+              )}
+            </div>
+          )}
+          <div className="sugg-grid">{g.items.map(Tile)}</div>
+        </div>
+      ))}
     </div>
   );
+}
+
+// Accept either the new grouped shape ([{name, items}]) or a legacy flat list.
+function normalizeGroups(a) {
+  if (!Array.isArray(a)) return [];
+  if (a.length && a[0] && Array.isArray(a[0].items)) return a.filter((g) => g.items && g.items.length);
+  return a.length ? [{ name: "", items: a }] : [];
 }
 
 function PinThumb({ item }) {
