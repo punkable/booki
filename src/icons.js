@@ -19,7 +19,22 @@ export const iconAppWindow = () =>
 export const iconPalette = () =>
   S(`<circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M17 21a2 2 0 0 1-2 2H7a5 5 0 0 1-5-5v-6a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8v2a3 3 0 0 1-3 3h-2a1 1 0 0 0-1 1 1 1 0 0 0 1 1h1a2 2 0 0 1 2 2Z"/>`);
 export const iconChevronDown = () => S(`<path d="m6 9 6 6 6-6"/>`);
+export const iconChevronRight = () => S(`<path d="m9 6 6 6-6 6"/>`);
 export const iconCheck = () => S(`<path d="M20 6 9 17l-5-5"/>`);
+export const iconGrip = () =>
+  S(`<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>`);
+export const iconFolder = () =>
+  S(`<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/>`);
+export const iconFolderPlus = () =>
+  S(`<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z"/><path d="M12 11v6M9 14h6"/>`);
+export const iconTakeOut = () =>
+  S(`<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v6"/>`);
+export const iconPencil = () =>
+  S(`<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>`);
+export const iconExternal = () =>
+  S(`<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>`);
+export const iconUngroup = () =>
+  S(`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M14 7h4M16 5v4"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -31,7 +46,15 @@ const iconMap = {
   app: iconAppWindow,
   palette: iconPalette,
   "chevron-down": iconChevronDown,
+  "chevron-right": iconChevronRight,
   check: iconCheck,
+  grip: iconGrip,
+  folder: iconFolder,
+  "folder-plus": iconFolderPlus,
+  "take-out": iconTakeOut,
+  pencil: iconPencil,
+  external: iconExternal,
+  ungroup: iconUngroup,
 };
 
 export function icon(name) {

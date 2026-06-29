@@ -1,11 +1,36 @@
 /* Booki — "What's new" window. A friendly, human changelog shown the first time
    you open the app after an update. Newest version first. */
 
-import { closeSelf, dock as dockApi } from "./api.js";
+import { closeSelf, config as configApi } from "./api.js";
 import { applyTheme } from "./theme.js";
 
 // Human-written notes. Keep it warm and concrete — what changed and why you care.
 const CHANGELOG = [
+  {
+    version: "0.5.1",
+    date: "29 jun 2026",
+    headline: "Arreglos importantes y carpetas mucho más fáciles de editar.",
+    sections: [
+      {
+        icon: "🛠️",
+        title: "Arreglado",
+        notes: [
+          "Abrir una app o un enlace ya no hace parpadear una ventana negra de consola.",
+          "El dock ya no se rompe al abrir una carpeta.",
+          "La ventana de Novedades ya se ve correctamente.",
+        ],
+      },
+      {
+        icon: "🗂️",
+        title: "Editar carpetas, renovado",
+        notes: [
+          "Botones con iconos claros y carpetas con su propio icono.",
+          "Arrastra los elementos dentro de una carpeta para reordenarlos.",
+          "Añade, saca o quita programas de una carpeta con un clic.",
+        ],
+      },
+    ],
+  },
   {
     version: "0.5.0",
     date: "29 jun 2026",
@@ -81,8 +106,11 @@ const CHANGELOG = [
   },
 ];
 
-const app = document.documentElement;
-applyTheme({ theme: "system" });
+// Match the user's theme/accent — guarded so a config hiccup can't blank the page.
+configApi
+  .get()
+  .then((c) => applyTheme({ theme: c.theme, accent: c.accent }))
+  .catch(() => applyTheme({ theme: "system", accent: "#dfaa75" }));
 
 const list = document.getElementById("cl-list");
 const sub = document.getElementById("cl-sub");
@@ -126,5 +154,3 @@ CHANGELOG.forEach((entry, idx) => {
 
 document.getElementById("cl-close").addEventListener("click", () => closeSelf());
 window.addEventListener("keydown", (e) => e.key === "Escape" && closeSelf());
-// Keep an unused import referenced (tree-shake friendliness / future use).
-void dockApi;
