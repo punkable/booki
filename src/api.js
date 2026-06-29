@@ -39,6 +39,8 @@ const DEMO_CONFIG = {
   autoHide: false,
   autoHideMode: "smart",
   autoHideDelay: 650,
+  notchPosition: "center",
+  notchPeek: true,
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
@@ -250,6 +252,8 @@ export const dock = {
     invoke("set_dock_frame", { edge, width, height, hidden }),
   hideDock: (edge) => invoke("hide_dock", { edge }),
   revealDock: () => invoke("reveal_dock"),
+  notchToast: (text) => invoke("notch_toast", { text }),
+  hideAll: () => invoke("hide_all"),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -289,4 +293,16 @@ export async function onReveal(cb) {
 export async function onShowChangelog(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://show-changelog", () => cb());
+}
+
+/** Listen for fullscreen on/off (a game/movie/presentation is running). */
+export async function onFullscreen(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://fullscreen", (e) => cb(!!e.payload));
+}
+
+/** Listen for a toast message to render on the notch window. */
+export async function onNotchToast(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-toast", (e) => cb(e.payload || ""));
 }

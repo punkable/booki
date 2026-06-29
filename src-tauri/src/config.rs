@@ -83,6 +83,9 @@ fn default_radius() -> u32 {
 fn default_hide_delay() -> u32 {
     650
 }
+fn default_notch_position() -> String {
+    "center".into()
+}
 fn default_anim() -> String {
     "spring".into()
 }
@@ -132,6 +135,12 @@ pub struct Config {
     /// Auto-hide delay before sliding away, in ms.
     #[serde(default = "default_hide_delay")]
     pub auto_hide_delay: u32,
+    /// Notch placement along the anchored edge: "center" | "start" | "end".
+    #[serde(default = "default_notch_position")]
+    pub notch_position: String,
+    /// Notch "peek" style — sits at the very edge like a tab, less intrusive.
+    #[serde(default = "default_true")]
+    pub notch_peek: bool,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
     /// Magnify animation style: "spring" | "smooth" | "off".
@@ -178,6 +187,8 @@ impl Default for Config {
             auto_hide: false,
             auto_hide_mode: default_auto_hide_mode(),
             auto_hide_delay: default_hide_delay(),
+            notch_position: default_notch_position(),
+            notch_peek: true,
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),

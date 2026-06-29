@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.6.0",
+    date: "29 jun 2026",
+    headline: "Booki se aparta solo cuando juegas o ves una peli, y el notch ya no estorba.",
+    sections: [
+      {
+        icon: "🎬",
+        title: "Consciente de pantalla completa",
+        notes: [
+          "Detecta juegos, películas y presentaciones a pantalla completa y se oculta del todo (sin tapar subtítulos ni el juego).",
+          "Te avisa con una pastilla discreta y reaparece al salir.",
+        ],
+      },
+      {
+        icon: "📍",
+        title: "Notch a tu medida",
+        notes: [
+          "Elige su posición (centro/izquierda/derecha) para que no tape un chat o los subtítulos.",
+          "Estilo 'sutil' que asoma como una pestañita desde el borde.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Detalles",
+        notes: [
+          "Los iconos de una carpeta entran escalonados al abrirla; pequeñas mejoras de movimiento.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.5.2",
     date: "29 jun 2026",
     headline: "Las novedades ahora viven dentro de Ajustes (adiós a la ventana que se rompía).",

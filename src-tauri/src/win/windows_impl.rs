@@ -276,6 +276,68 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
     }
 }
 
+/// True if a fullscreen game / movie / presentation is running — so Booki can get
+/// completely out of the way (e.g. not cover subtitles or a game).
+pub fn is_fullscreen() -> bool {
+    unsafe {
+        // 1) The shell's own "user is busy" state: fullscreen DirectX game,
+        // presentation mode, or a busy/fullscreen app (movies). This is exactly
+        // what Windows uses to suppress its own notifications.
+        use windows::Win32::UI::Shell::{
+            SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+            QUNS_RUNNING_D3D_FULL_SCREEN,
+        };
+        if let Ok(state) = SHQueryUserNotificationState() {
+            if state == QUNS_RUNNING_D3D_FULL_SCREEN
+                || state == QUNS_PRESENTATION_MODE
+                || state == QUNS_BUSY
+            {
+                return true;
+            }
+        }
+        // 2) Fallback: the foreground window covers the WHOLE monitor (borderless
+        // fullscreen video like YouTube/VLC). Ignore the desktop and the shell.
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if class == "Progman"
+            || class == "WorkerW"
+            || class == "Shell_TrayWnd"
+            || class == "Shell_SecondaryTrayWnd"
+        {
+            return false;
+        }
+        // A normal MAXIMIZED window also covers the monitor when the taskbar is
+        // set to auto-hide — so require the window to be borderless (no caption),
+        // which true fullscreen apps are but maximized ones aren't.
+        use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, WS_CAPTION};
+        let style = GetWindowLongW(hwnd, GWL_STYLE);
+        if (style & WS_CAPTION.0 as i32) != 0 {
+            return false;
+        }
+        let mut wr = RECT::default();
+        if GetWindowRect(hwnd, &mut wr).is_err() {
+            return false;
+        }
+        let cx = (wr.left + wr.right) / 2;
+        let cy = (wr.top + wr.bottom) / 2;
+        let hmon = MonitorFromPoint(POINT { x: cx, y: cy }, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return false;
+        }
+        let m = mi.rcMonitor;
+        wr.left <= m.left && wr.top <= m.top && wr.right >= m.right && wr.bottom >= m.bottom
+    }
+}
+
 /// Bring a window to the foreground, restoring it if minimized.
 pub fn focus_window(hwnd: isize) -> bool {
     let handle = HWND(hwnd as *mut c_void);

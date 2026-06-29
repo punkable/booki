@@ -607,6 +607,23 @@ function Behavior({ cfg, set }) {
           ]}
         />
       </Row>
+      {cfg.autoHideMode !== "off" && (
+        <>
+          <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
+            <SegmentedControl
+              value={cfg.notchPosition || "center"}
+              onChange={(v) => set({ notchPosition: v })}
+              options={[
+                { value: "start", label: t("be.notchStart") },
+                { value: "center", label: t("be.notchCenter") },
+                { value: "end", label: t("be.notchEnd") },
+              ]}
+            />
+          </Row>
+          <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
+            onChange={(v) => set({ notchPeek: v })} />
+        </>
+      )}
       <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
         onChange={(v) => set({ showLabels: v })} />
       <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
