@@ -284,3 +284,9 @@ export async function onReveal(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://reveal", () => cb());
 }
+
+/** Listen for the "show what's new" signal (settings shows the changelog modal). */
+export async function onShowChangelog(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://show-changelog", () => cb());
+}

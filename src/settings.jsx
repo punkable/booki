@@ -13,9 +13,11 @@ import {
   pickJsonFile,
   emitConfigChanged,
   onConfigChanged,
+  onShowChangelog,
   closeSelf,
   logMessage,
 } from "./api.js";
+import { CHANGELOG } from "./changelog-data.js";
 
 // One-click theme presets (accent + light/dark).
 const THEME_PRESETS = [
@@ -1166,7 +1168,17 @@ function App() {
   const [cfg, setCfg] = useState(null);
   const [tab, setTab] = useState("appearance");
   const [version, setVersion] = useState("0.1.0");
+  const [showChangelog, setShowChangelog] = useState(
+    typeof location !== "undefined" && location.hash === "#changelog"
+  );
   const saveTimer = useRef(null);
+
+  // Show "What's new" when the dock asks us to (first run after an update).
+  useEffect(() => {
+    let un;
+    onShowChangelog(() => setShowChangelog(true)).then((u) => (un = u));
+    return () => un && un();
+  }, []);
 
   useEffect(() => {
     configApi.get().then((c) => {
@@ -1201,10 +1213,15 @@ function App() {
   };
 
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && closeSelf();
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      // Escape closes the changelog modal first, then the window.
+      if (showChangelog) setShowChangelog(false);
+      else closeSelf();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [showChangelog]);
 
   // Reflect changes made from the dock itself (e.g. drag-reorder or creating a
   // folder) into the Apps list here. We only sync `pinned` so a slider being
@@ -1252,6 +1269,45 @@ function App() {
         {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
         {tab === "about" && <About version={version} />}
       </main>
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+    </div>
+  );
+}
+
+// "What's new" shown as a modal inside Settings (no fragile extra window).
+function ChangelogModal({ onClose }) {
+  return (
+    <div className="modal-scrim" onClick={onClose}>
+      <div className="modal cl-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <strong>🦫 {t("cl.title")}</strong>
+          <button className="pin-btn ico" onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
+        </div>
+        <div className="cl-list">
+          {CHANGELOG.map((entry, idx) => (
+            <section key={entry.version} className={"cl-entry" + (idx === 0 ? " latest" : "")}>
+              <div className="cl-entry-head">
+                <span className="cl-ver">v{entry.version}</span>
+                {idx === 0 && <span className="cl-new">{t("cl.new")}</span>}
+                <span className="cl-date">{entry.date}</span>
+              </div>
+              {entry.headline && <p className="cl-headline">{entry.headline}</p>}
+              {entry.sections.map((sec, k) => (
+                <div key={k} className="cl-section">
+                  <h3 className="cl-section-title"><span className="cl-ico">{sec.icon}</span>{sec.title}</h3>
+                  <ul className="cl-notes">
+                    {sec.notes.map((n, j) => <li key={j}>{n}</li>)}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
+        <div className="cl-foot">
+          <span className="cl-credit">{t("cl.by")} Punkable · @Punkabl3</span>
+          <button className="s-btn" onClick={onClose}>{t("cl.ok")}</button>
+        </div>
+      </div>
     </div>
   );
 }

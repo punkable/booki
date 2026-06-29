@@ -118,6 +118,10 @@ const DICT = {
     "ab.made": "Hecho con Tauri + Rust · MIT.",
     "ab.by": "Creado por",
     "ab.egg": "¡Fiesta de capibaras! Gracias por usar Booki.",
+    "cl.title": "Novedades de Booki",
+    "cl.new": "Nuevo",
+    "cl.by": "por",
+    "cl.ok": "Entendido",
 
     "m.open": "Abrir",
     "m.changeIcon": "Cambiar icono…",
@@ -285,6 +289,10 @@ const DICT = {
     "ab.made": "Made with Tauri + Rust · MIT.",
     "ab.by": "Created by",
     "ab.egg": "Capybara party! Thanks for using Booki.",
+    "cl.title": "What's new in Booki",
+    "cl.new": "New",
+    "cl.by": "by",
+    "cl.ok": "Got it",
 
     "m.open": "Open",
     "m.changeIcon": "Change icon…",
