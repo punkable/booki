@@ -9,11 +9,23 @@ import {
   pickAppFile,
   pickFolder,
   pickImageFile,
+  pickSavePath,
+  pickJsonFile,
   emitConfigChanged,
   onConfigChanged,
   closeSelf,
   logMessage,
 } from "./api.js";
+
+// One-click theme presets (accent + light/dark).
+const THEME_PRESETS = [
+  { name: "Booki", accent: "#dfaa75", theme: "system" },
+  { name: "Océano", accent: "#3a86ff", theme: "dark" },
+  { name: "Bosque", accent: "#2bb673", theme: "dark" },
+  { name: "Atardecer", accent: "#fb5607", theme: "light" },
+  { name: "Uva", accent: "#8338ec", theme: "dark" },
+  { name: "Rosa", accent: "#ff006e", theme: "light" },
+];
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang } from "./i18n.js";
@@ -471,6 +483,22 @@ function Appearance({ cfg, set }) {
       <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
         <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
       </Row>
+      <Row label={t("ap.presets")} hint={t("ap.presetsHint")}>
+        <div className="preset-row">
+          {THEME_PRESETS.map((p) => (
+            <button
+              key={p.name}
+              type="button"
+              className="preset-chip"
+              title={p.name}
+              style={{ background: p.accent }}
+              onClick={() => set({ accent: p.accent, theme: p.theme })}
+            >
+              <span className="preset-dot" data-theme={p.theme} />
+            </button>
+          ))}
+        </div>
+      </Row>
       <Row label={t("ap.iconSize")}>
         <Slider value={cfg.iconSize} min={32} max={80} step={4} fmt={(v) => `${v}px`}
           onChange={(v) => set({ iconSize: v })} />
@@ -487,6 +515,20 @@ function Appearance({ cfg, set }) {
         <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
+      </Row>
+      <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
+        <div className="s-actions" style={{ margin: 0 }}>
+          <button className="s-btn s-btn-soft" onClick={async () => {
+            const p = await pickSavePath("booki-config.json");
+            if (p) await dockApi.exportConfig(p);
+          }}>{t("ap.export")}</button>
+          <button className="s-btn s-btn-soft" onClick={async () => {
+            const p = await pickJsonFile();
+            if (!p) return;
+            const fresh = await dockApi.importConfig(p);
+            if (fresh) set(fresh);
+          }}>{t("ap.import")}</button>
+        </div>
       </Row>
     </>
   );
@@ -622,6 +664,17 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
           <strong>{t("w.styleTitle")}</strong>
           <button className="pin-btn" onClick={onClose}>✕</button>
         </div>
+        {item.widget === "notes" && (
+          <Row label={t("w.note")}>
+            <input
+              className="web-url"
+              type="text"
+              value={st.note || ""}
+              placeholder={t("w.notesEmpty")}
+              onChange={(e) => set1({ note: e.target.value })}
+            />
+          </Row>
+        )}
         <Row label={t("w.variant")}>
           <SegmentedControl
             value={variant}
@@ -653,6 +706,8 @@ function Apps({ cfg, set }) {
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
+  const mergeRef = useRef(-1);
+  const [mergeInto, setMergeInto] = useState(-1);
   const [iconFor, setIconFor] = useState(-1);
   const [styleFor, setStyleFor] = useState(-1);
   const [webUrl, setWebUrl] = useState("");
@@ -681,17 +736,49 @@ function Apps({ cfg, set }) {
     set({ pinned: cfg.pinned.flatMap((p, k) => (k === i ? grp.children || [] : [p])) });
   };
 
+  const doMerge = (from, to) => {
+    const arr = pinnedRef.current;
+    const dragged = arr[from];
+    const target = arr[to];
+    const merged =
+      target.kind === "group"
+        ? { ...target, children: [...(target.children || []), dragged] }
+        : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
+    set({ pinned: arr.map((p, k) => (k === to ? merged : p)).filter((_, k) => k !== from) });
+  };
   const startDrag = (i) => (e) => {
     e.preventDefault();
     drag.current = { from: i };
+    mergeRef.current = -1;
+    setMergeInto(-1);
     const onMove = (ev) => {
-      const lis = [...listRef.current.querySelectorAll(".pin-item")];
+      // Only top-level rows map 1:1 to cfg.pinned (folder children aren't draggable).
+      const lis = [...listRef.current.querySelectorAll(".pin-item:not(.pin-child)")];
+      const from = drag.current.from;
+      // Dropping onto the CENTER of another app/group row → make a folder.
+      let over = -1;
+      for (let k = 0; k < lis.length; k++) {
+        const r = lis[k].getBoundingClientRect();
+        if (ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
+      }
+      if (over >= 0 && over !== from) {
+        const r = lis[over].getBoundingClientRect();
+        const center = ev.clientY > r.top + r.height * 0.3 && ev.clientY < r.bottom - r.height * 0.3;
+        const dragged = pinnedRef.current[from];
+        const target = pinnedRef.current[over];
+        const canMerge = dragged.kind === "app" && (target.kind === "app" || target.kind === "group");
+        if (center && canMerge) {
+          if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
+          return; // aiming to merge → don't reorder
+        }
+      }
+      if (mergeRef.current !== -1) { mergeRef.current = -1; setMergeInto(-1); }
+      // Reorder.
       let to = lis.findIndex((li) => {
         const r = li.getBoundingClientRect();
         return ev.clientY < r.top + r.height / 2;
       });
       if (to === -1) to = pinnedRef.current.length - 1;
-      const from = drag.current.from;
       if (to >= 0 && to !== from) {
         const p = [...pinnedRef.current];
         const [m] = p.splice(from, 1);
@@ -702,6 +789,10 @@ function Apps({ cfg, set }) {
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
+      const m = mergeRef.current;
+      if (m >= 0 && m !== drag.current.from) doMerge(drag.current.from, m);
+      mergeRef.current = -1;
+      setMergeInto(-1);
       drag.current = null;
     };
     window.addEventListener("pointermove", onMove);
@@ -761,7 +852,7 @@ function Apps({ cfg, set }) {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
           const rows = [
-            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "")}>
+            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (mergeInto === i ? " merge-into" : "")}>
               <span className="pin-left">
                 <button className="pin-handle" title={t("apps.drag")}
                   onPointerDown={startDrag(i)}>⠿</button>
@@ -854,6 +945,8 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={() => addWidget("disk", t("w.disk"))}>＋ {t("w.disk")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("net", t("w.net"))}>＋ {t("w.net")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("uptime", t("w.uptime"))}>＋ {t("w.uptime")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("battery", t("w.battery"))}>＋ {t("w.battery")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("notes", t("w.notes"))}>＋ {t("w.notes")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.web")}</h2>
       <p className="muted">{t("apps.webHint")}</p>

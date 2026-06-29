@@ -52,6 +52,7 @@ async function boot() {
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     checkUpdates();
+    checkChangelog();
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -256,15 +257,19 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime"];
-const WIDGET_ICONS = { clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️" };
+const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes"];
+const WIDGET_ICONS = {
+  clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝",
+};
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
-const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime"];
+const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
 
 function widgetLabel(type) {
   return (
-    { clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net"), uptime: t("w.uptime") }[type] ||
-    type
+    {
+      clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"),
+      net: t("w.net"), uptime: t("w.uptime"), battery: t("w.battery"), notes: t("w.notes"),
+    }[type] || type
   );
 }
 
@@ -307,6 +312,12 @@ function widgetTile(item) {
   el.addEventListener("contextmenu", (e) => openMenu(e, item));
   el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
   if (type === "clock") tickClocks();
+  if (type === "notes") {
+    el.querySelector(".w-label").textContent = t("w.notes");
+    el.querySelector(".w-value").textContent = st.note || t("w.notesEmpty");
+    el.querySelector(".w-value").classList.add("w-note");
+    el.querySelector(".w-bar").style.display = "none";
+  }
   return el;
 }
 
@@ -388,6 +399,10 @@ function startWidgetPoll() {
         setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net"));
       else if (tp === "uptime")
         setText(el, t("w.uptime"), fmtUptime(s.uptime_secs));
+      else if (tp === "battery") {
+        if (s.battery < 0) setText(el, t("w.battery"), "—");
+        else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
+      }
     });
   };
   tick();
@@ -520,6 +535,48 @@ function magnify(clientX, clientY) {
   dockEl.querySelectorAll(".tile.focus").forEach((t) => t !== best && t.classList.remove("focus"));
   if (best && bestInf > 0.45) best.classList.add("focus");
 }
+
+// Show the changelog the first time the app opens after an update.
+async function checkChangelog() {
+  try {
+    const v = await dockApi.appVersion();
+    if (v && cfg.seenVersion !== v) {
+      cfg.seenVersion = v;
+      await persist();
+      dockApi.openChangelog();
+    }
+  } catch (_) {}
+}
+
+// Double-click the empty bar → open Settings (quick, intuitive).
+dockEl.addEventListener("dblclick", (e) => {
+  if (!e.target.closest(".tile")) dockApi.openSettings();
+});
+
+// Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
+let wheelSaveTimer = null;
+dockEl.addEventListener(
+  "wheel",
+  (e) => {
+    const w = e.target.closest(".tile.widget");
+    if (!w) return;
+    e.preventDefault();
+    const item = cfg.pinned.find((p) => p.id === w.dataset.id);
+    if (!item) return;
+    const cur = (item.style && item.style.variant) || "glass";
+    const i = WIDGET_VARIANTS.indexOf(cur);
+    const step = e.deltaY > 0 ? 1 : WIDGET_VARIANTS.length - 1;
+    const next = WIDGET_VARIANTS[(i + step) % WIDGET_VARIANTS.length];
+    item.style = { ...(item.style || {}), variant: next };
+    w.dataset.variant = next;
+    clearTimeout(wheelSaveTimer);
+    wheelSaveTimer = setTimeout(async () => {
+      await persist();
+      await emitConfigChanged();
+    }, 350);
+  },
+  { passive: false }
+);
 
 let magnifyRaf = 0;
 dockEl.addEventListener("pointermove", (e) => {
@@ -816,6 +873,14 @@ function openMenu(e, item) {
         dockApi.launch(item.path, item.args || []);
       }
     });
+    // Recents (a lightweight jump list of files opened with this app via Booki).
+    if (item.kind === "app" && (item.recents || []).length) {
+      sep();
+      item.recents.slice(0, 6).forEach((rp) =>
+        add("app", baseName(rp), () => dockApi.launch(item.path, [rp]))
+      );
+      sep();
+    }
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card) — so don't offer it for those.
     if (item.kind === "app" || item.kind === "folder") {
@@ -860,6 +925,8 @@ function openBackgroundMenu(e) {
   add("grid", t("w.add.disk"), () => addWidget("disk"));
   add("grid", t("w.add.net"), () => addWidget("net"));
   add("grid", t("w.add.uptime"), () => addWidget("uptime"));
+  add("grid", t("w.add.battery"), () => addWidget("battery"));
+  add("grid", t("w.add.notes"), () => addWidget("notes"));
   const s2 = document.createElement("div");
   s2.className = "sep";
   ctxMenu.appendChild(s2);
@@ -1102,16 +1169,55 @@ window.addEventListener("pointerdown", (e) => {
 
 // ─────────────────── Desktop file drop ───────────────────
 
+function tileFromPoint(position) {
+  if (!position) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const el = document.elementFromPoint(position.x / dpr, position.y / dpr);
+  return el ? el.closest(".tile[data-id]") : null;
+}
+let dropTargetEl = null;
+function setDropTarget(el) {
+  if (dropTargetEl === el) return;
+  if (dropTargetEl) dropTargetEl.classList.remove("drop-target");
+  dropTargetEl = el;
+  if (el) el.classList.add("drop-target");
+}
+
+// Open files with an app and remember them as recents (a small jump list).
+async function openWith(item, paths) {
+  for (const p of paths) dockApi.launch(item.path, [p]);
+  const i = cfg.pinned.findIndex((x) => x.id === item.id);
+  if (i >= 0) {
+    const cur = cfg.pinned[i].recents || [];
+    cfg.pinned[i].recents = [...paths, ...cur.filter((r) => !paths.includes(r))].slice(0, 8);
+    await persist();
+  }
+}
+
 function setupFileDrop() {
   onFileDrop({
     onEnter: () => {
       reveal();
       dropOverlay.classList.add("active");
     },
-    onLeave: () => dropOverlay.classList.remove("active"),
-    onDrop: async (paths) => {
+    onOver: (position) => setDropTarget(tileFromPoint(position)),
+    onLeave: () => {
       dropOverlay.classList.remove("active");
-      if (paths && paths.length) await addPaths(paths);
+      setDropTarget(null);
+    },
+    onDrop: async (paths, position) => {
+      dropOverlay.classList.remove("active");
+      const target = tileFromPoint(position);
+      setDropTarget(null);
+      if (!paths || !paths.length) return;
+      // Dropped onto an app icon → open the files with that app.
+      const item = target && cfg.pinned.find((p) => p.id === target.dataset.id);
+      if (item && item.kind === "app") {
+        await openWith(item, paths);
+        return;
+      }
+      // Otherwise pin them to the dock.
+      await addPaths(paths);
     },
   });
 }

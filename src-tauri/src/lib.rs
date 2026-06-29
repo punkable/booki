@@ -246,6 +246,8 @@ struct SystemStats {
     disk_used_gb: u64,
     disk_total_gb: u64,
     uptime_secs: u64,
+    battery: i32,
+    charging: bool,
 }
 
 /// Sample CPU/memory/network. Keeps persistent handles so CPU usage and network
@@ -285,6 +287,20 @@ fn system_stats() -> SystemStats {
     let disk = if dtotal > 0 { (dused as f64 / dtotal as f64 * 100.0) as f32 } else { 0.0 };
     let gb = 1024 * 1024 * 1024;
 
+    // Battery (Windows only). -1 = no battery (e.g. a desktop).
+    #[cfg(windows)]
+    let (battery, charging) = unsafe {
+        use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+        let mut s = SYSTEM_POWER_STATUS::default();
+        if GetSystemPowerStatus(&mut s).is_ok() && s.BatteryFlag & 128 == 0 && s.BatteryLifePercent != 255 {
+            (s.BatteryLifePercent as i32, s.ACLineStatus == 1)
+        } else {
+            (-1, false)
+        }
+    };
+    #[cfg(not(windows))]
+    let (battery, charging) = (-1i32, false);
+
     SystemStats {
         cpu,
         mem,
@@ -296,6 +312,8 @@ fn system_stats() -> SystemStats {
         disk_used_gb: dused / gb,
         disk_total_gb: dtotal / gb,
         uptime_secs: sysinfo::System::uptime(),
+        battery,
+        charging,
     }
 }
 
@@ -382,6 +400,40 @@ fn set_dock_edge(app: AppHandle, edge: String) {
         let _ = position_notch(&notch, &edge);
     }
     let _ = app.emit("booki://config-changed", ());
+}
+
+/// Open the "What's new" changelog window (shown on first run after an update).
+#[tauri::command]
+fn open_changelog(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("changelog") {
+        let _ = w.set_focus();
+        return;
+    }
+    let _ = WebviewWindowBuilder::new(&app, "changelog", WebviewUrl::App("changelog.html".into()))
+        .title("Booki — Novedades")
+        .inner_size(520.0, 660.0)
+        .min_inner_size(420.0, 480.0)
+        .resizable(true)
+        .center()
+        .decorations(true)
+        .build();
+}
+
+/// Export the current config to a JSON file the user picked.
+#[tauri::command]
+fn export_config(path: String) -> Result<(), String> {
+    let cfg = config::load();
+    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    std::fs::write(&path, text).map_err(|e| e.to_string())
+}
+
+/// Import config from a JSON file, replacing the current one. Returns the new config.
+#[tauri::command]
+fn import_config(path: String) -> Result<Config, String> {
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    config::save(&cfg)?;
+    Ok(cfg)
 }
 
 /// Place the small notch window centered on the dock's anchored edge.
@@ -767,6 +819,9 @@ pub fn run() {
             reveal_dock,
             notch_reveal,
             set_dock_edge,
+            open_changelog,
+            export_config,
+            import_config,
             image_data_uri,
             set_always_on_top,
             app_version,
