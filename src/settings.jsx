@@ -632,6 +632,8 @@ function Apps({ cfg, set }) {
   const [iconFor, setIconFor] = useState(-1);
   const [styleFor, setStyleFor] = useState(-1);
   const [webUrl, setWebUrl] = useState("");
+  const [openIds, setOpenIds] = useState({});
+  const toggleOpen = (id) => setOpenIds((o) => ({ ...o, [id]: !o[id] }));
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
   const setStyle = (i, value) =>
@@ -694,6 +696,36 @@ function Apps({ cfg, set }) {
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
   const addWidget = (widget, label) =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
+  const newFolder = () => {
+    const id = uid();
+    set({ pinned: [...cfg.pinned, { id, name: t("group.new"), path: "", args: [], kind: "group", children: [] }] });
+    setOpenIds((o) => ({ ...o, [id]: true }));
+  };
+  // Edit a folder's contents (kind === "group", children[]). Auto-dissolves a
+  // folder left with fewer than 2 items, matching the dock's behavior.
+  const settleFolder = (gi, kids, extra = []) => {
+    if (kids.length < 2) set({ pinned: cfg.pinned.flatMap((p, k) => (k === gi ? [...kids, ...extra] : [p])) });
+    else set({ pinned: cfg.pinned.flatMap((p, k) => (k === gi ? [{ ...p, children: kids }, ...extra] : [p])) });
+  };
+  const removeChild = (gi, childId) =>
+    settleFolder(gi, (cfg.pinned[gi].children || []).filter((c) => c.id !== childId));
+  const takeOutChild = (gi, childId) => {
+    const grp = cfg.pinned[gi];
+    const child = (grp.children || []).find((c) => c.id === childId);
+    if (!child) return;
+    settleFolder(gi, (grp.children || []).filter((c) => c.id !== childId), [child]);
+  };
+  const addToFolder = async (gi) => {
+    const path = await pickAppFile();
+    if (!path) return;
+    set({ pinned: cfg.pinned.map((p, k) => (k === gi ? { ...p, children: [...(p.children || []), mkApp(path)] } : p)) });
+  };
+  const renameChild = (gi, childId, name) =>
+    set({
+      pinned: cfg.pinned.map((p, k) =>
+        k === gi ? { ...p, children: (p.children || []).map((c) => (c.id === childId ? { ...c, name } : c)) } : p
+      ),
+    });
 
   return (
     <>
@@ -701,54 +733,92 @@ function Apps({ cfg, set }) {
       <p className="muted">{t("apps.hint")}</p>
       <ul className="pin-list" ref={listRef}>
         {cfg.pinned.length === 0 && <li className="pin-empty">{t("apps.empty")}</li>}
-        {cfg.pinned.map((item, i) => (
-          <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "")}>
-            <span className="pin-left">
-              <button className="pin-handle" title={t("apps.drag")}
-                onPointerDown={startDrag(i)}>⠿</button>
-              {item.kind !== "separator" && <PinThumb item={item} />}
-              {item.kind === "group" ? (
-                <input
-                  className="pin-name-edit"
-                  value={item.name}
-                  onChange={(e) =>
-                    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
-                  }
-                />
-              ) : (
-                <span className="pin-name" title={item.path}>
-                  {item.kind === "separator" ? t("apps.sep") : item.name}
-                </span>
-              )}
-              {item.kind === "group" && (
-                <span className="pin-count">{(item.children || []).length}</span>
-              )}
-            </span>
-            <span className="pin-actions">
-              {item.kind === "group" && (
-                <button className="pin-btn" title={t("group.ungroup")}
-                  onClick={() => ungroup(i)}>⊟</button>
-              )}
-              {item.kind === "widget" && (
-                <button className="pin-btn" title={t("w.styleTitle")}
-                  onClick={() => setStyleFor(i)}>🎨</button>
-              )}
-              {item.kind !== "separator" && item.kind !== "widget" && (
-                <button className="pin-btn" title={t("apps.changeIcon")}
-                  onClick={() => setIconFor(i)}>◑</button>
-              )}
-              {item.kind === "app" || item.kind === "folder" ? (
-                <button className="pin-btn" title={t("apps.openLoc")}
-                  onClick={() => dockApi.openLocation(item.path)}>↗</button>
-              ) : null}
-              <button className="pin-btn del" title={t("apps.remove")} onClick={() => remove(i)}>✕</button>
-            </span>
-          </li>
-        ))}
+        {cfg.pinned.flatMap((item, i) => {
+          const isGroup = item.kind === "group";
+          const open = isGroup && openIds[item.id];
+          const rows = [
+            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "")}>
+              <span className="pin-left">
+                <button className="pin-handle" title={t("apps.drag")}
+                  onPointerDown={startDrag(i)}>⠿</button>
+                {isGroup && (
+                  <button className="pin-btn pin-chevron" title={t("apps.editFolder")}
+                    onClick={() => toggleOpen(item.id)}>{open ? "▾" : "▸"}</button>
+                )}
+                {item.kind !== "separator" && <PinThumb item={item} />}
+                {isGroup ? (
+                  <input
+                    className="pin-name-edit"
+                    value={item.name}
+                    onChange={(e) =>
+                      set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
+                    }
+                  />
+                ) : (
+                  <span className="pin-name" title={item.path}>
+                    {item.kind === "separator" ? t("apps.sep") : item.name}
+                  </span>
+                )}
+                {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
+              </span>
+              <span className="pin-actions">
+                {isGroup && (
+                  <button className="pin-btn" title={t("group.ungroup")}
+                    onClick={() => ungroup(i)}>⊟</button>
+                )}
+                {item.kind === "widget" && (
+                  <button className="pin-btn" title={t("w.styleTitle")}
+                    onClick={() => setStyleFor(i)}>🎨</button>
+                )}
+                {item.kind !== "separator" && item.kind !== "widget" && !isGroup && (
+                  <button className="pin-btn" title={t("apps.changeIcon")}
+                    onClick={() => setIconFor(i)}>◑</button>
+                )}
+                {item.kind === "app" || item.kind === "folder" ? (
+                  <button className="pin-btn" title={t("apps.openLoc")}
+                    onClick={() => dockApi.openLocation(item.path)}>↗</button>
+                ) : null}
+                <button className="pin-btn del" title={t("apps.remove")} onClick={() => remove(i)}>✕</button>
+              </span>
+            </li>,
+          ];
+          if (open) {
+            (item.children || []).forEach((c) => {
+              rows.push(
+                <li key={item.id + ":" + c.id} className="pin-item pin-child">
+                  <span className="pin-left">
+                    <span className="pin-handle ghost">⠿</span>
+                    <PinThumb item={c} />
+                    <input
+                      className="pin-name-edit"
+                      value={c.name}
+                      onChange={(e) => renameChild(i, c.id, e.target.value)}
+                    />
+                  </span>
+                  <span className="pin-actions">
+                    <button className="pin-btn" title={t("group.takeOut")}
+                      onClick={() => takeOutChild(i, c.id)}>↑</button>
+                    <button className="pin-btn del" title={t("apps.remove")}
+                      onClick={() => removeChild(i, c.id)}>✕</button>
+                  </span>
+                </li>
+              );
+            });
+            rows.push(
+              <li key={item.id + ":add"} className="pin-item pin-child pin-add-row">
+                <button className="s-btn s-btn-soft" onClick={() => addToFolder(i)}>
+                  ＋ {t("apps.addToFolder")}
+                </button>
+              </li>
+            );
+          }
+          return rows;
+        })}
       </ul>
       <div className="s-actions">
         <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
         <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
+        <button className="s-btn s-btn-soft" onClick={newFolder}>{t("apps.newFolder")}</button>
         <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.widgets")}</h2>
@@ -757,7 +827,9 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={() => addWidget("clock", t("w.clock"))}>＋ {t("w.clock")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("cpu", "CPU")}>＋ CPU</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("ram", "RAM")}>＋ RAM</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("disk", t("w.disk"))}>＋ {t("w.disk")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("net", t("w.net"))}>＋ {t("w.net")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("uptime", t("w.uptime"))}>＋ {t("w.uptime")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.web")}</h2>
       <p className="muted">{t("apps.webHint")}</p>

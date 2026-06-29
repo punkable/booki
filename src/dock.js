@@ -128,7 +128,21 @@ async function render() {
     dockEl.appendChild(hint);
   }
 
+  fitDock();
+}
+
+// Never let the dock clip: if its natural length exceeds the usable screen
+// length on the anchored axis, shrink the icon size to fit (macOS-style), so any
+// number of items always fits inside the window.
+function fitDock() {
   setAllSizes(baseSize());
+  const usable =
+    (isVertical() ? window.screen.availHeight : window.screen.availWidth) - SHADOW_PAD * 2 - 28;
+  const natural = isVertical() ? dockEl.scrollHeight : dockEl.scrollWidth;
+  if (usable > 0 && natural > usable) {
+    const eff = Math.max(20, Math.floor(baseSize() * (usable / natural)));
+    setAllSizes(eff);
+  }
 }
 
 async function appTile(item) {
@@ -242,13 +256,15 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "net"];
-const WIDGET_ICONS = { clock: "🕒", cpu: "🧠", ram: "🧊", net: "📶" };
+const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime"];
+const WIDGET_ICONS = { clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️" };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
+const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime"];
 
 function widgetLabel(type) {
   return (
-    { clock: t("w.clock"), cpu: "CPU", ram: "RAM", net: t("w.net") }[type] || type
+    { clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net"), uptime: t("w.uptime") }[type] ||
+    type
   );
 }
 
@@ -274,7 +290,6 @@ function widgetTile(item) {
     `<span class="w-label"></span>` +
     `<span class="w-value">…</span>` +
     `<span class="w-bar"><i></i></span>` +
-    `<span class="w-sub"></span>` +
     `</span>`;
   el.appendChild(card);
 
@@ -298,31 +313,40 @@ function widgetTile(item) {
 const fmtRate = (kbps) =>
   kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
 
-function setMetric(el, label, val, sub) {
+function fmtUptime(s) {
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+// Set a percentage metric (CPU/RAM/disk): label + value% + bar. Extra detail
+// goes in the tooltip so nothing overflows the compact card.
+function setMetric(el, label, val, title) {
   el.querySelector(".w-label").textContent = label;
   el.querySelector(".w-value").textContent = `${val}%`;
   const bar = el.querySelector(".w-bar");
   bar.style.display = "";
   bar.querySelector("i").style.width = `${Math.min(100, Math.max(0, val))}%`;
-  el.querySelector(".w-sub").textContent = sub || "";
+  if (title) el.title = title;
+}
+
+function setText(el, label, value, title) {
+  el.querySelector(".w-label").textContent = label;
+  el.querySelector(".w-value").textContent = value;
+  el.querySelector(".w-bar").style.display = "none";
+  if (title) el.title = title;
 }
 
 function tickClocks() {
   const now = new Date();
-  const time = now.toLocaleTimeString(curLang() === "en" ? "en-US" : "es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const date = now.toLocaleDateString(curLang() === "en" ? "en-US" : "es-ES", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  const loc = curLang() === "en" ? "en-US" : "es-ES";
+  const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
+  const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
   dockEl.querySelectorAll('.tile.widget[data-widget="clock"]').forEach((el) => {
-    el.querySelector(".w-label").textContent = date;
-    el.querySelector(".w-value").textContent = time;
-    el.querySelector(".w-bar").style.display = "none";
-    el.querySelector(".w-sub").textContent = "";
+    setText(el, date, time);
   });
 }
 
@@ -335,7 +359,7 @@ function startWidgetPoll() {
   statsTimer = null;
   const hasClock = cfg.pinned.some((p) => p.kind === "widget" && p.widget === "clock");
   const needStats = () =>
-    cfg.pinned.some((p) => p.kind === "widget" && ["cpu", "ram", "net"].includes(p.widget));
+    cfg.pinned.some((p) => p.kind === "widget" && STAT_WIDGETS.includes(p.widget));
   // Only run timers when there's actually a widget that needs them → zero idle
   // cost when the dock has no widgets.
   if (hasClock) {
@@ -356,13 +380,13 @@ function startWidgetPoll() {
       const tp = el.dataset.widget;
       if (tp === "cpu") setMetric(el, "CPU", Math.round(s.cpu));
       else if (tp === "ram")
-        setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} GB`);
-      else if (tp === "net") {
-        el.querySelector(".w-label").textContent = `↓ ${t("w.net")}`;
-        el.querySelector(".w-value").textContent = fmtRate(s.net_down_kbps);
-        el.querySelector(".w-bar").style.display = "none";
-        el.querySelector(".w-sub").textContent = `↑ ${fmtRate(s.net_up_kbps)}`;
-      }
+        setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`);
+      else if (tp === "disk")
+        setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`);
+      else if (tp === "net")
+        setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net"));
+      else if (tp === "uptime")
+        setText(el, t("w.uptime"), fmtUptime(s.uptime_secs));
     });
   };
   tick();
@@ -828,7 +852,9 @@ function openBackgroundMenu(e) {
   add("grid", t("w.add.clock"), () => addWidget("clock"));
   add("grid", t("w.add.cpu"), () => addWidget("cpu"));
   add("grid", t("w.add.ram"), () => addWidget("ram"));
+  add("grid", t("w.add.disk"), () => addWidget("disk"));
   add("grid", t("w.add.net"), () => addWidget("net"));
+  add("grid", t("w.add.uptime"), () => addWidget("uptime"));
   const s2 = document.createElement("div");
   s2.className = "sep";
   ctxMenu.appendChild(s2);
