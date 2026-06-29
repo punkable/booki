@@ -59,8 +59,8 @@ pill.addEventListener("pointerup", (e) => {
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.
-  const sw = window.screen.width || 1920;
-  const sh = window.screen.height || 1080;
+  const sw = window.screen.availWidth || window.screen.width || 1920;
+  const sh = window.screen.availHeight || window.screen.height || 1080;
   const dist = { left: e.screenX, right: sw - e.screenX, top: e.screenY, bottom: sh - e.screenY };
   let edge = "bottom";
   let best = Infinity;
@@ -70,5 +70,35 @@ pill.addEventListener("pointerup", (e) => {
       edge = k;
     }
   }
-  invoke("set_dock_edge", { edge });
+  // Animate the notch gliding to the chosen edge (a natural travel), then let the
+  // backend place + resize it authoritatively for that edge.
+  const W = 184, H = 26, m = 3;
+  const target =
+    edge === "top" ? { x: (sw - W) / 2, y: m }
+    : edge === "left" ? { x: m, y: (sh - H) / 2 }
+    : edge === "right" ? { x: sw - W - m, y: (sh - H) / 2 }
+    : { x: (sw - W) / 2, y: sh - H - m };
+  const from = { x: e.screenX - W / 2, y: e.screenY - H / 2 };
+  tweenNotch(from, target, 340, () => invoke("set_dock_edge", { edge }));
 });
+
+// Glide the notch window from `from` to `to` over `ms` (easeOutCubic), then `done`.
+function tweenNotch(from, to, ms, done) {
+  if (!winApi) {
+    done && done();
+    return;
+  }
+  const w = winApi.getCurrentWindow();
+  const t0 = performance.now();
+  const ease = (p) => 1 - Math.pow(1 - p, 3);
+  const frame = (now) => {
+    const p = Math.min(1, (now - t0) / ms);
+    const e = ease(p);
+    try {
+      w.setPosition(new winApi.LogicalPosition(Math.round(from.x + (to.x - from.x) * e), Math.round(from.y + (to.y - from.y) * e)));
+    } catch (_) {}
+    if (p < 1) requestAnimationFrame(frame);
+    else done && done();
+  };
+  requestAnimationFrame(frame);
+}

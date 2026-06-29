@@ -474,11 +474,17 @@ fn is_dir(path: String) -> bool {
 /// Scan the Windows Start Menu for installed apps (.lnk shortcuts) so the
 /// settings UI can suggest things to pin without browsing the filesystem.
 /// Returns deduped, alphabetically-sorted shortcuts. Empty off-Windows.
+#[derive(serde::Serialize)]
+struct AppGroup {
+    name: String,
+    items: Vec<DirItem>,
+}
+
 #[tauri::command]
-fn list_installed_apps() -> Vec<DirItem> {
+fn list_installed_apps() -> Vec<AppGroup> {
     #[cfg(windows)]
     {
-        use std::collections::HashSet;
+        use std::collections::{BTreeMap, HashSet};
         let mut roots: Vec<std::path::PathBuf> = Vec::new();
         if let Ok(appdata) = std::env::var("APPDATA") {
             roots.push(
@@ -492,13 +498,29 @@ fn list_installed_apps() -> Vec<DirItem> {
             );
         }
         let mut seen: HashSet<String> = HashSet::new();
-        let mut out: Vec<DirItem> = Vec::new();
-        for root in roots {
-            scan_lnks(&root, &mut out, &mut seen, 0);
+        // group name → items. "" is the general bucket (top-level apps).
+        let mut map: BTreeMap<String, Vec<DirItem>> = BTreeMap::new();
+        for root in &roots {
+            scan_lnks(root, root, &mut map, &mut seen, 0);
         }
-        out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        out.truncate(400);
-        out
+        // Collapse single-item folders into the general bucket so we don't end up
+        // with dozens of one-app "groups" — only real groupings get a header.
+        let mut general: Vec<DirItem> = map.remove("").unwrap_or_default();
+        let mut groups: Vec<AppGroup> = Vec::new();
+        for (name, mut items) in map {
+            if items.len() <= 1 {
+                general.append(&mut items);
+            } else {
+                items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                groups.push(AppGroup { name, items });
+            }
+        }
+        groups.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        general.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        if !general.is_empty() {
+            groups.push(AppGroup { name: String::new(), items: general });
+        }
+        groups
     }
     #[cfg(not(windows))]
     {
@@ -506,10 +528,28 @@ fn list_installed_apps() -> Vec<DirItem> {
     }
 }
 
+/// The top-level Start-menu folder a shortcut lives in (its "group"), or "" if it
+/// sits directly under Programs.
+#[cfg(windows)]
+fn group_of(root: &std::path::Path, p: &std::path::Path) -> String {
+    if let Ok(rel) = p.strip_prefix(root) {
+        let mut comps = rel.components();
+        let first = comps.next();
+        let has_subpath = comps.next().is_some();
+        if has_subpath {
+            if let Some(c) = first {
+                return c.as_os_str().to_string_lossy().to_string();
+            }
+        }
+    }
+    String::new()
+}
+
 #[cfg(windows)]
 fn scan_lnks(
+    root: &std::path::Path,
     dir: &std::path::Path,
-    out: &mut Vec<DirItem>,
+    map: &mut std::collections::BTreeMap<String, Vec<DirItem>>,
     seen: &mut std::collections::HashSet<String>,
     depth: u8,
 ) {
@@ -523,7 +563,7 @@ fn scan_lnks(
     for e in rd.flatten() {
         let p = e.path();
         if p.is_dir() {
-            scan_lnks(&p, out, seen, depth + 1);
+            scan_lnks(root, &p, map, seen, depth + 1);
             continue;
         }
         let is_lnk = p
@@ -557,7 +597,8 @@ fn scan_lnks(
             continue;
         }
         if seen.insert(lower) {
-            out.push(DirItem {
+            let group = group_of(root, &p);
+            map.entry(group).or_default().push(DirItem {
                 name,
                 path: p.to_string_lossy().to_string(),
                 is_dir: false,

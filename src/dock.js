@@ -341,6 +341,7 @@ function setText(el, label, value, title) {
 }
 
 function tickClocks() {
+  if (hiddenState) return; // don't update a tucked-away dock
   const now = new Date();
   const loc = curLang() === "en" ? "en-US" : "es-ES";
   const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
@@ -815,8 +816,12 @@ function openMenu(e, item) {
         dockApi.launch(item.path, item.args || []);
       }
     });
-    add("palette", t("m.changeIcon"), () => changeIcon(item));
-    if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
+    // A custom icon only makes sense for apps/folders (groups show a mini-grid,
+    // widgets show their card) — so don't offer it for those.
+    if (item.kind === "app" || item.kind === "folder") {
+      add("palette", t("m.changeIcon"), () => changeIcon(item));
+      if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
+    }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
     sep();
   }
@@ -1220,11 +1225,23 @@ async function toggleStack(tileEl, item) {
     }
     grid.appendChild(cell);
   }
+  // Quick "add app to this folder" cell — makes filling a folder fast.
+  if (isGroup) {
+    const addCell = document.createElement("button");
+    addCell.className = "stack-item stack-add";
+    addCell.title = t("apps.addToFolder");
+    addCell.innerHTML =
+      `<span class="stack-glyph">＋</span><span class="stack-name">${t("apps.addToFolder")}</span>`;
+    addCell.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      addToFolderFromDock(item);
+    });
+    grid.appendChild(addCell);
+  }
   stackEl.appendChild(grid);
 
   stackOpen = true;
   document.body.classList.add("stack-open");
-  stackEl.classList.remove("hidden");
   reframe();
   // Place the flyout just past the bar, sized to the bar's real geometry (the
   // dock window is tight now, so a hardcoded offset would clip it).
@@ -1249,15 +1266,42 @@ async function toggleStack(tileEl, item) {
       if (cfg.edge === "left") stackEl.style.left = `${dr.width + gap}px`;
       else stackEl.style.right = `${dr.width + gap}px`;
     }
+    // Positioned in its closed state → flip to open so the transition plays.
+    stackEl.classList.add("open");
   });
 }
 
+let stackCloseTimer = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
   document.body.classList.remove("stack-open");
-  stackEl.classList.add("hidden");
+  stackEl.classList.remove("open"); // plays the close transition
+  // Shrink the window only after the close animation has played, so it doesn't
+  // get cut off mid-fade.
+  clearTimeout(stackCloseTimer);
+  stackCloseTimer = setTimeout(reframe, 240);
+}
+
+// Add an app into a folder from its open flyout, then reopen it so you can keep
+// adding several in a row.
+async function addToFolderFromDock(group) {
+  const path = await pickAppFile();
+  if (!path) return;
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  cfg.pinned[gi].children = [
+    ...(cfg.pinned[gi].children || []),
+    { id: uid(), name: baseName(path), path, args: [], kind: "app" },
+  ];
+  await persist();
+  await emitConfigChanged();
+  closeStack();
+  await render();
   reframe();
+  const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  const it = cfg.pinned.find((p) => p.id === group.id);
+  if (el && it) toggleStack(el, it);
 }
 window.addEventListener("pointerdown", (e) => {
   if (stackOpen && !e.target.closest("#stack") && !e.target.closest(".tile")) closeStack();
