@@ -81,7 +81,6 @@ fn set_dock_frame(
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
     let h = height.max(8);
-    let prev = window.outer_size().ok();
     window
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
@@ -89,33 +88,9 @@ fn set_dock_frame(
 
     if !hidden.unwrap_or(false) {
         if let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) {
-            *DOCK_HOME.lock().unwrap() = Some((
-                p.x,
-                p.y,
-                p.x + s.width as i32,
-                p.y + s.height as i32,
-            ));
-        }
-        // If we just expanded from the collapsed notch (a much smaller window),
-        // nudge the size once so WebView2 repaints its surface — otherwise the
-        // dock can come back blank/non-interactive after growing (same race the
-        // settings window had). Only on a big grow, so steady reframes don't flicker.
-        #[cfg(windows)]
-        if let Some(p) = prev {
-            if h > p.height + 40 || w > p.width + 40 {
-                let w2 = window.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(16));
-                    if let Ok(sz) = w2.inner_size() {
-                        let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
-                        let _ = w2.set_size(sz);
-                    }
-                });
-            }
+            *DOCK_HOME.lock().unwrap() = Some((p.x, p.y, p.x + s.width as i32, p.y + s.height as i32));
         }
     }
-    #[cfg(not(windows))]
-    let _ = prev;
     Ok(())
 }
 
@@ -409,7 +384,7 @@ fn open_changelog(app: AppHandle) {
         let _ = w.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(&app, "changelog", WebviewUrl::App("changelog.html".into()))
+    let built = WebviewWindowBuilder::new(&app, "changelog", WebviewUrl::App("changelog.html".into()))
         .title("Booki — Novedades")
         .inner_size(520.0, 660.0)
         .min_inner_size(420.0, 480.0)
@@ -417,6 +392,24 @@ fn open_changelog(app: AppHandle) {
         .center()
         .decorations(true)
         .build();
+    // Same WebView2 first-paint nudge the settings window uses, so the changelog
+    // never comes up blank.
+    #[cfg(windows)]
+    if let Ok(w) = &built {
+        let w2 = w.clone();
+        std::thread::spawn(move || {
+            for delay in [120u64, 350] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                if let Ok(sz) = w2.inner_size() {
+                    let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let _ = w2.set_size(sz);
+                }
+            }
+            let _ = w2.set_focus();
+        });
+    }
+    let _ = &built;
 }
 
 /// Export the current config to a JSON file the user picked.

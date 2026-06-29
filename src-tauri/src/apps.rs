@@ -16,8 +16,14 @@ pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
         .unwrap_or(false);
 
     if is_exe {
-        return Command::new(path)
-            .args(args)
+        let mut cmd = Command::new(path);
+        cmd.args(args);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
+        return cmd
             .spawn()
             .map(|_| ())
             .map_err(|e| format!("failed to launch {path}: {e}"));
@@ -54,8 +60,12 @@ pub fn reveal(path: &str) -> Result<(), String> {
 
 #[cfg(windows)]
 fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    // CREATE_NO_WINDOW — don't flash a console window when opening apps / URLs.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     // `cmd /C start "" <path> [args...]` resolves shortcuts and file associations.
     let mut cmd = Command::new("cmd");
+    cmd.creation_flags(CREATE_NO_WINDOW);
     cmd.arg("/C").arg("start").arg("").arg(path);
     cmd.args(args);
     cmd.spawn()

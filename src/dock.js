@@ -31,6 +31,10 @@ const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 
+// Safe .closest() — pointer/keyboard targets can be non-Element (document/window),
+// which would throw "closest is not a function".
+const closestSel = (target, sel) => (target && target.closest ? target.closest(sel) : null);
+
 let cfg = null;
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -550,7 +554,7 @@ async function checkChangelog() {
 
 // Double-click the empty bar → open Settings (quick, intuitive).
 dockEl.addEventListener("dblclick", (e) => {
-  if (!e.target.closest(".tile")) dockApi.openSettings();
+  if (!closestSel(e.target, ".tile")) dockApi.openSettings();
 });
 
 // Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
@@ -558,7 +562,7 @@ let wheelSaveTimer = null;
 dockEl.addEventListener(
   "wheel",
   (e) => {
-    const w = e.target.closest(".tile.widget");
+    const w = closestSel(e.target, ".tile.widget");
     if (!w) return;
     e.preventDefault();
     const item = cfg.pinned.find((p) => p.id === w.dataset.id);
@@ -840,7 +844,7 @@ async function takeOutChild(group, childId) {
 
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
-  if (editMode && !e.target.closest(".tile")) exitEdit();
+  if (editMode && !closestSel(e.target, ".tile")) exitEdit();
 });
 
 // ───────────────────────── Context menu ─────────────────────────
@@ -1162,7 +1166,7 @@ onReveal(() => {
 // tuck back into the notch (when the mode wants it hidden).
 window.addEventListener("pointerdown", (e) => {
   if (!pinnedReveal) return;
-  if (e.target.closest("#dock")) return;
+  if (closestSel(e.target, "#dock")) return;
   pinnedReveal = false;
   scheduleHide();
 });
@@ -1410,7 +1414,7 @@ async function addToFolderFromDock(group) {
   if (el && it) toggleStack(el, it);
 }
 window.addEventListener("pointerdown", (e) => {
-  if (stackOpen && !e.target.closest("#stack") && !e.target.closest(".tile")) closeStack();
+  if (stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
 });
 
 // ─────────────────── Update check ───────────────────

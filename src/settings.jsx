@@ -29,6 +29,21 @@ const THEME_PRESETS = [
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang } from "./i18n.js";
+import { icon } from "./icons.js";
+
+// Small icon button used across the Apps list.
+function IconBtn({ name, title, onClick, danger, onPointerDown }) {
+  return (
+    <button
+      type="button"
+      className={"pin-btn ico" + (danger ? " del" : "")}
+      title={title}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      dangerouslySetInnerHTML={{ __html: icon(name) }}
+    />
+  );
+}
 import {
   ICON_LIBRARY,
   ICON_STYLES,
@@ -413,12 +428,20 @@ function PinThumb({ item }) {
       alive = false;
     };
   }, [item.path, item.icon]);
+  if (item.kind === "group") {
+    return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("folder") }} />;
+  }
+  if (item.kind === "widget") {
+    return <span className="pin-thumb widget">{WIDGET_EMOJI[item.widget] || "▦"}</span>;
+  }
   return (
     <span className="pin-thumb">
       {src ? <img src={src} alt="" /> : (item.name || "?").trim().charAt(0).toUpperCase()}
     </span>
   );
 }
+
+const WIDGET_EMOJI = { clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝" };
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -706,6 +729,7 @@ function Apps({ cfg, set }) {
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
+  const childDrag = useRef(null);
   const mergeRef = useRef(-1);
   const [mergeInto, setMergeInto] = useState(-1);
   const [iconFor, setIconFor] = useState(-1);
@@ -798,6 +822,34 @@ function Apps({ cfg, set }) {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
   };
+  // Drag a folder's child up/down to reorder it within that folder.
+  const startDragChild = (gi, ci) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    childDrag.current = { gi, from: ci };
+    const onMove = (ev) => {
+      const rows = [...listRef.current.querySelectorAll(`.pin-child-item[data-folder="${gi}"]`)];
+      let to = rows.findIndex((r) => {
+        const b = r.getBoundingClientRect();
+        return ev.clientY < b.top + b.height / 2;
+      });
+      if (to === -1) to = rows.length - 1;
+      const from = childDrag.current.from;
+      if (to >= 0 && to !== from) {
+        const kids = [...(pinnedRef.current[gi].children || [])];
+        const [m] = kids.splice(from, 1);
+        kids.splice(to, 0, m);
+        childDrag.current.from = to;
+        set({ pinned: pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: kids } : p)) });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      childDrag.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
   const addApp = async () => {
     const path = await pickAppFile();
@@ -852,13 +904,13 @@ function Apps({ cfg, set }) {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
           const rows = [
-            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (mergeInto === i ? " merge-into" : "")}>
+            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
               <span className="pin-left">
                 <button className="pin-handle" title={t("apps.drag")}
-                  onPointerDown={startDrag(i)}>⠿</button>
+                  onPointerDown={startDrag(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                 {isGroup && (
-                  <button className="pin-btn pin-chevron" title={t("apps.editFolder")}
-                    onClick={() => toggleOpen(item.id)}>{open ? "▾" : "▸"}</button>
+                  <IconBtn name={open ? "chevron-down" : "chevron-right"} title={t("apps.editFolder")}
+                    onClick={() => toggleOpen(item.id)} />
                 )}
                 {item.kind !== "separator" && <PinThumb item={item} />}
                 {isGroup ? (
@@ -877,32 +929,25 @@ function Apps({ cfg, set }) {
                 {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
               </span>
               <span className="pin-actions">
-                {isGroup && (
-                  <button className="pin-btn" title={t("group.ungroup")}
-                    onClick={() => ungroup(i)}>⊟</button>
-                )}
-                {item.kind === "widget" && (
-                  <button className="pin-btn" title={t("w.styleTitle")}
-                    onClick={() => setStyleFor(i)}>🎨</button>
-                )}
+                {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
+                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
                 {item.kind !== "separator" && item.kind !== "widget" && !isGroup && (
-                  <button className="pin-btn" title={t("apps.changeIcon")}
-                    onClick={() => setIconFor(i)}>◑</button>
+                  <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                 )}
-                {item.kind === "app" || item.kind === "folder" ? (
-                  <button className="pin-btn" title={t("apps.openLoc")}
-                    onClick={() => dockApi.openLocation(item.path)}>↗</button>
-                ) : null}
-                <button className="pin-btn del" title={t("apps.remove")} onClick={() => remove(i)}>✕</button>
+                {(item.kind === "app" || item.kind === "folder") && (
+                  <IconBtn name="external" title={t("apps.openLoc")} onClick={() => dockApi.openLocation(item.path)} />
+                )}
+                <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => remove(i)} />
               </span>
             </li>,
           ];
           if (open) {
-            (item.children || []).forEach((c) => {
+            (item.children || []).forEach((c, ci) => {
               rows.push(
-                <li key={item.id + ":" + c.id} className="pin-item pin-child">
+                <li key={item.id + ":" + c.id} className="pin-item pin-child pin-child-item" data-folder={i}>
                   <span className="pin-left">
-                    <span className="pin-handle ghost">⠿</span>
+                    <button className="pin-handle" title={t("apps.drag")}
+                      onPointerDown={startDragChild(i, ci)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                     <PinThumb item={c} />
                     <input
                       className="pin-name-edit"
@@ -911,19 +956,16 @@ function Apps({ cfg, set }) {
                     />
                   </span>
                   <span className="pin-actions">
-                    <button className="pin-btn" title={t("group.takeOut")}
-                      onClick={() => takeOutChild(i, c.id)}>↑</button>
-                    <button className="pin-btn del" title={t("apps.remove")}
-                      onClick={() => removeChild(i, c.id)}>✕</button>
+                    <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
+                    <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
                   </span>
                 </li>
               );
             });
             rows.push(
               <li key={item.id + ":add"} className="pin-item pin-child pin-add-row">
-                <button className="s-btn s-btn-soft" onClick={() => addToFolder(i)}>
-                  ＋ {t("apps.addToFolder")}
-                </button>
+                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i)}
+                  dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
               </li>
             );
           }

@@ -1025,8 +1025,21 @@ select {
 }
 .pin-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .pin-btn { width: 26px; height: 26px; font-size: 12px; color: var(--ink); background: var(--hover); border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.pin-handle { border: 0; background: transparent; color: var(--ink-2); cursor: grab; font-size: 15px; padding: 0 2px; touch-action: none; }
+.pin-btn:hover { background: color-mix(in srgb, var(--accent) 18%, var(--hover)); }
+/* Icon buttons: center the 20×20 SVG and dim it a touch. */
+.pin-btn.ico { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.pin-btn.ico:hover { color: var(--ink); }
+.pin-btn.del.ico:hover { color: #fff; }
+.pin-btn svg { width: 16px; height: 16px; display: block; }
+.pin-handle { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--ink-2); cursor: grab; padding: 0 2px; touch-action: none; }
+.pin-handle svg { width: 16px; height: 16px; }
 .pin-handle:active { cursor: grabbing; }
+.pin-add-btn { display: inline-flex; align-items: center; gap: 6px; }
+.pin-add-btn svg { width: 16px; height: 16px; }
+.pin-item.is-folder { background: color-mix(in srgb, var(--accent) 6%, var(--layer)); }
+.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.pin-thumb.folder svg { width: 16px; height: 16px; }
+.pin-thumb.widget { background: var(--hover); font-size: 15px; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: #e23b3b; color: #fff; }
 .pin-empty { color: var(--ink-2); font-size: 13px; padding: 6px 2px; }
