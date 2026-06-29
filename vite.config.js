@@ -36,7 +36,6 @@ export default defineConfig({
         dock: resolve(process.cwd(), "src/index.html"),
         settings: resolve(process.cwd(), "src/settings.html"),
         notch: resolve(process.cwd(), "src/notch.html"),
-        changelog: resolve(process.cwd(), "src/changelog.html"),
       },
     },
   },

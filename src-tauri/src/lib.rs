@@ -377,39 +377,20 @@ fn set_dock_edge(app: AppHandle, edge: String) {
     let _ = app.emit("booki://config-changed", ());
 }
 
-/// Open the "What's new" changelog window (shown on first run after an update).
+/// Show the "What's new" changelog. To avoid a fragile extra window (which on
+/// some setups came up blank and could crash the app), it's shown INSIDE the
+/// stable settings window: if settings is open we just signal it; otherwise we
+/// open settings on the changelog view via a URL hash.
 #[tauri::command]
 fn open_changelog(app: AppHandle) {
-    if let Some(w) = app.get_webview_window("changelog") {
-        let _ = w.set_focus();
-        return;
+    if app.get_webview_window("settings").is_some() {
+        let _ = app.emit("booki://show-changelog", ());
+        if let Some(w) = app.get_webview_window("settings") {
+            let _ = w.set_focus();
+        }
+    } else {
+        open_settings_url(&app, "settings.html#changelog");
     }
-    let built = WebviewWindowBuilder::new(&app, "changelog", WebviewUrl::App("changelog.html".into()))
-        .title("Booki — Novedades")
-        .inner_size(520.0, 660.0)
-        .min_inner_size(420.0, 480.0)
-        .resizable(true)
-        .center()
-        .decorations(true)
-        .build();
-    // Same WebView2 first-paint nudge the settings window uses, so the changelog
-    // never comes up blank.
-    #[cfg(windows)]
-    if let Ok(w) = &built {
-        let w2 = w.clone();
-        std::thread::spawn(move || {
-            for delay in [120u64, 350] {
-                std::thread::sleep(std::time::Duration::from_millis(delay));
-                if let Ok(sz) = w2.inner_size() {
-                    let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
-                    std::thread::sleep(std::time::Duration::from_millis(40));
-                    let _ = w2.set_size(sz);
-                }
-            }
-            let _ = w2.set_focus();
-        });
-    }
-    let _ = &built;
 }
 
 /// Export the current config to a JSON file the user picked.
@@ -724,11 +705,15 @@ fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
 }
 
 fn open_settings_window(app: &AppHandle) {
+    open_settings_url(app, "settings.html");
+}
+
+fn open_settings_url(app: &AppHandle, url: &str) {
     if let Some(existing) = app.get_webview_window("settings") {
         let _ = existing.set_focus();
         return;
     }
-    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
         .title("Booki — Ajustes")
         .inner_size(760.0, 800.0)
         .min_inner_size(560.0, 560.0)
