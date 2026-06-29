@@ -123,8 +123,18 @@ async function mockInvoke(cmd, args) {
         mem_total_mb: 16384,
         net_down_kbps: Math.round(r(0, 1500)),
         net_up_kbps: Math.round(r(0, 400)),
+        disk: r(45, 80),
+        disk_used_gb: Math.round(r(200, 400)),
+        disk_total_gb: 512,
+        uptime_secs: Math.round(r(3600, 200000)),
+        battery: Math.round(r(20, 100)),
+        charging: Math.random() > 0.5,
       };
     }
+    case "export_config":
+    case "import_config":
+      console.info("[demo]", cmd, args);
+      return cmd === "import_config" ? demoConfig : null;
     default:
       return null;
   }
@@ -167,6 +177,19 @@ export function logMessage(level, message) {
   }
 }
 
+/** Pick a path to save a file to (for exporting config). */
+export async function pickSavePath(defaultName) {
+  if (T && T.dialog && T.dialog.save) {
+    return T.dialog.save({ defaultPath: defaultName, filters: [{ name: "JSON", extensions: ["json"] }] });
+  }
+  return window.prompt("Guardar como:", defaultName) || null;
+}
+
+/** Pick a JSON file (for importing config). */
+export function pickJsonFile() {
+  return pickFile([{ name: "JSON", extensions: ["json"] }]);
+}
+
 /** Open a native file picker for choosing a custom icon image. */
 export function pickImageFile() {
   return pickFile([
@@ -198,13 +221,16 @@ export async function onConfigChanged(cb) {
   return T.event.listen("booki://config-changed", () => cb());
 }
 
-/** Subscribe to OS file-drop events (dragging items from the desktop). */
-export async function onFileDrop({ onEnter, onLeave, onDrop } = {}) {
+/** Subscribe to OS file-drop events (dragging items from the desktop). The
+    position (physical px, window-relative) lets the dock target a specific tile. */
+export async function onFileDrop({ onEnter, onOver, onLeave, onDrop } = {}) {
   if (!(T && T.event && T.event.listen)) return () => {};
+  const pos = (e) => (e.payload && e.payload.position) || null;
   const unsubs = await Promise.all([
-    T.event.listen("tauri://drag-enter", () => onEnter && onEnter()),
+    T.event.listen("tauri://drag-enter", (e) => onEnter && onEnter(pos(e))),
+    T.event.listen("tauri://drag-over", (e) => onOver && onOver(pos(e))),
     T.event.listen("tauri://drag-leave", () => onLeave && onLeave()),
-    T.event.listen("tauri://drag-drop", (e) => onDrop && onDrop((e.payload && e.payload.paths) || [])),
+    T.event.listen("tauri://drag-drop", (e) => onDrop && onDrop((e.payload && e.payload.paths) || [], pos(e))),
   ]);
   return () => unsubs.forEach((u) => u());
 }
@@ -237,6 +263,9 @@ export const dock = {
   systemAccent: () => invoke("system_accent"),
   systemStats: () => invoke("system_stats"),
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
+  openChangelog: () => invoke("open_changelog"),
+  exportConfig: (path) => invoke("export_config", { path }),
+  importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),

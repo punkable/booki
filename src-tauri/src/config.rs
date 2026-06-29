@@ -37,6 +37,10 @@ pub struct PinnedApp {
     /// Child items for a "group" pin (a folder/container of other pins).
     #[serde(default)]
     pub children: Vec<PinnedApp>,
+    /// Recently opened files for this app (most-recent first) — a lightweight
+    /// jump list of things opened through Booki.
+    #[serde(default)]
+    pub recents: Vec<String>,
 }
 
 fn default_edge() -> String {
@@ -151,6 +155,10 @@ pub struct Config {
     /// Internal settings/migration revision (not user-facing).
     #[serde(default)]
     pub settings_rev: u32,
+    /// The app version whose changelog the user has already seen. When the app
+    /// updates, this differs from the running version → we show "What's new".
+    #[serde(default)]
+    pub seen_version: String,
 }
 
 impl Default for Config {
@@ -178,6 +186,7 @@ impl Default for Config {
             autostart: false,
             language: default_language(),
             settings_rev: 0,
+            seen_version: String::new(),
         }
     }
 }
