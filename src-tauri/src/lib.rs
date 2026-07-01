@@ -522,6 +522,30 @@ fn get_autostart() -> bool {
     win::get_autostart()
 }
 
+/// Send files/folders to the Recycle Bin (the dock's own UI confirms first).
+#[tauri::command]
+fn trash_paths(paths: Vec<String>) -> Result<(), String> {
+    let result = win::trash_paths(&paths);
+    if let Err(e) = &result {
+        log::error!("trash_paths failed: {e}");
+    }
+    result
+}
+
+#[tauri::command]
+fn trash_is_empty() -> bool {
+    win::trash_is_empty()
+}
+
+#[tauri::command]
+fn empty_trash() -> Result<(), String> {
+    let result = win::empty_trash();
+    if let Err(e) = &result {
+        log::error!("empty_trash failed: {e}");
+    }
+    result
+}
+
 #[derive(serde::Serialize)]
 struct DirItem {
     name: String,
@@ -877,6 +901,9 @@ pub fn run() {
             fetch_favicon,
             set_autostart,
             get_autostart,
+            trash_paths,
+            trash_is_empty,
+            empty_trash,
             list_dir,
             is_dir,
             list_installed_apps,

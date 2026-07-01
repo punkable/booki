@@ -330,6 +330,76 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 @keyframes w-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
 @keyframes w-grad { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
 
+/* ───────────────────────── Trash pin ───────────────────────── */
+/* A Recycle Bin tile: drop files on it → Booki asks → sends to the bin. */
+.tile.trash .trash-glyph {
+  display: grid;
+  place-items: center;
+  width: 74%;
+  height: 74%;
+  border-radius: var(--tile-r, 12px);
+  color: var(--ink-soft, var(--ink));
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border: 1px solid var(--stroke-light);
+}
+.tile.trash .trash-glyph svg { width: 55%; height: 55%; }
+.tile.trash.full .trash-glyph {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.tile.trash.drop-target .trash-glyph {
+  color: #fff;
+  background: #d13438;
+  border-color: #d13438;
+  transform: scale(1.06);
+}
+.tile.trash.gulp .trash-glyph { animation: trash-gulp 0.5s var(--ease-bounce); }
+@keyframes trash-gulp {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.82) rotate(-4deg); }
+  70% { transform: scale(1.1) rotate(2deg); }
+  100% { transform: scale(1); }
+}
+
+/* Confirmation popover — centered over the bar; nothing deletes without a yes. */
+.trash-pop {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  color: var(--ink);
+  font: 600 12.5px var(--font);
+  white-space: nowrap;
+  animation: notch-toast-in 0.2s var(--ease-bounce);
+}
+.trash-pop > svg { flex: 0 0 auto; color: #d13438; }
+.tp-btn {
+  border: 1px solid var(--stroke-light);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  font: 600 12px var(--font);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.tp-btn:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.tp-btn:active { transform: scale(0.96); }
+.tp-btn.danger { background: #d13438; border-color: #d13438; color: #fff; }
+.tp-btn.danger:hover { background: #b92b2f; }
+
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */
