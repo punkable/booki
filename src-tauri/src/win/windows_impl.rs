@@ -427,3 +427,67 @@ pub fn get_autostart() -> bool {
         .is_ok()
     }
 }
+
+// ──────────────────────────── Recycle bin ────────────────────────────
+
+/// Send files/folders to the Recycle Bin (undoable — NOT a permanent delete).
+/// Confirmation happens in Booki's own UI, so the shell dialog is suppressed.
+pub fn trash_paths(paths: &[String]) -> Result<(), String> {
+    use windows::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT,
+        FO_DELETE, SHFILEOPSTRUCTW,
+    };
+    if paths.is_empty() {
+        return Ok(());
+    }
+    // pFrom is a double-null-terminated list of null-separated paths.
+    let mut buf: Vec<u16> = Vec::new();
+    for p in paths {
+        buf.extend(p.encode_utf16());
+        buf.push(0);
+    }
+    buf.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(buf.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMATION.0 | FOF_SILENT.0 | FOF_NOERRORUI.0) as u16,
+        ..Default::default()
+    };
+    let code = unsafe { SHFileOperationW(&mut op) };
+    if code != 0 {
+        Err(format!("could not send to the recycle bin (code {code})"))
+    } else if op.fAnyOperationsAborted.as_bool() {
+        Err("the operation was aborted".into())
+    } else {
+        Ok(())
+    }
+}
+
+/// True when the Recycle Bin (across all drives) has no items.
+pub fn trash_is_empty() -> bool {
+    use windows::Win32::UI::Shell::{SHQueryRecycleBinW, SHQUERYRBINFO};
+    let mut info = SHQUERYRBINFO {
+        cbSize: std::mem::size_of::<SHQUERYRBINFO>() as u32,
+        ..Default::default()
+    };
+    match unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) } {
+        Ok(()) => info.i64NumItems == 0,
+        Err(_) => true,
+    }
+}
+
+/// Empty the Recycle Bin (Booki's UI asks for confirmation first).
+pub fn empty_trash() -> Result<(), String> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Shell::{
+        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI,
+    };
+    unsafe {
+        SHEmptyRecycleBinW(
+            HWND::default(),
+            PCWSTR::null(),
+            SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI,
+        )
+    }
+    .map_err(|e| e.to_string())
+}

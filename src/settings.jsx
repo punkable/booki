@@ -433,6 +433,9 @@ function PinThumb({ item }) {
   if (item.kind === "group") {
     return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("folder") }} />;
   }
+  if (item.kind === "trash") {
+    return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("trash") }} />;
+  }
   if (item.kind === "widget") {
     return <span className="pin-thumb widget">{WIDGET_EMOJI[item.widget] || "▦"}</span>;
   }
@@ -891,6 +894,10 @@ function Apps({ cfg, set }) {
   };
   const addSep = () =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
+  const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
+  const addTrash = () =>
+    !hasTrash &&
+    set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
   const addWidget = (widget, label) =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
   const newFolder = () => {
@@ -961,7 +968,7 @@ function Apps({ cfg, set }) {
               <span className="pin-actions">
                 {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
                 {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
-                {item.kind !== "separator" && item.kind !== "widget" && !isGroup && (
+                {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                   <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                 )}
                 {(item.kind === "app" || item.kind === "folder") && (
@@ -1007,6 +1014,8 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
         <button className="s-btn s-btn-soft" onClick={newFolder}>{t("apps.newFolder")}</button>
         <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
+        <button className="s-btn s-btn-soft" onClick={addTrash} disabled={hasTrash}
+          title={t("apps.trashHint")}>{t("apps.addTrash")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.widgets")}</h2>
       <p className="muted">{t("apps.widgetsHint")}</p>

@@ -36,3 +36,15 @@ pub fn set_autostart(_enabled: bool, _exe: &str) -> Result<(), String> {
 pub fn get_autostart() -> bool {
     false
 }
+
+pub fn trash_paths(_paths: &[String]) -> Result<(), String> {
+    Err("recycle bin is only available on Windows".into())
+}
+
+pub fn trash_is_empty() -> bool {
+    true
+}
+
+pub fn empty_trash() -> Result<(), String> {
+    Err("recycle bin is only available on Windows".into())
+}

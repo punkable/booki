@@ -117,6 +117,7 @@ async function render() {
     if (item.kind === "separator") tile = separatorTile(item);
     else if (item.kind === "group") tile = await groupTile(item);
     else if (item.kind === "widget") tile = widgetTile(item);
+    else if (item.kind === "trash") tile = trashTile(item);
     else tile = await appTile(item);
     dockEl.appendChild(tile);
   }
@@ -246,6 +247,30 @@ async function groupTile(item) {
   el.addEventListener("contextmenu", (e) => openMenu(e, item));
   el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
   return el;
+}
+
+// Recycle Bin pin: drop files on it to delete (with an in-dock confirmation);
+// click opens the bin. The icon tints when the bin has items in it.
+function trashTile(item) {
+  const el = document.createElement("button");
+  el.className = "tile trash";
+  el.dataset.id = item.id;
+  el.style.setProperty("--size", `${baseSize()}px`);
+  el.title = t("trash.name");
+  el.innerHTML =
+    `<span class="label">${t("trash.name")}</span>` +
+    `<span class="trash-glyph">${icon("trash")}</span>`;
+  el.addEventListener("contextmenu", (e) => openMenu(e, item));
+  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  refreshTrashState(el);
+  return el;
+}
+
+async function refreshTrashState(el) {
+  const tile = el || dockEl.querySelector(".tile.trash");
+  if (!tile) return;
+  const empty = await dockApi.trashIsEmpty().catch(() => true);
+  tile.classList.toggle("full", !empty);
 }
 
 function separatorTile(item) {
@@ -437,6 +462,11 @@ async function resolveIcon(item) {
 function launch(el, item) {
   // Widgets aren't launchers — clicking does nothing.
   if (item.kind === "widget") return;
+  // The trash pin opens the Recycle Bin.
+  if (item.kind === "trash") {
+    dockApi.launch("shell:RecycleBinFolder", []);
+    return;
+  }
   // Folder pins and groups open a "stack"/folder flyout instead of launching.
   if (item.kind === "folder" || item.kind === "group") {
     toggleStack(el, item);
@@ -847,6 +877,13 @@ async function takeOutChild(group, childId) {
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
   if (editMode && !closestSel(e.target, ".tile")) exitEdit();
+  // Clicking anywhere outside the trash confirmation cancels it (never delete
+  // on an ambiguous gesture).
+  if (trashPop && !closestSel(e.target, ".trash-pop")) {
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  }
 });
 
 // ───────────────────────── Context menu ─────────────────────────
@@ -875,6 +912,8 @@ function openMenu(e, item) {
       if (item.kind === "folder" || item.kind === "group") {
         const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
         if (tileEl) toggleStack(tileEl, item);
+      } else if (item.kind === "trash") {
+        dockApi.launch("shell:RecycleBinFolder", []);
       } else {
         dockApi.launch(item.path, item.args || []);
       }
@@ -894,6 +933,7 @@ function openMenu(e, item) {
       if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
+    if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true));
     sep();
   }
   add("plus", t("m.addApp"), onAddApp);
@@ -974,6 +1014,7 @@ window.addEventListener("keydown", (e) => {
     exitEdit();
     closeStack();
     cancelDrag();
+    closeTrashPop();
   }
 });
 
@@ -1215,6 +1256,61 @@ function setDropTarget(el) {
   if (el) el.classList.add("drop-target");
 }
 
+// ─────────────────────── Trash confirmation ───────────────────────
+// A small in-dock popover: nothing is ever deleted without an explicit yes.
+// Files go to the Recycle Bin (undoable), never a permanent delete.
+
+let trashPop = null;
+function closeTrashPop() {
+  if (trashPop) trashPop.remove();
+  trashPop = null;
+}
+
+function confirmTrash(paths, emptyBin = false) {
+  closeTrashPop();
+  pinnedReveal = true; // keep the dock open while the question is on screen
+  const n = paths.length;
+  const text = emptyBin
+    ? t("trash.emptyAsk")
+    : (n === 1 ? t("trash.askOne").replace("{name}", baseName(paths[0])) : t("trash.ask").replace("{n}", n));
+  const pop = document.createElement("div");
+  pop.className = "trash-pop";
+  pop.innerHTML = `${icon("trash")}<span class="tp-text">${text}</span>`;
+  const mkBtn = (cls, label, fn) => {
+    const b = document.createElement("button");
+    b.className = `tp-btn ${cls}`;
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    pop.appendChild(b);
+    return b;
+  };
+  mkBtn("danger", emptyBin ? t("trash.empty") : t("trash.delete"), async () => {
+    closeTrashPop();
+    try {
+      if (emptyBin) await dockApi.emptyTrash();
+      else await dockApi.trashPaths(paths);
+      const tile = dockEl.querySelector(".tile.trash");
+      if (tile) {
+        tile.classList.remove("gulp");
+        void tile.offsetWidth;
+        tile.classList.add("gulp");
+      }
+    } catch (err) {
+      logMessage(`trash: ${err}`);
+    }
+    await refreshTrashState();
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  mkBtn("", t("trash.cancel"), () => {
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  document.body.appendChild(pop);
+  trashPop = pop;
+}
+
 // Open files with an app and remember them as recents (a small jump list).
 async function openWith(item, paths) {
   for (const p of paths) dockApi.launch(item.path, [p]);
@@ -1248,6 +1344,11 @@ function setupFileDrop() {
         await openWith(item, paths);
         return;
       }
+      // Dropped onto the trash pin → confirm, then send to the Recycle Bin.
+      if (item && item.kind === "trash") {
+        confirmTrash(paths);
+        return;
+      }
       // Otherwise pin them to the dock.
       await addPaths(paths);
     },
@@ -1270,7 +1371,7 @@ function startRunningPoll() {
       const wins = await dockApi.listWindows();
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
-        if (!app || app.kind === "separator") return;
+        if (!app || app.kind === "separator" || app.kind === "trash") return;
         const name = (app.name || "").toLowerCase();
         const matches = name ? wins.filter((w) => w.title.toLowerCase().includes(name)) : [];
         const badge = t.querySelector(".badge");

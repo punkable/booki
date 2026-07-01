@@ -50,6 +50,7 @@ const DEMO_CONFIG = {
   language: "system",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
+let demoTrashItems = 2; // browser demo: pretend the bin has something in it
 
 async function mockInvoke(cmd, args) {
   switch (cmd) {
@@ -114,6 +115,14 @@ async function mockInvoke(cmd, args) {
       return null;
     case "take_pending_changelog":
       return false;
+    case "trash_paths":
+      demoTrashItems += ((args && args.paths) || []).length;
+      return null;
+    case "trash_is_empty":
+      return demoTrashItems === 0;
+    case "empty_trash":
+      demoTrashItems = 0;
+      return null;
     case "open_location":
     case "set_hotkey":
     case "set_material":
@@ -274,6 +283,9 @@ export const dock = {
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
   openChangelog: () => invoke("open_changelog"),
   takePendingChangelog: () => invoke("take_pending_changelog"),
+  trashPaths: (paths) => invoke("trash_paths", { paths }),
+  trashIsEmpty: () => invoke("trash_is_empty"),
+  emptyTrash: () => invoke("empty_trash"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),

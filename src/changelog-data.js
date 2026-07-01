@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.7.0",
+    date: "1 jul 2026",
+    headline: "Llega la papelera al dock: arrastra, confirma y fuera.",
+    sections: [
+      {
+        icon: "🗑️",
+        title: "Papelera en el dock",
+        notes: [
+          "Añádela desde Ajustes → Elementos y arrastra archivos, accesos o carpetas encima para borrarlos.",
+          "Booki siempre pregunta antes; todo va a la Papelera de reciclaje (nada se borra para siempre).",
+          "El icono se tiñe cuando la papelera tiene cosas; clic la abre y con clic derecho puedes vaciarla.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Pulido",
+        notes: [
+          "Pequeños retoques visuales y de interacción por todo el dock.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.6.1",
     date: "1 jul 2026",
     headline: "Adiós a la ventana blanca, y el notch por fin se siente parte de la barra de tareas.",
