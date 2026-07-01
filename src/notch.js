@@ -13,7 +13,11 @@ async function applyLook() {
   try {
     const cfg = await configApi.get();
     if (cfg.accent) applyAccent(root, cfg.accent);
-    document.body.classList.toggle("vertical", cfg.edge === "left" || cfg.edge === "right");
+    const edge = cfg.edge || "bottom";
+    document.body.classList.toggle("vertical", edge === "left" || edge === "right");
+    document.body.classList.toggle("peek", cfg.notchPeek !== false);
+    document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
+    document.body.classList.add(`edge-${edge}`);
   } catch (_) {
     /* keep defaults */
   }

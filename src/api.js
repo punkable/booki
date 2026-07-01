@@ -108,10 +108,15 @@ async function mockInvoke(cmd, args) {
           ],
         },
       ];
+    case "set_autostart":
+      demoConfig.autostart = !!(args && args.enabled);
+      console.info("[demo]", cmd, args);
+      return null;
+    case "take_pending_changelog":
+      return false;
     case "open_location":
     case "set_hotkey":
     case "set_material":
-    case "set_autostart":
       console.info("[demo]", cmd, args);
       return null;
     case "fetch_favicon":
@@ -268,6 +273,7 @@ export const dock = {
   systemStats: () => invoke("system_stats"),
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
   openChangelog: () => invoke("open_changelog"),
+  takePendingChangelog: () => invoke("take_pending_changelog"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
