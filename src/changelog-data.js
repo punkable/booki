@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.6.1",
+    date: "1 jul 2026",
+    headline: "Adiós a la ventana blanca, y el notch por fin se siente parte de la barra de tareas.",
+    sections: [
+      {
+        icon: "🛠️",
+        title: "Arreglado de verdad",
+        notes: [
+          "Abrir las novedades ya no deja Ajustes en blanco ni cuelga la app.",
+          "«Iniciar con Windows» ahora sí inicia con Windows: se escribe directo en el arranque del sistema y el interruptor refleja el estado real.",
+          "El notch ya no se recorta al crecer cuando pasas el cursor.",
+        ],
+      },
+      {
+        icon: "📌",
+        title: "Notch integrado",
+        notes: [
+          "En modo sutil, el notch asoma desde detrás de la barra de tareas como una pestañita, con las esquinas hacia afuera redondeadas — como si fuera parte de la barra.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.6.0",
     date: "29 jun 2026",
     headline: "Booki se aparta solo cuando juegas o ves una peli, y el notch ya no estorba.",

@@ -45,8 +45,8 @@ unsafe fn resolve_shortcut_target(path: &str) -> Option<String> {
     let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
     let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
     let pf: IPersistFile = link.cast().ok()?;
-    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    pf.Load(PCWSTR(wide.as_ptr()), STGM_READ).ok()?;
+    let wpath = wide(path);
+    pf.Load(PCWSTR(wpath.as_ptr()), STGM_READ).ok()?;
     let mut buf = [0u16; 260];
     let mut fd = WIN32_FIND_DATAW::default();
     link.GetPath(&mut buf, &mut fd, 0u32).ok()?;
@@ -68,12 +68,12 @@ unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
             }
         }
     }
-    let wide: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
+    let wtarget = wide(&target);
     let mut info = SHFILEINFOW::default();
     // Read the real icon of the file/exe/shortcut/folder on disk (no
     // USEFILEATTRIBUTES) so custom executable icons come through.
     let res = SHGetFileInfoW(
-        PCWSTR(wide.as_ptr()),
+        PCWSTR(wtarget.as_ptr()),
         FILE_FLAGS_AND_ATTRIBUTES(0),
         Some(&mut info),
         std::mem::size_of::<SHFILEINFOW>() as u32,
@@ -346,5 +346,84 @@ pub fn focus_window(hwnd: isize) -> bool {
             let _ = ShowWindow(handle, SW_RESTORE);
         }
         SetForegroundWindow(handle).as_bool()
+    }
+}
+
+// ──────────────────────────── Autostart ────────────────────────────
+// Written straight to HKCU\...\Run (the classic per-user startup list) so the
+// state is deterministic and verifiable — no plugin between us and the registry.
+
+const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const RUN_VALUE: &str = "Booki";
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Add or remove the "start with Windows" registry entry for this exe.
+pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
+    use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+        KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ,
+    };
+    let key_path = wide(RUN_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        let mut key = HKEY::default();
+        let opened = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            0,
+            None,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        );
+        if opened.is_err() {
+            return Err(format!("could not open the Run registry key ({opened:?})"));
+        }
+        let result = if enabled {
+            // Quote the path so spaces in the install dir can't break the command.
+            let cmd = wide(&format!("\"{exe}\""));
+            let bytes =
+                std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
+            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_SZ, Some(bytes));
+            if r.is_err() {
+                Err(format!("could not write the Run registry value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        } else {
+            let r = RegDeleteValueW(key, PCWSTR(value_name.as_ptr()));
+            if r.is_err() && r != ERROR_FILE_NOT_FOUND {
+                Err(format!("could not delete the Run registry value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        };
+        let _ = RegCloseKey(key);
+        result
+    }
+}
+
+/// True when the "start with Windows" registry entry exists.
+pub fn get_autostart() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key_path = wide(RUN_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            PCWSTR(value_name.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            None,
+            None,
+        )
+        .is_ok()
     }
 }

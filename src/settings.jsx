@@ -631,7 +631,18 @@ function Behavior({ cfg, set }) {
       <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <Toggle label={t("be.autostart")} checked={autostart}
-        onChange={(v) => { setAutostart(v); set({ autostart: v }); dockApi.setAutostart(v); }} />
+        onChange={async (v) => {
+          setAutostart(v);
+          try {
+            await dockApi.setAutostart(v);
+          } catch (e) {
+            console.error("autostart:", e);
+          }
+          // Trust the registry, not our optimism: re-read and reflect reality.
+          const real = !!(await dockApi.getAutostart().catch(() => v));
+          setAutostart(real);
+          set({ autostart: real });
+        }} />
       {cfg.autoHideMode === "edge" && (
         <Row label={t("be.hideDelay")}>
           <Slider value={cfg.autoHideDelay} min={0} max={2000} step={50}
@@ -1185,14 +1196,15 @@ function App() {
   const [cfg, setCfg] = useState(null);
   const [tab, setTab] = useState("appearance");
   const [version, setVersion] = useState("0.1.0");
-  const [showChangelog, setShowChangelog] = useState(
-    typeof location !== "undefined" && location.hash === "#changelog"
-  );
+  const [showChangelog, setShowChangelog] = useState(false);
   const saveTimer = useRef(null);
 
-  // Show "What's new" when the dock asks us to (first run after an update).
+  // Show "What's new" when the dock asks us to: either it was requested before
+  // this window existed (pending flag, asked once on mount) or it arrives live
+  // as an event while the window is open.
   useEffect(() => {
     let un;
+    dockApi.takePendingChangelog().then((v) => v && setShowChangelog(true)).catch(() => {});
     onShowChangelog(() => setShowChangelog(true)).then((u) => (un = u));
     return () => un && un();
   }, []);

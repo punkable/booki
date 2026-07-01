@@ -16,7 +16,14 @@ use tauri::{
 };
 
 use config::Config;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+
+/// Set when the changelog was requested before the settings window existed; the
+/// settings page asks for it on mount (`take_pending_changelog`). A plain flag —
+/// never a URL hash — so the settings window always loads its normal, known-good
+/// URL (a hash in the app URL made the window come up blank on Windows).
+static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
@@ -368,17 +375,22 @@ fn set_dock_edge(app: AppHandle, edge: String) {
 /// Show the "What's new" changelog. To avoid a fragile extra window (which on
 /// some setups came up blank and could crash the app), it's shown INSIDE the
 /// stable settings window: if settings is open we just signal it; otherwise we
-/// open settings on the changelog view via a URL hash.
+/// set a flag the settings page picks up on mount and open settings normally.
 #[tauri::command]
 fn open_changelog(app: AppHandle) {
-    if app.get_webview_window("settings").is_some() {
+    if let Some(w) = app.get_webview_window("settings") {
         let _ = app.emit("booki://show-changelog", ());
-        if let Some(w) = app.get_webview_window("settings") {
-            let _ = w.set_focus();
-        }
+        let _ = w.set_focus();
     } else {
-        open_settings_url(&app, "settings.html#changelog");
+        PENDING_CHANGELOG.store(true, Ordering::Relaxed);
+        open_settings_window(&app);
     }
+}
+
+/// Read-and-clear the "open on the changelog" flag (asked by settings on mount).
+#[tauri::command]
+fn take_pending_changelog() -> bool {
+    PENDING_CHANGELOG.swap(false, Ordering::Relaxed)
 }
 
 /// Export the current config to a JSON file the user picked.
@@ -413,10 +425,11 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let cfg = config::load();
     let vertical = edge == "left" || edge == "right";
     // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
-    // slightly larger pill with a small margin.
+    // slightly larger pill with a small margin. The window must be a bit larger
+    // than the pill's HOVER size (156×11) or the grow animation gets clipped.
     let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
-        (true, true) => (22.0, 150.0),
-        (true, false) => (150.0, 22.0),
+        (true, true) => (28.0, 170.0),
+        (true, false) => (170.0, 28.0),
         (false, true) => (26.0, 184.0),
         (false, false) => (184.0, 26.0),
     };
@@ -425,6 +438,14 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
     let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
+    // Peek style: slide a few px past the work area, INTO the taskbar band, so the
+    // pill looks like a tab emerging from behind the taskbar (the notch window is
+    // topmost, so the overlapped strip draws over the bar — no seam).
+    let overlap: i32 = if cfg.notch_peek {
+        (6.0 * dpr).round() as i32
+    } else {
+        0
+    };
     // Offset along the anchored edge so it can dodge subtitles / chat boxes.
     let along = |start: i32, span: i32, win: i32| -> i32 {
         let want = match cfg.notch_position.as_str() {
@@ -438,10 +459,10 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         want.max(lo).min(hi)
     };
     let (x, y) = match edge {
-        "top" => (along(ax, aw, ww), ay + margin),
-        "left" => (ax + margin, along(ay, ah, wh)),
-        "right" => (ax + aw - ww - margin, along(ay, ah, wh)),
-        _ => (along(ax, aw, ww), ay + ah - wh - margin),
+        "top" => (along(ax, aw, ww), ay + margin - overlap),
+        "left" => (ax + margin - overlap, along(ay, ah, wh)),
+        "right" => (ax + aw - ww - margin + overlap, along(ay, ah, wh)),
+        _ => (along(ax, aw, ww), ay + ah - wh - margin + overlap),
     };
     notch
         .set_position(PhysicalPosition::new(x, y))
@@ -487,20 +508,18 @@ fn hide_all(app: AppHandle) {
 }
 
 #[tauri::command]
-fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
-    use tauri_plugin_autostart::ManagerExt;
-    let m = app.autolaunch();
-    if enabled {
-        m.enable().map_err(|e| e.to_string())
-    } else {
-        m.disable().map_err(|e| e.to_string())
+fn set_autostart(enabled: bool) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let result = win::set_autostart(enabled, &exe.to_string_lossy());
+    if let Err(e) = &result {
+        log::error!("set_autostart({enabled}) failed: {e}");
     }
+    result
 }
 
 #[tauri::command]
-fn get_autostart(app: AppHandle) -> bool {
-    use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch().is_enabled().unwrap_or(false)
+fn get_autostart() -> bool {
+    win::get_autostart()
 }
 
 #[derive(serde::Serialize)]
@@ -822,10 +841,6 @@ pub fn run() {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
@@ -845,6 +860,7 @@ pub fn run() {
             hide_all,
             set_dock_edge,
             open_changelog,
+            take_pending_changelog,
             export_config,
             import_config,
             image_data_uri,

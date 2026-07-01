@@ -28,3 +28,11 @@ pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: i
 pub fn is_fullscreen() -> bool {
     false
 }
+
+pub fn set_autostart(_enabled: bool, _exe: &str) -> Result<(), String> {
+    Err("autostart is only available on Windows".into())
+}
+
+pub fn get_autostart() -> bool {
+    false
+}
