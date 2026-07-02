@@ -13,11 +13,17 @@ async function applyLook() {
   try {
     const cfg = await configApi.get();
     if (cfg.accent) applyAccent(root, cfg.accent);
-    const edge = cfg.edge || "bottom";
+    // The notch may live on its own edge ("auto" = follow the dock).
+    const edge =
+      cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : cfg.edge || "bottom";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
     document.body.classList.toggle("peek", cfg.notchPeek !== false);
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
+    document.body.classList.remove(
+      "style-island", "style-liquid", "style-mica", "style-acrylic", "style-windows"
+    );
+    document.body.classList.add(`style-${cfg.notchStyle || "island"}`);
   } catch (_) {
     /* keep defaults */
   }

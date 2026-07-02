@@ -29,7 +29,7 @@ const DEMO_CONFIG = {
   edge: "bottom",
   accent: "#dfaa75",
   theme: "system",
-  iconSize: 48,
+  iconSize: 36,
   magnification: false,
   zoom: 1.25,
   spacing: 6,
@@ -115,6 +115,12 @@ async function mockInvoke(cmd, args) {
       return null;
     case "take_pending_changelog":
       return false;
+    case "open_settings_tab":
+    case "take_pending_tab":
+      return null;
+    case "paths_exist":
+      // Demo: pretend one path is missing so the reassign UI can be seen.
+      return ((args && args.paths) || []).map((p) => !/photos/i.test(p));
     case "trash_paths":
       demoTrashItems += ((args && args.paths) || []).length;
       return null;
@@ -296,6 +302,8 @@ export const dock = {
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
   openChangelog: () => invoke("open_changelog"),
   takePendingChangelog: () => invoke("take_pending_changelog"),
+  openSettingsTab: (tab) => invoke("open_settings_tab", { tab }),
+  takePendingTab: () => invoke("take_pending_tab"),
   trashPaths: (paths) => invoke("trash_paths", { paths }),
   trashIsEmpty: () => invoke("trash_is_empty"),
   emptyTrash: () => invoke("empty_trash"),
@@ -306,12 +314,19 @@ export const dock = {
   mediaPrev: () => invoke("media_prev"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
+  pathsExist: (paths) => invoke("paths_exist", { paths }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: () => invoke("list_installed_apps"),
 };
+
+/** Listen for "switch to a pending settings tab" (settings re-asks the backend). */
+export async function onShowTab(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://show-tab", () => cb());
+}
 
 /** Listen for a position hotkey (modifier+1…9): launch the Nth dock item. */
 export async function onLaunchIndex(cb) {
