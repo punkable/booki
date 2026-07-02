@@ -488,6 +488,9 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   50% { transform: scale(1.06); }
 }
 .tile.widget.media .w-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Long song titles must not balloon the card (and with it, the whole bar). */
+.tile.widget.media .w-main { max-width: 118px; min-width: 0; }
+.tile.widget.media .w-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
@@ -1185,6 +1188,11 @@ body.settings-body {
 .s-search-results button:hover { background: var(--hover); }
 .s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
 .s-search-none { font: 500 12px var(--font); color: var(--ink-2); padding: 8px 9px; }
+
+/* Button with a leading icon (e.g. "What's new" in About). */
+.s-btn-ico { display: inline-flex; align-items: center; gap: 7px; }
+.s-btn-glyph { display: grid; place-items: center; }
+.s-btn-glyph svg { width: 15px; height: 15px; }
 
 .s-navicon { display: grid; place-items: center; color: var(--ink-2); }
 .s-navicon svg { width: 16px; height: 16px; }

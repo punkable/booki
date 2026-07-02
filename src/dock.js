@@ -36,6 +36,11 @@ const dropOverlay = document.getElementById("drop-overlay");
 // which would throw "closest is not a function".
 const closestSel = (target, sel) => (target && target.closest ? target.closest(sel) : null);
 
+// Escape user-controlled text (file/app names) before it goes into innerHTML —
+// a file literally named "<img onerror=…>.txt" must render as text, not run.
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
 let cfg = null;
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -1035,7 +1040,7 @@ function openMenu(e, item) {
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn) => {
     const b = document.createElement("button");
-    b.innerHTML = `${icon(iconName)}<span>${text}</span>`;
+    b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
       closeMenu();
       await fn();
@@ -1217,6 +1222,13 @@ async function removeItem(id) {
 }
 
 // ─────────────────── Window frame (magnify headroom) ───────────────────
+
+// Widgets change size when their data arrives (music title, network rates…) —
+// watch the bar's real layout size and re-fit the window whenever it moves, so
+// nothing ever gets cut off at the window edge.
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(() => reframe()).observe(dockEl);
+}
 
 let reframeTimer = null;
 function reframe() {
@@ -1497,7 +1509,7 @@ function confirmTrash(paths, emptyBin = false) {
   const n = paths.length;
   const text = emptyBin
     ? t("trash.emptyAsk")
-    : (n === 1 ? t("trash.askOne").replace("{name}", baseName(paths[0])) : t("trash.ask").replace("{n}", n));
+    : (n === 1 ? t("trash.askOne").replace("{name}", esc(baseName(paths[0]))) : t("trash.ask").replace("{n}", n));
   const pop = document.createElement("div");
   pop.className = "trash-pop";
   pop.innerHTML =
@@ -1719,8 +1731,8 @@ async function toggleStack(tileEl, item) {
     const ic = isGroup ? await resolveIcon(it) : await dockApi.appIcon(it.path);
     const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
     cell.innerHTML =
-      (ic ? `<img src="${ic}" alt="" />` : `<span class="stack-glyph">${isDir ? "📁" : (it.name[0] || "?").toUpperCase()}</span>`) +
-      `<span class="stack-name">${it.name}</span>`;
+      (ic ? `<img src="${esc(ic)}" alt="" />` : `<span class="stack-glyph">${isDir ? "📁" : esc((it.name[0] || "?").toUpperCase())}</span>`) +
+      `<span class="stack-name">${esc(it.name)}</span>`;
     cell.addEventListener("click", () => {
       if (it.path) dockApi.launch(it.path, it.args || []);
       closeStack();

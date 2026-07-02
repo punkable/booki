@@ -1249,8 +1249,10 @@ function About({ version, onWhatsNew }) {
           </div>
         )}
         <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
-        <button className="s-btn s-btn-soft" style={{ marginTop: 8 }} onClick={onWhatsNew}
-          dangerouslySetInnerHTML={{ __html: icon("sparkles") + `<span>${t("ab.whatsNew")}</span>` }} />
+        <button className="s-btn s-btn-soft s-btn-ico" style={{ marginTop: 8 }} onClick={onWhatsNew}>
+          <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
+          <span>{t("ab.whatsNew")}</span>
+        </button>
       </div>
 
       <p className="muted" style={{ marginTop: 14 }}>{t("ab.made")}</p>

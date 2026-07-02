@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.8.3",
+    date: "2 jul 2026",
+    headline: "El dock ya no se corta al crecer, y un repaso de seguridad a fondo.",
+    sections: [
+      {
+        icon: "📐",
+        title: "Ancho siempre correcto",
+        notes: [
+          "Añadir widgets (como la música) o más elementos ya no corta la barra: la ventana se ajusta sola cuando el contenido cambia de tamaño.",
+          "Los títulos de canciones largos se recortan con puntos suspensivos en vez de estirar la tarjeta.",
+        ],
+      },
+      {
+        icon: "🔒",
+        title: "Más seguro",
+        notes: [
+          "Blindaje interno: los nombres de archivo raros ya no pueden interferir con el dock, y abrir apps y enlaces usa la vía más segura de Windows.",
+          "Recordatorio: Booki funciona sin conexión, sin telemetría y guarda todo localmente.",
+        ],
+      },
+      {
+        icon: "🛠️",
+        title: "Arreglos",
+        notes: [
+          "El botón «Ver novedades» de Acerca de vuelve a verse y funcionar bien.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.2",
     date: "2 jul 2026",
     headline: "Todo más fluido: menos parpadeos, fotos con miniatura y sugerencias ordenadas.",
