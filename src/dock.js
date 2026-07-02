@@ -18,6 +18,7 @@ import {
   isTauri,
 } from "./api.js";
 import { icon } from "./icons.js";
+import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
@@ -331,8 +332,10 @@ function separatorTile(item) {
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
 const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media"];
+// Fluent 3D emoji per widget (bundled — see emoji.js).
 const WIDGET_ICONS = {
-  clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝", media: "🎵",
+  clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna",
+  uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes",
 };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
@@ -364,7 +367,7 @@ function widgetTile(item) {
   const card = document.createElement("span");
   card.className = "w-card";
   card.innerHTML =
-    `<span class="w-ico">${WIDGET_ICONS[type] || "▦"}</span>` +
+    `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>` +
     `<span class="w-main">` +
     `<span class="w-label"></span>` +
     `<span class="w-value">…</span>` +
@@ -704,9 +707,9 @@ async function checkChangelog() {
 async function maybeOnboard() {
   if (cfg.onboarded) return;
   const steps = [
-    { emoji: "👆", text: t("ob.step1") },
-    { emoji: "🗂️", text: t("ob.step2") },
-    { emoji: "🦫", text: t("ob.step3") },
+    { emoji: emo("pointer", 22), text: t("ob.step1") },
+    { emoji: emo("card", 22), text: t("ob.step2") },
+    { emoji: emo("beaver", 22), text: t("ob.step3") },
   ];
   let i = 0;
   pinnedReveal = true; // keep the dock open during the tour
@@ -1349,7 +1352,9 @@ function reframe() {
 
 // Transparent breathing room around the bar so the dock's drop shadow and the
 // magnified tiles have room to render without being clipped by the window edge.
-const SHADOW_PAD = 22;
+// Room around the bar inside the transparent window: the soft shadow AND
+// magnified tiles must fit here or the window edge slices them off.
+const SHADOW_PAD = 36;
 
 let lastFull = null;
 function computeFrame() {
@@ -1676,7 +1681,7 @@ function trashBlockedInfo() {
   const pop = document.createElement("div");
   pop.className = "trash-pop blocked";
   pop.innerHTML =
-    `<span class="tp-emoji">🛡️</span><span class="tp-col">` +
+    `<span class="tp-emoji">${emo("shield", 24)}</span><span class="tp-col">` +
     `<span class="tp-text">${t("trash.blocked")}</span>` +
     `<span class="tp-sub">${t("trash.blockedSub")}</span></span>`;
   const ok = document.createElement("button");
@@ -1908,7 +1913,7 @@ async function toggleStack(tileEl, item) {
     const ic = isGroup ? await resolveIcon(it) : await dockApi.appIcon(it.path);
     const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
     cell.innerHTML =
-      (ic ? `<img src="${esc(ic)}" alt="" />` : `<span class="stack-glyph">${isDir ? "📁" : esc((it.name[0] || "?").toUpperCase())}</span>`) +
+      (ic ? `<img src="${esc(ic)}" alt="" />` : `<span class="stack-glyph">${isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase())}</span>`) +
       `<span class="stack-name">${esc(it.name)}</span>`;
     cell.addEventListener("click", () => {
       if (it.path) dockApi.launch(it.path, it.args || []);

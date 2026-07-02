@@ -19,6 +19,7 @@ import {
   logMessage,
 } from "./api.js";
 import { CHANGELOG } from "./changelog-data.js";
+import { emoSrc } from "./emoji.js";
 
 // One-click theme presets (accent + light/dark).
 const THEME_PRESETS = [
@@ -404,25 +405,27 @@ function AccentPicker({ value, onChange }) {
         </label>
         <button
           type="button"
-          className="accent-system"
+          className="accent-src"
           title={t("ap.system")}
           onClick={async () => {
             const hex = await dockApi.systemAccent();
             if (hex) onChange(hex);
           }}
         >
-          ⊙
+          <span className="accent-src-dot" />
+          {t("ap.systemShort")}
         </button>
         <button
           type="button"
-          className="accent-system"
+          className="accent-src"
           title={t("ap.wallpaper")}
           onClick={async () => {
             const hex = await dockApi.wallpaperAccent().catch(() => null);
             if (hex) onChange(hex);
           }}
         >
-          🖼
+          <img className="emo" src={emoSrc("picture")} alt="" width="15" height="15" />
+          {t("ap.wallpaperShort")}
         </button>
       </div>
       <span className="accent-hex">{(value || "").toUpperCase()}</span>
@@ -569,7 +572,13 @@ function PinThumb({ item }) {
     return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("trash") }} />;
   }
   if (item.kind === "widget") {
-    return <span className="pin-thumb widget">{WIDGET_EMOJI[item.widget] || "▦"}</span>;
+    return (
+      <span className="pin-thumb widget">
+        {WIDGET_EMOJI[item.widget]
+          ? <img className="emo" src={emoSrc(WIDGET_EMOJI[item.widget])} alt="" width="18" height="18" />
+          : "▦"}
+      </span>
+    );
   }
   return (
     <span className="pin-thumb">
@@ -578,7 +587,7 @@ function PinThumb({ item }) {
   );
 }
 
-const WIDGET_EMOJI = { clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝" };
+const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes" };
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -672,6 +681,9 @@ function Appearance({ cfg, set }) {
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
+      <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
+        <NotchStylePicker cfg={cfg} set={set} />
+      </Row>
 
       <h2 className="s-subhead">{t("gp.general")}</h2>
       <Row label={t("ap.language")}>
@@ -740,9 +752,6 @@ function Behavior({ cfg, set }) {
           <h2 className="s-subhead">{t("gp.notch")}</h2>
           <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
             <NotchPicker cfg={cfg} set={set} />
-          </Row>
-          <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
-            <NotchStylePicker cfg={cfg} set={set} />
           </Row>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => set({ notchPeek: v })} />
@@ -1126,9 +1135,9 @@ function Apps({ cfg, set }) {
       <p className="muted">{t("apps.hint")}</p>
       {cfg.pinned.length === 0 && (
         <div className="s-tips">
-          <div className="s-tip"><span>🖱️</span>{t("apps.tips1")}</div>
-          <div className="s-tip"><span>⭐</span>{t("apps.tips2")}</div>
-          <div className="s-tip"><span>🧩</span>{t("apps.tips3")}</div>
+          <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
+          <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
+          <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
         </div>
       )}
       <ul className="pin-list" ref={listRef}>
@@ -1332,10 +1341,14 @@ function capybaraParade() {
   }
 }
 
+// Real network logos (official marks, drawn inline so they ship offline).
+const BTC_SVG = `<svg viewBox="0 0 32 32" width="30" height="30"><circle cx="16" cy="16" r="16" fill="#F7931A"/><path fill="#fff" d="M22.4 14.1c.3-2.1-1.3-3.2-3.5-4l.7-2.8-1.7-.4-.7 2.7c-.45-.11-.91-.22-1.37-.32l.7-2.75-1.7-.43-.7 2.83c-.37-.08-.73-.17-1.08-.26l-2.36-.59-.46 1.83s1.27.29 1.24.31c.69.17.82.63.8.99l-.8 3.22c.05.01.11.03.18.06l-.18-.05-1.13 4.51c-.08.21-.3.53-.78.41.02.02-1.24-.31-1.24-.31l-.85 1.96 2.22.55c.41.11.82.21 1.22.32l-.71 2.86 1.7.43.71-2.84c.47.13.92.24 1.36.35l-.7 2.82 1.7.43.71-2.86c2.92.55 5.11.33 6.03-2.31.75-2.12-.03-3.35-1.57-4.15 1.12-.26 1.96-1 2.18-2.52zm-3.9 5.49c-.53 2.12-4.1.98-5.26.69l.94-3.77c1.16.29 4.87.86 4.32 3.08zm.53-5.52c-.48 1.93-3.45.95-4.42.71l.85-3.42c.96.24 4.07.69 3.57 2.71z"/></svg>`;
+const SOL_SVG = `<svg viewBox="0 0 398 312" width="26" height="26"><defs><linearGradient id="solg" x1="360" y1="-40" x2="40" y2="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs><path fill="url(#solg)" d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7zM64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8zM333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z"/></svg>`;
+
 const DONATE = [
-  { key: "btc", name: "Bitcoin", glyph: "₿", cls: "btc",
+  { key: "btc", name: "Bitcoin", svg: BTC_SVG,
     addr: "bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3" },
-  { key: "sol", name: "Solana", glyph: "◎", cls: "sol",
+  { key: "sol", name: "Solana", svg: SOL_SVG,
     addr: "JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W" },
 ];
 
@@ -1357,7 +1370,7 @@ function DonateCard() {
       <div className="donate">
         {DONATE.map((d) => (
           <div key={d.key} className="donate-row">
-            <span className={`donate-ico ${d.cls}`}>{d.glyph}</span>
+            <span className="donate-ico" dangerouslySetInnerHTML={{ __html: d.svg }} />
             <span className="donate-col">
               <strong>{d.name}</strong>
               <code title={d.addr}>{short(d.addr)}</code>
@@ -1372,7 +1385,34 @@ function DonateCard() {
   );
 }
 
-function About({ version, onWhatsNew }) {
+// Reset lives HERE (not next to Quit in the sidebar — too easy to hit by
+// accident) and requires a second, explicit click.
+function ResetZone({ onReset }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const tm = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(tm);
+  }, [armed]);
+  return (
+    <div className="s-card-inner">
+      <h3>{t("ab.danger")}</h3>
+      <p className="muted">{t("ab.resetHint")}</p>
+      <button
+        className={"s-btn " + (armed ? "s-btn-danger" : "s-btn-soft")}
+        onClick={() => {
+          if (!armed) return setArmed(true);
+          setArmed(false);
+          onReset();
+        }}
+      >
+        {armed ? t("ab.resetConfirm") : t("act.reset")}
+      </button>
+    </div>
+  );
+}
+
+function About({ version, onWhatsNew, onReset }) {
   const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|error
   const [update, setUpdate] = useState(null);
   const [pct, setPct] = useState(0);
@@ -1468,6 +1508,8 @@ function About({ version, onWhatsNew }) {
           <span>{t("ab.whatsNew")}</span>
         </button>
       </div>
+
+      <ResetZone onReset={onReset} />
 
       <p className="muted" style={{ marginTop: 14 }}>{t("ab.made")}</p>
     </>
@@ -1607,7 +1649,6 @@ function App() {
           ))}
         </nav>
         <div className="s-sidebar-foot">
-          <button className="s-btn s-btn-soft" onClick={reset}>{t("act.reset")}</button>
           <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
         </div>
       </aside>
@@ -1616,7 +1657,7 @@ function App() {
         {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
         {tab === "apps" && <Apps cfg={cfg} set={set} />}
         {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
-        {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} />}
+        {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
       </main>
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>
