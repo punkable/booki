@@ -74,6 +74,22 @@ const ACCENTS = [
   ["Verde", "#2ecc71"],
 ];
 
+// Searchable option index: i18n key → tab that hosts it (settings search).
+const SEARCH_INDEX = [
+  ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
+  ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
+  ["ap.translucency", "appearance"], ["ap.language", "appearance"], ["ap.backup", "appearance"],
+  ["be.edge", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
+  ["be.notchPos", "behavior"], ["be.notchPeek", "behavior"], ["be.magnify", "behavior"],
+  ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
+  ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
+  ["be.alwaysOnTop", "behavior"], ["be.autostart", "behavior"],
+  ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
+  ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
+  ["sc.title", "shortcuts"], ["sc.global", "shortcuts"],
+  ["ab.updates", "about"], ["ab.whatsNew", "about"],
+];
+
 const TABS = [
   ["appearance", "tab.appearance", "palette"],
   ["behavior", "tab.behavior", "settings"],
@@ -107,7 +123,7 @@ function Toggle({ checked, onChange, label }) {
 }
 
 function Slider({ value, min, max, step, onChange, fmt }) {
-  const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  const pct = Math.min(100, Math.max(0, max > min ? ((value - min) / (max - min)) * 100 : 0));
   const fill = `linear-gradient(to right, var(--accent) ${pct}%, var(--track) ${pct}%)`;
   return (
     <div className="r-slider">
@@ -319,6 +335,17 @@ function AccentPicker({ value, onChange }) {
         >
           ⊙
         </button>
+        <button
+          type="button"
+          className="accent-system"
+          title={t("ap.wallpaper")}
+          onClick={async () => {
+            const hex = await dockApi.wallpaperAccent().catch(() => null);
+            if (hex) onChange(hex);
+          }}
+        >
+          🖼
+        </button>
       </div>
       <span className="accent-hex">{(value || "").toUpperCase()}</span>
     </div>
@@ -494,6 +521,7 @@ function Appearance({ cfg, set }) {
             { value: "system", label: t("theme.system") },
             { value: "light", label: t("theme.light"), icon: "☀" },
             { value: "dark", label: t("theme.dark"), icon: "☾" },
+            { value: "auto", label: t("theme.auto"), icon: "🕐" },
           ]}
         />
       </Row>
@@ -595,7 +623,8 @@ function Behavior({ cfg, set }) {
         onChange={(v) => set({ magnification: v })} />
       {cfg.magnification && (
         <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
-          <Slider value={Math.round(cfg.zoom * 100)} min={110} max={150} step={5}
+          <Slider value={Math.min(150, Math.max(110, Math.round((cfg.zoom || 1.25) * 100)))}
+            min={110} max={150} step={5}
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
@@ -1028,6 +1057,7 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={() => addWidget("uptime", t("w.uptime"))}>＋ {t("w.uptime")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("battery", t("w.battery"))}>＋ {t("w.battery")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("notes", t("w.notes"))}>＋ {t("w.notes")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("media", t("w.media"))}>＋ {t("w.media")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.web")}</h2>
       <p className="muted">{t("apps.webHint")}</p>
@@ -1208,6 +1238,7 @@ function App() {
   const [tab, setTab] = useState("appearance");
   const [version, setVersion] = useState("0.1.0");
   const [showChangelog, setShowChangelog] = useState(false);
+  const [query, setQuery] = useState("");
   const saveTimer = useRef(null);
 
   // Show "What's new" when the dock asks us to: either it was requested before
@@ -1285,6 +1316,30 @@ function App() {
           <img src="/brand/svg/isotype.svg" alt="" />
           <span>Booki</span>
         </div>
+        <div className="s-search">
+          <input
+            type="search"
+            placeholder={t("search.placeholder")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query.trim() && (
+            <div className="s-search-results">
+              {SEARCH_INDEX
+                .filter(([k]) => t(k).toLowerCase().includes(query.trim().toLowerCase()))
+                .slice(0, 8)
+                .map(([k, tb]) => (
+                  <button key={k} onClick={() => { setTab(tb); setQuery(""); }}>
+                    <span>{t(k)}</span>
+                    <span className="s-search-tab">{t(`tab.${tb}`)}</span>
+                  </button>
+                ))}
+              {!SEARCH_INDEX.some(([k]) => t(k).toLowerCase().includes(query.trim().toLowerCase())) && (
+                <div className="s-search-none">{t("search.none")}</div>
+              )}
+            </div>
+          )}
+        </div>
         <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
           <span className="s-nav-indicator" aria-hidden="true" />
           {TABS.map(([id, label, ico]) => (
@@ -1325,7 +1380,7 @@ function ChangelogModal({ onClose }) {
           <button className="pin-btn ico" onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
         </div>
         <div className="cl-list">
-          {CHANGELOG.map((entry, idx) => (
+          {CHANGELOG.slice(0, 1).map((entry, idx) => (
             <section key={entry.version} className={"cl-entry" + (idx === 0 ? " latest" : "")}>
               <div className="cl-entry-head">
                 <span className="cl-ver">v{entry.version}</span>

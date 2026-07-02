@@ -168,6 +168,9 @@ pub struct Config {
     /// updates, this differs from the running version → we show "What's new".
     #[serde(default)]
     pub seen_version: String,
+    /// Whether the three first-run tip bubbles were already shown.
+    #[serde(default)]
+    pub onboarded: bool,
 }
 
 impl Default for Config {
@@ -198,6 +201,7 @@ impl Default for Config {
             language: default_language(),
             settings_rev: 0,
             seen_version: String::new(),
+            onboarded: false,
         }
     }
 }

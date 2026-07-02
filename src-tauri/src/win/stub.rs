@@ -48,3 +48,22 @@ pub fn trash_is_empty() -> bool {
 pub fn empty_trash() -> Result<(), String> {
     Err("recycle bin is only available on Windows".into())
 }
+
+pub fn wallpaper_accent() -> Option<String> {
+    None
+}
+
+pub struct MediaSnapshot {
+    pub title: String,
+    pub artist: String,
+    pub playing: bool,
+    pub thumb: Option<String>,
+}
+
+pub fn media_now_playing() -> Option<MediaSnapshot> {
+    None
+}
+
+pub fn media_toggle() -> bool {
+    false
+}

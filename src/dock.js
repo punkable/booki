@@ -54,11 +54,13 @@ async function boot() {
     setupFileDrop();
     startRunningPoll();
     startWidgetPoll();
+    startMediaPoll();
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
     checkUpdates();
     checkChangelog();
+    maybeOnboard();
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -72,6 +74,7 @@ async function reloadConfig() {
   reframe();
   setupAutoHide();
   startWidgetPoll();
+  startMediaPoll();
 }
 
 function applyAll() {
@@ -102,6 +105,10 @@ function applyAll() {
   const style = cfg.magnifyStyle || "spring";
   const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
   root.style.setProperty("--mag-ease", ease);
+  // Genie minimize: aim the collapse at wherever the notch sits along the edge.
+  const ox = { start: 16.6, end: 83.4 }[cfg.notchPosition] ?? 50;
+  root.style.setProperty("--genie-ox", `${ox}%`);
+  root.style.setProperty("--genie-oxn", `${ox}`);
 }
 
 async function persist() {
@@ -288,9 +295,9 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes"];
+const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media"];
 const WIDGET_ICONS = {
-  clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝",
+  clock: "🕒", cpu: "🧠", ram: "🧊", disk: "💾", net: "📶", uptime: "⏱️", battery: "🔋", notes: "📝", media: "🎵",
 };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
@@ -300,6 +307,7 @@ function widgetLabel(type) {
     {
       clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"),
       net: t("w.net"), uptime: t("w.uptime"), battery: t("w.battery"), notes: t("w.notes"),
+      media: t("w.media"),
     }[type] || type
   );
 }
@@ -342,6 +350,16 @@ function widgetTile(item) {
 
   el.addEventListener("contextmenu", (e) => openMenu(e, item));
   el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  if (type === "media") {
+    el.classList.add("media");
+    const art = document.createElement("img");
+    art.className = "w-art";
+    art.alt = "";
+    card.prepend(art);
+    el.querySelector(".w-label").textContent = t("w.media");
+    el.querySelector(".w-value").textContent = "—";
+    el.querySelector(".w-bar").style.display = "none";
+  }
   if (type === "clock") tickClocks();
   if (type === "notes") {
     el.querySelector(".w-label").textContent = t("w.notes");
@@ -440,6 +458,39 @@ function startWidgetPoll() {
   statsTimer = setInterval(tick, 2500);
 }
 
+// Now-playing card: polls the system media session (Spotify, browser, …) only
+// while a media widget is pinned and the dock is visible.
+let mediaTimer = null;
+function startMediaPoll() {
+  clearInterval(mediaTimer);
+  mediaTimer = null;
+  if (!cfg.pinned.some((p) => p.kind === "widget" && p.widget === "media")) return;
+  const tick = async () => {
+    if (hiddenState) return;
+    const m = await dockApi.mediaInfo().catch(() => null);
+    dockEl.querySelectorAll('.tile.widget[data-widget="media"]').forEach((el) => {
+      const art = el.querySelector(".w-art");
+      const ico = el.querySelector(".w-ico");
+      if (!m) {
+        setText(el, t("w.media"), "—", t("w.media"));
+        el.classList.remove("playing");
+        if (art) art.style.display = "none";
+        if (ico) ico.style.display = "";
+        return;
+      }
+      setText(el, m.artist || t("w.media"), m.title || "—", `${m.title} — ${m.artist}`);
+      el.classList.toggle("playing", !!m.playing);
+      if (art && m.thumb) {
+        art.src = m.thumb;
+        art.style.display = "";
+        if (ico) ico.style.display = "none";
+      }
+    });
+  };
+  tick();
+  mediaTimer = setInterval(tick, 3000);
+}
+
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
   await persist();
@@ -460,8 +511,12 @@ async function resolveIcon(item) {
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
-  // Widgets aren't launchers — clicking does nothing.
-  if (item.kind === "widget") return;
+  // Widgets aren't launchers — except the media card, where a click is
+  // play/pause. Others do nothing on click.
+  if (item.kind === "widget") {
+    if (item.widget === "media") dockApi.mediaToggle().then(() => startMediaPoll());
+    return;
+  }
   // The trash pin opens the Recycle Bin.
   if (item.kind === "trash") {
     dockApi.launch("shell:RecycleBinFolder", []);
@@ -584,10 +639,71 @@ async function checkChangelog() {
   } catch (_) {}
 }
 
+// First-run tips: three small coach bubbles, shown once ever.
+async function maybeOnboard() {
+  if (cfg.onboarded) return;
+  const steps = [
+    { emoji: "👆", text: t("ob.step1") },
+    { emoji: "🗂️", text: t("ob.step2") },
+    { emoji: "🦫", text: t("ob.step3") },
+  ];
+  let i = 0;
+  pinnedReveal = true; // keep the dock open during the tour
+  const pop = document.createElement("div");
+  pop.className = "coach";
+  document.body.appendChild(pop);
+  const showStep = () => {
+    const last = i === steps.length - 1;
+    pop.innerHTML =
+      `<span class="coach-emoji">${steps[i].emoji}</span>` +
+      `<span class="coach-text">${steps[i].text}</span>` +
+      `<span class="coach-dots">${steps.map((_, k) => (k === i ? "●" : "○")).join(" ")}</span>`;
+    const btn = document.createElement("button");
+    btn.className = "coach-btn";
+    btn.textContent = last ? t("ob.done") : t("ob.next");
+    btn.addEventListener("click", async () => {
+      i += 1;
+      if (i < steps.length) {
+        showStep();
+      } else {
+        pop.remove();
+        cfg.onboarded = true;
+        await persist();
+        pinnedReveal = false;
+        scheduleHide();
+      }
+    });
+    pop.appendChild(btn);
+  };
+  showStep();
+}
+
 // Double-click the empty bar → open Settings (quick, intuitive).
 dockEl.addEventListener("dblclick", (e) => {
   if (!closestSel(e.target, ".tile")) dockApi.openSettings();
 });
+
+// Press-hold the empty bar and drag it toward its edge → tuck the dock away
+// (the natural "push it off the screen" gesture).
+let bgDrag = null;
+dockEl.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || closestSel(e.target, ".tile")) return;
+  bgDrag = { x: e.screenX, y: e.screenY };
+});
+window.addEventListener("pointermove", (e) => {
+  if (!bgDrag) return;
+  const dx = e.screenX - bgDrag.x;
+  const dy = e.screenY - bgDrag.y;
+  const toward =
+    cfg.edge === "top" ? -dy : cfg.edge === "left" ? -dx : cfg.edge === "right" ? dx : dy;
+  if (toward > 42) {
+    bgDrag = null;
+    pinnedReveal = false;
+    manualReveal = false;
+    setHidden(true);
+  }
+});
+window.addEventListener("pointerup", () => (bgDrag = null));
 
 // Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
 let wheelSaveTimer = null;
@@ -1084,9 +1200,20 @@ function computeFrame() {
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
+let lastFrameEdge = null;
 function applyFrame() {
   const full = computeFrame();
+  // Skip the native resize+reposition when nothing actually changed (±1px) —
+  // otherwise every settings tweak (zoom, labels…) made the whole dock jump.
+  const key = `${cfg.edge}:${cfg.monitor ?? -1}`;
+  if (
+    lastFull && lastFrameEdge === key &&
+    Math.abs(full.w - lastFull.w) <= 1 && Math.abs(full.h - lastFull.h) <= 1
+  ) {
+    return;
+  }
   lastFull = full;
+  lastFrameEdge = key;
   // The dock window stays full-size at all times now; hiding is done by showing
   // the separate notch window and hiding the dock window (no resize → no notch
   // flap or repaint race). hidden=false keeps the home rect updated for occlusion.
@@ -1103,6 +1230,7 @@ let occluded = false; // last occlusion signal from the backend (smart mode)
 let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // a fullscreen game/movie is running → blackout everything
+let draggingFile = false; // an OS file drag is over the dock → keep it open
 let blackoutTimer = null;
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
@@ -1190,10 +1318,10 @@ function scheduleHide() {
   const mode = hideMode();
   // While the user is dragging or has explicitly pinned the dock open from the
   // notch, never tuck it away — they're in the middle of using it.
-  if (mode === "off" || dragging || pinnedReveal) return;
+  if (mode === "off" || dragging || draggingFile || pinnedReveal) return;
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
-    if (dragging || pinnedReveal) return;
+    if (dragging || draggingFile || pinnedReveal) return;
     manualReveal = false;
     if (mode === "edge" || (mode === "smart" && occluded)) setHidden(true);
   }, cfg.autoHideDelay ?? 650);
@@ -1205,6 +1333,7 @@ function scheduleHide() {
 function onOcclusionSignal(value) {
   occluded = value;
   if (fullscreen) return; // blackout owns the visibility while fullscreen
+  if (draggingFile) return; // never tuck away mid file-drag (the drop needs us)
   if (hideMode() !== "smart") return;
   if (!value) {
     // Back on the desktop → bring the dock out automatically.
@@ -1355,15 +1484,26 @@ async function openWith(item, paths) {
 function setupFileDrop() {
   onFileDrop({
     onEnter: () => {
-      reveal();
+      // A file drag is aimed at the dock: force it open and PIN it open for the
+      // whole drag (smart-hide would otherwise tuck it away mid-drag, since
+      // dragging from Explorer counts as "working in another app").
+      draggingFile = true;
+      pinnedReveal = true;
+      clearTimeout(hideTimer);
+      setHidden(false);
       dropOverlay.classList.add("active");
     },
     onOver: (position) => setDropTarget(tileFromPoint(position)),
     onLeave: () => {
+      draggingFile = false;
+      pinnedReveal = false;
       dropOverlay.classList.remove("active");
       setDropTarget(null);
+      scheduleHide();
     },
     onDrop: async (paths, position) => {
+      draggingFile = false;
+      pinnedReveal = false;
       dropOverlay.classList.remove("active");
       const target = tileFromPoint(position);
       setDropTarget(null);
