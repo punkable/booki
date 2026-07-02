@@ -433,8 +433,8 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
         (true, true) => (28.0, 170.0),
         (true, false) => (170.0, 28.0),
-        (false, true) => (26.0, 184.0),
-        (false, false) => (184.0, 26.0),
+        (false, true) => (32.0, 184.0),
+        (false, false) => (184.0, 32.0),
     };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;

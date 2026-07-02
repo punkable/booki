@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.8.1",
+    date: "2 jul 2026",
+    headline: "Pulido general: nada se corta, y el notch estrena su mejor look.",
+    sections: [
+      {
+        icon: "🧼",
+        title: "Sin recortes",
+        notes: [
+          "El menú del clic derecho y los avisos del dock (confirmar borrado, consejos de bienvenida) ahora aparecen junto a la barra, completos y sin tapar tus iconos.",
+          "La ventana de Ajustes se adapta a cualquier tamaño: en ventanas estrechas los controles bajan debajo de su etiqueta en vez de cortarse.",
+        ],
+      },
+      {
+        icon: "💎",
+        title: "Notch estilo iPhone",
+        notes: [
+          "Más fino, de vidrio oscuro con brillo, y con las curvas de unión a la barra de tareas — como el notch clásico del iPhone, pero boca arriba.",
+          "Al pasar el cursor se enciende un halo con tu color de acento.",
+        ],
+      },
+      {
+        icon: "⚙️",
+        title: "Actualizaciones más agradables",
+        notes: [
+          "Al actualizar desde la app ahora ves una barra de progreso del instalador en vez de una espera a ciegas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2 jul 2026",
     headline: "Ya puedes arrastrar cosas a la papelera, y la música llega al dock.",
