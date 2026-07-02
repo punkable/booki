@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.8.2",
+    date: "2 jul 2026",
+    headline: "Todo más fluido: menos parpadeos, fotos con miniatura y sugerencias ordenadas.",
+    sections: [
+      {
+        icon: "⚡",
+        title: "Más fluido",
+        notes: [
+          "El menú del clic derecho y los avisos aparecen ya colocados, sin saltos ni parpadeos.",
+          "Los iconos del dock cargan todos a la vez, sin ir apareciendo uno a uno.",
+          "Mover un ajuste ya no hace parpadear la barra: solo se redibuja lo que cambió.",
+        ],
+      },
+      {
+        icon: "🖼️",
+        title: "Fotos con su miniatura",
+        notes: [
+          "Si anclas una imagen al dock, su icono es la propia foto — también en la lista de Ajustes.",
+        ],
+      },
+      {
+        icon: "🗂️",
+        title: "Sugerencias mejor ordenadas",
+        notes: [
+          "Los grupos de programas salen contraídos, con su contador; ábrelos con un clic.",
+          "Las apps sueltas se juntan en un solo grupo y todo va en orden alfabético.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.1",
     date: "2 jul 2026",
     headline: "Pulido general: nada se corta, y el notch estrena su mejor look.",
