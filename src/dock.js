@@ -75,7 +75,8 @@ async function boot() {
     });
     checkUpdates();
     checkChangelog();
-    maybeOnboard();
+    // Give the first layout a beat to settle so the tips measure correctly.
+    setTimeout(maybeOnboard, 800);
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -162,16 +163,17 @@ async function render() {
   );
   dockEl.replaceChildren(...tiles);
 
-  // Friendly empty state — the bar stays clean (no +/gear chrome); users add
-  // via drag-from-desktop or right-click.
+  // Friendly empty state: a "+" tile that opens Settings on the Pinned-apps tab
+  // (suggestions, widgets, tips) — much clearer than a bare file picker.
   if (!cfg.pinned.some((p) => p.kind !== "separator")) {
     const hint = document.createElement("button");
     hint.className = "tile hint";
     hint.style.setProperty("--size", `${baseSize()}px`);
+    hint.title = t("dock.emptyAdd");
     hint.innerHTML =
-      `<span class="label">${t("dock.empty")}</span>` +
-      `<img src="/brand/svg/isotype.svg" alt="Booki" />`;
-    hint.addEventListener("click", onAddApp);
+      `<span class="label">${t("dock.emptyAdd")}</span>` +
+      `<span class="hint-plus">${icon("plus")}</span>`;
+    hint.addEventListener("click", () => dockApi.openSettingsTab("apps"));
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
   }
