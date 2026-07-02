@@ -13,6 +13,7 @@ import {
   onReveal,
   onFullscreen,
   onLaunchIndex,
+  onHotEdge,
   emitConfigChanged,
   logMessage,
   isTauri,
@@ -62,6 +63,7 @@ async function boot() {
     startRunningPoll();
     startWidgetPoll();
     startMediaPoll();
+    startVolumePoll();
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
@@ -95,6 +97,7 @@ async function reloadConfig() {
     await render();
     startWidgetPoll();
     startMediaPoll();
+    startVolumePoll();
   } else {
     fitDock(); // size/spacing may still have changed
   }
@@ -339,7 +342,7 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media"];
+const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume"];
 // Transport glyphs for the media card — filled, rounded, Fluent-like SVGs.
 const MEDIA_SVG = {
   prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
@@ -351,6 +354,7 @@ const MEDIA_SVG = {
 const WIDGET_ICONS = {
   clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna",
   uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes",
+  volume: "speaker",
 };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
@@ -360,7 +364,7 @@ function widgetLabel(type) {
     {
       clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"),
       net: t("w.net"), uptime: t("w.uptime"), battery: t("w.battery"), notes: t("w.notes"),
-      media: t("w.media"),
+      media: t("w.media"), volume: t("w.volume"),
     }[type] || type
   );
 }
@@ -591,6 +595,31 @@ function startMediaPoll() {
   mediaTimer = setInterval(tick, 3000);
 }
 
+// System-volume card: scroll changes the volume, click toggles mute. A light
+// poll (only while a volume widget is pinned and the dock is visible) keeps it
+// honest when the volume changes from the keyboard or another app.
+let volumeTimer = null;
+function renderVolume(pct, muted) {
+  dockEl.querySelectorAll('.tile.widget[data-widget="volume"]').forEach((el) => {
+    setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
+    el.classList.toggle("muted", muted);
+    const img = el.querySelector(".w-ico img");
+    if (img) img.src = `/emoji/${muted ? "speaker-mute" : "speaker"}.png`;
+  });
+}
+function startVolumePoll() {
+  clearInterval(volumeTimer);
+  volumeTimer = null;
+  if (!cfg.pinned.some((p) => p.kind === "widget" && p.widget === "volume")) return;
+  const tick = async () => {
+    if (hiddenState) return;
+    const v = await dockApi.volumeInfo().catch(() => null);
+    if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
+  };
+  tick();
+  volumeTimer = setInterval(tick, 4000);
+}
+
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
   await persist();
@@ -620,6 +649,7 @@ function launch(el, item) {
   // play/pause. Others do nothing on click.
   if (item.kind === "widget") {
     if (item.widget === "media") dockApi.mediaToggle().then(() => startMediaPoll());
+    if (item.widget === "volume") dockApi.volumeMute().then(() => startVolumePoll());
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -824,6 +854,15 @@ dockEl.addEventListener(
     const w = closestSel(e.target, ".tile.widget");
     if (!w) return;
     e.preventDefault();
+    // The volume card is the exception: scrolling it changes the volume
+    // (the natural gesture), not the visual variant.
+    if (w.dataset.widget === "volume") {
+      const cur = parseInt(w.querySelector(".w-value").textContent, 10) || 0;
+      const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
+      renderVolume(next, false); // optimistic — the poll corrects if needed
+      dockApi.volumeSet(next);
+      return;
+    }
     const item = cfg.pinned.find((p) => p.id === w.dataset.id);
     if (!item) return;
     const cur = (item.style && item.style.variant) || "glass";
@@ -1243,8 +1282,8 @@ function openMenu(e, item) {
   placeMenu(e);
 }
 
-// Right-click on empty dock area / hint → add + settings.
-function openBackgroundMenu(e) {
+// Right-click on empty dock area / hint → add + profiles + settings.
+async function openBackgroundMenu(e) {
   e.preventDefault();
   e.stopPropagation();
   ctxMenu.innerHTML = "";
@@ -1257,11 +1296,14 @@ function openBackgroundMenu(e) {
     });
     ctxMenu.appendChild(b);
   };
+  const sep = () => {
+    const s = document.createElement("div");
+    s.className = "sep";
+    ctxMenu.appendChild(s);
+  };
   add("plus", t("m.addApp"), onAddApp);
   add("app", t("m.addFolder"), onAddFolder);
-  const s = document.createElement("div");
-  s.className = "sep";
-  ctxMenu.appendChild(s);
+  sep();
   add("grid", t("w.add.clock"), () => addWidget("clock"));
   add("grid", t("w.add.cpu"), () => addWidget("cpu"));
   add("grid", t("w.add.ram"), () => addWidget("ram"));
@@ -1270,9 +1312,25 @@ function openBackgroundMenu(e) {
   add("grid", t("w.add.uptime"), () => addWidget("uptime"));
   add("grid", t("w.add.battery"), () => addWidget("battery"));
   add("grid", t("w.add.notes"), () => addWidget("notes"));
-  const s2 = document.createElement("div");
-  s2.className = "sep";
-  ctxMenu.appendChild(s2);
+  add("grid", t("w.add.media"), () => addWidget("media"));
+  add("grid", t("w.add.volume"), () => addWidget("volume"));
+  // Saved profiles → one-click switch, right from the dock.
+  const profiles = await dockApi.profileList().catch(() => []);
+  if (Array.isArray(profiles) && profiles.length) {
+    sep();
+    for (const name of profiles.slice(0, 6)) {
+      add("sparkles", `${t("m.profile")}: ${esc(name)}`, async () => {
+        const fresh = await dockApi.profileApply(name).catch(() => null);
+        if (fresh) {
+          cfg = fresh;
+          applyAll();
+          await render();
+          reframe();
+        }
+      });
+    }
+  }
+  sep();
   add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
@@ -1378,7 +1436,10 @@ async function removeItem(id) {
 // watch the bar's real layout size and re-fit the window whenever it moves, so
 // nothing ever gets cut off at the window edge.
 if (typeof ResizeObserver !== "undefined") {
-  new ResizeObserver(() => reframe()).observe(dockEl);
+  new ResizeObserver(() => {
+    reframe();
+    placeUpdatePill();
+  }).observe(dockEl);
 }
 
 let reframeTimer = null;
@@ -1589,6 +1650,15 @@ dockEl.addEventListener("pointerleave", scheduleHide);
 // (so the user can actually launch something) until they click away or launch.
 onReveal(() => {
   manualHide = false; // explicit notch click always brings the dock back
+  pinnedReveal = true;
+  reveal();
+});
+
+// Hot edge: the cursor was pushed against the dock's screen edge — an explicit
+// "come out" gesture, treated exactly like clicking the notch.
+onHotEdge(() => {
+  if (fullscreen || !hiddenState) return;
+  manualHide = false;
   pinnedReveal = true;
   reveal();
 });
@@ -2059,17 +2129,35 @@ window.addEventListener("pointerdown", (e) => {
 
 // ─────────────────── Update check ───────────────────
 
+// Keep the pill centered over the BAR (not the window — the window grows for
+// popovers/flyouts, which would leave a fixed-centered pill visibly off-axis).
+function placeUpdatePill() {
+  const pill = document.getElementById("update-pill");
+  if (!pill || pill.classList.contains("hidden")) return;
+  // Position by explicit px, NOT transform: the breathe animation owns the
+  // pill's transform, so a translateX(-50%) centering would be stomped on.
+  const r = dockEl.getBoundingClientRect();
+  if (isVertical()) {
+    pill.style.top = `${r.top + r.height / 2 - pill.offsetHeight / 2}px`;
+  } else {
+    pill.style.left = `${r.left + r.width / 2 - pill.offsetWidth / 2}px`;
+  }
+}
+
 async function checkUpdates() {
   const pill = document.getElementById("update-pill");
   if (!pill) return;
   const update = await checkForUpdate();
-  if (update) {
+  if (update && pill.classList.contains("hidden")) {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
+    placeUpdatePill();
     // Straight to About — that's where the install button and progress live.
     pill.addEventListener("click", () => dockApi.openSettingsTab("about"), { once: true });
   }
 }
+// Long sessions deserve the pill too — re-check every 4 h, not just at boot.
+setInterval(checkUpdates, 4 * 3600 * 1000);
 
 // ─────────────────── Easter egg: Konami → party 🦫 ───────────────────
 const KONAMI = [

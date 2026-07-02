@@ -183,6 +183,10 @@ pub struct Config {
     /// Whether the three first-run tip bubbles were already shown.
     #[serde(default)]
     pub onboarded: bool,
+    /// Hot edge: with the dock hidden, pushing the cursor against its screen
+    /// edge reveals it (no need to find the notch).
+    #[serde(default = "default_true")]
+    pub hot_edge: bool,
     /// Position hotkeys: modifier+1…9 launches the Nth dock item.
     #[serde(default = "default_true")]
     pub position_hotkeys: bool,
@@ -226,6 +230,7 @@ impl Default for Config {
             settings_rev: 0,
             seen_version: String::new(),
             onboarded: false,
+            hot_edge: true,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
         }
