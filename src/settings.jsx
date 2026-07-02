@@ -75,11 +75,11 @@ const ACCENTS = [
 ];
 
 const TABS = [
-  ["appearance", "tab.appearance"],
-  ["behavior", "tab.behavior"],
-  ["apps", "tab.apps"],
-  ["shortcuts", "tab.shortcuts"],
-  ["about", "tab.about"],
+  ["appearance", "tab.appearance", "palette"],
+  ["behavior", "tab.behavior", "settings"],
+  ["apps", "tab.apps", "grid"],
+  ["shortcuts", "tab.shortcuts", "keyboard"],
+  ["about", "tab.about", "info"],
 ];
 
 // ── Reusable controls ──
@@ -1107,7 +1107,7 @@ function capybaraParade() {
   }
 }
 
-function About({ version }) {
+function About({ version, onWhatsNew }) {
   const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|error
   const [update, setUpdate] = useState(null);
   const [pct, setPct] = useState(0);
@@ -1192,6 +1192,8 @@ function About({ version }) {
           </div>
         )}
         <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
+        <button className="s-btn s-btn-soft" style={{ marginTop: 8 }} onClick={onWhatsNew}
+          dangerouslySetInnerHTML={{ __html: icon("sparkles") + `<span>${t("ab.whatsNew")}</span>` }} />
       </div>
 
       <p className="muted" style={{ marginTop: 14 }}>{t("ab.made")}</p>
@@ -1285,13 +1287,14 @@ function App() {
         </div>
         <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
           <span className="s-nav-indicator" aria-hidden="true" />
-          {TABS.map(([id, label]) => (
+          {TABS.map(([id, label, ico]) => (
             <button
               key={id}
               className={"s-navitem" + (tab === id ? " active" : "")}
               onClick={() => setTab(id)}
             >
-              {t(label)}
+              <span className="s-navicon" dangerouslySetInnerHTML={{ __html: icon(ico) }} />
+              <span>{t(label)}</span>
             </button>
           ))}
         </nav>
@@ -1305,7 +1308,7 @@ function App() {
         {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
         {tab === "apps" && <Apps cfg={cfg} set={set} />}
         {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
-        {tab === "about" && <About version={version} />}
+        {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} />}
       </main>
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>

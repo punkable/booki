@@ -385,6 +385,10 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   animation: notch-toast-in 0.2s var(--ease-bounce);
 }
 .trash-pop > svg { flex: 0 0 auto; color: #d13438; }
+.tp-emoji { font-size: 18px; }
+.tp-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tp-sub { font-size: 11px; font-weight: 500; color: var(--ink-2); white-space: normal; max-width: 340px; }
+.trash-pop.blocked { white-space: normal; max-width: min(440px, 92vw); }
 .tp-btn {
   border: 1px solid var(--stroke-light);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -792,18 +796,47 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 body.edge-top .stack { transform-origin: top center; }
 body.edge-left .stack { transform-origin: center left; }
 body.edge-right .stack { transform-origin: center right; }
-.stack-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); padding: 2px 4px 10px; }
+.stack-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--stroke-light);
+}
+.stack-head-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.stack-head-icon svg { width: 15px; height: 15px; }
+.stack-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stack-rename {
-  flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 700;
   color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 8px;
 }
 .stack-rename:hover { background: var(--hover); }
 .stack-rename:focus { background: var(--layer-strong); border-color: var(--stroke); outline: none; }
-.stack-ungroup {
-  flex: 0 0 auto; font-size: 14px; line-height: 1; color: var(--ink-2); cursor: pointer;
-  background: var(--hover); border: 0; border-radius: var(--r-sm); padding: 5px 8px; transition: all 0.12s ease;
+.stack-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--ink-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.stack-ungroup:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 24%, var(--hover)); }
+.stack-close svg { width: 14px; height: 14px; }
+.stack-close:hover { color: var(--ink); background: var(--hover); }
 .stack-item { position: relative; }
 .stack-rm {
   position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; display: none;
@@ -826,8 +859,17 @@ body.edge-right .stack { transform-origin: center right; }
   .stack.open .stack-item { animation: stack-cell-in 0.26s var(--ease-bounce) backwards; animation-delay: calc(var(--i, 0) * 28ms); }
 }
 @keyframes stack-cell-in { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
-.stack-item img, .stack-item .stack-glyph { width: 38px; height: 38px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 26px; }
-.stack-name { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+/* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
+.stack-item .stack-glyph {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border: 1px solid var(--stroke-light);
+  border-radius: 10px;
+}
+.stack-name { font-size: 11px; font-weight: 500; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* In-flyout "add app to folder" cell — optimized for adding several programs. */
 .stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
 .stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
@@ -946,12 +988,16 @@ body.settings-body {
   transition: transform 0.32s var(--ease-bounce);
   pointer-events: none;
 }
+.s-navicon { display: grid; place-items: center; color: var(--ink-2); }
+.s-navicon svg { width: 16px; height: 16px; }
+.s-navitem.active .s-navicon { color: var(--accent); }
 .s-navitem {
   position: relative;
   z-index: 1;
   height: var(--navh);
   display: flex;
   align-items: center;
+  gap: 9px;
   text-align: left;
   font: inherit;
   font-size: 14px;

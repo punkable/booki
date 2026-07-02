@@ -114,8 +114,11 @@ fn reset_config() -> Result<Config, String> {
     Ok(c)
 }
 
+// NOTE: commands that CREATE a window must be `async`. A synchronous command
+// runs on the main thread, and building a webview needs that same thread to
+// pump messages → deadlock on Windows (white window, app frozen).
 #[tauri::command]
-fn open_settings(app: AppHandle) {
+async fn open_settings(app: AppHandle) {
     open_settings_window(&app);
 }
 
@@ -377,7 +380,7 @@ fn set_dock_edge(app: AppHandle, edge: String) {
 /// stable settings window: if settings is open we just signal it; otherwise we
 /// set a flag the settings page picks up on mount and open settings normally.
 #[tauri::command]
-fn open_changelog(app: AppHandle) {
+async fn open_changelog(app: AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
         let _ = app.emit("booki://show-changelog", ());
         let _ = w.set_focus();
@@ -437,15 +440,11 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let wh = (lh * dpr).round() as i32;
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
+    // Peek style sits FLUSH against the work-area edge (touching the taskbar).
+    // Never overlap into the taskbar band: the notch is topmost, so any overlap
+    // would draw ON TOP of the bar. The flush pill with only its outward corners
+    // rounded (CSS) already reads as a tab attached to the bar.
     let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
-    // Peek style: slide a few px past the work area, INTO the taskbar band, so the
-    // pill looks like a tab emerging from behind the taskbar (the notch window is
-    // topmost, so the overlapped strip draws over the bar — no seam).
-    let overlap: i32 = if cfg.notch_peek {
-        (6.0 * dpr).round() as i32
-    } else {
-        0
-    };
     // Offset along the anchored edge so it can dodge subtitles / chat boxes.
     let along = |start: i32, span: i32, win: i32| -> i32 {
         let want = match cfg.notch_position.as_str() {
@@ -459,10 +458,10 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         want.max(lo).min(hi)
     };
     let (x, y) = match edge {
-        "top" => (along(ax, aw, ww), ay + margin - overlap),
-        "left" => (ax + margin - overlap, along(ay, ah, wh)),
-        "right" => (ax + aw - ww - margin + overlap, along(ay, ah, wh)),
-        _ => (along(ax, aw, ww), ay + ah - wh - margin + overlap),
+        "top" => (along(ax, aw, ww), ay + margin),
+        "left" => (ax + margin, along(ay, ah, wh)),
+        "right" => (ax + aw - ww - margin, along(ay, ah, wh)),
+        _ => (along(ax, aw, ww), ay + ah - wh - margin),
     };
     notch
         .set_position(PhysicalPosition::new(x, y))

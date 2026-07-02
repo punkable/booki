@@ -1275,7 +1275,9 @@ function confirmTrash(paths, emptyBin = false) {
     : (n === 1 ? t("trash.askOne").replace("{name}", baseName(paths[0])) : t("trash.ask").replace("{n}", n));
   const pop = document.createElement("div");
   pop.className = "trash-pop";
-  pop.innerHTML = `${icon("trash")}<span class="tp-text">${text}</span>`;
+  pop.innerHTML =
+    `${icon("trash")}<span class="tp-col"><span class="tp-text">${text}</span>` +
+    `<span class="tp-sub">${t("trash.sub")}</span></span>`;
   const mkBtn = (cls, label, fn) => {
     const b = document.createElement("button");
     b.className = `tp-btn ${cls}`;
@@ -1296,7 +1298,11 @@ function confirmTrash(paths, emptyBin = false) {
         tile.classList.add("gulp");
       }
     } catch (err) {
+      // Deletion was blocked (usually Defender's Controlled Folder Access) —
+      // explain honestly instead of failing in silence.
       logMessage(`trash: ${err}`);
+      trashBlockedInfo();
+      return;
     }
     await refreshTrashState();
     pinnedReveal = false;
@@ -1307,6 +1313,30 @@ function confirmTrash(paths, emptyBin = false) {
     pinnedReveal = false;
     scheduleHide();
   });
+  document.body.appendChild(pop);
+  trashPop = pop;
+}
+
+// Shown when Windows refuses the operation: it's almost always Defender's
+// "Controlled folder access" being cautious about an app it doesn't know yet.
+function trashBlockedInfo() {
+  closeTrashPop();
+  pinnedReveal = true;
+  const pop = document.createElement("div");
+  pop.className = "trash-pop blocked";
+  pop.innerHTML =
+    `<span class="tp-emoji">🛡️</span><span class="tp-col">` +
+    `<span class="tp-text">${t("trash.blocked")}</span>` +
+    `<span class="tp-sub">${t("trash.blockedSub")}</span></span>`;
+  const ok = document.createElement("button");
+  ok.className = "tp-btn";
+  ok.textContent = t("trash.ok");
+  ok.addEventListener("click", () => {
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  pop.appendChild(ok);
   document.body.appendChild(pop);
   trashPop = pop;
 }
@@ -1415,6 +1445,10 @@ async function toggleStack(tileEl, item) {
   stackEl.innerHTML = "";
   const head = document.createElement("div");
   head.className = "stack-head";
+  const glyph = document.createElement("span");
+  glyph.className = "stack-head-icon";
+  glyph.innerHTML = icon("folder");
+  head.appendChild(glyph);
   if (isGroup) {
     const input = document.createElement("input");
     input.className = "stack-rename";
@@ -1422,15 +1456,18 @@ async function toggleStack(tileEl, item) {
     input.placeholder = t("group.new");
     input.addEventListener("input", () => renameGroup(item, input.value));
     head.appendChild(input);
-    const ung = document.createElement("button");
-    ung.className = "stack-ungroup";
-    ung.title = t("group.ungroup");
-    ung.textContent = "⊟";
-    ung.addEventListener("click", () => ungroup(item));
-    head.appendChild(ung);
   } else {
-    head.textContent = item.name;
+    const name = document.createElement("span");
+    name.className = "stack-title";
+    name.textContent = item.name;
+    head.appendChild(name);
   }
+  const close = document.createElement("button");
+  close.className = "stack-close";
+  close.title = t("stack.close");
+  close.innerHTML = icon("x");
+  close.addEventListener("click", closeStack);
+  head.appendChild(close);
   stackEl.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "stack-grid";

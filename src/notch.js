@@ -3,7 +3,7 @@
    move the dock (and notch) there. It's its own small window (never resized
    mid-flight) so the click target and repaint stay rock-solid. */
 
-import { config as configApi, invoke, onConfigChanged, onNotchToast } from "./api.js";
+import { config as configApi, invoke, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
 import { applyAccent } from "./util-color.js";
 
 const root = document.documentElement;
@@ -40,6 +40,10 @@ onNotchToast((text) => {
     if (textEl) textEl.textContent = "";
   }, 2600);
 });
+
+// Dragging a file NEAR the notch reveals the dock — otherwise there'd be
+// nowhere to drop while the dock is tucked away (its window is hidden).
+onFileDrop({ onEnter: () => invoke("notch_reveal") });
 
 // Click = reveal the dock. Drag to a screen edge = move the dock there.
 let drag = null;
