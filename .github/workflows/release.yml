@@ -11,11 +11,10 @@ on:
   push:
     tags:
       - "v*"
-    # Temporary: also publish from the dev branch so the first downloadable
-    # installer exists before the PR is merged (tag pushes are restricted in
-    # the dev environment). Remove this branch trigger once on main + tags.
+    # Releases publish from main: every push there with a new version in
+    # package.json produces a signed installer release.
     branches:
-      - "claude/docky-windows-modernize-10rbkk"
+      - "main"
   workflow_dispatch:
     inputs:
       tag:
@@ -52,15 +51,29 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      # Derive the release tag from the app version (package.json), so bumping
+      # the version is all it takes to publish a new release — no hardcoded tag
+      # to forget. A push that doesn't change the version just re-uploads to the
+      # same tag (idempotent).
+      - name: Resolve release tag
+        id: ver
+        shell: bash
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Build and publish release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Auto-updater signing. Add these as repo secrets to enable signed
+          # update artifacts (latest.json + .sig). Until then, builds are
+          # unsigned and the in-app updater simply finds no update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.2.0' }}
-          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.2.0' }}"
+          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
+          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }} (beta)"
           releaseBody: |
-            **Booki Dock** — a modern, lightweight dock for Windows. 🦫
+            **Booki Dock** — a modern, lightweight dock for Windows. 🦫 _Beta._
 
             Download the installer below and run it:
             - `Booki_*_x64-setup.exe` — recommended (NSIS, per-user install)
@@ -68,6 +81,28 @@ jobs:
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 
-            > Early / alpha build. See the README for features and roadmap.
+            **SmartScreen / Defender note:** this beta isn't signed with a commercial certificate yet, so Windows may show "Windows protected your PC" — choose *More info → Run anyway*. Booki only touches its own folder, your dock settings and the per-user startup entry; deletions from the dock's trash go to the Recycle Bin (recoverable). If Defender's *Controlled folder access* blocks a delete, allow Booki in Windows Security → Ransomware protection.
+
+            Created by **Punkable** ([GitHub](https://github.com/punkable) · [@Punkabl3 on X](https://x.com/Punkabl3)).
+
+            > Beta build — only the latest version is kept available. The in-app updater keeps you current.
           releaseDraft: false
-          prerelease: true
+          # Must be a full release (not prerelease) so the updater endpoint
+          # `releases/latest/download/latest.json` resolves. "Beta" is a label only.
+          prerelease: false
+
+      # Keep only the just-published release downloadable: delete every older
+      # release (and its tag) so users always grab the latest beta.
+      - name: Prune old releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          keep="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          echo "Keeping latest release: $keep"
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
+            if [ -n "$tag" ] && [ "$tag" != "$keep" ]; then
+              echo "Deleting old release $tag"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+            fi
+          done

@@ -14,20 +14,33 @@ const DEMO_CONFIG = {
     { id: "d", name: "Notepad", path: "C:/Windows/notepad.exe", args: [], kind: "app" },
     { id: "e", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
     { id: "f", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
+    { id: "g", name: "Proyectos", path: "C:/Users/Proyectos", args: [], kind: "folder" },
+    { id: "w1", name: "Reloj", path: "", args: [], kind: "widget", widget: "clock" },
+    { id: "w2", name: "CPU", path: "", args: [], kind: "widget", widget: "cpu" },
+    {
+      id: "grp", name: "Diseño", path: "", args: [], kind: "group",
+      children: [
+        { id: "c1", name: "Photos", path: "C:/Apps/photos.exe", args: [], kind: "app" },
+        { id: "c2", name: "Music", path: "C:/Apps/music.exe", args: [], kind: "app" },
+        { id: "c3", name: "Editor", path: "C:/Apps/editor.exe", args: [], kind: "app", icon: "lib:palette:badge" },
+      ],
+    },
   ],
   edge: "bottom",
   accent: "#dfaa75",
   theme: "system",
   iconSize: 48,
-  magnification: true,
-  zoom: 1.8,
+  magnification: false,
+  zoom: 1.25,
   spacing: 6,
-  opacity: 0.62,
+  cornerRadius: 12,
   showLabels: true,
   showIndicators: true,
   autoHide: false,
-  autoHideMode: "off",
+  autoHideMode: "smart",
   autoHideDelay: 650,
+  notchPosition: "center",
+  notchPeek: true,
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
@@ -37,6 +50,7 @@ const DEMO_CONFIG = {
   language: "system",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
+let demoTrashItems = 2; // browser demo: pretend the bin has something in it
 
 async function mockInvoke(cmd, args) {
   switch (cmd) {
@@ -65,6 +79,8 @@ async function mockInvoke(cmd, args) {
       ];
     case "get_autostart":
       return demoConfig.autostart;
+    case "system_accent":
+      return "#3a86ff";
     case "is_dir":
       return false;
     case "list_dir":
@@ -73,12 +89,78 @@ async function mockInvoke(cmd, args) {
         { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
         { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
       ];
-    case "open_location":
-    case "set_hotkey":
-    case "set_material":
+    case "list_installed_apps":
+      return [
+        {
+          name: "Microsoft Office",
+          items: [
+            { name: "Word", path: "C:/Apps/Office/Word.lnk", is_dir: false },
+            { name: "Excel", path: "C:/Apps/Office/Excel.lnk", is_dir: false },
+            { name: "PowerPoint", path: "C:/Apps/Office/PowerPoint.lnk", is_dir: false },
+          ],
+        },
+        {
+          name: "",
+          items: [
+            { name: "Microsoft Edge", path: "C:/Program Files/Edge/msedge.lnk", is_dir: false },
+            { name: "Spotify", path: "C:/Apps/Spotify.lnk", is_dir: false },
+            { name: "Visual Studio Code", path: "C:/Apps/Code.lnk", is_dir: false },
+            { name: "WhatsApp", path: "C:/Apps/WhatsApp.lnk", is_dir: false },
+          ],
+        },
+      ];
     case "set_autostart":
+      demoConfig.autostart = !!(args && args.enabled);
       console.info("[demo]", cmd, args);
       return null;
+    case "take_pending_changelog":
+      return false;
+    case "trash_paths":
+      demoTrashItems += ((args && args.paths) || []).length;
+      return null;
+    case "trash_is_empty":
+      return demoTrashItems === 0;
+    case "empty_trash":
+      demoTrashItems = 0;
+      return null;
+    case "wallpaper_accent":
+      return "#3a86ff";
+    case "media_info":
+      return { title: "Capybara Groove", artist: "Los Roedores", playing: true, thumb: null };
+    case "media_toggle":
+    case "media_next":
+    case "media_prev":
+      return true;
+    case "open_location":
+    case "set_hotkey":
+    case "apply_hotkeys":
+    case "move_paths":
+    case "set_material":
+      console.info("[demo]", cmd, args);
+      return null;
+    case "fetch_favicon":
+      return null; // browser demo can't fetch; the UI falls back to a letter tile
+    case "system_stats": {
+      const r = (a, b) => a + Math.random() * (b - a);
+      return {
+        cpu: r(4, 38),
+        mem: r(40, 70),
+        mem_used_mb: Math.round(r(6000, 11000)),
+        mem_total_mb: 16384,
+        net_down_kbps: Math.round(r(0, 1500)),
+        net_up_kbps: Math.round(r(0, 400)),
+        disk: r(45, 80),
+        disk_used_gb: Math.round(r(200, 400)),
+        disk_total_gb: 512,
+        uptime_secs: Math.round(r(3600, 200000)),
+        battery: Math.round(r(20, 100)),
+        charging: Math.random() > 0.5,
+      };
+    }
+    case "export_config":
+    case "import_config":
+      console.info("[demo]", cmd, args);
+      return cmd === "import_config" ? demoConfig : null;
     default:
       return null;
   }
@@ -121,6 +203,19 @@ export function logMessage(level, message) {
   }
 }
 
+/** Pick a path to save a file to (for exporting config). */
+export async function pickSavePath(defaultName) {
+  if (T && T.dialog && T.dialog.save) {
+    return T.dialog.save({ defaultPath: defaultName, filters: [{ name: "JSON", extensions: ["json"] }] });
+  }
+  return window.prompt("Guardar como:", defaultName) || null;
+}
+
+/** Pick a JSON file (for importing config). */
+export function pickJsonFile() {
+  return pickFile([{ name: "JSON", extensions: ["json"] }]);
+}
+
 /** Open a native file picker for choosing a custom icon image. */
 export function pickImageFile() {
   return pickFile([
@@ -152,13 +247,16 @@ export async function onConfigChanged(cb) {
   return T.event.listen("booki://config-changed", () => cb());
 }
 
-/** Subscribe to OS file-drop events (dragging items from the desktop). */
-export async function onFileDrop({ onEnter, onLeave, onDrop } = {}) {
+/** Subscribe to OS file-drop events (dragging items from the desktop). The
+    position (physical px, window-relative) lets the dock target a specific tile. */
+export async function onFileDrop({ onEnter, onOver, onLeave, onDrop } = {}) {
   if (!(T && T.event && T.event.listen)) return () => {};
+  const pos = (e) => (e.payload && e.payload.position) || null;
   const unsubs = await Promise.all([
-    T.event.listen("tauri://drag-enter", () => onEnter && onEnter()),
+    T.event.listen("tauri://drag-enter", (e) => onEnter && onEnter(pos(e))),
+    T.event.listen("tauri://drag-over", (e) => onOver && onOver(pos(e))),
     T.event.listen("tauri://drag-leave", () => onLeave && onLeave()),
-    T.event.listen("tauri://drag-drop", (e) => onDrop && onDrop((e.payload && e.payload.paths) || [])),
+    T.event.listen("tauri://drag-drop", (e) => onDrop && onDrop((e.payload && e.payload.paths) || [], pos(e))),
   ]);
   return () => unsubs.forEach((u) => u());
 }
@@ -174,7 +272,12 @@ export const dock = {
   appIcon: (path) => invoke("app_icon", { path }),
   imageDataUri: (path) => invoke("image_data_uri", { path }),
   reposition: (edge) => invoke("reposition_dock", { edge }),
-  setDockFrame: (edge, width, height) => invoke("set_dock_frame", { edge, width, height }),
+  setDockFrame: (edge, width, height, hidden = false) =>
+    invoke("set_dock_frame", { edge, width, height, hidden }),
+  hideDock: (edge) => invoke("hide_dock", { edge }),
+  revealDock: () => invoke("reveal_dock"),
+  notchToast: (text) => invoke("notch_toast", { text }),
+  hideAll: () => invoke("hide_all"),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -183,16 +286,65 @@ export const dock = {
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
+  applyHotkeys: (toggle, positions, modifier) =>
+    invoke("apply_hotkeys", { toggle, positions, modifier }),
+  movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (strength) => invoke("set_material", { strength }),
+  systemAccent: () => invoke("system_accent"),
+  systemStats: () => invoke("system_stats"),
+  fetchFavicon: (url) => invoke("fetch_favicon", { url }),
+  openChangelog: () => invoke("open_changelog"),
+  takePendingChangelog: () => invoke("take_pending_changelog"),
+  trashPaths: (paths) => invoke("trash_paths", { paths }),
+  trashIsEmpty: () => invoke("trash_is_empty"),
+  emptyTrash: () => invoke("empty_trash"),
+  wallpaperAccent: () => invoke("wallpaper_accent"),
+  mediaInfo: () => invoke("media_info"),
+  mediaToggle: () => invoke("media_toggle"),
+  mediaNext: () => invoke("media_next"),
+  mediaPrev: () => invoke("media_prev"),
+  exportConfig: (path) => invoke("export_config", { path }),
+  importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
   listDir: (path) => invoke("list_dir", { path }),
   isDir: (path) => invoke("is_dir", { path }),
+  listInstalledApps: () => invoke("list_installed_apps"),
 };
+
+/** Listen for a position hotkey (modifier+1…9): launch the Nth dock item. */
+export async function onLaunchIndex(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://launch-index", (e) => cb(e.payload));
+}
 
 /** Listen for the smart-hide occlusion signal from the backend. */
 export async function onOcclusion(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://occlusion", (e) => cb(!!e.payload));
+}
+
+/** Listen for the "reveal the dock" signal (fired when the notch is clicked). */
+export async function onReveal(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://reveal", () => cb());
+}
+
+/** Listen for the "show what's new" signal (settings shows the changelog modal). */
+export async function onShowChangelog(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://show-changelog", () => cb());
+}
+
+/** Listen for fullscreen on/off (a game/movie/presentation is running). */
+export async function onFullscreen(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://fullscreen", (e) => cb(!!e.payload));
+}
+
+/** Listen for a toast message to render on the notch window. */
+export async function onNotchToast(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-toast", (e) => cb(e.payload || ""));
 }
