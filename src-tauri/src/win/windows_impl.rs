@@ -576,13 +576,20 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         .unwrap_or(false);
     let thumb = (|| {
         let stream = info.Thumbnail().ok()?.OpenReadAsync().ok()?.get().ok()?;
-        let size = stream.Size().ok()?;
-        if size == 0 || size > 2_000_000 {
-            return None; // no art, or unreasonably big
+        let size = stream.Size().unwrap_or(0);
+        if size > 2_000_000 {
+            return None; // unreasonably big for album art
         }
         let reader = DataReader::CreateDataReader(&stream).ok()?;
-        reader.LoadAsync(size as u32).ok()?.get().ok()?;
-        let mut bytes = vec![0u8; size as usize];
+        // Some sources (e.g. browser tabs) report Size()==0 — ask for a chunk
+        // and read whatever actually arrived.
+        let want: u32 = if size == 0 { 500_000 } else { size as u32 };
+        reader.LoadAsync(want).ok()?.get().ok()?;
+        let got = reader.UnconsumedBufferLength().ok()? as usize;
+        if got == 0 {
+            return None;
+        }
+        let mut bytes = vec![0u8; got];
         reader.ReadBytes(&mut bytes).ok()?;
         let mime = if bytes.starts_with(&[0x89, b'P']) { "png" } else { "jpeg" };
         Some(format!(
@@ -597,6 +604,22 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
 pub fn media_toggle() -> bool {
     media_session()
         .and_then(|s| s.TryTogglePlayPauseAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}
+
+/// Skip to the next track on the current system media session.
+pub fn media_next() -> bool {
+    media_session()
+        .and_then(|s| s.TrySkipNextAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}
+
+/// Skip to the previous track on the current system media session.
+pub fn media_prev() -> bool {
+    media_session()
+        .and_then(|s| s.TrySkipPreviousAsync().ok())
         .and_then(|op| op.get().ok())
         .unwrap_or(false)
 }

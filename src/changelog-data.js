@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.9.0",
+    date: "2 jul 2026",
+    headline: "La música toma el control, y el dock obedece cuando lo escondes.",
+    sections: [
+      {
+        icon: "🎵",
+        title: "Música completa",
+        notes: [
+          "Pasa el cursor por la tarjeta de música y aparecen los controles: anterior, pausa/reproducir y siguiente.",
+          "La carátula ahora también llega desde el navegador (YouTube incluido).",
+        ],
+      },
+      {
+        icon: "🤚",
+        title: "Esconder es esconder",
+        notes: [
+          "Si arrastras el dock hacia el borde para esconderlo, se queda escondido: solo vuelve con el notch o al cambiar de app.",
+          "Abrir una carpeta ya no muestra ese medio segundo de panel recortado.",
+        ],
+      },
+      {
+        icon: "🧰",
+        title: "Ajustes más limpios",
+        notes: [
+          "Las opciones de añadir (carpeta, separador, papelera…) ahora viven en un menú «Más opciones» junto a «Añadir app».",
+          "El logotipo real de Booki, con su letra original, aparece en Ajustes.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.8.3",
     date: "2 jul 2026",
     headline: "El dock ya no se corta al crecer, y un repaso de seguridad a fondo.",

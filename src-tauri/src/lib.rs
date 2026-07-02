@@ -567,6 +567,16 @@ async fn media_toggle() -> bool {
 }
 
 #[tauri::command]
+async fn media_next() -> bool {
+    win::media_next()
+}
+
+#[tauri::command]
+async fn media_prev() -> bool {
+    win::media_prev()
+}
+
+#[tauri::command]
 fn empty_trash() -> Result<(), String> {
     let result = win::empty_trash();
     if let Err(e) = &result {
@@ -936,6 +946,8 @@ pub fn run() {
             wallpaper_accent,
             media_info,
             media_toggle,
+            media_next,
+            media_prev,
             list_dir,
             is_dir,
             list_installed_apps,

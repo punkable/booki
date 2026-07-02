@@ -128,6 +128,8 @@ async function mockInvoke(cmd, args) {
     case "media_info":
       return { title: "Capybara Groove", artist: "Los Roedores", playing: true, thumb: null };
     case "media_toggle":
+    case "media_next":
+    case "media_prev":
       return true;
     case "open_location":
     case "set_hotkey":
@@ -295,6 +297,8 @@ export const dock = {
   wallpaperAccent: () => invoke("wallpaper_accent"),
   mediaInfo: () => invoke("media_info"),
   mediaToggle: () => invoke("media_toggle"),
+  mediaNext: () => invoke("media_next"),
+  mediaPrev: () => invoke("media_prev"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),

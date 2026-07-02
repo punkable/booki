@@ -382,6 +382,27 @@ function widgetTile(item) {
     el.querySelector(".w-label").textContent = t("w.media");
     el.querySelector(".w-value").textContent = "—";
     el.querySelector(".w-bar").style.display = "none";
+    // Hover controls: previous · play/pause · next (click on the card itself
+    // still toggles play/pause).
+    const controls = document.createElement("span");
+    controls.className = "w-controls";
+    const mkCtl = (label, glyph, fn) => {
+      const b = document.createElement("button");
+      b.className = "w-ctl";
+      b.title = label;
+      b.textContent = glyph;
+      b.addEventListener("pointerdown", (e) => e.stopPropagation());
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await fn();
+        setTimeout(startMediaPoll, 350); // refresh title/state right away
+      });
+      controls.appendChild(b);
+    };
+    mkCtl(t("w.prev"), "⏮", () => dockApi.mediaPrev());
+    mkCtl(t("w.playPause"), "⏯", () => dockApi.mediaToggle());
+    mkCtl(t("w.next"), "⏭", () => dockApi.mediaNext());
+    card.appendChild(controls);
   }
   if (type === "clock") tickClocks();
   if (type === "notes") {
@@ -730,6 +751,9 @@ window.addEventListener("pointermove", (e) => {
     bgDrag = null;
     pinnedReveal = false;
     manualReveal = false;
+    // The pointer is still inside the window when the gesture ends — without
+    // this flag the hover-reveal would pop the dock right back out.
+    manualHide = true;
     setHidden(true);
   }
 });
@@ -1304,6 +1328,7 @@ let manualReveal = false; // user hovered/clicked the notch → keep shown for n
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // a fullscreen game/movie is running → blackout everything
 let draggingFile = false; // an OS file drag is over the dock → keep it open
+let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
@@ -1375,6 +1400,7 @@ function setupAutoHide() {
 // Pointer entered the dock → reveal and hold it open.
 function reveal() {
   if (fullscreen) return; // stay out of the way during fullscreen
+  if (manualHide) return; // user swiped the dock away — only the notch brings it back
   const mode = hideMode();
   if (mode === "off") return;
   // In smart mode, while you're working in another app, DON'T reveal on hover —
@@ -1405,8 +1431,12 @@ function scheduleHide() {
 // measured against a stable rect in Rust, so it can no longer flap.
 function onOcclusionSignal(value) {
   occluded = value;
+  // Going back to work in an app releases a manual swipe-hide: next time the
+  // desktop is clear, normal smart behavior resumes.
+  if (value) manualHide = false;
   if (fullscreen) return; // blackout owns the visibility while fullscreen
   if (draggingFile) return; // never tuck away mid file-drag (the drop needs us)
+  if (manualHide) return; // stay hidden until the user asks for the dock again
   if (hideMode() !== "smart") return;
   if (!value) {
     // Back on the desktop → bring the dock out automatically.
@@ -1429,6 +1459,7 @@ dockEl.addEventListener("pointerleave", scheduleHide);
 // shows the dock window again and fires `booki://reveal` — we pin the dock open
 // (so the user can actually launch something) until they click away or launch.
 onReveal(() => {
+  manualHide = false; // explicit notch click always brings the dock back
   pinnedReveal = true;
   reveal();
 });
@@ -1768,10 +1799,11 @@ async function toggleStack(tileEl, item) {
 
   stackOpen = true;
   document.body.classList.add("stack-open");
-  reframe();
-  // Place the flyout just past the bar, sized to the bar's real geometry (the
-  // dock window is tight now, so a hardcoded offset would clip it).
-  requestAnimationFrame(() => {
+  // Grow the window synchronously BEFORE the flyout becomes visible — same
+  // pattern as the context menu / popovers, so opening a folder never flashes
+  // a clipped panel while the window catches up.
+  applyFrame();
+  setTimeout(() => requestAnimationFrame(() => {
     const dr = dockEl.getBoundingClientRect();
     const gap = 10;
     stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
@@ -1794,7 +1826,7 @@ async function toggleStack(tileEl, item) {
     }
     // Positioned in its closed state → flip to open so the transition plays.
     stackEl.classList.add("open");
-  });
+  }), 70);
 }
 
 let stackCloseTimer = null;

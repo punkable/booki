@@ -491,6 +491,40 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 /* Long song titles must not balloon the card (and with it, the whole bar). */
 .tile.widget.media .w-main { max-width: 118px; min-width: 0; }
 .tile.widget.media .w-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Hover controls: prev · play/pause · next as a floating glass strip. */
+.tile.widget.media { position: relative; }
+.tile.widget.media .w-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--layer-strong) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+.tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; }
+.w-ctl {
+  border: 0;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.w-ctl:active { transform: scale(0.9); }
 
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
@@ -1130,8 +1164,19 @@ body.settings-body {
   -webkit-backdrop-filter: blur(30px) saturate(160%);
   backdrop-filter: blur(30px) saturate(160%);
 }
-.s-brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 14px; font-weight: 700; font-size: 17px; }
+.s-brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 14px; }
 .s-brand img { width: 26px; height: 26px; }
+/* The real wordmark from the brand kit — black on light, white on dark. */
+.s-brand img.brand-word { width: auto; height: 17px; }
+.s-about-word { display: inline-flex; vertical-align: -3px; }
+.s-about-word .brand-word { height: 19px; }
+.word-white { display: none; }
+[data-theme="dark"] .word-black { display: none; }
+[data-theme="dark"] .word-white { display: inline; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .word-black { display: none; }
+  :root:not([data-theme]) .word-white { display: inline; }
+}
 .s-sidebar nav { position: relative; display: flex; flex-direction: column; gap: 2px; --navh: 40px; }
 /* Sliding active pill */
 .s-nav-indicator {
@@ -1188,6 +1233,36 @@ body.settings-body {
 .s-search-results button:hover { background: var(--hover); }
 .s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
 .s-search-none { font: 500 12px var(--font); color: var(--ink-2); padding: 8px 9px; }
+
+/* "More options" dropdown next to "+ Add app" (Pinned apps tab). */
+.s-more { position: relative; display: inline-block; }
+.s-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 5px;
+  border-radius: var(--r-md);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  animation: notch-toast-in 0.16s var(--ease-bounce);
+}
+.s-more-menu button {
+  font: 500 13px var(--font);
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.s-more-menu button:hover { background: var(--hover); }
+.s-more-menu button:disabled { opacity: 0.45; cursor: default; }
 
 /* Button with a leading icon (e.g. "What's new" in About). */
 .s-btn-ico { display: inline-flex; align-items: center; gap: 7px; }
