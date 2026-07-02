@@ -367,6 +367,29 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 @keyframes w-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
 @keyframes w-grad { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
 
+/* ─────────────── Drag clone (the tile that follows the pointer) ─────────────── */
+.tile.drag-clone {
+  position: fixed;
+  z-index: 90;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.92;
+  transform: scale(1.08);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+  transition: transform 0.14s var(--ease), opacity 0.14s ease;
+}
+.tile.drag-clone .label, .tile.drag-clone .badge, .tile.drag-clone .rm { display: none; }
+/* Pulled away from the bar → "release to unpin" look. */
+.tile.drag-clone.will-unpin { opacity: 0.55; transform: scale(0.82) rotate(-4deg); }
+.tile.drag-clone.poof {
+  opacity: 0;
+  transform: scale(0.1) rotate(10deg);
+  transition: transform 0.26s ease-in, opacity 0.26s ease-in;
+}
+/* The slot left behind while dragging: ghosted; nearly gone when unpinning. */
+.tile.dragging { opacity: 0.35; }
+.tile.dragging.unpin-slot { opacity: 0.12; }
+
 /* ───────────────────────── Trash pin ───────────────────────── */
 /* A Recycle Bin tile: drop files on it → Booki asks → sends to the bin. */
 .tile.trash .trash-glyph {
@@ -912,14 +935,9 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .tile.hint img { opacity: 0.85; }
 @keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
-/* Lifted dragged tile (micro-interaction) */
-.dock.dragging .tile.dragging {
-  opacity: 0.95;
-  transform: scale(1.14);
-  z-index: 10;
-  transition: transform 0.12s var(--ease-bounce);
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.45));
-}
+/* While dragging, the in-bar tile is just the ghost slot — the floating
+   .drag-clone is the thing that follows the pointer (see its rules above). */
+.dock.dragging .tile.dragging { transform: none; }
 
 /* Drop overlay (covers the whole window for an easy target) */
 .drop-overlay {

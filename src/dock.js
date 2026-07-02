@@ -12,6 +12,7 @@ import {
   onOcclusion,
   onReveal,
   onFullscreen,
+  onLaunchIndex,
   emitConfigChanged,
   logMessage,
   isTauri,
@@ -63,6 +64,15 @@ async function boot() {
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
+    // Position hotkeys (modifier+1…9): launch the Nth item on the bar.
+    onLaunchIndex((i) => {
+      const items = cfg.pinned.filter((p) => p.kind !== "separator");
+      const item = items[i];
+      if (!item) return;
+      const el = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
+      if (el) launch(el, item);
+      else if (item.path) dockApi.launch(item.path, item.args || []);
+    });
     checkUpdates();
     checkChangelog();
     maybeOnboard();
@@ -827,11 +837,28 @@ function onPointerDown(e, el, item) {
 
 let mergeEl = null; // tile currently armed as a folder (merge) target
 let mergeArm = 0; // timestamp hovering the current target's center began
+let dragClone = null; // floating copy of the tile that follows the pointer
+let willUnpin = false; // pointer pulled far from the bar → release = unpin
 
 function clearMerge() {
   if (mergeEl) mergeEl.classList.remove("merge-target");
   mergeEl = null;
   mergeArm = 0;
+}
+
+function killClone() {
+  if (dragClone) dragClone.remove();
+  dragClone = null;
+  willUnpin = false;
+}
+
+// Distance from the pointer to the bar, measured AWAY from the anchored edge.
+function pullDistance(e) {
+  const r = dockEl.getBoundingClientRect();
+  if (cfg.edge === "top") return e.clientY - r.bottom;
+  if (cfg.edge === "left") return e.clientX - r.right;
+  if (cfg.edge === "right") return r.left - e.clientX;
+  return r.top - e.clientY;
 }
 
 function onPressMove(e) {
@@ -847,6 +874,32 @@ function onPressMove(e) {
     dragging = true;
     dockEl.classList.add("dragging");
     press.el.classList.add("dragging");
+    // A floating copy follows the pointer; the real tile stays as a ghost slot,
+    // so you SEE what you're moving instead of it teleporting between slots.
+    const r = press.el.getBoundingClientRect();
+    dragClone = press.el.cloneNode(true);
+    dragClone.className = "tile drag-clone";
+    dragClone.style.width = `${r.width}px`;
+    dragClone.style.height = `${r.height}px`;
+    press.grabX = e.clientX - r.left;
+    press.grabY = e.clientY - r.top;
+    document.body.appendChild(dragClone);
+  }
+  if (dragClone) {
+    dragClone.style.left = `${e.clientX - press.grabX}px`;
+    dragClone.style.top = `${e.clientY - press.grabY}px`;
+  }
+
+  // Pulled well past the bar → dropping here unpins (macOS-style).
+  const pulling = pullDistance(e) > 90;
+  if (pulling !== willUnpin) {
+    willUnpin = pulling;
+    if (dragClone) dragClone.classList.toggle("will-unpin", willUnpin);
+    press.el.classList.toggle("unpin-slot", willUnpin);
+  }
+  if (willUnpin) {
+    clearMerge();
+    return; // no reordering/merging while aiming outside the bar
   }
 
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
@@ -930,8 +983,33 @@ async function onPressUp() {
     dragging = false;
     dockEl.classList.remove("dragging");
     p.el.classList.remove("dragging");
+    p.el.classList.remove("unpin-slot");
     const armed = mergeEl && mergeEl.classList.contains("merge-target") ? mergeEl.dataset.id : null;
     clearMerge();
+    // Released far from the bar → unpin with a little poof.
+    if (willUnpin) {
+      if (dragClone) {
+        const c = dragClone;
+        dragClone = null;
+        c.classList.add("poof");
+        setTimeout(() => c.remove(), 280);
+      }
+      willUnpin = false;
+      await removeItem(p.item.id);
+      await emitConfigChanged();
+      return;
+    }
+    // Settle the floating copy into the tile's final slot, then drop it.
+    if (dragClone) {
+      const c = dragClone;
+      dragClone = null;
+      const r = p.el.getBoundingClientRect();
+      c.style.transition = "left 0.16s var(--ease), top 0.16s var(--ease), opacity 0.16s ease";
+      c.style.left = `${r.left}px`;
+      c.style.top = `${r.top}px`;
+      c.style.opacity = "0";
+      setTimeout(() => c.remove(), 180);
+    }
     if (armed && armed !== p.item.id) {
       await createGroup(p.item.id, armed);
     } else {
@@ -958,8 +1036,10 @@ async function cancelDrag() {
   press = null;
   dragging = false;
   clearMerge();
+  killClone();
   dockEl.classList.remove("dragging");
-  dockEl.querySelectorAll(".tile.dragging").forEach((t) => t.classList.remove("dragging"));
+  dockEl.querySelectorAll(".tile.dragging, .tile.unpin-slot").forEach((t) =>
+    t.classList.remove("dragging", "unpin-slot"));
   if (wasDragging) {
     await render(); // rebuild from the unchanged cfg → original order
     reframe();
@@ -1610,6 +1690,46 @@ function trashBlockedInfo() {
   trashPop = pop;
 }
 
+// Drop-on-folder: ask, then move the files into that folder (shell move —
+// undoable with Ctrl+Z in Explorer).
+function confirmMove(paths, item) {
+  closeTrashPop();
+  pinnedReveal = true;
+  const n = paths.length;
+  const what = n === 1 ? `«${esc(baseName(paths[0]))}»` : t("move.n").replace("{n}", n);
+  const pop = document.createElement("div");
+  pop.className = "trash-pop";
+  pop.innerHTML =
+    `${icon("folder")}<span class="tp-col"><span class="tp-text">${t("move.ask")
+      .replace("{what}", what)
+      .replace("{dest}", esc(item.name))}</span>` +
+    `<span class="tp-sub">${t("move.sub")}</span></span>`;
+  const mkBtn = (cls, label, fn) => {
+    const b = document.createElement("button");
+    b.className = `tp-btn ${cls}`;
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    pop.appendChild(b);
+  };
+  mkBtn("", t("move.ok"), async () => {
+    closeTrashPop();
+    try {
+      await dockApi.movePaths(paths, item.path);
+    } catch (err) {
+      logMessage(`move: ${err}`);
+    }
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  mkBtn("", t("trash.cancel"), () => {
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  placePop(pop);
+  trashPop = pop;
+}
+
 // Open files with an app and remember them as recents (a small jump list).
 async function openWith(item, paths) {
   for (const p of paths) dockApi.launch(item.path, [p]);
@@ -1657,6 +1777,29 @@ function setupFileDrop() {
       // Dropped onto the trash pin → confirm, then send to the Recycle Bin.
       if (item && item.kind === "trash") {
         confirmTrash(paths);
+        return;
+      }
+      // Dropped onto a real folder pin → confirm, then MOVE the files there.
+      if (item && item.kind === "folder") {
+        confirmMove(paths, item);
+        return;
+      }
+      // Dropped onto a dock folder (group) → pin the files inside it.
+      if (item && item.kind === "group") {
+        for (const pth of paths) {
+          item.children = item.children || [];
+          item.children.push({
+            id: uid(),
+            name: baseName(pth).replace(/\.lnk$/i, ""),
+            path: pth,
+            args: [],
+            kind: "app",
+          });
+        }
+        await persist();
+        await emitConfigChanged();
+        await render();
+        reframe();
         return;
       }
       // Otherwise pin them to the dock.

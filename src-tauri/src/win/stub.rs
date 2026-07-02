@@ -75,3 +75,7 @@ pub fn media_next() -> bool {
 pub fn media_prev() -> bool {
     false
 }
+
+pub fn move_paths(_paths: &[String], _dest: &str) -> Result<(), String> {
+    Err("moving files is only available on Windows".into())
+}

@@ -11,11 +11,10 @@ on:
   push:
     tags:
       - "v*"
-    # Temporary: also publish from the dev branch so the first downloadable
-    # installer exists before the PR is merged (tag pushes are restricted in
-    # the dev environment). Remove this branch trigger once on main + tags.
+    # Releases publish from main: every push there with a new version in
+    # package.json produces a signed installer release.
     branches:
-      - "claude/docky-windows-modernize-10rbkk"
+      - "main"
   workflow_dispatch:
     inputs:
       tag:

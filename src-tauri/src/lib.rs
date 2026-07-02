@@ -521,6 +521,16 @@ fn get_autostart() -> bool {
     win::get_autostart()
 }
 
+/// Move files/folders into a destination folder (drop onto a folder pin).
+#[tauri::command]
+fn move_paths(paths: Vec<String>, dest: String) -> Result<(), String> {
+    let result = win::move_paths(&paths, &dest);
+    if let Err(e) = &result {
+        log::error!("move_paths failed: {e}");
+    }
+    result
+}
+
 /// Send files/folders to the Recycle Bin (the dock's own UI confirms first).
 #[tauri::command]
 fn trash_paths(paths: Vec<String>) -> Result<(), String> {
@@ -763,14 +773,42 @@ fn scan_lnks(
 /// (Re)register the global hotkey that toggles the dock. Empty = none.
 #[tauri::command]
 fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
+    let cfg = config::load();
+    hotkeys_apply(&app, &accelerator, cfg.position_hotkeys, &cfg.hotkey_modifier)
+}
+
+/// Re-register ALL global shortcuts: the toggle hotkey plus (when enabled) the
+/// position hotkeys modifier+1…9 that launch the Nth dock item.
+fn hotkeys_apply(
+    app: &AppHandle,
+    toggle: &str,
+    positions: bool,
+    modifier: &str,
+) -> Result<(), String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    if !accelerator.trim().is_empty() {
-        gs.register(accelerator.as_str())
-            .map_err(|e| e.to_string())?;
+    if !toggle.trim().is_empty() {
+        gs.register(toggle.trim()).map_err(|e| e.to_string())?;
+    }
+    if positions {
+        for i in 1..=9 {
+            // Best-effort: another app may own one of the combos; skip it.
+            let _ = gs.register(format!("{modifier}+{i}").as_str());
+        }
     }
     Ok(())
+}
+
+/// Called from Settings when the position-hotkey options change.
+#[tauri::command]
+fn apply_hotkeys(
+    app: AppHandle,
+    toggle: String,
+    positions: bool,
+    modifier: String,
+) -> Result<(), String> {
+    hotkeys_apply(&app, &toggle, positions, &modifier)
 }
 
 /// Lets the frontend write to the app log file (for diagnosing issues).
@@ -896,10 +934,31 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    use tauri_plugin_global_shortcut::ShortcutState;
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_dock(app);
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::{Code, ShortcutState};
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    // Digit shortcuts are only ever registered as position
+                    // hotkeys (modifier+1…9 → launch the Nth dock item);
+                    // anything else is the show/hide toggle.
+                    let idx = match shortcut.key {
+                        Code::Digit1 => Some(0usize),
+                        Code::Digit2 => Some(1),
+                        Code::Digit3 => Some(2),
+                        Code::Digit4 => Some(3),
+                        Code::Digit5 => Some(4),
+                        Code::Digit6 => Some(5),
+                        Code::Digit7 => Some(6),
+                        Code::Digit8 => Some(7),
+                        Code::Digit9 => Some(8),
+                        _ => None,
+                    };
+                    match idx {
+                        Some(i) => {
+                            let _ = app.emit("booki://launch-index", i);
+                        }
+                        None => toggle_dock(app),
                     }
                 })
                 .build(),
@@ -933,6 +992,8 @@ pub fn run() {
             open_settings,
             open_location,
             set_hotkey,
+            apply_hotkeys,
+            move_paths,
             list_monitors,
             set_material,
             system_accent,
@@ -1009,10 +1070,12 @@ pub fn run() {
                 let _ = dock.show();
 
                 // Register the global hotkey, if configured.
-                if !cfg.hotkey.trim().is_empty() {
-                    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-                    let _ = app.global_shortcut().register(cfg.hotkey.as_str());
-                }
+                let _ = hotkeys_apply(
+                    app.handle(),
+                    &cfg.hotkey,
+                    cfg.position_hotkeys,
+                    &cfg.hotkey_modifier,
+                );
 
                 // Smart auto-hide watcher: emit `booki://occlusion` when the user
                 // is working in another app (vs. on the desktop). The frontend

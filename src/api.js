@@ -133,6 +133,8 @@ async function mockInvoke(cmd, args) {
       return true;
     case "open_location":
     case "set_hotkey":
+    case "apply_hotkeys":
+    case "move_paths":
     case "set_material":
       console.info("[demo]", cmd, args);
       return null;
@@ -284,6 +286,9 @@ export const dock = {
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
+  applyHotkeys: (toggle, positions, modifier) =>
+    invoke("apply_hotkeys", { toggle, positions, modifier }),
+  movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (strength) => invoke("set_material", { strength }),
   systemAccent: () => invoke("system_accent"),
@@ -307,6 +312,12 @@ export const dock = {
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: () => invoke("list_installed_apps"),
 };
+
+/** Listen for a position hotkey (modifier+1…9): launch the Nth dock item. */
+export async function onLaunchIndex(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://launch-index", (e) => cb(e.payload));
+}
 
 /** Listen for the smart-hide occlusion signal from the backend. */
 export async function onOcclusion(cb) {

@@ -13,7 +13,12 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/folder.png" alt="Folder flyout" width="405" />
+  <img src="assets/screenshots/genie.gif" alt="The dock tucking away toward the notch" width="480" /><br/>
+  <sub>Smart hide: the dock funnels into the notch when you start working.</sub>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/folder.gif" alt="Folder flyout opening" width="405" />
   <img src="assets/screenshots/settings.png" alt="Settings window" width="300" />
 </p>
 
