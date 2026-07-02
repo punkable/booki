@@ -651,7 +651,7 @@ async function maybeOnboard() {
   pinnedReveal = true; // keep the dock open during the tour
   const pop = document.createElement("div");
   pop.className = "coach";
-  document.body.appendChild(pop);
+  placePop(pop);
   const showStep = () => {
     const last = i === steps.length - 1;
     pop.innerHTML =
@@ -667,6 +667,8 @@ async function maybeOnboard() {
         showStep();
       } else {
         pop.remove();
+        document.body.classList.remove("pop-open");
+        reframe();
         cfg.onboarded = true;
         await persist();
         pinnedReveal = false;
@@ -1096,21 +1098,40 @@ function openBackgroundMenu(e) {
   placeMenu(e);
 }
 
+// The context menu lives beside the bar (like the folder flyout): the window is
+// grown to fit it, so it can never be cut off by the dock window's bounds.
 function placeMenu(e) {
-  // Reveal first so we can measure, then clamp within the window.
-  ctxMenu.style.left = "0px";
-  ctxMenu.style.top = "0px";
+  const cx = e.clientX;
+  const cy = e.clientY;
   ctxMenu.classList.remove("hidden");
-  const pad = 8;
-  const mw = ctxMenu.offsetWidth;
-  const mh = ctxMenu.offsetHeight;
-  const x = Math.min(e.clientX, window.innerWidth - mw - pad);
-  const y = Math.min(e.clientY, window.innerHeight - mh - pad);
-  ctxMenu.style.left = `${Math.max(pad, x)}px`;
-  ctxMenu.style.top = `${Math.max(pad, y)}px`;
+  document.body.classList.add("menu-open");
+  reframe();
+  const put = () => {
+    const dr = dockEl.getBoundingClientRect();
+    const pad = 8;
+    const gap = 10;
+    const mw = ctxMenu.offsetWidth;
+    const mh = ctxMenu.offsetHeight;
+    if (isVertical()) {
+      const top = Math.min(Math.max(pad, cy - mh / 2), window.innerHeight - mh - pad);
+      ctxMenu.style.top = `${top}px`;
+      ctxMenu.style.left =
+        cfg.edge === "left" ? `${dr.right + gap}px` : `${dr.left - mw - gap}px`;
+    } else {
+      const left = Math.min(Math.max(pad, cx - mw / 2), window.innerWidth - mw - pad);
+      ctxMenu.style.left = `${left}px`;
+      ctxMenu.style.top =
+        cfg.edge === "top" ? `${dr.bottom + gap}px` : `${dr.top - mh - gap}px`;
+    }
+  };
+  put();
+  setTimeout(() => requestAnimationFrame(put), 120);
 }
 function closeMenu() {
+  if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
+  document.body.classList.remove("menu-open");
+  reframe();
 }
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
@@ -1196,6 +1217,15 @@ function computeFrame() {
     const sr = stackEl.getBoundingClientRect();
     hCss += sr.height + 16;
     wCss = Math.max(wCss, sr.width + 32);
+  }
+  // …and for anything open beside the bar: popovers (trash confirm, first-run
+  // tips) and the context menu. Everything that isn't the bar itself must fit
+  // INSIDE the window or it gets clipped at the window edge.
+  const pop = document.querySelector(".trash-pop, .coach, #ctx-menu:not(.hidden)");
+  if (pop) {
+    if (isVertical()) wCss += pop.offsetWidth + 24;
+    else hCss += pop.offsetHeight + 24;
+    wCss = Math.max(wCss, pop.offsetWidth + 40);
   }
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
@@ -1393,6 +1423,35 @@ let trashPop = null;
 function closeTrashPop() {
   if (trashPop) trashPop.remove();
   trashPop = null;
+  document.body.classList.remove("pop-open");
+  reframe();
+}
+
+// Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never
+// on top of it — and grow the window so nothing gets clipped.
+function placePop(pop) {
+  document.body.appendChild(pop);
+  document.body.classList.add("pop-open");
+  reframe();
+  const put = () => {
+    const dr = dockEl.getBoundingClientRect();
+    const gap = 12;
+    pop.style.left = pop.style.right = pop.style.top = pop.style.bottom = "";
+    if (isVertical()) {
+      pop.style.top = "50%";
+      pop.style.transform = "translateY(-50%)";
+      if (cfg.edge === "left") pop.style.left = `${dr.width + gap}px`;
+      else pop.style.right = `${dr.width + gap}px`;
+    } else {
+      pop.style.left = "50%";
+      pop.style.transform = "translateX(-50%)";
+      if (cfg.edge === "top") pop.style.top = `${dr.height + gap}px`;
+      else pop.style.bottom = `${dr.height + gap}px`;
+    }
+  };
+  // Position after the window has grown (reframe is debounced ~50ms + 2 rAF).
+  setTimeout(() => requestAnimationFrame(put), 120);
+  put();
 }
 
 function confirmTrash(paths, emptyBin = false) {
@@ -1442,7 +1501,7 @@ function confirmTrash(paths, emptyBin = false) {
     pinnedReveal = false;
     scheduleHide();
   });
-  document.body.appendChild(pop);
+  placePop(pop);
   trashPop = pop;
 }
 
@@ -1466,7 +1525,7 @@ function trashBlockedInfo() {
     scheduleHide();
   });
   pop.appendChild(ok);
-  document.body.appendChild(pop);
+  placePop(pop);
   trashPop = pop;
 }
 

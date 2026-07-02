@@ -381,10 +381,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 
 /* Confirmation popover — centered over the bar; nothing deletes without a yes. */
 .trash-pop {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: fixed; /* placed beside the bar by placePop() in dock.js */
   z-index: 60;
   display: flex;
   align-items: center;
@@ -423,10 +420,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 
 /* ─────────────────── First-run coach bubbles ─────────────────── */
 .coach {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: fixed; /* placed beside the bar by placePop() in dock.js */
   z-index: 70;
   display: flex;
   align-items: center;
@@ -490,34 +484,45 @@ body.notch-body {
 }
 body.notch-body.vertical { align-items: center; }
 .notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.82));
+  position: relative;
   flex: 0 0 auto;
-  width: 128px;
-  height: 6px;
+  width: 118px;
+  height: 13px;
   padding: 0;
   cursor: pointer;
   border-radius: 999px;
-  /* Tinted glass: a dark translucent body with a soft accent tint, a hairline
-     light border and a top sheen — premium, not a flat colored bar. */
+  /* "Dynamic island" glass: deep charcoal capsule with a soft accent tint, a
+     specular top sheen, a hairline light border and real depth in the shadow. */
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 55%),
-    color-mix(in srgb, var(--accent) 26%, rgba(24, 24, 30, 0.62));
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 58%),
+    color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.80));
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
   /* No pulsing animation — a steady pill (no blinking). */
-  transition: width 0.18s var(--ease-bounce), height 0.18s var(--ease-bounce),
-    background 0.2s ease, box-shadow 0.18s ease, opacity 0.2s ease;
+  transition: width 0.2s var(--ease-bounce), height 0.2s var(--ease-bounce),
+    background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 .notch-pill:hover {
-  width: 152px;
-  height: 9px;
+  width: 146px;
+  height: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.06) 55%),
-    color-mix(in srgb, var(--accent) 42%, rgba(24, 24, 30, 0.6));
+    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 58%),
+    color-mix(in srgb, var(--accent) 30%, rgba(15, 15, 20, 0.78));
+  box-shadow:
+    0 6px 22px rgba(0, 0, 0, 0.5),
+    0 0 18px color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
-.notch-pill:active { cursor: grabbing; transform: scaleY(0.85); }
-body.notch-body.vertical .notch-pill:active { transform: scaleX(0.85); }
-body.notch-body.vertical .notch-pill { width: 6px; height: 128px; }
-body.notch-body.vertical .notch-pill:hover { width: 9px; height: 152px; }
+.notch-pill:active { cursor: grabbing; transform: scaleY(0.88); }
+body.notch-body.vertical .notch-pill:active { transform: scaleX(0.88); }
+body.notch-body.vertical .notch-pill { width: 13px; height: 118px; }
+body.notch-body.vertical .notch-pill:hover { width: 18px; height: 146px; }
 
 /* Peek style: a tab that emerges from behind the taskbar. The window slides a
    few px past the work area into the taskbar band (backend), and the pill sits
@@ -528,19 +533,64 @@ body.notch-body.peek.edge-top { align-items: flex-start; }
 body.notch-body.peek.edge-left { justify-content: flex-start; }
 body.notch-body.peek.edge-right { justify-content: flex-end; }
 body.notch-body.peek .notch-pill {
-  width: 142px;
-  height: 10px;
-  border-radius: 12px 12px 0 0;
+  width: 112px;
+  height: 12px;
+  border-radius: 11px 11px 0 0;
   border-bottom: 0;
   transform-origin: center bottom;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 -3px 14px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.25);
 }
-body.notch-body.peek .notch-pill:hover { width: 158px; height: 16px; }
-body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 12px 12px; border-bottom: 1px solid rgba(255,255,255,0.28); border-top: 0; transform-origin: center top; }
-body.notch-body.peek.vertical .notch-pill { width: 10px; height: 142px; }
-body.notch-body.peek.vertical .notch-pill:hover { width: 16px; height: 158px; }
-body.notch-body.peek.edge-left .notch-pill { border-radius: 0 12px 12px 0; border-left: 0; border-bottom: 1px solid rgba(255,255,255,0.28); transform-origin: left center; }
-body.notch-body.peek.edge-right .notch-pill { border-radius: 12px 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.28); transform-origin: right center; }
+body.notch-body.peek .notch-pill:hover { width: 138px; height: 17px; }
+/* iPhone-notch corner fillets: small concave curves that blend the tab into the
+   taskbar edge, so it reads as part of the bar instead of a floating chip. */
+body.notch-body.peek .notch-pill::before,
+body.notch-body.peek .notch-pill::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+}
+body.notch-body.peek.edge-bottom .notch-pill::before {
+  left: -9px; bottom: 0;
+  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-bottom .notch-pill::after {
+  right: -9px; bottom: 0;
+  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill::before {
+  left: -9px; top: 0;
+  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill::after {
+  right: -9px; top: 0;
+  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-left .notch-pill::before {
+  top: -9px; left: 0;
+  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-left .notch-pill::after {
+  bottom: -9px; left: 0;
+  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-right .notch-pill::before {
+  top: -9px; right: 0;
+  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-right .notch-pill::after {
+  bottom: -9px; right: 0;
+  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
+body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
+body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
+body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: left center; }
+body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: right center; }
 /* The toast needs breathing room even in peek mode (its window is repositioned). */
 body.notch-body.toast { padding: 4px; }
 /* Subtle "breathing" so it feels alive without blinking. */
@@ -1158,12 +1208,25 @@ body.settings-body {
 .muted-list { color: var(--ink-2); font-size: 13px; padding-left: 18px; margin: 4px 0; line-height: 1.7; }
 .s-card-inner { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
 
-.r-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--stroke); }
+.r-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 11px 0; border-bottom: 1px solid var(--stroke); }
 .r-row:last-child { border-bottom: 0; }
-.r-label { flex: 0 0 200px; font-size: 14px; display: flex; flex-direction: column; }
+.r-label { flex: 1 1 180px; min-width: 140px; font-size: 14px; display: flex; flex-direction: column; }
 .r-hint { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
-.r-control { flex: 1; display: flex; justify-content: flex-end; }
-.r-control select { min-width: 200px; }
+/* Controls never clip: they shrink, wrap their contents, and drop below the
+   label on narrow windows instead of overflowing off-screen. */
+.r-control { flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.r-control > * { max-width: 100%; }
+.r-control select { min-width: 160px; }
+
+/* Narrow window: tighter chrome, controls under their labels. */
+@media (max-width: 720px) {
+  .s-shell { grid-template-columns: 164px 1fr; gap: 10px; padding: 10px; }
+  .s-content { padding: 16px 14px; }
+  .s-brand { font-size: 15px; }
+  .s-navitem { font-size: 13px; padding: 0 9px; }
+  .r-label { flex: 1 1 100%; min-width: 0; }
+  .r-control { justify-content: flex-start; }
+}
 
 /* Slider with accent fill + value bubble */
 .r-slider { width: 100%; }
@@ -1202,7 +1265,8 @@ select {
 .seg {
   position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
   padding: 3px; border-radius: var(--r-md);
-  background: var(--track); border: 1px solid var(--stroke); min-width: 250px;
+  background: var(--track); border: 1px solid var(--stroke);
+  min-width: min(250px, 100%); max-width: 100%; box-sizing: border-box;
 }
 .seg-thumb {
   position: absolute; top: 3px; bottom: 3px; left: 3px;
