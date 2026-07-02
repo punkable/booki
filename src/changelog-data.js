@@ -3,6 +3,54 @@
 
 export const CHANGELOG = [
   {
+    version: "0.8.0",
+    date: "2 jul 2026",
+    headline: "Ya puedes arrastrar cosas a la papelera, y la música llega al dock.",
+    sections: [
+      {
+        icon: "🗑️",
+        title: "Papelera",
+        notes: [
+          "Arrastra archivos, accesos o carpetas a la papelera del dock y confirma para borrarlos. Ahora funciona siempre.",
+          "El dock se queda abierto mientras arrastras algo, para que llegues sin prisa.",
+        ],
+      },
+      {
+        icon: "🎵",
+        title: "Música en el dock",
+        notes: [
+          "Nueva tarjeta de música con la carátula, el título y el artista de lo que está sonando.",
+          "Un clic en la tarjeta pausa o reanuda.",
+        ],
+      },
+      {
+        icon: "🧞",
+        title: "Se esconde con estilo",
+        notes: [
+          "Al ocultarse, el dock se desliza hacia el notch con un efecto tipo genio.",
+          "Nuevo gesto: mantén pulsado el fondo del dock y arrástralo hacia el borde para esconderlo.",
+        ],
+      },
+      {
+        icon: "🎨",
+        title: "Tema y color",
+        notes: [
+          "Tema «Auto»: claro de día, oscuro de noche.",
+          "Toma el color de acento directamente de tu fondo de pantalla con un clic.",
+        ],
+      },
+      {
+        icon: "🔎",
+        title: "Más fácil de usar",
+        notes: [
+          "Busca cualquier ajuste desde el menú lateral y salta directo a él.",
+          "Al abrir Booki por primera vez, tres consejos rápidos te enseñan lo esencial.",
+          "El notch estrena un look más fino y elegante.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.7.1",
     date: "2 jul 2026",
     headline: "Se acabó la ventana blanca, y las carpetas estrenan interior.",

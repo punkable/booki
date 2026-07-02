@@ -536,6 +536,36 @@ fn trash_is_empty() -> bool {
     win::trash_is_empty()
 }
 
+/// Accent color derived from the desktop wallpaper (async: decodes an image).
+#[tauri::command]
+async fn wallpaper_accent() -> Option<String> {
+    win::wallpaper_accent()
+}
+
+#[derive(serde::Serialize)]
+struct MediaInfo {
+    title: String,
+    artist: String,
+    playing: bool,
+    thumb: Option<String>,
+}
+
+/// What the system media session is playing (async: WinRT calls block briefly).
+#[tauri::command]
+async fn media_info() -> Option<MediaInfo> {
+    win::media_now_playing().map(|m| MediaInfo {
+        title: m.title,
+        artist: m.artist,
+        playing: m.playing,
+        thumb: m.thumb,
+    })
+}
+
+#[tauri::command]
+async fn media_toggle() -> bool {
+    win::media_toggle()
+}
+
 #[tauri::command]
 fn empty_trash() -> Result<(), String> {
     let result = win::empty_trash();
@@ -903,6 +933,9 @@ pub fn run() {
             trash_paths,
             trash_is_empty,
             empty_trash,
+            wallpaper_accent,
+            media_info,
+            media_toggle,
             list_dir,
             is_dir,
             list_installed_apps,
@@ -942,6 +975,16 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // The dock/notch windows are created VISIBLE but far off-screen
+            // (tauri.conf.json): WebView2 only registers its drag-drop targets
+            // for windows that are visible at creation (wry bug — hidden-created
+            // windows keep a "forbidden" drop cursor forever). Here we move them
+            // into place and set their real visibility.
+            if let Some(notch) = app.get_webview_window("notch") {
+                let cfg = config::load();
+                let _ = position_notch(&notch, &cfg.edge);
+                let _ = notch.hide();
+            }
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
                 let cfg = config::load();

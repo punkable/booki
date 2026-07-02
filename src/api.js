@@ -123,6 +123,12 @@ async function mockInvoke(cmd, args) {
     case "empty_trash":
       demoTrashItems = 0;
       return null;
+    case "wallpaper_accent":
+      return "#3a86ff";
+    case "media_info":
+      return { title: "Capybara Groove", artist: "Los Roedores", playing: true, thumb: null };
+    case "media_toggle":
+      return true;
     case "open_location":
     case "set_hotkey":
     case "set_material":
@@ -286,6 +292,9 @@ export const dock = {
   trashPaths: (paths) => invoke("trash_paths", { paths }),
   trashIsEmpty: () => invoke("trash_is_empty"),
   emptyTrash: () => invoke("empty_trash"),
+  wallpaperAccent: () => invoke("wallpaper_accent"),
+  mediaInfo: () => invoke("media_info"),
+  mediaToggle: () => invoke("media_toggle"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),

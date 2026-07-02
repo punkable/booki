@@ -491,3 +491,112 @@ pub fn empty_trash() -> Result<(), String> {
     }
     .map_err(|e| e.to_string())
 }
+
+// ─────────────────────── Wallpaper accent ───────────────────────
+
+/// Derive an accent color from the current desktop wallpaper: average of the
+/// most vivid (saturated × bright) pixels of a small thumbnail.
+pub fn wallpaper_accent() -> Option<String> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SystemParametersInfoW, SPI_GETDESKWALLPAPER, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    };
+    let mut buf = [0u16; 512];
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETDESKWALLPAPER,
+            buf.len() as u32,
+            Some(buf.as_mut_ptr() as *mut _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+        .ok()?;
+    }
+    let end = buf.iter().position(|&c| c == 0)?;
+    let path = String::from_utf16_lossy(&buf[..end]);
+    if path.is_empty() {
+        return None;
+    }
+    let img = image::open(&path).ok()?.thumbnail(64, 64).to_rgba8();
+    let mut scored: Vec<(f32, [u8; 3])> = img
+        .pixels()
+        .map(|p| {
+            let [r, g, b, _] = p.0;
+            let mx = r.max(g).max(b) as f32;
+            let mn = r.min(g).min(b) as f32;
+            let sat = if mx == 0.0 { 0.0 } else { (mx - mn) / mx };
+            (sat * (mx / 255.0), [r, g, b])
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let take = (scored.len() / 10).max(1);
+    let (mut r, mut g, mut b) = (0u32, 0u32, 0u32);
+    for (_, px) in scored.iter().take(take) {
+        r += px[0] as u32;
+        g += px[1] as u32;
+        b += px[2] as u32;
+    }
+    let n = take as u32;
+    Some(format!("#{:02x}{:02x}{:02x}", r / n, g / n, b / n))
+}
+
+// ─────────────────────── Now playing (system media) ───────────────────────
+
+/// Snapshot of whatever the system media session is playing (Spotify, browser…).
+pub struct MediaSnapshot {
+    pub title: String,
+    pub artist: String,
+    pub playing: bool,
+    /// Album art as a data URI, when the source exposes one.
+    pub thumb: Option<String>,
+}
+
+fn media_session(
+) -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+    let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .ok()?
+        .get()
+        .ok()?;
+    mgr.GetCurrentSession().ok()
+}
+
+pub fn media_now_playing() -> Option<MediaSnapshot> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status;
+    use windows::Storage::Streams::DataReader;
+    let session = media_session()?;
+    let info = session.TryGetMediaPropertiesAsync().ok()?.get().ok()?;
+    let title = info.Title().map(|s| s.to_string()).unwrap_or_default();
+    let artist = info.Artist().map(|s| s.to_string()).unwrap_or_default();
+    if title.is_empty() && artist.is_empty() {
+        return None;
+    }
+    let playing = session
+        .GetPlaybackInfo()
+        .and_then(|p| p.PlaybackStatus())
+        .map(|s| s == Status::Playing)
+        .unwrap_or(false);
+    let thumb = (|| {
+        let stream = info.Thumbnail().ok()?.OpenReadAsync().ok()?.get().ok()?;
+        let size = stream.Size().ok()?;
+        if size == 0 || size > 2_000_000 {
+            return None; // no art, or unreasonably big
+        }
+        let reader = DataReader::CreateDataReader(&stream).ok()?;
+        reader.LoadAsync(size as u32).ok()?.get().ok()?;
+        let mut bytes = vec![0u8; size as usize];
+        reader.ReadBytes(&mut bytes).ok()?;
+        let mime = if bytes.starts_with(&[0x89, b'P']) { "png" } else { "jpeg" };
+        Some(format!(
+            "data:image/{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ))
+    })();
+    Some(MediaSnapshot { title, artist, playing, thumb })
+}
+
+/// Toggle play/pause on the current system media session.
+pub fn media_toggle() -> bool {
+    media_session()
+        .and_then(|s| s.TryTogglePlayPauseAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}

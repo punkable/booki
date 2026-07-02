@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.7.1"
+version = "0.8.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -37,6 +37,8 @@ version = "0.6"
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]
 png = "0.17"
+# Decode the desktop wallpaper to derive an accent color from it.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.58"
@@ -50,6 +52,10 @@ features = [
     "Win32_System_Registry",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
+    "Media_Control",
+    "Foundation",
+    "Foundation_Collections",
+    "Storage_Streams",
 ]
 
 [profile.release]

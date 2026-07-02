@@ -170,13 +170,30 @@ body.edge-top .dock { align-items: flex-start; }
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
 body.edge-right .dock { align-items: flex-end; }
 
-/* Auto-hide: shrink + fade toward the anchored edge so it reads as minimizing
-   into the notch (not an instant disappear). */
-body.autohide.tucked .dock { opacity: 0; }
-body.autohide.tucked.edge-bottom .dock { transform-origin: bottom center; transform: translateY(80%) scale(0.45); }
-body.autohide.tucked.edge-top .dock { transform-origin: top center; transform: translateY(-80%) scale(0.45); }
-body.autohide.tucked.edge-left .dock { transform-origin: center left; transform: translateX(-80%) scale(0.45); }
-body.autohide.tucked.edge-right .dock { transform-origin: center right; transform: translateX(80%) scale(0.45); }
+/* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
+   suck-in, approximated with anchored scale + skew). --genie-ox/--genie-oy point
+   at where the notch sits along the edge (set from config in dock.js). */
+body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
+body.autohide .dock { transition: transform 0.34s cubic-bezier(0.5, 0, 0.9, 0.4), opacity 0.3s ease, filter 0.3s ease; }
+body.autohide.tucked.edge-bottom .dock {
+  transform-origin: var(--genie-ox, 50%) 100%;
+  transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+}
+body.autohide.tucked.edge-top .dock {
+  transform-origin: var(--genie-ox, 50%) 0%;
+  transform: translateY(-60%) scale(0.12, 0.06) skewX(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+}
+body.autohide.tucked.edge-left .dock {
+  transform-origin: 0% var(--genie-ox, 50%);
+  transform: translateX(-60%) scale(0.06, 0.12) skewY(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+}
+body.autohide.tucked.edge-right .dock {
+  transform-origin: 100% var(--genie-ox, 50%);
+  transform: translateX(60%) scale(0.06, 0.12) skewY(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+}
+@media (prefers-reduced-motion: reduce) {
+  body.autohide.tucked .dock { transform: none !important; filter: none; }
+}
 
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
@@ -404,6 +421,60 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .tp-btn.danger { background: #d13438; border-color: #d13438; color: #fff; }
 .tp-btn.danger:hover { background: #b92b2f; }
 
+/* ─────────────────── First-run coach bubbles ─────────────────── */
+.coach {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, 92vw);
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  color: var(--ink);
+  font: 500 12.5px var(--font);
+  animation: notch-toast-in 0.24s var(--ease-bounce);
+}
+.coach-emoji { font-size: 18px; flex: 0 0 auto; }
+.coach-text { min-width: 0; }
+.coach-dots { flex: 0 0 auto; font-size: 9px; color: var(--accent); letter-spacing: 2px; }
+.coach-btn {
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font: 600 12px var(--font);
+  padding: 6px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.coach-btn:active { transform: scale(0.96); }
+
+/* ───────────────── Now-playing (media) widget card ───────────────── */
+.tile.widget.media .w-art {
+  display: none;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.tile.widget.media.playing .w-art { animation: media-pulse 3s ease-in-out infinite; }
+@keyframes media-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.tile.widget.media .w-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */
@@ -420,23 +491,33 @@ body.notch-body {
 body.notch-body.vertical { align-items: center; }
 .notch-pill {
   flex: 0 0 auto;
-  width: 132px;
-  height: 8px;
+  width: 128px;
+  height: 6px;
   padding: 0;
-  border: 0;
   cursor: pointer;
   border-radius: 999px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  /* Tinted glass: a dark translucent body with a soft accent tint, a hairline
+     light border and a top sheen — premium, not a flat colored bar. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04) 55%),
+    color-mix(in srgb, var(--accent) 26%, rgba(24, 24, 30, 0.62));
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   /* No pulsing animation — a steady pill (no blinking). */
-  transition: width 0.16s var(--ease-bounce), height 0.16s var(--ease-bounce),
-    box-shadow 0.16s ease, opacity 0.2s ease;
+  transition: width 0.18s var(--ease-bounce), height 0.18s var(--ease-bounce),
+    background 0.2s ease, box-shadow 0.18s ease, opacity 0.2s ease;
 }
-.notch-pill:active { cursor: grabbing; transform: scaleY(0.8); }
-body.notch-body.vertical .notch-pill:active { transform: scaleX(0.8); }
-.notch-pill:hover { width: 156px; height: 11px; }
-body.notch-body.vertical .notch-pill { width: 8px; height: 132px; }
-body.notch-body.vertical .notch-pill:hover { width: 11px; height: 156px; }
+.notch-pill:hover {
+  width: 152px;
+  height: 9px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.06) 55%),
+    color-mix(in srgb, var(--accent) 42%, rgba(24, 24, 30, 0.6));
+}
+.notch-pill:active { cursor: grabbing; transform: scaleY(0.85); }
+body.notch-body.vertical .notch-pill:active { transform: scaleX(0.85); }
+body.notch-body.vertical .notch-pill { width: 6px; height: 128px; }
+body.notch-body.vertical .notch-pill:hover { width: 9px; height: 152px; }
 
 /* Peek style: a tab that emerges from behind the taskbar. The window slides a
    few px past the work area into the taskbar band (backend), and the pill sits
@@ -447,18 +528,19 @@ body.notch-body.peek.edge-top { align-items: flex-start; }
 body.notch-body.peek.edge-left { justify-content: flex-start; }
 body.notch-body.peek.edge-right { justify-content: flex-end; }
 body.notch-body.peek .notch-pill {
-  width: 148px;
-  height: 14px;
-  border-radius: 10px 10px 0 0;
+  width: 142px;
+  height: 10px;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 0;
   transform-origin: center bottom;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
-body.notch-body.peek .notch-pill:hover { width: 160px; height: 20px; }
-body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 10px 10px; transform-origin: center top; }
-body.notch-body.peek.vertical .notch-pill { width: 14px; height: 148px; }
-body.notch-body.peek.vertical .notch-pill:hover { width: 20px; height: 160px; }
-body.notch-body.peek.edge-left .notch-pill { border-radius: 0 10px 10px 0; transform-origin: left center; }
-body.notch-body.peek.edge-right .notch-pill { border-radius: 10px 0 0 10px; transform-origin: right center; }
+body.notch-body.peek .notch-pill:hover { width: 158px; height: 16px; }
+body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 12px 12px; border-bottom: 1px solid rgba(255,255,255,0.28); border-top: 0; transform-origin: center top; }
+body.notch-body.peek.vertical .notch-pill { width: 10px; height: 142px; }
+body.notch-body.peek.vertical .notch-pill:hover { width: 16px; height: 158px; }
+body.notch-body.peek.edge-left .notch-pill { border-radius: 0 12px 12px 0; border-left: 0; border-bottom: 1px solid rgba(255,255,255,0.28); transform-origin: left center; }
+body.notch-body.peek.edge-right .notch-pill { border-radius: 12px 0 0 12px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.28); transform-origin: right center; }
 /* The toast needs breathing room even in peek mode (its window is repositioned). */
 body.notch-body.toast { padding: 4px; }
 /* Subtle "breathing" so it feels alive without blinking. */
@@ -988,6 +1070,52 @@ body.settings-body {
   transition: transform 0.32s var(--ease-bounce);
   pointer-events: none;
 }
+/* Settings search (Windows 11-style: type → jump to the section). */
+.s-search { position: relative; margin: 2px 0 10px; }
+.s-search input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 500 12.5px var(--font);
+  color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-md);
+  padding: 7px 10px;
+  outline: none;
+}
+.s-search input:focus { border-color: var(--accent); }
+.s-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.s-search-results button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font: 500 12.5px var(--font);
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.s-search-results button:hover { background: var(--hover); }
+.s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
+.s-search-none { font: 500 12px var(--font); color: var(--ink-2); padding: 8px 9px; }
+
 .s-navicon { display: grid; place-items: center; color: var(--ink-2); }
 .s-navicon svg { width: 16px; height: 16px; }
 .s-navitem.active .s-navicon { color: var(--accent); }
