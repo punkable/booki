@@ -18,11 +18,14 @@ export async function checkForUpdate() {
   }
 }
 
-/** Download + install an update, reporting progress, then relaunch. */
+/** Download + install an update, reporting progress, then relaunch.
+    Download and install run as SEPARATE steps so the UI gets a beat to show
+    "installing — Booki will restart itself" before the installer closes the
+    app; with the old all-in-one call the progress bar just vanished. */
 export async function installUpdate(update, onProgress) {
   let total = 0;
   let received = 0;
-  await update.downloadAndInstall((event) => {
+  const onEvent = (event) => {
     switch (event.event) {
       case "Started":
         total = event.data.contentLength || 0;
@@ -36,7 +39,19 @@ export async function installUpdate(update, onProgress) {
         onProgress && onProgress({ phase: "install", pct: 1 });
         break;
     }
-  });
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
+  };
+  if (typeof update.download === "function" && typeof update.install === "function") {
+    await update.download(onEvent);
+    onProgress && onProgress({ phase: "install", pct: 1 });
+    await new Promise((r) => setTimeout(r, 1600)); // let the message be read
+    await update.install(); // on Windows this exits the app into the installer
+  } else {
+    await update.downloadAndInstall(onEvent);
+  }
+  try {
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  } catch (_) {
+    /* on Windows the app is already exiting into the installer */
+  }
 }

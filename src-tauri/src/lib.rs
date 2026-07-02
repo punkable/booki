@@ -16,7 +16,7 @@ use tauri::{
 };
 
 use config::Config;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 /// Set when the changelog was requested before the settings window existed; the
@@ -28,6 +28,11 @@ static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 /// Tab the settings window should open on (e.g. "apps" from the empty dock's
 /// "+" tile). Same read-and-clear pattern as PENDING_CHANGELOG.
 static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
+
+/// Generation counter for the notch preview: each preview bumps it, and only the
+/// timer holding the LATEST generation hides the notch again (rapid style
+/// changes in settings keep the preview alive instead of blinking it away).
+static NOTCH_PREVIEW_GEN: AtomicU64 = AtomicU64::new(0);
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
@@ -364,11 +369,16 @@ fn notch_reveal(app: AppHandle) {
 }
 
 /// Set the dock's anchored edge (used when the user drags the notch to a screen
-/// edge). Persists, repositions both windows, and tells the dock to re-read.
+/// edge, or clicks a notch that lives on another edge). Persists, repositions
+/// both windows, and tells the dock to re-read. The notch goes back to "auto"
+/// (follow the dock): after an explicit move the two belong together again —
+/// otherwise a stale explicit notch edge keeps tucking the dock toward a side
+/// the user just moved away from.
 #[tauri::command]
 fn set_dock_edge(app: AppHandle, edge: String) {
     let mut cfg = config::load();
     cfg.edge = edge.clone();
+    cfg.notch_edge = "auto".into();
     let _ = config::save(&cfg);
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &edge);
@@ -530,11 +540,50 @@ fn notch_toast(app: AppHandle, text: String) {
             let ww = (320.0 * dpr).round() as i32;
             let wh = (48.0 * dpr).round() as i32;
             let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
-            let _ = notch.set_position(PhysicalPosition::new(ax + (aw - ww) / 2, ay + ah - wh - 14));
+            // Show the toast on the dock's anchored edge — a side-docked bar
+            // must not flash a pill at the bottom of the screen.
+            let m = (14.0 * dpr).round() as i32;
+            let (x, y) = match config::load().edge.as_str() {
+                "top" => (ax + (aw - ww) / 2, ay + m),
+                "left" => (ax + m, ay + (ah - wh) / 2),
+                "right" => (ax + aw - ww - m, ay + (ah - wh) / 2),
+                _ => (ax + (aw - ww) / 2, ay + ah - wh - m),
+            };
+            let _ = notch.set_position(PhysicalPosition::new(x, y));
         }
         let _ = notch.show();
         let _ = app.emit("booki://notch-toast", text);
     }
+}
+
+/// Briefly show the notch while the user is tweaking its style/position in
+/// settings — normally it only appears when the dock is tucked away, so there'd
+/// be nothing to look at. Repeated calls extend the preview; it hides again a
+/// few seconds after the LAST change (unless the dock is actually hidden, in
+/// which case the notch is legitimately on duty and stays).
+#[tauri::command]
+fn notch_preview(app: AppHandle) {
+    let gen = NOTCH_PREVIEW_GEN.fetch_add(1, Ordering::SeqCst) + 1;
+    if let Some(notch) = app.get_webview_window("notch") {
+        let cfg = config::load();
+        let _ = position_notch(&notch, &cfg.edge);
+        let _ = notch.show();
+    }
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2800));
+        if NOTCH_PREVIEW_GEN.load(Ordering::SeqCst) != gen {
+            return; // a newer preview took over
+        }
+        let dock_visible = app
+            .get_webview_window("dock")
+            .map(|d| d.is_visible().unwrap_or(true))
+            .unwrap_or(true);
+        if dock_visible {
+            if let Some(notch) = app.get_webview_window("notch") {
+                let _ = notch.hide();
+            }
+        }
+    });
 }
 
 /// Hide both windows (full blackout, e.g. while a fullscreen app is running).
@@ -1021,6 +1070,7 @@ pub fn run() {
             reveal_dock,
             notch_reveal,
             notch_toast,
+            notch_preview,
             hide_all,
             set_dock_edge,
             open_changelog,
