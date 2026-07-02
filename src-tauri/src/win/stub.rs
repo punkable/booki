@@ -24,3 +24,58 @@ pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {
 pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: isize) -> bool {
     false
 }
+
+pub fn is_fullscreen() -> bool {
+    false
+}
+
+pub fn set_autostart(_enabled: bool, _exe: &str) -> Result<(), String> {
+    Err("autostart is only available on Windows".into())
+}
+
+pub fn get_autostart() -> bool {
+    false
+}
+
+pub fn trash_paths(_paths: &[String]) -> Result<(), String> {
+    Err("recycle bin is only available on Windows".into())
+}
+
+pub fn trash_is_empty() -> bool {
+    true
+}
+
+pub fn empty_trash() -> Result<(), String> {
+    Err("recycle bin is only available on Windows".into())
+}
+
+pub fn wallpaper_accent() -> Option<String> {
+    None
+}
+
+pub struct MediaSnapshot {
+    pub title: String,
+    pub artist: String,
+    pub playing: bool,
+    pub thumb: Option<String>,
+}
+
+pub fn media_now_playing() -> Option<MediaSnapshot> {
+    None
+}
+
+pub fn media_toggle() -> bool {
+    false
+}
+
+pub fn media_next() -> bool {
+    false
+}
+
+pub fn media_prev() -> bool {
+    false
+}
+
+pub fn move_paths(_paths: &[String], _dest: &str) -> Result<(), String> {
+    Err("moving files is only available on Windows".into())
+}

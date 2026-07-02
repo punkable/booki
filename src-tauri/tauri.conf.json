@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Booki",
-  "version": "0.2.0",
+  "version": "0.10.0",
   "identifier": "com.booki.dock",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -27,7 +27,30 @@
         "minimizable": false,
         "shadow": false,
         "focus": false,
-        "visible": false,
+        "visible": true,
+        "x": -20000,
+        "y": -20000,
+        "center": false,
+        "dragDropEnabled": true
+      },
+      {
+        "label": "notch",
+        "title": "Booki",
+        "url": "notch.html",
+        "width": 184,
+        "height": 26,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "shadow": false,
+        "focus": false,
+        "visible": true,
+        "x": -20000,
+        "y": -20000,
         "center": false,
         "dragDropEnabled": true
       }
@@ -39,6 +62,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "createUpdaterArtifacts": true,
     "publisher": "Booki",
     "copyright": "© 2026 Booki contributors. MIT licensed.",
     "category": "Utility",
@@ -57,9 +81,20 @@
         "installMode": "currentUser",
         "installerIcon": "icons/icon.ico",
         "headerImage": "installer/header.bmp",
-        "sidebarImage": "installer/sidebar.bmp"
+        "sidebarImage": "installer/sidebar.bmp",
+        "installerHooks": "installer/hooks.nsh"
       }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "windows": {
+        "installMode": "passive"
+      },
+      "endpoints": [
+        "https://github.com/punkable/booki/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUwQ0JCRTlFQ0M0MDAzQkEKUldTNkEwRE1ucjdMNEZtTER1Q2lNNk5LT1hKbGl0aHZ5Zm1PempSWTZGWk9TWGM0U2toNVNMU2IK"
+    }
+  }
 }

@@ -35,6 +35,7 @@ export default defineConfig({
       input: {
         dock: resolve(process.cwd(), "src/index.html"),
         settings: resolve(process.cwd(), "src/settings.html"),
+        notch: resolve(process.cwd(), "src/notch.html"),
       },
     },
   },

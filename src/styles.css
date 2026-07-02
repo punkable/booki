@@ -28,9 +28,18 @@
   --ink-2: #5a5a5a;
   --hover: rgba(0, 0, 0, 0.05);
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.10);
+  --track: rgba(0, 0, 0, 0.12);
+  /* Floating panels (settings sidebar / content) over Mica */
+  --acrylic: rgba(255, 255, 255, 0.55);
+  --acrylic-soft: rgba(255, 255, 255, 0.4);
 
   /* Material strength (dock bg alpha), overridden at runtime */
   --material: 0.55;
+  /* Tint painted over the dock's Mica — its opacity follows --material so the
+     translucency slider visibly frosts/clears the bar. */
+  --surface-tint: #f4f4f7;
+  /* Tile corner roundness (user-tunable), overridden at runtime */
+  --tile-r: 12px;
 
   /* Radii (Fluent) */
   --r-sm: 6px;
@@ -57,6 +66,10 @@
     --ink-2: #a8a8a8;
     --hover: rgba(255, 255, 255, 0.07);
     --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --track: rgba(255, 255, 255, 0.16);
+    --acrylic: rgba(38, 38, 42, 0.55);
+    --acrylic-soft: rgba(34, 34, 38, 0.42);
+    --surface-tint: #202024;
   }
 }
 [data-theme="light"] {
@@ -78,10 +91,29 @@
   --ink: #f2f2f2;
   --ink-2: #a8a8a8;
   --hover: rgba(255, 255, 255, 0.07);
+  --track: rgba(255, 255, 255, 0.16);
+  --acrylic: rgba(38, 38, 42, 0.55);
+  --acrylic-soft: rgba(34, 34, 38, 0.42);
+  --surface-tint: #202024;
+}
+[data-theme="light"] {
+  --track: rgba(0, 0, 0, 0.12);
+  --acrylic: rgba(255, 255, 255, 0.6);
+  --acrylic-soft: rgba(255, 255, 255, 0.45);
+  --surface-tint: #f4f4f7;
 }
 
 * {
   box-sizing: border-box;
+}
+/* Respect the OS "reduce motion" setting — disable animations/transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 html,
 body {
@@ -91,7 +123,11 @@ body {
   color: var(--ink);
   -webkit-user-select: none;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+/* Fluent-style keyboard focus ring (accent) */
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; border-radius: 6px; }
 
 /* ═══════════════════════════ Dock window ═══════════════════════════ */
 
@@ -99,6 +135,9 @@ body.dock-body {
   background: transparent;
   overflow: hidden;
   display: flex;
+  /* Transparent breathing room around the bar for the drop shadow + magnified
+     tiles (must match SHADOW_PAD in dock.js so the window is sized to fit). */
+  padding: 22px;
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
@@ -110,49 +149,565 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   position: relative;
   display: flex;
   gap: var(--gap);
-  padding: 7px 9px;
-  margin: 9px;
+  padding: 8px 10px;
+  margin: 0;
   list-style: none;
   overflow: visible;
-  border-radius: var(--r-xl);
-  /* Tint over the native Acrylic; blur is a fallback where there's no material */
-  background: color-mix(in srgb, var(--layer) calc(var(--material) * 100%), transparent);
-  border: 1px solid var(--stroke);
-  box-shadow: var(--shadow), inset 0 1px 0 var(--stroke-light);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  backdrop-filter: blur(20px) saturate(150%);
-  transition: transform 0.32s var(--ease), opacity 0.26s ease;
+  /* The dock surface is a custom CSS acrylic painted on a transparent window:
+     a backdrop blur + a tint whose opacity follows --material (the translucency
+     slider), with a fully tunable corner radius (--dock-r). No native Mica, so
+     the OUTER corner rounds exactly as the slider says — no fixed system corner. */
+  background: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
+  border-radius: var(--dock-r);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
 body.edge-right .dock { align-items: flex-end; }
 
-/* Auto-hide slide */
-body.autohide.hidden.edge-bottom .dock { transform: translateY(135%); }
-body.autohide.hidden.edge-top .dock { transform: translateY(-135%); }
-body.autohide.hidden.edge-left .dock { transform: translateX(-135%); }
-body.autohide.hidden.edge-right .dock { transform: translateX(135%); }
+/* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
+   suck-in, approximated with anchored scale + skew). --genie-ox/--genie-oy point
+   at where the notch sits along the edge (set from config in dock.js). */
+body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
+body.autohide .dock { transition: transform 0.34s cubic-bezier(0.5, 0, 0.9, 0.4), opacity 0.3s ease, filter 0.3s ease; }
+body.autohide.tucked.edge-bottom .dock {
+  transform-origin: var(--genie-ox, 50%) 100%;
+  transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+}
+body.autohide.tucked.edge-top .dock {
+  transform-origin: var(--genie-ox, 50%) 0%;
+  transform: translateY(-60%) scale(0.12, 0.06) skewX(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+}
+body.autohide.tucked.edge-left .dock {
+  transform-origin: 0% var(--genie-ox, 50%);
+  transform: translateX(-60%) scale(0.06, 0.12) skewY(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+}
+body.autohide.tucked.edge-right .dock {
+  transform-origin: 100% var(--genie-ox, 50%);
+  transform: translateX(60%) scale(0.06, 0.12) skewY(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+}
+@media (prefers-reduced-motion: reduce) {
+  body.autohide.tucked .dock { transform: none !important; filter: none; }
+}
 
-/* Reveal handle */
-.reveal-handle {
+/* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
+.s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+/* Grouped app suggestions (by Start-menu folder). */
+.sugg-group { margin-top: 12px; }
+.sugg-group-head { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; }
+.sugg-group-head.clickable {
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 8px;
+  margin: 0 0 4px;
+  border-radius: var(--r-sm);
+  transition: background 0.12s ease;
+}
+.sugg-group-head.clickable:hover { background: var(--hover); }
+.sugg-chevron { display: grid; place-items: center; color: var(--ink-2); }
+.sugg-chevron svg { width: 13px; height: 13px; }
+.sugg-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--track);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.sugg-group-head .sugg-group-add { margin-left: auto; }
+.sugg-group-name { font-size: 12px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.03em; }
+.sugg-group-add {
+  font: inherit; font-size: 11px; cursor: pointer; color: var(--accent);
+  background: transparent; border: 0; padding: 2px 6px; border-radius: var(--r-sm);
+}
+.sugg-group-add:hover { background: var(--hover); }
+
+/* Folder editing in the Apps list: indented child rows + chevron. */
+.pin-chevron { font-size: 11px; }
+.pin-handle.ghost { opacity: 0; pointer-events: none; }
+.pin-item.pin-child { margin-left: 26px; background: var(--layer); }
+.pin-item.pin-add-row { border-style: dashed; }
+.pin-item.pin-add-row .s-btn { width: 100%; }
+
+/* One-click theme presets */
+.preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.preset-chip {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--stroke-light);
+  cursor: pointer; position: relative; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+  transition: transform 0.12s var(--ease-bounce);
+}
+.preset-chip:hover { transform: scale(1.12); }
+.preset-dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--bg); }
+.preset-dot[data-theme="dark"] { background: #1c1c1c; }
+.preset-dot[data-theme="light"] { background: #fafafa; }
+.preset-dot[data-theme="system"] { background: linear-gradient(135deg, #fafafa 50%, #1c1c1c 50%); }
+
+/* Drag-onto-another-row to create a folder (Settings). */
+.pin-item.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
+
+.web-add { display: flex; gap: 8px; margin-top: 6px; }
+.web-url {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 11px;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+}
+
+/* About: beta badge, credits, and the capybara easter egg. */
+.s-beta {
+  display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px;
+  color: var(--accent-contrast); background: var(--accent);
+}
+.s-credits { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.s-link {
+  font: inherit; font-size: 13px; cursor: pointer; color: var(--ink);
+  background: var(--layer); border: 1px solid var(--stroke);
+  border-radius: var(--r-pill); padding: 6px 13px; transition: all 0.14s ease;
+}
+.s-link:hover { background: var(--hover); transform: translateY(-1px); }
+.s-about-logo { cursor: pointer; transition: transform 0.3s var(--ease-bounce); }
+.s-about-logo.spin { animation: capy-spin 0.9s var(--ease-bounce); }
+@keyframes capy-spin { to { transform: rotate(360deg) scale(1.1); } }
+.s-egg { margin-top: 12px; font-weight: 600; color: var(--accent); }
+.capy-egg { position: fixed; top: -44px; z-index: 9999; pointer-events: none;
+  animation: capy-fall 3.6s linear forwards; }
+@keyframes capy-fall { to { transform: translateY(112vh) rotate(360deg); } }
+
+/* Dock party mode (Konami code): a hue cycle + a little tile bounce. */
+body.party .dock { animation: party-hue 1.5s linear infinite; }
+body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
+@keyframes party-hue { to { filter: hue-rotate(360deg); } }
+@keyframes party-bounce { 0%, 100% { transform: translateY(0); } 42% { transform: translateY(-14px); } }
+
+/* ─────────────────────────── Changelog modal ─────────────────────────── */
+.cl-modal { display: flex; flex-direction: column; max-height: min(80vh, 640px); width: min(560px, 92vw); }
+.cl-list { flex: 1; overflow-y: auto; padding: 4px 2px 4px; }
+.cl-entry { padding: 14px 0; border-top: 1px solid var(--stroke); }
+.cl-entry:first-child { border-top: 0; }
+.cl-entry-head { display: flex; align-items: center; gap: 8px; }
+.cl-ver { font-size: 13px; font-weight: 800; color: var(--ink); }
+.cl-new { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; padding: 1px 7px; border-radius: 999px; color: var(--accent-contrast); background: var(--accent); }
+.cl-date { margin-left: auto; font-size: 11px; color: var(--ink-2); }
+.cl-headline { margin: 8px 0 12px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.cl-section { margin: 12px 0; }
+.cl-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 13px; font-weight: 700; }
+.cl-ico { font-size: 16px; }
+.cl-notes { margin: 0; padding-left: 0; list-style: none; }
+.cl-notes li { position: relative; padding: 3px 0 3px 18px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.cl-notes li::before { content: ""; position: absolute; left: 4px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.cl-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 26px 18px; border-top: 1px solid var(--stroke); }
+.cl-credit { font-size: 12px; color: var(--ink-2); }
+
+/* ─────────────────────────── Widget cards ─────────────────────────── */
+/* macOS / Liquid-Glass-style live cards in the dock (clock, CPU, RAM, network).
+   Each card has a style: variant + accent color + optional motion. */
+.tile.widget {
+  --w-accent: var(--accent);
+  width: auto;
+  min-width: calc(var(--size) * 1.9);
+  height: var(--size);
+  background: transparent;
+}
+.tile.widget:hover { background: transparent; }
+.w-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 6px 11px;
+  border-radius: var(--tile-r);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid var(--stroke);
+  text-align: left;
+  overflow: hidden;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--mag-ease);
+}
+.tile.widget:hover .w-card { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.w-ico { flex: 0 0 auto; font-size: calc(var(--size) * 0.32); line-height: 1; }
+.tile.widget.no-ico .w-ico { display: none; }
+.w-main { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+.w-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.w-value { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-bar { display: block; height: 4px; margin-top: 3px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, black)); transition: width 0.4s var(--ease); }
+
+/* Variants */
+.tile.widget[data-variant="glass"] .w-card { -webkit-backdrop-filter: blur(8px) saturate(150%); backdrop-filter: blur(8px) saturate(150%); }
+.tile.widget[data-variant="solid"] .w-card { background: var(--w-accent); border-color: transparent; }
+.tile.widget[data-variant="gradient"] .w-card {
+  background: linear-gradient(135deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 50%, black));
+  border-color: transparent;
+}
+.tile.widget[data-variant="solid"] .w-value,
+.tile.widget[data-variant="gradient"] .w-value { color: #fff; }
+.tile.widget[data-variant="solid"] .w-label, .tile.widget[data-variant="solid"] .w-sub,
+.tile.widget[data-variant="gradient"] .w-label, .tile.widget[data-variant="gradient"] .w-sub { color: rgba(255, 255, 255, 0.82); }
+.tile.widget[data-variant="solid"] .w-bar, .tile.widget[data-variant="gradient"] .w-bar { background: rgba(255, 255, 255, 0.28); }
+.tile.widget[data-variant="solid"] .w-bar > i, .tile.widget[data-variant="gradient"] .w-bar > i { background: #fff; }
+.tile.widget[data-variant="outline"] .w-card { background: transparent; border: 1.5px solid var(--w-accent); }
+.tile.widget[data-variant="outline"] .w-value { color: var(--w-accent); }
+.tile.widget[data-variant="minimal"] .w-card { background: transparent; border-color: transparent; padding-left: 4px; }
+
+/* Animation (opt-in per widget) */
+.tile.widget.animated .w-ico { animation: w-bob 2.6s var(--ease) infinite; }
+.tile.widget.animated[data-variant="gradient"] .w-card { background-size: 220% 220%; animation: w-grad 7s linear infinite; }
+@keyframes w-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes w-grad { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
+
+/* ─────────────── Drag clone (the tile that follows the pointer) ─────────────── */
+.tile.drag-clone {
   position: fixed;
-  left: 50%;
-  bottom: 3px;
-  transform: translateX(-50%);
-  width: 96px;
-  height: 5px;
+  z-index: 90;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0.92;
+  transform: scale(1.08);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+  transition: transform 0.14s var(--ease), opacity 0.14s ease;
+}
+.tile.drag-clone .label, .tile.drag-clone .badge, .tile.drag-clone .rm { display: none; }
+/* Pulled away from the bar → "release to unpin" look. */
+.tile.drag-clone.will-unpin { opacity: 0.55; transform: scale(0.82) rotate(-4deg); }
+.tile.drag-clone.poof {
+  opacity: 0;
+  transform: scale(0.1) rotate(10deg);
+  transition: transform 0.26s ease-in, opacity 0.26s ease-in;
+}
+/* The slot left behind while dragging: ghosted; nearly gone when unpinning. */
+.tile.dragging { opacity: 0.35; }
+.tile.dragging.unpin-slot { opacity: 0.12; }
+
+/* ───────────────────────── Trash pin ───────────────────────── */
+/* A Recycle Bin tile: drop files on it → Booki asks → sends to the bin. */
+.tile.trash .trash-glyph {
+  display: grid;
+  place-items: center;
+  width: 74%;
+  height: 74%;
+  border-radius: var(--tile-r, 12px);
+  color: var(--ink-soft, var(--ink));
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border: 1px solid var(--stroke-light);
+}
+.tile.trash .trash-glyph svg { width: 55%; height: 55%; }
+.tile.trash.full .trash-glyph {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.tile.trash.drop-target .trash-glyph {
+  color: #fff;
+  background: #d13438;
+  border-color: #d13438;
+  transform: scale(1.06);
+}
+.tile.trash.gulp .trash-glyph { animation: trash-gulp 0.5s var(--ease-bounce); }
+@keyframes trash-gulp {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.82) rotate(-4deg); }
+  70% { transform: scale(1.1) rotate(2deg); }
+  100% { transform: scale(1); }
+}
+
+/* Confirmation popover — centered over the bar; nothing deletes without a yes. */
+.trash-pop {
+  position: fixed; /* placed beside the bar by placePop() in dock.js */
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
   border-radius: var(--r-pill);
   background: var(--layer-strong);
-  border: 1px solid var(--stroke);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  color: var(--ink);
+  font: 600 12.5px var(--font);
+  white-space: nowrap;
+  animation: notch-toast-in 0.2s var(--ease-bounce);
+}
+.trash-pop > svg { flex: 0 0 auto; color: #d13438; }
+.tp-emoji { font-size: 18px; }
+.tp-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tp-sub { font-size: 11px; font-weight: 500; color: var(--ink-2); white-space: normal; max-width: 340px; }
+.trash-pop.blocked { white-space: normal; max-width: min(440px, 92vw); }
+.tp-btn {
+  border: 1px solid var(--stroke-light);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  font: 600 12px var(--font);
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.tp-btn:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.tp-btn:active { transform: scale(0.96); }
+.tp-btn.danger { background: #d13438; border-color: #d13438; color: #fff; }
+.tp-btn.danger:hover { background: #b92b2f; }
+
+/* ─────────────────── First-run coach bubbles ─────────────────── */
+.coach {
+  position: fixed; /* placed beside the bar by placePop() in dock.js */
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, 92vw);
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  color: var(--ink);
+  font: 500 12.5px var(--font);
+  animation: notch-toast-in 0.24s var(--ease-bounce);
+}
+.coach-emoji { font-size: 18px; flex: 0 0 auto; }
+.coach-text { min-width: 0; }
+.coach-dots { flex: 0 0 auto; font-size: 9px; color: var(--accent); letter-spacing: 2px; }
+.coach-btn {
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font: 600 12px var(--font);
+  padding: 6px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.coach-btn:active { transform: scale(0.96); }
+
+/* ───────────────── Now-playing (media) widget card ───────────────── */
+.tile.widget.media .w-art {
+  display: none;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.tile.widget.media.playing .w-art { animation: media-pulse 3s ease-in-out infinite; }
+@keyframes media-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.tile.widget.media .w-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Long song titles must not balloon the card (and with it, the whole bar). */
+.tile.widget.media .w-main { max-width: 118px; min-width: 0; }
+.tile.widget.media .w-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Hover controls: prev · play/pause · next as a floating glass strip. */
+.tile.widget.media { position: relative; }
+.tile.widget.media .w-controls {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--layer-strong) 82%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+.tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; }
+.w-ctl {
+  border: 0;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+.w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.w-ctl:active { transform: scale(0.9); }
+
+/* ─────────── Notch window (the always-reliable "home pill") ─────────── */
+/* Its own tiny window shown when the dock is tucked away; clicking it brings the
+   dock back. A real window → the click target and repaint are rock-solid. */
+body.notch-body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100vh;
+  padding: 4px;
+}
+body.notch-body.vertical { align-items: center; }
+.notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.82));
+  position: relative;
+  flex: 0 0 auto;
+  width: 118px;
+  height: 13px;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  /* "Dynamic island" glass: deep charcoal capsule with a soft accent tint, a
+     specular top sheen, a hairline light border and real depth in the shadow. */
+  background:
+    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 58%),
+    color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.80));
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+  /* No pulsing animation — a steady pill (no blinking). */
+  transition: width 0.2s var(--ease-bounce), height 0.2s var(--ease-bounce),
+    background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+.notch-pill:hover {
+  width: 146px;
+  height: 18px;
+  background:
+    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 58%),
+    color-mix(in srgb, var(--accent) 30%, rgba(15, 15, 20, 0.78));
+  box-shadow:
+    0 6px 22px rgba(0, 0, 0, 0.5),
+    0 0 18px color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+}
+.notch-pill:active { cursor: grabbing; transform: scaleY(0.88); }
+body.notch-body.vertical .notch-pill:active { transform: scaleX(0.88); }
+body.notch-body.vertical .notch-pill { width: 13px; height: 118px; }
+body.notch-body.vertical .notch-pill:hover { width: 18px; height: 146px; }
+
+/* Peek style: a tab that emerges from behind the taskbar. The window slides a
+   few px past the work area into the taskbar band (backend), and the pill sits
+   flush against that edge with only its outward corners rounded — so it reads
+   as part of the bar, and growing on hover never clips (window > hover size). */
+body.notch-body.peek { padding: 0; }
+body.notch-body.peek.edge-top { align-items: flex-start; }
+body.notch-body.peek.edge-left { justify-content: flex-start; }
+body.notch-body.peek.edge-right { justify-content: flex-end; }
+body.notch-body.peek .notch-pill {
+  width: 112px;
+  height: 12px;
+  border-radius: 11px 11px 0 0;
+  border-bottom: 0;
+  transform-origin: center bottom;
+  box-shadow:
+    0 -3px 14px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.25);
+}
+body.notch-body.peek .notch-pill:hover { width: 138px; height: 17px; }
+/* iPhone-notch corner fillets: small concave curves that blend the tab into the
+   taskbar edge, so it reads as part of the bar instead of a floating chip. */
+body.notch-body.peek .notch-pill::before,
+body.notch-body.peek .notch-pill::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
   pointer-events: none;
 }
-body.autohide.hidden .reveal-handle { opacity: 1; }
-body.edge-top .reveal-handle { bottom: auto; top: 3px; }
-body.edge-left .reveal-handle { left: 3px; bottom: 50%; top: auto; transform: translateY(50%); width: 5px; height: 96px; }
-body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform: translateY(50%); width: 5px; height: 96px; }
+body.notch-body.peek.edge-bottom .notch-pill::before {
+  left: -9px; bottom: 0;
+  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-bottom .notch-pill::after {
+  right: -9px; bottom: 0;
+  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill::before {
+  left: -9px; top: 0;
+  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill::after {
+  right: -9px; top: 0;
+  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-left .notch-pill::before {
+  top: -9px; left: 0;
+  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-left .notch-pill::after {
+  bottom: -9px; left: 0;
+  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-right .notch-pill::before {
+  top: -9px; right: 0;
+  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-right .notch-pill::after {
+  bottom: -9px; right: 0;
+  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+}
+body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
+body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
+body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
+body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: left center; }
+body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: right center; }
+/* The toast needs breathing room even in peek mode (its window is repositioned). */
+body.notch-body.toast { padding: 4px; }
+/* Subtle "breathing" so it feels alive without blinking. */
+@media (prefers-reduced-motion: no-preference) {
+  .notch-pill { animation: notch-breathe 4s var(--ease) infinite; }
+}
+@keyframes notch-breathe {
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
+}
+
+/* Toast message on the notch ("Booki se ocultó · pantalla completa"). */
+.notch-toast {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  max-width: 96%;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  color: var(--ink);
+  font: 600 12.5px var(--font);
+  white-space: nowrap;
+  animation: notch-toast-in 0.24s var(--ease-bounce);
+}
+.notch-emoji { font-size: 15px; }
+.notch-text { overflow: hidden; text-overflow: ellipsis; }
+body.notch-body.toast .notch-pill { display: none; }
+body.notch-body.toast .notch-toast { display: flex; }
+@keyframes notch-toast-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
 
 /* ───────────────────────────── Tiles ───────────────────────────── */
 
@@ -169,22 +724,20 @@ body.edge-right .reveal-handle { left: auto; right: 3px; bottom: 50%; transform:
   padding: 0;
   background: transparent;
   cursor: pointer;
-  border-radius: var(--r-md);
+  border-radius: var(--tile-r);
   transform-origin: bottom center;
-  transition: width 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
-    height 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
-    transform 0.17s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
+  transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
     background 0.12s ease;
 }
-body.edge-left .tile, body.edge-right .tile { transform-origin: center; }
+/* Center origin → the icon scales symmetrically and stays inside the bar's
+   padding (contained magnify, no clipping in the bar-sized window). */
+.tile { transform-origin: center center; }
 .tile:hover { background: var(--hover); }
+/* The hover name uses the native OS tooltip (title attr); hide the in-page one. */
+.tile .label { display: none !important; }
 
-/* Focused tile — a gentle lift + accent glow (distinct from macOS, subtle) */
+/* Focused tile — accent glow (the scale itself conveys the lift). */
 .tile.focus { z-index: 5; }
-body.edge-bottom .tile.focus { transform: translateY(-5px); }
-body.edge-top .tile.focus { transform: translateY(5px); }
-body.edge-left .tile.focus { transform: translateX(5px); }
-body.edge-right .tile.focus { transform: translateX(-5px); }
 .tile.focus img,
 .tile.focus .glyph {
   filter: drop-shadow(0 6px 11px rgba(0, 0, 0, 0.28))
@@ -277,6 +830,51 @@ body.edit .dock { cursor: grab; }
   filter: none;
 }
 
+/* Folder / group tile — iOS-style mini grid of child icons. A centered flex
+   wrap so 1–4 icons always sit balanced in the middle (no top-left clumping). */
+.tile.group .group-grid {
+  width: 84%;
+  height: 84%;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 26%;
+  background: color-mix(in srgb, var(--layer-strong) 60%, transparent);
+  box-shadow: inset 0 0 0 1px var(--stroke-light);
+}
+.tile.group .group-mini {
+  flex: 0 0 auto;
+  width: calc(50% - 4px);
+  height: calc(50% - 4px);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border-radius: 22%; font-size: 8px; font-weight: 700; color: var(--ink-2);
+}
+.tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Folder-create (merge) target highlight while dragging one tile onto another */
+.tile.merge-target { transform: scale(1.1); background: color-mix(in srgb, var(--accent) 20%, transparent); }
+/* Highlight an icon when a file is dragged over it (drop-to-open). */
+.tile.drop-target { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: 0 0 0 2px var(--accent); }
+/* Running-app dot indicator. */
+.tile[data-running="true"]::after {
+  content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -3px; }
+body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -3px; transform: translateY(50%); }
+body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -3px; transform: translateY(50%); }
+/* Notes widget: allow a couple of wrapped lines. */
+.w-value.w-note { font-size: 12px; font-weight: 600; white-space: normal; line-height: 1.2; max-height: 2.5em; overflow: hidden; }
+.tile.merge-target::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 30%;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+  pointer-events: none;
+}
+
 /* Running indicator */
 .tile[data-running="true"]::after {
   content: "";
@@ -337,7 +935,9 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .tile.hint img { opacity: 0.85; }
 @keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
-.tile.dragging { opacity: 0.5; }
+/* While dragging, the in-bar tile is just the ghost slot — the floating
+   .drag-clone is the thing that follows the pointer (see its rules above). */
+.dock.dragging .tile.dragging { transform: none; }
 
 /* Drop overlay (covers the whole window for an easy target) */
 .drop-overlay {
@@ -367,6 +967,120 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
+
+/* ───────────────────────── Folder stack flyout ───────────────────────── */
+
+.stack {
+  position: fixed;
+  /* vertical/edge offset is set inline from the bar's real size (dock.js) */
+  z-index: 40;
+  width: min(420px, 92vw);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  /* Open/close via transition (reliable in WebView2) — grows from the tile. */
+  transform-origin: bottom center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.94);
+  transition: opacity 0.18s var(--ease), transform 0.24s var(--ease-bounce),
+    visibility 0s linear 0.24s;
+}
+.stack.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 0.18s var(--ease), transform 0.26s var(--ease-bounce);
+}
+body.edge-top .stack { transform-origin: top center; }
+body.edge-left .stack { transform-origin: center left; }
+body.edge-right .stack { transform-origin: center right; }
+.stack-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--stroke-light);
+}
+.stack-head-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.stack-head-icon svg { width: 15px; height: 15px; }
+.stack-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-rename {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; font-weight: 700;
+  color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 8px;
+}
+.stack-rename:hover { background: var(--hover); }
+.stack-rename:focus { background: var(--layer-strong); border-color: var(--stroke); outline: none; }
+.stack-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--ink-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.stack-close svg { width: 14px; height: 14px; }
+.stack-close:hover { color: var(--ink); background: var(--hover); }
+.stack-item { position: relative; }
+.stack-rm {
+  position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; display: none;
+  align-items: center; justify-content: center; font-size: 13px; line-height: 1; color: #fff;
+  background: #e23b3b; border-radius: 50%; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.stack-item:hover .stack-rm { display: flex; }
+.stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.stack-empty { grid-column: 1 / -1; color: var(--ink-2); font-size: 13px; padding: 14px; text-align: center; }
+.stack-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px; border: 0; background: transparent; border-radius: var(--r-md);
+  cursor: pointer; color: var(--ink); overflow: hidden;
+  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+}
+.stack-item:hover { background: var(--hover); transform: translateY(-2px) scale(1.04); }
+.stack-item:active { transform: scale(0.96); }
+/* Staggered entry of the folder items when the flyout opens. */
+@media (prefers-reduced-motion: no-preference) {
+  .stack.open .stack-item { animation: stack-cell-in 0.26s var(--ease-bounce) backwards; animation-delay: calc(var(--i, 0) * 28ms); }
+}
+@keyframes stack-cell-in { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
+.stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+/* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
+.stack-item .stack-glyph {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border: 1px solid var(--stroke-light);
+  border-radius: 10px;
+}
+.stack-name { font-size: 11px; font-weight: 500; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* In-flyout "add app to folder" cell — optimized for adding several programs. */
+.stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
+.stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
+.stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
 /* ───────────────────────── Context menu ───────────────────────── */
 
@@ -402,69 +1116,428 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .menu .sep { height: 1px; margin: 5px 8px; background: var(--stroke); }
 .hidden { display: none !important; }
 
+/* Update-available pill (dock) */
+.update-pill {
+  position: fixed;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  animation: booki-breathe 2.4s var(--ease) infinite;
+}
+/* Sit in the magnify-headroom side so it never overlaps the icons. */
+body.edge-top .update-pill { top: auto; bottom: 4px; }
+body.edge-left .update-pill { left: auto; right: 4px; top: 50%; transform: translateY(-50%); }
+body.edge-right .update-pill { left: 4px; right: auto; top: 50%; transform: translateY(-50%); }
+
+/* Update controls (settings) */
+.upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
+.upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.2s ease; }
+
 /* ═══════════════════════ Settings window (React) ═══════════════════════ */
 
-body.settings-body { background: var(--bg); overflow: hidden; }
+/* The settings window is opaque (a transparent one rendered blank on real
+   Windows). A soft tinted background sits behind the floating acrylic-style
+   sidebar + content card so the layered look is preserved. */
+body.settings-body {
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%),
+    radial-gradient(120% 80% at 100% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 55%),
+    var(--bg);
+}
 #root { height: 100%; }
 .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); }
 
-.s-shell { display: grid; grid-template-columns: 190px 1fr; height: 100vh; }
+.s-shell {
+  display: grid;
+  grid-template-columns: 212px 1fr;
+  gap: 12px;
+  height: 100vh;
+  padding: 12px;
+  background: transparent;
+}
 
+/* Floating acrylic sidebar */
 .s-sidebar {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 16px 10px;
-  background: var(--layer);
-  border-right: 1px solid var(--stroke);
+  padding: 14px 12px;
+  background: var(--acrylic);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 34px rgba(15, 15, 25, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
 }
-.s-brand { display: flex; align-items: center; gap: 9px; padding: 6px 10px 14px; font-weight: 700; font-size: 17px; }
+.s-brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 14px; }
 .s-brand img { width: 26px; height: 26px; }
-.s-sidebar nav { display: flex; flex-direction: column; gap: 2px; }
-.s-navitem {
-  text-align: left;
-  font: inherit;
-  font-size: 14px;
-  padding: 9px 12px;
+/* The real wordmark from the brand kit — black on light, white on dark. */
+.s-brand img.brand-word { width: auto; height: 17px; }
+.s-about-word { display: inline-flex; vertical-align: -3px; }
+.s-about-word .brand-word { height: 19px; }
+.word-white { display: none; }
+[data-theme="dark"] .word-black { display: none; }
+[data-theme="dark"] .word-white { display: inline; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .word-black { display: none; }
+  :root:not([data-theme]) .word-white { display: inline; }
+}
+.s-sidebar nav { position: relative; display: flex; flex-direction: column; gap: 2px; --navh: 40px; }
+/* Sliding active pill */
+.s-nav-indicator {
+  position: absolute; left: 0; right: 0; top: 0; height: var(--navh);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--accent) 20%, var(--hover));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  transform: translateY(calc(var(--active, 0) * var(--navh)));
+  transition: transform 0.32s var(--ease-bounce);
+  pointer-events: none;
+}
+/* Settings search (Windows 11-style: type → jump to the section). */
+.s-search { position: relative; margin: 2px 0 10px; }
+.s-search input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 500 12.5px var(--font);
   color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-md);
+  padding: 7px 10px;
+  outline: none;
+}
+.s-search input:focus { border-color: var(--accent); }
+.s-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.s-search-results button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font: 500 12.5px var(--font);
+  color: var(--ink);
+  text-align: left;
   background: transparent;
   border: 0;
   border-radius: var(--r-sm);
+  padding: 7px 9px;
   cursor: pointer;
-  position: relative;
-  transition: background 0.12s ease;
 }
-.s-navitem:hover { background: var(--hover); }
-.s-navitem.active { background: var(--hover); font-weight: 600; }
-.s-navitem.active::before {
-  content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
-  width: 3px; height: 16px; border-radius: 2px; background: var(--accent);
-}
-.s-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 6px 0; }
+.s-search-results button:hover { background: var(--hover); }
+.s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
+.s-search-none { font: 500 12px var(--font); color: var(--ink-2); padding: 8px 9px; }
 
-.s-content { padding: 26px 30px; overflow-y: auto; }
+/* "More options" dropdown next to "+ Add app" (Pinned apps tab). */
+.s-more { position: relative; display: inline-block; }
+.s-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 5px;
+  border-radius: var(--r-md);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  animation: notch-toast-in 0.16s var(--ease-bounce);
+}
+.s-more-menu button {
+  font: 500 13px var(--font);
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.s-more-menu button:hover { background: var(--hover); }
+.s-more-menu button:disabled { opacity: 0.45; cursor: default; }
+
+/* Button with a leading icon (e.g. "What's new" in About). */
+.s-btn-ico { display: inline-flex; align-items: center; gap: 7px; }
+.s-btn-glyph { display: grid; place-items: center; }
+.s-btn-glyph svg { width: 15px; height: 15px; }
+
+.s-navicon { display: grid; place-items: center; color: var(--ink-2); }
+.s-navicon svg { width: 16px; height: 16px; }
+.s-navitem.active .s-navicon { color: var(--accent); }
+.s-navitem {
+  position: relative;
+  z-index: 1;
+  height: var(--navh);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.s-navitem:hover { color: var(--accent-deep); }
+.s-navitem.active { font-weight: 600; }
+.s-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 2px; }
+
+/* Content card over the Mica */
+.s-content {
+  padding: 24px 28px;
+  overflow-y: auto;
+  background: var(--acrylic-soft);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 34px rgba(15, 15, 25, 0.14);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+}
 .s-content h1 { margin: 0 0 18px; font-size: 22px; font-weight: 650; }
 .s-content h3 { margin: 18px 0 8px; font-size: 14px; }
 .muted { color: var(--ink-2); font-size: 13px; }
 .muted-list { color: var(--ink-2); font-size: 13px; padding-left: 18px; margin: 4px 0; line-height: 1.7; }
 .s-card-inner { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
 
-.r-row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--stroke); }
+.r-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 11px 0; border-bottom: 1px solid var(--stroke); }
 .r-row:last-child { border-bottom: 0; }
-.r-label { flex: 0 0 200px; font-size: 14px; display: flex; flex-direction: column; }
+.r-label { flex: 1 1 180px; min-width: 140px; font-size: 14px; display: flex; flex-direction: column; }
 .r-hint { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
-.r-control { flex: 1; display: flex; justify-content: flex-end; }
-.r-control select { min-width: 200px; }
+/* Controls never clip: they shrink, wrap their contents, and drop below the
+   label on narrow windows instead of overflowing off-screen. */
+.r-control { flex: 1 1 240px; min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.r-control > * { max-width: 100%; }
+.r-control select { min-width: 160px; }
 
-.r-slider { display: flex; align-items: center; gap: 12px; width: 100%; }
-.r-slider input[type="range"] { flex: 1; }
-.r-val { flex: 0 0 52px; text-align: right; font-size: 13px; color: var(--ink-2); }
+/* Narrow window: tighter chrome, controls under their labels. */
+@media (max-width: 720px) {
+  .s-shell { grid-template-columns: 164px 1fr; gap: 10px; padding: 10px; }
+  .s-content { padding: 16px 14px; }
+  .s-brand { font-size: 15px; }
+  .s-navitem { font-size: 13px; padding: 0 9px; }
+  .r-label { flex: 1 1 100%; min-width: 0; }
+  .r-control { justify-content: flex-start; }
+}
+
+/* Slider with accent fill + value bubble */
+.r-slider { width: 100%; }
+.slider-wrap { position: relative; width: 100%; padding-top: 28px; }
+.slider-input {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: var(--r-pill);
+  outline: none; cursor: pointer;
+}
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--stroke);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); cursor: grab;
+  transition: transform 0.1s ease;
+}
+.slider-input:active::-webkit-slider-thumb { transform: scale(1.12); cursor: grabbing; }
+.slider-bubble {
+  position: absolute; top: 0; transform: translateX(-50%);
+  padding: 2px 9px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--accent-contrast); background: var(--accent);
+  border-radius: var(--r-pill); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  white-space: nowrap; pointer-events: none;
+}
+.slider-bubble::after {
+  content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  border: 4px solid transparent; border-top-color: var(--accent);
+}
 
 select {
   font: inherit; font-size: 14px; padding: 7px 10px; color: var(--ink);
   background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm);
 }
-input[type="range"] { accent-color: var(--accent); }
+
+/* Segmented control */
+.seg {
+  position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  padding: 3px; border-radius: var(--r-md);
+  background: var(--track); border: 1px solid var(--stroke);
+  min-width: min(250px, 100%); max-width: 100%; box-sizing: border-box;
+}
+.seg-thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 3px;
+  width: calc((100% - 6px) / var(--n));
+  transform: translateX(calc(var(--i) * 100%));
+  background: var(--layer-strong); border-radius: calc(var(--r-md) - 3px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.3s var(--ease-bounce);
+}
+.seg-item {
+  position: relative; z-index: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 8px; font: inherit; font-size: 13px; color: var(--ink-2);
+  background: transparent; border: 0; cursor: pointer; border-radius: calc(var(--r-md) - 3px);
+  transition: color 0.15s ease; overflow: hidden;
+}
+.seg-item.active { color: var(--ink); font-weight: 600; }
+.seg-ico { flex: 0 0 auto; font-size: 13px; }
+.seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Edge picker (mini screen) */
+/* Notch position picker: a mini screen with the taskbar and three clickable
+   tab slots along the dock's anchored edge. What you click is what you get. */
+.notchpick { display: flex; justify-content: flex-end; }
+.notchpick-screen {
+  position: relative;
+  width: 210px;
+  height: 96px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--layer)), var(--layer));
+  overflow: hidden;
+}
+/* The "taskbar" strip on the anchored edge. */
+.notchpick-bar { position: absolute; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.np-edge-bottom .notchpick-bar { left: 0; right: 0; bottom: 0; height: 12px; }
+.np-edge-top .notchpick-bar { left: 0; right: 0; top: 0; height: 12px; }
+.np-edge-left .notchpick-bar { top: 0; bottom: 0; left: 0; width: 12px; }
+.np-edge-right .notchpick-bar { top: 0; bottom: 0; right: 0; width: 12px; }
+/* Three generous click targets along that edge. */
+.notchpick-slot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+.np-edge-bottom .notchpick-slot, .np-edge-top .notchpick-slot { width: 33.3%; height: 40px; }
+.np-edge-bottom .notchpick-slot { bottom: 0; }
+.np-edge-top .notchpick-slot { top: 0; }
+.np-edge-bottom .nps-start, .np-edge-top .nps-start { left: 0; }
+.np-edge-bottom .nps-center, .np-edge-top .nps-center { left: 33.3%; }
+.np-edge-bottom .nps-end, .np-edge-top .nps-end { left: 66.6%; }
+.np-edge-left .notchpick-slot, .np-edge-right .notchpick-slot { height: 33.3%; width: 40px; }
+.np-edge-left .notchpick-slot { left: 0; }
+.np-edge-right .notchpick-slot { right: 0; }
+.np-edge-left .nps-start, .np-edge-right .nps-start { top: 0; }
+.np-edge-left .nps-center, .np-edge-right .nps-center { top: 33.3%; }
+.np-edge-left .nps-end, .np-edge-right .nps-end { top: 66.6%; }
+/* The little tab inside each slot — ghosted until chosen. */
+.notchpick-tab {
+  width: 34px;
+  height: 8px;
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+}
+.np-edge-bottom .notchpick-tab { margin-top: auto; margin-bottom: 12px; }
+.np-edge-top .notchpick-tab { margin-bottom: auto; margin-top: 12px; border-radius: 0 0 6px 6px; }
+.np-edge-left .notchpick-tab, .np-edge-right .notchpick-tab { width: 8px; height: 34px; }
+.np-edge-left .notchpick-tab { margin-right: auto; margin-left: 12px; border-radius: 0 6px 6px 0; }
+.np-edge-right .notchpick-tab { margin-left: auto; margin-right: 12px; border-radius: 6px 0 0 6px; }
+.notchpick-slot:hover .notchpick-tab { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.notchpick-slot.active .notchpick-tab {
+  background: var(--accent);
+  transform: scale(1.15);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.edgepick { display: flex; justify-content: flex-end; }
+.edgepick-screen {
+  position: relative; width: 210px; height: 124px; border-radius: var(--r-md);
+  border: 1px solid var(--stroke);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--layer)), var(--layer));
+  overflow: hidden;
+}
+.edgepick-label {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--ink-2); pointer-events: none;
+}
+.edgepick-edge { position: absolute; border: 0; background: transparent; cursor: pointer; transition: background 0.15s ease; }
+.ep-top { top: 0; left: 0; right: 0; height: 24px; }
+.ep-bottom { bottom: 0; left: 0; right: 0; height: 24px; }
+.ep-left { left: 0; top: 0; bottom: 0; width: 24px; }
+.ep-right { right: 0; top: 0; bottom: 0; width: 24px; }
+.edgepick-edge:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.edgepick-edge.active { background: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent); }
+
+/* Monitor picker */
+.monpick { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+.monpick-auto {
+  font: inherit; font-size: 12px; padding: 6px 12px; color: var(--ink); cursor: pointer;
+  background: var(--layer); border: 1px dashed var(--stroke); border-radius: var(--r-pill);
+}
+.monpick-auto.active { border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--layer)); font-weight: 600; }
+.monpick-stage { position: relative; }
+.monpick-box {
+  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
+  color: var(--ink-2); background: var(--layer); border: 1px solid var(--stroke); border-radius: 6px;
+  cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.monpick-box:hover { border-color: var(--accent); }
+.monpick-box.active {
+  border-color: var(--accent); color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 22%, var(--layer));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.monpick-box.primary { font-weight: 800; }
+
+/* Live mini-dock preview */
+.preview {
+  position: relative; height: 150px; margin: 0 0 22px; border-radius: var(--r-lg);
+  border: 1px solid var(--stroke-light); overflow: hidden; display: flex;
+  background:
+    radial-gradient(120% 90% at 70% 10%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 60%),
+    linear-gradient(160deg, #2b3a55, #1d2436);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.prev-bottom { align-items: flex-end; justify-content: center; }
+.prev-top { align-items: flex-start; justify-content: center; }
+.prev-left { align-items: center; justify-content: flex-start; }
+.prev-right { align-items: center; justify-content: flex-end; }
+.preview-bar {
+  display: flex; align-items: center; padding: 6px 8px; margin: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transition: all 0.28s var(--ease);
+}
+.preview-tile {
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  border-radius: 8px; transition: width 0.2s var(--ease-bounce), height 0.2s var(--ease-bounce), transform 0.2s var(--ease-bounce);
+}
+.preview-tile img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)); }
+.preview-glyph {
+  width: 84%; height: 84%; border-radius: 22%;
+  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
 
 .r-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--stroke); }
 .r-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -489,13 +1562,124 @@ input[type="range"] { accent-color: var(--accent); }
 .pin-thumb { flex: 0 0 auto; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: linear-gradient(150deg, var(--accent), var(--accent-deep)); color: #fff; font-size: 12px; font-weight: 700; overflow: hidden; }
 .pin-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .pin-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-name-edit {
+  font: inherit; font-size: 14px; padding: 4px 8px; min-width: 0; width: 140px;
+  color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm);
+}
+.pin-count {
+  flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--accent-contrast);
+  background: var(--accent); border-radius: var(--r-pill); padding: 1px 7px;
+}
 .pin-actions { display: flex; gap: 4px; flex: 0 0 auto; }
 .pin-btn { width: 26px; height: 26px; font-size: 12px; color: var(--ink); background: var(--hover); border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.pin-handle { border: 0; background: transparent; color: var(--ink-2); cursor: grab; font-size: 15px; padding: 0 2px; touch-action: none; }
+.pin-btn:hover { background: color-mix(in srgb, var(--accent) 18%, var(--hover)); }
+/* Icon buttons: center the 20×20 SVG and dim it a touch. */
+.pin-btn.ico { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.pin-btn.ico:hover { color: var(--ink); }
+.pin-btn.del.ico:hover { color: #fff; }
+.pin-btn svg { width: 16px; height: 16px; display: block; }
+.pin-handle { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--ink-2); cursor: grab; padding: 0 2px; touch-action: none; }
+.pin-handle svg { width: 16px; height: 16px; }
 .pin-handle:active { cursor: grabbing; }
+.pin-add-btn { display: inline-flex; align-items: center; gap: 6px; }
+.pin-add-btn svg { width: 16px; height: 16px; }
+.pin-item.is-folder { background: color-mix(in srgb, var(--accent) 6%, var(--layer)); }
+.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.pin-thumb.folder svg { width: 16px; height: 16px; }
+.pin-thumb.widget { background: var(--hover); font-size: 15px; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: #e23b3b; color: #fff; }
 .pin-empty { color: var(--ink-2); font-size: 13px; padding: 6px 2px; }
+
+/* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
+.accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.accent-swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.accent-sw, .accent-custom {
+  position: relative; width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer; padding: 0;
+  background: var(--sw);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.12s var(--ease-bounce), box-shadow 0.12s ease;
+}
+.accent-sw:hover, .accent-custom:hover { transform: scale(1.12); }
+.accent-sw.active, .accent-custom.active {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 0 0 3px color-mix(in srgb, var(--sw) 40%, transparent);
+}
+.accent-check, .accent-plus {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 14px; font-weight: 800; opacity: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); transition: opacity 0.12s ease; pointer-events: none;
+}
+.accent-sw.active .accent-check { opacity: 1; }
+.accent-custom { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.accent-custom .accent-plus { opacity: 0.9; }
+.accent-custom input[type="color"] {
+  position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+  border: 0; padding: 0; background: transparent; opacity: 0; cursor: pointer;
+}
+.accent-system {
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 15px; color: var(--ink);
+  background: var(--layer); border: 1px dashed var(--stroke);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease;
+}
+.accent-system:hover { transform: scale(1.12); border-color: var(--accent); }
+.accent-hex { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 64px; text-align: right; }
+
+/* Installed-app suggestions */
+.sugg-search {
+  width: 100%; font: inherit; font-size: 13px; padding: 9px 12px; margin: 6px 0 12px;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+}
+.sugg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.sugg-item {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 12px 6px; border: 1px solid var(--stroke); background: var(--layer);
+  border-radius: var(--r-md); cursor: pointer; color: var(--ink); overflow: hidden;
+  transition: background 0.12s ease, transform 0.12s var(--ease), border-color 0.12s ease;
+}
+.sugg-item:hover { background: var(--hover); transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 40%, var(--stroke)); }
+.sugg-item.pinned { opacity: 0.45; cursor: default; }
+.sugg-item.pinned:hover { transform: none; }
+.sugg-thumb {
+  width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; font-size: 16px; font-weight: 700; color: #fff; overflow: hidden;
+  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+}
+.sugg-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.sugg-name { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Icon-picker modal */
+.modal-scrim {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.4); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  animation: fade-in 0.14s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  width: min(520px, 92vw); max-height: 80vh; overflow-y: auto; padding: 18px 20px;
+  background: var(--acrylic); border: 1px solid var(--stroke-light); border-radius: var(--r-lg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4); -webkit-backdrop-filter: blur(34px); backdrop-filter: blur(34px);
+  animation: pop-in 0.18s var(--ease-bounce);
+}
+@keyframes pop-in { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 16px; }
+.icon-styles { display: flex; gap: 6px; margin-bottom: 14px; }
+.seg-mini {
+  font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer; color: var(--ink-2);
+  background: var(--track); border: 1px solid var(--stroke); border-radius: var(--r-pill); transition: all 0.14s ease;
+}
+.seg-mini.active { color: var(--accent-contrast); background: var(--accent); border-color: transparent; font-weight: 600; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; }
+.icon-cell {
+  display: flex; align-items: center; justify-content: center; padding: 8px; cursor: pointer;
+  background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-md);
+  transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease, background 0.12s ease;
+}
+.icon-cell:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke)); background: var(--hover); }
+.icon-cell img { width: 34px; height: 34px; }
 
 .s-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .s-btn { font: inherit; font-size: 14px; font-weight: 600; padding: 9px 16px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--r-sm); cursor: pointer; transition: filter 0.15s ease; }
@@ -508,3 +1692,29 @@ input[type="range"] { accent-color: var(--accent); }
 .s-about { display: flex; align-items: center; gap: 14px; }
 .s-about-logo { width: 46px; height: 46px; flex: 0 0 auto; }
 .s-ver { margin-left: 8px; font-size: 12px; color: var(--ink-2); }
+
+/* ═══════════════════════════ Premium polish ═══════════════════════════ */
+/* Subtle, additive refinements (depth, accent touches) over the base. */
+.dock {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 18px 50px rgba(15, 15, 25, 0.32),
+    0 4px 12px rgba(15, 15, 25, 0.16);
+}
+.tile img,
+.tile .glyph { transition: transform 0.12s var(--ease); }
+.tile:hover img,
+.tile:hover .glyph { transform: translateY(-1px); }
+
+.s-navitem.active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--hover));
+}
+.s-content h1 { letter-spacing: -0.01em; }
+.s-card { transition: box-shadow 0.18s ease; }
+.s-btn {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 26%, transparent);
+  transition: transform 0.12s var(--ease), filter 0.15s ease;
+}
+.s-btn:hover { transform: translateY(-1px); }
+.s-btn-soft,
+.s-btn-ghost { box-shadow: none; }

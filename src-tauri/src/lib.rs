@@ -16,6 +16,14 @@ use tauri::{
 };
 
 use config::Config;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+
+/// Set when the changelog was requested before the settings window existed; the
+/// settings page asks for it on mount (`take_pending_changelog`). A plain flag —
+/// never a URL hash — so the settings window always loads its normal, known-good
+/// URL (a hash in the app URL made the window come up blank on Windows).
+static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
@@ -58,12 +66,17 @@ fn reposition_dock(window: WebviewWindow, edge: String) -> Result<(), String> {
 
 /// Resize the dock window to fit its content (plus magnify headroom) and
 /// re-anchor it to the given edge. Called by the frontend after layout.
+///
+/// `hidden` tells us whether this frame is the small "notch" (auto-hidden) or
+/// the full dock. We only record the full-size geometry as the occlusion
+/// watcher's home rect, so smart-hide never measures the shrunken notch.
 #[tauri::command]
 fn set_dock_frame(
     window: WebviewWindow,
     edge: String,
     width: u32,
     height: u32,
+    hidden: Option<bool>,
 ) -> Result<(), String> {
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
@@ -71,7 +84,9 @@ fn set_dock_frame(
     window
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
-    position_dock(&window, &edge)
+    position_dock(&window, &edge)?;
+    let _ = hidden;
+    Ok(())
 }
 
 /// Convert an image file to a data URI (for custom tile icons).
@@ -99,8 +114,11 @@ fn reset_config() -> Result<Config, String> {
     Ok(c)
 }
 
+// NOTE: commands that CREATE a window must be `async`. A synchronous command
+// runs on the main thread, and building a webview needs that same thread to
+// pump messages → deadlock on Windows (white window, app frozen).
 #[tauri::command]
-fn open_settings(app: AppHandle) {
+async fn open_settings(app: AppHandle) {
     open_settings_window(&app);
 }
 
@@ -153,34 +171,428 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
-/// Re-apply the native material with a new strength (0–100).
+/// Kept for IPC compatibility; the dock's translucency is now CSS-only.
 #[tauri::command]
-fn set_material(window: WebviewWindow, strength: u32) -> Result<(), String> {
-    #[cfg(windows)]
-    {
-        let a = ((strength.min(100) as f32 / 100.0) * 220.0) as u8;
-        let _ = window_vibrancy::apply_acrylic(&window, Some((22, 22, 24, a)));
-    }
-    #[cfg(not(windows))]
-    let _ = (&window, strength);
+fn set_material(_app: AppHandle, _strength: u32) -> Result<(), String> {
+    // No-op: the dock's translucency is now a pure-CSS acrylic driven by the
+    // `--material` variable in the frontend (see styles.css / dock.js). Kept so
+    // the existing IPC call from settings stays valid.
     Ok(())
 }
 
+/// The Windows accent/colorization color as a `#rrggbb` hex string, so the user
+/// can match the dock to their system accent. None off-Windows / on failure.
 #[tauri::command]
-fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
-    use tauri_plugin_autostart::ManagerExt;
-    let m = app.autolaunch();
-    if enabled {
-        m.enable().map_err(|e| e.to_string())
+fn system_accent() -> Option<String> {
+    #[cfg(windows)]
+    {
+        #[link(name = "dwmapi")]
+        extern "system" {
+            fn DwmGetColorizationColor(pcrcolorization: *mut u32, pfopaqueblend: *mut i32) -> i32;
+        }
+        let mut color: u32 = 0;
+        let mut opaque: i32 = 0;
+        let hr = unsafe { DwmGetColorizationColor(&mut color, &mut opaque) };
+        if hr == 0 {
+            let r = (color >> 16) & 0xff;
+            let g = (color >> 8) & 0xff;
+            let b = color & 0xff;
+            return Some(format!("#{:02x}{:02x}{:02x}", r, g, b));
+        }
+    }
+    None
+}
+
+/// Live system metrics for the dock widgets (CPU %, memory, network throughput).
+static SYS: Mutex<Option<sysinfo::System>> = Mutex::new(None);
+static NETS: Mutex<Option<(sysinfo::Networks, std::time::Instant)>> = Mutex::new(None);
+
+#[derive(serde::Serialize)]
+struct SystemStats {
+    cpu: f32,
+    mem: f32,
+    mem_used_mb: u64,
+    mem_total_mb: u64,
+    net_down_kbps: u64,
+    net_up_kbps: u64,
+    disk: f32,
+    disk_used_gb: u64,
+    disk_total_gb: u64,
+    uptime_secs: u64,
+    battery: i32,
+    charging: bool,
+}
+
+/// Sample CPU/memory/network. Keeps persistent handles so CPU usage and network
+/// deltas are measured between calls (the dock polls this every couple seconds,
+/// and only while it's visible — so idle cost stays near zero).
+#[tauri::command]
+fn system_stats() -> SystemStats {
+    let mut guard = SYS.lock().unwrap();
+    let sys = guard.get_or_insert_with(sysinfo::System::new);
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    let cpu = sys.global_cpu_usage();
+    let total = sys.total_memory().max(1);
+    let used = sys.used_memory();
+    let mem = (used as f64 / total as f64 * 100.0) as f32;
+
+    let mut nguard = NETS.lock().unwrap();
+    let entry = nguard.get_or_insert_with(|| {
+        (sysinfo::Networks::new_with_refreshed_list(), std::time::Instant::now())
+    });
+    entry.0.refresh();
+    let secs = entry.1.elapsed().as_secs_f64().max(0.001);
+    entry.1 = std::time::Instant::now();
+    let (mut down, mut up) = (0u64, 0u64);
+    for (_name, data) in entry.0.iter() {
+        down += data.received();
+        up += data.transmitted();
+    }
+    // Disk usage (aggregate across mounted disks) + system uptime.
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let (mut dtotal, mut davail) = (0u64, 0u64);
+    for d in disks.iter() {
+        dtotal += d.total_space();
+        davail += d.available_space();
+    }
+    let dused = dtotal.saturating_sub(davail);
+    let disk = if dtotal > 0 { (dused as f64 / dtotal as f64 * 100.0) as f32 } else { 0.0 };
+    let gb = 1024 * 1024 * 1024;
+
+    // Battery (Windows only). -1 = no battery (e.g. a desktop).
+    #[cfg(windows)]
+    let (battery, charging) = unsafe {
+        use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+        let mut s = SYSTEM_POWER_STATUS::default();
+        if GetSystemPowerStatus(&mut s).is_ok() && s.BatteryFlag & 128 == 0 && s.BatteryLifePercent != 255 {
+            (s.BatteryLifePercent as i32, s.ACLineStatus == 1)
+        } else {
+            (-1, false)
+        }
+    };
+    #[cfg(not(windows))]
+    let (battery, charging) = (-1i32, false);
+
+    SystemStats {
+        cpu,
+        mem,
+        mem_used_mb: used / 1024 / 1024,
+        mem_total_mb: total / 1024 / 1024,
+        net_down_kbps: (down as f64 / secs / 1024.0) as u64,
+        net_up_kbps: (up as f64 / secs / 1024.0) as u64,
+        disk,
+        disk_used_gb: dused / gb,
+        disk_total_gb: dtotal / gb,
+        uptime_secs: sysinfo::System::uptime(),
+        battery,
+        charging,
+    }
+}
+
+/// Fetch a website's favicon as a PNG data URI, so a pinned website shows its
+/// real icon. Uses Google's favicon service (one well-known host) and caches the
+/// bytes into the pin's icon, so it only hits the network when you add the site.
+#[tauri::command]
+fn fetch_favicon(url: String) -> Option<String> {
+    use base64::Engine;
+    let host = url
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .split('/')
+        .next()
+        .unwrap_or("")
+        .to_string();
+    if host.is_empty() {
+        return None;
+    }
+    let api = format!("https://www.google.com/s2/favicons?sz=64&domain={host}");
+    let resp = ureq::get(&api)
+        .timeout(std::time::Duration::from_secs(6))
+        .call()
+        .ok()?;
+    let mut bytes: Vec<u8> = Vec::new();
+    use std::io::Read;
+    resp.into_reader()
+        .take(1_000_000)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() < 64 {
+        return None;
+    }
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Some(format!("data:image/png;base64,{b64}"))
+}
+
+/// Hide the dock into the notch: show the small always-on, click-reliable notch
+/// window and hide the (full-size) dock window. No resizing of the dock window,
+/// so there's no WebView2 repaint race or erratic shrink.
+#[tauri::command]
+fn hide_dock(app: AppHandle, edge: String) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = position_notch(&notch, &edge);
+        let _ = notch.show();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
+    }
+}
+
+/// Bring the dock back: hide the notch window and show the dock window. Called by
+/// the dock frontend itself (it then slides the bar back in). Does NOT emit, so a
+/// boot/config-reload window-sync never spuriously pins the dock open.
+#[tauri::command]
+fn reveal_dock(app: AppHandle) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.show();
+    }
+}
+
+/// Fired by the notch window when the user clicks it: just signal the dock to
+/// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
+#[tauri::command]
+fn notch_reveal(app: AppHandle) {
+    let _ = app.emit("booki://reveal", ());
+}
+
+/// Set the dock's anchored edge (used when the user drags the notch to a screen
+/// edge). Persists, repositions both windows, and tells the dock to re-read.
+#[tauri::command]
+fn set_dock_edge(app: AppHandle, edge: String) {
+    let mut cfg = config::load();
+    cfg.edge = edge.clone();
+    let _ = config::save(&cfg);
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = position_dock(&dock, &edge);
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = position_notch(&notch, &edge);
+    }
+    let _ = app.emit("booki://config-changed", ());
+}
+
+/// Show the "What's new" changelog. To avoid a fragile extra window (which on
+/// some setups came up blank and could crash the app), it's shown INSIDE the
+/// stable settings window: if settings is open we just signal it; otherwise we
+/// set a flag the settings page picks up on mount and open settings normally.
+#[tauri::command]
+async fn open_changelog(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = app.emit("booki://show-changelog", ());
+        let _ = w.set_focus();
     } else {
-        m.disable().map_err(|e| e.to_string())
+        PENDING_CHANGELOG.store(true, Ordering::Relaxed);
+        open_settings_window(&app);
+    }
+}
+
+/// Read-and-clear the "open on the changelog" flag (asked by settings on mount).
+#[tauri::command]
+fn take_pending_changelog() -> bool {
+    PENDING_CHANGELOG.swap(false, Ordering::Relaxed)
+}
+
+/// Export the current config to a JSON file the user picked.
+#[tauri::command]
+fn export_config(path: String) -> Result<(), String> {
+    let cfg = config::load();
+    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    std::fs::write(&path, text).map_err(|e| e.to_string())
+}
+
+/// Import config from a JSON file, replacing the current one. Returns the new config.
+#[tauri::command]
+fn import_config(path: String) -> Result<Config, String> {
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    config::save(&cfg)?;
+    Ok(cfg)
+}
+
+/// Place the small notch window centered on the dock's anchored edge.
+fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
+    let monitor = pick_monitor(notch).ok_or_else(|| "no monitor found".to_string())?;
+    let mpos = monitor.position();
+    let msize = monitor.size();
+    let dpr = notch.scale_factor().unwrap_or(1.0);
+    let (ax, ay, aw, ah) = win::work_area(
+        mpos.x + msize.width as i32 / 2,
+        mpos.y + msize.height as i32 / 2,
+    )
+    .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+
+    let cfg = config::load();
+    let vertical = edge == "left" || edge == "right";
+    // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
+    // slightly larger pill with a small margin. The window must be a bit larger
+    // than the pill's HOVER size (156×11) or the grow animation gets clipped.
+    let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
+        (true, true) => (28.0, 170.0),
+        (true, false) => (170.0, 28.0),
+        (false, true) => (32.0, 184.0),
+        (false, false) => (184.0, 32.0),
+    };
+    let ww = (lw * dpr).round() as i32;
+    let wh = (lh * dpr).round() as i32;
+    let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
+
+    // Peek style sits FLUSH against the work-area edge (touching the taskbar).
+    // Never overlap into the taskbar band: the notch is topmost, so any overlap
+    // would draw ON TOP of the bar. The flush pill with only its outward corners
+    // rounded (CSS) already reads as a tab attached to the bar.
+    let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
+    // Offset along the anchored edge so it can dodge subtitles / chat boxes.
+    let along = |start: i32, span: i32, win: i32| -> i32 {
+        let want = match cfg.notch_position.as_str() {
+            "start" => start + span / 6 - win / 2,
+            "end" => start + span - span / 6 - win / 2,
+            _ => start + (span - win) / 2,
+        };
+        // Keep on-screen without panicking when the span is tiny (lo>hi → clamp panics).
+        let lo = start + 4;
+        let hi = (start + span - win - 4).max(lo);
+        want.max(lo).min(hi)
+    };
+    let (x, y) = match edge {
+        "top" => (along(ax, aw, ww), ay + margin),
+        "left" => (ax + margin, along(ay, ah, wh)),
+        "right" => (ax + aw - ww - margin, along(ay, ah, wh)),
+        _ => (along(ax, aw, ww), ay + ah - wh - margin),
+    };
+    notch
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())
+}
+
+/// Briefly show a message on the notch window (used for "Booki se ocultó …").
+#[tauri::command]
+fn notch_toast(app: AppHandle, text: String) {
+    // The toast replaces the bar — hide the dock window while it shows.
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        if let Ok(Some(mon)) = notch.current_monitor() {
+            let dpr = notch.scale_factor().unwrap_or(1.0);
+            let mpos = mon.position();
+            let msize = mon.size();
+            let (ax, ay, aw, ah) = win::work_area(
+                mpos.x + msize.width as i32 / 2,
+                mpos.y + msize.height as i32 / 2,
+            )
+            .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+            let ww = (320.0 * dpr).round() as i32;
+            let wh = (48.0 * dpr).round() as i32;
+            let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
+            let _ = notch.set_position(PhysicalPosition::new(ax + (aw - ww) / 2, ay + ah - wh - 14));
+        }
+        let _ = notch.show();
+        let _ = app.emit("booki://notch-toast", text);
+    }
+}
+
+/// Hide both windows (full blackout, e.g. while a fullscreen app is running).
+#[tauri::command]
+fn hide_all(app: AppHandle) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.hide();
     }
 }
 
 #[tauri::command]
-fn get_autostart(app: AppHandle) -> bool {
-    use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch().is_enabled().unwrap_or(false)
+fn set_autostart(enabled: bool) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let result = win::set_autostart(enabled, &exe.to_string_lossy());
+    if let Err(e) = &result {
+        log::error!("set_autostart({enabled}) failed: {e}");
+    }
+    result
+}
+
+#[tauri::command]
+fn get_autostart() -> bool {
+    win::get_autostart()
+}
+
+/// Move files/folders into a destination folder (drop onto a folder pin).
+#[tauri::command]
+fn move_paths(paths: Vec<String>, dest: String) -> Result<(), String> {
+    let result = win::move_paths(&paths, &dest);
+    if let Err(e) = &result {
+        log::error!("move_paths failed: {e}");
+    }
+    result
+}
+
+/// Send files/folders to the Recycle Bin (the dock's own UI confirms first).
+#[tauri::command]
+fn trash_paths(paths: Vec<String>) -> Result<(), String> {
+    let result = win::trash_paths(&paths);
+    if let Err(e) = &result {
+        log::error!("trash_paths failed: {e}");
+    }
+    result
+}
+
+#[tauri::command]
+fn trash_is_empty() -> bool {
+    win::trash_is_empty()
+}
+
+/// Accent color derived from the desktop wallpaper (async: decodes an image).
+#[tauri::command]
+async fn wallpaper_accent() -> Option<String> {
+    win::wallpaper_accent()
+}
+
+#[derive(serde::Serialize)]
+struct MediaInfo {
+    title: String,
+    artist: String,
+    playing: bool,
+    thumb: Option<String>,
+}
+
+/// What the system media session is playing (async: WinRT calls block briefly).
+#[tauri::command]
+async fn media_info() -> Option<MediaInfo> {
+    win::media_now_playing().map(|m| MediaInfo {
+        title: m.title,
+        artist: m.artist,
+        playing: m.playing,
+        thumb: m.thumb,
+    })
+}
+
+#[tauri::command]
+async fn media_toggle() -> bool {
+    win::media_toggle()
+}
+
+#[tauri::command]
+async fn media_next() -> bool {
+    win::media_next()
+}
+
+#[tauri::command]
+async fn media_prev() -> bool {
+    win::media_prev()
+}
+
+#[tauri::command]
+fn empty_trash() -> Result<(), String> {
+    let result = win::empty_trash();
+    if let Err(e) = &result {
+        log::error!("empty_trash failed: {e}");
+    }
+    result
 }
 
 #[derive(serde::Serialize)]
@@ -222,17 +634,181 @@ fn is_dir(path: String) -> bool {
     std::path::Path::new(&path).is_dir()
 }
 
+/// Scan the Windows Start Menu for installed apps (.lnk shortcuts) so the
+/// settings UI can suggest things to pin without browsing the filesystem.
+/// Returns deduped, alphabetically-sorted shortcuts. Empty off-Windows.
+#[derive(serde::Serialize)]
+struct AppGroup {
+    name: String,
+    items: Vec<DirItem>,
+}
+
+#[tauri::command]
+fn list_installed_apps() -> Vec<AppGroup> {
+    #[cfg(windows)]
+    {
+        use std::collections::{BTreeMap, HashSet};
+        let mut roots: Vec<std::path::PathBuf> = Vec::new();
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            roots.push(
+                std::path::PathBuf::from(appdata)
+                    .join("Microsoft\\Windows\\Start Menu\\Programs"),
+            );
+        }
+        if let Ok(pd) = std::env::var("ProgramData") {
+            roots.push(
+                std::path::PathBuf::from(pd).join("Microsoft\\Windows\\Start Menu\\Programs"),
+            );
+        }
+        let mut seen: HashSet<String> = HashSet::new();
+        // group name → items. "" is the general bucket (top-level apps).
+        let mut map: BTreeMap<String, Vec<DirItem>> = BTreeMap::new();
+        for root in &roots {
+            scan_lnks(root, root, &mut map, &mut seen, 0);
+        }
+        // Collapse single-item folders into the general bucket so we don't end up
+        // with dozens of one-app "groups" — only real groupings get a header.
+        let mut general: Vec<DirItem> = map.remove("").unwrap_or_default();
+        let mut groups: Vec<AppGroup> = Vec::new();
+        for (name, mut items) in map {
+            if items.len() <= 1 {
+                general.append(&mut items);
+            } else {
+                items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                groups.push(AppGroup { name, items });
+            }
+        }
+        groups.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        general.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        if !general.is_empty() {
+            groups.push(AppGroup { name: String::new(), items: general });
+        }
+        groups
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// The top-level Start-menu folder a shortcut lives in (its "group"), or "" if it
+/// sits directly under Programs.
+#[cfg(windows)]
+fn group_of(root: &std::path::Path, p: &std::path::Path) -> String {
+    if let Ok(rel) = p.strip_prefix(root) {
+        let mut comps = rel.components();
+        let first = comps.next();
+        let has_subpath = comps.next().is_some();
+        if has_subpath {
+            if let Some(c) = first {
+                return c.as_os_str().to_string_lossy().to_string();
+            }
+        }
+    }
+    String::new()
+}
+
+#[cfg(windows)]
+fn scan_lnks(
+    root: &std::path::Path,
+    dir: &std::path::Path,
+    map: &mut std::collections::BTreeMap<String, Vec<DirItem>>,
+    seen: &mut std::collections::HashSet<String>,
+    depth: u8,
+) {
+    if depth > 4 {
+        return;
+    }
+    let rd = match std::fs::read_dir(dir) {
+        Ok(rd) => rd,
+        Err(_) => return,
+    };
+    for e in rd.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            scan_lnks(root, &p, map, seen, depth + 1);
+            continue;
+        }
+        let is_lnk = p
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| s.eq_ignore_ascii_case("lnk"))
+            .unwrap_or(false);
+        if !is_lnk {
+            continue;
+        }
+        let name = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+        let lower = name.to_lowercase();
+        // Skip the noise that clutters the Start Menu: uninstallers, docs, help,
+        // website links, changelogs, license/EULA, "report a bug", etc. — so the
+        // suggestions are real, useful apps, not junk.
+        const JUNK: &[&str] = &[
+            "uninstall", "readme", "read me", "help", "manual", "documentation",
+            "docs", "license", "licence", "eula", "changelog", "release notes",
+            "what's new", "whats new", "website", "web site", "home page",
+            "homepage", "visit ", "report", "feedback", "support", "faq",
+            "register", "activate", "modify", "repair", "update", "updater",
+            "command prompt", "powershell", "terminal here",
+        ];
+        if JUNK.iter().any(|j| lower.contains(j)) {
+            continue;
+        }
+        if seen.insert(lower) {
+            let group = group_of(root, &p);
+            map.entry(group).or_default().push(DirItem {
+                name,
+                path: p.to_string_lossy().to_string(),
+                is_dir: false,
+            });
+        }
+    }
+}
+
 /// (Re)register the global hotkey that toggles the dock. Empty = none.
 #[tauri::command]
 fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
+    let cfg = config::load();
+    hotkeys_apply(&app, &accelerator, cfg.position_hotkeys, &cfg.hotkey_modifier)
+}
+
+/// Re-register ALL global shortcuts: the toggle hotkey plus (when enabled) the
+/// position hotkeys modifier+1…9 that launch the Nth dock item.
+fn hotkeys_apply(
+    app: &AppHandle,
+    toggle: &str,
+    positions: bool,
+    modifier: &str,
+) -> Result<(), String> {
     use tauri_plugin_global_shortcut::GlobalShortcutExt;
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    if !accelerator.trim().is_empty() {
-        gs.register(accelerator.as_str())
-            .map_err(|e| e.to_string())?;
+    if !toggle.trim().is_empty() {
+        gs.register(toggle.trim()).map_err(|e| e.to_string())?;
+    }
+    if positions {
+        for i in 1..=9 {
+            // Best-effort: another app may own one of the combos; skip it.
+            let _ = gs.register(format!("{modifier}+{i}").as_str());
+        }
     }
     Ok(())
+}
+
+/// Called from Settings when the position-hotkey options change.
+#[tauri::command]
+fn apply_hotkeys(
+    app: AppHandle,
+    toggle: String,
+    positions: bool,
+    modifier: String,
+) -> Result<(), String> {
+    hotkeys_apply(&app, &toggle, positions, &modifier)
 }
 
 /// Lets the frontend write to the app log file (for diagnosing issues).
@@ -294,26 +870,45 @@ fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
 }
 
 fn open_settings_window(app: &AppHandle) {
+    open_settings_url(app, "settings.html");
+}
+
+fn open_settings_url(app: &AppHandle, url: &str) {
     if let Some(existing) = app.get_webview_window("settings") {
         let _ = existing.set_focus();
         return;
     }
-    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+    let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
         .title("Booki — Ajustes")
-        .inner_size(580.0, 700.0)
-        .min_inner_size(480.0, 520.0)
+        .inner_size(760.0, 800.0)
+        .min_inner_size(560.0, 560.0)
         .resizable(true)
-        .transparent(true)
+        .center()
         .decorations(true)
         .build();
+    // NOTE: the settings window is deliberately NOT transparent. A transparent
+    // WebView2 window rendered blank/see-through on real Windows (the page never
+    // painted). An opaque window always paints; the modern look comes from the
+    // floating acrylic-style panels in CSS over a solid background.
     #[cfg(windows)]
-    if let Ok(w) = built {
-        // Windows 11 system material for the settings window.
-        let _ = window_vibrancy::apply_mica(&w, None)
-            .or_else(|_| window_vibrancy::apply_acrylic(&w, Some((22, 22, 24, 180))));
+    if let Ok(w) = &built {
+        // Defeat the WebView2 initial-size race: on first paint the webview can
+        // come up smaller than the window. Nudge the size a couple of times so
+        // it re-lays-out to fill the client area.
+        let w2 = w.clone();
+        std::thread::spawn(move || {
+            for delay in [120u64, 350] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                if let Ok(sz) = w2.inner_size() {
+                    let _ = w2.set_size(PhysicalSize::new(sz.width + 1, sz.height + 1));
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let _ = w2.set_size(sz);
+                }
+            }
+            let _ = w2.set_focus();
+        });
     }
-    #[cfg(not(windows))]
-    let _ = built;
+    let _ = &built;
 }
 
 fn toggle_dock(app: &AppHandle) {
@@ -339,18 +934,37 @@ pub fn run() {
         )
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    use tauri_plugin_global_shortcut::ShortcutState;
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_dock(app);
+                .with_handler(|app, shortcut, event| {
+                    use tauri_plugin_global_shortcut::{Code, ShortcutState};
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    // Digit shortcuts are only ever registered as position
+                    // hotkeys (modifier+1…9 → launch the Nth dock item);
+                    // anything else is the show/hide toggle.
+                    let idx = match shortcut.key {
+                        Code::Digit1 => Some(0usize),
+                        Code::Digit2 => Some(1),
+                        Code::Digit3 => Some(2),
+                        Code::Digit4 => Some(3),
+                        Code::Digit5 => Some(4),
+                        Code::Digit6 => Some(5),
+                        Code::Digit7 => Some(6),
+                        Code::Digit8 => Some(7),
+                        Code::Digit9 => Some(8),
+                        _ => None,
+                    };
+                    match idx {
+                        Some(i) => {
+                            let _ = app.emit("booki://launch-index", i);
+                        }
+                        None => toggle_dock(app),
                     }
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -361,6 +975,16 @@ pub fn run() {
             focus_window,
             reposition_dock,
             set_dock_frame,
+            hide_dock,
+            reveal_dock,
+            notch_reveal,
+            notch_toast,
+            hide_all,
+            set_dock_edge,
+            open_changelog,
+            take_pending_changelog,
+            export_config,
+            import_config,
             image_data_uri,
             set_always_on_top,
             app_version,
@@ -368,12 +992,26 @@ pub fn run() {
             open_settings,
             open_location,
             set_hotkey,
+            apply_hotkeys,
+            move_paths,
             list_monitors,
             set_material,
+            system_accent,
+            system_stats,
+            fetch_favicon,
             set_autostart,
             get_autostart,
+            trash_paths,
+            trash_is_empty,
+            empty_trash,
+            wallpaper_accent,
+            media_info,
+            media_toggle,
+            media_next,
+            media_prev,
             list_dir,
             is_dir,
+            list_installed_apps,
             quit,
             frontend_log,
         ])
@@ -410,54 +1048,71 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // The dock/notch windows are created VISIBLE but far off-screen
+            // (tauri.conf.json): WebView2 only registers its drag-drop targets
+            // for windows that are visible at creation (wry bug — hidden-created
+            // windows keep a "forbidden" drop cursor forever). Here we move them
+            // into place and set their real visibility.
+            if let Some(notch) = app.get_webview_window("notch") {
+                let cfg = config::load();
+                let _ = position_notch(&notch, &cfg.edge);
+                let _ = notch.hide();
+            }
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
-                // Windows 11 Acrylic material (frosted, translucent).
-                #[cfg(windows)]
-                {
-                    let _ = window_vibrancy::apply_acrylic(&dock, Some((22, 22, 24, 160)));
-                }
                 let cfg = config::load();
+                // The dock surface is a custom CSS acrylic (blur + tint) painted on
+                // a transparent window — this gives full control of the corner
+                // radius and translucency and avoids the native-Mica corner/resize
+                // quirks. So no Mica/DWM rounding is applied to the window here.
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
 
                 // Register the global hotkey, if configured.
-                if !cfg.hotkey.trim().is_empty() {
-                    use tauri_plugin_global_shortcut::GlobalShortcutExt;
-                    let _ = app.global_shortcut().register(cfg.hotkey.as_str());
-                }
+                let _ = hotkeys_apply(
+                    app.handle(),
+                    &cfg.hotkey,
+                    cfg.position_hotkeys,
+                    &cfg.hotkey_modifier,
+                );
 
-                // Apply the configured material strength.
-                let _ = set_material(dock.clone(), cfg.material_strength);
-
-                // Smart auto-hide watcher: emit `booki://occlusion` when the
-                // foreground window covers the dock area. The frontend decides
-                // whether to act (only in "smart" mode). Windows-only.
+                // Smart auto-hide watcher: emit `booki://occlusion` when the user
+                // is working in another app (vs. on the desktop). The frontend
+                // decides whether to act (only in "smart" mode). Windows-only.
                 #[cfg(windows)]
                 {
                     let watch = dock.clone();
                     let handle = app.handle().clone();
                     std::thread::spawn(move || {
                         let self_hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                        let mut last = false;
+                        // (last, candidate, streak) for each debounced signal.
+                        let mut occ = (false, false, 0u8);
+                        let mut fs = (false, false, 0u8);
+                        // Debounce helper: returns Some(new) when the value has held
+                        // for two polls (so momentary changes can't make it flap).
+                        fn debounce(s: &mut (bool, bool, u8), v: bool) -> Option<bool> {
+                            if v == s.1 {
+                                s.2 = s.2.saturating_add(1);
+                            } else {
+                                s.1 = v;
+                                s.2 = 1;
+                            }
+                            if s.1 != s.0 && s.2 >= 2 {
+                                s.0 = s.1;
+                                return Some(s.0);
+                            }
+                            None
+                        }
                         loop {
-                            std::thread::sleep(std::time::Duration::from_millis(350));
-                            let pos = match watch.outer_position() {
-                                Ok(p) => p,
-                                Err(_) => continue,
-                            };
-                            let size = watch.outer_size().unwrap_or_default();
-                            let occ = win::foreground_occludes(
-                                pos.x,
-                                pos.y,
-                                pos.x + size.width as i32,
-                                pos.y + size.height as i32,
-                                self_hwnd,
-                            );
-                            if occ != last {
-                                last = occ;
-                                let _ = handle.emit("booki://occlusion", occ);
+                            std::thread::sleep(std::time::Duration::from_millis(300));
+                            // foreground_occludes = "the user is in an app".
+                            if let Some(v) = debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd)) {
+                                let _ = handle.emit("booki://occlusion", v);
+                            }
+                            // fullscreen game / movie / presentation → get out of the way.
+                            if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
+                                let _ = handle.emit("booki://fullscreen", v);
                             }
                         }
                     });

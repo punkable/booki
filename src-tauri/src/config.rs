@@ -20,13 +20,27 @@ pub struct PinnedApp {
     pub path: String,
     #[serde(default)]
     pub args: Vec<String>,
-    /// "app" | "separator".
+    /// "app" | "separator" | "folder" | "group" | "widget".
     #[serde(default = "default_kind")]
     pub kind: String,
+    /// For kind == "widget": which widget ("clock" | "cpu" | "ram" | "net").
+    #[serde(default)]
+    pub widget: Option<String>,
+    /// Free-form visual style for a widget (variant, color, animated, …). Kept as
+    /// JSON so the look can evolve without backend changes.
+    #[serde(default)]
+    pub style: Option<serde_json::Value>,
     /// Optional custom icon: a path to an image or a data URI overriding the
     /// native icon.
     #[serde(default)]
     pub icon: Option<String>,
+    /// Child items for a "group" pin (a folder/container of other pins).
+    #[serde(default)]
+    pub children: Vec<PinnedApp>,
+    /// Recently opened files for this app (most-recent first) — a lightweight
+    /// jump list of things opened through Booki.
+    #[serde(default)]
+    pub recents: Vec<String>,
 }
 
 fn default_edge() -> String {
@@ -43,10 +57,13 @@ fn default_icon_size() -> u32 {
     48
 }
 fn default_zoom() -> f32 {
-    1.35
+    1.25
 }
 fn default_auto_hide_mode() -> String {
-    "off".into()
+    // Smart by default: visible on the desktop, slides to the notch when a window
+    // covers the dock area, and reappears when the desktop is clear. Measured
+    // against a stable home rect so it can't flap.
+    "smart".into()
 }
 fn default_monitor() -> i32 {
     -1
@@ -60,11 +77,14 @@ fn default_language() -> String {
 fn default_spacing() -> u32 {
     6
 }
-fn default_opacity() -> f32 {
-    0.62
+fn default_radius() -> u32 {
+    12
 }
 fn default_hide_delay() -> u32 {
     650
+}
+fn default_notch_position() -> String {
+    "center".into()
 }
 fn default_anim() -> String {
     "spring".into()
@@ -90,7 +110,7 @@ pub struct Config {
     pub theme: String,
     #[serde(default = "default_icon_size")]
     pub icon_size: u32,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub magnification: bool,
     /// Peak magnification scale (e.g. 1.8 = tiles grow up to 180%).
     #[serde(default = "default_zoom")]
@@ -98,9 +118,9 @@ pub struct Config {
     /// Gap between tiles, in px.
     #[serde(default = "default_spacing")]
     pub spacing: u32,
-    /// Dock background translucency (0.2–1.0).
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
+    /// Corner roundness of tiles (px). 0 = square, larger = rounder.
+    #[serde(default = "default_radius")]
+    pub corner_radius: u32,
     /// Show name tooltips on hover.
     #[serde(default = "default_true")]
     pub show_labels: bool,
@@ -115,6 +135,12 @@ pub struct Config {
     /// Auto-hide delay before sliding away, in ms.
     #[serde(default = "default_hide_delay")]
     pub auto_hide_delay: u32,
+    /// Notch placement along the anchored edge: "center" | "start" | "end".
+    #[serde(default = "default_notch_position")]
+    pub notch_position: String,
+    /// Notch "peek" style — sits at the very edge like a tab, less intrusive.
+    #[serde(default = "default_true")]
+    pub notch_peek: bool,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
     /// Magnify animation style: "spring" | "smooth" | "off".
@@ -135,6 +161,26 @@ pub struct Config {
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
+    /// Internal settings/migration revision (not user-facing).
+    #[serde(default)]
+    pub settings_rev: u32,
+    /// The app version whose changelog the user has already seen. When the app
+    /// updates, this differs from the running version → we show "What's new".
+    #[serde(default)]
+    pub seen_version: String,
+    /// Whether the three first-run tip bubbles were already shown.
+    #[serde(default)]
+    pub onboarded: bool,
+    /// Position hotkeys: modifier+1…9 launches the Nth dock item.
+    #[serde(default = "default_true")]
+    pub position_hotkeys: bool,
+    /// Modifier for the position hotkeys ("Alt" | "Ctrl+Alt" | "Alt+Shift").
+    #[serde(default = "default_hotkey_modifier")]
+    pub hotkey_modifier: String,
+}
+
+fn default_hotkey_modifier() -> String {
+    "Alt".into()
 }
 
 impl Default for Config {
@@ -145,15 +191,17 @@ impl Default for Config {
             accent: default_accent(),
             theme: default_theme(),
             icon_size: default_icon_size(),
-            magnification: true,
+            magnification: false,
             zoom: default_zoom(),
             spacing: default_spacing(),
-            opacity: default_opacity(),
+            corner_radius: default_radius(),
             show_labels: true,
             show_indicators: true,
             auto_hide: false,
             auto_hide_mode: default_auto_hide_mode(),
             auto_hide_delay: default_hide_delay(),
+            notch_position: default_notch_position(),
+            notch_peek: true,
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),
@@ -161,6 +209,11 @@ impl Default for Config {
             material_strength: default_material(),
             autostart: false,
             language: default_language(),
+            settings_rev: 0,
+            seen_version: String::new(),
+            onboarded: false,
+            position_hotkeys: true,
+            hotkey_modifier: default_hotkey_modifier(),
         }
     }
 }
@@ -179,10 +232,28 @@ fn config_path() -> PathBuf {
 /// Load config from disk, falling back to defaults on any error.
 pub fn load() -> Config {
     let path = config_path();
-    match fs::read_to_string(&path) {
+    // Clean any leftover temp file from an interrupted atomic save (no junk).
+    let _ = fs::remove_file(config_dir().join("config.json.tmp"));
+    let mut cfg = match fs::read_to_string(&path) {
         Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
         Err(_) => Config::default(),
+    };
+    // Migration: now that smart-hide is stable (measured against a fixed home
+    // rect, with a visible animated notch), make it the default for existing
+    // installs too — visible on the desktop, hides when a window covers it.
+    if cfg.settings_rev < 2 {
+        cfg.auto_hide_mode = "smart".into();
+        cfg.settings_rev = 2;
+        let _ = save(&cfg);
     }
+    // rev 3: Windows-native default — icons no longer magnify on hover by default
+    // (a subtle highlight is used instead). Users can re-enable it in settings.
+    if cfg.settings_rev < 3 {
+        cfg.magnification = false;
+        cfg.settings_rev = 3;
+        let _ = save(&cfg);
+    }
+    cfg
 }
 
 /// Persist config to disk, creating the directory if needed.

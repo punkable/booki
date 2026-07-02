@@ -5,7 +5,13 @@
 use std::ffi::c_void;
 
 use base64::Engine;
-use windows::core::PCWSTR;
+use windows::core::{Interface, PCWSTR};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER,
+    COINIT_APARTMENTTHREADED, STGM_READ,
+};
+use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
+use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::Graphics::Gdi::{
@@ -17,9 +23,9 @@ use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
-    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, IsIconic, IsWindowVisible,
-    SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE,
-    WS_EX_TOOLWINDOW,
+    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+    IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON,
+    ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -33,13 +39,41 @@ pub fn app_icon_data_uri(path: &str) -> Option<String> {
     Some(format!("data:image/png;base64,{b64}"))
 }
 
+/// Resolve a .lnk shortcut to its target path (so we can read the target's icon
+/// instead of the shell's shortcut icon, which carries the overlay arrow badge).
+unsafe fn resolve_shortcut_target(path: &str) -> Option<String> {
+    let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+    let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
+    let pf: IPersistFile = link.cast().ok()?;
+    let wpath = wide(path);
+    pf.Load(PCWSTR(wpath.as_ptr()), STGM_READ).ok()?;
+    let mut buf = [0u16; 260];
+    let mut fd = WIN32_FIND_DATAW::default();
+    link.GetPath(&mut buf, &mut fd, 0u32).ok()?;
+    let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    if end == 0 {
+        return None;
+    }
+    Some(String::from_utf16_lossy(&buf[..end]))
+}
+
 unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
-    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    // For .lnk shortcuts, read the TARGET's icon so the shell's shortcut-arrow
+    // overlay badge doesn't appear on the dock tile.
+    let mut target = path.to_string();
+    if path.to_ascii_lowercase().ends_with(".lnk") {
+        if let Some(t) = resolve_shortcut_target(path) {
+            if !t.is_empty() {
+                target = t;
+            }
+        }
+    }
+    let wtarget = wide(&target);
     let mut info = SHFILEINFOW::default();
     // Read the real icon of the file/exe/shortcut/folder on disk (no
     // USEFILEATTRIBUTES) so custom executable icons come through.
     let res = SHGetFileInfoW(
-        PCWSTR(wide.as_ptr()),
+        PCWSTR(wtarget.as_ptr()),
         FILE_FLAGS_AND_ATTRIBUTES(0),
         Some(&mut info),
         std::mem::size_of::<SHFILEINFOW>() as u32,
@@ -212,24 +246,95 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
         if hwnd.0.is_null() || hwnd.0 as isize == self_hwnd {
             return false;
         }
+        // Any window belonging to Booki itself (dock, notch, settings) doesn't
+        // count as "another app" — so editing Settings keeps the dock visible for
+        // live preview instead of tucking it away.
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
+            return false;
+        }
         let mut buf = [0u16; 64];
         let n = GetClassNameW(hwnd, &mut buf);
         let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
         if class == "Progman" || class == "WorkerW" {
-            return false; // desktop is in front
+            return false; // desktop is in front → show the dock
         }
-        if IsIconic(hwnd).as_bool() {
+        // The shell / taskbar don't count as "an app".
+        if class == "Shell_TrayWnd" || class == "Shell_SecondaryTrayWnd" {
             return false;
         }
-        let mut r = RECT::default();
-        if GetWindowRect(hwnd, &mut r).is_err() {
+        if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
             return false;
         }
-        let ol = r.left.max(dl);
-        let ot = r.top.max(dt);
-        let or = r.right.min(dr);
-        let ob = r.bottom.min(db);
-        or > ol && ob > ot
+        // The user is working in a real app window → tuck the dock away. We don't
+        // require the window to overlap the dock: it should stay out of the way
+        // whenever you're in another window, not only when physically covered. It
+        // returns on the desktop, or when the notch is clicked.
+        let _ = (dl, dt, dr, db);
+        true
+    }
+}
+
+/// True if a fullscreen game / movie / presentation is running — so Booki can get
+/// completely out of the way (e.g. not cover subtitles or a game).
+pub fn is_fullscreen() -> bool {
+    unsafe {
+        // 1) The shell's own "user is busy" state: fullscreen DirectX game,
+        // presentation mode, or a busy/fullscreen app (movies). This is exactly
+        // what Windows uses to suppress its own notifications.
+        use windows::Win32::UI::Shell::{
+            SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+            QUNS_RUNNING_D3D_FULL_SCREEN,
+        };
+        if let Ok(state) = SHQueryUserNotificationState() {
+            if state == QUNS_RUNNING_D3D_FULL_SCREEN
+                || state == QUNS_PRESENTATION_MODE
+                || state == QUNS_BUSY
+            {
+                return true;
+            }
+        }
+        // 2) Fallback: the foreground window covers the WHOLE monitor (borderless
+        // fullscreen video like YouTube/VLC). Ignore the desktop and the shell.
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if class == "Progman"
+            || class == "WorkerW"
+            || class == "Shell_TrayWnd"
+            || class == "Shell_SecondaryTrayWnd"
+        {
+            return false;
+        }
+        // A normal MAXIMIZED window also covers the monitor when the taskbar is
+        // set to auto-hide — so require the window to be borderless (no caption),
+        // which true fullscreen apps are but maximized ones aren't.
+        use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, WS_CAPTION};
+        let style = GetWindowLongW(hwnd, GWL_STYLE);
+        if (style & WS_CAPTION.0 as i32) != 0 {
+            return false;
+        }
+        let mut wr = RECT::default();
+        if GetWindowRect(hwnd, &mut wr).is_err() {
+            return false;
+        }
+        let cx = (wr.left + wr.right) / 2;
+        let cy = (wr.top + wr.bottom) / 2;
+        let hmon = MonitorFromPoint(POINT { x: cx, y: cy }, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return false;
+        }
+        let m = mi.rcMonitor;
+        wr.left <= m.left && wr.top <= m.top && wr.right >= m.right && wr.bottom >= m.bottom
     }
 }
 
@@ -241,5 +346,315 @@ pub fn focus_window(hwnd: isize) -> bool {
             let _ = ShowWindow(handle, SW_RESTORE);
         }
         SetForegroundWindow(handle).as_bool()
+    }
+}
+
+// ──────────────────────────── Autostart ────────────────────────────
+// Written straight to HKCU\...\Run (the classic per-user startup list) so the
+// state is deterministic and verifiable — no plugin between us and the registry.
+
+const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const RUN_VALUE: &str = "Booki";
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Add or remove the "start with Windows" registry entry for this exe.
+pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
+    use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+        KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ,
+    };
+    let key_path = wide(RUN_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        let mut key = HKEY::default();
+        let opened = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            0,
+            None,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        );
+        if opened.is_err() {
+            return Err(format!("could not open the Run registry key ({opened:?})"));
+        }
+        let result = if enabled {
+            // Quote the path so spaces in the install dir can't break the command.
+            let cmd = wide(&format!("\"{exe}\""));
+            let bytes =
+                std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
+            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_SZ, Some(bytes));
+            if r.is_err() {
+                Err(format!("could not write the Run registry value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        } else {
+            let r = RegDeleteValueW(key, PCWSTR(value_name.as_ptr()));
+            if r.is_err() && r != ERROR_FILE_NOT_FOUND {
+                Err(format!("could not delete the Run registry value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        };
+        let _ = RegCloseKey(key);
+        result
+    }
+}
+
+/// True when the "start with Windows" registry entry exists.
+pub fn get_autostart() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key_path = wide(RUN_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            PCWSTR(value_name.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            None,
+            None,
+        )
+        .is_ok()
+    }
+}
+
+// ──────────────────────────── Recycle bin ────────────────────────────
+
+/// Send files/folders to the Recycle Bin (undoable — NOT a permanent delete).
+/// Confirmation happens in Booki's own UI, so the shell dialog is suppressed.
+pub fn trash_paths(paths: &[String]) -> Result<(), String> {
+    use windows::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT,
+        FO_DELETE, SHFILEOPSTRUCTW,
+    };
+    if paths.is_empty() {
+        return Ok(());
+    }
+    // pFrom is a double-null-terminated list of null-separated paths.
+    let mut buf: Vec<u16> = Vec::new();
+    for p in paths {
+        buf.extend(p.encode_utf16());
+        buf.push(0);
+    }
+    buf.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_DELETE,
+        pFrom: PCWSTR(buf.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMATION.0 | FOF_SILENT.0 | FOF_NOERRORUI.0) as u16,
+        ..Default::default()
+    };
+    let code = unsafe { SHFileOperationW(&mut op) };
+    if code != 0 {
+        Err(format!("could not send to the recycle bin (code {code})"))
+    } else if op.fAnyOperationsAborted.as_bool() {
+        Err("the operation was aborted".into())
+    } else {
+        Ok(())
+    }
+}
+
+/// True when the Recycle Bin (across all drives) has no items.
+pub fn trash_is_empty() -> bool {
+    use windows::Win32::UI::Shell::{SHQueryRecycleBinW, SHQUERYRBINFO};
+    let mut info = SHQUERYRBINFO {
+        cbSize: std::mem::size_of::<SHQUERYRBINFO>() as u32,
+        ..Default::default()
+    };
+    match unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) } {
+        Ok(()) => info.i64NumItems == 0,
+        Err(_) => true,
+    }
+}
+
+/// Empty the Recycle Bin (Booki's UI asks for confirmation first).
+pub fn empty_trash() -> Result<(), String> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Shell::{
+        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI,
+    };
+    unsafe {
+        SHEmptyRecycleBinW(
+            HWND::default(),
+            PCWSTR::null(),
+            SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI,
+        )
+    }
+    .map_err(|e| e.to_string())
+}
+
+// ─────────────────────── Wallpaper accent ───────────────────────
+
+/// Derive an accent color from the current desktop wallpaper: average of the
+/// most vivid (saturated × bright) pixels of a small thumbnail.
+pub fn wallpaper_accent() -> Option<String> {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SystemParametersInfoW, SPI_GETDESKWALLPAPER, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    };
+    let mut buf = [0u16; 512];
+    unsafe {
+        SystemParametersInfoW(
+            SPI_GETDESKWALLPAPER,
+            buf.len() as u32,
+            Some(buf.as_mut_ptr() as *mut _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+        .ok()?;
+    }
+    let end = buf.iter().position(|&c| c == 0)?;
+    let path = String::from_utf16_lossy(&buf[..end]);
+    if path.is_empty() {
+        return None;
+    }
+    let img = image::open(&path).ok()?.thumbnail(64, 64).to_rgba8();
+    let mut scored: Vec<(f32, [u8; 3])> = img
+        .pixels()
+        .map(|p| {
+            let [r, g, b, _] = p.0;
+            let mx = r.max(g).max(b) as f32;
+            let mn = r.min(g).min(b) as f32;
+            let sat = if mx == 0.0 { 0.0 } else { (mx - mn) / mx };
+            (sat * (mx / 255.0), [r, g, b])
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let take = (scored.len() / 10).max(1);
+    let (mut r, mut g, mut b) = (0u32, 0u32, 0u32);
+    for (_, px) in scored.iter().take(take) {
+        r += px[0] as u32;
+        g += px[1] as u32;
+        b += px[2] as u32;
+    }
+    let n = take as u32;
+    Some(format!("#{:02x}{:02x}{:02x}", r / n, g / n, b / n))
+}
+
+// ─────────────────────── Now playing (system media) ───────────────────────
+
+/// Snapshot of whatever the system media session is playing (Spotify, browser…).
+pub struct MediaSnapshot {
+    pub title: String,
+    pub artist: String,
+    pub playing: bool,
+    /// Album art as a data URI, when the source exposes one.
+    pub thumb: Option<String>,
+}
+
+fn media_session(
+) -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+    let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .ok()?
+        .get()
+        .ok()?;
+    mgr.GetCurrentSession().ok()
+}
+
+pub fn media_now_playing() -> Option<MediaSnapshot> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status;
+    use windows::Storage::Streams::DataReader;
+    let session = media_session()?;
+    let info = session.TryGetMediaPropertiesAsync().ok()?.get().ok()?;
+    let title = info.Title().map(|s| s.to_string()).unwrap_or_default();
+    let artist = info.Artist().map(|s| s.to_string()).unwrap_or_default();
+    if title.is_empty() && artist.is_empty() {
+        return None;
+    }
+    let playing = session
+        .GetPlaybackInfo()
+        .and_then(|p| p.PlaybackStatus())
+        .map(|s| s == Status::Playing)
+        .unwrap_or(false);
+    let thumb = (|| {
+        let stream = info.Thumbnail().ok()?.OpenReadAsync().ok()?.get().ok()?;
+        let size = stream.Size().unwrap_or(0);
+        if size > 2_000_000 {
+            return None; // unreasonably big for album art
+        }
+        let reader = DataReader::CreateDataReader(&stream).ok()?;
+        // Some sources (e.g. browser tabs) report Size()==0 — ask for a chunk
+        // and read whatever actually arrived.
+        let want: u32 = if size == 0 { 500_000 } else { size as u32 };
+        reader.LoadAsync(want).ok()?.get().ok()?;
+        let got = reader.UnconsumedBufferLength().ok()? as usize;
+        if got == 0 {
+            return None;
+        }
+        let mut bytes = vec![0u8; got];
+        reader.ReadBytes(&mut bytes).ok()?;
+        let mime = if bytes.starts_with(&[0x89, b'P']) { "png" } else { "jpeg" };
+        Some(format!(
+            "data:image/{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ))
+    })();
+    Some(MediaSnapshot { title, artist, playing, thumb })
+}
+
+/// Toggle play/pause on the current system media session.
+pub fn media_toggle() -> bool {
+    media_session()
+        .and_then(|s| s.TryTogglePlayPauseAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}
+
+/// Skip to the next track on the current system media session.
+pub fn media_next() -> bool {
+    media_session()
+        .and_then(|s| s.TrySkipNextAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}
+
+/// Skip to the previous track on the current system media session.
+pub fn media_prev() -> bool {
+    media_session()
+        .and_then(|s| s.TrySkipPreviousAsync().ok())
+        .and_then(|op| op.get().ok())
+        .unwrap_or(false)
+}
+
+/// Move files/folders into a destination folder via the shell (undoable, shows
+/// the native progress/collision dialogs when needed).
+pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
+    use windows::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMMKDIR, FO_MOVE, SHFILEOPSTRUCTW,
+    };
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut from: Vec<u16> = Vec::new();
+    for p in paths {
+        from.extend(p.encode_utf16());
+        from.push(0);
+    }
+    from.push(0);
+    let mut to: Vec<u16> = dest.encode_utf16().collect();
+    to.push(0);
+    to.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_MOVE,
+        pFrom: PCWSTR(from.as_ptr()),
+        pTo: PCWSTR(to.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMMKDIR.0) as u16,
+        ..Default::default()
+    };
+    let code = unsafe { SHFileOperationW(&mut op) };
+    if code != 0 {
+        Err(format!("could not move (code {code})"))
+    } else if op.fAnyOperationsAborted.as_bool() {
+        Err("the move was cancelled".into())
+    } else {
+        Ok(())
     }
 }
