@@ -623,3 +623,38 @@ pub fn media_prev() -> bool {
         .and_then(|op| op.get().ok())
         .unwrap_or(false)
 }
+
+/// Move files/folders into a destination folder via the shell (undoable, shows
+/// the native progress/collision dialogs when needed).
+pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
+    use windows::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMMKDIR, FO_MOVE, SHFILEOPSTRUCTW,
+    };
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let mut from: Vec<u16> = Vec::new();
+    for p in paths {
+        from.extend(p.encode_utf16());
+        from.push(0);
+    }
+    from.push(0);
+    let mut to: Vec<u16> = dest.encode_utf16().collect();
+    to.push(0);
+    to.push(0);
+    let mut op = SHFILEOPSTRUCTW {
+        wFunc: FO_MOVE,
+        pFrom: PCWSTR(from.as_ptr()),
+        pTo: PCWSTR(to.as_ptr()),
+        fFlags: (FOF_ALLOWUNDO.0 | FOF_NOCONFIRMMKDIR.0) as u16,
+        ..Default::default()
+    };
+    let code = unsafe { SHFileOperationW(&mut op) };
+    if code != 0 {
+        Err(format!("could not move (code {code})"))
+    } else if op.fAnyOperationsAborted.as_bool() {
+        Err("the move was cancelled".into())
+    } else {
+        Ok(())
+    }
+}

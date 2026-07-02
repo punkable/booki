@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.10.0",
+    date: "2 jul 2026",
+    headline: "Atajos de teclado, mover archivos a carpetas y un arrastre que se siente de verdad.",
+    sections: [
+      {
+        icon: "⌨️",
+        title: "Atajos por posición",
+        notes: [
+          "Alt+1 abre el primer elemento del dock, Alt+2 el segundo… hasta el 9.",
+          "Puedes cambiar la tecla (Alt, Ctrl+Alt o Alt+Shift) o apagarlos en Ajustes → Atajos.",
+        ],
+      },
+      {
+        icon: "📂",
+        title: "Suelta archivos en carpetas",
+        notes: [
+          "Arrastra un archivo sobre una carpeta del dock y, tras confirmar, se mueve dentro (con Ctrl+Z para deshacer).",
+          "Si la sueltas sobre una carpeta de apps, se ancla dentro de ella.",
+        ],
+      },
+      {
+        icon: "✋",
+        title: "Arrastre de verdad",
+        notes: [
+          "Al mover un icono del dock ahora lo ves viajar contigo, con los demás haciéndole sitio.",
+          "Arrástralo fuera del dock y suéltalo para desanclarlo — desaparece con un plof.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2 jul 2026",
     headline: "Elegir dónde va el notch ahora es tan fácil como tocar una mini pantalla.",

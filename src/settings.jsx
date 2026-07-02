@@ -86,7 +86,7 @@ const SEARCH_INDEX = [
   ["be.alwaysOnTop", "behavior"], ["be.autostart", "behavior"],
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
   ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
-  ["sc.title", "shortcuts"], ["sc.global", "shortcuts"],
+  ["sc.title", "shortcuts"], ["sc.global", "shortcuts"], ["sc.positions", "shortcuts"],
   ["ab.updates", "about"], ["ab.whatsNew", "about"],
 ];
 
@@ -1177,6 +1177,27 @@ function Shortcuts({ cfg, set }) {
           }}
         />
       </Row>
+      <Toggle label={t("sc.positions")} checked={cfg.positionHotkeys !== false}
+        onChange={(v) => {
+          set({ positionHotkeys: v });
+          dockApi.applyHotkeys(cfg.hotkey || "", v, cfg.hotkeyModifier || "Alt");
+        }} />
+      {cfg.positionHotkeys !== false && (
+        <Row label={t("sc.posMod")} hint={t("sc.posHint").replace("{mod}", cfg.hotkeyModifier || "Alt")}>
+          <SegmentedControl
+            value={cfg.hotkeyModifier || "Alt"}
+            onChange={(v) => {
+              set({ hotkeyModifier: v });
+              dockApi.applyHotkeys(cfg.hotkey || "", true, v);
+            }}
+            options={[
+              { value: "Alt", label: "Alt" },
+              { value: "Ctrl+Alt", label: "Ctrl+Alt" },
+              { value: "Alt+Shift", label: "Alt+Shift" },
+            ]}
+          />
+        </Row>
+      )}
       <div className="s-card-inner">
         <h3>{t("sc.other")}</h3>
         <ul className="muted-list">

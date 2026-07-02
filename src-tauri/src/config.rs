@@ -171,6 +171,16 @@ pub struct Config {
     /// Whether the three first-run tip bubbles were already shown.
     #[serde(default)]
     pub onboarded: bool,
+    /// Position hotkeys: modifier+1…9 launches the Nth dock item.
+    #[serde(default = "default_true")]
+    pub position_hotkeys: bool,
+    /// Modifier for the position hotkeys ("Alt" | "Ctrl+Alt" | "Alt+Shift").
+    #[serde(default = "default_hotkey_modifier")]
+    pub hotkey_modifier: String,
+}
+
+fn default_hotkey_modifier() -> String {
+    "Alt".into()
 }
 
 impl Default for Config {
@@ -202,6 +212,8 @@ impl Default for Config {
             settings_rev: 0,
             seen_version: String::new(),
             onboarded: false,
+            position_hotkeys: true,
+            hotkey_modifier: default_hotkey_modifier(),
         }
     }
 }
