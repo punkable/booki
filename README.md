@@ -125,3 +125,5 @@ releases are pruned so only the latest stays downloadable.
 ## License
 
 MIT — do whatever makes you happy, credit is appreciated. 🦫
+
+Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT license.

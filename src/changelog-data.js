@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.12.0",
+    date: "2 jul 2026",
+    headline: "Más personalidad, más seguro de usar, y el dock ya no recorta nada.",
+    sections: [
+      {
+        icon: "😊",
+        title: "Emojis con vida",
+        notes: [
+          "Los widgets, consejos y avisos estrenan emojis 3D al estilo premium (reloj, cerebro, batería…), incluidos en la app — sin depender de internet.",
+          "Los logos de Bitcoin y Solana en las donaciones ahora son los oficiales.",
+        ],
+      },
+      {
+        icon: "🛟",
+        title: "Sin sustos",
+        notes: [
+          "«Restablecer» ya no vive al lado de «Salir»: ahora está al final de Acerca de y pide confirmación con un segundo clic.",
+          "La sombra del dock y los iconos ampliados ya no se recortan en el borde de la ventana.",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Mejor ordenado",
+        notes: [
+          "El estilo del notch se elige en Apariencia (es visual); su posición sigue en Comportamiento.",
+          "Los botones de acento «Sistema» y «Fondo» ahora se entienden: llevan su nombre.",
+          "Si el notch vive en un lateral o arriba, al hacer clic el dock aparece en ese mismo borde (en vertical si toca).",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2 jul 2026",
     headline: "El notch se viste como quieras, y todo es más claro desde el primer minuto.",
