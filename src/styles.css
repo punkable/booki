@@ -1390,6 +1390,66 @@ select {
 .seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Edge picker (mini screen) */
+/* Notch position picker: a mini screen with the taskbar and three clickable
+   tab slots along the dock's anchored edge. What you click is what you get. */
+.notchpick { display: flex; justify-content: flex-end; }
+.notchpick-screen {
+  position: relative;
+  width: 210px;
+  height: 96px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--stroke);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--layer)), var(--layer));
+  overflow: hidden;
+}
+/* The "taskbar" strip on the anchored edge. */
+.notchpick-bar { position: absolute; background: color-mix(in srgb, var(--ink) 22%, transparent); }
+.np-edge-bottom .notchpick-bar { left: 0; right: 0; bottom: 0; height: 12px; }
+.np-edge-top .notchpick-bar { left: 0; right: 0; top: 0; height: 12px; }
+.np-edge-left .notchpick-bar { top: 0; bottom: 0; left: 0; width: 12px; }
+.np-edge-right .notchpick-bar { top: 0; bottom: 0; right: 0; width: 12px; }
+/* Three generous click targets along that edge. */
+.notchpick-slot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+.np-edge-bottom .notchpick-slot, .np-edge-top .notchpick-slot { width: 33.3%; height: 40px; }
+.np-edge-bottom .notchpick-slot { bottom: 0; }
+.np-edge-top .notchpick-slot { top: 0; }
+.np-edge-bottom .nps-start, .np-edge-top .nps-start { left: 0; }
+.np-edge-bottom .nps-center, .np-edge-top .nps-center { left: 33.3%; }
+.np-edge-bottom .nps-end, .np-edge-top .nps-end { left: 66.6%; }
+.np-edge-left .notchpick-slot, .np-edge-right .notchpick-slot { height: 33.3%; width: 40px; }
+.np-edge-left .notchpick-slot { left: 0; }
+.np-edge-right .notchpick-slot { right: 0; }
+.np-edge-left .nps-start, .np-edge-right .nps-start { top: 0; }
+.np-edge-left .nps-center, .np-edge-right .nps-center { top: 33.3%; }
+.np-edge-left .nps-end, .np-edge-right .nps-end { top: 66.6%; }
+/* The little tab inside each slot — ghosted until chosen. */
+.notchpick-tab {
+  width: 34px;
+  height: 8px;
+  border-radius: 6px 6px 0 0;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+}
+.np-edge-bottom .notchpick-tab { margin-top: auto; margin-bottom: 12px; }
+.np-edge-top .notchpick-tab { margin-bottom: auto; margin-top: 12px; border-radius: 0 0 6px 6px; }
+.np-edge-left .notchpick-tab, .np-edge-right .notchpick-tab { width: 8px; height: 34px; }
+.np-edge-left .notchpick-tab { margin-right: auto; margin-left: 12px; border-radius: 0 6px 6px 0; }
+.np-edge-right .notchpick-tab { margin-left: auto; margin-right: 12px; border-radius: 6px 0 0 6px; }
+.notchpick-slot:hover .notchpick-tab { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.notchpick-slot.active .notchpick-tab {
+  background: var(--accent);
+  transform: scale(1.15);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
 .edgepick { display: flex; justify-content: flex-end; }
 .edgepick-screen {
   position: relative; width: 210px; height: 124px; border-radius: var(--r-md);
