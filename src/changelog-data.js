@@ -3,6 +3,47 @@
 
 export const CHANGELOG = [
   {
+    version: "0.11.0",
+    date: "2 jul 2026",
+    headline: "El notch se viste como quieras, y todo es más claro desde el primer minuto.",
+    sections: [
+      {
+        icon: "💎",
+        title: "Notch a tu gusto",
+        notes: [
+          "Cinco acabados: Isla, Liquid glass, Mica, Acrylic y estilo Windows — elígelo con miniaturas en Ajustes.",
+          "Ahora puede vivir en cualquier borde de la pantalla: toca su sitio en el dibujito (12 posiciones).",
+          "Sus curvas ya no se separan en pantallas con escalado (125%, 150%).",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Más claro desde el inicio",
+        notes: [
+          "Los consejos de bienvenida ya se ven completos, sin texto roto.",
+          "Con el dock vacío aparece un botón «+» que abre Ajustes con consejos y sugerencias.",
+          "Ajustes reorganizado en secciones (Tema, Iconos, Notch, Sistema…) y el menú lateral ya no duplica el color al cambiar de pestaña.",
+        ],
+      },
+      {
+        icon: "🧳",
+        title: "Tu configuración viaja bien",
+        notes: [
+          "Si importas tu configuración en otro PC y un programa vive en otra ruta, Ajustes lo marca con «No encontrado» y te deja reasignar su ubicación en dos clics.",
+        ],
+      },
+      {
+        icon: "⌨️",
+        title: "Detalles",
+        notes: [
+          "El modificador de los atajos 1…9 ahora se compone con fichas (Ctrl, Alt, Shift, Win) en la combinación que quieras.",
+          "Iconos del dock a 36px por defecto, y el widget de música pasa a llamarse «Media» (es cualquier reproducción).",
+          "Nueva sección «Proyecto libre» en Acerca de — Booki es open source hecho con cariño; si quieres apoyar, hay direcciones de donación.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2 jul 2026",
     headline: "Atajos de teclado, mover archivos a carpetas y un arrastre que se siente de verdad.",

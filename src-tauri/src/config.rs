@@ -54,7 +54,7 @@ fn default_theme() -> String {
     "system".into()
 }
 fn default_icon_size() -> u32 {
-    48
+    36
 }
 fn default_zoom() -> f32 {
     1.25
@@ -85,6 +85,12 @@ fn default_hide_delay() -> u32 {
 }
 fn default_notch_position() -> String {
     "center".into()
+}
+fn default_notch_edge() -> String {
+    "auto".into()
+}
+fn default_notch_style() -> String {
+    "island".into()
 }
 fn default_anim() -> String {
     "spring".into()
@@ -141,6 +147,12 @@ pub struct Config {
     /// Notch "peek" style — sits at the very edge like a tab, less intrusive.
     #[serde(default = "default_true")]
     pub notch_peek: bool,
+    /// Edge the notch lives on: "auto" (same as the dock) or a specific edge.
+    #[serde(default = "default_notch_edge")]
+    pub notch_edge: String,
+    /// Notch visual style: "island" | "liquid" | "mica" | "acrylic" | "windows".
+    #[serde(default = "default_notch_style")]
+    pub notch_style: String,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
     /// Magnify animation style: "spring" | "smooth" | "off".
@@ -202,6 +214,8 @@ impl Default for Config {
             auto_hide_delay: default_hide_delay(),
             notch_position: default_notch_position(),
             notch_peek: true,
+            notch_edge: default_notch_edge(),
+            notch_style: default_notch_style(),
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),
@@ -251,6 +265,15 @@ pub fn load() -> Config {
     if cfg.settings_rev < 3 {
         cfg.magnification = false;
         cfg.settings_rev = 3;
+        let _ = save(&cfg);
+    }
+    // rev 4: the default icon size dropped 48 → 36. Only migrate installs still
+    // on the old default (a hand-picked 48 was never distinguishable from it).
+    if cfg.settings_rev < 4 {
+        if cfg.icon_size == 48 {
+            cfg.icon_size = 36;
+        }
+        cfg.settings_rev = 4;
         let _ = save(&cfg);
     }
     cfg

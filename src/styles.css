@@ -468,7 +468,10 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: min(520px, 92vw);
+  /* Intrinsic width: the coach must NOT be measured against the (possibly tiny)
+     dock window, or the window never grows enough and the text shatters. */
+  width: 430px;
+  box-sizing: border-box;
   padding: 10px 14px;
   border-radius: var(--r-pill);
   background: var(--layer-strong);
@@ -634,38 +637,83 @@ body.notch-body.peek .notch-pill::after {
   height: 9px;
   pointer-events: none;
 }
+/* The fillet squares OVERLAP the pill by 1px (-8 offset for a 9px square) so
+   fractional DPI scaling (125/150%) can't open a seam between curve and pill. */
+body.notch-body.peek .notch-pill::before,
+body.notch-body.peek .notch-pill::after { width: 10px; height: 10px; }
 body.notch-body.peek.edge-bottom .notch-pill::before {
-  left: -9px; bottom: 0;
-  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+  left: -8px; bottom: 0;
+  background: radial-gradient(circle 10px at 0 0, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-bottom .notch-pill::after {
-  right: -9px; bottom: 0;
-  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+  right: -8px; bottom: 0;
+  background: radial-gradient(circle 10px at 100% 0, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-top .notch-pill::before {
-  left: -9px; top: 0;
-  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+  left: -8px; top: 0;
+  background: radial-gradient(circle 10px at 0 100%, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-top .notch-pill::after {
-  right: -9px; top: 0;
-  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+  right: -8px; top: 0;
+  background: radial-gradient(circle 10px at 100% 100%, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-left .notch-pill::before {
-  top: -9px; left: 0;
-  background: radial-gradient(circle 9px at 100% 0, transparent 8.5px, var(--glass) 9px);
+  top: -8px; left: 0;
+  background: radial-gradient(circle 10px at 100% 0, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-left .notch-pill::after {
-  bottom: -9px; left: 0;
-  background: radial-gradient(circle 9px at 100% 100%, transparent 8.5px, var(--glass) 9px);
+  bottom: -8px; left: 0;
+  background: radial-gradient(circle 10px at 100% 100%, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-right .notch-pill::before {
-  top: -9px; right: 0;
-  background: radial-gradient(circle 9px at 0 0, transparent 8.5px, var(--glass) 9px);
+  top: -8px; right: 0;
+  background: radial-gradient(circle 10px at 0 0, transparent 9px, var(--glass) 9.5px);
 }
 body.notch-body.peek.edge-right .notch-pill::after {
-  bottom: -9px; right: 0;
-  background: radial-gradient(circle 9px at 0 100%, transparent 8.5px, var(--glass) 9px);
+  bottom: -8px; right: 0;
+  background: radial-gradient(circle 10px at 0 100%, transparent 9px, var(--glass) 9.5px);
 }
+
+/* ───────────── Notch visual styles (island is the default look) ───────────── */
+/* Liquid glass: bright, saturated, watery highlight. */
+body.notch-body.style-liquid .notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.30));
+  background:
+    radial-gradient(120% 220% at 30% -60%, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.05) 60%),
+    var(--glass);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.12);
+}
+/* Mica: calm, near-opaque neutral tint — no glow, no drama. */
+body.notch-body.style-mica .notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 10%, rgba(58, 58, 64, 0.96));
+  background: var(--glass);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+/* Acrylic: milky translucency with a faint sheen. */
+body.notch-body.style-acrylic .notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 12%, rgba(160, 160, 170, 0.45));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08)),
+    var(--glass);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+/* Windows: squared taskbar-style tab with an accent underline. */
+body.notch-body.style-windows .notch-pill,
+body.notch-body.style-windows.peek .notch-pill {
+  --glass: rgba(32, 32, 36, 0.9);
+  border-radius: 4px 4px 0 0;
+  background: var(--glass);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 2px 0 var(--accent), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+body.notch-body.style-windows .notch-pill::before,
+body.notch-body.style-windows .notch-pill::after { display: none; }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
 body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
@@ -931,8 +979,21 @@ body.edge-right.show-labels .tile:hover .label { transform: translateY(50%) tran
 body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 
 /* Empty-state hint */
-.tile.hint { cursor: default; opacity: 0.9; animation: booki-breathe 2.6s var(--ease) infinite; }
-.tile.hint img { opacity: 0.85; }
+.tile.hint { cursor: pointer; opacity: 0.95; animation: booki-breathe 2.6s var(--ease) infinite; }
+/* Empty-dock "+" tile: a friendly dashed add button that opens Settings. */
+.hint-plus {
+  display: grid;
+  place-items: center;
+  width: 82%;
+  height: 82%;
+  color: var(--accent);
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--tile-r, 12px);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+}
+.hint-plus svg { width: 55%; height: 55%; }
+.tile.hint:hover .hint-plus { background: color-mix(in srgb, var(--accent) 20%, transparent); transform: scale(1.06); }
 @keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
 /* While dragging, the in-bar tile is just the ghost slot — the floating
@@ -1408,25 +1469,26 @@ select {
 .seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Edge picker (mini screen) */
-/* Notch position picker: a mini screen with the taskbar and three clickable
-   tab slots along the dock's anchored edge. What you click is what you get. */
+/* Notch position picker: a mini screen with clickable tab slots on ALL FOUR
+   edges (3 per edge). One click = edge + position. The strip marks where the
+   dock currently lives. */
 .notchpick { display: flex; justify-content: flex-end; }
 .notchpick-screen {
   position: relative;
-  width: 210px;
-  height: 96px;
+  width: 220px;
+  height: 128px;
   border-radius: var(--r-md);
   border: 1px solid var(--stroke);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--layer)), var(--layer));
   overflow: hidden;
 }
-/* The "taskbar" strip on the anchored edge. */
-.notchpick-bar { position: absolute; background: color-mix(in srgb, var(--ink) 22%, transparent); }
-.np-edge-bottom .notchpick-bar { left: 0; right: 0; bottom: 0; height: 12px; }
-.np-edge-top .notchpick-bar { left: 0; right: 0; top: 0; height: 12px; }
-.np-edge-left .notchpick-bar { top: 0; bottom: 0; left: 0; width: 12px; }
-.np-edge-right .notchpick-bar { top: 0; bottom: 0; right: 0; width: 12px; }
-/* Three generous click targets along that edge. */
+/* The dock's own edge, marked as a faint strip. */
+.notchpick-bar { position: absolute; background: color-mix(in srgb, var(--ink) 16%, transparent); pointer-events: none; }
+.npb-bottom { left: 0; right: 0; bottom: 0; height: 10px; }
+.npb-top { left: 0; right: 0; top: 0; height: 10px; }
+.npb-left { top: 0; bottom: 0; left: 0; width: 10px; }
+.npb-right { top: 0; bottom: 0; right: 0; width: 10px; }
+/* Click targets: 3 slots per edge. */
 .notchpick-slot {
   position: absolute;
   display: grid;
@@ -1436,37 +1498,146 @@ select {
   cursor: pointer;
   padding: 0;
 }
-.np-edge-bottom .notchpick-slot, .np-edge-top .notchpick-slot { width: 33.3%; height: 40px; }
-.np-edge-bottom .notchpick-slot { bottom: 0; }
-.np-edge-top .notchpick-slot { top: 0; }
-.np-edge-bottom .nps-start, .np-edge-top .nps-start { left: 0; }
-.np-edge-bottom .nps-center, .np-edge-top .nps-center { left: 33.3%; }
-.np-edge-bottom .nps-end, .np-edge-top .nps-end { left: 66.6%; }
-.np-edge-left .notchpick-slot, .np-edge-right .notchpick-slot { height: 33.3%; width: 40px; }
-.np-edge-left .notchpick-slot { left: 0; }
-.np-edge-right .notchpick-slot { right: 0; }
-.np-edge-left .nps-start, .np-edge-right .nps-start { top: 0; }
-.np-edge-left .nps-center, .np-edge-right .nps-center { top: 33.3%; }
-.np-edge-left .nps-end, .np-edge-right .nps-end { top: 66.6%; }
+.npe-bottom, .npe-top { width: 26%; height: 30px; }
+.npe-bottom { bottom: 0; }
+.npe-top { top: 0; }
+.npe-bottom.nps-start, .npe-top.nps-start { left: 8%; }
+.npe-bottom.nps-center, .npe-top.nps-center { left: 37%; }
+.npe-bottom.nps-end, .npe-top.nps-end { left: 66%; }
+.npe-left, .npe-right { height: 26%; width: 30px; }
+.npe-left { left: 0; }
+.npe-right { right: 0; }
+.npe-left.nps-start, .npe-right.nps-start { top: 8%; }
+.npe-left.nps-center, .npe-right.nps-center { top: 37%; }
+.npe-left.nps-end, .npe-right.nps-end { top: 66%; }
 /* The little tab inside each slot — ghosted until chosen. */
 .notchpick-tab {
-  width: 34px;
-  height: 8px;
-  border-radius: 6px 6px 0 0;
-  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  width: 30px;
+  height: 7px;
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
   transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
 }
-.np-edge-bottom .notchpick-tab { margin-top: auto; margin-bottom: 12px; }
-.np-edge-top .notchpick-tab { margin-bottom: auto; margin-top: 12px; border-radius: 0 0 6px 6px; }
-.np-edge-left .notchpick-tab, .np-edge-right .notchpick-tab { width: 8px; height: 34px; }
-.np-edge-left .notchpick-tab { margin-right: auto; margin-left: 12px; border-radius: 0 6px 6px 0; }
-.np-edge-right .notchpick-tab { margin-left: auto; margin-right: 12px; border-radius: 6px 0 0 6px; }
+.npe-bottom .notchpick-tab { margin-top: auto; margin-bottom: 3px; border-radius: 6px 6px 0 0; }
+.npe-top .notchpick-tab { margin-bottom: auto; margin-top: 3px; border-radius: 0 0 6px 6px; }
+.npe-left .notchpick-tab, .npe-right .notchpick-tab { width: 7px; height: 30px; }
+.npe-left .notchpick-tab { margin-right: auto; margin-left: 3px; border-radius: 0 6px 6px 0; }
+.npe-right .notchpick-tab { margin-left: auto; margin-right: 3px; border-radius: 6px 0 0 6px; }
 .notchpick-slot:hover .notchpick-tab { background: color-mix(in srgb, var(--accent) 45%, transparent); }
 .notchpick-slot.active .notchpick-tab {
   background: var(--accent);
-  transform: scale(1.15);
+  transform: scale(1.2);
   box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
 }
+
+/* Notch style chips: mini pill previews. */
+.nstyle-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.nstyle-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px 6px;
+  background: var(--layer);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.nstyle-chip:hover { background: var(--hover); }
+.nstyle-chip.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.nstyle-name { font: 600 10.5px var(--font); color: var(--ink-2); }
+.nstyle-chip.active .nstyle-name { color: var(--accent-deep, var(--accent)); }
+.nstyle-pill { width: 42px; height: 10px; border-radius: 999px; }
+.ns-island {
+  background: radial-gradient(130% 200% at 50% -50%, rgba(255,255,255,0.3), transparent 58%),
+    color-mix(in srgb, var(--accent) 16%, rgba(15,15,20,0.8));
+  border: 1px solid rgba(255,255,255,0.25);
+}
+.ns-liquid {
+  background: radial-gradient(120% 220% at 30% -60%, rgba(255,255,255,0.7), transparent 60%),
+    color-mix(in srgb, var(--accent) 30%, rgba(255,255,255,0.3));
+  border: 1px solid rgba(255,255,255,0.6);
+}
+.ns-mica { background: color-mix(in srgb, var(--accent) 10%, rgba(58,58,64,0.96)); border: 1px solid rgba(255,255,255,0.15); }
+.ns-acrylic {
+  background: linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.08)),
+    color-mix(in srgb, var(--accent) 12%, rgba(160,160,170,0.45));
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.ns-windows { border-radius: 3px; background: rgba(32,32,36,0.9); box-shadow: inset 0 2px 0 var(--accent); }
+
+/* Modifier chips for the position hotkeys. */
+.mod-row { display: flex; gap: 6px; }
+.mod-chip {
+  font: 600 12.5px var(--font);
+  color: var(--ink-2);
+  padding: 7px 13px;
+  background: var(--track);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.mod-chip.active {
+  color: var(--accent-contrast, #fff);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Missing-path pill on a pinned item (moved / uninstalled / imported config). */
+.pin-missing {
+  flex: 0 0 auto;
+  font: 700 10.5px var(--font);
+  color: #b25c00;
+  background: color-mix(in srgb, #ffab40 22%, transparent);
+  border: 1px solid color-mix(in srgb, #ffab40 45%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+[data-theme="dark"] .pin-missing { color: #ffc46b; }
+
+/* Donations (About): free project made with love. */
+.donate { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.donate-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
+  background: var(--layer);
+  border: 1px solid var(--stroke);
+}
+.donate-ico {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+.donate-ico.btc { background: #f7931a; }
+.donate-ico.sol { background: linear-gradient(135deg, #9945ff, #14f195); }
+.donate-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.donate-col strong { font-size: 13px; }
+.donate-col code { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+
+/* First-run tips card (empty pinned list). */
+.s-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--accent) 8%, var(--layer));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--stroke));
+}
+.s-tip { display: flex; align-items: baseline; gap: 9px; font: 500 13px var(--font); color: var(--ink); }
+.s-tip span:first-child { flex: 0 0 auto; }
 
 .edgepick { display: flex; justify-content: flex-end; }
 .edgepick-screen {
@@ -1706,9 +1877,8 @@ select {
 .tile:hover img,
 .tile:hover .glyph { transform: translateY(-1px); }
 
-.s-navitem.active {
-  background: color-mix(in srgb, var(--accent) 14%, var(--hover));
-}
+/* The sliding indicator pill is the ONLY active highlight — a static background
+   here doubled up with it mid-transition (two tabs looked selected at once). */
 .s-content h1 { letter-spacing: -0.01em; }
 .s-card { transition: box-shadow 0.18s ease; }
 .s-btn {

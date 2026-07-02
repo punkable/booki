@@ -14,6 +14,7 @@ import {
   emitConfigChanged,
   onConfigChanged,
   onShowChangelog,
+  onShowTab,
   closeSelf,
   logMessage,
 } from "./api.js";
@@ -190,28 +191,79 @@ function EdgePicker({ value, onChange }) {
   );
 }
 
-// Pick where the notch sits along the dock's edge — a mini screen diagram with
-// three clickable tabs on the anchored edge (way clearer than "start/center/end").
+// Pick where the notch lives — a mini screen diagram with clickable tab slots
+// on ALL FOUR edges (3 per edge). One click sets edge + position at once.
 function NotchPicker({ cfg, set }) {
   const pos = cfg.notchPosition || "center";
-  const edge = cfg.edge || "bottom";
+  const dockEdge = cfg.edge || "bottom";
+  const activeEdge =
+    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : dockEdge;
+  const pick = (edge, position) =>
+    set({ notchEdge: edge === dockEdge ? "auto" : edge, notchPosition: position });
   return (
-    <div className={`notchpick np-edge-${edge}`}>
+    <div className="notchpick">
       <div className="notchpick-screen">
-        <span className="notchpick-bar" aria-hidden="true" />
-        {["start", "center", "end"].map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`notchpick-slot nps-${s}` + (pos === s ? " active" : "")}
-            onClick={() => set({ notchPosition: s })}
-            title={t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}
-            aria-label={t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}
-          >
-            <span className="notchpick-tab" />
-          </button>
-        ))}
+        <span className={`notchpick-bar npb-${dockEdge}`} aria-hidden="true" />
+        {["top", "bottom", "left", "right"].flatMap((edge) =>
+          ["start", "center", "end"].map((s) => (
+            <button
+              key={`${edge}-${s}`}
+              type="button"
+              className={
+                `notchpick-slot npe-${edge} nps-${s}` +
+                (activeEdge === edge && pos === s ? " active" : "")
+              }
+              onClick={() => pick(edge, s)}
+              title={`${t(`edge.${edge}`)} · ${t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}`}
+            >
+              <span className="notchpick-tab" />
+            </button>
+          ))
+        )}
       </div>
+    </div>
+  );
+}
+
+// Notch style chips: little live previews of each finish.
+const NOTCH_STYLES = ["island", "liquid", "mica", "acrylic", "windows"];
+function NotchStylePicker({ cfg, set }) {
+  const cur = cfg.notchStyle || "island";
+  return (
+    <div className="nstyle-row">
+      {NOTCH_STYLES.map((s) => (
+        <button key={s} type="button"
+          className={"nstyle-chip" + (cur === s ? " active" : "")}
+          onClick={() => set({ notchStyle: s })} title={t(`nstyle.${s}`)}>
+          <span className={`nstyle-pill ns-${s}`} />
+          <span className="nstyle-name">{t(`nstyle.${s}`)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Compose the position-hotkey modifier from Ctrl/Alt/Shift/Win chips.
+function ModifierPicker({ cfg, set }) {
+  const cur = (cfg.hotkeyModifier || "Alt").split("+");
+  const KEYS = ["Ctrl", "Alt", "Shift", "Super"];
+  const LABEL = { Ctrl: "Ctrl", Alt: "Alt", Shift: "Shift", Super: "Win" };
+  const toggle = (k) => {
+    let next = cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k];
+    if (!next.length) next = ["Alt"]; // at least one modifier always
+    const ordered = KEYS.filter((x) => next.includes(x)).join("+");
+    set({ hotkeyModifier: ordered });
+    dockApi.applyHotkeys(cfg.hotkey || "", cfg.positionHotkeys !== false, ordered);
+  };
+  return (
+    <div className="mod-row">
+      {KEYS.map((k) => (
+        <button key={k} type="button"
+          className={"mod-chip" + (cur.includes(k) ? " active" : "")}
+          onClick={() => toggle(k)}>
+          {LABEL[k]}
+        </button>
+      ))}
     </div>
   );
 }
@@ -566,6 +618,8 @@ function Appearance({ cfg, set }) {
     <>
       <h1>{t("ap.title")}</h1>
       <MiniDockPreview cfg={cfg} />
+
+      <h2 className="s-subhead">{t("gp.theme")}</h2>
       <Row label={t("ap.theme")}>
         <SegmentedControl
           value={cfg.theme || "system"}
@@ -575,17 +629,6 @@ function Appearance({ cfg, set }) {
             { value: "light", label: t("theme.light"), icon: "☀" },
             { value: "dark", label: t("theme.dark"), icon: "☾" },
             { value: "auto", label: t("theme.auto"), icon: "🕐" },
-          ]}
-        />
-      </Row>
-      <Row label={t("ap.language")}>
-        <SegmentedControl
-          value={cfg.language || "system"}
-          onChange={(v) => set({ language: v })}
-          options={[
-            { value: "system", label: t("lang.system") },
-            { value: "es", label: "ES" },
-            { value: "en", label: "EN" },
           ]}
         />
       </Row>
@@ -608,8 +651,10 @@ function Appearance({ cfg, set }) {
           ))}
         </div>
       </Row>
+
+      <h2 className="s-subhead">{t("gp.icons")}</h2>
       <Row label={t("ap.iconSize")}>
-        <Slider value={cfg.iconSize} min={32} max={80} step={4} fmt={(v) => `${v}px`}
+        <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
           onChange={(v) => set({ iconSize: v })} />
       </Row>
       <Row label={t("ap.spacing")}>
@@ -620,10 +665,25 @@ function Appearance({ cfg, set }) {
         <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
           onChange={(v) => set({ cornerRadius: v })} />
       </Row>
+
+      <h2 className="s-subhead">{t("gp.material")}</h2>
       <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
+      </Row>
+
+      <h2 className="s-subhead">{t("gp.general")}</h2>
+      <Row label={t("ap.language")}>
+        <SegmentedControl
+          value={cfg.language || "system"}
+          onChange={(v) => set({ language: v })}
+          options={[
+            { value: "system", label: t("lang.system") },
+            { value: "es", label: "ES" },
+            { value: "en", label: "EN" },
+          ]}
+        />
       </Row>
       <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
         <div className="s-actions" style={{ margin: 0 }}>
@@ -654,6 +714,8 @@ function Behavior({ cfg, set }) {
     <>
       <h1>{t("be.title")}</h1>
       <MiniDockPreview cfg={cfg} />
+
+      <h2 className="s-subhead">{t("gp.dock")}</h2>
       <Row label={t("be.edge")}>
         <EdgePicker value={cfg.edge || "bottom"} onChange={(v) => set({ edge: v })} />
       </Row>
@@ -661,6 +723,33 @@ function Behavior({ cfg, set }) {
         <MonitorPicker value={cfg.monitor} monitors={monitors}
           onChange={(v) => set({ monitor: v })} />
       </Row>
+      <Row label={t("be.autoHide")}>
+        <SegmentedControl
+          value={cfg.autoHideMode || "smart"}
+          onChange={(v) => set({ autoHideMode: v })}
+          options={[
+            { value: "off", label: t("hide.offShort") },
+            { value: "smart", label: t("hide.smartShort") },
+            { value: "edge", label: t("hide.edgeShort") },
+          ]}
+        />
+      </Row>
+
+      {cfg.autoHideMode !== "off" && (
+        <>
+          <h2 className="s-subhead">{t("gp.notch")}</h2>
+          <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
+            <NotchPicker cfg={cfg} set={set} />
+          </Row>
+          <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
+            <NotchStylePicker cfg={cfg} set={set} />
+          </Row>
+          <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
+            onChange={(v) => set({ notchPeek: v })} />
+        </>
+      )}
+
+      <h2 className="s-subhead">{t("gp.icons")}</h2>
       <Row label={t("be.anim")}>
         <SegmentedControl
           value={cfg.magnifyStyle || "spring"}
@@ -681,30 +770,12 @@ function Behavior({ cfg, set }) {
             fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
         </Row>
       )}
-      <Row label={t("be.autoHide")}>
-        <SegmentedControl
-          value={cfg.autoHideMode || "smart"}
-          onChange={(v) => set({ autoHideMode: v })}
-          options={[
-            { value: "off", label: t("hide.offShort") },
-            { value: "smart", label: t("hide.smartShort") },
-            { value: "edge", label: t("hide.edgeShort") },
-          ]}
-        />
-      </Row>
-      {cfg.autoHideMode !== "off" && (
-        <>
-          <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
-            <NotchPicker cfg={cfg} set={set} />
-          </Row>
-          <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
-            onChange={(v) => set({ notchPeek: v })} />
-        </>
-      )}
       <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
         onChange={(v) => set({ showLabels: v })} />
       <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
         onChange={(v) => set({ showIndicators: v })} />
+
+      <h2 className="s-subhead">{t("gp.system")}</h2>
       <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <Toggle label={t("be.autostart")} checked={autostart}
@@ -958,6 +1029,40 @@ function Apps({ cfg, set }) {
     window.addEventListener("pointerup", onUp, { once: true });
   };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
+  // Flag pins whose target doesn't exist on THIS machine (moved, uninstalled,
+  // or config imported from another PC) and offer to reassign the path.
+  const [missing, setMissing] = useState({});
+  useEffect(() => {
+    const items = [];
+    for (const p of cfg.pinned) {
+      if (p.path && (p.kind === "app" || p.kind === "folder")) items.push([p.id, p.path]);
+      for (const c of p.children || []) if (c.path) items.push([c.id, c.path]);
+    }
+    if (!items.length) {
+      setMissing({});
+      return;
+    }
+    let alive = true;
+    dockApi
+      .pathsExist(items.map(([, pth]) => pth))
+      .then((flags) => {
+        if (!alive || !Array.isArray(flags)) return;
+        const m = {};
+        items.forEach(([id], i) => {
+          if (!flags[i]) m[id] = true;
+        });
+        setMissing(m);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [cfg.pinned]);
+  const reassign = async (i) => {
+    const item = cfg.pinned[i];
+    const pth = item.kind === "folder" ? await pickFolder() : await pickAppFile();
+    if (pth) set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, path: pth } : p)) });
+  };
   const addApp = async () => {
     const path = await pickAppFile();
     if (path) set({ pinned: [...cfg.pinned, mkApp(path)] });
@@ -1019,6 +1124,13 @@ function Apps({ cfg, set }) {
     <>
       <h1>{t("apps.title")}</h1>
       <p className="muted">{t("apps.hint")}</p>
+      {cfg.pinned.length === 0 && (
+        <div className="s-tips">
+          <div className="s-tip"><span>🖱️</span>{t("apps.tips1")}</div>
+          <div className="s-tip"><span>⭐</span>{t("apps.tips2")}</div>
+          <div className="s-tip"><span>🧩</span>{t("apps.tips3")}</div>
+        </div>
+      )}
       <ul className="pin-list" ref={listRef}>
         {cfg.pinned.length === 0 && <li className="pin-empty">{t("apps.empty")}</li>}
         {cfg.pinned.flatMap((item, i) => {
@@ -1047,6 +1159,9 @@ function Apps({ cfg, set }) {
                     {item.kind === "separator" ? t("apps.sep") : item.name}
                   </span>
                 )}
+                {missing[item.id] && (
+                  <span className="pin-missing" title={t("apps.missing")}>⚠ {t("apps.missingShort")}</span>
+                )}
                 {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
               </span>
               <span className="pin-actions">
@@ -1054,6 +1169,9 @@ function Apps({ cfg, set }) {
                 {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
                 {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                   <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
+                )}
+                {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
+                  <IconBtn name="pencil" title={t("apps.reassign")} onClick={() => reassign(i)} />
                 )}
                 {(item.kind === "app" || item.kind === "folder") && (
                   <IconBtn name="external" title={t("apps.openLoc")} onClick={() => dockApi.openLocation(item.path)} />
@@ -1183,19 +1301,8 @@ function Shortcuts({ cfg, set }) {
           dockApi.applyHotkeys(cfg.hotkey || "", v, cfg.hotkeyModifier || "Alt");
         }} />
       {cfg.positionHotkeys !== false && (
-        <Row label={t("sc.posMod")} hint={t("sc.posHint").replace("{mod}", cfg.hotkeyModifier || "Alt")}>
-          <SegmentedControl
-            value={cfg.hotkeyModifier || "Alt"}
-            onChange={(v) => {
-              set({ hotkeyModifier: v });
-              dockApi.applyHotkeys(cfg.hotkey || "", true, v);
-            }}
-            options={[
-              { value: "Alt", label: "Alt" },
-              { value: "Ctrl+Alt", label: "Ctrl+Alt" },
-              { value: "Alt+Shift", label: "Alt+Shift" },
-            ]}
-          />
+        <Row label={t("sc.posMod")} hint={t("sc.posHint").replace("{mod}", (cfg.hotkeyModifier || "Alt").replace("Super", "Win"))}>
+          <ModifierPicker cfg={cfg} set={set} />
         </Row>
       )}
       <div className="s-card-inner">
@@ -1223,6 +1330,46 @@ function capybaraParade() {
     document.body.appendChild(c);
     setTimeout(() => c.remove(), 4200);
   }
+}
+
+const DONATE = [
+  { key: "btc", name: "Bitcoin", glyph: "₿", cls: "btc",
+    addr: "bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3" },
+  { key: "sol", name: "Solana", glyph: "◎", cls: "sol",
+    addr: "JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W" },
+];
+
+function DonateCard() {
+  const [copied, setCopied] = useState("");
+  const copy = async (d) => {
+    try {
+      await navigator.clipboard.writeText(d.addr);
+      setCopied(d.key);
+      setTimeout(() => setCopied(""), 1600);
+    } catch (_) {}
+  };
+  const short = (a) => `${a.slice(0, 8)}…${a.slice(-6)}`;
+  return (
+    <div className="s-card-inner">
+      <h3>{t("ab.free")}</h3>
+      <p className="muted">{t("ab.freeText")}</p>
+      <p className="muted">{t("ab.donateHint")}</p>
+      <div className="donate">
+        {DONATE.map((d) => (
+          <div key={d.key} className="donate-row">
+            <span className={`donate-ico ${d.cls}`}>{d.glyph}</span>
+            <span className="donate-col">
+              <strong>{d.name}</strong>
+              <code title={d.addr}>{short(d.addr)}</code>
+            </span>
+            <button className="s-btn s-btn-soft" onClick={() => copy(d)}>
+              {copied === d.key ? t("ab.copied") : t("ab.copy")}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function About({ version, onWhatsNew }) {
@@ -1292,6 +1439,8 @@ function About({ version, onWhatsNew }) {
       </div>
       {partying && <p className="s-egg">🦫 {t("ab.egg")} 🦫</p>}
 
+      <DonateCard />
+
       <div className="s-card-inner">
         <h3>{t("ab.updates")}</h3>
         {status === "available" ? (
@@ -1340,9 +1489,18 @@ function App() {
   // as an event while the window is open.
   useEffect(() => {
     let un;
+    let un2;
     dockApi.takePendingChangelog().then((v) => v && setShowChangelog(true)).catch(() => {});
     onShowChangelog(() => setShowChangelog(true)).then((u) => (un = u));
-    return () => un && un();
+    // The dock can ask us to open on a specific tab (e.g. the empty-dock "+").
+    const showTab = () =>
+      dockApi.takePendingTab().then((tb) => tb && setTab(tb)).catch(() => {});
+    showTab();
+    onShowTab(showTab).then((u) => (un2 = u));
+    return () => {
+      un && un();
+      un2 && un2();
+    };
   }, []);
 
   useEffect(() => {
