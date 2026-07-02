@@ -67,3 +67,11 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
 pub fn media_toggle() -> bool {
     false
 }
+
+pub fn media_next() -> bool {
+    false
+}
+
+pub fn media_prev() -> bool {
+    false
+}

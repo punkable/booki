@@ -951,6 +951,7 @@ function Apps({ cfg, set }) {
   const addSep = () =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
   const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
+  const [moreOpen, setMoreOpen] = useState(false);
   const addTrash = () =>
     !hasTrash &&
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
@@ -1067,11 +1068,23 @@ function Apps({ cfg, set }) {
       </ul>
       <div className="s-actions">
         <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
-        <button className="s-btn s-btn-soft" onClick={addFolder}>{t("apps.addFolder")}</button>
-        <button className="s-btn s-btn-soft" onClick={newFolder}>{t("apps.newFolder")}</button>
-        <button className="s-btn s-btn-soft" onClick={addSep}>{t("apps.addSep")}</button>
-        <button className="s-btn s-btn-soft" onClick={addTrash} disabled={hasTrash}
-          title={t("apps.trashHint")}>{t("apps.addTrash")}</button>
+        <div className="s-more">
+          <button className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
+            onClick={() => setMoreOpen((v) => !v)}>
+            <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("settings") }} />
+            <span>{t("apps.more")}</span>
+          </button>
+          {moreOpen && (
+            <div className="s-more-menu" onClick={() => setMoreOpen(false)}>
+              <button onClick={addFolder}>{t("apps.addFolder")}</button>
+              <button onClick={newFolder}>{t("apps.newFolder")}</button>
+              <button onClick={addSep}>{t("apps.addSep")}</button>
+              <button onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
+                {t("apps.addTrash")}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <h2 className="s-subhead">{t("apps.widgets")}</h2>
       <p className="muted">{t("apps.widgetsHint")}</p>
@@ -1211,7 +1224,11 @@ function About({ version, onWhatsNew }) {
           onClick={bumpEgg}
         />
         <div>
-          <strong>Booki Dock</strong> <span className="s-ver">v{version}</span>{" "}
+          <span className="s-about-word">
+            <img className="brand-word word-black" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
+            <img className="brand-word word-white" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
+          </span>{" "}
+          <span className="s-ver">v{version}</span>{" "}
           <span className="s-beta">BETA</span>
           <p className="muted" style={{ marginTop: 4 }}>{t("ab.tagline")}</p>
         </div>
@@ -1343,7 +1360,8 @@ function App() {
       <aside className="s-sidebar">
         <div className="s-brand">
           <img src="/brand/svg/isotype.svg" alt="" />
-          <span>Booki</span>
+          <img className="brand-word word-black" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
+          <img className="brand-word word-white" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
         </div>
         <div className="s-search">
           <input

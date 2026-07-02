@@ -9,7 +9,17 @@
 <p align="center"><em>Beta — updated often. Only the latest release is kept downloadable; the in-app updater keeps you current.</em></p>
 
 <p align="center">
-  <img src="assets/screenshots/dock.png" alt="Booki Dock preview" width="620" />
+  <img src="assets/screenshots/dock.png" alt="Booki Dock — the bar with apps, widgets and the trash pin" width="720" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/folder.png" alt="Folder flyout" width="405" />
+  <img src="assets/screenshots/settings.png" alt="Settings window" width="300" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/notch.png" alt="The notch — a slim glass tab blended into the taskbar" width="220" /><br/>
+  <sub>The <em>notch</em>: when the dock tucks away, this little glass tab stays blended into the taskbar edge.</sub>
 </p>
 
 ---
