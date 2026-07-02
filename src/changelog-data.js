@@ -3,6 +3,46 @@
 
 export const CHANGELOG = [
   {
+    version: "0.7.1",
+    date: "2 jul 2026",
+    headline: "Se acabó la ventana blanca, y las carpetas estrenan interior.",
+    sections: [
+      {
+        icon: "🛠️",
+        title: "Arreglado a fondo",
+        notes: [
+          "Abrir Ajustes o las novedades ya no puede congelar la app (era un bloqueo interno al crear la ventana; eliminado de raíz).",
+          "El notch ya no se dibuja por encima de la barra de tareas: queda pegado a ella, como una pestañita.",
+          "Ahora puedes arrastrar archivos a la papelera aunque el dock esté escondido: acerca el arrastre al notch y el dock aparece solo.",
+        ],
+      },
+      {
+        icon: "🗂️",
+        title: "Carpetas renovadas por dentro",
+        notes: [
+          "Cabecera clara con icono, nombre editable y botón de cerrar.",
+          "Se quitó el botón de desagrupar que confundía (sigue en el clic derecho).",
+          "Celdas más grandes y limpias; sacar un elemento aparece solo al pasar el cursor.",
+        ],
+      },
+      {
+        icon: "🛡️",
+        title: "Papelera más honesta",
+        notes: [
+          "El aviso siempre aclara que todo va a la Papelera de reciclaje (recuperable).",
+          "Si Windows Defender bloquea un borrado, Booki te lo explica y te dice cómo permitirlo — es una falsa alarma, no un virus.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Ajustes más intuitivos",
+        notes: [
+          "Iconos en el menú lateral y botón «Ver novedades» en Acerca de.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.7.0",
     date: "1 jul 2026",
     headline: "Llega la papelera al dock: arrastra, confirma y fuera.",

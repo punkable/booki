@@ -82,6 +82,8 @@ jobs:
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 
+            **SmartScreen / Defender note:** this beta isn't signed with a commercial certificate yet, so Windows may show "Windows protected your PC" — choose *More info → Run anyway*. Booki only touches its own folder, your dock settings and the per-user startup entry; deletions from the dock's trash go to the Recycle Bin (recoverable). If Defender's *Controlled folder access* blocks a delete, allow Booki in Windows Security → Ransomware protection.
+
             Created by **Punkable** ([GitHub](https://github.com/punkable) · [@Punkabl3 on X](https://x.com/Punkabl3)).
 
             > Beta build — only the latest version is kept available. The in-app updater keeps you current.
