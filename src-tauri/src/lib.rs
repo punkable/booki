@@ -25,6 +25,10 @@ use std::sync::Mutex;
 /// URL (a hash in the app URL made the window come up blank on Windows).
 static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 
+/// Tab the settings window should open on (e.g. "apps" from the empty dock's
+/// "+" tile). Same read-and-clear pattern as PENDING_CHANGELOG.
+static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
+
 // ─────────────────────────────── Commands ───────────────────────────────
 
 #[tauri::command]
@@ -396,6 +400,24 @@ fn take_pending_changelog() -> bool {
     PENDING_CHANGELOG.swap(false, Ordering::Relaxed)
 }
 
+/// Open settings directly on a specific tab (e.g. "apps").
+#[tauri::command]
+async fn open_settings_tab(app: AppHandle, tab: String) {
+    *PENDING_TAB.lock().unwrap() = Some(tab);
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = app.emit("booki://show-tab", ());
+        let _ = w.set_focus();
+    } else {
+        open_settings_window(&app);
+    }
+}
+
+/// Read-and-clear the tab settings should show (asked on mount / on signal).
+#[tauri::command]
+fn take_pending_tab() -> Option<String> {
+    PENDING_TAB.lock().unwrap().take()
+}
+
 /// Export the current config to a JSON file the user picked.
 #[tauri::command]
 fn export_config(path: String) -> Result<(), String> {
@@ -408,9 +430,23 @@ fn export_config(path: String) -> Result<(), String> {
 #[tauri::command]
 fn import_config(path: String) -> Result<Config, String> {
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    // Machine-specific bits don't travel: the monitor layout of the exporting
+    // PC rarely matches this one (paths DO travel — settings flags the ones
+    // that don't exist here and offers to reassign them).
+    cfg.monitor = -1;
     config::save(&cfg)?;
     Ok(cfg)
+}
+
+/// Which of these paths exist on THIS machine (used after importing a config
+/// from another PC to flag pins whose program lives somewhere else here).
+#[tauri::command]
+fn paths_exist(paths: Vec<String>) -> Vec<bool> {
+    paths
+        .iter()
+        .map(|p| !p.is_empty() && std::path::Path::new(p).exists())
+        .collect()
 }
 
 /// Place the small notch window centered on the dock's anchored edge.
@@ -426,6 +462,12 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
     let cfg = config::load();
+    // The notch can live on its own edge ("auto" = follow the dock).
+    let edge: &str = if cfg.notch_edge == "auto" {
+        edge
+    } else {
+        cfg.notch_edge.as_str()
+    };
     let vertical = edge == "left" || edge == "right";
     // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
     // slightly larger pill with a small margin. The window must be a bit larger
@@ -983,8 +1025,11 @@ pub fn run() {
             set_dock_edge,
             open_changelog,
             take_pending_changelog,
+            open_settings_tab,
+            take_pending_tab,
             export_config,
             import_config,
+            paths_exist,
             image_data_uri,
             set_always_on_top,
             app_version,
