@@ -199,8 +199,10 @@ function NotchPicker({ cfg, set }) {
   const dockEdge = cfg.edge || "bottom";
   const activeEdge =
     cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : dockEdge;
-  const pick = (edge, position) =>
+  const pick = (edge, position) => {
     set({ notchEdge: edge === dockEdge ? "auto" : edge, notchPosition: position });
+    dockApi.notchPreview(); // flash the notch so the choice is visible right away
+  };
   return (
     <div className="notchpick">
       <div className="notchpick-screen">
@@ -235,7 +237,11 @@ function NotchStylePicker({ cfg, set }) {
       {NOTCH_STYLES.map((s) => (
         <button key={s} type="button"
           className={"nstyle-chip" + (cur === s ? " active" : "")}
-          onClick={() => set({ notchStyle: s })} title={t(`nstyle.${s}`)}>
+          onClick={() => {
+            set({ notchStyle: s });
+            dockApi.notchPreview(); // show the real notch with the new finish
+          }}
+          title={t(`nstyle.${s}`)}>
           <span className={`nstyle-pill ns-${s}`} />
           <span className="nstyle-name">{t(`nstyle.${s}`)}</span>
         </button>
@@ -754,7 +760,7 @@ function Behavior({ cfg, set }) {
             <NotchPicker cfg={cfg} set={set} />
           </Row>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
-            onChange={(v) => set({ notchPeek: v })} />
+            onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
         </>
       )}
 
@@ -1413,7 +1419,7 @@ function ResetZone({ onReset }) {
 }
 
 function About({ version, onWhatsNew, onReset }) {
-  const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|error
+  const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|installing|error
   const [update, setUpdate] = useState(null);
   const [pct, setPct] = useState(0);
 
@@ -1427,10 +1433,18 @@ function About({ version, onWhatsNew, onReset }) {
       setStatus("none");
     }
   };
+  // Check on arrival: the dock's "update available" pill lands here, so the
+  // install button must be waiting — not another "check for updates" click.
+  useEffect(() => {
+    check();
+  }, []);
   const install = async () => {
     setStatus("downloading");
     try {
-      await installUpdate(update, (p) => setPct(p.pct || 0));
+      await installUpdate(update, (p) => {
+        setPct(p.pct || 0);
+        if (p.phase === "install") setStatus("installing");
+      });
     } catch (e) {
       logMessage("error", `update install: ${e}`);
       setStatus("error");
@@ -1492,6 +1506,11 @@ function About({ version, onWhatsNew, onReset }) {
           <div className="upd-row">
             <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
             <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
+          </div>
+        ) : status === "installing" ? (
+          <div className="upd-row">
+            <span><img className="emo" src={emoSrc("sparkles")} alt="" width="16" height="16" /> <strong>{t("ab.installing")}</strong></span>
+            <div className="upd-bar"><i style={{ width: "100%" }} /></div>
           </div>
         ) : (
           <div className="upd-row">

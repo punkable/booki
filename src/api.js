@@ -312,6 +312,7 @@ export const dock = {
   mediaToggle: () => invoke("media_toggle"),
   mediaNext: () => invoke("media_next"),
   mediaPrev: () => invoke("media_prev"),
+  notchPreview: () => invoke("notch_preview"),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),
