@@ -68,13 +68,29 @@ async function boot() {
 }
 
 async function reloadConfig() {
+  const prev = cfg;
   cfg = await configApi.get();
   applyAll();
-  await render();
+  // Only rebuild the bar when the pinned items actually changed — sliders and
+  // toggles in Settings shouldn't make the whole dock flash.
+  const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
+  if (pinsChanged) {
+    await render();
+    startWidgetPoll();
+    startMediaPoll();
+  } else {
+    fitDock(); // size/spacing may still have changed
+  }
   reframe();
-  setupAutoHide();
-  startWidgetPoll();
-  startMediaPoll();
+  // Re-arming auto-hide resets the shown/hidden state; only do it when the
+  // behavior actually changed, so unrelated tweaks can't blink the dock.
+  const hideChanged =
+    !prev ||
+    prev.edge !== cfg.edge ||
+    (prev.autoHideMode || "") !== (cfg.autoHideMode || "") ||
+    prev.notchPeek !== cfg.notchPeek ||
+    prev.notchPosition !== cfg.notchPosition;
+  if (hideChanged) setupAutoHide();
 }
 
 function applyAll() {
@@ -118,16 +134,18 @@ async function persist() {
 // ──────────────────────────── Render ────────────────────────────
 
 async function render() {
-  dockEl.innerHTML = "";
-  for (const item of cfg.pinned) {
-    let tile;
-    if (item.kind === "separator") tile = separatorTile(item);
-    else if (item.kind === "group") tile = await groupTile(item);
-    else if (item.kind === "widget") tile = widgetTile(item);
-    else if (item.kind === "trash") tile = trashTile(item);
-    else tile = await appTile(item);
-    dockEl.appendChild(tile);
-  }
+  // Build every tile in parallel and swap the whole bar in ONE DOM operation —
+  // no icons popping in one by one, no empty-bar flash between renders.
+  const tiles = await Promise.all(
+    cfg.pinned.map((item) => {
+      if (item.kind === "separator") return separatorTile(item);
+      if (item.kind === "group") return groupTile(item);
+      if (item.kind === "widget") return widgetTile(item);
+      if (item.kind === "trash") return trashTile(item);
+      return appTile(item);
+    })
+  );
+  dockEl.replaceChildren(...tiles);
 
   // Friendly empty state — the bar stays clean (no +/gear chrome); users add
   // via drag-from-desktop or right-click.
@@ -499,11 +517,16 @@ async function addWidget(type) {
   reframe();
 }
 
+// Pinned pictures show their own thumbnail instead of a generic file icon.
+const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|webp|ico)$/i;
+
 async function resolveIcon(item) {
   if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
   if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
   if (iconCache.has(item.path)) return iconCache.get(item.path);
-  const uri = await dockApi.appIcon(item.path);
+  const uri = IMAGE_EXT.test(item.path || "")
+    ? (await dockApi.imageDataUri(item.path)) || (await dockApi.appIcon(item.path))
+    : await dockApi.appIcon(item.path);
   iconCache.set(item.path, uri);
   return uri;
 }
@@ -1103,9 +1126,12 @@ function openBackgroundMenu(e) {
 function placeMenu(e) {
   const cx = e.clientX;
   const cy = e.clientY;
+  // Measure invisibly, grow the window FIRST, then reveal in its final spot —
+  // one paint, no flicker from the window resizing under an already-visible menu.
+  ctxMenu.style.visibility = "hidden";
   ctxMenu.classList.remove("hidden");
   document.body.classList.add("menu-open");
-  reframe();
+  applyFrame();
   const put = () => {
     const dr = dockEl.getBoundingClientRect();
     const pad = 8;
@@ -1125,7 +1151,12 @@ function placeMenu(e) {
     }
   };
   put();
-  setTimeout(() => requestAnimationFrame(put), 120);
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      put();
+      ctxMenu.style.visibility = "";
+    });
+  }, 70);
 }
 function closeMenu() {
   if (ctxMenu.classList.contains("hidden")) return;
@@ -1430,9 +1461,10 @@ function closeTrashPop() {
 // Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never
 // on top of it — and grow the window so nothing gets clipped.
 function placePop(pop) {
+  pop.style.visibility = "hidden";
   document.body.appendChild(pop);
   document.body.classList.add("pop-open");
-  reframe();
+  applyFrame(); // grow the window before anything is visible
   const put = () => {
     const dr = dockEl.getBoundingClientRect();
     const gap = 12;
@@ -1449,9 +1481,14 @@ function placePop(pop) {
       else pop.style.bottom = `${dr.height + gap}px`;
     }
   };
-  // Position after the window has grown (reframe is debounced ~50ms + 2 rAF).
-  setTimeout(() => requestAnimationFrame(put), 120);
   put();
+  // Reveal only after the window has grown and the popover sits in place.
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      put();
+      pop.style.visibility = "";
+    });
+  }, 70);
 }
 
 function confirmTrash(paths, emptyBin = false) {

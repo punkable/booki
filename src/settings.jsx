@@ -374,6 +374,8 @@ function SuggIcon({ path, name }) {
 function Suggestions({ cfg, set }) {
   const [groups, setGroups] = useState(null);
   const [q, setQ] = useState("");
+  const [openGroups, setOpenGroups] = useState({}); // collapsed by default
+  const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
   useEffect(() => {
     dockApi.listInstalledApps().then((a) => setGroups(normalizeGroups(a)));
   }, []);
@@ -416,30 +418,52 @@ function Suggestions({ cfg, set }) {
       <p className="muted">{t("apps.suggestHint")}</p>
       <input className="sugg-search" placeholder={t("apps.search")} value={q}
         onChange={(e) => setQ(e.target.value)} />
-      {view.map((g, gi) => (
-        <div key={g.name || "general-" + gi} className="sugg-group">
-          {!ql && (
-            <div className="sugg-group-head">
-              <span className="sugg-group-name">{g.name || t("apps.suggestGeneral")}</span>
-              {g.name && g.items.length > 1 && (
-                <button className="sugg-group-add" onClick={() => addGroup(g)}>
-                  {t("apps.pinFolder")}
-                </button>
-              )}
-            </div>
-          )}
-          <div className="sugg-grid">{g.items.map(Tile)}</div>
-        </div>
-      ))}
+      {view.map((g, gi) => {
+        const key = g.name || "general-" + gi;
+        const open = ql || !!openGroups[key];
+        return (
+          <div key={key} className="sugg-group">
+            {!ql && (
+              <div className="sugg-group-head clickable" onClick={() => toggleGroup(key)}>
+                <span className="sugg-chevron" dangerouslySetInnerHTML={{ __html: icon(open ? "chevron-down" : "chevron-right") }} />
+                <span className="sugg-group-name">{g.name || t("apps.suggestGeneral")}</span>
+                <span className="sugg-count">{g.items.length}</span>
+                {g.name && g.items.length > 1 && (
+                  <button className="sugg-group-add"
+                    onClick={(e) => { e.stopPropagation(); addGroup(g); }}>
+                    {t("apps.pinFolder")}
+                  </button>
+                )}
+              </div>
+            )}
+            {open && <div className="sugg-grid">{g.items.map(Tile)}</div>}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // Accept either the new grouped shape ([{name, items}]) or a legacy flat list.
+// Tiny groups (a single app) merge into the general "Apps" bucket, and groups
+// come out alphabetized with the general bucket first — tidier to scan.
 function normalizeGroups(a) {
   if (!Array.isArray(a)) return [];
-  if (a.length && a[0] && Array.isArray(a[0].items)) return a.filter((g) => g.items && g.items.length);
-  return a.length ? [{ name: "", items: a }] : [];
+  let groups =
+    a.length && a[0] && Array.isArray(a[0].items)
+      ? a.filter((g) => g.items && g.items.length)
+      : a.length
+        ? [{ name: "", items: a }]
+        : [];
+  const general = { name: "", items: [] };
+  const real = [];
+  for (const g of groups) {
+    if (!g.name || g.items.length < 2) general.items.push(...g.items);
+    else real.push(g);
+  }
+  real.sort((x, y) => x.name.localeCompare(y.name));
+  general.items.sort((x, y) => x.name.localeCompare(y.name));
+  return general.items.length ? [general, ...real] : real;
 }
 
 function PinThumb({ item }) {
@@ -450,6 +474,9 @@ function PinThumb({ item }) {
       setSrc(resolveLibIcon(item.icon));
     } else if (item.icon) {
       setSrc(item.icon);
+    } else if (item.path && /\.(png|jpe?g|gif|bmp|webp|ico)$/i.test(item.path)) {
+      // Pinned pictures preview their own thumbnail.
+      dockApi.imageDataUri(item.path).then((u) => alive && u && setSrc(u));
     } else if (item.path) {
       dockApi.appIcon(item.path).then((u) => alive && setSrc(u));
     }
