@@ -595,6 +595,10 @@ body.edge-left .tile.widget.media .w-value, body.edge-right .tile.widget.media .
 .w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .w-ctl:active { transform: scale(0.9); }
 
+/* Volume card: muted reads at a glance (dimmed value + bar). */
+.tile.widget[data-widget="volume"].muted .w-value,
+.tile.widget[data-widget="volume"].muted .w-bar { opacity: 0.45; }
+
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */
@@ -981,12 +985,43 @@ body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; rig
 body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 
+/* Launch feedback: the icon bounces off its edge (twice, macOS-style) while
+   the app opens. Direction follows the anchored edge. */
 @keyframes booki-bounce {
-  0%, 100% { transform: translateY(0); }
-  35% { transform: translateY(-26px); }
-  60% { transform: translateY(-6px); }
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(0, -24px); }
+  44% { transform: translate(0, 0); }
+  62% { transform: translate(0, -10px); }
+  80% { transform: translate(0, 0); }
 }
-.tile.launching { animation: booki-bounce 0.55s var(--ease-bounce); }
+@keyframes booki-bounce-down {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(0, 24px); }
+  44% { transform: translate(0, 0); }
+  62% { transform: translate(0, 10px); }
+  80% { transform: translate(0, 0); }
+}
+@keyframes booki-bounce-right {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(24px, 0); }
+  44% { transform: translate(0, 0); }
+  62% { transform: translate(10px, 0); }
+  80% { transform: translate(0, 0); }
+}
+@keyframes booki-bounce-left {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-24px, 0); }
+  44% { transform: translate(0, 0); }
+  62% { transform: translate(-10px, 0); }
+  80% { transform: translate(0, 0); }
+}
+.tile.launching { animation: booki-bounce 0.9s var(--ease); }
+body.edge-top .tile.launching { animation-name: booki-bounce-down; }
+body.edge-left .tile.launching { animation-name: booki-bounce-right; }
+body.edge-right .tile.launching { animation-name: booki-bounce-left; }
+@media (prefers-reduced-motion: reduce) {
+  .tile.launching { animation: none; }
+}
 
 /* Tooltip */
 .tile .label {
@@ -1220,12 +1255,14 @@ body.edge-right .stack { transform-origin: center right; }
 .menu .sep { height: 1px; margin: 5px 8px; background: var(--stroke); }
 .hidden { display: none !important; }
 
-/* Update-available pill (dock) */
+/* Update-available pill (dock). Centered over the BAR by dock.js
+   (placeUpdatePill) with explicit px — no transform centering, because the
+   breathe animation owns the transform and would stomp on it (the old
+   translateX(-50%) was silently ignored → the pill sat half a width off). */
 .update-pill {
   position: fixed;
   top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 40px;
   z-index: 30;
   font: inherit;
   font-size: 12px;
@@ -1241,8 +1278,8 @@ body.edge-right .stack { transform-origin: center right; }
 }
 /* Sit in the magnify-headroom side so it never overlaps the icons. */
 body.edge-top .update-pill { top: auto; bottom: 4px; }
-body.edge-left .update-pill { left: auto; right: 4px; top: 50%; transform: translateY(-50%); }
-body.edge-right .update-pill { left: 4px; right: auto; top: 50%; transform: translateY(-50%); }
+body.edge-left .update-pill { left: auto; right: 4px; top: 40px; }
+body.edge-right .update-pill { left: 4px; right: auto; top: 40px; }
 
 /* Update controls (settings) */
 .upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -1515,22 +1552,51 @@ select {
 /* Notch position picker: a mini screen with clickable tab slots on ALL FOUR
    edges (3 per edge). One click = edge + position. The strip marks where the
    dock currently lives. */
-.notchpick { display: flex; justify-content: flex-end; }
-.notchpick-screen {
+/* ── Position picker: dock edge + notch placement + live mini bar, in ONE
+   mini-screen. Click an edge band → the dock moves there; click a tab → the
+   notch lives there. ── */
+.pospick { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pospick-screen {
   position: relative;
-  width: 220px;
-  height: 128px;
+  width: 260px;
+  height: 150px;
   border-radius: var(--r-md);
   border: 1px solid var(--stroke);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--layer)), var(--layer));
   overflow: hidden;
 }
-/* The dock's own edge, marked as a faint strip. */
-.notchpick-bar { position: absolute; background: color-mix(in srgb, var(--ink) 16%, transparent); pointer-events: none; }
-.npb-bottom { left: 0; right: 0; bottom: 0; height: 10px; }
-.npb-top { left: 0; right: 0; top: 0; height: 10px; }
-.npb-left { top: 0; bottom: 0; left: 0; width: 10px; }
-.npb-right { top: 0; bottom: 0; right: 0; width: 10px; }
+/* Edge bands: the dock's landing zones. */
+.pospick-edge { position: absolute; border: 0; padding: 0; background: transparent; cursor: pointer; transition: background 0.15s ease; }
+.pp-bottom { left: 0; right: 0; bottom: 0; height: 22px; }
+.pp-top { left: 0; right: 0; top: 0; height: 22px; }
+.pp-left { top: 0; bottom: 0; left: 0; width: 22px; }
+.pp-right { top: 0; bottom: 0; right: 0; width: 22px; }
+.pospick-edge:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.pospick-edge.active { background: color-mix(in srgb, var(--accent) 10%, transparent); cursor: default; }
+/* The dock in miniature, snapped to its edge. */
+.pospick-bar {
+  position: absolute;
+  display: flex;
+  gap: 3px;
+  padding: 3px 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  pointer-events: none;
+  animation: pospick-in 0.28s var(--ease-bounce);
+}
+.pospick-bar > i { width: 8px; height: 8px; border-radius: 2.5px; background: var(--accent); opacity: 0.85; }
+.pospick-bar > i:nth-child(odd) { opacity: 0.55; }
+.ppb-bottom { bottom: 5px; left: 50%; transform: translateX(-50%); }
+.ppb-top { top: 5px; left: 50%; transform: translateX(-50%); }
+.ppb-left { left: 5px; top: 50%; transform: translateY(-50%); flex-direction: column; }
+.ppb-right { right: 5px; top: 50%; transform: translateY(-50%); flex-direction: column; }
+@keyframes pospick-in {
+  from { opacity: 0; scale: 0.7; }
+  to { opacity: 1; scale: 1; }
+}
+.pospick-caption { margin: 0; font-size: 11.5px; color: var(--ink-2); }
+.pospick-caption strong { color: var(--ink); font-weight: 700; }
 /* Click targets: 3 slots per edge. */
 .notchpick-slot {
   position: absolute;
@@ -1700,24 +1766,11 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .s-tip { display: flex; align-items: baseline; gap: 9px; font: 500 13px var(--font); color: var(--ink); }
 .s-tip span:first-child { flex: 0 0 auto; }
 
-.edgepick { display: flex; justify-content: flex-end; }
-.edgepick-screen {
-  position: relative; width: 210px; height: 124px; border-radius: var(--r-md);
-  border: 1px solid var(--stroke);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--layer)), var(--layer));
-  overflow: hidden;
-}
-.edgepick-label {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: var(--ink-2); pointer-events: none;
-}
-.edgepick-edge { position: absolute; border: 0; background: transparent; cursor: pointer; transition: background 0.15s ease; }
-.ep-top { top: 0; left: 0; right: 0; height: 24px; }
-.ep-bottom { bottom: 0; left: 0; right: 0; height: 24px; }
-.ep-left { left: 0; top: 0; bottom: 0; width: 24px; }
-.ep-right { right: 0; top: 0; bottom: 0; width: 24px; }
-.edgepick-edge:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.edgepick-edge.active { background: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Profiles: saved config snapshots (Behavior tab). */
+.prof-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.prof-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prof-new { margin-top: 8px; }
+.prof-new .sugg-search { flex: 1; }
 
 /* Monitor picker */
 .monpick { display: flex; align-items: center; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }

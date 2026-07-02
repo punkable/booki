@@ -79,3 +79,19 @@ pub fn media_prev() -> bool {
 pub fn move_paths(_paths: &[String], _dest: &str) -> Result<(), String> {
     Err("moving files is only available on Windows".into())
 }
+
+pub fn volume_get() -> Result<(u32, bool), String> {
+    Err("system volume is only available on Windows".into())
+}
+
+pub fn volume_set(_pct: u32) -> Result<(), String> {
+    Err("system volume is only available on Windows".into())
+}
+
+pub fn volume_mute_toggle() -> Result<bool, String> {
+    Err("system volume is only available on Windows".into())
+}
+
+pub fn cursor_at_edge(_edge: &str) -> bool {
+    false
+}
