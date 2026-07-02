@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.9.1",
+    date: "2 jul 2026",
+    headline: "Elegir dónde va el notch ahora es tan fácil como tocar una mini pantalla.",
+    sections: [
+      {
+        icon: "🖱️",
+        title: "Notch a un clic",
+        notes: [
+          "La posición del notch se elige ahora en un dibujito de tu pantalla: toca la pestañita izquierda, central o derecha y listo — se acabó adivinar qué significa «inicio» o «final».",
+          "El dibujito sigue al borde donde tengas el dock (abajo, arriba o a los lados).",
+        ],
+      },
+      {
+        icon: "🧹",
+        title: "Pulido",
+        notes: [
+          "Los consejos de bienvenida ya no pueden aparecer con el dock escondido.",
+          "El menú «Más opciones» de Ajustes se cierra al hacer clic fuera.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2 jul 2026",
     headline: "La música toma el control, y el dock obedece cuando lo escondes.",

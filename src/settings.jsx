@@ -190,6 +190,32 @@ function EdgePicker({ value, onChange }) {
   );
 }
 
+// Pick where the notch sits along the dock's edge — a mini screen diagram with
+// three clickable tabs on the anchored edge (way clearer than "start/center/end").
+function NotchPicker({ cfg, set }) {
+  const pos = cfg.notchPosition || "center";
+  const edge = cfg.edge || "bottom";
+  return (
+    <div className={`notchpick np-edge-${edge}`}>
+      <div className="notchpick-screen">
+        <span className="notchpick-bar" aria-hidden="true" />
+        {["start", "center", "end"].map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={`notchpick-slot nps-${s}` + (pos === s ? " active" : "")}
+            onClick={() => set({ notchPosition: s })}
+            title={t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}
+            aria-label={t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}
+          >
+            <span className="notchpick-tab" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Pick a monitor from boxes scaled to their real geometry.
 function MonitorPicker({ value, monitors, onChange }) {
   if (!monitors || monitors.length === 0) {
@@ -669,15 +695,7 @@ function Behavior({ cfg, set }) {
       {cfg.autoHideMode !== "off" && (
         <>
           <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
-            <SegmentedControl
-              value={cfg.notchPosition || "center"}
-              onChange={(v) => set({ notchPosition: v })}
-              options={[
-                { value: "start", label: t("be.notchStart") },
-                { value: "center", label: t("be.notchCenter") },
-                { value: "end", label: t("be.notchEnd") },
-              ]}
-            />
+            <NotchPicker cfg={cfg} set={set} />
           </Row>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => set({ notchPeek: v })} />
@@ -952,6 +970,15 @@ function Apps({ cfg, set }) {
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
   const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
   const [moreOpen, setMoreOpen] = useState(false);
+  // Close the "more options" dropdown when clicking anywhere else.
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (e) => {
+      if (!e.target.closest || !e.target.closest(".s-more")) setMoreOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [moreOpen]);
   const addTrash = () =>
     !hasTrash &&
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });

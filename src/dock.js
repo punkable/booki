@@ -698,6 +698,7 @@ async function maybeOnboard() {
   ];
   let i = 0;
   pinnedReveal = true; // keep the dock open during the tour
+  setHidden(false); // the tips are useless if the dock booted tucked away
   const pop = document.createElement("div");
   pop.className = "coach";
   placePop(pop);
