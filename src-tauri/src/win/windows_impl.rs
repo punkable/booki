@@ -6,8 +6,10 @@ use std::ffi::c_void;
 
 use base64::Engine;
 use windows::core::{Interface, PCWSTR};
+use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_INPROC_SERVER,
+    CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_ALL, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED, STGM_READ,
 };
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
@@ -656,5 +658,89 @@ pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
         Err("the move was cancelled".into())
     } else {
         Ok(())
+    }
+}
+
+// ──────────────────────── System volume (Core Audio) ────────────────────────
+
+/// Default render endpoint's volume control. COM may already be initialized on
+/// this thread (the call is harmless then — the error is ignored).
+fn endpoint_volume() -> Result<IAudioEndpointVolume, String> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
+        let device = enumerator
+            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .map_err(|e| e.to_string())?;
+        device
+            .Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+            .map_err(|e| e.to_string())
+    }
+}
+
+/// Master volume as (percent 0–100, muted).
+pub fn volume_get() -> Result<(u32, bool), String> {
+    unsafe {
+        let vol = endpoint_volume()?;
+        let level = vol.GetMasterVolumeLevelScalar().map_err(|e| e.to_string())?;
+        let muted = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
+        Ok(((level * 100.0).round() as u32, muted))
+    }
+}
+
+pub fn volume_set(pct: u32) -> Result<(), String> {
+    unsafe {
+        let vol = endpoint_volume()?;
+        vol.SetMasterVolumeLevelScalar(pct.min(100) as f32 / 100.0, std::ptr::null())
+            .map_err(|e| e.to_string())?;
+        // Nudging the volume up while muted should be audible right away.
+        if pct > 0 {
+            let _ = vol.SetMute(false, std::ptr::null());
+        }
+        Ok(())
+    }
+}
+
+/// Toggle mute; returns the NEW muted state.
+pub fn volume_mute_toggle() -> Result<bool, String> {
+    unsafe {
+        let vol = endpoint_volume()?;
+        let muted = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
+        vol.SetMute(!muted, std::ptr::null())
+            .map_err(|e| e.to_string())?;
+        Ok(!muted)
+    }
+}
+
+// ─────────────────────────── Hot edge (cursor) ───────────────────────────
+
+/// True when the cursor is pressed against the given screen edge, within the
+/// middle 70% of that edge (the corners stay free — they're hot spots for
+/// window buttons and the Start corner). Used to reveal a hidden dock.
+pub fn cursor_at_edge(edge: &str) -> bool {
+    unsafe {
+        let mut p = POINT::default();
+        if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut p).is_err() {
+            return false;
+        }
+        let hmon = MonitorFromPoint(p, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return false;
+        }
+        let r = mi.rcMonitor;
+        let (w, h) = (r.right - r.left, r.bottom - r.top);
+        let in_x = p.x >= r.left + w * 15 / 100 && p.x <= r.right - w * 15 / 100;
+        let in_y = p.y >= r.top + h * 15 / 100 && p.y <= r.bottom - h * 15 / 100;
+        match edge {
+            "top" => p.y <= r.top + 1 && in_x,
+            "left" => p.x <= r.left + 1 && in_y,
+            "right" => p.x >= r.right - 2 && in_y,
+            _ => p.y >= r.bottom - 2 && in_x,
+        }
     }
 }

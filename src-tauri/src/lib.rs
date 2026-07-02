@@ -449,6 +449,97 @@ fn import_config(path: String) -> Result<Config, String> {
     Ok(cfg)
 }
 
+// ─────────────────────────── Dock profiles ───────────────────────────
+// Full config snapshots the user can switch between with one click (e.g.
+// "Trabajo" / "Gaming"). Stored as %APPDATA%\Booki\profiles\{name}.json.
+
+fn profiles_dir() -> std::path::PathBuf {
+    config::config_dir().join("profiles")
+}
+
+/// Sanitized file path for a profile name (no separators/dots → no traversal).
+fn profile_file(name: &str) -> Result<std::path::PathBuf, String> {
+    let safe: String = name
+        .trim()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
+        .collect();
+    let safe = safe.trim().to_string();
+    if safe.is_empty() || safe.len() > 40 {
+        return Err("invalid profile name".into());
+    }
+    Ok(profiles_dir().join(format!("{safe}.json")))
+}
+
+#[tauri::command]
+fn profile_list() -> Vec<String> {
+    let mut names = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(profiles_dir()) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "json") {
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    names.push(stem.to_string());
+                }
+            }
+        }
+    }
+    names.sort_by_key(|n| n.to_lowercase());
+    names
+}
+
+/// Snapshot the CURRENT config under the given name (overwrites).
+#[tauri::command]
+fn profile_save(name: String) -> Result<(), String> {
+    let path = profile_file(&name)?;
+    std::fs::create_dir_all(profiles_dir()).map_err(|e| e.to_string())?;
+    let text = serde_json::to_string_pretty(&config::load()).map_err(|e| e.to_string())?;
+    std::fs::write(path, text).map_err(|e| e.to_string())
+}
+
+/// Make the named profile the active config; repositions windows and tells
+/// every surface to re-read. Returns the applied config.
+#[tauri::command]
+fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
+    let path = profile_file(&name)?;
+    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    config::save(&cfg)?;
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = position_dock(&dock, &cfg.edge);
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = position_notch(&notch, &cfg.edge);
+    }
+    let _ = app.emit("booki://config-changed", ());
+    Ok(cfg)
+}
+
+#[tauri::command]
+fn profile_delete(name: String) -> Result<(), String> {
+    let path = profile_file(&name)?;
+    std::fs::remove_file(path).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────── System volume ───────────────────────────
+
+/// Master volume as (percent, muted); None when unavailable.
+#[tauri::command]
+fn volume_info() -> Option<(u32, bool)> {
+    win::volume_get().ok()
+}
+
+#[tauri::command]
+fn volume_set(pct: u32) -> Result<(), String> {
+    win::volume_set(pct)
+}
+
+/// Toggle mute; returns the new muted state.
+#[tauri::command]
+fn volume_mute() -> Result<bool, String> {
+    win::volume_mute_toggle()
+}
+
 /// Which of these paths exist on THIS machine (used after importing a config
 /// from another PC to flag pins whose program lives somewhere else here).
 #[tauri::command]
@@ -1072,6 +1163,13 @@ pub fn run() {
             notch_toast,
             notch_preview,
             hide_all,
+            profile_list,
+            profile_save,
+            profile_apply,
+            profile_delete,
+            volume_info,
+            volume_set,
+            volume_mute,
             set_dock_edge,
             open_changelog,
             take_pending_changelog,
@@ -1199,8 +1297,19 @@ pub fn run() {
                             }
                             None
                         }
+                        // Hot edge: cached config (re-read every ~3 s, not every
+                        // tick), a 2-tick streak so a fast swipe-by can't trigger
+                        // it, and a cooldown so it fires once per push.
+                        let mut cfg_cache = config::load();
+                        let mut tick: u32 = 0;
+                        let mut edge_streak: u8 = 0;
+                        let mut edge_cooldown: u8 = 0;
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(300));
+                            tick = tick.wrapping_add(1);
+                            if tick % 10 == 0 {
+                                cfg_cache = config::load();
+                            }
                             // foreground_occludes = "the user is in an app".
                             if let Some(v) = debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd)) {
                                 let _ = handle.emit("booki://occlusion", v);
@@ -1208,6 +1317,19 @@ pub fn run() {
                             // fullscreen game / movie / presentation → get out of the way.
                             if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
                                 let _ = handle.emit("booki://fullscreen", v);
+                            }
+                            // Cursor pressed against the dock's edge → reveal signal.
+                            if cfg_cache.hot_edge {
+                                edge_cooldown = edge_cooldown.saturating_sub(1);
+                                if win::cursor_at_edge(&cfg_cache.edge) {
+                                    edge_streak = edge_streak.saturating_add(1);
+                                } else {
+                                    edge_streak = 0;
+                                }
+                                if edge_streak >= 2 && edge_cooldown == 0 {
+                                    edge_cooldown = 6; // ≈1.8 s between triggers
+                                    let _ = handle.emit("booki://hot-edge", ());
+                                }
                             }
                         }
                     });

@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.14.0",
+    date: "2 jul 2026",
+    headline: "Todo lo espacial en un solo control, perfiles y un dock más vivo.",
+    sections: [
+      {
+        icon: "🗺️",
+        title: "Posición unificada",
+        notes: [
+          "El borde del dock, la posición del notch y la vista previa ahora son UN solo control en Comportamiento: haz clic en un borde y el dock se muda; toca una pestañita y el notch se coloca ahí.",
+          "Con el dock oculto, empuja el cursor contra su borde y sale solo — sin buscar el notch (se puede apagar).",
+        ],
+      },
+      {
+        icon: "🎛️",
+        title: "Perfiles y volumen",
+        notes: [
+          "Perfiles del dock: guarda tu configuración completa con un nombre (p. ej. Trabajo / Gaming) y cambia con un clic desde el menú del dock o Ajustes.",
+          "Nuevo widget de volumen: rueda del ratón para subir o bajar, clic para silenciar.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Más vivo, más fino",
+        notes: [
+          "Los iconos rebotan suavemente al lanzar una app, en la dirección del borde.",
+          "El aviso de actualización queda centrado sobre la barra, y Booki revisa si hay versión nueva cada pocas horas, no solo al arrancar.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2 jul 2026",
     headline: "Actualizar ya no es a ciegas, y el reproductor se adapta al dock vertical.",
