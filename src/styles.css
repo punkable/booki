@@ -137,7 +137,7 @@ body.dock-body {
   display: flex;
   /* Transparent breathing room around the bar for the drop shadow + magnified
      tiles (must match SHADOW_PAD in dock.js so the window is sized to fit). */
-  padding: 22px;
+  padding: 36px;
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
@@ -1612,18 +1612,36 @@ select {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff;
+  width: 32px;
+  height: 32px;
 }
-.donate-ico.btc { background: #f7931a; }
-.donate-ico.sol { background: linear-gradient(135deg, #9945ff, #14f195); }
+.donate-ico svg { display: block; }
 .donate-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .donate-col strong { font-size: 13px; }
 .donate-col code { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+
+/* Bundled Fluent emoji images (crisp, aligned with the text baseline). The
+   explicit sizes beat the generic `.tile img` icon rules — emojis inside
+   widget cards / flyouts must stay small, never balloon to app-icon size. */
+img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img {
+  display: inline-block;
+  vertical-align: -0.2em;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.tile .w-ico img.emo { width: 20px !important; height: 20px !important; }
+.stack-glyph img.emo { width: 26px !important; height: 26px !important; }
+.coach-emoji img.emo { width: 22px; height: 22px; }
+.tp-emoji img.emo { width: 24px; height: 24px; }
+.s-tip img.emo { align-self: center; }
+
+/* Danger button (two-step reset confirm). */
+.s-btn-danger {
+  background: #d13438 !important;
+  border-color: #d13438 !important;
+  color: #fff !important;
+}
 
 /* First-run tips card (empty pinned list). */
 .s-tips {
@@ -1789,13 +1807,29 @@ select {
   position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
   border: 0; padding: 0; background: transparent; opacity: 0; cursor: pointer;
 }
-.accent-system {
-  width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 15px; color: var(--ink);
-  background: var(--layer); border: 1px dashed var(--stroke);
-  display: flex; align-items: center; justify-content: center;
+/* Accent sources with a readable label ("System" / "Wallpaper") — the old
+   bare-glyph circles weren't understandable. */
+.accent-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  font: 600 11.5px var(--font);
+  color: var(--ink);
+  background: var(--layer);
+  border: 1px dashed var(--stroke);
   transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease;
 }
-.accent-system:hover { transform: scale(1.12); border-color: var(--accent); }
+.accent-src:hover { transform: scale(1.05); border-color: var(--accent); }
+.accent-src-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(#e74856, #ffb900, #10893e, #0078d4, #886ce4, #e74856);
+}
 .accent-hex { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 64px; text-align: right; }
 
 /* Installed-app suggestions */
