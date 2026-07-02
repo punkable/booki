@@ -138,10 +138,18 @@ function applyAll() {
   const style = cfg.magnifyStyle || "spring";
   const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
   root.style.setProperty("--mag-ease", ease);
-  // Genie minimize: aim the collapse at wherever the notch sits along the edge.
+  // Genie minimize: aim the collapse at wherever the NOTCH actually sits — its
+  // own edge when set explicitly, else the dock's. Without this, a side-docked
+  // bar whose notch lives on another edge would funnel toward the wrong side.
   const ox = { start: 16.6, end: 83.4 }[cfg.notchPosition] ?? 50;
   root.style.setProperty("--genie-ox", `${ox}%`);
   root.style.setProperty("--genie-oxn", `${ox}`);
+  const notchEdge =
+    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : cfg.edge || "bottom";
+  ["genie-bottom", "genie-top", "genie-left", "genie-right"].forEach((c) =>
+    document.body.classList.remove(c)
+  );
+  document.body.classList.add(`genie-${notchEdge}`);
 }
 
 async function persist() {
@@ -332,6 +340,13 @@ function separatorTile(item) {
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
 const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media"];
+// Transport glyphs for the media card — filled, rounded, Fluent-like SVGs.
+const MEDIA_SVG = {
+  prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
+  next: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12.8 2.8c0-.44-.36-.8-.8-.8s-.8.36-.8.8v4.1l-7-4.63c-.8-.53-1.87.04-1.87 1v9.46c0 .96 1.07 1.53 1.87 1l7-4.63v4.1c0 .44.36.8.8.8s.8-.36.8-.8V2.8Z"/></svg>',
+  play: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M5.1 2.32c-.87-.5-1.95.13-1.95 1.13v9.1c0 1 1.08 1.63 1.95 1.13l7.9-4.55c.87-.5.87-1.76 0-2.26L5.1 2.32Z"/></svg>',
+  pause: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M4.1 2.5c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1H4.1Zm6.5 0c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1h-1.3Z"/></svg>',
+};
 // Fluent 3D emoji per widget (bundled — see emoji.js).
 const WIDGET_ICONS = {
   clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna",
@@ -398,14 +413,14 @@ function widgetTile(item) {
     el.querySelector(".w-value").textContent = "—";
     el.querySelector(".w-bar").style.display = "none";
     // Hover controls: previous · play/pause · next (click on the card itself
-    // still toggles play/pause).
+    // still toggles play/pause). Crisp SVG glyphs, not text emoji.
     const controls = document.createElement("span");
     controls.className = "w-controls";
-    const mkCtl = (label, glyph, fn) => {
+    const mkCtl = (label, svg, fn, cls) => {
       const b = document.createElement("button");
-      b.className = "w-ctl";
+      b.className = "w-ctl" + (cls ? ` ${cls}` : "");
       b.title = label;
-      b.textContent = glyph;
+      b.innerHTML = svg;
       b.addEventListener("pointerdown", (e) => e.stopPropagation());
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -414,9 +429,9 @@ function widgetTile(item) {
       });
       controls.appendChild(b);
     };
-    mkCtl(t("w.prev"), "⏮", () => dockApi.mediaPrev());
-    mkCtl(t("w.playPause"), "⏯", () => dockApi.mediaToggle());
-    mkCtl(t("w.next"), "⏭", () => dockApi.mediaNext());
+    mkCtl(t("w.prev"), MEDIA_SVG.prev, () => dockApi.mediaPrev());
+    mkCtl(t("w.playPause"), MEDIA_SVG.play, () => dockApi.mediaToggle(), "w-ctl-toggle");
+    mkCtl(t("w.next"), MEDIA_SVG.next, () => dockApi.mediaNext());
     card.appendChild(controls);
   }
   if (type === "clock") tickClocks();
@@ -457,6 +472,25 @@ function setText(el, label, value, title) {
   el.querySelector(".w-value").textContent = value;
   el.querySelector(".w-bar").style.display = "none";
   if (title) el.title = title;
+}
+
+// Media card text: artist as label, song as value. A title that doesn't fit its
+// box scrolls gently in a loop (marquee) instead of being chopped by ellipsis —
+// essential on the compact vertical card. Rebuilt only when the song changes so
+// the animation never restarts mid-scroll on every poll.
+function setMediaText(el, artist, title) {
+  el.querySelector(".w-label").textContent = artist;
+  el.querySelector(".w-bar").style.display = "none";
+  if (el.dataset.mqTitle === title) return;
+  el.dataset.mqTitle = title;
+  const v = el.querySelector(".w-value");
+  v.classList.remove("scroll");
+  v.textContent = title;
+  if (v.scrollWidth > v.clientWidth + 2) {
+    const safe = esc(title);
+    v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
+    v.classList.add("scroll");
+  }
 }
 
 function tickClocks() {
@@ -530,18 +564,25 @@ function startMediaPoll() {
     dockEl.querySelectorAll('.tile.widget[data-widget="media"]').forEach((el) => {
       const art = el.querySelector(".w-art");
       const ico = el.querySelector(".w-ico");
+      const toggle = el.querySelector(".w-ctl-toggle");
       if (!m) {
         setText(el, t("w.media"), "—", t("w.media"));
+        delete el.dataset.mqTitle;
         el.classList.remove("playing");
         if (art) art.style.display = "none";
         if (ico) ico.style.display = "";
+        if (toggle) toggle.innerHTML = MEDIA_SVG.play;
         return;
       }
-      setText(el, m.artist || t("w.media"), m.title || "—", `${m.title} — ${m.artist}`);
+      setMediaText(el, m.artist || t("w.media"), m.title || "—");
+      el.title = `${m.title} — ${m.artist}`;
       el.classList.toggle("playing", !!m.playing);
+      if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
       if (art && m.thumb) {
         art.src = m.thumb;
-        art.style.display = "";
+        // Explicit "block": clearing the inline style would fall back to the
+        // stylesheet's display:none and the album art would never show up.
+        art.style.display = "block";
         if (ico) ico.style.display = "none";
       }
     });
@@ -2025,7 +2066,8 @@ async function checkUpdates() {
   if (update) {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
-    pill.addEventListener("click", () => dockApi.openSettings(), { once: true });
+    // Straight to About — that's where the install button and progress live.
+    pill.addEventListener("click", () => dockApi.openSettingsTab("about"), { once: true });
   }
 }
 

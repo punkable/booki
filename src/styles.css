@@ -171,23 +171,24 @@ body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-item
 body.edge-right .dock { align-items: flex-end; }
 
 /* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
-   suck-in, approximated with anchored scale + skew). --genie-ox/--genie-oy point
-   at where the notch sits along the edge (set from config in dock.js). */
+   suck-in, approximated with anchored scale + skew). --genie-ox points at where
+   the notch sits along its edge, and the genie-* class (set in dock.js) at the
+   EDGE the notch lives on — which may differ from the dock's own edge. */
 body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
 body.autohide .dock { transition: transform 0.34s cubic-bezier(0.5, 0, 0.9, 0.4), opacity 0.3s ease, filter 0.3s ease; }
-body.autohide.tucked.edge-bottom .dock {
+body.autohide.tucked.genie-bottom .dock {
   transform-origin: var(--genie-ox, 50%) 100%;
   transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
 }
-body.autohide.tucked.edge-top .dock {
+body.autohide.tucked.genie-top .dock {
   transform-origin: var(--genie-ox, 50%) 0%;
   transform: translateY(-60%) scale(0.12, 0.06) skewX(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
 }
-body.autohide.tucked.edge-left .dock {
+body.autohide.tucked.genie-left .dock {
   transform-origin: 0% var(--genie-ox, 50%);
   transform: translateX(-60%) scale(0.06, 0.12) skewY(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
 }
-body.autohide.tucked.edge-right .dock {
+body.autohide.tucked.genie-right .dock {
   transform-origin: 100% var(--genie-ox, 50%);
   transform: translateX(60%) scale(0.06, 0.12) skewY(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
 }
@@ -517,6 +518,47 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 /* Long song titles must not balloon the card (and with it, the whole bar). */
 .tile.widget.media .w-main { max-width: 118px; min-width: 0; }
 .tile.widget.media .w-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Overflowing titles scroll in a gentle loop (the text is doubled in .mq, so a
+   -50% slide lands exactly on the seam). Built in dock.js only on overflow. */
+.tile.widget.media .w-value.scroll { text-overflow: clip; }
+.w-value .mq { display: inline-flex; white-space: nowrap; animation: w-mq 9s linear 1.2s infinite; }
+.w-value .mq > span { padding-right: 26px; }
+@keyframes w-mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .w-value .mq { animation: none; } }
+
+/* Vertical dock → the media card turns into a compact column (art on top,
+   scrolling title below) instead of a wide horizontal strip that stretches
+   the whole bar sideways. */
+body.edge-left .tile.widget.media, body.edge-right .tile.widget.media {
+  width: auto;
+  min-width: 0;
+  height: auto;
+}
+body.edge-left .tile.widget.media .w-card, body.edge-right .tile.widget.media .w-card {
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 8px 7px;
+  /* same footprint as the other widget cards so the vertical bar stays even */
+  width: calc(var(--size) * 1.9);
+}
+body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
+  width: calc(var(--size) * 0.95);
+  height: calc(var(--size) * 0.95);
+  border-radius: 10px;
+}
+body.edge-left .tile.widget.media .w-main, body.edge-right .tile.widget.media .w-main {
+  max-width: 100%;
+  width: 100%;
+  align-items: center;
+  text-align: center;
+}
+body.edge-left .tile.widget.media .w-label, body.edge-right .tile.widget.media .w-label,
+body.edge-left .tile.widget.media .w-value, body.edge-right .tile.widget.media .w-value {
+  max-width: 100%;
+}
+body.edge-left .tile.widget.media .w-value, body.edge-right .tile.widget.media .w-value {
+  font-size: 12px;
+}
 /* Hover controls: prev · play/pause · next as a floating glass strip. */
 .tile.widget.media { position: relative; }
 .tile.widget.media .w-controls {
@@ -539,7 +581,6 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   border: 0;
   background: color-mix(in srgb, var(--ink) 9%, transparent);
   color: var(--ink);
-  font-size: 13px;
   line-height: 1;
   width: 26px;
   height: 26px;
@@ -549,6 +590,8 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   place-items: center;
   transition: background 0.12s ease, transform 0.12s ease;
 }
+.w-ctl svg { display: block; }
+.w-ctl-toggle { width: 30px; height: 30px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .w-ctl:active { transform: scale(0.9); }
 

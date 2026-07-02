@@ -3,6 +3,40 @@
 
 export const CHANGELOG = [
   {
+    version: "0.13.0",
+    date: "2 jul 2026",
+    headline: "Actualizar ya no es a ciegas, y el reproductor se adapta al dock vertical.",
+    sections: [
+      {
+        icon: "🎵",
+        title: "Reproductor más fino",
+        notes: [
+          "Con el dock en un lateral, la tarjeta de música se vuelve vertical: carátula arriba y el título desfilando debajo — ya no estira toda la barra.",
+          "Los títulos largos se desplazan suavemente en bucle en vez de cortarse.",
+          "Botones de anterior, pausa y siguiente rediseñados: iconos nítidos que cambian según si suena algo.",
+        ],
+      },
+      {
+        icon: "⬇️",
+        title: "Actualizaciones con cara",
+        notes: [
+          "Al instalar una actualización ahora se ve cada paso: descarga con porcentaje y un aviso de «instalando, Booki se reabrirá solo» antes de cerrarse.",
+          "El botón de novedades del dock abre directo Acerca de con la actualización lista para instalar.",
+          "Arreglado: el botón de exportar la configuración no hacía nada.",
+        ],
+      },
+      {
+        icon: "📌",
+        title: "Notch y bordes, más coherentes",
+        notes: [
+          "Al cambiar el estilo o la posición del notch en Ajustes, aparece unos segundos para que veas cómo queda.",
+          "El dock ya no se esconde hacia abajo cuando está anclado en un costado: la animación y los avisos van al borde correcto.",
+          "Mover el dock de borde (arrastrando el notch o tocándolo) vuelve a unir notch y dock en el mismo lado.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.12.0",
     date: "2 jul 2026",
     headline: "Más personalidad, más seguro de usar, y el dock ya no recorta nada.",
