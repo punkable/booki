@@ -5,7 +5,7 @@
 const NAMES = [
   "clock", "brain", "ice", "floppy", "antenna", "stopwatch", "battery", "memo",
   "notes", "folder", "beaver", "shield", "picture", "sparkles", "wastebasket",
-  "pointer", "card", "puzzle", "star", "mouse",
+  "pointer", "card", "puzzle", "star", "mouse", "speaker", "speaker-mute",
 ];
 
 /** <img> tag markup for a bundled Fluent emoji (falls back to nothing). */

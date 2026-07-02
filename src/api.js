@@ -51,6 +51,8 @@ const DEMO_CONFIG = {
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
+let demoVolume = { pct: 55, muted: false };
+let demoProfiles = { Trabajo: structuredClone(DEMO_CONFIG) };
 
 async function mockInvoke(cmd, args) {
   switch (cmd) {
@@ -137,6 +139,26 @@ async function mockInvoke(cmd, args) {
     case "media_next":
     case "media_prev":
       return true;
+    case "volume_info":
+      return [demoVolume.pct, demoVolume.muted];
+    case "volume_set":
+      demoVolume.pct = Math.max(0, Math.min(100, (args && args.pct) || 0));
+      if (demoVolume.pct > 0) demoVolume.muted = false;
+      return null;
+    case "volume_mute":
+      demoVolume.muted = !demoVolume.muted;
+      return demoVolume.muted;
+    case "profile_list":
+      return Object.keys(demoProfiles).sort();
+    case "profile_save":
+      demoProfiles[(args && args.name) || "Perfil"] = structuredClone(demoConfig);
+      return null;
+    case "profile_apply":
+      demoConfig = structuredClone(demoProfiles[(args && args.name) || ""] || demoConfig);
+      return structuredClone(demoConfig);
+    case "profile_delete":
+      delete demoProfiles[(args && args.name) || ""];
+      return null;
     case "open_location":
     case "set_hotkey":
     case "apply_hotkeys":
@@ -313,6 +335,13 @@ export const dock = {
   mediaNext: () => invoke("media_next"),
   mediaPrev: () => invoke("media_prev"),
   notchPreview: () => invoke("notch_preview"),
+  volumeInfo: () => invoke("volume_info"),
+  volumeSet: (pct) => invoke("volume_set", { pct }),
+  volumeMute: () => invoke("volume_mute"),
+  profileList: () => invoke("profile_list"),
+  profileSave: (name) => invoke("profile_save", { name }),
+  profileApply: (name) => invoke("profile_apply", { name }),
+  profileDelete: (name) => invoke("profile_delete", { name }),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),
@@ -333,6 +362,12 @@ export async function onShowTab(cb) {
 export async function onLaunchIndex(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://launch-index", (e) => cb(e.payload));
+}
+
+/** Listen for "cursor pushed against the dock's edge" (reveal a hidden dock). */
+export async function onHotEdge(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://hot-edge", () => cb());
 }
 
 /** Listen for the smart-hide occlusion signal from the backend. */

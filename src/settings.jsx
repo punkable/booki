@@ -81,8 +81,9 @@ const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.translucency", "appearance"], ["ap.language", "appearance"], ["ap.backup", "appearance"],
-  ["be.edge", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
-  ["be.notchPos", "behavior"], ["be.notchPeek", "behavior"], ["be.magnify", "behavior"],
+  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
+  ["be.notchPeek", "behavior"], ["be.hotEdge", "behavior"], ["prof.title", "behavior"],
+  ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
   ["be.alwaysOnTop", "behavior"], ["be.autostart", "behavior"],
@@ -171,58 +172,129 @@ function SegmentedControl({ value, options, onChange }) {
 }
 
 // Click an edge of a mini screen to anchor the dock there.
-function EdgePicker({ value, onChange }) {
-  const edges = ["top", "bottom", "left", "right"];
+// ONE control for everything spatial: click an edge band to move the DOCK
+// there (the live mini bar follows), click a little tab to place the NOTCH.
+// Replaces the old separate edge picker + notch picker + preview trio.
+function PositionPicker({ cfg, set }) {
+  const dockEdge = cfg.edge || "bottom";
+  const pos = cfg.notchPosition || "center";
+  const notchEdge =
+    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : dockEdge;
+  const showNotch = (cfg.autoHideMode || "smart") !== "off";
+  const pickNotch = (edge, position) => {
+    set({ notchEdge: edge === dockEdge ? "auto" : edge, notchPosition: position });
+    dockApi.notchPreview(); // flash the real notch so the choice is visible
+  };
+  const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter((p) => p.kind !== "separator").length || 5));
+  const posLabel = (s) => t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`);
   return (
-    <div className="edgepick">
-      <div className="edgepick-screen">
-        {edges.map((e) => (
+    <div className="pospick">
+      <div className="pospick-screen">
+        {["top", "bottom", "left", "right"].map((e) => (
           <button
             key={e}
             type="button"
-            className={`edgepick-edge ep-${e}` + (value === e ? " active" : "")}
-            onClick={() => onChange(e)}
-            title={t(`edge.${e}`)}
-            aria-label={t(`edge.${e}`)}
+            className={`pospick-edge pp-${e}` + (dockEdge === e ? " active" : "")}
+            onClick={() => set({ edge: e })}
+            title={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
+            aria-label={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
           />
         ))}
-        <span className="edgepick-label">{t(`edge.${value}`)}</span>
+        {/* The dock itself, in miniature, living on its edge. */}
+        <span key={dockEdge} className={`pospick-bar ppb-${dockEdge}`} aria-hidden="true">
+          {Array.from({ length: tiles }).map((_, i) => <i key={i} />)}
+        </span>
+        {showNotch &&
+          ["top", "bottom", "left", "right"].flatMap((edge) =>
+            ["start", "center", "end"].map((s) => (
+              <button
+                key={`${edge}-${s}`}
+                type="button"
+                className={
+                  `notchpick-slot npe-${edge} nps-${s}` +
+                  (notchEdge === edge && pos === s ? " active" : "")
+                }
+                onClick={() => pickNotch(edge, s)}
+                title={`Notch: ${t(`edge.${edge}`)} · ${posLabel(s)}`}
+              >
+                <span className="notchpick-tab" />
+              </button>
+            ))
+          )}
       </div>
+      <p className="pospick-caption">
+        Dock: <strong>{t(`edge.${dockEdge}`)}</strong>
+        {showNotch && (
+          <>
+            {" · "}Notch:{" "}
+            <strong>
+              {cfg.notchEdge && cfg.notchEdge !== "auto"
+                ? t(`edge.${notchEdge}`)
+                : t("be.notchAuto")}
+            </strong>{" "}
+            ({posLabel(pos)})
+          </>
+        )}
+      </p>
     </div>
   );
 }
 
-// Pick where the notch lives — a mini screen diagram with clickable tab slots
-// on ALL FOUR edges (3 per edge). One click sets edge + position at once.
-function NotchPicker({ cfg, set }) {
-  const pos = cfg.notchPosition || "center";
-  const dockEdge = cfg.edge || "bottom";
-  const activeEdge =
-    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : dockEdge;
-  const pick = (edge, position) => {
-    set({ notchEdge: edge === dockEdge ? "auto" : edge, notchPosition: position });
-    dockApi.notchPreview(); // flash the notch so the choice is visible right away
-  };
+// Saved dock profiles: whole-config snapshots you switch between in one click.
+function ProfilesCard({ set }) {
+  const [profiles, setProfiles] = useState([]);
+  const [name, setName] = useState("");
+  const refresh = () => dockApi.profileList().then((p) => setProfiles(p || []));
+  useEffect(() => {
+    refresh();
+  }, []);
   return (
-    <div className="notchpick">
-      <div className="notchpick-screen">
-        <span className={`notchpick-bar npb-${dockEdge}`} aria-hidden="true" />
-        {["top", "bottom", "left", "right"].flatMap((edge) =>
-          ["start", "center", "end"].map((s) => (
-            <button
-              key={`${edge}-${s}`}
-              type="button"
-              className={
-                `notchpick-slot npe-${edge} nps-${s}` +
-                (activeEdge === edge && pos === s ? " active" : "")
-              }
-              onClick={() => pick(edge, s)}
-              title={`${t(`edge.${edge}`)} · ${t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`)}`}
-            >
-              <span className="notchpick-tab" />
-            </button>
-          ))
-        )}
+    <div className="s-card-inner">
+      <h3>{t("prof.title")}</h3>
+      <p className="muted">{t("prof.hint")}</p>
+      {profiles.map((n) => (
+        <div key={n} className="prof-row">
+          <span className="prof-name">{n}</span>
+          <button
+            className="s-btn s-btn-soft"
+            onClick={async () => {
+              const fresh = await dockApi.profileApply(n).catch(() => null);
+              if (fresh) set(fresh);
+            }}
+          >
+            {t("prof.apply")}
+          </button>
+          <button
+            className="s-btn s-btn-soft"
+            title={t("apps.remove")}
+            onClick={async () => {
+              await dockApi.profileDelete(n).catch(() => {});
+              refresh();
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="prof-row prof-new">
+        <input
+          className="sugg-search"
+          placeholder={t("prof.name")}
+          value={name}
+          maxLength={40}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button
+          className="s-btn"
+          disabled={!name.trim()}
+          onClick={async () => {
+            await dockApi.profileSave(name.trim()).catch(() => {});
+            setName("");
+            refresh();
+          }}
+        >
+          {t("prof.save")}
+        </button>
       </div>
     </div>
   );
@@ -593,7 +665,7 @@ function PinThumb({ item }) {
   );
 }
 
-const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes" };
+const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes", volume: "speaker" };
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -731,11 +803,10 @@ function Behavior({ cfg, set }) {
   return (
     <>
       <h1>{t("be.title")}</h1>
-      <MiniDockPreview cfg={cfg} />
 
       <h2 className="s-subhead">{t("gp.dock")}</h2>
-      <Row label={t("be.edge")}>
-        <EdgePicker value={cfg.edge || "bottom"} onChange={(v) => set({ edge: v })} />
+      <Row label={t("be.position")} hint={t("be.positionHint")}>
+        <PositionPicker cfg={cfg} set={set} />
       </Row>
       <Row label={t("be.monitor")}>
         <MonitorPicker value={cfg.monitor} monitors={monitors}
@@ -752,15 +823,12 @@ function Behavior({ cfg, set }) {
           ]}
         />
       </Row>
-
       {cfg.autoHideMode !== "off" && (
         <>
-          <h2 className="s-subhead">{t("gp.notch")}</h2>
-          <Row label={t("be.notchPos")} hint={t("be.notchPosHint")}>
-            <NotchPicker cfg={cfg} set={set} />
-          </Row>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
+          <Toggle label={t("be.hotEdge")} checked={cfg.hotEdge !== false}
+            onChange={(v) => set({ hotEdge: v })} />
         </>
       )}
 
@@ -812,6 +880,8 @@ function Behavior({ cfg, set }) {
             fmt={(v) => `${v}ms`} onChange={(v) => set({ autoHideDelay: v })} />
         </Row>
       )}
+
+      <ProfilesCard set={set} />
     </>
   );
 }
@@ -1258,6 +1328,7 @@ function Apps({ cfg, set }) {
         <button className="s-btn s-btn-soft" onClick={() => addWidget("battery", t("w.battery"))}>＋ {t("w.battery")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("notes", t("w.notes"))}>＋ {t("w.notes")}</button>
         <button className="s-btn s-btn-soft" onClick={() => addWidget("media", t("w.media"))}>＋ {t("w.media")}</button>
+        <button className="s-btn s-btn-soft" onClick={() => addWidget("volume", t("w.volume"))}>＋ {t("w.volume")}</button>
       </div>
       <h2 className="s-subhead">{t("apps.web")}</h2>
       <p className="muted">{t("apps.webHint")}</p>
