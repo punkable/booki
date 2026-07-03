@@ -151,10 +151,12 @@ async function mockInvoke(cmd, args) {
     case "profile_list":
       return Object.keys(demoProfiles).sort();
     case "profile_save":
-      demoProfiles[(args && args.name) || "Perfil"] = structuredClone(demoConfig);
+      demoConfig.lastProfile = (args && args.name) || "Perfil";
+      demoProfiles[demoConfig.lastProfile] = structuredClone(demoConfig);
       return null;
     case "profile_apply":
       demoConfig = structuredClone(demoProfiles[(args && args.name) || ""] || demoConfig);
+      demoConfig.lastProfile = (args && args.name) || "";
       return structuredClone(demoConfig);
     case "profile_delete":
       delete demoProfiles[(args && args.name) || ""];

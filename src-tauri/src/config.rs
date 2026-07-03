@@ -183,6 +183,9 @@ pub struct Config {
     /// Whether the three first-run tip bubbles were already shown.
     #[serde(default)]
     pub onboarded: bool,
+    /// Name of the last dock profile applied/saved (shown with a check mark).
+    #[serde(default)]
+    pub last_profile: String,
     /// Hot edge: with the dock hidden, pushing the cursor against its screen
     /// edge reveals it (no need to find the notch).
     #[serde(default = "default_true")]
@@ -230,6 +233,7 @@ impl Default for Config {
             settings_rev: 0,
             seen_version: String::new(),
             onboarded: false,
+            last_profile: String::new(),
             hot_edge: true,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
@@ -279,6 +283,15 @@ pub fn load() -> Config {
             cfg.icon_size = 36;
         }
         cfg.settings_rev = 4;
+        let _ = save(&cfg);
+    }
+    // rev 5: the notch follows the dock again. Older builds could leave an
+    // explicit notch_edge behind (e.g. "bottom"), and moving the dock from
+    // settings didn't clear it — so the dock kept tucking toward the stale
+    // edge. One-time heal; the unified position picker re-sets it explicitly.
+    if cfg.settings_rev < 5 {
+        cfg.notch_edge = "auto".into();
+        cfg.settings_rev = 5;
         let _ = save(&cfg);
     }
     cfg
