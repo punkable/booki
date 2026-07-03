@@ -162,9 +162,15 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   backdrop-filter: blur(22px) saturate(165%);
   border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
   border-radius: var(--dock-r);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  /* Shadow is cast AWAY from the anchored screen edge (--sh-x/--sh-y), so a
+     top/side dock throws its depth in the natural direction, not always down. */
+  box-shadow: var(--sh-x, 0) var(--sh-y, 10px) 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
+body.edge-bottom .dock { --sh-x: 0; --sh-y: 10px; }
+body.edge-top .dock { --sh-x: 0; --sh-y: -10px; }
+body.edge-left .dock { --sh-x: -10px; --sh-y: 0; }
+body.edge-right .dock { --sh-x: 10px; --sh-y: 0; }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
 /* Vertical: center every child (app icons AND widget cards) so the side bar
@@ -532,6 +538,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   object-fit: cover;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.35s var(--ease); /* cross-fade when the track art changes */
 }
 .tile.widget.media.playing .w-art { animation: media-pulse 3s ease-in-out infinite; }
 @keyframes media-pulse {
@@ -1038,14 +1045,6 @@ body.edit .dock { cursor: grab; }
 /* Highlight an icon when a file is dragged over it (drop-to-open). */
 .tile.drop-target { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: 0 0 0 2px var(--accent); }
 /* Running-app dot indicator. */
-.tile[data-running="true"]::after {
-  content: ""; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
-  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
-  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 70%, transparent);
-}
-body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -3px; }
-body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -3px; transform: translateY(50%); }
-body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -3px; transform: translateY(50%); }
 /* Notes widget: allow a couple of wrapped lines. */
 .w-value.w-note { font-size: 12px; font-weight: 600; white-space: normal; line-height: 1.2; max-height: 2.5em; overflow: hidden; }
 .tile.merge-target::before {
@@ -1054,7 +1053,7 @@ body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; rig
   pointer-events: none;
 }
 
-/* Running indicator */
+/* Running indicator — a small accent pill that breathes very gently. */
 .tile[data-running="true"]::after {
   content: "";
   position: absolute;
@@ -1065,9 +1064,13 @@ body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; rig
   height: 3px;
   border-radius: var(--r-pill);
   background: var(--accent);
+  animation: run-pulse 2.6s var(--ease) infinite;
 }
+body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -5px; }
 body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
+@keyframes run-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tile[data-running="true"]::after { animation: none; } }
 
 /* Launch feedback: the icon bounces off its edge (twice, macOS-style) while
    the app opens. Direction follows the anchored edge. */
@@ -1105,6 +1108,15 @@ body.edge-left .tile.launching { animation-name: booki-bounce-right; }
 body.edge-right .tile.launching { animation-name: booki-bounce-left; }
 @media (prefers-reduced-motion: reduce) {
   .tile.launching { animation: none; }
+}
+
+/* Pin / unpin: tiles fade+scale in when added and out when removed. */
+.tile.tile-in { animation: tile-in 0.24s var(--ease-bounce); }
+.tile.tile-out { animation: tile-out 0.17s var(--ease) forwards; pointer-events: none; }
+@keyframes tile-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes tile-out { to { opacity: 0; transform: scale(0.4); } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.tile-in, .tile.tile-out { animation: none; }
 }
 
 /* Tooltip */
@@ -1574,6 +1586,10 @@ body.settings-body {
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   backdrop-filter: blur(20px) saturate(140%);
 }
+/* Tab content eases in when you switch tabs (keyed remount in settings.jsx). */
+.s-panel-in { animation: s-panel-in 0.24s var(--ease); }
+@keyframes s-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .s-panel-in { animation: none; } }
 .s-content h1 { margin: 0 0 18px; font-size: 22px; font-weight: 650; }
 .s-content h3 { margin: 18px 0 8px; font-size: 14px; }
 .muted { color: var(--ink-2); font-size: 13px; }
@@ -1947,11 +1963,6 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .r-hotkey { display: flex; gap: 8px; align-items: center; }
 .r-hotkey input { font: inherit; font-size: 13px; padding: 7px 10px; min-width: 180px; text-align: center; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); }
 
-.swatches { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); transition: transform 0.12s var(--ease-bounce); }
-.swatch:hover { transform: scale(1.12); }
-.swatch.active { border-color: var(--ink); }
-.swatch-custom { width: 28px; height: 28px; padding: 0; border: 1px solid var(--stroke); border-radius: 50%; background: none; cursor: pointer; }
 
 .pin-list { list-style: none; margin: 14px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .pin-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); }

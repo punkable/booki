@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.18.0",
+    date: "3 jul 2026",
+    headline: "Una tanda de pulido: todo más suave, más fino y más ligero.",
+    sections: [
+      {
+        icon: "🌊",
+        title: "Más suave",
+        notes: [
+          "La carátula se funde al cambiar de canción, los porcentajes (CPU/RAM/volumen) suben con un conteo animado, y anclar o quitar un icono se ve con una animación limpia.",
+          "Las pestañas de Ajustes entran con una transición sutil; los iconos se elevan un poquito al pasar el cursor.",
+        ],
+      },
+      {
+        icon: "🎯",
+        title: "Detalles útiles",
+        notes: [
+          "Clic central en un icono abre su ubicación en el Explorador; doble clic en un widget salta a su editor.",
+          "Ajustes recuerda la última pestaña que estabas viendo.",
+          "El puntito de 'app abierta' late suavemente y la sombra del dock se proyecta hacia el lado correcto según el borde.",
+        ],
+      },
+      {
+        icon: "🪶",
+        title: "Más ligero y limpio",
+        notes: [
+          "Un solo temporizador para los widgets que se detiene del todo cuando el dock está oculto — menos consumo de batería.",
+          "Limpieza interna de código y estilos sin uso.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.17.0",
     date: "3 jul 2026",
     headline: "El dock vertical ahora es fino de verdad y el reproductor se siente premium.",
