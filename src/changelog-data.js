@@ -3,6 +3,40 @@
 
 export const CHANGELOG = [
   {
+    version: "0.15.0",
+    date: "3 jul 2026",
+    headline: "El notch ya no se va al lado equivocado, y el dock vertical se ve parejo.",
+    sections: [
+      {
+        icon: "🎯",
+        title: "Posición arreglada",
+        notes: [
+          "Corregido: al elegir un borde, el dock y el notch a veces se seguían yendo abajo. Ahora el notch acompaña al dock donde lo pongas.",
+          "Todo lo de posición vive en un solo control visual: eliges el borde del dock y colocas el notch en la misma mini-pantalla.",
+          "Al cambiar de borde, la barra hace una transición suave en vez de saltar de golpe.",
+        ],
+      },
+      {
+        icon: "📊",
+        title: "Dock vertical y widgets",
+        notes: [
+          "En los laterales, todas las tarjetas (reloj, CPU, volumen, música…) se compactan en columna del mismo ancho: la barra queda pareja y estrecha.",
+          "Nuevo widget de volumen: rueda para subir/bajar, clic para silenciar.",
+          "El menú de clic derecho ahora muestra los widgets como una cuadrícula de emojis, mucho más compacta.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Perfiles y detalles",
+        notes: [
+          "Guarda configuraciones completas como perfiles y cámbialos con un clic; el activo se marca con ✓.",
+          "Empuja el cursor contra el borde de la pantalla para sacar el dock oculto (además de la pestañita).",
+          "Los iconos rebotan al abrir una app, y la app pesa un poco menos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2 jul 2026",
     headline: "Todo lo espacial en un solo control, perfiles y un dock más vivo.",
