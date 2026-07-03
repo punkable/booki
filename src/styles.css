@@ -167,8 +167,15 @@ body.edge-right { align-items: center; justify-content: flex-end; }
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
-body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: flex-start; }
-body.edge-right .dock { align-items: flex-end; }
+/* Vertical: center every child (app icons AND the wider widget cards) so the
+   side bar reads as one tidy column instead of a ragged left/right edge. */
+body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: center; }
+
+/* Compact density (opt-in) — tighter chrome for small screens. Tiles keep their
+   configured size; only the surrounding padding/gaps shrink. */
+body.compact .dock { padding: 4px 6px; gap: calc(var(--gap) * 0.6); }
+body.compact.edge-left .dock, body.compact.edge-right .dock { padding: 6px 4px; }
+body.compact .w-card { padding: 4px 8px; gap: 6px; }
 
 /* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
    suck-in, approximated with anchored scale + skew). --genie-ox points at where
@@ -350,7 +357,9 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .w-main { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
 .w-label {
   font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--ink-2);
+  /* Brighter than plain secondary ink so the tiny uppercase label stays legible
+     on the translucent glass card — especially in dark mode. */
+  text-transform: uppercase; color: color-mix(in srgb, var(--ink) 52%, var(--ink-2));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .w-value { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -529,9 +538,25 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   50% { transform: scale(1.06); }
 }
 .tile.widget.media .w-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Long song titles must not balloon the card (and with it, the whole bar). */
-.tile.widget.media .w-main { max-width: 118px; min-width: 0; }
+/* The media card keeps a FIXED footprint: async title/art loads (a long song
+   name arriving after the bar was laid out) must never resize — and jump —
+   the whole dock. The title scrolls inside instead of stretching the card. */
+.tile.widget.media { width: calc(var(--size) * 3.7); min-width: calc(var(--size) * 3.7); }
+.tile.widget.media .w-main { flex: 1 1 auto; min-width: 0; max-width: none; }
 .tile.widget.media .w-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Stat cards get stable widths too, so a value going 9%→100% (an extra digit)
+   can't nudge the bar. Digits are tabular so they don't shimmer either. */
+.w-value { font-variant-numeric: tabular-nums; }
+.tile.widget[data-widget="cpu"], .tile.widget[data-widget="ram"],
+.tile.widget[data-widget="disk"], .tile.widget[data-widget="battery"],
+.tile.widget[data-widget="volume"] {
+  width: calc(var(--size) * 2.5);
+  min-width: calc(var(--size) * 2.5);
+}
+.tile.widget[data-widget="net"], .tile.widget[data-widget="uptime"] {
+  width: calc(var(--size) * 2.9);
+  min-width: calc(var(--size) * 2.9);
+}
 /* Overflowing titles scroll in a gentle loop (the text is doubled in .mq, so a
    -50% slide lands exactly on the seam). Built in dock.js only on overflow. */
 .tile.widget.media .w-value.scroll { text-overflow: clip; }
@@ -552,7 +577,9 @@ body.edge-left .tile.widget .w-card, body.edge-right .tile.widget .w-card {
   flex-direction: column;
   gap: 5px;
   padding: 9px 8px 7px;
-  width: calc(var(--size) * 1.9);
+  /* ONE shared width for every widget card → the side bar is perfectly even.
+     Wide enough to hold the media transport row. */
+  width: calc(var(--size) * 2.4);
 }
 body.edge-left .tile.widget .w-main, body.edge-right .tile.widget .w-main {
   max-width: 100%;
@@ -598,8 +625,8 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
   background: color-mix(in srgb, var(--ink) 9%, transparent);
   color: var(--ink);
   line-height: 1;
-  width: 26px;
-  height: 26px;
+  width: 23px;
+  height: 23px;
   border-radius: 50%;
   cursor: pointer;
   display: grid;
@@ -607,9 +634,41 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
   transition: background 0.12s ease, transform 0.12s ease;
 }
 .w-ctl svg { display: block; }
-.w-ctl-toggle { width: 30px; height: 30px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.w-ctl-toggle { width: 27px; height: 27px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .w-ctl:active { transform: scale(0.9); }
+
+/* Vertical media: the card is a real column — art on top, artist, a scrolling
+   title, and a compact ALWAYS-VISIBLE controls row (no cramped hover overlay
+   in a narrow column). The card widens just enough to hold three buttons. */
+body.edge-left .tile.widget.media, body.edge-right .tile.widget.media {
+  width: auto;
+  min-width: 0;
+}
+/* Vertical media: the transport controls become an always-visible row under the
+   title (a hover overlay is unusable in a narrow column). Sized to fit the
+   shared card width. */
+body.edge-left .tile.widget.media .w-controls,
+body.edge-right .tile.widget.media .w-controls {
+  position: static;
+  inset: auto;
+  opacity: 1;
+  pointer-events: auto;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  gap: 5px;
+  margin-top: 2px;
+  width: 100%;
+}
+body.edge-left .tile.widget.media .w-ctl, body.edge-right .tile.widget.media .w-ctl {
+  width: 20px;
+  height: 20px;
+}
+body.edge-left .tile.widget.media .w-ctl-toggle, body.edge-right .tile.widget.media .w-ctl-toggle {
+  width: 24px;
+  height: 24px;
+}
 
 /* Volume card: muted reads at a glance (dimmed value + bar). */
 .tile.widget[data-widget="volume"].muted .w-value,

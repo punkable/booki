@@ -190,6 +190,9 @@ pub struct Config {
     /// edge reveals it (no need to find the notch).
     #[serde(default = "default_true")]
     pub hot_edge: bool,
+    /// Compact density: tighter padding/gaps for small screens.
+    #[serde(default)]
+    pub compact: bool,
     /// Position hotkeys: modifier+1…9 launches the Nth dock item.
     #[serde(default = "default_true")]
     pub position_hotkeys: bool,
@@ -235,6 +238,7 @@ impl Default for Config {
             onboarded: false,
             last_profile: String::new(),
             hot_edge: true,
+            compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
         }

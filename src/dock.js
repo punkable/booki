@@ -61,9 +61,7 @@ async function boot() {
     setupAutoHide();
     setupFileDrop();
     startRunningPoll();
-    startWidgetPoll();
-    startMediaPoll();
-    startVolumePoll();
+    startPolls();
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
@@ -101,9 +99,7 @@ async function reloadConfig() {
   const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
     await render();
-    startWidgetPoll();
-    startMediaPoll();
-    startVolumePoll();
+    startPolls();
   } else {
     fitDock(); // size/spacing may still have changed
   }
@@ -118,11 +114,34 @@ async function reloadConfig() {
     prev.notchPosition !== cfg.notchPosition;
   if (hideChanged) setupAutoHide();
   if (edgeSwapped) {
-    // Window is placed on the new edge now — let the bar pop back in.
+    // Briefly SHOW the dock in its new spot so the user actually sees it move —
+    // otherwise smart-hide (the settings window occludes the dock area) tucks it
+    // away and only the notch appears to move. (Notch-only changes preview the
+    // notch via notch_preview.) Then let the faded-out bar pop back in.
+    positionPreview();
     setTimeout(() => {
       requestAnimationFrame(() => document.body.classList.remove("edge-swap"));
     }, 90);
   }
+}
+
+// Show the dock in its current position for a few seconds regardless of
+// smart-hide occlusion — used as a live preview while tweaking position in
+// Settings. After the window elapses, normal hide behavior resumes.
+let previewing = false;
+let previewTimer = null;
+function positionPreview() {
+  previewing = true;
+  clearTimeout(previewTimer);
+  manualHide = false;
+  hiddenState = false;
+  document.body.classList.remove("tucked");
+  dockApi.revealDock();
+  applyFrame();
+  previewTimer = setTimeout(() => {
+    previewing = false;
+    setupAutoHide(); // return to whatever the hide mode wants
+  }, 2600);
 }
 
 function applyAll() {
@@ -148,23 +167,22 @@ function applyAll() {
   root.style.setProperty("--tile-r", `${cr}px`);
   root.style.setProperty("--dock-r", `${cr + 8}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
+  document.body.classList.toggle("compact", !!cfg.compact);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
   const style = cfg.magnifyStyle || "spring";
   const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
   root.style.setProperty("--mag-ease", ease);
-  // Genie minimize: aim the collapse at wherever the NOTCH actually sits — its
-  // own edge when set explicitly, else the dock's. Without this, a side-docked
-  // bar whose notch lives on another edge would funnel toward the wrong side.
+  // Genie minimize: the notch always sits on the dock's edge, so the bar funnels
+  // toward its along-position on that same edge.
   const ox = { start: 16.6, end: 83.4 }[cfg.notchPosition] ?? 50;
   root.style.setProperty("--genie-ox", `${ox}%`);
   root.style.setProperty("--genie-oxn", `${ox}`);
-  const notchEdge =
-    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : cfg.edge || "bottom";
+  const gedge = cfg.edge || "bottom";
   ["genie-bottom", "genie-top", "genie-left", "genie-right"].forEach((c) =>
     document.body.classList.remove(c)
   );
-  document.body.classList.add(`genie-${notchEdge}`);
+  document.body.classList.add(`genie-${gedge}`);
 }
 
 async function persist() {
@@ -441,7 +459,7 @@ function widgetTile(item) {
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
         await fn();
-        setTimeout(startMediaPoll, 350); // refresh title/state right away
+        setTimeout(refreshMedia, 350); // refresh title/state right away
       });
       controls.appendChild(b);
     };
@@ -520,97 +538,65 @@ function tickClocks() {
   });
 }
 
-let statsTimer = null;
-let clockTimer = null;
-function startWidgetPoll() {
-  clearInterval(clockTimer);
-  clearInterval(statsTimer);
-  clockTimer = null;
-  statsTimer = null;
-  const hasClock = cfg.pinned.some((p) => p.kind === "widget" && p.widget === "clock");
-  const needStats = () =>
-    cfg.pinned.some((p) => p.kind === "widget" && STAT_WIDGETS.includes(p.widget));
-  // Only run timers when there's actually a widget that needs them → zero idle
-  // cost when the dock has no widgets.
-  if (hasClock) {
-    tickClocks();
-    clockTimer = setInterval(tickClocks, 1000);
+// System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
+// every stat card on the bar.
+async function pollStats() {
+  let s;
+  try {
+    s = await dockApi.systemStats();
+  } catch (_) {
+    return;
   }
-  if (!needStats()) return;
-  const tick = async () => {
-    if (hiddenState) return;
-    let s;
-    try {
-      s = await dockApi.systemStats();
-    } catch (_) {
+  if (!s) return;
+  dockEl.querySelectorAll(".tile.widget").forEach((el) => {
+    const tp = el.dataset.widget;
+    if (tp === "cpu") setMetric(el, "CPU", Math.round(s.cpu));
+    else if (tp === "ram")
+      setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`);
+    else if (tp === "disk")
+      setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`);
+    else if (tp === "net")
+      setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net"));
+    else if (tp === "uptime")
+      setText(el, t("w.uptime"), fmtUptime(s.uptime_secs));
+    else if (tp === "battery") {
+      if (s.battery < 0) setText(el, t("w.battery"), "—");
+      else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
+    }
+  });
+}
+
+// Now-playing card: the system media session (Spotify, browser, …).
+async function pollMedia() {
+  const m = await dockApi.mediaInfo().catch(() => null);
+  dockEl.querySelectorAll('.tile.widget[data-widget="media"]').forEach((el) => {
+    const art = el.querySelector(".w-art");
+    const ico = el.querySelector(".w-ico");
+    const toggle = el.querySelector(".w-ctl-toggle");
+    if (!m) {
+      setText(el, t("w.media"), "—", t("w.media"));
+      delete el.dataset.mqTitle;
+      el.classList.remove("playing");
+      if (art) art.style.display = "none";
+      if (ico) ico.style.display = "";
+      if (toggle) toggle.innerHTML = MEDIA_SVG.play;
       return;
     }
-    if (!s) return;
-    dockEl.querySelectorAll(".tile.widget").forEach((el) => {
-      const tp = el.dataset.widget;
-      if (tp === "cpu") setMetric(el, "CPU", Math.round(s.cpu));
-      else if (tp === "ram")
-        setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`);
-      else if (tp === "disk")
-        setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`);
-      else if (tp === "net")
-        setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net"));
-      else if (tp === "uptime")
-        setText(el, t("w.uptime"), fmtUptime(s.uptime_secs));
-      else if (tp === "battery") {
-        if (s.battery < 0) setText(el, t("w.battery"), "—");
-        else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
-      }
-    });
-  };
-  tick();
-  statsTimer = setInterval(tick, 2500);
+    setMediaText(el, m.artist || t("w.media"), m.title || "—");
+    el.title = `${m.title} — ${m.artist}`;
+    el.classList.toggle("playing", !!m.playing);
+    if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+    if (art && m.thumb) {
+      art.src = m.thumb;
+      // Explicit "block": clearing the inline style would fall back to the
+      // stylesheet's display:none and the album art would never show up.
+      art.style.display = "block";
+      if (ico) ico.style.display = "none";
+    }
+  });
 }
 
-// Now-playing card: polls the system media session (Spotify, browser, …) only
-// while a media widget is pinned and the dock is visible.
-let mediaTimer = null;
-function startMediaPoll() {
-  clearInterval(mediaTimer);
-  mediaTimer = null;
-  if (!cfg.pinned.some((p) => p.kind === "widget" && p.widget === "media")) return;
-  const tick = async () => {
-    if (hiddenState) return;
-    const m = await dockApi.mediaInfo().catch(() => null);
-    dockEl.querySelectorAll('.tile.widget[data-widget="media"]').forEach((el) => {
-      const art = el.querySelector(".w-art");
-      const ico = el.querySelector(".w-ico");
-      const toggle = el.querySelector(".w-ctl-toggle");
-      if (!m) {
-        setText(el, t("w.media"), "—", t("w.media"));
-        delete el.dataset.mqTitle;
-        el.classList.remove("playing");
-        if (art) art.style.display = "none";
-        if (ico) ico.style.display = "";
-        if (toggle) toggle.innerHTML = MEDIA_SVG.play;
-        return;
-      }
-      setMediaText(el, m.artist || t("w.media"), m.title || "—");
-      el.title = `${m.title} — ${m.artist}`;
-      el.classList.toggle("playing", !!m.playing);
-      if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
-      if (art && m.thumb) {
-        art.src = m.thumb;
-        // Explicit "block": clearing the inline style would fall back to the
-        // stylesheet's display:none and the album art would never show up.
-        art.style.display = "block";
-        if (ico) ico.style.display = "none";
-      }
-    });
-  };
-  tick();
-  mediaTimer = setInterval(tick, 3000);
-}
-
-// System-volume card: scroll changes the volume, click toggles mute. A light
-// poll (only while a volume widget is pinned and the dock is visible) keeps it
-// honest when the volume changes from the keyboard or another app.
-let volumeTimer = null;
+// System volume — scroll changes it, click toggles mute.
 function renderVolume(pct, muted) {
   dockEl.querySelectorAll('.tile.widget[data-widget="volume"]').forEach((el) => {
     setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
@@ -619,18 +605,51 @@ function renderVolume(pct, muted) {
     if (img) img.src = `/emoji/${muted ? "speaker-mute" : "speaker"}.png`;
   });
 }
-function startVolumePoll() {
-  clearInterval(volumeTimer);
-  volumeTimer = null;
-  if (!cfg.pinned.some((p) => p.kind === "widget" && p.widget === "volume")) return;
-  const tick = async () => {
-    if (hiddenState) return;
-    const v = await dockApi.volumeInfo().catch(() => null);
-    if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
-  };
-  tick();
-  volumeTimer = setInterval(tick, 4000);
+async function pollVolume() {
+  const v = await dockApi.volumeInfo().catch(() => null);
+  if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
 }
+
+// ONE poll loop drives every live widget on its own cadence — a single timer
+// instead of three, and it does nothing while the dock is tucked away. Fewer
+// wakeups → lighter on the battery.
+let widgetPollTimer = null;
+let pollDue = { stats: 0, media: 0, volume: 0 };
+function widgetPresent(w) {
+  return cfg.pinned.some((p) => p.kind === "widget" && (Array.isArray(w) ? w.includes(p.widget) : p.widget === w));
+}
+function startPolls() {
+  clearInterval(widgetPollTimer);
+  widgetPollTimer = null;
+  const hasClock = widgetPresent("clock");
+  const hasStats = widgetPresent(STAT_WIDGETS);
+  const hasMedia = widgetPresent("media");
+  const hasVolume = widgetPresent("volume");
+  // Nothing live pinned → no timer at all (zero idle cost).
+  if (!hasClock && !hasStats && !hasMedia && !hasVolume) return;
+  // First paint immediately so cards aren't blank until the first tick, then
+  // schedule each poll a full interval out (no wasteful double-poll at start).
+  if (hasClock) tickClocks();
+  if (hasStats) pollStats();
+  if (hasMedia) pollMedia();
+  if (hasVolume) pollVolume();
+  const t0 = Date.now();
+  pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000 };
+  // Base cadence: 1 s only when a clock needs the second/minute rollover;
+  // otherwise 1.5 s is plenty and lighter.
+  const base = hasClock ? 1000 : 1500;
+  widgetPollTimer = setInterval(() => {
+    if (hiddenState) return; // don't poll a tucked-away dock
+    const now = Date.now();
+    if (hasClock) tickClocks();
+    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
+    if (hasMedia && now >= pollDue.media) { pollDue.media = now + 3000; pollMedia(); }
+    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + 4000; pollVolume(); }
+  }, base);
+}
+// Nudge a specific poll right away (e.g. after a transport/volume button).
+function refreshMedia() { pollDue.media = 0; if (!hiddenState) pollMedia(); }
+function refreshVolume() { pollDue.volume = 0; if (!hiddenState) pollVolume(); }
 
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
@@ -660,8 +679,8 @@ function launch(el, item) {
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
   if (item.kind === "widget") {
-    if (item.widget === "media") dockApi.mediaToggle().then(() => startMediaPoll());
-    if (item.widget === "volume") dockApi.volumeMute().then(() => startVolumePoll());
+    if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia);
+    if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -1648,6 +1667,7 @@ function onOcclusionSignal(value) {
   // Going back to work in an app releases a manual swipe-hide: next time the
   // desktop is clear, normal smart behavior resumes.
   if (value) manualHide = false;
+  if (previewing) return; // a live position preview owns visibility for now
   if (fullscreen) return; // blackout owns the visibility while fullscreen
   if (draggingFile) return; // never tuck away mid file-drag (the drop needs us)
   if (manualHide) return; // stay hidden until the user asks for the dock again
