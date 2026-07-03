@@ -9,16 +9,12 @@ import { applyAccent } from "./util-color.js";
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
 
-let lastCfg = null; // latest config, for the click handler below
-
 async function applyLook() {
   try {
     const cfg = await configApi.get();
-    lastCfg = cfg;
     if (cfg.accent) applyAccent(root, cfg.accent);
-    // The notch may live on its own edge ("auto" = follow the dock).
-    const edge =
-      cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : cfg.edge || "bottom";
+    // The notch always lives on the dock's edge now.
+    const edge = cfg.edge || "bottom";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
     document.body.classList.toggle("peek", cfg.notchPeek !== false);
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
@@ -85,17 +81,9 @@ pill.addEventListener("pointerup", (e) => {
     pill.releasePointerCapture(e.pointerId);
   } catch (_) {}
   if (!d.moved) {
-    // A plain click brings the dock back — ON THE NOTCH'S EDGE. If the notch
-    // lives on a side/top, the dock adapts and comes out vertical there,
-    // instead of appearing on some other edge far from where you clicked.
-    const ne = lastCfg && lastCfg.notchEdge && lastCfg.notchEdge !== "auto"
-      ? lastCfg.notchEdge
-      : null;
-    if (ne && lastCfg && ne !== (lastCfg.edge || "bottom")) {
-      invoke("set_dock_edge", { edge: ne }).then(() => invoke("notch_reveal"));
-    } else {
-      invoke("notch_reveal");
-    }
+    // The notch always lives on the dock's own edge, so a plain click just
+    // brings the dock back where it is.
+    invoke("notch_reveal");
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.

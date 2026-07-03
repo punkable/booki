@@ -24,12 +24,16 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
+  // Strip license/legal comment blocks from the bundled output (they're kept in
+  // the repo's LICENSE files) — a small, safe size trim.
+  esbuild: { legalComments: "none" },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
     // Tauri uses Chromium on Windows (WebView2 / Edge) — target evergreen
     target: "es2021",
     minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
+    cssMinify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     rollupOptions: {
       input: {
