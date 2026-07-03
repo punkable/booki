@@ -48,6 +48,9 @@ const DEMO_CONFIG = {
   materialStrength: 70,
   autostart: false,
   language: "system",
+  hotEdge: true,
+  compact: false,
+  lastProfile: "",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it

@@ -3,6 +3,39 @@
 
 export const CHANGELOG = [
   {
+    version: "0.16.0",
+    date: "3 jul 2026",
+    headline: "El notch lleva el dock consigo, el reproductor se adapta y la barra ya no salta.",
+    sections: [
+      {
+        icon: "🧲",
+        title: "Notch y dock, siempre juntos",
+        notes: [
+          "Ahora el notch y el dock viven en el mismo borde: al mover el notch (arrastrándolo o desde el control de posición), el dock lo acompaña.",
+          "Al cambiar la posición en Ajustes, el dock aparece un momento en su nuevo sitio para que veas el cambio en vivo (antes solo se movía el notch).",
+        ],
+      },
+      {
+        icon: "🎚️",
+        title: "Widgets y reproductor verticales",
+        notes: [
+          "Con el dock en un lateral, todas las tarjetas se ordenan en columnas del mismo ancho: la barra queda pareja.",
+          "El reproductor muestra carátula, título desplazándose y los botones anterior/pausa/siguiente en su propia fila, sin comprimirse.",
+          "Arreglado: la barra ya no cambia de tamaño ni salta cuando llega el título de una canción o cambia un porcentaje.",
+        ],
+      },
+      {
+        icon: "🪶",
+        title: "Más ligero y accesible",
+        notes: [
+          "Modo compacto opcional (densidad más apretada para pantallas pequeñas).",
+          "Un solo temporizador para todos los widgets: menos consumo y mejor batería.",
+          "Etiquetas de los widgets más legibles en tema oscuro.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.15.0",
     date: "3 jul 2026",
     headline: "El notch ya no se va al lado equivocado, y el dock vertical se ve parejo.",

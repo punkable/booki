@@ -171,19 +171,21 @@ function SegmentedControl({ value, options, onChange }) {
   );
 }
 
-// Click an edge of a mini screen to anchor the dock there.
-// ONE control for everything spatial: click an edge band to move the DOCK
-// there (the live mini bar follows), click a little tab to place the NOTCH.
-// Replaces the old separate edge picker + notch picker + preview trio.
+// ONE control for position. The dock and its notch always live on the SAME
+// edge — so clicking an edge band OR a notch tab moves the DOCK there (the
+// notch just picks its spot along that edge). No more "notch on a lonely other
+// edge" that used to drift the dock to the wrong place.
 function PositionPicker({ cfg, set }) {
   const dockEdge = cfg.edge || "bottom";
   const pos = cfg.notchPosition || "center";
-  const notchEdge =
-    cfg.notchEdge && cfg.notchEdge !== "auto" ? cfg.notchEdge : dockEdge;
   const showNotch = (cfg.autoHideMode || "smart") !== "off";
+  // A notch tab sets the dock's edge AND the notch's along-position at once.
   const pickNotch = (edge, position) => {
-    set({ notchEdge: edge === dockEdge ? "auto" : edge, notchPosition: position });
-    dockApi.notchPreview(); // flash the real notch so the choice is visible
+    const moved = edge !== dockEdge;
+    set({ edge, notchPosition: position, notchEdge: "auto" });
+    // Same edge → the dock won't move, so flash the notch to show the new spot.
+    // Different edge → reloadConfig already previews the dock on its new edge.
+    if (!moved) dockApi.notchPreview();
   };
   const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter((p) => p.kind !== "separator").length || 5));
   const posLabel = (s) => t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`);
@@ -212,10 +214,10 @@ function PositionPicker({ cfg, set }) {
                 type="button"
                 className={
                   `notchpick-slot npe-${edge} nps-${s}` +
-                  (notchEdge === edge && pos === s ? " active" : "")
+                  (dockEdge === edge && pos === s ? " active" : "")
                 }
                 onClick={() => pickNotch(edge, s)}
-                title={`Notch: ${t(`edge.${edge}`)} · ${posLabel(s)}`}
+                title={`${t("be.moveDock")}: ${t(`edge.${edge}`)} · ${posLabel(s)}`}
               >
                 <span className="notchpick-tab" />
               </button>
@@ -226,13 +228,7 @@ function PositionPicker({ cfg, set }) {
         Dock: <strong>{t(`edge.${dockEdge}`)}</strong>
         {showNotch && (
           <>
-            {" · "}Notch:{" "}
-            <strong>
-              {cfg.notchEdge && cfg.notchEdge !== "auto"
-                ? t(`edge.${notchEdge}`)
-                : t("be.notchAuto")}
-            </strong>{" "}
-            ({posLabel(pos)})
+            {" · "}Notch: <strong>{posLabel(pos)}</strong>
           </>
         )}
       </p>
@@ -756,6 +752,8 @@ function Appearance({ cfg, set }) {
         <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
           onChange={(v) => set({ cornerRadius: v })} />
       </Row>
+      <Toggle label={t("ap.compact")} checked={!!cfg.compact}
+        onChange={(v) => set({ compact: v })} />
 
       <h2 className="s-subhead">{t("gp.material")}</h2>
       <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
