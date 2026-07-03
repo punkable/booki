@@ -89,6 +89,12 @@ async function boot() {
 async function reloadConfig() {
   const prev = cfg;
   cfg = await configApi.get();
+  // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
+  // instantly, the window moves, and the bar pops back in on the new edge.
+  const edgeSwapped = prev && prev.edge !== cfg.edge;
+  if (edgeSwapped) {
+    document.body.classList.add("edge-swap");
+  }
   applyAll();
   // Only rebuild the bar when the pinned items actually changed — sliders and
   // toggles in Settings shouldn't make the whole dock flash.
@@ -111,6 +117,12 @@ async function reloadConfig() {
     prev.notchPeek !== cfg.notchPeek ||
     prev.notchPosition !== cfg.notchPosition;
   if (hideChanged) setupAutoHide();
+  if (edgeSwapped) {
+    // Window is placed on the new edge now — let the bar pop back in.
+    setTimeout(() => {
+      requestAnimationFrame(() => document.body.classList.remove("edge-swap"));
+    }, 90);
+  }
 }
 
 function applyAll() {
@@ -1304,22 +1316,34 @@ async function openBackgroundMenu(e) {
   add("plus", t("m.addApp"), onAddApp);
   add("app", t("m.addFolder"), onAddFolder);
   sep();
-  add("grid", t("w.add.clock"), () => addWidget("clock"));
-  add("grid", t("w.add.cpu"), () => addWidget("cpu"));
-  add("grid", t("w.add.ram"), () => addWidget("ram"));
-  add("grid", t("w.add.disk"), () => addWidget("disk"));
-  add("grid", t("w.add.net"), () => addWidget("net"));
-  add("grid", t("w.add.uptime"), () => addWidget("uptime"));
-  add("grid", t("w.add.battery"), () => addWidget("battery"));
-  add("grid", t("w.add.notes"), () => addWidget("notes"));
-  add("grid", t("w.add.media"), () => addWidget("media"));
-  add("grid", t("w.add.volume"), () => addWidget("volume"));
-  // Saved profiles → one-click switch, right from the dock.
+  // Widgets as a compact chip grid (emoji + tooltip) — ten text rows would
+  // make the menu taller than the screen's worth of attention.
+  const gridLabel = document.createElement("div");
+  gridLabel.className = "menu-label";
+  gridLabel.textContent = t("m.widgets");
+  ctxMenu.appendChild(gridLabel);
+  const grid = document.createElement("div");
+  grid.className = "menu-grid";
+  for (const type of WIDGETS) {
+    const chip = document.createElement("button");
+    chip.className = "menu-chip";
+    chip.title = widgetLabel(type);
+    chip.innerHTML = emo(WIDGET_ICONS[type] || "puzzle", 20);
+    chip.addEventListener("click", async () => {
+      closeMenu();
+      await addWidget(type);
+    });
+    grid.appendChild(chip);
+  }
+  ctxMenu.appendChild(grid);
+  // Saved profiles → one-click switch, right from the dock. The active one
+  // (last applied/saved) is marked with a check.
   const profiles = await dockApi.profileList().catch(() => []);
   if (Array.isArray(profiles) && profiles.length) {
     sep();
     for (const name of profiles.slice(0, 6)) {
-      add("sparkles", `${t("m.profile")}: ${esc(name)}`, async () => {
+      const active = name === (cfg.lastProfile || "");
+      add(active ? "check" : "sparkles", `${t("m.profile")}: ${esc(name)}`, async () => {
         const fresh = await dockApi.profileApply(name).catch(() => null);
         if (fresh) {
           cfg = fresh;

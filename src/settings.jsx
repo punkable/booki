@@ -195,7 +195,7 @@ function PositionPicker({ cfg, set }) {
             key={e}
             type="button"
             className={`pospick-edge pp-${e}` + (dockEdge === e ? " active" : "")}
-            onClick={() => set({ edge: e })}
+            onClick={() => set({ edge: e, notchEdge: "auto" })}
             title={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
             aria-label={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
           />
@@ -241,20 +241,24 @@ function PositionPicker({ cfg, set }) {
 }
 
 // Saved dock profiles: whole-config snapshots you switch between in one click.
-function ProfilesCard({ set }) {
+function ProfilesCard({ cfg, set }) {
   const [profiles, setProfiles] = useState([]);
   const [name, setName] = useState("");
   const refresh = () => dockApi.profileList().then((p) => setProfiles(p || []));
   useEffect(() => {
     refresh();
   }, []);
+  const active = (cfg && cfg.lastProfile) || "";
   return (
     <div className="s-card-inner">
       <h3>{t("prof.title")}</h3>
       <p className="muted">{t("prof.hint")}</p>
       {profiles.map((n) => (
-        <div key={n} className="prof-row">
-          <span className="prof-name">{n}</span>
+        <div key={n} className={"prof-row" + (n === active ? " prof-active" : "")}>
+          <span className="prof-name">
+            {n === active && <span className="prof-check">✓</span>}
+            {n}
+          </span>
           <button
             className="s-btn s-btn-soft"
             onClick={async () => {
@@ -881,7 +885,7 @@ function Behavior({ cfg, set }) {
         </Row>
       )}
 
-      <ProfilesCard set={set} />
+      <ProfilesCard cfg={cfg} set={set} />
     </>
   );
 }
