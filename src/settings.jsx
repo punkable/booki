@@ -1612,7 +1612,14 @@ function About({ version, onWhatsNew, onReset }) {
 
 function App() {
   const [cfg, setCfg] = useState(null);
-  const [tab, setTab] = useState("appearance");
+  // Reopen on the last tab the user was looking at.
+  const [tab, setTabRaw] = useState(() => {
+    try { return localStorage.getItem("booki.lastTab") || "appearance"; } catch (_) { return "appearance"; }
+  });
+  const setTab = (t) => {
+    setTabRaw(t);
+    try { localStorage.setItem("booki.lastTab", t); } catch (_) {}
+  };
   const [version, setVersion] = useState("0.1.0");
   const [showChangelog, setShowChangelog] = useState(false);
   const [query, setQuery] = useState("");
@@ -1745,11 +1752,14 @@ function App() {
         </div>
       </aside>
       <main className="s-content">
-        {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
-        {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
-        {tab === "apps" && <Apps cfg={cfg} set={set} />}
-        {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
-        {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
+        {/* key={tab} remounts on switch → the panel fades/slides in smoothly. */}
+        <div className="s-panel-in" key={tab}>
+          {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
+          {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
+          {tab === "apps" && <Apps cfg={cfg} set={set} />}
+          {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
+          {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
+        </div>
       </main>
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
     </div>

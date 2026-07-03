@@ -137,6 +137,7 @@ function positionPreview() {
   hiddenState = false;
   document.body.classList.remove("tucked");
   dockApi.revealDock();
+  startPolls(); // visible again → resume live widgets
   applyFrame();
   previewTimer = setTimeout(() => {
     previewing = false;
@@ -191,6 +192,21 @@ async function persist() {
 
 // ──────────────────────────── Render ────────────────────────────
 
+// Cache of live-widget elements by type, rebuilt on each render so the poll
+// loop never re-queries the DOM every tick. Invalidated (rebuilt) below.
+let widgetEls = {};
+function cacheWidgetEls() {
+  widgetEls = {};
+  dockEl.querySelectorAll(".tile.widget").forEach((el) => {
+    const w = el.dataset.widget || "";
+    (widgetEls[w] || (widgetEls[w] = [])).push(el);
+  });
+}
+
+// Remember which ids were on the bar last render, so only genuinely NEW tiles
+// animate in (not every tile on an unrelated re-render).
+let lastRenderIds = new Set();
+
 async function render() {
   // Build every tile in parallel and swap the whole bar in ONE DOM operation —
   // no icons popping in one by one, no empty-bar flash between renders.
@@ -203,7 +219,15 @@ async function render() {
       return appTile(item);
     })
   );
+  // Fade+scale in only the tiles that weren't on the bar before.
+  const prevIds = lastRenderIds;
+  for (const el of tiles) {
+    const id = el.dataset && el.dataset.id;
+    if (id && !prevIds.has(id)) el.classList.add("tile-in");
+  }
   dockEl.replaceChildren(...tiles);
+  lastRenderIds = new Set(cfg.pinned.map((p) => p.id));
+  cacheWidgetEls();
 
   // Friendly empty state: a "+" tile that opens Settings on the Pinned-apps tab
   // (suggestions, widgets, tips) — much clearer than a bare file picker.
@@ -490,11 +514,36 @@ function fmtUptime(s) {
   return `${m}m`;
 }
 
+const REDUCE_MOTION =
+  typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Animate an integer from its previous value to the next over ~320ms (easeOut),
+// so CPU/RAM/volume tick up smoothly instead of snapping. Cheap: one rAF chain
+// per metric, and it no-ops when the value is unchanged or motion is reduced.
+function tweenNumber(el, to, fmt) {
+  const from = Number(el.dataset.v);
+  el.dataset.v = String(to);
+  if (REDUCE_MOTION || !Number.isFinite(from) || from === to) {
+    el.textContent = fmt(to);
+    return;
+  }
+  const t0 = performance.now();
+  const dur = 320;
+  const step = (now) => {
+    const p = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(Math.round(from + (to - from) * e));
+    if (p < 1 && el.dataset.v === String(to)) requestAnimationFrame(step);
+    else el.textContent = fmt(to);
+  };
+  requestAnimationFrame(step);
+}
+
 // Set a percentage metric (CPU/RAM/disk): label + value% + bar. Extra detail
 // goes in the tooltip so nothing overflows the compact card.
 function setMetric(el, label, val, title) {
   el.querySelector(".w-label").textContent = label;
-  el.querySelector(".w-value").textContent = `${val}%`;
+  tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
   const bar = el.querySelector(".w-bar");
   bar.style.display = "";
   bar.querySelector("i").style.width = `${Math.min(100, Math.max(0, val))}%`;
@@ -527,19 +576,23 @@ function setMediaText(el, artist, title) {
   }
 }
 
+// Run fn over every cached element of a widget type (no per-tick DOM query).
+function eachWidget(type, fn) {
+  const list = widgetEls[type];
+  if (list) list.forEach(fn);
+}
+
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
   const now = new Date();
   const loc = curLang() === "en" ? "en-US" : "es-ES";
   const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
   const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
-  dockEl.querySelectorAll('.tile.widget[data-widget="clock"]').forEach((el) => {
-    setText(el, date, time);
-  });
+  eachWidget("clock", (el) => setText(el, date, time));
 }
 
 // System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
-// every stat card on the bar.
+// every stat card on the bar (from the cached element map).
 async function pollStats() {
   let s;
   try {
@@ -548,28 +601,24 @@ async function pollStats() {
     return;
   }
   if (!s) return;
-  dockEl.querySelectorAll(".tile.widget").forEach((el) => {
-    const tp = el.dataset.widget;
-    if (tp === "cpu") setMetric(el, "CPU", Math.round(s.cpu));
-    else if (tp === "ram")
-      setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`);
-    else if (tp === "disk")
-      setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`);
-    else if (tp === "net")
-      setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net"));
-    else if (tp === "uptime")
-      setText(el, t("w.uptime"), fmtUptime(s.uptime_secs));
-    else if (tp === "battery") {
-      if (s.battery < 0) setText(el, t("w.battery"), "—");
-      else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
-    }
+  eachWidget("cpu", (el) => setMetric(el, "CPU", Math.round(s.cpu)));
+  eachWidget("ram", (el) =>
+    setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`));
+  eachWidget("disk", (el) =>
+    setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`));
+  eachWidget("net", (el) =>
+    setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net")));
+  eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
+  eachWidget("battery", (el) => {
+    if (s.battery < 0) setText(el, t("w.battery"), "—");
+    else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
   });
 }
 
 // Now-playing card: the system media session (Spotify, browser, …).
 async function pollMedia() {
   const m = await dockApi.mediaInfo().catch(() => null);
-  dockEl.querySelectorAll('.tile.widget[data-widget="media"]').forEach((el) => {
+  eachWidget("media", (el) => {
     const art = el.querySelector(".w-art");
     const ico = el.querySelector(".w-ico");
     const toggle = el.querySelector(".w-ctl-toggle");
@@ -577,7 +626,7 @@ async function pollMedia() {
       setText(el, t("w.media"), "—", t("w.media"));
       delete el.dataset.mqTitle;
       el.classList.remove("playing");
-      if (art) art.style.display = "none";
+      if (art) { art.style.display = "none"; art.removeAttribute("data-src"); }
       if (ico) ico.style.display = "";
       if (toggle) toggle.innerHTML = MEDIA_SVG.play;
       return;
@@ -587,9 +636,13 @@ async function pollMedia() {
     el.classList.toggle("playing", !!m.playing);
     if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
     if (art && m.thumb) {
-      art.src = m.thumb;
-      // Explicit "block": clearing the inline style would fall back to the
-      // stylesheet's display:none and the album art would never show up.
+      // Cross-fade the album art when the track's art actually changes.
+      if (art.dataset.src !== m.thumb) {
+        art.dataset.src = m.thumb;
+        art.style.opacity = "0";
+        art.onload = () => { art.style.opacity = "1"; };
+        art.src = m.thumb;
+      }
       art.style.display = "block";
       if (ico) ico.style.display = "none";
     }
@@ -598,7 +651,7 @@ async function pollMedia() {
 
 // System volume — scroll changes it, click toggles mute.
 function renderVolume(pct, muted) {
-  dockEl.querySelectorAll('.tile.widget[data-widget="volume"]').forEach((el) => {
+  eachWidget("volume", (el) => {
     setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
     el.classList.toggle("muted", muted);
     const img = el.querySelector(".w-ico img");
@@ -618,9 +671,14 @@ let pollDue = { stats: 0, media: 0, volume: 0 };
 function widgetPresent(w) {
   return cfg.pinned.some((p) => p.kind === "widget" && (Array.isArray(w) ? w.includes(p.widget) : p.widget === w));
 }
+function stopPolls() {
+  clearInterval(widgetPollTimer);
+  widgetPollTimer = null;
+}
 function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  if (hiddenState) return; // tucked away → stay idle until revealed
   const hasClock = widgetPresent("clock");
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
@@ -787,7 +845,16 @@ function magnify(clientX, clientY) {
     const dist = Math.abs(pointer - center);
     const influence = Math.max(0, 1 - (dist / spread) ** 2);
     const scale = noMag ? 1 : 1 + (maxScale - 1) * influence;
-    t.style.transform = `scale(${scale.toFixed(3)})`;
+    // A small lift toward the screen interior, on top of the zoom, for depth.
+    // (translate BEFORE scale so the lift stays a constant number of px.)
+    const lift = noMag ? 0 : Math.round(influence * 6);
+    let liftTf = "";
+    if (lift) {
+      liftTf = vertical
+        ? `translateX(${cfg.edge === "left" ? lift : -lift}px) `
+        : `translateY(${cfg.edge === "top" ? lift : -lift}px) `;
+    }
+    t.style.transform = `${liftTf}scale(${scale.toFixed(3)})`;
     if (!noMag && influence > bestInf) {
       bestInf = influence;
       best = t;
@@ -853,7 +920,25 @@ async function maybeOnboard() {
 
 // Double-click the empty bar → open Settings (quick, intuitive).
 dockEl.addEventListener("dblclick", (e) => {
-  if (!closestSel(e.target, ".tile")) dockApi.openSettings();
+  const tile = closestSel(e.target, ".tile");
+  if (!tile) {
+    dockApi.openSettings(); // double-click the empty bar → Settings
+    return;
+  }
+  // Double-click a widget → jump to its editor (styles/colors live in Apps).
+  if (tile.classList.contains("widget")) dockApi.openSettingsTab("apps");
+});
+
+// Middle-click an app/folder/file pin → open its location in Explorer.
+dockEl.addEventListener("auxclick", (e) => {
+  if (e.button !== 1) return;
+  const tile = closestSel(e.target, ".tile");
+  if (!tile || !tile.dataset.id) return;
+  const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
+  if (item && item.path && (item.kind === "app" || item.kind === "folder")) {
+    e.preventDefault();
+    dockApi.openLocation(item.path);
+  }
 });
 
 // Press-hold the empty bar and drag it toward its edge → tuck the dock away
@@ -892,7 +977,9 @@ dockEl.addEventListener(
     // The volume card is the exception: scrolling it changes the volume
     // (the natural gesture), not the visual variant.
     if (w.dataset.widget === "volume") {
-      const cur = parseInt(w.querySelector(".w-value").textContent, 10) || 0;
+      // Read the settled value (dataset.v), not the tween's mid-animation text.
+      const vEl = w.querySelector(".w-value");
+      const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
       const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
       renderVolume(next, false); // optimistic — the poll corrects if needed
       dockApi.volumeSet(next);
@@ -1471,6 +1558,12 @@ async function addSeparatorAfter(id) {
   reframe();
 }
 async function removeItem(id) {
+  // Play a quick fade+scale-out on the tile before the re-render swaps it away.
+  const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
+  if (el && !REDUCE_MOTION) {
+    el.classList.add("tile-out");
+    await new Promise((r) => setTimeout(r, 170));
+  }
   cfg.pinned = cfg.pinned.filter((a) => a.id !== id);
   await persist();
   await render();
@@ -1577,6 +1670,7 @@ function onFullscreenSignal(value) {
     pinnedReveal = false;
     manualReveal = false;
     hiddenState = true;
+    stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
     dockApi.notchToast(t("fs.hidden")); // hides the dock + shows the toast on the notch
     blackoutTimer = setTimeout(() => {
@@ -1597,6 +1691,10 @@ function hideMode() {
 function setHidden(v) {
   if (v === hiddenState) return;
   hiddenState = v;
+  // Fully STOP the widget poll while tucked away (not just skip it) — a truly
+  // idle dock burns no timer wakeups; it resumes the moment it reappears.
+  if (v) stopPolls();
+  else startPolls();
   if (v) {
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
@@ -1632,6 +1730,9 @@ function setupAutoHide() {
   // pin the dock open).
   if (hiddenState) dockApi.hideDock(cfg.edge);
   else dockApi.revealDock();
+  // Keep the poll loop in step with visibility (idle when tucked away).
+  if (hiddenState) stopPolls();
+  else startPolls();
 }
 
 // Pointer entered the dock → reveal and hold it open.
