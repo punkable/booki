@@ -664,15 +664,19 @@ body.edge-left .tile.widget.media, body.edge-right .tile.widget.media {
 body.edge-left .tile.widget.media .w-controls,
 body.edge-right .tile.widget.media .w-controls {
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 body.edge-left .tile.widget.media .w-ctl, body.edge-right .tile.widget.media .w-ctl {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 body.edge-left .tile.widget.media .w-ctl-toggle, body.edge-right .tile.widget.media .w-ctl-toggle {
-  width: 28px;
-  height: 28px;
+  width: 21px;
+  height: 21px;
+}
+body.edge-left .tile.widget.media .w-ctl svg, body.edge-right .tile.widget.media .w-ctl svg {
+  width: 11px;
+  height: 11px;
 }
 
 /* Volume card: muted reads at a glance (dimmed value + bar). */
