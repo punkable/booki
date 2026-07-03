@@ -54,17 +54,26 @@
 
 - **Dock, not a taskbar** — pin apps, folders, files, pictures (with their own
   thumbnail) and websites (with their favicon). Click launches or focuses;
-  drag from the desktop to pin; drag out to unpin; position hotkeys (Alt+1…9).
-- **Live widgets** — clock, CPU, RAM, disk, network, uptime, battery, quick notes
-  and a **now-playing media card** (album art + prev/play/next controls). Every
-  widget is visually editable: glass/solid/gradient/outline/minimal, colors, animation.
+  icons **bounce** as the app opens; drag from the desktop to pin; drag out to
+  unpin; position hotkeys (Alt+1…9).
+- **Live widgets** — clock, CPU, RAM, disk, network, uptime, battery, quick notes,
+  a **system-volume card** (scroll to change, click to mute) and a **now-playing
+  media card** (album art + prev/play/next, scrolling title, and a compact
+  vertical layout when the dock sits on a side). Every widget is visually
+  editable: glass/solid/gradient/outline/minimal, colors, animation.
 - **Recycle Bin in the dock** — drop files on it, confirm, and they go to the
   Windows Recycle Bin (always recoverable). Drop files on a folder pin to move
   them there (undoable with Ctrl+Z).
 - **Smart hide + notch** — the dock tucks away with a genie animation and leaves
   a slim glass tab (the *notch*) blended into the taskbar edge, iPhone-notch
   style. Five notch finishes (island, liquid glass, mica, acrylic, Windows), any
-  edge, any position. Fullscreen games and movies black everything out.
+  edge, any position. Push the cursor into the screen edge (or click the notch)
+  to bring it back. Fullscreen games and movies black everything out.
+- **One control for position** — a single mini-screen sets the dock's edge and
+  the notch's spot at once; the notch follows the dock, and switching edges
+  fades the bar across smoothly.
+- **Dock profiles** — save whole setups (e.g. *Work* / *Gaming*) and switch with
+  one click from Settings or the dock's right-click menu.
 - **Deep customization** — light/dark/system/**auto-by-hour** theme, accent from
   a palette, the system or **your wallpaper**, icon size/spacing/roundness,
   translucency, magnify-on-hover, four anchor edges, multi-monitor, ES/EN,

@@ -488,13 +488,19 @@ fn profile_list() -> Vec<String> {
     names
 }
 
-/// Snapshot the CURRENT config under the given name (overwrites).
+/// Snapshot the CURRENT config under the given name (overwrites), and mark it
+/// as the active profile.
 #[tauri::command]
-fn profile_save(name: String) -> Result<(), String> {
+fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
     let path = profile_file(&name)?;
     std::fs::create_dir_all(profiles_dir()).map_err(|e| e.to_string())?;
-    let text = serde_json::to_string_pretty(&config::load()).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| e.to_string())
+    let mut cfg = config::load();
+    cfg.last_profile = name.trim().to_string();
+    let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
+    std::fs::write(path, text).map_err(|e| e.to_string())?;
+    config::save(&cfg)?;
+    let _ = app.emit("booki://config-changed", ());
+    Ok(())
 }
 
 /// Make the named profile the active config; repositions windows and tells
@@ -503,7 +509,8 @@ fn profile_save(name: String) -> Result<(), String> {
 fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
     let path = profile_file(&name)?;
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    cfg.last_profile = name.trim().to_string();
     config::save(&cfg)?;
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);

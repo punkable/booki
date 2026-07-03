@@ -196,6 +196,20 @@ body.autohide.tucked.genie-right .dock {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
 }
 
+/* Edge change: hide the bar instantly while its window teleports to the new
+   edge, then pop it back in (the class is removed a beat later in dock.js). */
+body.edge-swap .dock {
+  opacity: 0;
+  transform: scale(0.92);
+  transition: none !important;
+}
+body:not(.edge-swap):not(.tucked) .dock {
+  transition: transform 0.32s var(--ease-bounce), opacity 0.22s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.edge-swap .dock { transform: none; }
+}
+
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 /* Grouped app suggestions (by Start-menu folder). */
@@ -526,38 +540,40 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 @keyframes w-mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .w-value .mq { animation: none; } }
 
-/* Vertical dock → the media card turns into a compact column (art on top,
-   scrolling title below) instead of a wide horizontal strip that stretches
-   the whole bar sideways. */
-body.edge-left .tile.widget.media, body.edge-right .tile.widget.media {
+/* Vertical dock → EVERY widget card turns into a compact column (icon or art
+   on top, label/value/bar below) with one shared width, so the side bar stays
+   even and narrow instead of being stretched by horizontal strips. */
+body.edge-left .tile.widget, body.edge-right .tile.widget {
   width: auto;
   min-width: 0;
   height: auto;
 }
-body.edge-left .tile.widget.media .w-card, body.edge-right .tile.widget.media .w-card {
+body.edge-left .tile.widget .w-card, body.edge-right .tile.widget .w-card {
   flex-direction: column;
   gap: 5px;
   padding: 9px 8px 7px;
-  /* same footprint as the other widget cards so the vertical bar stays even */
   width: calc(var(--size) * 1.9);
 }
-body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
-  width: calc(var(--size) * 0.95);
-  height: calc(var(--size) * 0.95);
-  border-radius: 10px;
-}
-body.edge-left .tile.widget.media .w-main, body.edge-right .tile.widget.media .w-main {
+body.edge-left .tile.widget .w-main, body.edge-right .tile.widget .w-main {
   max-width: 100%;
   width: 100%;
   align-items: center;
   text-align: center;
 }
-body.edge-left .tile.widget.media .w-label, body.edge-right .tile.widget.media .w-label,
-body.edge-left .tile.widget.media .w-value, body.edge-right .tile.widget.media .w-value {
+body.edge-left .tile.widget .w-label, body.edge-right .tile.widget .w-label,
+body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value {
   max-width: 100%;
 }
-body.edge-left .tile.widget.media .w-value, body.edge-right .tile.widget.media .w-value {
+body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value {
   font-size: 12px;
+}
+body.edge-left .tile.widget .w-bar, body.edge-right .tile.widget .w-bar {
+  width: 100%;
+}
+body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
+  width: calc(var(--size) * 0.95);
+  height: calc(var(--size) * 0.95);
+  border-radius: 10px;
 }
 /* Hover controls: prev · play/pause · next as a floating glass strip. */
 .tile.widget.media { position: relative; }
@@ -1253,6 +1269,32 @@ body.edge-right .stack { transform-origin: center right; }
 .menu button:hover { background: var(--hover); }
 .menu button svg { width: 16px; height: 16px; opacity: 0.8; }
 .menu .sep { height: 1px; margin: 5px 8px; background: var(--stroke); }
+/* Widget chips: a compact emoji grid instead of ten text rows. */
+.menu .menu-label {
+  padding: 4px 10px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.menu .menu-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 2px 6px 4px;
+}
+.menu .menu-chip {
+  display: grid;
+  place-items: center;
+  width: auto;
+  padding: 7px 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  transition: background 0.12s ease, transform 0.12s var(--ease-bounce);
+}
+.menu .menu-chip:hover { background: var(--hover); transform: scale(1.12); }
+.menu .menu-chip img.emo { width: 20px; height: 20px; }
 .hidden { display: none !important; }
 
 /* Update-available pill (dock). Centered over the BAR by dock.js
@@ -1769,6 +1811,9 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 /* Profiles: saved config snapshots (Behavior tab). */
 .prof-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .prof-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Active profile: accent check + subtle tint so it reads at a glance. */
+.prof-check { color: var(--accent); font-weight: 800; margin-right: 6px; }
+.prof-active .prof-name { color: var(--accent); }
 .prof-new { margin-top: 8px; }
 .prof-new .sugg-search { flex: 1; }
 
