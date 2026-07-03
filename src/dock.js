@@ -777,14 +777,18 @@ function magnify(clientX, clientY) {
   let bestInf = 0;
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const sep = t.classList.contains("separator");
+    // Widgets are info CARDS, not launch icons — scaling a big media/clock card
+    // makes it grow into and cover its neighbours, so they don't magnify (they
+    // have their own subtle hover background instead).
+    const noMag = sep || t.classList.contains("widget");
     const center = vertical
       ? t.offsetTop + t.offsetHeight / 2
       : t.offsetLeft + t.offsetWidth / 2;
     const dist = Math.abs(pointer - center);
     const influence = Math.max(0, 1 - (dist / spread) ** 2);
-    const scale = sep ? 1 : 1 + (maxScale - 1) * influence;
+    const scale = noMag ? 1 : 1 + (maxScale - 1) * influence;
     t.style.transform = `scale(${scale.toFixed(3)})`;
-    if (!sep && influence > bestInf) {
+    if (!noMag && influence > bestInf) {
       bestInf = influence;
       best = t;
     }
