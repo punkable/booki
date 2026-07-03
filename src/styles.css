@@ -167,9 +167,10 @@ body.edge-right { align-items: center; justify-content: flex-end; }
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
-/* Vertical: center every child (app icons AND the wider widget cards) so the
-   side bar reads as one tidy column instead of a ragged left/right edge. */
-body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: center; }
+/* Vertical: center every child (app icons AND widget cards) so the side bar
+   reads as one tidy column. Thin cross-axis padding keeps its WIDTH close to
+   the horizontal bar's HEIGHT — a slim column, not a fat panel. */
+body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: center; padding: 8px 6px; }
 
 /* Compact density (opt-in) — tighter chrome for small screens. Tiles keep their
    configured size; only the surrounding padding/gaps shrink. */
@@ -575,11 +576,13 @@ body.edge-left .tile.widget, body.edge-right .tile.widget {
 }
 body.edge-left .tile.widget .w-card, body.edge-right .tile.widget .w-card {
   flex-direction: column;
-  gap: 5px;
-  padding: 9px 8px 7px;
-  /* ONE shared width for every widget card → the side bar is perfectly even.
-     Wide enough to hold the media transport row. */
-  width: calc(var(--size) * 2.4);
+  gap: 3px;
+  padding: 5px 2px 4px;
+  /* ONE shared width for every widget card, kept as THIN as the horizontal bar
+     is tall: it tracks the icon size but never dips below what the media
+     transport row needs (~46px). So the side bar reads as a slim column, not a
+     fat panel. */
+  width: max(var(--size), 46px);
 }
 body.edge-left .tile.widget .w-main, body.edge-right .tile.widget .w-main {
   max-width: 100%;
@@ -598,9 +601,9 @@ body.edge-left .tile.widget .w-bar, body.edge-right .tile.widget .w-bar {
   width: 100%;
 }
 body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
-  width: calc(var(--size) * 0.95);
-  height: calc(var(--size) * 0.95);
-  border-radius: 10px;
+  width: calc(var(--size) * 0.78);
+  height: calc(var(--size) * 0.78);
+  border-radius: 8px;
 }
 /* Hover controls: prev · play/pause · next as a floating glass strip. */
 .tile.widget.media { position: relative; }
@@ -617,9 +620,20 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
   backdrop-filter: blur(6px);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.14s ease;
+  transform: scale(0.96);
+  transition: opacity 0.2s var(--ease), transform 0.24s var(--ease-bounce);
 }
-.tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; }
+.tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; transform: scale(1); }
+/* Each transport button eases in with a tiny stagger for a smooth reveal. */
+.tile.widget.media:hover .w-ctl { animation: w-ctl-in 0.26s var(--ease-bounce) backwards; }
+.tile.widget.media:hover .w-ctl:nth-child(1) { animation-delay: 0.02s; }
+.tile.widget.media:hover .w-ctl:nth-child(2) { animation-delay: 0.06s; }
+.tile.widget.media:hover .w-ctl:nth-child(3) { animation-delay: 0.1s; }
+@keyframes w-ctl-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.widget.media .w-controls { transition: opacity 0.12s ease; transform: none; }
+  .tile.widget.media:hover .w-ctl { animation: none; }
+}
 .w-ctl {
   border: 0;
   background: color-mix(in srgb, var(--ink) 9%, transparent);
@@ -638,36 +652,27 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
 .w-ctl:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .w-ctl:active { transform: scale(0.9); }
 
-/* Vertical media: the card is a real column — art on top, artist, a scrolling
-   title, and a compact ALWAYS-VISIBLE controls row (no cramped hover overlay
-   in a narrow column). The card widens just enough to hold three buttons. */
 body.edge-left .tile.widget.media, body.edge-right .tile.widget.media {
   width: auto;
   min-width: 0;
 }
-/* Vertical media: the transport controls become an always-visible row under the
-   title (a hover overlay is unusable in a narrow column). Sized to fit the
-   shared card width. */
+/* Vertical media: the resting card stays slim (art + title). Cramming three
+   buttons into a ~46px row looked squished, so instead the transport controls
+   ride in as a comfortable VERTICAL STACK on hover — a smooth glass overlay
+   over the whole card, roomy buttons, never compressed. (The base .w-controls
+   already provides the absolute overlay + fade; here we just stack + size it.) */
 body.edge-left .tile.widget.media .w-controls,
 body.edge-right .tile.widget.media .w-controls {
-  position: static;
-  inset: auto;
-  opacity: 1;
-  pointer-events: auto;
-  background: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  gap: 5px;
-  margin-top: 2px;
-  width: 100%;
+  flex-direction: column;
+  gap: 6px;
 }
 body.edge-left .tile.widget.media .w-ctl, body.edge-right .tile.widget.media .w-ctl {
-  width: 20px;
-  height: 20px;
-}
-body.edge-left .tile.widget.media .w-ctl-toggle, body.edge-right .tile.widget.media .w-ctl-toggle {
   width: 24px;
   height: 24px;
+}
+body.edge-left .tile.widget.media .w-ctl-toggle, body.edge-right .tile.widget.media .w-ctl-toggle {
+  width: 28px;
+  height: 28px;
 }
 
 /* Volume card: muted reads at a glance (dimmed value + bar). */

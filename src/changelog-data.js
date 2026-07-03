@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.17.0",
+    date: "3 jul 2026",
+    headline: "El dock vertical ahora es fino de verdad y el reproductor se siente premium.",
+    sections: [
+      {
+        icon: "📏",
+        title: "Dock vertical más fino",
+        notes: [
+          "En los laterales, el ancho de la barra ahora coincide con el alto que tiene en horizontal: una columna esbelta, no un panel ancho.",
+          "Los botones del reproductor ya no se ven apretados: en vertical aparecen al pasar el cursor, en una columna cómoda con animación suave.",
+        ],
+      },
+      {
+        icon: "🧲",
+        title: "Notch y borde",
+        notes: [
+          "Confirmado: con el dock abajo o arriba, anclar el notch a la izquierda o derecha mueve el dock a ese lado también.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.16.0",
     date: "3 jul 2026",
     headline: "El notch lleva el dock consigo, el reproductor se adapta y la barra ya no salta.",
