@@ -3,6 +3,35 @@
 
 export const CHANGELOG = [
   {
+    version: "0.22.0",
+    date: "4 jul 2026",
+    headline: "Pequeños arreglos y un poco menos de trabajo en segundo plano.",
+    sections: [
+      {
+        icon: "💬",
+        title: "Tooltips que no se cortan",
+        notes: [
+          "El nombre al pasar el cursor vuelve al estilo del sistema cuando no cabría dentro de la barra (por ejemplo en el dock vertical o con nombres largos), así nunca se ve recortado.",
+        ],
+      },
+      {
+        icon: "🎵",
+        title: "Carátula al día",
+        notes: [
+          "Al cambiar a una canción sin carátula ya no se queda la imagen de la anterior.",
+        ],
+      },
+      {
+        icon: "🪶",
+        title: "Más liviano",
+        notes: [
+          "Menos trabajo al leer el uso de disco (ya no se re-explora el disco en cada actualización).",
+          "Si solo tienes widgets anclados, Booki deja de recorrer todas las ventanas del sistema sin necesidad.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.21.0",
     date: "4 jul 2026",
     headline: "Papelera con contador, recientes al alcance y una pasada a fondo de arreglos.",

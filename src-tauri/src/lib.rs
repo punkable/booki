@@ -215,6 +215,7 @@ fn system_accent() -> Option<String> {
 /// Live system metrics for the dock widgets (CPU %, memory, network throughput).
 static SYS: Mutex<Option<sysinfo::System>> = Mutex::new(None);
 static NETS: Mutex<Option<(sysinfo::Networks, std::time::Instant)>> = Mutex::new(None);
+static DISKS: Mutex<Option<sysinfo::Disks>> = Mutex::new(None);
 
 #[derive(serde::Serialize)]
 struct SystemStats {
@@ -258,8 +259,12 @@ fn system_stats() -> SystemStats {
         down += data.received();
         up += data.transmitted();
     }
-    // Disk usage (aggregate across mounted disks) + system uptime.
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    // Disk usage (aggregate across mounted disks) + system uptime. Keep the disk
+    // list cached and just refresh its figures each poll — re-enumerating every
+    // volume (opening handles) on every tick was needless work.
+    let mut dguard = DISKS.lock().unwrap();
+    let disks = dguard.get_or_insert_with(sysinfo::Disks::new_with_refreshed_list);
+    disks.refresh();
     let (mut dtotal, mut davail) = (0u64, 0u64);
     for d in disks.iter() {
         dtotal += d.total_space();
