@@ -98,6 +98,31 @@ fn set_dock_frame(
     Ok(())
 }
 
+/// Grow the dock window to cover the whole work area so it can host the
+/// edge-move overlay (the 4 anchor targets + ghost preview shown while the
+/// user drags the bar to another edge). Returns the CSS size of the work area
+/// so the frontend can lay the overlay out in logical pixels. Restored by the
+/// usual applyFrame() path when the drag ends.
+#[tauri::command]
+fn dock_cover_workarea(window: WebviewWindow) -> Result<(f64, f64), String> {
+    let monitor = pick_monitor(&window).ok_or_else(|| "no monitor found".to_string())?;
+    let mpos = monitor.position();
+    let msize = monitor.size();
+    let dpr = window.scale_factor().unwrap_or(1.0);
+    let (ax, ay, aw, ah) = win::work_area(
+        mpos.x + msize.width as i32 / 2,
+        mpos.y + msize.height as i32 / 2,
+    )
+    .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+    window
+        .set_size(PhysicalSize::new(aw.max(8) as u32, ah.max(8) as u32))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_position(PhysicalPosition::new(ax, ay))
+        .map_err(|e| e.to_string())?;
+    Ok((aw as f64 / dpr, ah as f64 / dpr))
+}
+
 /// Convert an image file to a data URI (for custom tile icons).
 #[tauri::command]
 fn image_data_uri(path: String) -> Option<String> {
@@ -576,6 +601,21 @@ fn paths_exist(paths: Vec<String>) -> Vec<bool> {
         .collect()
 }
 
+/// Offset a window of size `win` along an edge that spans `[start, start+span)`,
+/// honoring the chosen along-edge slot ("start" | "center" | "end"). The result
+/// is clamped on-screen without panicking when the span is tiny. Shared by the
+/// notch and the dock so they land aligned (the dock stays "parallel" to the notch).
+fn along_offset(start: i32, span: i32, win: i32, position: &str) -> i32 {
+    let want = match position {
+        "start" => start + span / 6 - win / 2,
+        "end" => start + span - span / 6 - win / 2,
+        _ => start + (span - win) / 2,
+    };
+    let lo = start + 4;
+    let hi = (start + span - win - 4).max(lo);
+    want.max(lo).min(hi)
+}
+
 /// Place the small notch window centered on the dock's anchored edge.
 fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let monitor = pick_monitor(notch).ok_or_else(|| "no monitor found".to_string())?;
@@ -616,17 +656,7 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     // rounded (CSS) already reads as a tab attached to the bar.
     let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
     // Offset along the anchored edge so it can dodge subtitles / chat boxes.
-    let along = |start: i32, span: i32, win: i32| -> i32 {
-        let want = match cfg.notch_position.as_str() {
-            "start" => start + span / 6 - win / 2,
-            "end" => start + span - span / 6 - win / 2,
-            _ => start + (span - win) / 2,
-        };
-        // Keep on-screen without panicking when the span is tiny (lo>hi → clamp panics).
-        let lo = start + 4;
-        let hi = (start + span - win - 4).max(lo);
-        want.max(lo).min(hi)
-    };
+    let along = |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
     let (x, y) = match edge {
         "top" => (along(ax, aw, ww), ay + margin),
         "left" => (ax + margin, along(ay, ah, wh)),
@@ -1135,12 +1165,18 @@ fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let ww = wsize.width as i32;
     let wh = wsize.height as i32;
 
+    // Align the dock with the notch's along-edge slot so the two stay parallel:
+    // if the notch sits at the top-left, the dock reveals at the left too (not
+    // stuck in the center). Only meaningful when the dock is narrower than the
+    // span; a full-width dock simply clamps to filling it.
+    let cfg = config::load();
+    let slot = cfg.notch_position.as_str();
     let (x, y) = match edge {
-        "top" => (ax + (aw - ww) / 2, ay + margin),
-        "left" => (ax + margin, ay + (ah - wh) / 2),
-        "right" => (ax + aw - ww - margin, ay + (ah - wh) / 2),
+        "top" => (along_offset(ax, aw, ww, slot), ay + margin),
+        "left" => (ax + margin, along_offset(ay, ah, wh, slot)),
+        "right" => (ax + aw - ww - margin, along_offset(ay, ah, wh, slot)),
         // default: bottom
-        _ => (ax + (aw - ww) / 2, ay + ah - wh - margin),
+        _ => (along_offset(ax, aw, ww, slot), ay + ah - wh - margin),
     };
 
     window
@@ -1305,6 +1341,7 @@ pub fn run() {
             focus_window,
             reposition_dock,
             set_dock_frame,
+            dock_cover_workarea,
             hide_dock,
             reveal_dock,
             notch_reveal,
@@ -1414,6 +1451,10 @@ pub fn run() {
                 let cfg = config::load();
                 let _ = position_notch(&notch, &cfg.edge);
                 let _ = notch.hide();
+                #[cfg(windows)]
+                if let Ok(h) = notch.hwnd() {
+                    win::exclude_from_capture(h.0 as isize);
+                }
             }
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
@@ -1425,6 +1466,10 @@ pub fn run() {
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
+                #[cfg(windows)]
+                if let Ok(h) = dock.hwnd() {
+                    win::exclude_from_capture(h.0 as isize);
+                }
 
                 // Register the global hotkey, if configured.
                 let _ = hotkeys_apply(

@@ -12,6 +12,8 @@ export const iconSettings = () =>
 export const iconX = () => S(`<path d="M18 6 6 18M6 6l12 12"/>`);
 export const iconGrid = () =>
   S(`<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>`);
+export const iconList = () =>
+  S(`<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>`);
 export const iconPower = () =>
   S(`<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>`);
 export const iconAppWindow = () =>
@@ -51,6 +53,7 @@ const iconMap = {
   settings: iconSettings,
   x: iconX,
   grid: iconGrid,
+  list: iconList,
   power: iconPower,
   app: iconAppWindow,
   palette: iconPalette,

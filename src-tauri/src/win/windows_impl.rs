@@ -385,6 +385,20 @@ pub fn is_fullscreen() -> bool {
     }
 }
 
+/// Hide a window from screen capture / recording (Discord, OBS, Teams, the Snip
+/// tool…). WDA_EXCLUDEFROMCAPTURE (Win10 2004+) makes the window render normally
+/// on screen but appear blank/absent to any capture — so Booki never shows up as
+/// a shareable window and never covers what you're actually sharing.
+pub fn exclude_from_capture(hwnd: isize) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+    };
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let _ = SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
+    }
+}
+
 /// Bring a window to the foreground, restoring it if minimized.
 pub fn focus_window(hwnd: isize) -> bool {
     let handle = HWND(hwnd as *mut c_void);
