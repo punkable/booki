@@ -199,6 +199,8 @@ async function mockInvoke(cmd, args) {
         charging: Math.random() > 0.5,
       };
     }
+    case "dock_cover_workarea":
+      return [window.screen.availWidth, window.screen.availHeight];
     case "export_config":
     case "import_config":
       console.info("[demo]", cmd, args);
@@ -316,6 +318,7 @@ export const dock = {
   reposition: (edge) => invoke("reposition_dock", { edge }),
   setDockFrame: (edge, width, height, hidden = false) =>
     invoke("set_dock_frame", { edge, width, height, hidden }),
+  dockCoverWorkarea: () => invoke("dock_cover_workarea"),
   hideDock: (edge) => invoke("hide_dock", { edge }),
   revealDock: () => invoke("reveal_dock"),
   notchToast: (text) => invoke("notch_toast", { text }),
