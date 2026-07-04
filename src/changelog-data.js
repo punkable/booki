@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.30.0",
+    date: "4 jul 2026",
+    headline: "Mueve el dock viéndolo, y organiza tus apps a tu manera.",
+    sections: [
+      {
+        icon: "🧲",
+        title: "Mover el dock ahora se ve",
+        notes: [
+          "Arrastra el fondo del dock y aparecen los cuatro puntos de anclaje: el que tienes más cerca se ilumina y una vista previa te muestra dónde va a quedar, en vez de saltar de golpe.",
+          "Los anclajes son más flexibles: basta con acercarte a un borde, ya no hay que apuntar exacto.",
+        ],
+      },
+      {
+        icon: "📐",
+        title: "El dock va en línea con el notch",
+        notes: [
+          "Si el notch está a la izquierda o la derecha, el dock aparece alineado con él y no centrado.",
+        ],
+      },
+      {
+        icon: "🗂️",
+        title: "Tus apps, como quieras verlas",
+        notes: [
+          "Nueva vista en cuadros en Ajustes → Elementos: ves las apps y los grupos de un vistazo, abres un grupo para ver lo que tiene, y sacas o añades cosas fácil.",
+          "Arrastra una app encima de otra para agruparlas, también en la vista de cuadros.",
+          "Botón «Borrar todo» con confirmación para empezar de cero.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.29.0",
     date: "4 jul 2026",
     headline: "Invisible en las capturas de pantalla, y varios detalles más claros.",

@@ -281,6 +281,55 @@ body:not(.edge-swap):not(.tucked) .dock {
   body.edge-swap .dock { transform: none; }
 }
 
+/* ── Edge-move overlay ────────────────────────────────────────────────────
+   While dragging the empty bar to another edge, the dock window grows to
+   cover the screen and this overlay shows the four anchor targets + a ghost
+   bar that slides to the nearest edge, so you SEE where it will land. */
+body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: none; }
+#edge-overlay {
+  position: fixed; inset: 0; z-index: 40;
+  pointer-events: none;
+  animation: edge-ov-in 0.18s var(--ease);
+}
+#edge-overlay.hidden { display: none; }
+@keyframes edge-ov-in { from { opacity: 0; } to { opacity: 1; } }
+.edge-zone {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--ease-bounce);
+}
+.edge-zone-top    { top: 8px;  left: 12%; right: 12%; height: 74px; }
+.edge-zone-bottom { bottom: 8px; left: 12%; right: 12%; height: 74px; }
+.edge-zone-left   { left: 8px;  top: 14%; bottom: 14%; width: 74px; }
+.edge-zone-right  { right: 8px; top: 14%; bottom: 14%; width: 74px; }
+.edge-zone-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  transition: transform 0.18s var(--ease-bounce), background 0.18s ease;
+}
+.edge-zone.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: var(--accent);
+  transform: scale(1.02);
+}
+.edge-zone.active .edge-zone-dot { background: var(--accent); transform: scale(1.6); }
+.edge-ghost {
+  position: absolute;
+  border-radius: var(--dock-r, 18px);
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: top 0.22s var(--ease-bounce), left 0.22s var(--ease-bounce),
+              width 0.22s var(--ease-bounce), height 0.22s var(--ease-bounce);
+}
+@media (prefers-reduced-motion: reduce) {
+  #edge-overlay { animation: none; }
+  .edge-zone, .edge-ghost, .edge-zone-dot { transition: none; }
+}
+
 /* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
 .s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
 /* Grouped app suggestions (by Start-menu folder). */
@@ -2171,6 +2220,50 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .empty-capy { width: 56px; height: 56px; opacity: 0.9; animation: booki-breathe 3s var(--ease) infinite; }
 .empty-capy.sm { width: 34px; height: 34px; }
 @media (prefers-reduced-motion: reduce) { .empty-capy { animation: none; } }
+
+/* ── Apps toolbar: list/grid switch + clear-all ─────────────────────────── */
+.pin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; flex-wrap: wrap; }
+.pin-view-toggle { display: inline-flex; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 2px; gap: 2px; }
+.pin-view-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 26px; border: 0; background: transparent; color: var(--ink-2); border-radius: calc(var(--r-sm) - 2px); cursor: pointer; }
+.pin-view-btn svg { width: 16px; height: 16px; display: block; }
+.pin-view-btn:hover { color: var(--ink); }
+.pin-view-btn.active { background: var(--accent); color: var(--accent-contrast); }
+.s-btn-sm { padding: 4px 10px; font-size: 12px; }
+.pin-clear { display: inline-flex; align-items: center; gap: 5px; }
+.pin-clear .s-btn-glyph svg { width: 14px; height: 14px; }
+.pin-clear-confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+
+/* ── Grid view: cards that wrap; a group card spans the row when opened ──── */
+.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.pin-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 8px 10px; background: var(--layer); border: 1px solid var(--stroke);
+  border-radius: var(--r-md, 12px); text-align: center; min-width: 0;
+  transition: box-shadow 0.18s ease, background 0.18s ease, transform 0.14s var(--ease-bounce);
+}
+.pin-card.is-group { background: color-mix(in srgb, var(--accent) 6%, var(--layer)); }
+.pin-card.is-sep { opacity: 0.7; }
+.pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
+.pin-card.open { grid-column: 1 / -1; align-items: stretch; }
+.pin-card-grip { position: absolute; top: 4px; left: 4px; display: inline-flex; border: 0; background: transparent; color: var(--ink-2); cursor: grab; padding: 2px; touch-action: none; opacity: 0; transition: opacity 0.15s ease; }
+.pin-card:hover .pin-card-grip { opacity: 1; }
+.pin-card-grip svg { width: 15px; height: 15px; }
+.pin-card-grip:active { cursor: grabbing; }
+.pin-card-body { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; width: 100%; }
+.pin-card.open .pin-card-body { flex-direction: row; justify-content: center; }
+.pin-card-body.clickable { cursor: pointer; }
+.pin-card .pin-thumb { width: 40px; height: 40px; font-size: 16px; }
+.pin-card .pin-thumb.folder svg { width: 22px; height: 22px; }
+.pin-card-name { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-card .pin-count { position: absolute; top: 6px; right: 6px; }
+.pin-card .pin-missing { font-size: 11px; color: #e0a02a; }
+.pin-card-actions { display: flex; gap: 4px; justify-content: center; opacity: 0; transition: opacity 0.15s ease; }
+.pin-card:hover .pin-card-actions, .pin-card.open .pin-card-actions { opacity: 1; }
+.pin-card-children { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--stroke); }
+.pin-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke); border-radius: var(--r-pill); max-width: 100%; }
+.pin-chip .pin-thumb { width: 22px; height: 22px; font-size: 11px; }
+.pin-chip-name { font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-card-children .pin-add-btn { align-self: center; }
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
