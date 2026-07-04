@@ -336,12 +336,13 @@ body:not(.edge-swap):not(.tucked) .dock {
 /* Drag-onto-another-row to create a folder (Settings). */
 .pin-item.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
 
-.web-add { display: flex; gap: 8px; margin-top: 6px; }
-.web-url {
+.web-add { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.web-url, .web-name {
   flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 8px 11px;
   color: var(--ink); background: var(--layer-strong);
   border: 1px solid var(--stroke); border-radius: var(--r-sm);
 }
+.web-name { flex: 0 1 160px; }
 
 /* About: beta badge, credits, and the capybara easter egg. */
 .s-beta {

@@ -1338,7 +1338,9 @@ function processMove(e) {
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
-        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
+        // Smaller bullseye → merging into a folder takes a deliberate aim at the
+        // very centre; anywhere else just reorders, so you don't group by mistake.
+        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.24) {
           centerTarget = s;
         }
         break;
@@ -1352,8 +1354,10 @@ function processMove(e) {
       mergeEl = centerTarget;
       mergeArm = Date.now();
     }
-    if (Date.now() - mergeArm > 260) centerTarget.classList.add("merge-target");
-    return; // aiming at a merge → don't reorder
+    // Hold on the centre a moment longer before arming the merge — a quick pass
+    // over a tile while reordering should never fold things into a folder.
+    if (Date.now() - mergeArm > 480) centerTarget.classList.add("merge-target");
+    return; // aiming at the bullseye → hold for a merge, don't reorder
   }
 
   clearMerge();
@@ -1765,19 +1769,28 @@ function placeMenu(e) {
     }
   };
   put();
+  // The window resizes asynchronously after applyFrame(); reposition again the
+  // moment it actually settles (via the resize hook) AND on a short fallback, so
+  // the menu can never end up clipped by a window that grew a beat too late.
+  pendingReplace = put;
   setTimeout(() => {
     requestAnimationFrame(() => {
       put();
       ctxMenu.style.visibility = "";
     });
-  }, 70);
+  }, 90);
 }
 function closeMenu() {
   if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
   document.body.classList.remove("menu-open");
+  pendingReplace = null;
   reframe();
 }
+
+// When the dock window finishes resizing (async, after applyFrame), re-place the
+// overlay that's currently open so it can't be left clipped by a slow resize.
+let pendingReplace = null;
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
@@ -1944,6 +1957,9 @@ window.addEventListener("resize", () => {
   // The bar's viewport rect (cached for magnify) shifts when the window resizes
   // — re-measure lazily so magnify never maps the pointer against a stale rect.
   invalidateMag();
+  // An open menu/flyout grew the window; now that it actually resized, snap it
+  // back into place so it's never clipped by the resize lagging behind.
+  if (pendingReplace) { try { pendingReplace(); } catch (_) {} }
   clearTimeout(screenChangeTimer);
   screenChangeTimer = setTimeout(checkScreenChange, 250);
 });
@@ -2637,7 +2653,7 @@ async function toggleStack(tileEl, item) {
   // pattern as the context menu / popovers, so opening a folder never flashes
   // a clipped panel while the window catches up.
   applyFrame();
-  setTimeout(() => requestAnimationFrame(() => {
+  const placeStack = () => {
     const dr = dockEl.getBoundingClientRect();
     const gap = 10;
     stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
@@ -2658,15 +2674,21 @@ async function toggleStack(tileEl, item) {
       if (cfg.edge === "left") stackEl.style.left = `${dr.width + gap}px`;
       else stackEl.style.right = `${dr.width + gap}px`;
     }
+  };
+  // Re-place when the window actually finishes resizing (async), plus a fallback.
+  pendingReplace = placeStack;
+  setTimeout(() => requestAnimationFrame(() => {
+    placeStack();
     // Positioned in its closed state → flip to open so the transition plays.
     stackEl.classList.add("open");
-  }), 70);
+  }), 90);
 }
 
 let stackCloseTimer = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
+  pendingReplace = null;
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open"); // plays the close transition
   // Shrink the window only after the close animation has played, so it doesn't

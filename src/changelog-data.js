@@ -3,6 +3,43 @@
 
 export const CHANGELOG = [
   {
+    version: "0.29.0",
+    date: "4 jul 2026",
+    headline: "Invisible en las capturas de pantalla, y varios detalles más claros.",
+    sections: [
+      {
+        icon: "🕵️",
+        title: "No aparece al compartir pantalla",
+        notes: [
+          "El dock y el notch ya no se ven en Discord, OBS, Teams ni la herramienta de recortes, y no salen en la lista de ventanas para compartir.",
+        ],
+      },
+      {
+        icon: "🧩",
+        title: "Arrastrar sin agrupar por error",
+        notes: [
+          "Al reordenar, ahora hay que apuntar al centro justo (y sostener) para agrupar; en cualquier otro sitio solo reordena.",
+        ],
+      },
+      {
+        icon: "🔤",
+        title: "Más claro",
+        notes: [
+          "Modos de ocultar renombrados: Nunca · Inteligente · Al salir (del dock).",
+          "«Carpeta nueva» ahora se llama «Grupo nuevo».",
+          "Al anclar un enlace puedes ponerle un nombre; y si no se encuentra su icono, se ancla igual sin avisar.",
+        ],
+      },
+      {
+        icon: "🩹",
+        title: "Menos recortes",
+        notes: [
+          "Los menús y las carpetas se recolocan en cuanto la ventana termina de crecer, para que no se corten.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.28.0",
     date: "4 jul 2026",
     headline: "El dock ya no se rompe con muchos elementos, notas que se guardan y varios arreglos.",
