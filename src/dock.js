@@ -74,8 +74,10 @@ async function boot() {
       if (el) launch(el, item);
       else if (item.path) dockApi.launch(item.path, item.args || []);
     });
-    checkUpdates();
     checkChangelog();
+    // Defer the update check (a network round-trip) a few seconds so it doesn't
+    // compete with first paint / icon extraction during startup.
+    setTimeout(checkUpdates, 4000);
     // Give the first layout a beat to settle so the tips measure correctly.
     setTimeout(maybeOnboard, 800);
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
