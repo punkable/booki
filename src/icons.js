@@ -40,6 +40,8 @@ export const iconKeyboard = () =>
   S(`<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/>`);
 export const iconInfo = () =>
   S(`<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>`);
+export const iconHelp = () =>
+  S(`<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>`);
 export const iconSparkles = () =>
   S(`<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>`);
 
@@ -64,6 +66,7 @@ const iconMap = {
   ungroup: iconUngroup,
   keyboard: iconKeyboard,
   info: iconInfo,
+  help: iconHelp,
   sparkles: iconSparkles,
 };
 
