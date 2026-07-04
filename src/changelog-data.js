@@ -3,6 +3,43 @@
 
 export const CHANGELOG = [
   {
+    version: "0.27.0",
+    date: "4 jul 2026",
+    headline: "Arreglos importantes: nada de Bookis duplicados, y vaciar la papelera ya no congela.",
+    sections: [
+      {
+        icon: "1️⃣",
+        title: "Una sola instancia",
+        notes: [
+          "Si Booki ya está abierto, volver a lanzarlo (o el inicio con Windows) trae al frente el dock existente en vez de abrir otro duplicado.",
+        ],
+      },
+      {
+        icon: "🚀",
+        title: "Inicio con Windows más fiable",
+        notes: [
+          "Si tienes activado «Iniciar con Windows», Booki re-asegura la entrada en cada arranque, así no deja de funcionar tras mover o reinstalar la app.",
+          "Recuerda: para que el dock esté siempre visible en el escritorio, elige «Nunca» en Ocultar automáticamente (Comportamiento).",
+        ],
+      },
+      {
+        icon: "🗑️",
+        title: "Papelera sin congelones",
+        notes: [
+          "Vaciar la papelera (y borrar arrastrando) ya no bloquea el dock mientras Windows trabaja — se hace en segundo plano.",
+          "El contador de la papelera tampoco frena la barra al actualizarse.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Detalle visual",
+        notes: [
+          "Los bordes del notch cuando el dock está a la izquierda o derecha se ven más limpios.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.26.0",
     date: "4 jul 2026",
     headline: "Más fluida — pensada para pantallas de 120/144Hz y más.",
