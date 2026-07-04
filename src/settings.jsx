@@ -833,7 +833,7 @@ function Behavior({ cfg, set }) {
         <MonitorPicker value={cfg.monitor} monitors={monitors}
           onChange={(v) => set({ monitor: v })} />
       </Row>
-      <Row label={t("be.autoHide")}>
+      <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
         <SegmentedControl
           value={cfg.autoHideMode || "smart"}
           onChange={(v) => set({ autoHideMode: v })}
