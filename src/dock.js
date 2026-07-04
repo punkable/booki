@@ -1094,36 +1094,130 @@ dockEl.addEventListener("auxclick", (e) => {
   }
 });
 
-// Drag the empty bar to move or hide the dock (natural, no menus):
-//  · drag toward ANOTHER edge  → move the dock there
-//  · drag toward its OWN edge   → tuck it away (push-off-screen)
-let bgDrag = null;
+// Drag the empty bar to MOVE the dock to another edge — with a live preview so
+// you SEE where it will land instead of it teleporting: the window grows to
+// cover the screen, four anchor targets light up, and a ghost bar slides to
+// whichever edge is nearest the cursor. Release commits; Esc cancels. Nearest-
+// edge (not dominant-direction) makes the anchors forgiving, not rigid.
+let edgeMove = null;
+let edgeOverlay = null;
+
+function buildEdgeOverlay() {
+  if (edgeOverlay) return edgeOverlay;
+  const o = document.createElement("div");
+  o.id = "edge-overlay";
+  o.className = "hidden";
+  o.innerHTML =
+    ["top", "bottom", "left", "right"]
+      .map((ed) => `<div class="edge-zone edge-zone-${ed}" data-edge="${ed}"><span class="edge-zone-dot"></span></div>`)
+      .join("") + `<div class="edge-ghost" aria-hidden="true"></div>`;
+  document.body.appendChild(o);
+  edgeOverlay = o;
+  return o;
+}
+
+// Nearest of the four edges to a point inside the (work-area-sized) window.
+function edgeMoveTarget(x, y, W, H) {
+  const d = { top: y, bottom: H - y, left: x, right: W - x };
+  return Object.keys(d).reduce((a, b) => (d[b] < d[a] ? b : a));
+}
+
+function updateEdgePreview(x, y) {
+  if (!edgeMove || !edgeMove.ready) return;
+  const { W, H } = edgeMove;
+  const target = edgeMoveTarget(x, y, W, H);
+  edgeMove.target = target;
+  edgeOverlay.querySelectorAll(".edge-zone").forEach((z) =>
+    z.classList.toggle("active", z.dataset.edge === target));
+  const g = edgeOverlay.querySelector(".edge-ghost");
+  const vert = target === "left" || target === "right";
+  const len = Math.min(edgeMove.barLen, (vert ? H : W) * 0.7);
+  const thick = edgeMove.barThick;
+  const m = 14;
+  if (vert) {
+    g.style.width = `${thick}px`;
+    g.style.height = `${len}px`;
+    g.style.top = `${(H - len) / 2}px`;
+    g.style.left = target === "left" ? `${m}px` : `${W - thick - m}px`;
+  } else {
+    g.style.width = `${len}px`;
+    g.style.height = `${thick}px`;
+    g.style.left = `${(W - len) / 2}px`;
+    g.style.top = target === "top" ? `${m}px` : `${H - thick - m}px`;
+  }
+}
+
+async function enterEdgeMove() {
+  // Capture the bar's footprint BEFORE the window grows (afterwards it reflows
+  // against the huge window and the numbers stop meaning anything).
+  const r = dockEl.getBoundingClientRect();
+  const vert = isVertical();
+  edgeMove.barLen = Math.round(vert ? r.height : r.width) || 320;
+  edgeMove.barThick = Math.round(vert ? r.width : r.height) || 54;
+  buildEdgeOverlay();
+  document.body.classList.add("edge-moving");
+  let css = null;
+  try { css = await dockApi.dockCoverWorkarea(); } catch (_) {}
+  if (!edgeMove) return; // released/cancelled while the resize was in flight
+  edgeMove.W = (css && css[0]) || window.innerWidth;
+  edgeMove.H = (css && css[1]) || window.innerHeight;
+  edgeOverlay.classList.remove("hidden");
+  edgeMove.ready = true;
+  updateEdgePreview(edgeMove.lastX, edgeMove.lastY);
+}
+
+function endEdgeMove(commit) {
+  const mv = edgeMove;
+  edgeMove = null;
+  if (edgeOverlay) edgeOverlay.classList.add("hidden");
+  document.body.classList.remove("edge-moving");
+  if (!mv || !mv.active) return; // never grew the window → nothing to restore
+  // The OS window was grown to cover the screen, but lastFull still holds the
+  // bar-sized frame — so applyFrame() would no-op and leave the window huge.
+  // Force it to re-issue the real frame.
+  lastFull = null;
+  const target = mv.target;
+  if (commit && target && target !== cfg.edge) {
+    // Land on the new edge with a pop so the move reads as motion, not a jump.
+    cfg.edge = target;
+    applyEdge(cfg);
+    fitDock();
+    document.body.classList.add("edge-swap");
+    applyFrame();
+    dockApi.setDockEdge(target).catch(() => {});
+    setTimeout(() => requestAnimationFrame(() => document.body.classList.remove("edge-swap")), 90);
+  } else {
+    applyFrame(); // same edge or cancelled → just shrink the window back to the bar
+  }
+}
+
 dockEl.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || closestSel(e.target, ".tile")) return;
-  bgDrag = { x: e.screenX, y: e.screenY, done: false };
+  edgeMove = {
+    x: e.screenX, y: e.screenY, active: false, ready: false,
+    lastX: e.clientX, lastY: e.clientY, target: cfg.edge,
+  };
+  try { dockEl.setPointerCapture(e.pointerId); } catch (_) {}
 });
 window.addEventListener("pointermove", (e) => {
-  if (!bgDrag || bgDrag.done) return;
-  const dx = e.screenX - bgDrag.x;
-  const dy = e.screenY - bgDrag.y;
-  if (Math.hypot(dx, dy) < 46) return; // ignore tiny jitters — needs a clear drag
-  bgDrag.done = true;
-  // Dominant direction → target edge.
-  const target = Math.abs(dx) > Math.abs(dy)
-    ? (dx > 0 ? "right" : "left")
-    : (dy > 0 ? "bottom" : "top");
-  if (target === cfg.edge) {
-    // Pushed toward its own edge → hide (keep the pointer-in-window guard).
-    pinnedReveal = false;
-    manualReveal = false;
-    manualHide = true;
-    setHidden(true);
-  } else {
-    // Dragged toward a different edge → move the whole dock there.
-    dockApi.setDockEdge(target).catch(() => {});
+  if (!edgeMove) return;
+  edgeMove.lastX = e.clientX;
+  edgeMove.lastY = e.clientY;
+  if (!edgeMove.active) {
+    const dx = e.screenX - edgeMove.x;
+    const dy = e.screenY - edgeMove.y;
+    if (Math.hypot(dx, dy) < 20) return; // small threshold → forgiving, not rigid
+    edgeMove.active = true;
+    enterEdgeMove();
+    return;
   }
+  updateEdgePreview(e.clientX, e.clientY);
 });
-window.addEventListener("pointerup", () => (bgDrag = null));
+window.addEventListener("pointerup", () => { if (edgeMove) endEdgeMove(true); });
+window.addEventListener("pointercancel", () => { if (edgeMove) endEdgeMove(false); });
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && edgeMove) endEdgeMove(false);
+});
 
 // Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
 let wheelSaveTimer = null;
@@ -1177,6 +1271,7 @@ dockEl.addEventListener("pointermove", (e) => {
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
   magPointer.x = e.clientX;
   magPointer.y = e.clientY;
+  if (edgeMove) return; // moving the whole dock to another edge — no magnify
   if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
   if (magnifyRaf) return;
   magnifyRaf = requestAnimationFrame(() => {
@@ -1338,7 +1433,9 @@ function processMove(e) {
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
-        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
+        // Smaller bullseye → merging into a folder takes a deliberate aim at the
+        // very centre; anywhere else just reorders, so you don't group by mistake.
+        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.24) {
           centerTarget = s;
         }
         break;
@@ -1352,8 +1449,10 @@ function processMove(e) {
       mergeEl = centerTarget;
       mergeArm = Date.now();
     }
-    if (Date.now() - mergeArm > 260) centerTarget.classList.add("merge-target");
-    return; // aiming at a merge → don't reorder
+    // Hold on the centre a moment longer before arming the merge — a quick pass
+    // over a tile while reordering should never fold things into a folder.
+    if (Date.now() - mergeArm > 480) centerTarget.classList.add("merge-target");
+    return; // aiming at the bullseye → hold for a merge, don't reorder
   }
 
   clearMerge();
@@ -1765,19 +1864,28 @@ function placeMenu(e) {
     }
   };
   put();
+  // The window resizes asynchronously after applyFrame(); reposition again the
+  // moment it actually settles (via the resize hook) AND on a short fallback, so
+  // the menu can never end up clipped by a window that grew a beat too late.
+  pendingReplace = put;
   setTimeout(() => {
     requestAnimationFrame(() => {
       put();
       ctxMenu.style.visibility = "";
     });
-  }, 70);
+  }, 90);
 }
 function closeMenu() {
   if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
   document.body.classList.remove("menu-open");
+  pendingReplace = null;
   reframe();
 }
+
+// When the dock window finishes resizing (async, after applyFrame), re-place the
+// overlay that's currently open so it can't be left clipped by a slow resize.
+let pendingReplace = null;
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
@@ -1944,6 +2052,9 @@ window.addEventListener("resize", () => {
   // The bar's viewport rect (cached for magnify) shifts when the window resizes
   // — re-measure lazily so magnify never maps the pointer against a stale rect.
   invalidateMag();
+  // An open menu/flyout grew the window; now that it actually resized, snap it
+  // back into place so it's never clipped by the resize lagging behind.
+  if (pendingReplace) { try { pendingReplace(); } catch (_) {} }
   clearTimeout(screenChangeTimer);
   screenChangeTimer = setTimeout(checkScreenChange, 250);
 });
@@ -2637,7 +2748,7 @@ async function toggleStack(tileEl, item) {
   // pattern as the context menu / popovers, so opening a folder never flashes
   // a clipped panel while the window catches up.
   applyFrame();
-  setTimeout(() => requestAnimationFrame(() => {
+  const placeStack = () => {
     const dr = dockEl.getBoundingClientRect();
     const gap = 10;
     stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
@@ -2658,15 +2769,21 @@ async function toggleStack(tileEl, item) {
       if (cfg.edge === "left") stackEl.style.left = `${dr.width + gap}px`;
       else stackEl.style.right = `${dr.width + gap}px`;
     }
+  };
+  // Re-place when the window actually finishes resizing (async), plus a fallback.
+  pendingReplace = placeStack;
+  setTimeout(() => requestAnimationFrame(() => {
+    placeStack();
     // Positioned in its closed state → flip to open so the transition plays.
     stackEl.classList.add("open");
-  }), 70);
+  }), 90);
 }
 
 let stackCloseTimer = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
+  pendingReplace = null;
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open"); // plays the close transition
   // Shrink the window only after the close animation has played, so it doesn't

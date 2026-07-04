@@ -1020,6 +1020,7 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
 
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
+  const gridRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
@@ -1029,8 +1030,14 @@ function Apps({ cfg, set }) {
   const [iconFor, setIconFor] = useState(-1);
   const [styleFor, setStyleFor] = useState(-1);
   const [webUrl, setWebUrl] = useState("");
+  const [webName, setWebName] = useState("");
   const [openIds, setOpenIds] = useState({});
   const toggleOpen = (id) => setOpenIds((o) => ({ ...o, [id]: !o[id] }));
+  // List vs. grid layout for the pinned items (remembered across sessions).
+  const [view, setView] = useState(() => localStorage.getItem("booki.appsView") || "list");
+  const pickView = (v) => { setView(v); try { localStorage.setItem("booki.appsView", v); } catch (_) {} };
+  // Two-step "remove everything" so a stray click can't wipe the dock.
+  const [clearArm, setClearArm] = useState(false);
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
   const setStyle = (i, value) =>
@@ -1040,12 +1047,19 @@ function Apps({ cfg, set }) {
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) url = "https://" + url;
     const host = url.replace(/^https?:\/\//i, "").split("/")[0].replace(/^www\./, "");
+    // A friendlier default name from the domain (e.g. "youtube.com" → "Youtube"),
+    // but the optional name field wins if you typed one.
+    const nice = host.split(".")[0].replace(/^\w/, (c) => c.toUpperCase());
+    const name = webName.trim() || nice || host;
     let icon = null;
     try {
+      // Favicon is best-effort: if it can't be fetched the pin still works with
+      // its initial — never block or warn just because an icon didn't load.
       icon = await dockApi.fetchFavicon(url);
     } catch (_) {}
-    set({ pinned: [...cfg.pinned, { id: uid(), name: host, path: url, args: [], kind: "app", icon }] });
+    set({ pinned: [...cfg.pinned, { id: uid(), name, path: url, args: [], kind: "app", icon }] });
     setWebUrl("");
+    setWebName("");
   };
   // Dissolve a folder, spilling its items back to the dock (no data loss).
   const ungroup = (i) => {
@@ -1144,7 +1158,56 @@ function Apps({ cfg, set }) {
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
   };
+  // Grid version of the drag: same reorder + drop-onto-center-to-group logic,
+  // but hit-tested in 2D (cards wrap onto multiple rows).
+  const startDragGrid = (i) => (e) => {
+    e.preventDefault();
+    drag.current = { from: i };
+    mergeRef.current = -1;
+    setMergeInto(-1);
+    const onMove = (ev) => {
+      const cards = [...gridRef.current.querySelectorAll(".pin-card")];
+      const from = drag.current.from;
+      let over = -1;
+      for (let k = 0; k < cards.length; k++) {
+        const r = cards[k].getBoundingClientRect();
+        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
+      }
+      if (over >= 0 && over !== from) {
+        const r = cards[over].getBoundingClientRect();
+        const center =
+          ev.clientX > r.left + r.width * 0.28 && ev.clientX < r.right - r.width * 0.28 &&
+          ev.clientY > r.top + r.height * 0.28 && ev.clientY < r.bottom - r.height * 0.28;
+        const dragged = pinnedRef.current[from];
+        const target = pinnedRef.current[over];
+        const canMerge = dragged.kind === "app" && (target.kind === "app" || target.kind === "group");
+        if (center && canMerge) {
+          if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
+          return;
+        }
+      }
+      if (mergeRef.current !== -1) { mergeRef.current = -1; setMergeInto(-1); }
+      if (over >= 0 && over !== from) {
+        const p = [...pinnedRef.current];
+        const [m] = p.splice(from, 1);
+        p.splice(over, 0, m);
+        drag.current.from = over;
+        set({ pinned: p });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      const m = mergeRef.current;
+      if (m >= 0 && m !== drag.current.from) doMerge(drag.current.from, m);
+      mergeRef.current = -1;
+      setMergeInto(-1);
+      drag.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
+  const clearAll = () => { set({ pinned: [] }); setClearArm(false); };
   // Flag pins whose target doesn't exist on THIS machine (moved, uninstalled,
   // or config imported from another PC) and offer to reassign the path.
   const [missing, setMissing] = useState({});
@@ -1247,6 +1310,80 @@ function Apps({ cfg, set }) {
           <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
         </div>
       )}
+      {cfg.pinned.length > 0 && (
+        <div className="pin-toolbar">
+          <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
+            <button className={"pin-view-btn" + (view === "list" ? " active" : "")}
+              title={t("apps.viewList")} onClick={() => pickView("list")}>
+              <span dangerouslySetInnerHTML={{ __html: icon("list") }} />
+            </button>
+            <button className={"pin-view-btn" + (view === "grid" ? " active" : "")}
+              title={t("apps.viewGrid")} onClick={() => pickView("grid")}>
+              <span dangerouslySetInnerHTML={{ __html: icon("grid") }} />
+            </button>
+          </div>
+          {clearArm ? (
+            <span className="pin-clear-confirm">
+              {t("apps.clearConfirm")}
+              <button className="s-btn s-btn-danger s-btn-sm" onClick={clearAll}>{t("apps.clearYes")}</button>
+              <button className="s-btn s-btn-soft s-btn-sm" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</button>
+            </span>
+          ) : (
+            <button className="s-btn s-btn-soft s-btn-sm pin-clear" onClick={() => setClearArm(true)}>
+              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("trash") }} />
+              <span>{t("apps.clearAll")}</span>
+            </button>
+          )}
+        </div>
+      )}
+      {view === "grid" && cfg.pinned.length > 0 ? (
+        <div className="pin-grid" ref={gridRef}>
+          {cfg.pinned.map((item, i) => {
+            const isGroup = item.kind === "group";
+            const open = isGroup && openIds[item.id];
+            return (
+              <div key={item.id} data-idx={i}
+                className={"pin-card" + (isGroup ? " is-group" : "") + (item.kind === "separator" ? " is-sep" : "") +
+                  (mergeInto === i ? " merge-into" : "") + (open ? " open" : "")}>
+                <button className="pin-card-grip" title={t("apps.drag")}
+                  onPointerDown={startDragGrid(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
+                <div className={"pin-card-body" + (isGroup ? " clickable" : "")}
+                  onClick={isGroup ? () => toggleOpen(item.id) : undefined}
+                  title={isGroup ? t("apps.editFolder") : item.path || ""}>
+                  {item.kind !== "separator" && <PinThumb item={item} />}
+                  <span className="pin-card-name">
+                    {item.kind === "separator" ? t("apps.sep") : item.name}
+                  </span>
+                  {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
+                  {missing[item.id] && <span className="pin-missing" title={t("apps.missing")}>⚠</span>}
+                </div>
+                <div className="pin-card-actions">
+                  {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
+                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
+                  {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
+                    <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
+                  )}
+                  <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => remove(i)} />
+                </div>
+                {open && (
+                  <div className="pin-card-children">
+                    {(item.children || []).map((c) => (
+                      <div key={c.id} className="pin-chip">
+                        <PinThumb item={c} />
+                        <span className="pin-chip-name" title={c.path || ""}>{c.name}</span>
+                        <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
+                        <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
+                      </div>
+                    ))}
+                    <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i)}
+                      dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
       <ul className="pin-list" ref={listRef}>
         {cfg.pinned.length === 0 && (
           <li className="pin-empty">
@@ -1332,6 +1469,7 @@ function Apps({ cfg, set }) {
           return rows;
         })}
       </ul>
+      )}
       <div className="s-actions">
         <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
         <div className="s-more">
@@ -1377,6 +1515,14 @@ function Apps({ cfg, set }) {
           placeholder={t("apps.webPlaceholder")}
           value={webUrl}
           onChange={(e) => setWebUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addWebsite()}
+        />
+        <input
+          className="r-hotkey-input web-name"
+          type="text"
+          placeholder={t("apps.webName")}
+          value={webName}
+          onChange={(e) => setWebName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addWebsite()}
         />
         <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
