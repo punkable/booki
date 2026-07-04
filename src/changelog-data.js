@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.20.0",
+    date: "4 jul 2026",
+    headline: "Más carácter capibara, y una pasada a fondo de pulido y accesibilidad.",
+    sections: [
+      {
+        icon: "🦫",
+        title: "El capibara asoma",
+        notes: [
+          "Cuando el dock está vacío, ahora te saluda el capibara de Booki para invitarte a anclar tus apps.",
+          "También aparece en los estados vacíos de Ajustes, en las novedades y en Acerca de.",
+        ],
+      },
+      {
+        icon: "♿",
+        title: "Más accesible",
+        notes: [
+          "Anillos de foco visibles al navegar con el teclado y etiquetas para lectores de pantalla en los controles.",
+          "Se respeta a fondo la preferencia de «reducir movimiento» del sistema en todas las animaciones.",
+        ],
+      },
+      {
+        icon: "🪶",
+        title: "Más ligero y fino",
+        notes: [
+          "Cada idioma se carga solo cuando lo usas, así el arranque es más rápido.",
+          "El agrandado de iconos al pasar el cursor va más suave y consume menos.",
+          "Pequeños arreglos: manejo de errores más claro y detalles visuales en el modo oscuro.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.19.0",
     date: "3 jul 2026",
     headline: "El notch se controla como quieras, y Booki habla más idiomas.",
