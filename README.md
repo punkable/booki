@@ -38,7 +38,7 @@
 | 🫥 **Smart hide + notch** | Tucks away with a genie animation into a slim glass *notch*; push the cursor to the edge (or click it) to bring it back. Fullscreen games/movies black it out. |
 | 🧲 **One control for position** | A single mini-screen sets the dock's edge and the notch's spot at once — the notch always travels with the dock, in a horizontal or slim vertical bar. |
 | 💾 **Dock profiles** | Save whole setups (e.g. *Work* / *Gaming*) and switch with one click from Settings or the right-click menu. |
-| 🎨 **Deep customization** | Light / dark / system / **auto-by-hour** theme, accent from a palette / system / **your wallpaper**, size, spacing, roundness, translucency, five notch finishes, multi-monitor, ES/EN. |
+| 🎨 **Deep customization** | Light / dark / system / **auto-by-hour** theme, accent from a palette / system / **your wallpaper**, size, spacing, roundness, translucency, five notch finishes, multi-monitor and **6 languages**. |
 | 🪶 **Featherweight** | Tauri 2 + Rust on the built-in WebView2 — a ~4 MB installer, tiny memory use, and timers that pause the moment the dock is hidden. |
 
 ## 🖼️ Gallery
@@ -152,3 +152,8 @@ releases are pruned so only the latest stays downloadable.
 MIT — do whatever makes you happy, credit is appreciated. 🦫
 
 <sub>Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT license.</sub>
+
+<p align="center">
+  <img src="assets/brand/svg/isotype.svg" alt="Booki the capybara" height="96" /><br/>
+  <sub>Made with 🧡 by <a href="https://github.com/punkable">Punkable</a> · <a href="https://x.com/Punkabl3">@Punkabl3</a></sub>
+</p>

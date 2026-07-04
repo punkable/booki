@@ -5,6 +5,29 @@
    restrained translucency, light borders, depth, Segoe UI.
    ─────────────────────────────────────────────────────────── */
 
+/* Respect "reduce motion" everywhere: kill decorative loops and near-instant
+   any remaining transitions, without disabling functionality. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keyboard focus: a clear accent ring on interactive controls (mouse clicks
+   don't trigger :focus-visible, so it stays clean for pointer users). */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible,
+.s-navitem:focus-visible,
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 :root {
   color-scheme: light dark;
 
@@ -1171,6 +1194,17 @@ body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
 .hint-plus svg { width: 55%; height: 55%; }
 .tile.hint:hover .hint-plus { background: color-mix(in srgb, var(--accent) 20%, transparent); transform: scale(1.06); }
 @keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+/* Empty-dock capybara: the mascot with a little "+" badge, inviting a first pin. */
+.hint-capy { position: relative; display: grid; place-items: center; width: 82%; height: 82%; }
+.hint-capy img { width: 84%; height: 84%; object-fit: contain; }
+.hint-plus-badge {
+  position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center;
+  width: 44%; height: 44%; color: var(--accent-contrast, #fff); background: var(--accent);
+  border-radius: 50%; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.14s var(--ease-bounce);
+}
+.hint-plus-badge svg { width: 58%; height: 58%; }
+.tile.hint:hover .hint-plus-badge { transform: scale(1.14); }
 
 /* While dragging, the in-bar tile is just the ghost slot — the floating
    .drag-clone is the thing that follows the pointer (see its rules above). */
@@ -1515,7 +1549,7 @@ body.settings-body {
 }
 .s-search-results button:hover { background: var(--hover); }
 .s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
-.s-search-none { font: 500 12px var(--font); color: var(--ink-2); padding: 8px 9px; }
+.s-search-none { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 500 12px var(--font); color: var(--ink-2); padding: 12px 9px; }
 
 /* "More options" dropdown next to "+ Add app" (Pinned apps tab). */
 .s-more { position: relative; display: inline-block; }
@@ -2000,7 +2034,11 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-thumb.widget { background: var(--hover); font-size: 15px; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: #e23b3b; color: #fff; }
-.pin-empty { color: var(--ink-2); font-size: 13px; padding: 6px 2px; }
+.pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; padding: 20px 2px; text-align: center; }
+/* Capybara mascot in empty states — friendly, not loud. */
+.empty-capy { width: 56px; height: 56px; opacity: 0.9; animation: booki-breathe 3s var(--ease) infinite; }
+.empty-capy.sm { width: 34px; height: 34px; }
+@media (prefers-reduced-motion: reduce) { .empty-capy { animation: none; } }
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
@@ -2071,6 +2109,16 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   background-repeat: no-repeat; background-position: right 10px center;
 }
 .s-select:hover { border-color: var(--accent); }
+.s-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+/* Lighter chevron in dark mode so it doesn't vanish on the dark field. */
+:root[data-theme="dark"] .s-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c7c7c7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .s-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c7c7c7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  }
+}
 .sugg-item {
   display: flex; flex-direction: column; align-items: center; gap: 7px;
   padding: 12px 6px; border: 1px solid var(--stroke); background: var(--layer);
@@ -2103,6 +2151,8 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 @keyframes pop-in { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
 .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; font-size: 16px; }
+.modal-head strong { display: inline-flex; align-items: center; gap: 8px; }
+.cl-capy { width: 26px; height: 26px; vertical-align: middle; }
 .icon-styles { display: flex; gap: 6px; margin-bottom: 14px; }
 .seg-mini {
   font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer; color: var(--ink-2);
