@@ -83,6 +83,12 @@ async function boot() {
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
+    // Self-heal: a transient failure (e.g. the backend not ready yet) shouldn't
+    // leave a dead dock. Retry once after a short beat before giving up.
+    if (!boot.retried) {
+      boot.retried = true;
+      setTimeout(boot, 1500);
+    }
   }
 }
 
@@ -1090,7 +1096,7 @@ function exitEdit() {
 
 function onPointerDown(e, el, item) {
   if (e.button !== 0) return;
-  press = { el, item, startX: e.clientX, startY: e.clientY, moved: false };
+  press = { el, item, startX: e.clientX, startY: e.clientY, moved: false, pointerId: e.pointerId };
   // Long-press on an app/folder enters edit mode (iOS-style).
   if (item.kind !== "separator" && !editMode) {
     press.longTimer = setTimeout(enterEdit, 550);
@@ -1138,6 +1144,10 @@ function onPressMove(e) {
     dragging = true;
     dockEl.classList.add("dragging");
     press.el.classList.add("dragging");
+    // Capture the pointer so moves keep firing even once the cursor leaves the
+    // dock's small window — otherwise the "pull far out to unpin" gesture could
+    // never reach its threshold with a mouse (mice get no implicit capture).
+    try { press.el.setPointerCapture(press.pointerId); } catch (_) {}
     // A floating copy follows the pointer; the real tile stays as a ghost slot,
     // so you SEE what you're moving instead of it teleporting between slots.
     const r = press.el.getBoundingClientRect();
@@ -1154,8 +1164,9 @@ function onPressMove(e) {
     dragClone.style.top = `${e.clientY - press.grabY}px`;
   }
 
-  // Pulled well past the bar → dropping here unpins (macOS-style).
-  const pulling = pullDistance(e) > 90;
+  // Pulled clearly out of the bar's window (its pad is ~36px) → dropping here
+  // unpins (macOS-style). Reachable now that the pointer is captured.
+  const pulling = pullDistance(e) > 64;
   if (pulling !== willUnpin) {
     willUnpin = pulling;
     if (dragClone) dragClone.classList.toggle("will-unpin", willUnpin);
@@ -1243,6 +1254,7 @@ async function onPressUp() {
   press = null;
   if (!p) return;
   clearTimeout(p.longTimer);
+  try { p.el.releasePointerCapture(p.pointerId); } catch (_) {}
   if (dragging) {
     dragging = false;
     dockEl.classList.remove("dragging");
@@ -1296,6 +1308,7 @@ async function onPressUp() {
 async function cancelDrag() {
   if (!press && !dragging) return;
   window.removeEventListener("pointermove", onPressMove);
+  if (press) { try { press.el.releasePointerCapture(press.pointerId); } catch (_) {} }
   const wasDragging = dragging;
   press = null;
   dragging = false;

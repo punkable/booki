@@ -327,6 +327,7 @@ export const dock = {
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
   trashCount: () => invoke("trash_count"),
   recentFiles: (limit) => invoke("recent_files", { limit }),
+  openDataDir: () => invoke("open_data_dir"),
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),

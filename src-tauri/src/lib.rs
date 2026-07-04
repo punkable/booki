@@ -747,6 +747,15 @@ fn trash_count() -> u64 {
     win::trash_count().unwrap_or(0)
 }
 
+/// Open Booki's data folder (config, backups, logs, crash.log) in the file
+/// manager — a one-click way to grab diagnostics when something goes wrong.
+#[tauri::command]
+fn open_data_dir() -> Result<(), String> {
+    let dir = config::config_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    apps::launch(&dir.to_string_lossy(), &[])
+}
+
 #[derive(serde::Serialize)]
 struct RecentFile {
     name: String,
@@ -1175,11 +1184,55 @@ fn toggle_dock(app: &AppHandle) {
 // ──────────────────────────────── Entry ─────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Append any panic (with location + version + timestamp) to a crash log next to
+/// the config, written directly so it survives even if logging is down. With
+/// `panic = "abort"` this runs just before the process exits, turning an opaque
+/// crash into a debuggable line the user can send us.
+fn install_panic_hook() {
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let loc = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "?".into());
+        let line = format!(
+            "[t={secs}] Booki {} panicked at {loc}: {info}\n",
+            env!("CARGO_PKG_VERSION")
+        );
+        let dir = config::config_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        let crash_path = dir.join("crash.log");
+        // Start fresh if a crash-loop ever bloated the file — never grow unbounded.
+        let too_big = std::fs::metadata(&crash_path).map(|m| m.len() > 128 * 1024).unwrap_or(false);
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(!too_big)
+            .truncate(too_big)
+            .write(true)
+            .open(&crash_path)
+        {
+            use std::io::Write;
+            let _ = f.write_all(line.as_bytes());
+        }
+        log::error!("{line}");
+        prev(info);
+    }));
+}
+
 pub fn run() {
+    install_panic_hook();
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
+                // Cap the log so it can never grow without bound; keep just the
+                // most recent file. Sustainable for a long-running background app.
+                .max_file_size(1_000_000) // ~1 MB
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepOne)
                 .build(),
         )
         .plugin(
@@ -1267,6 +1320,7 @@ pub fn run() {
             trash_count,
             empty_trash,
             recent_files,
+            open_data_dir,
             wallpaper_accent,
             media_info,
             media_toggle,
