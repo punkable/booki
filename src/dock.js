@@ -667,6 +667,12 @@ async function pollMedia() {
       }
       art.style.display = "block";
       if (ico) ico.style.display = "none";
+    } else if (art) {
+      // Playing something with no artwork → don't leave the previous track's
+      // cover showing; fall back to the widget icon.
+      art.style.display = "none";
+      art.removeAttribute("data-src");
+      if (ico) ico.style.display = "";
     }
   });
 }
@@ -1980,11 +1986,11 @@ function tipName(el) {
 function showTip(el) {
   const name = tipName(el);
   if (!name) return;
+  // Measure while still hidden (opacity:0, but laid out) so we can decide whether
+  // it fits BEFORE committing to it.
   tipEl.textContent = name;
-  tipEl.classList.add("show");
   const r = el.getBoundingClientRect();
   const gap = 10;
-  // Measure after making it visible.
   const tw = tipEl.offsetWidth;
   const th = tipEl.offsetHeight;
   let x, y;
@@ -2001,9 +2007,22 @@ function showTip(el) {
     x = r.left + r.width / 2 - tw / 2;
     y = r.top - gap - th;
   }
-  x = Math.max(6, Math.min(x, window.innerWidth - tw - 6));
-  y = Math.max(6, Math.min(y, window.innerHeight - th - 6));
+  // The dock window is only the bar + a small shadow-pad margin, so a wide tip
+  // (long name, or a slim vertical bar) can't fit inside the webview and would be
+  // clipped. When it doesn't fit, bail and let the native OS tooltip show instead
+  // (its title is still on the tile), so the name is never cut off or invisible.
+  const m = 4;
+  const fits =
+    x >= m && y >= m && x + tw <= window.innerWidth - m && y + th <= window.innerHeight - m;
+  if (!fits) return;
+  // Committing: suppress the OS tooltip (stash its title) and show ours.
+  const nativeTitle = el.getAttribute("title");
+  if (nativeTitle != null) {
+    el._tip = nativeTitle;
+    el.removeAttribute("title");
+  }
   tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  tipEl.classList.add("show");
 }
 
 function hideTip() {
@@ -2028,12 +2047,8 @@ dockEl.addEventListener("pointerover", (e) => {
   if (el.classList.contains("separator")) return;
   hideTip();
   tipTile = el;
-  // Suppress the OS tooltip while ours is in play.
-  const nativeTitle = el.getAttribute("title");
-  if (nativeTitle != null) {
-    el._tip = nativeTitle;
-    el.removeAttribute("title");
-  }
+  // Don't touch the native title yet — showTip removes it only if the custom tip
+  // actually fits, otherwise the OS tooltip stays as the reliable fallback.
   tipTimer = setTimeout(() => showTip(el), 340);
 });
 dockEl.addEventListener("pointerout", (e) => {
@@ -2296,6 +2311,11 @@ function startRunningPoll() {
     if (dockEl.querySelector(".tile.trash")) refreshTrashState();
     if (cfg.showIndicators === false) {
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => (t.dataset.running = "false"));
+      return;
+    }
+    // Nothing that could be "running" is pinned (only widgets/trash/separators) →
+    // skip enumerating every window (which now also resolves each process's exe).
+    if (!cfg.pinned.some((p) => p.kind === "app" || p.kind === "folder" || p.kind === "group")) {
       return;
     }
     try {
