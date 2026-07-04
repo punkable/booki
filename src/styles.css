@@ -203,6 +203,38 @@ body.edge-top .dock { align-items: flex-start; }
    the horizontal bar's HEIGHT — a slim column, not a fat panel. */
 body.edge-left .dock, body.edge-right .dock { flex-direction: column; align-items: center; padding: 8px 6px; }
 
+/* Overflow (too many pins to fit even at the minimum icon size): the bar is
+   capped to the screen and scrolls on its main axis. Magnify is off in this mode
+   (dock.js), so clipping the scroll axis is safe. Scrollbar hidden — you scroll
+   with the wheel or by hovering the ends (dock.js edge auto-scroll). */
+body.dock-overflow.edge-bottom .dock,
+body.dock-overflow.edge-top .dock { overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth; }
+body.dock-overflow.edge-left .dock,
+body.dock-overflow.edge-right .dock { overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
+body.dock-overflow .dock::-webkit-scrollbar { width: 0; height: 0; display: none; }
+body.dock-overflow .dock { scrollbar-width: none; }
+
+/* Notes widget editor — a small floating pad you type into; saves on blur/Esc. */
+.note-editor {
+  position: fixed;
+  z-index: 60;
+  width: 240px;
+  height: 130px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: none;
+  color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  outline: none;
+}
+
 /* Compact density (opt-in) — tighter chrome for small screens. Tiles keep their
    configured size; only the surrounding padding/gaps shrink. */
 body.compact .dock { padding: 4px 6px; gap: calc(var(--gap) * 0.6); }

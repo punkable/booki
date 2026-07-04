@@ -1355,16 +1355,18 @@ function Apps({ cfg, set }) {
       <h2 className="s-subhead">{t("apps.widgets")}</h2>
       <p className="muted">{t("apps.widgetsHint")}</p>
       <div className="s-actions">
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("clock", t("w.clock"))}>＋ {t("w.clock")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("cpu", "CPU")}>＋ CPU</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("ram", "RAM")}>＋ RAM</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("disk", t("w.disk"))}>＋ {t("w.disk")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("net", t("w.net"))}>＋ {t("w.net")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("uptime", t("w.uptime"))}>＋ {t("w.uptime")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("battery", t("w.battery"))}>＋ {t("w.battery")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("notes", t("w.notes"))}>＋ {t("w.notes")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("media", t("w.media"))}>＋ {t("w.media")}</button>
-        <button className="s-btn s-btn-soft" onClick={() => addWidget("volume", t("w.volume"))}>＋ {t("w.volume")}</button>
+        {[
+          ["clock", t("w.clock")], ["cpu", "CPU"], ["ram", "RAM"], ["disk", t("w.disk")],
+          ["net", t("w.net")], ["uptime", t("w.uptime")], ["battery", t("w.battery")],
+          ["notes", t("w.notes")], ["media", t("w.media")], ["volume", t("w.volume")],
+        ]
+          // Hide widgets you already have — no point adding a second of the same.
+          .filter(([w]) => !cfg.pinned.some((p) => p.kind === "widget" && p.widget === w))
+          .map(([w, label]) => (
+            <button key={w} className="s-btn s-btn-soft" onClick={() => addWidget(w, label)}>
+              ＋ {label}
+            </button>
+          ))}
       </div>
       <h2 className="s-subhead">{t("apps.web")}</h2>
       <p className="muted">{t("apps.webHint")}</p>
