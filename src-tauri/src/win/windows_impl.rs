@@ -215,11 +215,56 @@ unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
         return TRUE;
     }
     let title = String::from_utf16_lossy(&buf[..copied as usize]);
+    let mut pid: u32 = 0;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
     out.push(WindowInfo {
         hwnd: hwnd.0 as isize,
         title,
+        exe: process_image_path(pid).unwrap_or_default(),
     });
     TRUE
+}
+
+/// Full image path of a process id, lowercased. Uses the limited-information
+/// query right so it works without elevation for most user processes.
+unsafe fn process_image_path(pid: u32) -> Option<String> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_FORMAT,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    if pid == 0 {
+        return None;
+    }
+    let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+    let mut buf = [0u16; 260];
+    let mut len = buf.len() as u32;
+    let ok = QueryFullProcessImageNameW(
+        handle,
+        PROCESS_NAME_FORMAT(0),
+        windows::core::PWSTR(buf.as_mut_ptr()),
+        &mut len,
+    )
+    .is_ok();
+    let _ = CloseHandle(handle);
+    if ok && len > 0 {
+        Some(String::from_utf16_lossy(&buf[..len as usize]).to_lowercase())
+    } else {
+        None
+    }
+}
+
+/// Number of items currently in the Recycle Bin (all drives). None on failure.
+pub fn trash_count() -> Option<u64> {
+    use windows::Win32::UI::Shell::{SHQueryRecycleBinW, SHQUERYRBINFO};
+    let mut info = SHQUERYRBINFO {
+        cbSize: std::mem::size_of::<SHQUERYRBINFO>() as u32,
+        ..Default::default()
+    };
+    match unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) } {
+        Ok(_) => Some(info.i64NumItems as u64),
+        Err(_) => None,
+    }
 }
 
 /// Work area (screen minus the taskbar) of the monitor containing a point,

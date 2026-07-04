@@ -83,6 +83,8 @@ const DICT = {
     "be.materialHint": "Acrylic / Mica",
     "be.showLabels": "Mostrar nombres al pasar el cursor",
     "be.showIndicators": "Indicar apps en ejecución",
+    "be.focusRunning": "Ir a la ventana si ya está abierta",
+    "be.focusRunningHint": "Al hacer clic, enfoca la ventana existente en vez de abrir otra instancia.",
     "be.alwaysOnTop": "Mantener siempre visible",
     "be.autostart": "Iniciar con Windows",
     "be.autoHide": "Ocultar automáticamente",
@@ -205,6 +207,7 @@ const DICT = {
     "cl.ok": "Entendido",
 
     "m.open": "Abrir",
+    "m.recent": "Recientes",
     "m.changeIcon": "Cambiar icono…",
     "m.removeIcon": "Quitar icono personalizado",
     "m.addApp": "Añadir app…",
@@ -327,6 +330,8 @@ const DICT = {
     "be.materialHint": "Acrylic / Mica",
     "be.showLabels": "Show names on hover",
     "be.showIndicators": "Show running apps",
+    "be.focusRunning": "Go to window if already open",
+    "be.focusRunningHint": "Clicking focuses the existing window instead of launching another instance.",
     "be.alwaysOnTop": "Always on top",
     "be.autostart": "Start with Windows",
     "be.autoHide": "Auto-hide",
@@ -449,6 +454,7 @@ const DICT = {
     "cl.ok": "Got it",
 
     "m.open": "Open",
+    "m.recent": "Recent",
     "m.changeIcon": "Change icon…",
     "m.removeIcon": "Remove custom icon",
     "m.addApp": "Add app…",

@@ -45,6 +45,10 @@ pub fn trash_is_empty() -> bool {
     true
 }
 
+pub fn trash_count() -> Option<u64> {
+    None
+}
+
 pub fn empty_trash() -> Result<(), String> {
     Err("recycle bin is only available on Windows".into())
 }
