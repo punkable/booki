@@ -48,7 +48,7 @@ const DEMO_CONFIG = {
   materialStrength: 70,
   autostart: false,
   language: "system",
-  hotEdge: true,
+  notchTrigger: "click",
   compact: false,
   lastProfile: "",
 };

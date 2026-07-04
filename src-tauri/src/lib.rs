@@ -578,13 +578,14 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     };
     let vertical = edge == "left" || edge == "right";
     // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
-    // slightly larger pill with a small margin. The window must be a bit larger
-    // than the pill's HOVER size (156×11) or the grow animation gets clipped.
+    // slightly larger pill with a small margin. The window hugs the pill's HOVER
+    // size (146×18) closely — a small transparent margin only — so its click
+    // hitbox doesn't cover much of what's behind it.
     let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
-        (true, true) => (28.0, 170.0),
-        (true, false) => (170.0, 28.0),
-        (false, true) => (32.0, 184.0),
-        (false, false) => (184.0, 32.0),
+        (true, true) => (22.0, 156.0),
+        (true, false) => (156.0, 22.0),
+        (false, true) => (26.0, 168.0),
+        (false, false) => (168.0, 26.0),
     };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;
@@ -1326,7 +1327,7 @@ pub fn run() {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }
                             // Cursor pressed against the dock's edge → reveal signal.
-                            if cfg_cache.hot_edge {
+                            if cfg_cache.notch_trigger == "hover" {
                                 edge_cooldown = edge_cooldown.saturating_sub(1);
                                 if win::cursor_at_edge(&cfg_cache.edge) {
                                     edge_streak = edge_streak.saturating_add(1);

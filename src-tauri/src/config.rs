@@ -186,10 +186,11 @@ pub struct Config {
     /// Name of the last dock profile applied/saved (shown with a check mark).
     #[serde(default)]
     pub last_profile: String,
-    /// Hot edge: with the dock hidden, pushing the cursor against its screen
-    /// edge reveals it (no need to find the notch).
-    #[serde(default = "default_true")]
-    pub hot_edge: bool,
+    /// How the tucked-away dock comes back: "click" (only clicking the notch —
+    /// nothing auto-reveals) or "hover" (hovering the notch, or pushing the
+    /// cursor against its screen edge, brings it out).
+    #[serde(default = "default_notch_trigger")]
+    pub notch_trigger: String,
     /// Compact density: tighter padding/gaps for small screens.
     #[serde(default)]
     pub compact: bool,
@@ -203,6 +204,10 @@ pub struct Config {
 
 fn default_hotkey_modifier() -> String {
     "Alt".into()
+}
+
+fn default_notch_trigger() -> String {
+    "click".into()
 }
 
 impl Default for Config {
@@ -237,7 +242,7 @@ impl Default for Config {
             seen_version: String::new(),
             onboarded: false,
             last_profile: String::new(),
-            hot_edge: true,
+            notch_trigger: default_notch_trigger(),
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
