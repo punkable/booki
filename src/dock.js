@@ -23,7 +23,7 @@ import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
-import { t, setLang, curLang } from "./i18n.js";
+import { t, setLang, curLang, ensureLang } from "./i18n.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -55,6 +55,7 @@ const baseSize = () => cfg.iconSize || 48;
 async function boot() {
   try {
     cfg = await configApi.get();
+    await ensureLang(cfg.language); // load pt/fr/de before the first paint
     applyAll();
     await render();
     reframe();
@@ -87,6 +88,8 @@ async function boot() {
 async function reloadConfig() {
   const prev = cfg;
   cfg = await configApi.get();
+  // If the language changed, make sure its dictionary is loaded before re-render.
+  if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -236,9 +239,11 @@ async function render() {
     hint.className = "tile hint";
     hint.style.setProperty("--size", `${baseSize()}px`);
     hint.title = t("dock.emptyAdd");
+    // The capybara mascot waves you in — friendlier than a bare "+".
     hint.innerHTML =
       `<span class="label">${t("dock.emptyAdd")}</span>` +
-      `<span class="hint-plus">${icon("plus")}</span>`;
+      `<span class="hint-capy"><img src="/brand/svg/isotype.svg" alt="" draggable="false" />` +
+      `<span class="hint-plus-badge">${icon("plus")}</span></span>`;
     hint.addEventListener("click", () => dockApi.openSettingsTab("apps"));
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
@@ -259,6 +264,7 @@ function fitDock() {
     const eff = Math.max(20, Math.floor(baseSize() * (usable / natural)));
     setAllSizes(eff);
   }
+  invalidateMag(); // tile sizes/positions just changed → re-measure lazily
 }
 
 async function appTile(item) {
@@ -478,11 +484,13 @@ function widgetTile(item) {
       const b = document.createElement("button");
       b.className = "w-ctl" + (cls ? ` ${cls}` : "");
       b.title = label;
+      b.setAttribute("aria-label", label);
       b.innerHTML = svg;
       b.addEventListener("pointerdown", (e) => e.stopPropagation());
       b.addEventListener("click", async (e) => {
         e.stopPropagation();
-        await fn();
+        // A failing native media call must never bubble as an uncaught error.
+        try { await fn(); } catch (_) {}
         setTimeout(refreshMedia, 350); // refresh title/state right away
       });
       controls.appendChild(b);
@@ -737,8 +745,8 @@ function launch(el, item) {
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
   if (item.kind === "widget") {
-    if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia);
-    if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume);
+    if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia, () => {});
+    if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -816,52 +824,66 @@ function resetMagnify() {
     t.style.transform = "";
     t.classList.remove("focus");
   });
+  magFocus = null;
+}
+
+// Cached tile geometry for magnify: measured ONCE per layout (transforms don't
+// affect offsetLeft/Top, so the resting centers stay valid), then reused on
+// every pointer move — no more read/write layout thrashing in the hot loop.
+let magCache = null;
+let magFocus = null;
+function invalidateMag() {
+  magCache = null;
+  magFocus = null;
+}
+function buildMagCache() {
+  const vertical = isVertical();
+  magCache = [...dockEl.querySelectorAll(".tile")].map((el) => ({
+    el,
+    center: vertical ? el.offsetTop + el.offsetHeight / 2 : el.offsetLeft + el.offsetWidth / 2,
+    // Widgets are info CARDS, not launch icons — scaling a big media/clock card
+    // covers its neighbours, so they (and separators) don't magnify.
+    noMag: el.classList.contains("separator") || el.classList.contains("widget"),
+  }));
 }
 
 // Booki magnify — tasteful, CONTAINED scaling. Tiles keep their layout slot and
 // scale visually (CSS transform), growing into the bar's edge-side padding so
 // nothing overflows the window (no clipping, no resize per frame). The hovered
-// tile gets a subtle glow.
+// tile gets a subtle glow. The measuring pass is cached; this loop only writes.
 function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || editMode) return;
+  if (!magCache) buildMagCache();
   const base = baseSize();
   const maxScale = Math.max(1, cfg.zoom || 1.25);
   const spread = base * 1.5;
   const vertical = isVertical();
+  const liftAxis = vertical ? "X" : "Y";
+  const liftSign = (vertical ? cfg.edge === "left" : cfg.edge === "top") ? 1 : -1;
   const dr = dockEl.getBoundingClientRect();
   const pointer = vertical ? clientY - dr.top : clientX - dr.left;
   let best = null;
   let bestInf = 0;
-  dockEl.querySelectorAll(".tile").forEach((t) => {
-    const sep = t.classList.contains("separator");
-    // Widgets are info CARDS, not launch icons — scaling a big media/clock card
-    // makes it grow into and cover its neighbours, so they don't magnify (they
-    // have their own subtle hover background instead).
-    const noMag = sep || t.classList.contains("widget");
-    const center = vertical
-      ? t.offsetTop + t.offsetHeight / 2
-      : t.offsetLeft + t.offsetWidth / 2;
-    const dist = Math.abs(pointer - center);
-    const influence = Math.max(0, 1 - (dist / spread) ** 2);
-    const scale = noMag ? 1 : 1 + (maxScale - 1) * influence;
-    // A small lift toward the screen interior, on top of the zoom, for depth.
-    // (translate BEFORE scale so the lift stays a constant number of px.)
-    const lift = noMag ? 0 : Math.round(influence * 6);
-    let liftTf = "";
-    if (lift) {
-      liftTf = vertical
-        ? `translateX(${cfg.edge === "left" ? lift : -lift}px) `
-        : `translateY(${cfg.edge === "top" ? lift : -lift}px) `;
-    }
-    t.style.transform = `${liftTf}scale(${scale.toFixed(3)})`;
-    if (!noMag && influence > bestInf) {
+  for (const item of magCache) {
+    const influence = item.noMag ? 0 : Math.max(0, 1 - (Math.abs(pointer - item.center) / spread) ** 2);
+    const scale = item.noMag ? 1 : 1 + (maxScale - 1) * influence;
+    // A small lift toward the screen interior (translate BEFORE scale so it
+    // stays a constant px amount regardless of zoom).
+    const lift = Math.round(influence * 6);
+    const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
+    item.el.style.transform = `${liftTf}scale(${scale.toFixed(3)})`;
+    if (!item.noMag && influence > bestInf) {
       bestInf = influence;
-      best = t;
+      best = item.el;
     }
-  });
-  dockEl.querySelectorAll(".tile.focus").forEach((t) => t !== best && t.classList.remove("focus"));
-  if (best && bestInf > 0.45) best.classList.add("focus");
+  }
+  const focus = best && bestInf > 0.45 ? best : null;
+  if (focus !== magFocus) {
+    if (magFocus) magFocus.classList.remove("focus");
+    if (focus) focus.classList.add("focus");
+    magFocus = focus;
+  }
 }
 
 // Show the changelog the first time the app opens after an update.
@@ -982,7 +1004,7 @@ dockEl.addEventListener(
       const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
       const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
       renderVolume(next, false); // optimistic — the poll corrects if needed
-      dockApi.volumeSet(next);
+      dockApi.volumeSet(next).catch(() => {});
       return;
     }
     const item = cfg.pinned.find((p) => p.id === w.dataset.id);

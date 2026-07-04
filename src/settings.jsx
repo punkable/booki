@@ -32,7 +32,7 @@ const THEME_PRESETS = [
 ];
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
-import { t, setLang } from "./i18n.js";
+import { t, setLang, ensureLang } from "./i18n.js";
 import { icon } from "./icons.js";
 
 // Small icon button used across the Apps list.
@@ -1230,7 +1230,12 @@ function Apps({ cfg, set }) {
         </div>
       )}
       <ul className="pin-list" ref={listRef}>
-        {cfg.pinned.length === 0 && <li className="pin-empty">{t("apps.empty")}</li>}
+        {cfg.pinned.length === 0 && (
+          <li className="pin-empty">
+            <img className="empty-capy" src="/brand/svg/isotype.svg" alt="" />
+            {t("apps.empty")}
+          </li>
+        )}
         {cfg.pinned.flatMap((item, i) => {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
@@ -1656,8 +1661,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    configApi.get().then((c) => {
-      setLang(c.language);
+    configApi.get().then(async (c) => {
+      await ensureLang(c.language); // load pt/fr/de before first render
       setCfg(c);
       applyTheme(c);
     });
@@ -1667,7 +1672,12 @@ function App() {
   const set = (patch) => {
     setCfg((prev) => {
       const next = { ...prev, ...patch };
-      setLang(next.language);
+      // Switching language may need its dictionary → load then re-render.
+      if (prev && prev.language !== next.language) {
+        ensureLang(next.language).then(() => setCfg((c) => ({ ...c })));
+      } else {
+        setLang(next.language);
+      }
       applyTheme(next);
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
@@ -1740,7 +1750,10 @@ function App() {
                   </button>
                 ))}
               {!SEARCH_INDEX.some(([k]) => t(k).toLowerCase().includes(query.trim().toLowerCase())) && (
-                <div className="s-search-none">{t("search.none")}</div>
+                <div className="s-search-none">
+                  <img className="empty-capy sm" src="/brand/svg/isotype.svg" alt="" />
+                  {t("search.none")}
+                </div>
               )}
             </div>
           )}
@@ -1783,8 +1796,8 @@ function ChangelogModal({ onClose }) {
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <strong>🦫 {t("cl.title")}</strong>
-          <button className="pin-btn ico" onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
+          <strong><img className="cl-capy" src="/brand/svg/isotype.svg" alt="" /> {t("cl.title")}</strong>
+          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
         </div>
         <div className="cl-list">
           {CHANGELOG.slice(0, 1).map((entry, idx) => (
