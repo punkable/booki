@@ -200,6 +200,11 @@ pub struct Config {
     /// Modifier for the position hotkeys ("Alt" | "Ctrl+Alt" | "Alt+Shift").
     #[serde(default = "default_hotkey_modifier")]
     pub hotkey_modifier: String,
+    /// When on, clicking a pin whose app already has a window focuses that
+    /// window instead of launching a new instance. Off by default (each click
+    /// launches; single-instance apps still focus themselves).
+    #[serde(default)]
+    pub focus_if_running: bool,
 }
 
 fn default_hotkey_modifier() -> String {
@@ -246,6 +251,7 @@ impl Default for Config {
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
+            focus_if_running: false,
         }
     }
 }
@@ -316,7 +322,14 @@ pub fn save(config: &Config) -> Result<(), String> {
     let text = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     let final_path = config_path();
     let tmp_path = dir.join("config.json.tmp");
-    fs::write(&tmp_path, text).map_err(|e| e.to_string())?;
+    // Write the temp file and flush it all the way to disk before renaming, so a
+    // power loss right after the rename can't leave an empty/zero-length config.
+    {
+        use std::io::Write;
+        let mut f = fs::File::create(&tmp_path).map_err(|e| e.to_string())?;
+        f.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+        f.sync_all().map_err(|e| e.to_string())?;
+    }
     fs::rename(&tmp_path, &final_path).map_err(|e| e.to_string())?;
     Ok(())
 }

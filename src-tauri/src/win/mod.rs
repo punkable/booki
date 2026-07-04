@@ -12,6 +12,10 @@ pub struct WindowInfo {
     /// Native window handle, passed back to [`focus_window`].
     pub hwnd: isize,
     pub title: String,
+    /// Full path of the process that owns the window (lowercased), for reliably
+    /// matching a pinned app to its live window. Empty if it couldn't be read.
+    #[serde(default)]
+    pub exe: String,
 }
 
 #[cfg(windows)]
@@ -20,7 +24,7 @@ mod windows_impl;
 pub use windows_impl::{
     app_icon_data_uri, cursor_at_edge, empty_trash, focus_window, foreground_occludes,
     get_autostart, is_fullscreen, list_windows, media_next, media_now_playing, media_prev,
-    media_toggle, move_paths, set_autostart, trash_is_empty, trash_paths, volume_get,
+    media_toggle, move_paths, set_autostart, trash_count, trash_is_empty, trash_paths, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
 
@@ -30,6 +34,6 @@ mod stub;
 pub use stub::{
     app_icon_data_uri, cursor_at_edge, empty_trash, focus_window, foreground_occludes,
     get_autostart, is_fullscreen, list_windows, media_next, media_now_playing, media_prev,
-    media_toggle, move_paths, set_autostart, trash_is_empty, trash_paths, volume_get,
+    media_toggle, move_paths, set_autostart, trash_count, trash_is_empty, trash_paths, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
