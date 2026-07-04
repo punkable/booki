@@ -82,7 +82,7 @@ const SEARCH_INDEX = [
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.translucency", "appearance"], ["ap.language", "appearance"], ["ap.backup", "appearance"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
-  ["be.notchPeek", "behavior"], ["be.hotEdge", "behavior"], ["prof.title", "behavior"],
+  ["be.notchPeek", "behavior"], ["be.reveal", "behavior"], ["prof.title", "behavior"],
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
@@ -767,15 +767,18 @@ function Appearance({ cfg, set }) {
 
       <h2 className="s-subhead">{t("gp.general")}</h2>
       <Row label={t("ap.language")}>
-        <SegmentedControl
+        <select
+          className="s-select"
           value={cfg.language || "system"}
-          onChange={(v) => set({ language: v })}
-          options={[
-            { value: "system", label: t("lang.system") },
-            { value: "es", label: "ES" },
-            { value: "en", label: "EN" },
-          ]}
-        />
+          onChange={(e) => set({ language: e.target.value })}
+        >
+          <option value="system">{t("lang.system")}</option>
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="pt">Português</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+        </select>
       </Row>
       <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
         <div className="s-actions" style={{ margin: 0 }}>
@@ -829,8 +832,16 @@ function Behavior({ cfg, set }) {
         <>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
-          <Toggle label={t("be.hotEdge")} checked={cfg.hotEdge !== false}
-            onChange={(v) => set({ hotEdge: v })} />
+          <Row label={t("be.reveal")} hint={t("be.revealHint")}>
+            <SegmentedControl
+              value={cfg.notchTrigger || "click"}
+              onChange={(v) => set({ notchTrigger: v })}
+              options={[
+                { value: "click", label: t("be.revealClick") },
+                { value: "hover", label: t("be.revealHover") },
+              ]}
+            />
+          </Row>
         </>
       )}
 
