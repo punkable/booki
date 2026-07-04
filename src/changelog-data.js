@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.19.0",
+    date: "3 jul 2026",
+    headline: "El notch se controla como quieras, y Booki habla más idiomas.",
+    sections: [
+      {
+        icon: "👆",
+        title: "Notch a tu gusto",
+        notes: [
+          "Nueva opción en Comportamiento: el dock vuelve solo al hacer clic en el notch (por defecto) o también al pasar el cursor.",
+          "El área táctil del notch es más pequeña, así ya no tapa cosas detrás de él.",
+        ],
+      },
+      {
+        icon: "🌍",
+        title: "Más idiomas",
+        notes: [
+          "Nuevos idiomas: portugués, francés y alemán, además de español e inglés.",
+          "El idioma del sistema ahora se detecta mejor (y usa inglés como respaldo en vez de español).",
+        ],
+      },
+      {
+        icon: "🩹",
+        title: "Detalle",
+        notes: [
+          "La sombra del dock ya no se recorta en el borde de la ventana.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.18.0",
     date: "3 jul 2026",
     headline: "Una tanda de pulido: todo más suave, más fino y más ligero.",

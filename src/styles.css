@@ -163,14 +163,16 @@ body.edge-right { align-items: center; justify-content: flex-end; }
   border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
   border-radius: var(--dock-r);
   /* Shadow is cast AWAY from the anchored screen edge (--sh-x/--sh-y), so a
-     top/side dock throws its depth in the natural direction, not always down. */
-  box-shadow: var(--sh-x, 0) var(--sh-y, 10px) 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+     top/side dock throws its depth in the natural direction, not always down.
+     Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
+     gets clipped by the window's transparent margin. */
+  box-shadow: var(--sh-x, 0) var(--sh-y, 6px) 18px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
-body.edge-bottom .dock { --sh-x: 0; --sh-y: 10px; }
-body.edge-top .dock { --sh-x: 0; --sh-y: -10px; }
-body.edge-left .dock { --sh-x: -10px; --sh-y: 0; }
-body.edge-right .dock { --sh-x: 10px; --sh-y: 0; }
+body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
+body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
+body.edge-left .dock { --sh-x: -6px; --sh-y: 0; }
+body.edge-right .dock { --sh-x: 6px; --sh-y: 0; }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
 body.edge-top .dock { align-items: flex-start; }
 /* Vertical: center every child (app icons AND widget cards) so the side bar
@@ -2059,6 +2061,16 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   border: 1px solid var(--stroke); border-radius: var(--r-sm);
 }
 .sugg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+/* Plain dropdown (used by the language picker — too many options for a segmented). */
+.s-select {
+  font: inherit; font-size: 13px; padding: 7px 30px 7px 11px; cursor: pointer;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.s-select:hover { border-color: var(--accent); }
 .sugg-item {
   display: flex; flex-direction: column; align-items: center; gap: 7px;
   padding: 12px 6px; border: 1px solid var(--stroke); background: var(--layer);
