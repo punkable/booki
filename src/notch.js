@@ -73,22 +73,30 @@ pill.addEventListener("pointerdown", (e) => {
   } catch (_) {}
 });
 
+let dragRaf = 0;
+let dragPos = null;
 pill.addEventListener("pointermove", (e) => {
   if (!drag) return;
   if (!drag.moved && Math.hypot(e.screenX - drag.sx, e.screenY - drag.sy) < 6) return;
   drag.moved = true;
-  // Move the notch window to follow the cursor (logical screen px ↔ LogicalPosition).
-  if (winApi) {
+  // Coalesce to one window move per frame — moving the OS window is an IPC, so
+  // firing it on every raw pointer event would flood it at high refresh rates.
+  dragPos = { x: Math.round(e.screenX - 92), y: Math.round(e.screenY - 13) };
+  if (dragRaf || !winApi) return;
+  dragRaf = requestAnimationFrame(() => {
+    dragRaf = 0;
     try {
-      const w = winApi.getCurrentWindow();
-      w.setPosition(new winApi.LogicalPosition(Math.round(e.screenX - 92), Math.round(e.screenY - 13)));
+      winApi.getCurrentWindow().setPosition(new winApi.LogicalPosition(dragPos.x, dragPos.y));
     } catch (_) {}
-  }
+  });
 });
 
 pill.addEventListener("pointerup", (e) => {
   const d = drag;
   drag = null;
+  // Drop any queued follow-move so it can't fight the settle animation.
+  cancelAnimationFrame(dragRaf);
+  dragRaf = 0;
   if (!d) return;
   try {
     pill.releasePointerCapture(e.pointerId);
