@@ -880,8 +880,15 @@ body.notch-body.style-windows .notch-pill::after { display: none; }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
 body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
-body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: left center; }
-body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.20); transform-origin: right center; }
+body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; transform-origin: left center; }
+body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; transform-origin: right center; }
+/* The concave corner fillets blend the tab into the *taskbar* — that only makes
+   sense on the bottom edge. On the sides (and top) they read as odd stray curves,
+   so drop them and keep the clean rounded pill. */
+body.notch-body.peek.edge-left .notch-pill::before,
+body.notch-body.peek.edge-left .notch-pill::after,
+body.notch-body.peek.edge-right .notch-pill::before,
+body.notch-body.peek.edge-right .notch-pill::after { display: none; }
 /* The toast needs breathing room even in peek mode (its window is repositioned). */
 body.notch-body.toast { padding: 4px; }
 /* Subtle "breathing" so it feels alive without blinking. */

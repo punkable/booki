@@ -373,6 +373,20 @@ fn notch_reveal(app: AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// Bring the already-running Booki's dock to the front (used when a second
+/// instance is launched). Shows + focuses the dock window, hides the notch, and
+/// tells the frontend to un-hide and pin itself open.
+fn reveal_running_dock(app: &AppHandle) {
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.show();
+        let _ = dock.set_focus();
+    }
+    let _ = app.emit("booki://reveal", ());
+}
+
 /// Set the dock's anchored edge (used when the user drags the notch to a screen
 /// edge, or clicks a notch that lives on another edge). Persists, repositions
 /// both windows, and tells the dock to re-read. The notch goes back to "auto"
@@ -727,8 +741,9 @@ fn move_paths(paths: Vec<String>, dest: String) -> Result<(), String> {
 }
 
 /// Send files/folders to the Recycle Bin (the dock's own UI confirms first).
+/// async so a large delete never blocks the UI thread.
 #[tauri::command]
-fn trash_paths(paths: Vec<String>) -> Result<(), String> {
+async fn trash_paths(paths: Vec<String>) -> Result<(), String> {
     let result = win::trash_paths(&paths);
     if let Err(e) = &result {
         log::error!("trash_paths failed: {e}");
@@ -736,14 +751,17 @@ fn trash_paths(paths: Vec<String>) -> Result<(), String> {
     result
 }
 
+// async so the Shell query runs off the main thread — SHQueryRecycleBinW can be
+// slow on a huge bin, and it runs on the widget poll every few seconds.
 #[tauri::command]
-fn trash_is_empty() -> bool {
+async fn trash_is_empty() -> bool {
     win::trash_is_empty()
 }
 
-/// How many items are in the Recycle Bin (for the trash tile's badge).
+/// How many items are in the Recycle Bin (for the trash tile's badge). async so a
+/// slow query never blocks the dock's UI thread.
 #[tauri::command]
-fn trash_count() -> u64 {
+async fn trash_count() -> u64 {
     win::trash_count().unwrap_or(0)
 }
 
@@ -845,8 +863,10 @@ async fn media_prev() -> bool {
     win::media_prev()
 }
 
+// async: emptying the Recycle Bin can take a while (many/large files), and a sync
+// command would run on the main thread and freeze the whole dock until it's done.
 #[tauri::command]
-fn empty_trash() -> Result<(), String> {
+async fn empty_trash() -> Result<(), String> {
     let result = win::empty_trash();
     if let Err(e) = &result {
         log::error!("empty_trash failed: {e}");
@@ -1226,6 +1246,13 @@ fn install_panic_hook() {
 pub fn run() {
     install_panic_hook();
     tauri::Builder::default()
+        // MUST be the first plugin: if Booki is already running, a new launch
+        // (e.g. clicking the icon while the autostart copy is alive) just brings
+        // the existing dock to the front and exits, instead of duplicating
+        // everything. Windows startup then never ends up with two docks.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            reveal_running_dock(app);
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -1334,6 +1361,15 @@ pub fn run() {
         ])
         .setup(|app| {
             log::info!("Booki backend started");
+            // Self-heal the "start with Windows" entry: if the user has it on,
+            // re-assert the Run key to the CURRENT exe on every launch. This fixes
+            // a stale/missing entry (e.g. after moving or reinstalling the app) so
+            // autostart keeps working without the user toggling it again.
+            if config::load().autostart {
+                if let Ok(exe) = std::env::current_exe() {
+                    let _ = win::set_autostart(true, &exe.to_string_lossy());
+                }
+            }
             // System tray.
             let toggle = MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Ajustes…", true, None::<&str>)?;
