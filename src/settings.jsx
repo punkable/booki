@@ -1029,6 +1029,7 @@ function Apps({ cfg, set }) {
   const [iconFor, setIconFor] = useState(-1);
   const [styleFor, setStyleFor] = useState(-1);
   const [webUrl, setWebUrl] = useState("");
+  const [webName, setWebName] = useState("");
   const [openIds, setOpenIds] = useState({});
   const toggleOpen = (id) => setOpenIds((o) => ({ ...o, [id]: !o[id] }));
   const setIcon = (i, value) =>
@@ -1040,12 +1041,19 @@ function Apps({ cfg, set }) {
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) url = "https://" + url;
     const host = url.replace(/^https?:\/\//i, "").split("/")[0].replace(/^www\./, "");
+    // A friendlier default name from the domain (e.g. "youtube.com" → "Youtube"),
+    // but the optional name field wins if you typed one.
+    const nice = host.split(".")[0].replace(/^\w/, (c) => c.toUpperCase());
+    const name = webName.trim() || nice || host;
     let icon = null;
     try {
+      // Favicon is best-effort: if it can't be fetched the pin still works with
+      // its initial — never block or warn just because an icon didn't load.
       icon = await dockApi.fetchFavicon(url);
     } catch (_) {}
-    set({ pinned: [...cfg.pinned, { id: uid(), name: host, path: url, args: [], kind: "app", icon }] });
+    set({ pinned: [...cfg.pinned, { id: uid(), name, path: url, args: [], kind: "app", icon }] });
     setWebUrl("");
+    setWebName("");
   };
   // Dissolve a folder, spilling its items back to the dock (no data loss).
   const ungroup = (i) => {
@@ -1377,6 +1385,14 @@ function Apps({ cfg, set }) {
           placeholder={t("apps.webPlaceholder")}
           value={webUrl}
           onChange={(e) => setWebUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addWebsite()}
+        />
+        <input
+          className="r-hotkey-input web-name"
+          type="text"
+          placeholder={t("apps.webName")}
+          value={webName}
+          onChange={(e) => setWebName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addWebsite()}
         />
         <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>

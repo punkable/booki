@@ -1414,6 +1414,10 @@ pub fn run() {
                 let cfg = config::load();
                 let _ = position_notch(&notch, &cfg.edge);
                 let _ = notch.hide();
+                #[cfg(windows)]
+                if let Ok(h) = notch.hwnd() {
+                    win::exclude_from_capture(h.0 as isize);
+                }
             }
             // Position and reveal the dock.
             if let Some(dock) = app.get_webview_window("dock") {
@@ -1425,6 +1429,10 @@ pub fn run() {
                 let _ = position_dock(&dock, &cfg.edge);
                 let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
+                #[cfg(windows)]
+                if let Ok(h) = dock.hwnd() {
+                    win::exclude_from_capture(h.0 as isize);
+                }
 
                 // Register the global hotkey, if configured.
                 let _ = hotkeys_apply(
