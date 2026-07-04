@@ -3,6 +3,44 @@
 
 export const CHANGELOG = [
   {
+    version: "0.21.0",
+    date: "4 jul 2026",
+    headline: "Papelera con contador, recientes al alcance y una pasada a fondo de arreglos.",
+    sections: [
+      {
+        icon: "🗑️",
+        title: "Papelera más útil",
+        notes: [
+          "El icono de la papelera ahora muestra cuántos elementos tiene, y puedes vaciarla (con confirmación) desde su clic derecho.",
+        ],
+      },
+      {
+        icon: "🕘",
+        title: "Recientes a un clic",
+        notes: [
+          "Clic derecho en una app anclada muestra tus archivos abiertos recientemente para volver a ellos al instante.",
+        ],
+      },
+      {
+        icon: "🎯",
+        title: "Ir a la ventana abierta",
+        notes: [
+          "Nueva opción en Comportamiento: al hacer clic en una app que ya está abierta, Booki puede traer su ventana al frente en vez de abrir otra (desactivado por defecto).",
+        ],
+      },
+      {
+        icon: "🩹",
+        title: "Arreglos y afinado",
+        notes: [
+          "El dock se recoloca solo al cambiar de resolución, escala o monitor.",
+          "Menos consumo en reposo: al esconderse, ya no quedan temporizadores despiertos.",
+          "Los iconos que no cargaban a la primera ahora se reintentan en vez de quedarse en blanco.",
+          "Separadores con degradado, punto de app en ejecución con brillo del acento y tooltips con el estilo de Booki.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.20.0",
     date: "4 jul 2026",
     headline: "Más carácter capibara, y una pasada a fondo de pulido y accesibilidad.",

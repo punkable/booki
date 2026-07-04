@@ -61,8 +61,7 @@ async function boot() {
     reframe();
     setupAutoHide();
     setupFileDrop();
-    startRunningPoll();
-    startPolls();
+    startPolls(); // starts the widget + running-app/trash polls together
     onConfigChanged(reloadConfig);
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
@@ -286,16 +285,27 @@ async function appTile(item) {
   el.appendChild(badge);
 
   const src = await resolveIcon(item);
-  if (src) {
-    const img = document.createElement("img");
-    img.src = src;
-    img.alt = item.name;
-    el.appendChild(img);
-  } else {
+  const addGlyph = () => {
+    if (el.querySelector(".glyph")) return;
     const glyph = document.createElement("span");
     glyph.className = "glyph";
     glyph.textContent = (item.name || "?").trim().charAt(0).toUpperCase();
     el.appendChild(glyph);
+  };
+  if (src) {
+    const img = document.createElement("img");
+    img.alt = item.name;
+    // If the icon fails to decode, drop it, show the initial glyph, and forget
+    // the cached value so a later render can try extracting it again.
+    img.addEventListener("error", () => {
+      img.remove();
+      iconCache.delete(item.path);
+      addGlyph();
+    });
+    img.src = src;
+    el.appendChild(img);
+  } else {
+    addGlyph();
   }
 
   // Remove badge — only visible in edit mode.
@@ -373,6 +383,7 @@ function trashTile(item) {
   el.title = t("trash.name");
   el.innerHTML =
     `<span class="label">${t("trash.name")}</span>` +
+    `<span class="badge trash-count"></span>` +
     `<span class="trash-glyph">${icon("trash")}</span>`;
   el.addEventListener("contextmenu", (e) => openMenu(e, item));
   el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
@@ -383,8 +394,11 @@ function trashTile(item) {
 async function refreshTrashState(el) {
   const tile = el || dockEl.querySelector(".tile.trash");
   if (!tile) return;
-  const empty = await dockApi.trashIsEmpty().catch(() => true);
-  tile.classList.toggle("full", !empty);
+  const count = await dockApi.trashCount().catch(() => 0);
+  tile.classList.toggle("full", count > 0);
+  const badge = tile.querySelector(".trash-count");
+  if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
+  tile.title = count > 0 ? `${t("trash.name")} · ${count}` : t("trash.name");
 }
 
 function separatorTile(item) {
@@ -682,11 +696,16 @@ function widgetPresent(w) {
 function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  // Also stop the running-app/trash poll so a tucked-away dock burns zero timer
+  // wakeups (not just early-returns). Resumed by startPolls on reveal.
+  clearInterval(pollTimer);
+  pollTimer = null;
 }
 function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
   if (hiddenState) return; // tucked away → stay idle until revealed
+  startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const hasClock = widgetPresent("clock");
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
@@ -732,10 +751,17 @@ async function resolveIcon(item) {
   if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
   if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
   if (iconCache.has(item.path)) return iconCache.get(item.path);
-  const uri = IMAGE_EXT.test(item.path || "")
-    ? (await dockApi.imageDataUri(item.path)) || (await dockApi.appIcon(item.path))
-    : await dockApi.appIcon(item.path);
-  iconCache.set(item.path, uri);
+  let uri;
+  try {
+    uri = IMAGE_EXT.test(item.path || "")
+      ? (await dockApi.imageDataUri(item.path)) || (await dockApi.appIcon(item.path))
+      : await dockApi.appIcon(item.path);
+  } catch (_) {
+    uri = null;
+  }
+  // Only cache a real icon — never a failed/empty result, so a transient
+  // extraction failure retries on the next render instead of sticking forever.
+  if (uri) iconCache.set(item.path, uri);
   return uri;
 }
 
@@ -763,10 +789,11 @@ function launch(el, item) {
   // any pinned reveal so smart-hide can tuck it back into the notch.
   pinnedReveal = false;
   scheduleHide();
-  // Launcher + switcher: if the app already has a window, focus it;
-  // otherwise launch a new instance.
+  // Launcher + switcher: when "focus if running" is enabled and the app already
+  // has a window, bring it to the front instead of launching a new instance.
+  // Off by default — each click launches (single-instance apps focus themselves).
   const hwnd = el.dataset.hwnd;
-  if (el.dataset.running === "true" && hwnd) {
+  if (cfg.focusIfRunning && el.dataset.running === "true" && hwnd) {
     dockApi.focusWindow(Number(hwnd));
     return;
   }
@@ -1416,6 +1443,14 @@ function openMenu(e, item) {
     if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true));
     sep();
   }
+  // Slot for the system's recent files (filled asynchronously for app pins so
+  // opening the menu stays instant).
+  let recentsSlot = null;
+  if (item.kind === "app") {
+    recentsSlot = document.createElement("div");
+    recentsSlot.className = "ctx-recents";
+    ctxMenu.appendChild(recentsSlot);
+  }
   add("plus", t("m.addApp"), onAddApp);
   add("app", t("m.addFolder"), onAddFolder);
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
@@ -1424,6 +1459,37 @@ function openMenu(e, item) {
   add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
+  if (recentsSlot) fillRecentFiles(recentsSlot, e);
+}
+
+// Load the OS "recent files" and drop them into the pin's context menu. Runs
+// after the menu is already on screen; re-places it once the items are in.
+async function fillRecentFiles(slot, e) {
+  let recents = [];
+  try {
+    recents = await dockApi.recentFiles(6);
+  } catch (_) {
+    return;
+  }
+  if (!recents.length || !slot.isConnected) return;
+  const head = document.createElement("div");
+  head.className = "menu-label";
+  head.textContent = t("m.recent");
+  slot.appendChild(head);
+  recents.forEach((r) => {
+    const b = document.createElement("button");
+    b.innerHTML = `${icon("app")}<span>${esc(r.name)}</span>`;
+    b.title = r.name;
+    b.addEventListener("click", async () => {
+      closeMenu();
+      await dockApi.launch(r.path, []);
+    });
+    slot.appendChild(b);
+  });
+  const s = document.createElement("div");
+  s.className = "sep";
+  slot.appendChild(s);
+  placeMenu(e); // re-measure now that the menu is taller
 }
 
 // Right-click on empty dock area / hint → add + profiles + settings.
@@ -1669,6 +1735,32 @@ function applyFrame() {
   dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
 }
 
+// Reposition when the screen metrics change — resolution, DPI/scale, taskbar
+// size, or plugging/unplugging a monitor. The dock's pixel size may be identical
+// (so applyFrame's no-op guard would skip it), yet its anchored spot moved, which
+// otherwise left it half-off-screen until the next settings change.
+let lastScreenSig = "";
+function screenSig() {
+  const s = window.screen || {};
+  return [s.width, s.height, s.availWidth, s.availHeight, window.devicePixelRatio || 1].join("x");
+}
+function checkScreenChange() {
+  if (!cfg) return; // a resize before boot finished → nothing to reframe yet
+  const sig = screenSig();
+  if (sig === lastScreenSig) return;
+  lastScreenSig = sig;
+  lastFull = null; // force setDockFrame even if the pixel size is unchanged
+  if (typeof invalidateMag === "function") invalidateMag();
+  fitDock();
+  applyFrame();
+}
+lastScreenSig = screenSig();
+let screenChangeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(screenChangeTimer);
+  screenChangeTimer = setTimeout(checkScreenChange, 250);
+});
+
 // ───────────────────────── Auto-hide ─────────────────────────
 // Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
 // driven by the backend occlusion watcher) · "edge" (hide, reveal on hover).
@@ -1853,11 +1945,102 @@ function tileFromPoint(position) {
 }
 let dropTargetEl = null;
 function setDropTarget(el) {
+  // Only highlight tiles that actually accept a dropped file: apps (open with),
+  // folders/groups (move/pin in) and the trash. Widgets/separators don't react.
+  if (el) {
+    const item = cfg.pinned.find((p) => p.id === el.dataset.id);
+    const kind = item && item.kind;
+    if (kind !== "app" && kind !== "folder" && kind !== "group" && kind !== "trash") {
+      el = null;
+    }
+  }
   if (dropTargetEl === el) return;
   if (dropTargetEl) dropTargetEl.classList.remove("drop-target");
   dropTargetEl = el;
   if (el) el.classList.add("drop-target");
 }
+
+// ─────────────────────── Custom tooltips ───────────────────────
+// A Booki-styled tooltip (acrylic, soft fade) shown on hover, replacing the OS
+// tooltip. Only when tile labels are hidden — otherwise the name is already
+// visible under the icon. We stash the native title while hovering so the OS
+// one never double-shows, and restore it (for accessibility) on leave.
+const tipEl = document.createElement("div");
+tipEl.className = "dock-tip";
+tipEl.setAttribute("role", "tooltip");
+document.body.appendChild(tipEl);
+let tipTile = null;
+let tipTimer = 0;
+
+function tipName(el) {
+  const label = el.querySelector(".label");
+  return (label && label.textContent) || el.getAttribute("title") || "";
+}
+
+function showTip(el) {
+  const name = tipName(el);
+  if (!name) return;
+  tipEl.textContent = name;
+  tipEl.classList.add("show");
+  const r = el.getBoundingClientRect();
+  const gap = 10;
+  // Measure after making it visible.
+  const tw = tipEl.offsetWidth;
+  const th = tipEl.offsetHeight;
+  let x, y;
+  if (cfg.edge === "left") {
+    x = r.right + gap;
+    y = r.top + r.height / 2 - th / 2;
+  } else if (cfg.edge === "right") {
+    x = r.left - gap - tw;
+    y = r.top + r.height / 2 - th / 2;
+  } else if (cfg.edge === "top") {
+    x = r.left + r.width / 2 - tw / 2;
+    y = r.bottom + gap;
+  } else {
+    x = r.left + r.width / 2 - tw / 2;
+    y = r.top - gap - th;
+  }
+  x = Math.max(6, Math.min(x, window.innerWidth - tw - 6));
+  y = Math.max(6, Math.min(y, window.innerHeight - th - 6));
+  tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+}
+
+function hideTip() {
+  clearTimeout(tipTimer);
+  tipTimer = 0;
+  if (tipTile) {
+    // Restore the native title we stashed for screen readers.
+    if (tipTile._tip != null) {
+      tipTile.setAttribute("title", tipTile._tip);
+      tipTile._tip = null;
+    }
+    tipTile = null;
+  }
+  tipEl.classList.remove("show");
+}
+
+dockEl.addEventListener("pointerover", (e) => {
+  if (document.body.classList.contains("show-labels")) return; // name already shown
+  if (editMode || dragging) return;
+  const el = e.target.closest && e.target.closest(".tile[data-id]");
+  if (!el || el === tipTile) return;
+  if (el.classList.contains("separator")) return;
+  hideTip();
+  tipTile = el;
+  // Suppress the OS tooltip while ours is in play.
+  const nativeTitle = el.getAttribute("title");
+  if (nativeTitle != null) {
+    el._tip = nativeTitle;
+    el.removeAttribute("title");
+  }
+  tipTimer = setTimeout(() => showTip(el), 340);
+});
+dockEl.addEventListener("pointerout", (e) => {
+  const to = e.relatedTarget;
+  if (tipTile && (!to || !tipTile.contains(to))) hideTip();
+});
+dockEl.addEventListener("pointerdown", hideTip, true);
 
 // ─────────────────────── Trash confirmation ───────────────────────
 // A small in-dock popover: nothing is ever deleted without an explicit yes.
@@ -2102,9 +2285,15 @@ function setupFileDrop() {
 let pollTimer = null;
 function startRunningPoll() {
   if (!isTauri) return;
+  clearInterval(pollTimer); // never stack two running-app polls
+  pollTimer = null;
   const tick = async () => {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
     if (hiddenState) return;
+    // Cheap, no-IPC guard that repositions the dock if the screen changed.
+    checkScreenChange();
+    // Keep the trash badge in sync with deletions made outside Booki.
+    if (dockEl.querySelector(".tile.trash")) refreshTrashState();
     if (cfg.showIndicators === false) {
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => (t.dataset.running = "false"));
       return;
@@ -2114,8 +2303,17 @@ function startRunningPoll() {
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash") return;
+        // Prefer matching by the owning process's executable (reliable, exact);
+        // fall back to a title contains-name match for .lnk/shell pins.
+        const path = (app.path || "").toLowerCase();
+        const exeBase = path.endsWith(".exe") ? path.split(/[\\/]/).pop() : "";
         const name = (app.name || "").toLowerCase();
-        const matches = name ? wins.filter((w) => w.title.toLowerCase().includes(name)) : [];
+        let matches = exeBase
+          ? wins.filter((w) => ((w.exe || "").split(/[\\/]/).pop() || "") === exeBase)
+          : [];
+        if (!matches.length && name) {
+          matches = wins.filter((w) => w.title.toLowerCase().includes(name));
+        }
         const badge = t.querySelector(".badge");
         if (matches.length) {
           t.dataset.running = "true";

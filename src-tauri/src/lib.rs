@@ -736,6 +736,61 @@ fn trash_is_empty() -> bool {
     win::trash_is_empty()
 }
 
+/// How many items are in the Recycle Bin (for the trash tile's badge).
+#[tauri::command]
+fn trash_count() -> u64 {
+    win::trash_count().unwrap_or(0)
+}
+
+#[derive(serde::Serialize)]
+struct RecentFile {
+    name: String,
+    path: String,
+}
+
+/// The system's recently-opened files (newest first), read from the Windows
+/// Recent folder. Each entry is a .lnk we can open directly with the shell, so
+/// no fragile binary parsing is involved. Empty off-Windows or on any error.
+#[tauri::command]
+fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
+    let cap = limit.unwrap_or(12).min(40);
+    let Some(data) = dirs::data_dir() else {
+        return Vec::new();
+    };
+    let recent = data.join("Microsoft").join("Windows").join("Recent");
+    let Ok(entries) = std::fs::read_dir(&recent) else {
+        return Vec::new();
+    };
+    let mut items: Vec<(std::time::SystemTime, RecentFile)> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        // Only the flat .lnk shortcuts (skip the AutomaticDestinations subfolders).
+        if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk"))
+            != Some(true)
+        {
+            continue;
+        }
+        let modified = entry.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_string();
+        if name.is_empty() {
+            continue;
+        }
+        items.push((
+            modified,
+            RecentFile {
+                name,
+                path: path.to_string_lossy().to_string(),
+            },
+        ));
+    }
+    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.into_iter().take(cap).map(|(_, f)| f).collect()
+}
+
 /// Accent color derived from the desktop wallpaper (async: decodes an image).
 #[tauri::command]
 async fn wallpaper_accent() -> Option<String> {
@@ -1204,7 +1259,9 @@ pub fn run() {
             get_autostart,
             trash_paths,
             trash_is_empty,
+            trash_count,
             empty_trash,
+            recent_files,
             wallpaper_accent,
             media_info,
             media_toggle,
