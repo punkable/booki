@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.25.0",
+    date: "4 jul 2026",
+    headline: "Más reforzado y auto-recuperable — y arreglado el arrastrar-para-quitar.",
+    sections: [
+      {
+        icon: "🩹",
+        title: "Arrastrar fuera para quitar (arreglado)",
+        notes: [
+          "Sacar un icono de la barra para quitarlo ahora funciona de verdad con el ratón (antes el gesto no llegaba a activarse).",
+        ],
+      },
+      {
+        icon: "🛡️",
+        title: "A prueba de sustos",
+        notes: [
+          "Si el archivo de ajustes se dañara, Booki se recupera solo desde una copia de seguridad en vez de perder tus pines.",
+          "Cualquier fallo grave queda anotado en un pequeño registro (crash.log) para poder diagnosticarlo.",
+          "El dock reintenta arrancar una vez si algo falla al inicio.",
+        ],
+      },
+      {
+        icon: "🧰",
+        title: "Más fácil de depurar",
+        notes: [
+          "Nuevo botón en Ayuda y FAQ para abrir la carpeta de datos (ajustes, copias y registros) de un clic.",
+          "Los registros ya no crecen sin límite.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.24.0",
     date: "4 jul 2026",
     headline: "Nueva sección de Ayuda y transparencia, más un arreglo y una optimización.",

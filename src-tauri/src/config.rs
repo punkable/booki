@@ -267,14 +267,35 @@ fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
-/// Load config from disk, falling back to defaults on any error.
+fn backup_path() -> PathBuf {
+    config_dir().join("config.bak.json")
+}
+
+/// Parse a config file if it exists and is valid JSON.
+fn read_config(path: &PathBuf) -> Option<Config> {
+    let text = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Load config from disk. Self-healing: if the main file is corrupt, recover from
+/// the last-good backup (kept by `save`) instead of silently wiping the user's
+/// pins, and stash the bad file for inspection. Falls back to defaults only when
+/// neither file is usable (e.g. a genuine first run).
 pub fn load() -> Config {
     let path = config_path();
     // Clean any leftover temp file from an interrupted atomic save (no junk).
     let _ = fs::remove_file(config_dir().join("config.json.tmp"));
-    let mut cfg = match fs::read_to_string(&path) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_default(),
-        Err(_) => Config::default(),
+    let mut cfg = if let Some(c) = read_config(&path) {
+        c
+    } else if path.exists() {
+        // The file is there but unreadable/corrupt → keep a copy to debug, then
+        // fall back to the backup, then to defaults as a last resort.
+        log::error!("config.json is corrupt; recovering from backup");
+        let _ = fs::copy(&path, config_dir().join("config.corrupt.json"));
+        read_config(&backup_path()).unwrap_or_default()
+    } else {
+        // No config yet → maybe a backup survived a wipe; otherwise defaults.
+        read_config(&backup_path()).unwrap_or_default()
     };
     // Migration: now that smart-hide is stable (measured against a fixed home
     // rect, with a visible animated notch), make it the default for existing
@@ -331,5 +352,8 @@ pub fn save(config: &Config) -> Result<(), String> {
         f.sync_all().map_err(|e| e.to_string())?;
     }
     fs::rename(&tmp_path, &final_path).map_err(|e| e.to_string())?;
+    // Keep a redundant last-good copy so a later corruption of config.json can be
+    // healed on the next load without losing the user's setup. Best-effort.
+    let _ = fs::copy(&final_path, backup_path());
     Ok(())
 }
