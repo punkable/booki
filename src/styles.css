@@ -1019,6 +1019,12 @@ body.edit .dock { cursor: grab; }
   transition: transform 0.09s ease;
 }
 .dock.dragging .tile { transition: none; }
+/* Magnify: while actively tracking the pointer, drive the transform per-frame
+   from JS with no CSS transition (1:1, crisp at any refresh); the ease-back on
+   pointer-leave still animates. Promote tiles to compositor layers only while
+   the cursor is over the bar, so magnify is pure GPU work with no repaints. */
+.dock.mag-live .tile { transition: background 0.12s ease; }
+.dock:hover .tile { will-change: transform; }
 
 .tile img,
 .tile .glyph {
