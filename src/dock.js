@@ -198,6 +198,10 @@ function applyAll() {
 
 async function persist() {
   await configApi.save(cfg);
+  // Always notify the other windows (Settings especially) so its pinned-apps
+  // list can never drift out of sync with the dock — removing/adding/reordering
+  // straight on the bar now reflects in Settings immediately.
+  await emitConfigChanged();
 }
 
 // ──────────────────────────── Render ────────────────────────────
@@ -259,18 +263,38 @@ async function render() {
   fitDock();
 }
 
-// Never let the dock clip: if its natural length exceeds the usable screen
-// length on the anchored axis, shrink the icon size to fit (macOS-style), so any
-// number of items always fits inside the window.
+// Smallest a shrunk icon may get before we stop shrinking and start scrolling —
+// below this they're too tiny to recognise.
+const MIN_TILE = 30;
+
+// Keep the dock within the screen no matter how many items are pinned. First
+// shrink icons to fit (macOS-style). If even at the minimum size they'd still
+// run past the screen, cap the bar to the screen and switch to SCROLL mode
+// (wheel + hover the ends) so you can reach the side items — the bar never grows
+// past the screen and never "breaks".
 function fitDock() {
   setAllSizes(baseSize());
+  const vertical = isVertical();
   const usable =
-    (isVertical() ? window.screen.availHeight : window.screen.availWidth) - SHADOW_PAD * 2 - 28;
-  const natural = isVertical() ? dockEl.scrollHeight : dockEl.scrollWidth;
-  if (usable > 0 && natural > usable) {
-    const eff = Math.max(20, Math.floor(baseSize() * (usable / natural)));
-    setAllSizes(eff);
+    (vertical ? window.screen.availHeight : window.screen.availWidth) - SHADOW_PAD * 2 - 24;
+  let overflow = false;
+  if (usable > 0) {
+    const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
+    if (natural > usable) {
+      const eff = Math.floor(baseSize() * (usable / natural));
+      if (eff >= MIN_TILE) {
+        setAllSizes(eff); // everything still fits at this smaller size
+      } else {
+        setAllSizes(MIN_TILE); // floor reached → the rest lives behind a scroll
+        const natural2 = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
+        overflow = natural2 > usable;
+      }
+    }
   }
+  document.body.classList.toggle("dock-overflow", overflow);
+  // Cap the visible bar so the window can never exceed the screen.
+  dockEl.style.maxWidth = overflow && !vertical ? `${usable}px` : "";
+  dockEl.style.maxHeight = overflow && vertical ? `${usable}px` : "";
   invalidateMag(); // tile sizes/positions just changed → re-measure lazily
 }
 
@@ -779,6 +803,56 @@ async function resolveIcon(item) {
   return uri;
 }
 
+// Notes widget: click it to jot a note in a small editor that saves as you go.
+let noteEditor = null;
+function closeNoteEditor() {
+  if (noteEditor) noteEditor.remove();
+  noteEditor = null;
+  reframe();
+}
+function editNote(item) {
+  closeNoteEditor();
+  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
+  if (!tile) return;
+  const ta = document.createElement("textarea");
+  ta.className = "note-editor";
+  ta.value = (item.style && item.style.note) || "";
+  ta.placeholder = t("w.notesEmpty");
+  document.body.appendChild(ta);
+  noteEditor = ta;
+  pinnedReveal = true; // keep the dock open while writing
+  applyFrame(); // grow the window so the editor isn't clipped
+  const place = () => {
+    const r = tile.getBoundingClientRect();
+    const gap = 10;
+    const w = ta.offsetWidth, h = ta.offsetHeight;
+    let x = r.left + r.width / 2 - w / 2;
+    let y = cfg.edge === "top" ? r.bottom + gap : r.top - h - gap;
+    if (isVertical()) {
+      y = r.top + r.height / 2 - h / 2;
+      x = cfg.edge === "left" ? r.right + gap : r.left - w - gap;
+    }
+    ta.style.left = `${Math.max(6, Math.min(x, window.innerWidth - w - 6))}px`;
+    ta.style.top = `${Math.max(6, Math.min(y, window.innerHeight - h - 6))}px`;
+  };
+  place();
+  setTimeout(() => { place(); ta.focus(); ta.select(); }, 80);
+  const save = () => {
+    item.style = { ...(item.style || {}), note: ta.value };
+    eachWidget("notes", (el) => {
+      if (el.dataset.id !== item.id) return;
+      const val = el.querySelector(".w-value");
+      if (val) val.textContent = ta.value || t("w.notesEmpty");
+    });
+    persist();
+  };
+  ta.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Escape") { save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); }
+  });
+  ta.addEventListener("blur", () => { save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); });
+}
+
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
@@ -787,6 +861,7 @@ function launch(el, item) {
   if (item.kind === "widget") {
     if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia, () => {});
     if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
+    if (item.widget === "notes") editNote(item);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -904,6 +979,9 @@ function buildMagCache() {
 function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || editMode) return;
+  // In scroll (overflow) mode the bar clips its ends, so a scaled tile would be
+  // cut off — skip magnify; the name still shows via tooltip on hover.
+  if (document.body.classList.contains("dock-overflow")) return;
   if (!magCache) buildMagCache();
   // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
   // you leave still eases. This is what makes it feel crisp at high refresh.
@@ -1016,27 +1094,33 @@ dockEl.addEventListener("auxclick", (e) => {
   }
 });
 
-// Press-hold the empty bar and drag it toward its edge → tuck the dock away
-// (the natural "push it off the screen" gesture).
+// Drag the empty bar to move or hide the dock (natural, no menus):
+//  · drag toward ANOTHER edge  → move the dock there
+//  · drag toward its OWN edge   → tuck it away (push-off-screen)
 let bgDrag = null;
 dockEl.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || closestSel(e.target, ".tile")) return;
-  bgDrag = { x: e.screenX, y: e.screenY };
+  bgDrag = { x: e.screenX, y: e.screenY, done: false };
 });
 window.addEventListener("pointermove", (e) => {
-  if (!bgDrag) return;
+  if (!bgDrag || bgDrag.done) return;
   const dx = e.screenX - bgDrag.x;
   const dy = e.screenY - bgDrag.y;
-  const toward =
-    cfg.edge === "top" ? -dy : cfg.edge === "left" ? -dx : cfg.edge === "right" ? dx : dy;
-  if (toward > 42) {
-    bgDrag = null;
+  if (Math.hypot(dx, dy) < 46) return; // ignore tiny jitters — needs a clear drag
+  bgDrag.done = true;
+  // Dominant direction → target edge.
+  const target = Math.abs(dx) > Math.abs(dy)
+    ? (dx > 0 ? "right" : "left")
+    : (dy > 0 ? "bottom" : "top");
+  if (target === cfg.edge) {
+    // Pushed toward its own edge → hide (keep the pointer-in-window guard).
     pinnedReveal = false;
     manualReveal = false;
-    // The pointer is still inside the window when the gesture ends — without
-    // this flag the hover-reveal would pop the dock right back out.
     manualHide = true;
     setHidden(true);
+  } else {
+    // Dragged toward a different edge → move the whole dock there.
+    dockApi.setDockEdge(target).catch(() => {});
   }
 });
 window.addEventListener("pointerup", () => (bgDrag = null));
@@ -1046,6 +1130,15 @@ let wheelSaveTimer = null;
 dockEl.addEventListener(
   "wheel",
   (e) => {
+    // In overflow (scroll) mode, the wheel pans the bar so you can reach the
+    // side items — unless you're over a widget (which keeps its own wheel use).
+    if (document.body.classList.contains("dock-overflow") && !closestSel(e.target, ".tile.widget")) {
+      e.preventDefault();
+      const amt = (e.deltaY || e.deltaX) * 1.2;
+      if (isVertical()) dockEl.scrollTop += amt;
+      else dockEl.scrollLeft += amt;
+      return;
+    }
     const w = closestSel(e.target, ".tile.widget");
     if (!w) return;
     e.preventDefault();
@@ -1084,13 +1177,40 @@ dockEl.addEventListener("pointermove", (e) => {
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
   magPointer.x = e.clientX;
   magPointer.y = e.clientY;
+  if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
   if (magnifyRaf) return;
   magnifyRaf = requestAnimationFrame(() => {
     magnifyRaf = 0;
     magnify(magPointer.x, magPointer.y);
   });
 });
-dockEl.addEventListener("pointerleave", resetMagnify);
+dockEl.addEventListener("pointerleave", () => { resetMagnify(); stopEdgeScroll(); });
+
+// Overflow mode: hovering near an end of the bar auto-scrolls it that way, so you
+// can reach the side items by just moving the cursor there (macOS-Genie style).
+let edgeScrollRaf = 0;
+let edgeScrollVel = 0;
+function edgeAutoScroll() {
+  const vertical = isVertical();
+  const r = dockEl.getBoundingClientRect();
+  const pos = vertical ? magPointer.y : magPointer.x;
+  const lo = vertical ? r.top : r.left;
+  const hi = vertical ? r.bottom : r.right;
+  const zone = Math.min(90, (hi - lo) * 0.18);
+  if (pos < lo + zone) edgeScrollVel = -Math.ceil((lo + zone - pos) / 6);
+  else if (pos > hi - zone) edgeScrollVel = Math.ceil((pos - (hi - zone)) / 6);
+  else edgeScrollVel = 0;
+  if (edgeScrollVel && !edgeScrollRaf) {
+    const tick = () => {
+      if (!edgeScrollVel || !document.body.classList.contains("dock-overflow")) { edgeScrollRaf = 0; return; }
+      if (isVertical()) dockEl.scrollTop += edgeScrollVel;
+      else dockEl.scrollLeft += edgeScrollVel;
+      edgeScrollRaf = requestAnimationFrame(tick);
+    };
+    edgeScrollRaf = requestAnimationFrame(tick);
+  }
+}
+function stopEdgeScroll() { edgeScrollVel = 0; }
 
 // ─────────── Edit mode (iOS-style long-press) + reorder ───────────
 
@@ -1569,24 +1689,29 @@ async function openBackgroundMenu(e) {
   sep();
   // Widgets as a compact chip grid (emoji + tooltip) — ten text rows would
   // make the menu taller than the screen's worth of attention.
-  const gridLabel = document.createElement("div");
-  gridLabel.className = "menu-label";
-  gridLabel.textContent = t("m.widgets");
-  ctxMenu.appendChild(gridLabel);
-  const grid = document.createElement("div");
-  grid.className = "menu-grid";
-  for (const type of WIDGETS) {
-    const chip = document.createElement("button");
-    chip.className = "menu-chip";
-    chip.title = widgetLabel(type);
-    chip.innerHTML = emo(WIDGET_ICONS[type] || "puzzle", 20);
-    chip.addEventListener("click", async () => {
-      closeMenu();
-      await addWidget(type);
-    });
-    grid.appendChild(chip);
+  // Only offer widgets you don't already have — no point adding a second CPU
+  // meter or clock. When they're all added, the whole section disappears.
+  const availableWidgets = WIDGETS.filter((type) => !widgetPresent(type));
+  if (availableWidgets.length) {
+    const gridLabel = document.createElement("div");
+    gridLabel.className = "menu-label";
+    gridLabel.textContent = t("m.widgets");
+    ctxMenu.appendChild(gridLabel);
+    const grid = document.createElement("div");
+    grid.className = "menu-grid";
+    for (const type of availableWidgets) {
+      const chip = document.createElement("button");
+      chip.className = "menu-chip";
+      chip.title = widgetLabel(type);
+      chip.innerHTML = emo(WIDGET_ICONS[type] || "puzzle", 20);
+      chip.addEventListener("click", async () => {
+        closeMenu();
+        await addWidget(type);
+      });
+      grid.appendChild(chip);
+    }
+    ctxMenu.appendChild(grid);
   }
-  ctxMenu.appendChild(grid);
   // Saved profiles → one-click switch, right from the dock. The active one
   // (last applied/saved) is marked with a check.
   const profiles = await dockApi.profileList().catch(() => []);
@@ -1707,6 +1832,7 @@ async function removeItem(id) {
   }
   cfg.pinned = cfg.pinned.filter((a) => a.id !== id);
   await persist();
+  await emitConfigChanged(); // keep the Settings "pinned apps" list in sync
   await render();
   reframe();
 }
@@ -1759,12 +1885,17 @@ function computeFrame() {
   // …and for anything open beside the bar: popovers (trash confirm, first-run
   // tips) and the context menu. Everything that isn't the bar itself must fit
   // INSIDE the window or it gets clipped at the window edge.
-  const pop = document.querySelector(".trash-pop, .coach, #ctx-menu:not(.hidden)");
+  const pop = document.querySelector(".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden)");
   if (pop) {
     if (isVertical()) wCss += pop.offsetWidth + 24;
     else hCss += pop.offsetHeight + 24;
     wCss = Math.max(wCss, pop.offsetWidth + 40);
   }
+  // Never let the window exceed the screen — otherwise a very full dock (or a
+  // wide flyout) makes an over-screen window that the OS clips, and the dock
+  // looks broken. The bar itself is already capped to the screen in fitDock.
+  wCss = Math.min(wCss, window.screen.availWidth);
+  hCss = Math.min(hCss, window.screen.availHeight);
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -1952,9 +2083,11 @@ function onOcclusionSignal(value) {
     pinnedReveal = false;
     manualReveal = false;
     setHidden(false);
-  } else if (!pinnedReveal) {
-    // Working in an app → tuck away regardless of hover, unless the user pinned
-    // the dock open from the notch.
+  } else {
+    // Working in another window → tuck away. Even a dock pinned open from the
+    // notch should hide once you switch to another app: staying open on top of
+    // whatever you opened is exactly what felt broken ("no se oculta").
+    pinnedReveal = false;
     manualReveal = false;
     setHidden(true);
   }
