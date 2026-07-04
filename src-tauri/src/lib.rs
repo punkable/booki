@@ -1286,8 +1286,7 @@ pub fn run() {
             let quit_item = MenuItem::with_id(app, "quit", "Salir de Booki", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &settings, &quit_item])?;
 
-            let _tray = TrayIconBuilder::with_id("booki-tray")
-                .icon(app.default_window_icon().unwrap().clone())
+            let mut tray_builder = TrayIconBuilder::with_id("booki-tray")
                 .tooltip("Booki")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -1308,8 +1307,13 @@ pub fn run() {
                         ..
                     } => open_settings_window(tray.app_handle()),
                     _ => {}
-                })
-                .build(app)?;
+                });
+            // Only set the tray icon if the bundled default icon is present —
+            // never panic the whole app over a missing icon.
+            if let Some(icon) = app.default_window_icon() {
+                tray_builder = tray_builder.icon(icon.clone());
+            }
+            let _tray = tray_builder.build(app)?;
 
             // The dock/notch windows are created VISIBLE but far off-screen
             // (tauri.conf.json): WebView2 only registers its drag-drop targets

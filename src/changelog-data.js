@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.24.0",
+    date: "4 jul 2026",
+    headline: "Nueva sección de Ayuda y transparencia, más un arreglo y una optimización.",
+    sections: [
+      {
+        icon: "❓",
+        title: "Ayuda y FAQ",
+        notes: [
+          "Nueva pestaña en Ajustes con respuestas claras: qué hace Booki, tu privacidad, dónde se guardan tus datos, por qué Windows avisa al instalar y cómo funcionan las actualizaciones.",
+          "Incluye enlaces al código, a reportar problemas y a la licencia.",
+        ],
+      },
+      {
+        icon: "🛡️",
+        title: "Más robusto",
+        notes: [
+          "Booki ya no se cierra si por algún motivo falta su icono de bandeja al arrancar.",
+          "La lista de apps sugeridas se recuerda al cambiar de pestaña, en vez de re-escanear el menú Inicio cada vez.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.23.0",
     date: "4 jul 2026",
     headline: "Actualizaciones más fiables y un poquito menos de trabajo de fondo.",

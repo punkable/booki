@@ -90,6 +90,8 @@ const SEARCH_INDEX = [
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
   ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
   ["sc.title", "shortcuts"], ["sc.global", "shortcuts"], ["sc.positions", "shortcuts"],
+  ["faq.title", "faq"], ["faq.q.data", "faq"], ["faq.q.updates", "faq"],
+  ["faq.q.smartscreen", "faq"], ["faq.q.uninstall", "faq"], ["faq.transparency", "faq"],
   ["ab.updates", "about"], ["ab.whatsNew", "about"],
 ];
 
@@ -98,8 +100,17 @@ const TABS = [
   ["behavior", "tab.behavior", "settings"],
   ["apps", "tab.apps", "grid"],
   ["shortcuts", "tab.shortcuts", "keyboard"],
+  ["faq", "tab.faq", "help"],
   ["about", "tab.about", "info"],
 ];
+
+// Scan the Start Menu once per settings session, then reuse — the scan +
+// icon extraction is costly and the Apps panel remounts on every tab switch.
+let _installedApps = null;
+function installedAppsOnce() {
+  if (!_installedApps) _installedApps = dockApi.listInstalledApps().catch(() => []);
+  return _installedApps;
+}
 
 // ── Reusable controls ──
 
@@ -539,7 +550,9 @@ function Suggestions({ cfg, set }) {
   const [openGroups, setOpenGroups] = useState({}); // collapsed by default
   const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
   useEffect(() => {
-    dockApi.listInstalledApps().then((a) => setGroups(normalizeGroups(a)));
+    // Memoized across tab switches: scanning the Start Menu and extracting every
+    // icon is slow, and this panel remounts each time you open the Apps tab.
+    installedAppsOnce().then((a) => setGroups(normalizeGroups(a)));
   }, []);
   if (!groups || groups.length === 0) return null;
   const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
@@ -1512,6 +1525,51 @@ function ResetZone({ onReset }) {
   );
 }
 
+// Transparency / FAQ tab: plain answers about privacy, data, updates and the
+// beta, plus the links to see everything for yourself. Content is data-driven so
+// it stays translatable; the accordion is native <details> (no extra JS).
+function Faq({ version }) {
+  const items = ["what", "data", "where", "smartscreen", "updates", "resources", "opensource", "uninstall"];
+  const open = (url) => dockApi.launch(url);
+  return (
+    <>
+      <h1>{t("faq.title")}</h1>
+      <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>{t("faq.intro")}</p>
+
+      <div className="faq-list">
+        {items.map((k) => (
+          <details className="faq-item" key={k}>
+            <summary>{t(`faq.q.${k}`)}</summary>
+            <p>{t(`faq.a.${k}`)}</p>
+          </details>
+        ))}
+      </div>
+
+      <h2 className="s-subhead">{t("faq.transparency")}</h2>
+      <div className="s-card-inner faq-facts">
+        <p><strong>{t("faq.fact.dataTitle")}</strong><br />
+          <code>%APPDATA%\Booki\config.json</code> — {t("faq.fact.data")}</p>
+        <p><strong>{t("faq.fact.netTitle")}</strong><br />{t("faq.fact.net")}</p>
+        <p><strong>{t("faq.fact.startupTitle")}</strong><br />
+          <code>HKCU\…\Run\Booki</code> — {t("faq.fact.startup")}</p>
+      </div>
+
+      <div className="s-credits" style={{ marginTop: 14 }}>
+        <button className="s-link" onClick={() => open("https://github.com/punkable/booki")}>
+          {t("faq.link.repo")} ↗
+        </button>
+        <button className="s-link" onClick={() => open("https://github.com/punkable/booki/issues")}>
+          {t("faq.link.issues")} ↗
+        </button>
+        <button className="s-link" onClick={() => open("https://github.com/punkable/booki/blob/main/LICENSE")}>
+          {t("faq.link.license")} ↗
+        </button>
+      </div>
+      <p className="muted" style={{ marginTop: 12 }}>v{version} · {t("faq.foot")}</p>
+    </>
+  );
+}
+
 function About({ version, onWhatsNew, onReset }) {
   const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|installing|error
   const [update, setUpdate] = useState(null);
@@ -1787,6 +1845,7 @@ function App() {
           {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
           {tab === "apps" && <Apps cfg={cfg} set={set} />}
           {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
+          {tab === "faq" && <Faq version={version} />}
           {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
         </div>
       </main>

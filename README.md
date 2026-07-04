@@ -32,13 +32,15 @@
 
 | | |
 |---|---|
-| 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures (own thumbnail) and websites (favicon). Click to launch or focus; icons **bounce** as they open. |
-| 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drag onto a folder to move a file in, drop on the bin to delete. Group pins into folders. |
+| 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures (own thumbnail) and websites (favicon). Click to launch — or optionally **focus the open window** instead. Right-click a pin for your **recent files**. Icons **bounce** as they open. |
+| 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drag onto a folder to move a file in, drop on the bin to delete. Group pins into folders, reorder right on the bar. |
 | 🎛️ **Live widgets** | Clock, CPU, RAM, disk, network, uptime, battery, notes, **system volume** (scroll = change, click = mute) and a **now-playing card** with album art + transport controls. |
+| 🗑️ **Recycle Bin** | A bin tile that **shows how many items it holds** and empties (with a confirmation) from its right-click menu. |
 | 🫥 **Smart hide + notch** | Tucks away with a genie animation into a slim glass *notch*; push the cursor to the edge (or click it) to bring it back. Fullscreen games/movies black it out. |
 | 🧲 **One control for position** | A single mini-screen sets the dock's edge and the notch's spot at once — the notch always travels with the dock, in a horizontal or slim vertical bar. |
 | 💾 **Dock profiles** | Save whole setups (e.g. *Work* / *Gaming*) and switch with one click from Settings or the right-click menu. |
 | 🎨 **Deep customization** | Light / dark / system / **auto-by-hour** theme, accent from a palette / system / **your wallpaper**, size, spacing, roundness, translucency, five notch finishes, multi-monitor and **6 languages**. |
+| 🔒 **Private by design** | No accounts, no telemetry, nothing phones home. A built-in **Help & FAQ** tab explains exactly what touches your PC. |
 | 🪶 **Featherweight** | Tauri 2 + Rust on the built-in WebView2 — a ~4 MB installer, tiny memory use, and timers that pause the moment the dock is hidden. |
 
 ## 🖼️ Gallery
@@ -102,6 +104,9 @@
   releases), and — only if you pin a website — fetching its favicon. **No
   telemetry, no accounts, no data collection.**
 - Everything is stored locally in `%APPDATA%\Booki\config.json`.
+- **Updates** are delivered in-app: Booki checks the latest GitHub release,
+  downloads the **signed** installer, updates itself in place for your user and
+  **keeps your settings**. You can also check manually in *Settings → About*.
 - "Start with Windows" writes a single per-user registry entry
   (`HKCU\…\Run\Booki`); the uninstaller removes the app's data folders.
 - Deletions from the dock's trash go to the Recycle Bin. If Defender's
