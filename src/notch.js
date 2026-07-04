@@ -9,10 +9,13 @@ import { applyAccent } from "./util-color.js";
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
 
+let hoverTrigger = false; // reveal the dock when the pill is hovered
+
 async function applyLook() {
   try {
     const cfg = await configApi.get();
     if (cfg.accent) applyAccent(root, cfg.accent);
+    hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
@@ -52,6 +55,16 @@ onFileDrop({ onEnter: () => invoke("notch_reveal") });
 
 // Click = reveal the dock. Drag to a screen edge = move the dock there.
 let drag = null;
+
+// Optional: reveal on hover (when the user chose the "hover" trigger). A short
+// intent delay avoids opening on an accidental brush-past.
+let hoverTimer = null;
+pill.addEventListener("pointerenter", () => {
+  if (!hoverTrigger) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => invoke("notch_reveal"), 120);
+});
+pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 
 pill.addEventListener("pointerdown", (e) => {
   drag = { sx: e.screenX, sy: e.screenY, moved: false };
