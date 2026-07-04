@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.26.0",
+    date: "4 jul 2026",
+    headline: "Más fluida — pensada para pantallas de 120/144Hz y más.",
+    sections: [
+      {
+        icon: "⚡",
+        title: "Fluidez a alto refresco",
+        notes: [
+          "El agrandado de iconos ahora sigue el cursor 1:1 en cada frame, sin el retraso que tenía antes: se siente instantáneo y aprovecha 120/144Hz.",
+          "Arrastrar iconos (y mover el notch) se sincroniza con el refresco de la pantalla, sin tirones.",
+          "Los iconos se preparan en la GPU al pasar el cursor, para un movimiento sin repintados.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.25.0",
     date: "4 jul 2026",
     headline: "Más reforzado y auto-recuperable — y arreglado el arrastrar-para-quitar.",
