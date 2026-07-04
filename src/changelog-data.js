@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.23.0",
+    date: "4 jul 2026",
+    headline: "Actualizaciones más fiables y un poquito menos de trabajo de fondo.",
+    sections: [
+      {
+        icon: "⬆️",
+        title: "Actualizaciones más fiables",
+        notes: [
+          "Ahora la actualización automática entrega siempre el instalador que coincide con cómo instalaste Booki, evitando instalaciones duplicadas.",
+          "El aviso de nueva versión ya no compite con el arranque: se comprueba unos segundos después de abrir.",
+        ],
+      },
+      {
+        icon: "🪶",
+        title: "Menos trabajo de fondo",
+        notes: [
+          "Booki solo vigila si una ventana lo tapa cuando usas el ocultado inteligente; en los demás modos se ahorra ese trabajo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.22.0",
     date: "4 jul 2026",
     headline: "Pequeños arreglos y un poco menos de trabajo en segundo plano.",

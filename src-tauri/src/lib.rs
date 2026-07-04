@@ -1380,9 +1380,15 @@ pub fn run() {
                             if tick % 10 == 0 {
                                 cfg_cache = config::load();
                             }
-                            // foreground_occludes = "the user is in an app".
-                            if let Some(v) = debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd)) {
-                                let _ = handle.emit("booki://occlusion", v);
+                            // foreground_occludes = "the user is in an app". Only
+                            // smart-hide consumes this signal, so skip the Win32
+                            // work entirely in the other modes.
+                            if cfg_cache.auto_hide_mode == "smart" {
+                                if let Some(v) =
+                                    debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd))
+                                {
+                                    let _ = handle.emit("booki://occlusion", v);
+                                }
                             }
                             // fullscreen game / movie / presentation → get out of the way.
                             if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {

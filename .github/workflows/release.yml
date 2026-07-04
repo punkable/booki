@@ -75,9 +75,7 @@ jobs:
           releaseBody: |
             **Booki Dock** — a modern, lightweight dock for Windows. 🦫 _Beta._
 
-            Download the installer below and run it:
-            - `Booki_*_x64-setup.exe` — recommended (NSIS, per-user install)
-            - `Booki_*_x64_en-US.msi` — MSI alternative
+            Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 
