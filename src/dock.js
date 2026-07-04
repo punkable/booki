@@ -861,6 +861,9 @@ function setAllSizes(size) {
 }
 
 function resetMagnify() {
+  // Drop "live" mode first so restoring the transform transition lets the tiles
+  // ease smoothly back to rest instead of snapping.
+  dockEl.classList.remove("mag-live");
   dockEl.querySelectorAll(".tile").forEach((t) => {
     t.style.transform = "";
     t.classList.remove("focus");
@@ -873,12 +876,18 @@ function resetMagnify() {
 // every pointer move — no more read/write layout thrashing in the hot loop.
 let magCache = null;
 let magFocus = null;
+let magDockRect = null;
 function invalidateMag() {
   magCache = null;
+  magDockRect = null;
   magFocus = null;
 }
 function buildMagCache() {
   const vertical = isVertical();
+  // Measure the bar's viewport rect ONCE here (it only moves on reframe/edge
+  // change, both of which invalidate the cache) so the hot per-frame loop never
+  // reads layout again — pure compositor writes = smooth at any refresh rate.
+  magDockRect = dockEl.getBoundingClientRect();
   magCache = [...dockEl.querySelectorAll(".tile")].map((el) => ({
     el,
     center: vertical ? el.offsetTop + el.offsetHeight / 2 : el.offsetLeft + el.offsetWidth / 2,
@@ -896,13 +905,16 @@ function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || editMode) return;
   if (!magCache) buildMagCache();
+  // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
+  // you leave still eases. This is what makes it feel crisp at high refresh.
+  dockEl.classList.add("mag-live");
   const base = baseSize();
   const maxScale = Math.max(1, cfg.zoom || 1.25);
   const spread = base * 1.5;
   const vertical = isVertical();
   const liftAxis = vertical ? "X" : "Y";
   const liftSign = (vertical ? cfg.edge === "left" : cfg.edge === "top") ? 1 : -1;
-  const dr = dockEl.getBoundingClientRect();
+  const dr = magDockRect;
   const pointer = vertical ? clientY - dr.top : clientX - dr.left;
   let best = null;
   let bestInf = 0;
@@ -1066,12 +1078,16 @@ dockEl.addEventListener(
 );
 
 let magnifyRaf = 0;
+let magPointer = { x: 0, y: 0 };
 dockEl.addEventListener("pointermove", (e) => {
+  // Always keep the freshest pointer position; coalesce to one magnify per frame
+  // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
+  magPointer.x = e.clientX;
+  magPointer.y = e.clientY;
   if (magnifyRaf) return;
-  const { clientX, clientY } = e;
   magnifyRaf = requestAnimationFrame(() => {
     magnifyRaf = 0;
-    magnify(clientX, clientY);
+    magnify(magPointer.x, magPointer.y);
   });
 });
 dockEl.addEventListener("pointerleave", resetMagnify);
@@ -1131,7 +1147,19 @@ function pullDistance(e) {
   return r.top - e.clientY;
 }
 
+// Coalesce pointer moves to one per animation frame: the drag does layout reads
+// (rects) + FLIP reordering, so running it per raw event would thrash at 144Hz.
+let pressMoveRaf = 0;
+let pressMoveEv = null;
 function onPressMove(e) {
+  pressMoveEv = e;
+  if (pressMoveRaf) return;
+  pressMoveRaf = requestAnimationFrame(() => {
+    pressMoveRaf = 0;
+    if (press && pressMoveEv) processMove(pressMoveEv);
+  });
+}
+function processMove(e) {
   if (!press) return;
   const dx = e.clientX - press.startX;
   const dy = e.clientY - press.startY;
@@ -1250,6 +1278,8 @@ function flipReorder(mutate) {
 
 async function onPressUp() {
   window.removeEventListener("pointermove", onPressMove);
+  cancelAnimationFrame(pressMoveRaf);
+  pressMoveRaf = 0;
   const p = press;
   press = null;
   if (!p) return;
@@ -1308,6 +1338,8 @@ async function onPressUp() {
 async function cancelDrag() {
   if (!press && !dragging) return;
   window.removeEventListener("pointermove", onPressMove);
+  cancelAnimationFrame(pressMoveRaf);
+  pressMoveRaf = 0;
   if (press) { try { press.el.releasePointerCapture(press.pointerId); } catch (_) {} }
   const wasDragging = dragging;
   press = null;
@@ -1778,6 +1810,9 @@ function checkScreenChange() {
 lastScreenSig = screenSig();
 let screenChangeTimer = null;
 window.addEventListener("resize", () => {
+  // The bar's viewport rect (cached for magnify) shifts when the window resizes
+  // — re-measure lazily so magnify never maps the pointer against a stale rect.
+  invalidateMag();
   clearTimeout(screenChangeTimer);
   screenChangeTimer = setTimeout(checkScreenChange, 250);
 });
