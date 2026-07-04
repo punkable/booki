@@ -3,6 +3,43 @@
 
 export const CHANGELOG = [
   {
+    version: "0.28.0",
+    date: "4 jul 2026",
+    headline: "El dock ya no se rompe con muchos elementos, notas que se guardan y varios arreglos.",
+    sections: [
+      {
+        icon: "📏",
+        title: "Muchos elementos, sin romperse",
+        notes: [
+          "El dock nunca crece más allá de la pantalla: los iconos se achican para caber y, si hay demasiados, la barra se desplaza (con la rueda o acercando el cursor a los extremos) para llegar a los de los lados.",
+        ],
+      },
+      {
+        icon: "🗒️",
+        title: "Notas que funcionan",
+        notes: [
+          "Haz clic en el widget de notas para escribir; se guarda solo al terminar.",
+        ],
+      },
+      {
+        icon: "🧲",
+        title: "Mover y ocultar más intuitivo",
+        notes: [
+          "Arrastra el fondo del dock hacia otro borde para moverlo ahí; hacia su propio borde para esconderlo.",
+          "Al abrir otra ventana, el dock ahora sí se aparta (aunque lo hubieras abierto desde el notch).",
+        ],
+      },
+      {
+        icon: "🩹",
+        title: "Arreglos",
+        notes: [
+          "Quitar algo directamente del dock ahora también lo quita de la lista en Ajustes.",
+          "Los widgets que ya tienes anclados dejan de ofrecerse para añadir (no más CPU repetido).",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.27.0",
     date: "4 jul 2026",
     headline: "Arreglos importantes: nada de Bookis duplicados, y vaciar la papelera ya no congela.",
