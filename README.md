@@ -74,7 +74,7 @@
 ## 🚀 Install
 
 1. Download the latest installer from [**Releases**](https://github.com/punkable/booki/releases/latest) —
-   `Booki_*_x64-setup.exe` (recommended) or the `.msi`.
+   `Booki_*_x64-setup.exe` (per-user, no admin needed).
 2. Run it and launch **Booki** from the Start menu. The dock appears at the bottom
    of the screen; a tray icon gives you show/hide, settings and quit.
 
@@ -140,7 +140,7 @@ are welcome — totally optional, thank you 🙏
 npm install
 npm run dev          # browser preview with mock data → http://localhost:1420
 npm run tauri:dev    # the real app (Windows, Rust toolchain + WebView2)
-npm run tauri:build  # build the installers (.exe / .msi)
+npm run tauri:build  # build the NSIS installer (.exe)
 ```
 
 Releases are built and signed by CI on every version bump pushed to `main`
