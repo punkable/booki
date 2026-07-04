@@ -328,6 +328,7 @@ export const dock = {
   trashCount: () => invoke("trash_count"),
   recentFiles: (limit) => invoke("recent_files", { limit }),
   openDataDir: () => invoke("open_data_dir"),
+  setDockEdge: (edge) => invoke("set_dock_edge", { edge }),
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
