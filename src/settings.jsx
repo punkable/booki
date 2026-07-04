@@ -1555,6 +1555,9 @@ function Faq({ version }) {
       </div>
 
       <div className="s-credits" style={{ marginTop: 14 }}>
+        <button className="s-link" onClick={() => dockApi.openDataDir().catch(() => {})}>
+          {t("faq.link.data")}
+        </button>
         <button className="s-link" onClick={() => open("https://github.com/punkable/booki")}>
           {t("faq.link.repo")} ↗
         </button>

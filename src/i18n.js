@@ -37,6 +37,7 @@ const DICT = {
     "faq.link.repo": "Ver el c\u00f3digo",
     "faq.link.issues": "Reportar un problema",
     "faq.link.license": "Licencia MIT",
+    "faq.link.data": "Abrir carpeta de datos",
     "act.reset": "Restablecer",
     "act.quit": "Salir",
 
@@ -314,6 +315,7 @@ const DICT = {
     "faq.link.repo": "View the code",
     "faq.link.issues": "Report a problem",
     "faq.link.license": "MIT license",
+    "faq.link.data": "Open data folder",
     "act.reset": "Reset",
     "act.quit": "Quit",
 
