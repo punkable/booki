@@ -115,10 +115,13 @@ function Row({ label, children, hint }) {
   );
 }
 
-function Toggle({ checked, onChange, label }) {
+function Toggle({ checked, onChange, label, hint }) {
   return (
     <label className="r-toggle">
-      <span>{label}</span>
+      <span className="r-toggle-text">
+        {label}
+        {hint ? <small className="r-toggle-hint">{hint}</small> : null}
+      </span>
       <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="r-switch" />
     </label>
@@ -870,6 +873,8 @@ function Behavior({ cfg, set }) {
         onChange={(v) => set({ showLabels: v })} />
       <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
         onChange={(v) => set({ showIndicators: v })} />
+      <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
+        checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
 
       <h2 className="s-subhead">{t("gp.system")}</h2>
       <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}

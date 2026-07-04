@@ -51,6 +51,7 @@ const DEMO_CONFIG = {
   notchTrigger: "click",
   compact: false,
   lastProfile: "",
+  focusIfRunning: false,
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
@@ -131,9 +132,17 @@ async function mockInvoke(cmd, args) {
       return null;
     case "trash_is_empty":
       return demoTrashItems === 0;
+    case "trash_count":
+      return demoTrashItems;
     case "empty_trash":
       demoTrashItems = 0;
       return null;
+    case "recent_files":
+      return [
+        { name: "Notas de la reunión", path: "C:/demo/Notas.docx" },
+        { name: "Presupuesto 2026", path: "C:/demo/Presupuesto.xlsx" },
+        { name: "captura", path: "C:/demo/captura.png" },
+      ].slice(0, (args && args.limit) || 12);
     case "wallpaper_accent":
       return "#3a86ff";
     case "media_info":
@@ -316,6 +325,8 @@ export const dock = {
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
+  trashCount: () => invoke("trash_count"),
+  recentFiles: (limit) => invoke("recent_files", { limit }),
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),

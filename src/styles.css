@@ -1089,6 +1089,8 @@ body.edit .dock { cursor: grab; }
   height: 3px;
   border-radius: var(--r-pill);
   background: var(--accent);
+  /* A soft halo in the accent colour makes the running dot feel alive. */
+  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--accent) 65%, transparent);
   animation: run-pulse 2.6s var(--ease) infinite;
 }
 body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -5px; }
@@ -1174,8 +1176,15 @@ body.edge-right.show-labels .tile:hover .label { transform: translateY(50%) tran
 
 /* Separator */
 .tile.separator { cursor: default; }
-.sep-line { width: 1px; height: 56%; border-radius: 2px; background: var(--stroke); }
-body.edge-left .sep-line, body.edge-right .sep-line { width: 56%; height: 1px; }
+.sep-line {
+  width: 2px; height: 58%; border-radius: 2px;
+  /* Fades out at both ends so it reads as a soft divider, not a hard bar. */
+  background: linear-gradient(to bottom, transparent, var(--stroke) 22%, var(--stroke) 78%, transparent);
+}
+body.edge-left .sep-line, body.edge-right .sep-line {
+  width: 58%; height: 2px;
+  background: linear-gradient(to right, transparent, var(--stroke) 22%, var(--stroke) 78%, transparent);
+}
 
 /* Empty-state hint */
 .tile.hint { cursor: pointer; opacity: 0.95; animation: booki-breathe 2.6s var(--ease) infinite; }
@@ -1352,6 +1361,34 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
 .stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ───────────────────────── Tooltip ───────────────────────── */
+/* Booki-styled hover tooltip (replaces the OS one). Positioned via transform
+   from JS; fades in softly. */
+.dock-tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  max-width: 260px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s var(--ease);
+}
+.dock-tip.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .dock-tip { transition: none; } }
 
 /* ───────────────────────── Context menu ───────────────────────── */
 
@@ -1991,6 +2028,8 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 
 .r-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; font-size: 14px; cursor: pointer; border-bottom: 1px solid var(--stroke); }
 .r-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.r-toggle-text { display: flex; flex-direction: column; gap: 2px; }
+.r-toggle-hint { font-size: 11.5px; color: var(--ink-2); font-weight: 400; line-height: 1.3; }
 .r-switch { position: relative; width: 40px; height: 22px; flex: 0 0 auto; border-radius: var(--r-pill); background: var(--ink-2); transition: background 0.18s ease; }
 .r-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.18s var(--ease); }
 .r-toggle input:checked + .r-switch { background: var(--accent); }
