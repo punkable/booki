@@ -118,6 +118,8 @@
 
 Booki is **free and open source** (MIT), made with care by
 **[Punkable](https://github.com/punkable)** ([@Punkabl3](https://x.com/Punkabl3) on X).
+Built with [Tauri 2](https://tauri.app) + Rust, and developed with the help of
+AI tooling ([Claude Code](https://claude.com/claude-code)) under human direction and testing.
 
 If it makes your desktop nicer and you'd like to support development, donations
 are welcome — totally optional, thank you 🙏

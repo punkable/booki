@@ -81,7 +81,7 @@ const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.translucency", "appearance"], ["ap.language", "general"], ["ap.backup", "general"],
-  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
+  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
   ["be.notchPeek", "behavior"], ["be.reveal", "behavior"], ["prof.title", "behavior"],
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
@@ -801,6 +801,10 @@ function Behavior({ cfg, set }) {
       <Row label={t("be.monitor")}>
         <MonitorPicker value={cfg.monitor} monitors={monitors}
           onChange={(v) => set({ monitor: v })} />
+      </Row>
+      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+        <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
+          fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
       </Row>
       <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
         <SegmentedControl

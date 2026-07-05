@@ -95,6 +95,10 @@ fn default_notch_style() -> String {
 fn default_anim() -> String {
     "spring".into()
 }
+fn default_edge_gap() -> u32 {
+    48
+}
+
 fn default_true() -> bool {
     true
 }
@@ -173,6 +177,10 @@ pub struct Config {
     /// Explorer right-click "Add to Booki" menu (files + folders).
     #[serde(default = "default_true")]
     pub context_menu: bool,
+    /// Visual gap (CSS px) between the bar and its screen edge. Default 48
+    /// (12px window margin + the 36px transparent shadow pad).
+    #[serde(default = "default_edge_gap")]
+    pub edge_gap: u32,
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
@@ -246,6 +254,7 @@ impl Default for Config {
             material_strength: default_material(),
             autostart: false,
             context_menu: true,
+            edge_gap: 48,
             language: default_language(),
             settings_rev: 0,
             seen_version: String::new(),
