@@ -170,6 +170,9 @@ pub struct Config {
     /// Start with Windows.
     #[serde(default)]
     pub autostart: bool,
+    /// Explorer right-click "Add to Booki" menu (files + folders).
+    #[serde(default = "default_true")]
+    pub context_menu: bool,
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
@@ -242,6 +245,7 @@ impl Default for Config {
             monitor: default_monitor(),
             material_strength: default_material(),
             autostart: false,
+            context_menu: true,
             language: default_language(),
             settings_rev: 0,
             seen_version: String::new(),

@@ -480,6 +480,93 @@ pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
     }
 }
 
+/// Install/refresh (or remove) the Explorer right-click "Booki" cascading menu
+/// for files (*) and folders (Directory). Per-user (HKCU\Software\Classes), so
+/// no admin is needed. `groups` = (id, label) → one "add to group" entry each;
+/// labels arrive already localized from the frontend. The whole key is deleted
+/// and rewritten so removed groups can't leave stale entries behind.
+pub fn sync_context_menu(
+    enabled: bool,
+    exe: &str,
+    label_pin: &str,
+    group_entries: &[(String, String)],
+) -> Result<(), String> {
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, RegDeleteTreeW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+        KEY_SET_VALUE, REG_OPTION_NON_VOLATILE, REG_SZ,
+    };
+
+    unsafe fn set_str(key: HKEY, name: Option<&str>, value: &str) -> Result<(), String> {
+        let wname: Vec<u16>;
+        let name_ptr = match name {
+            Some(n) => {
+                wname = wide(n);
+                PCWSTR(wname.as_ptr())
+            }
+            None => PCWSTR::null(),
+        };
+        let wval = wide(value);
+        let bytes = std::slice::from_raw_parts(wval.as_ptr() as *const u8, wval.len() * 2);
+        let r = unsafe { RegSetValueExW(key, name_ptr, 0, REG_SZ, Some(bytes)) };
+        if r.is_err() { Err(format!("reg set failed ({r:?})")) } else { Ok(()) }
+    }
+    unsafe fn create(path: &str) -> Result<HKEY, String> {
+        let wpath = wide(path);
+        let mut key = HKEY::default();
+        let r = unsafe {
+            RegCreateKeyExW(
+                HKEY_CURRENT_USER,
+                PCWSTR(wpath.as_ptr()),
+                0,
+                None,
+                REG_OPTION_NON_VOLATILE,
+                KEY_SET_VALUE,
+                None,
+                &mut key,
+                None,
+            )
+        };
+        if r.is_err() { Err(format!("reg create {path} failed ({r:?})")) } else { Ok(key) }
+    }
+
+    unsafe {
+        for base in ["*", "Directory"] {
+            let root = format!("Software\\Classes\\{base}\\shell\\Booki");
+            // Always start clean (also removes the menu when disabling).
+            let wroot = wide(&root);
+            let _ = RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr()));
+            if !enabled {
+                continue;
+            }
+            let key = create(&root)?;
+            set_str(key, Some("MUIVerb"), "Booki")?;
+            set_str(key, Some("Icon"), &format!("\"{exe}\""))?;
+            // An empty SubCommands + subkeys under shell\ = a cascading menu.
+            set_str(key, Some("SubCommands"), "")?;
+            let _ = RegCloseKey(key);
+
+            // Entries sort alphabetically by key name → numeric prefixes fix order.
+            let pin_key = create(&format!("{root}\\shell\\01_pin"))?;
+            set_str(pin_key, Some("MUIVerb"), label_pin)?;
+            let _ = RegCloseKey(pin_key);
+            let cmd = create(&format!("{root}\\shell\\01_pin\\command"))?;
+            set_str(cmd, None, &format!("\"{exe}\" --pin \"%1\""))?;
+            let _ = RegCloseKey(cmd);
+
+            for (i, (id, label)) in group_entries.iter().enumerate() {
+                let sub = format!("{root}\\shell\\10_{i:02}");
+                let gk = create(&sub)?;
+                set_str(gk, Some("MUIVerb"), label)?;
+                let _ = RegCloseKey(gk);
+                let gc = create(&format!("{sub}\\command"))?;
+                set_str(gc, None, &format!("\"{exe}\" --pin-group \"{id}\" \"%1\""))?;
+                let _ = RegCloseKey(gc);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// True when the "start with Windows" registry entry exists.
 pub fn get_autostart() -> bool {
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
