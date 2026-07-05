@@ -3,6 +3,34 @@
 
 export const CHANGELOG = [
   {
+    version: "0.38.0",
+    date: "5 jul 2026",
+    headline: "Adi\u00f3s al parpadeo, el dock ya no salta solo, y eliges su distancia al borde.",
+    sections: [
+      {
+        icon: "\u2728",
+        title: "Parpadeo, atacado de ra\u00edz",
+        notes: [
+          "La ventana del dock ahora se redimensiona y reposiciona en UNA sola operaci\u00f3n del sistema (antes eran dos: se ve\u00eda un frame intermedio \u2014 el blink \u2014 cada vez que abr\u00edas o cerrabas un grupo o men\u00fa).",
+        ],
+      },
+      {
+        icon: "\ud83d\udc7b",
+        title: "Ya no aparece solo",
+        notes: [
+          "Al cambiar de ventana o mover cosas hab\u00eda huecos de un instante sobre el sitio del dock y \u00e9l aprovechaba para salir. Ahora solo reaparece cuando el escritorio lleva un momento despejado de verdad.",
+        ],
+      },
+      {
+        icon: "\ud83d\udccf",
+        title: "Distancia al borde",
+        notes: [
+          "Nuevo control en Comportamiento: elige qu\u00e9 tan pegado va el dock al borde de la pantalla (y a la barra de tareas). En modo compacto ya puedes bajarlo bien cerquita.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.37.0",
     date: "5 jul 2026",
     headline: "El dock ya no se esconde mientras lo usas, y «Añadir a Booki» llega al Explorador.",

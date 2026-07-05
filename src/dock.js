@@ -141,6 +141,7 @@ async function reloadConfig() {
   // If the language changed, make sure its dictionary is loaded before re-render.
   if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
   maybeSyncCtxMenu();
+  if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -216,6 +217,13 @@ function applyAll() {
     root.style.setProperty("--accent", cfg.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
+  // How close the bar sits to its screen edge (user-tunable). The transparent
+  // pad on the anchored side shrinks down to the requested gap; anything past
+  // 36px is handled by the window's own margin (backend dock_xy).
+  const edgeGap = Math.max(4, Math.min(96, cfg.edgeGap ?? 48));
+  root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
+  // A small gap leaves no room for the outward drop shadow — soften it.
+  document.body.classList.toggle("tight-edge", edgeGap < 24);
   // Tile/corner roundness (user-tunable). Drives tile, group and folder radii;
   // the dock's own outer corner is a touch rounder so it frames the tiles.
   const cr = cfg.cornerRadius ?? 12;
@@ -2183,8 +2191,11 @@ function computeFrame() {
   // Use offsetWidth/Height (layout size) — NOT getBoundingClientRect — so a dock
   // that's currently scaled by the minimize animation doesn't size the window too
   // small (which left the bar looking cut off after revealing, esp. at the top).
-  let wCss = dockEl.offsetWidth + SHADOW_PAD * 2;
-  let hCss = dockEl.offsetHeight + SHADOW_PAD * 2;
+  // The anchored side's transparent pad shrinks with the user's edge gap, so
+  // the window hugs the bar there; the other sides keep the full shadow pad.
+  const edgePad = Math.min(SHADOW_PAD, Math.max(4, Math.min(96, cfg.edgeGap ?? 48)));
+  let wCss = dockEl.offsetWidth + (isVertical() ? SHADOW_PAD + edgePad : SHADOW_PAD * 2);
+  let hCss = dockEl.offsetHeight + (isVertical() ? SHADOW_PAD * 2 : SHADOW_PAD + edgePad);
   // Make room for an open folder-stack flyout.
   if (stackOpen && stackEl) {
     const sr = stackEl.getBoundingClientRect();
@@ -2278,6 +2289,7 @@ let fullscreen = false; // a fullscreen game/movie is running → blackout every
 let draggingFile = false; // an OS file drag is over the dock → keep it open
 let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
+let occRevealTimer = null; // debounce for the smart-mode auto-reveal
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
 // brief toast, then hide BOTH the bar and the notch. Restore when it ends.
@@ -2445,16 +2457,25 @@ function onOcclusionSignal(value) {
   if (manualHide) return; // stay hidden until the user asks for the dock again
   if (hideMode() !== "smart") return;
   if (!value) {
-    // Back on the desktop → bring the dock out automatically.
-    pinnedReveal = false;
-    manualReveal = false;
-    setHidden(false);
+    // Back on the desktop → bring the dock out automatically, but only after
+    // the desktop has stayed clear for a beat. Switching/moving windows opens
+    // transient gaps over the dock's spot, and revealing on those made the dock
+    // pop out "by itself" mid alt-tab / drag (reported bug).
+    clearTimeout(occRevealTimer);
+    occRevealTimer = setTimeout(() => {
+      if (occluded || fullscreen || manualHide || hideMode() !== "smart") return;
+      pinnedReveal = false;
+      manualReveal = false;
+      setHidden(false);
+    }, 500);
   } else if (pointerInside || interacting()) {
+    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
     // Another window covers the dock's spot, but the user is ON the dock right
     // now (it's topmost) — hiding it under the cursor was the "it hides while
     // I'm using it!" bug. It tucks the moment they leave instead (pointer-out).
     return;
   } else {
+    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
     // Working in another window → tuck away. Even a dock pinned open from the
     // notch hides once you switch to another app.
     pinnedReveal = false;
