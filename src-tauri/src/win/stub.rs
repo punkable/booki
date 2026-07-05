@@ -98,6 +98,15 @@ pub fn volume_mute_toggle() -> Result<bool, String> {
     Err("system volume is only available on Windows".into())
 }
 
+pub fn sync_context_menu(
+    _enabled: bool,
+    _exe: &str,
+    _label_pin: &str,
+    _group_entries: &[(String, String)],
+) -> Result<(), String> {
+    Ok(())
+}
+
 pub fn cursor_at_edge(_edge: &str) -> bool {
     false
 }

@@ -96,6 +96,9 @@ async function boot() {
       else if (item.path) dockApi.launch(item.path, item.args || []);
     });
     checkChangelog();
+    // Keep the Explorer "Add to Booki" right-click menu in step with the
+    // current groups + language (deferred: registry writes aren't urgent).
+    setTimeout(maybeSyncCtxMenu, 2500);
     // Defer the update check (a network round-trip) a few seconds so it doesn't
     // compete with first paint / icon extraction during startup.
     setTimeout(checkUpdates, 4000);
@@ -113,11 +116,31 @@ async function boot() {
   }
 }
 
+// Explorer right-click menu: entries live in the registry, written by the
+// backend with labels WE localize here (so all 5 languages work). Re-synced
+// whenever the groups, the language, or the toggle change.
+const ctxGroupsSig = (c) =>
+  (c.pinned || []).filter((p) => p.kind === "group").map((p) => `${p.id}:${p.name}`).join("|") +
+  `|${c.contextMenu !== false}|${c.language || ""}`;
+let lastCtxSig = null;
+function syncCtxMenu() {
+  lastCtxSig = ctxGroupsSig(cfg);
+  dockApi
+    .syncContextMenu(cfg.contextMenu !== false, t("ctx.addToBooki"), t("ctx.addToGroup"))
+    .catch(() => {});
+}
+// Cheap guard used from persist(): dock-side group edits bypass reloadConfig
+// (self-emit echo guard), so re-sync here when the signature actually moved.
+function maybeSyncCtxMenu() {
+  if (cfg && ctxGroupsSig(cfg) !== lastCtxSig) syncCtxMenu();
+}
+
 async function reloadConfig() {
   const prev = cfg;
   cfg = await configApi.get();
   // If the language changed, make sure its dictionary is loaded before re-render.
   if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
+  maybeSyncCtxMenu();
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -219,6 +242,7 @@ function applyAll() {
 
 async function persist() {
   await configApi.save(cfg);
+  maybeSyncCtxMenu(); // group added/renamed/removed on the dock → refresh Explorer menu
   // Always notify the other windows (Settings especially) so its pinned-apps
   // list can never drift out of sync with the dock — removing/adding/reordering
   // straight on the bar now reflects in Settings immediately.
@@ -2290,6 +2314,9 @@ function setHidden(v) {
   if (v) stopPolls();
   else startPolls();
   if (v) {
+    // The window is about to go away — the pointer can't be "inside" anymore.
+    // (Windows won't fire pointerout for a window that hides under the cursor.)
+    pointerInside = false;
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
     document.body.classList.add("tucked");
@@ -2307,17 +2334,67 @@ function setHidden(v) {
   }
 }
 
+// ─── The ONE rule of hiding ───────────────────────────────────────────────
+// The dock NEVER tucks away while you're using it: pointer on the bar, a drag
+// in flight, an open group/menu/popover. Timers and occlusion signals don't
+// hide directly — they go through tryTuck(), which defers until the gesture
+// ends; the pointer leaving the window is what finishes a deferred hide.
+// The auto-hide delay is purely a grace period AFTER you leave, never a
+// countdown while you're on the dock.
+let pointerInside = false;
+
+// Would the current mode want the dock hidden right now (ignoring the user's
+// ongoing interaction)? edge = whenever you're not on it; smart = only while
+// another window covers its spot.
+function wantsHideNow() {
+  const m = hideMode();
+  return m === "edge" || (m === "smart" && occluded);
+}
+
+// Anything mid-use that a hide would yank out from under the user.
+function interacting() {
+  return (
+    pointerInside || dragging || draggingFile || pinnedReveal || stackOpen ||
+    !!edgeMove || document.body.classList.contains("menu-open") ||
+    !!document.querySelector(".trash-pop, .note-editor, .coach")
+  );
+}
+
+// Hide if the user isn't mid-something; otherwise wait — the pointer-out
+// handler re-checks when they actually leave.
+function tryTuck() {
+  if (fullscreen || previewing || !wantsHideNow()) return;
+  if (interacting()) return; // deferred: pointer-out / gesture-end re-checks
+  manualReveal = false;
+  setHidden(true);
+}
+
+// Track pointer presence at the WINDOW level (bar + its transparent pad):
+// relatedTarget === null means the pointer truly entered/left the window,
+// not just moved between elements inside it.
+window.addEventListener("pointerover", (e) => {
+  if (e.relatedTarget) return;
+  pointerInside = true;
+  // A visible dock never counts down while you're on it — any trigger mode.
+  if (!hiddenState) clearTimeout(hideTimer);
+});
+window.addEventListener("pointerout", (e) => {
+  if (e.relatedTarget) return;
+  pointerInside = false;
+  // Leaving is the moment a wanted hide (edge mode, or smart while covered)
+  // actually happens — after the grace delay.
+  if (!hiddenState && wantsHideNow()) scheduleHide();
+});
+
 function setupAutoHide() {
   clearTimeout(hideTimer);
   manualReveal = false;
   pinnedReveal = false;
-  // edge mode starts hidden; off/smart start shown (smart hides only once the
-  // backend reports the dock is actually covered, so on the desktop it stays
-  // visible — never flapping).
-  // edge mode starts hidden; smart starts hidden only if we're currently in an
-  // app (occluded) — so a config reload while you're working doesn't flash the
-  // dock open. off/smart-on-desktop start shown.
-  hiddenState = hideMode() === "edge" || (hideMode() === "smart" && occluded);
+  // smart starts hidden only if we're currently in an app (occluded), so a
+  // config reload while working doesn't flash the dock open. edge now starts
+  // VISIBLE and then visibly tucks after the grace delay (unless you move onto
+  // it) — starting already-hidden read as "the dock never comes out".
+  hiddenState = hideMode() === "smart" && occluded;
   document.body.classList.toggle("tucked", hiddenState);
   applyFrame();
   // Sync the two windows to the starting state (these don't emit, so this won't
@@ -2327,38 +2404,31 @@ function setupAutoHide() {
   // Keep the poll loop in step with visibility (idle when tucked away).
   if (hiddenState) stopPolls();
   else startPolls();
+  if (!hiddenState && wantsHideNow()) scheduleHide();
 }
 
-// Pointer entered the dock → reveal and hold it open.
+// Pointer entered the dock area while HIDDEN → reveal (hover trigger only; in
+// click mode a hidden dock comes back exclusively from the notch).
 function reveal() {
   if (fullscreen) return; // stay out of the way during fullscreen
   if (manualHide) return; // user swiped the dock away — only the notch brings it back
-  // "Click" trigger means the dock comes back ONLY from a notch click (and the
-  // automatic smart-hide reveal), never just because the cursor passed over it.
   if ((cfg.notchTrigger || "click") === "click") return;
   const mode = hideMode();
   if (mode === "off") return;
   // In smart mode, while you're working in another app, DON'T reveal on hover —
-  // the dock returns only on the desktop or when you click the notch. This keeps
-  // it out of the way instead of popping open as the cursor passes by.
+  // the dock returns only on the desktop or when you click the notch.
   if (mode === "smart" && occluded && !pinnedReveal) return;
   clearTimeout(hideTimer);
   manualReveal = true;
   setHidden(false);
 }
 
-// Pointer left → after the delay, hide again if the mode still wants to.
+// Grace period after leaving the dock; the callback re-checks EVERYTHING so a
+// pointer that came back (or an opened menu) simply cancels the hide.
 function scheduleHide() {
-  const mode = hideMode();
-  // While the user is dragging or has explicitly pinned the dock open from the
-  // notch, never tuck it away — they're in the middle of using it.
-  if (mode === "off" || dragging || draggingFile || pinnedReveal) return;
+  if (hideMode() === "off") return;
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => {
-    if (dragging || draggingFile || pinnedReveal) return;
-    manualReveal = false;
-    if (mode === "edge" || (mode === "smart" && occluded)) setHidden(true);
-  }, cfg.autoHideDelay ?? 650);
+  hideTimer = setTimeout(tryTuck, cfg.autoHideDelay ?? 650);
 }
 
 // Smart-hide: the backend tells us when a window covers the dock's home area.
@@ -2379,10 +2449,14 @@ function onOcclusionSignal(value) {
     pinnedReveal = false;
     manualReveal = false;
     setHidden(false);
+  } else if (pointerInside || interacting()) {
+    // Another window covers the dock's spot, but the user is ON the dock right
+    // now (it's topmost) — hiding it under the cursor was the "it hides while
+    // I'm using it!" bug. It tucks the moment they leave instead (pointer-out).
+    return;
   } else {
     // Working in another window → tuck away. Even a dock pinned open from the
-    // notch should hide once you switch to another app: staying open on top of
-    // whatever you opened is exactly what felt broken ("no se oculta").
+    // notch hides once you switch to another app.
     pinnedReveal = false;
     manualReveal = false;
     setHidden(true);
@@ -2391,7 +2465,7 @@ function onOcclusionSignal(value) {
 
 document.body.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerenter", reveal);
-dockEl.addEventListener("pointerleave", scheduleHide);
+dockEl.addEventListener("pointerleave", () => { if (wantsHideNow()) scheduleHide(); });
 
 // The notch is now its own small window. Clicking it calls the backend, which
 // shows the dock window again and fires `booki://reveal` — we pin the dock open

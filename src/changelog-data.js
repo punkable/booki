@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.37.0",
+    date: "5 jul 2026",
+    headline: "El dock ya no se esconde mientras lo usas, y «Añadir a Booki» llega al Explorador.",
+    sections: [
+      {
+        icon: "🖱️",
+        title: "Ocultar sin sustos",
+        notes: [
+          "Regla nueva: el dock JAMÁS se esconde mientras el cursor está encima o tienes algo a medias (arrastre, grupo o menú abierto). Se esconde solo cuando lo dejas.",
+          "El retraso de ocultado ahora es una gracia después de salir, nunca una cuenta atrás mientras lo usas.",
+          "«Al salir» ya no arranca escondido: el dock aparece y se guarda visiblemente si no lo tocas, para que se entienda cómo funciona.",
+        ],
+      },
+      {
+        icon: "🖥️",
+        title: "Clic derecho en Windows",
+        notes: [
+          "Nuevo menú «Booki» en el clic derecho del Explorador: añade cualquier archivo o carpeta al dock, o mándalo directo a uno de tus grupos.",
+          "Funciona aunque Booki esté cerrado (lo abre y ancla el elemento). Se puede desactivar en Ajustes → General.",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Ajustes, todo en su sitio",
+        notes: [
+          "General ahora reúne: iniciar con Windows, siempre visible, actualizaciones, atajos de teclado, idioma y copia de seguridad. La pestaña Atajos se integró ahí.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.36.0",
     date: "5 jul 2026",
     headline: "Menos parpadeo, dock más fluido, y grupos mucho más cómodos.",
