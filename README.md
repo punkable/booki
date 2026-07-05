@@ -117,8 +117,7 @@
 ## 💛 A free project, made with love
 
 Booki is **free and open source** (MIT), made with care by
-**[Punkable](https://github.com/punkable)** ([@Punkabl3](https://x.com/Punkabl3) on X)
-and built with the help of **[Claude Code](https://claude.com/claude-code)**.
+**[Punkable](https://github.com/punkable)** ([@Punkabl3](https://x.com/Punkabl3) on X).
 
 If it makes your desktop nicer and you'd like to support development, donations
 are welcome — totally optional, thank you 🙏
