@@ -1948,7 +1948,7 @@ function App() {
     return () => un && un();
   }, []);
 
-  if (!cfg) return <div className="loading">…</div>;
+  if (!cfg) return <SettingsSkeleton />;
 
   return (
     <div className="s-shell">
@@ -2028,6 +2028,27 @@ function App() {
         </div>
       </main>
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+    </div>
+  );
+}
+
+// Shown for the instant before config loads — mirrors the real layout so the
+// window reads as "loading", not blank or a lone "…".
+function SettingsSkeleton() {
+  return (
+    <div className="s-shell" aria-busy="true">
+      <aside className="s-sidebar">
+        <div className="s-brand"><span className="sk sk-logo" /><span className="sk sk-word" /></div>
+        <div className="sk sk-search" />
+        <nav className="s-nav">
+          {Array.from({ length: 6 }).map((_, i) => <span key={i} className="sk sk-nav" />)}
+        </nav>
+      </aside>
+      <main className="s-content">
+        <span className="sk sk-title" />
+        <span className="sk sk-sub" />
+        {Array.from({ length: 3 }).map((_, i) => <span key={i} className="sk sk-card" />)}
+      </main>
     </div>
   );
 }
