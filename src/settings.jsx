@@ -100,6 +100,7 @@ const TABS = [
   ["behavior", "tab.behavior", "settings"],
   ["apps", "tab.apps", "grid"],
   ["shortcuts", "tab.shortcuts", "keyboard"],
+  ["general", "tab.general", "sliders"],
   ["faq", "tab.faq", "help"],
   ["about", "tab.about", "info"],
 ];
@@ -781,35 +782,6 @@ function Appearance({ cfg, set }) {
         <NotchStylePicker cfg={cfg} set={set} />
       </Row>
 
-      <h2 className="s-subhead">{t("gp.general")}</h2>
-      <Row label={t("ap.language")}>
-        <select
-          className="s-select"
-          value={cfg.language || "system"}
-          onChange={(e) => set({ language: e.target.value })}
-        >
-          <option value="system">{t("lang.system")}</option>
-          <option value="es">Español</option>
-          <option value="en">English</option>
-          <option value="pt">Português</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-        </select>
-      </Row>
-      <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
-        <div className="s-actions" style={{ margin: 0 }}>
-          <button className="s-btn s-btn-soft" onClick={async () => {
-            const p = await pickSavePath("booki-config.json");
-            if (p) await dockApi.exportConfig(p);
-          }}>{t("ap.export")}</button>
-          <button className="s-btn s-btn-soft" onClick={async () => {
-            const p = await pickJsonFile();
-            if (!p) return;
-            const fresh = await dockApi.importConfig(p);
-            if (fresh) set(fresh);
-          }}>{t("ap.import")}</button>
-        </div>
-      </Row>
     </>
   );
 }
@@ -1210,6 +1182,55 @@ function Apps({ cfg, set }) {
   };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
   const clearAll = () => { set({ pinned: [] }); setClearArm(false); };
+
+  // Grid view: drag a group's child SQUARE to reorder it within the group, or
+  // drag it out of the group card to take it back onto the dock — no buttons.
+  const kidDrag = useRef(null);
+  const kidOutRef = useRef(-1);
+  const [kidOut, setKidOut] = useState(-1);
+  const startKidDrag = (gi, childId) => (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = e.currentTarget.closest(".pin-card");
+    const startIndex = (pinnedRef.current[gi].children || []).findIndex((c) => c.id === childId);
+    kidDrag.current = { gi, id: childId, from: startIndex };
+    kidOutRef.current = -1;
+    setKidOut(-1);
+    const onMove = (ev) => {
+      const cr = card.getBoundingClientRect();
+      const out =
+        ev.clientX < cr.left - 8 || ev.clientX > cr.right + 8 ||
+        ev.clientY < cr.top - 8 || ev.clientY > cr.bottom + 8;
+      if (out) {
+        if (kidOutRef.current !== gi) { kidOutRef.current = gi; setKidOut(gi); }
+        return; // aiming outside → release will take it out
+      }
+      if (kidOutRef.current !== -1) { kidOutRef.current = -1; setKidOut(-1); }
+      const kids = [...card.querySelectorAll(".pin-kid:not(.pin-kid-add)")];
+      let over = -1;
+      for (let k = 0; k < kids.length; k++) {
+        const r = kids[k].getBoundingClientRect();
+        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
+      }
+      const from = kidDrag.current.from;
+      if (over >= 0 && over !== from) {
+        const arr = [...(pinnedRef.current[gi].children || [])];
+        const [m] = arr.splice(from, 1);
+        arr.splice(over, 0, m);
+        kidDrag.current.from = over;
+        set({ pinned: pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: arr } : p)) });
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      if (kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
+      kidOutRef.current = -1;
+      setKidOut(-1);
+      kidDrag.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  };
   // Flag pins whose target doesn't exist on THIS machine (moved, uninstalled,
   // or config imported from another PC) and offer to reassign the path.
   const [missing, setMissing] = useState({});
@@ -1368,17 +1389,21 @@ function Apps({ cfg, set }) {
                   <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => remove(i)} />
                 </div>
                 {open && (
-                  <div className="pin-card-children">
+                  <div className={"pin-card-kids" + (kidOut === i ? " taking-out" : "")}>
                     {(item.children || []).map((c) => (
-                      <div key={c.id} className="pin-chip">
+                      <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
+                        onPointerDown={startKidDrag(i, c.id)}>
                         <PinThumb item={c} />
-                        <span className="pin-chip-name" title={c.path || ""}>{c.name}</span>
-                        <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
-                        <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
+                        <span className="pin-kid-name" title={c.path || ""}>{c.name}</span>
+                        <button className="pin-kid-x" title={t("apps.remove")}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); removeChild(i, c.id); }}>×</button>
                       </div>
                     ))}
-                    <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i)}
-                      dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
+                    <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
+                      onClick={() => addToFolder(i)}
+                      dangerouslySetInnerHTML={{ __html: icon("plus") }} />
+                    <div className="pin-kids-hint">{t("apps.kidsHint")}</div>
                   </div>
                 )}
               </div>
@@ -1624,7 +1649,6 @@ function DonateCard() {
       setTimeout(() => setCopied(""), 1600);
     } catch (_) {}
   };
-  const short = (a) => `${a.slice(0, 8)}…${a.slice(-6)}`;
   return (
     <div className="s-card-inner">
       <h3>{t("ab.free")}</h3>
@@ -1636,7 +1660,21 @@ function DonateCard() {
             <span className="donate-ico" dangerouslySetInnerHTML={{ __html: d.svg }} />
             <span className="donate-col">
               <strong>{d.name}</strong>
-              <code title={d.addr}>{short(d.addr)}</code>
+              {/* Full address, selectable for manual copy/paste; the button is an
+                  extra convenience, not the only way. */}
+              <code
+                className="donate-addr"
+                title={t("ab.selectCopy")}
+                onClick={(e) => {
+                  const r = document.createRange();
+                  r.selectNodeContents(e.currentTarget);
+                  const sel = window.getSelection();
+                  sel.removeAllRanges();
+                  sel.addRange(r);
+                }}
+              >
+                {d.addr}
+              </code>
             </span>
             <button className="s-btn s-btn-soft" onClick={() => copy(d)}>
               {copied === d.key ? t("ab.copied") : t("ab.copy")}
@@ -1723,26 +1761,20 @@ function Faq({ version }) {
   );
 }
 
-function About({ version, onWhatsNew, onReset }) {
+// Updates live in the General tab (the dock's "update available" pill opens it),
+// so the check + install button is always where you'd look for it.
+function UpdatesCard({ onWhatsNew }) {
   const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|installing|error
   const [update, setUpdate] = useState(null);
   const [pct, setPct] = useState(0);
-
   const check = async () => {
     setStatus("checking");
     const u = await checkForUpdate();
-    if (u) {
-      setUpdate(u);
-      setStatus("available");
-    } else {
-      setStatus("none");
-    }
+    if (u) { setUpdate(u); setStatus("available"); } else { setStatus("none"); }
   };
-  // Check on arrival: the dock's "update available" pill lands here, so the
-  // install button must be waiting — not another "check for updates" click.
-  useEffect(() => {
-    check();
-  }, []);
+  // Check on arrival: the pill lands on this tab, so the install button must be
+  // waiting — not another "check for updates" click.
+  useEffect(() => { check(); }, []);
   const install = async () => {
     setStatus("downloading");
     try {
@@ -1755,7 +1787,85 @@ function About({ version, onWhatsNew, onReset }) {
       setStatus("error");
     }
   };
+  return (
+    <div className="s-card-inner">
+      <h3>{t("ab.updates")}</h3>
+      {status === "available" ? (
+        <div className="upd-row">
+          <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
+          <button className="s-btn" onClick={install}>{t("ab.install")}</button>
+        </div>
+      ) : status === "downloading" ? (
+        <div className="upd-row">
+          <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
+          <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
+        </div>
+      ) : status === "installing" ? (
+        <div className="upd-row">
+          <span><img className="emo" src={emoSrc("sparkles")} alt="" width="16" height="16" /> <strong>{t("ab.installing")}</strong></span>
+          <div className="upd-bar"><i style={{ width: "100%" }} /></div>
+        </div>
+      ) : (
+        <div className="upd-row">
+          <button className="s-btn s-btn-soft" onClick={check} disabled={status === "checking"}>
+            {status === "checking" ? t("ab.checking") : t("ab.check")}
+          </button>
+          {status === "none" && <span className="muted">{t("ab.upToDate")}</span>}
+          {status === "error" && <span className="muted">{t("ab.error")}</span>}
+        </div>
+      )}
+      <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
+      <button className="s-btn s-btn-soft s-btn-ico" style={{ marginTop: 8 }} onClick={onWhatsNew}>
+        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
+        <span>{t("ab.whatsNew")}</span>
+      </button>
+    </div>
+  );
+}
 
+// Language + updates + backup: the "everything general" tab.
+function General({ cfg, set, onWhatsNew }) {
+  return (
+    <>
+      <h1>{t("gen.title")}</h1>
+      <p className="muted">{t("gen.hint")}</p>
+
+      <h2 className="s-subhead">{t("ab.updates")}</h2>
+      <UpdatesCard onWhatsNew={onWhatsNew} />
+
+      <h2 className="s-subhead">{t("gen.langSub")}</h2>
+      <Row label={t("ap.language")} hint={t("gen.langHint")}>
+        <select className="s-select" value={cfg.language || "system"}
+          onChange={(e) => set({ language: e.target.value })}>
+          <option value="system">{t("lang.system")}</option>
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="pt">Português</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+        </select>
+      </Row>
+
+      <h2 className="s-subhead">{t("ap.backup")}</h2>
+      <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
+        <div className="s-actions" style={{ margin: 0 }}>
+          <button className="s-btn s-btn-soft" onClick={async () => {
+            const p = await pickSavePath("booki-config.json");
+            if (p) await dockApi.exportConfig(p);
+          }}>{t("ap.export")}</button>
+          <button className="s-btn s-btn-soft" onClick={async () => {
+            const p = await pickJsonFile();
+            if (!p) return;
+            const fresh = await dockApi.importConfig(p);
+            if (fresh) set(fresh);
+          }}>{t("ap.import")}</button>
+        </div>
+      </Row>
+    </>
+  );
+}
+
+function About({ version, onWhatsNew, onReset }) {
   const [eggs, setEggs] = useState(0);
   const partying = eggs >= 5;
   const bumpEgg = () => {
@@ -1800,38 +1910,11 @@ function About({ version, onWhatsNew, onReset }) {
 
       <DonateCard />
 
-      <div className="s-card-inner">
-        <h3>{t("ab.updates")}</h3>
-        {status === "available" ? (
-          <div className="upd-row">
-            <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
-            <button className="s-btn" onClick={install}>{t("ab.install")}</button>
-          </div>
-        ) : status === "downloading" ? (
-          <div className="upd-row">
-            <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
-            <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
-          </div>
-        ) : status === "installing" ? (
-          <div className="upd-row">
-            <span><img className="emo" src={emoSrc("sparkles")} alt="" width="16" height="16" /> <strong>{t("ab.installing")}</strong></span>
-            <div className="upd-bar"><i style={{ width: "100%" }} /></div>
-          </div>
-        ) : (
-          <div className="upd-row">
-            <button className="s-btn s-btn-soft" onClick={check} disabled={status === "checking"}>
-              {status === "checking" ? t("ab.checking") : t("ab.check")}
-            </button>
-            {status === "none" && <span className="muted">{t("ab.upToDate")}</span>}
-            {status === "error" && <span className="muted">{t("ab.error")}</span>}
-          </div>
-        )}
-        <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
-        <button className="s-btn s-btn-soft s-btn-ico" style={{ marginTop: 8 }} onClick={onWhatsNew}>
-          <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
-          <span>{t("ab.whatsNew")}</span>
-        </button>
-      </div>
+      {/* A quick way back to the changelog; full update controls live in General. */}
+      <button className="s-btn s-btn-soft s-btn-ico" style={{ marginTop: 12 }} onClick={onWhatsNew}>
+        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
+        <span>{t("ab.whatsNew")}</span>
+      </button>
 
       <ResetZone onReset={onReset} />
 
@@ -2023,6 +2106,7 @@ function App() {
           {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
           {tab === "apps" && <Apps cfg={cfg} set={set} />}
           {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
+          {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
           {tab === "faq" && <Faq version={version} />}
           {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
         </div>
