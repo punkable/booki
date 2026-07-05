@@ -1002,7 +1002,9 @@ body.notch-body.style-windows .notch-pill::after { display: none; }
    + source order. Insets stay (they're inside the pill, never clipped). */
 body.notch-body.peek .notch-pill,
 body.notch-body.style-windows.peek .notch-pill {
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 9px color-mix(in srgb, var(--accent) 30%, rgba(0, 0, 0, 0.4)),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
@@ -1705,14 +1707,16 @@ body.settings-body {
   :root:not([data-theme]) .word-black { display: none; }
   :root:not([data-theme]) .word-white { display: inline; }
 }
-.s-sidebar nav { position: relative; display: flex; flex-direction: column; gap: 2px; --navh: 40px; }
-/* Sliding active pill */
+.s-sidebar nav { position: relative; display: flex; flex-direction: column; gap: var(--navgap); --navh: 40px; --navgap: 2px; }
+/* Sliding active pill. Each row occupies navh + the flex gap, so the indicator
+   must step by BOTH — otherwise it drifts one gap per row (the last tab was
+   ~12px off). */
 .s-nav-indicator {
   position: absolute; left: 0; right: 0; top: 0; height: var(--navh);
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--accent) 20%, var(--hover));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
-  transform: translateY(calc(var(--active, 0) * var(--navh)));
+  transform: translateY(calc(var(--active, 0) * (var(--navh) + var(--navgap))));
   transition: transform 0.32s var(--ease-bounce);
   pointer-events: none;
 }
@@ -2395,6 +2399,25 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-kid-add svg { width: 22px; height: 22px; }
 .pin-kid-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); transform: none; }
 .pin-kids-hint { grid-column: 1 / -1; font-size: 11px; color: var(--ink-2); text-align: center; padding-top: 2px; }
+.s-inline-link { color: var(--accent); text-decoration: none; }
+.s-inline-link:hover { text-decoration: underline; }
+/* Right-click menu on a group child square (take out / remove). */
+.pin-kid-menu {
+  position: fixed; z-index: 60; min-width: 160px; padding: 5px;
+  background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke);
+  border-radius: var(--r-md); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column; gap: 2px;
+  animation: kidmenu-in 0.12s var(--ease);
+}
+@keyframes kidmenu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.pin-kid-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 7px 9px; border: 0; background: transparent; color: var(--ink);
+  border-radius: var(--r-sm); font: inherit; font-size: 13px; cursor: pointer;
+}
+.pin-kid-menu button svg { width: 16px; height: 16px; }
+.pin-kid-menu button:hover { background: var(--hover); }
+.pin-kid-menu button.danger:hover { background: #e23b3b; color: #fff; }
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
