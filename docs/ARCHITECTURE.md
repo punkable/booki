@@ -1,4 +1,4 @@
-# Booki Dock — Agent Guide
+# Booki Dock — Architecture & developer guide
 
 A modern, lightweight **dock for Windows** (macOS-dock-style launcher), inspired by
 [Docky](https://github.com/josejuanqm/docky) but rebuilt from scratch for Windows.
@@ -79,8 +79,3 @@ npm run tauri:build  # installers (.exe/.msi) — Windows only
   (run in `src-tauri/`; needs a `dist/` — run `npm run build` first so `generate_context!` finds assets).
 - **CI** (`.github/workflows/build-windows.yml`) builds installers on `windows-latest`
   for every push; artifacts under the run's **Artifacts**.
-
-## Roadmap (not yet built)
-
-DWM live window previews, app folders + Launchpad, themes/profiles, multi-monitor &
-AppBar space reservation, widgets, custom icons, global hotkeys, auto-update.
