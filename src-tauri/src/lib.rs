@@ -440,6 +440,12 @@ fn reveal_running_dock(app: &AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// The user's important shell folders for the Settings search ((key, path)).
+#[tauri::command]
+fn known_folders() -> Vec<(String, String)> {
+    win::known_folders()
+}
+
 /// Install/refresh (or remove) the Explorer "Booki" right-click menu. The
 /// frontend sends the already-localized labels (`label_group` is a template
 /// with `{name}`); the group list comes from the current config, so removed
@@ -1479,6 +1485,7 @@ pub fn run() {
             set_dock_frame,
             dock_cover_workarea,
             sync_context_menu,
+            known_folders,
             hide_dock,
             reveal_dock,
             notch_reveal,

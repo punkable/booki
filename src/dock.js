@@ -1022,12 +1022,13 @@ function isRecycleBin(path) {
   );
 }
 
-async function addPaths(paths, forceKind) {
+async function addPaths(paths, forceKind, atIndex = null) {
+  const items = [];
   for (const path of paths) {
     if (isRecycleBin(path)) {
       // Only one trash tile makes sense; if it's already there, skip silently.
       if (!cfg.pinned.some((p) => p.kind === "trash")) {
-        cfg.pinned.push({ id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" });
+        items.push({ id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" });
       }
       continue;
     }
@@ -1037,8 +1038,11 @@ async function addPaths(paths, forceKind) {
         if (await dockApi.isDir(path)) kind = "folder";
       } catch (_) {}
     }
-    cfg.pinned.push({ id: uid(), name: baseName(path), path, args: [], kind });
+    items.push({ id: uid(), name: baseName(path), path, args: [], kind });
   }
+  // Land exactly where the insertion gap showed during the drag (null = end).
+  if (atIndex == null || atIndex >= cfg.pinned.length) cfg.pinned.push(...items);
+  else cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
   await persist();
   await render();
   reframe();
@@ -2523,6 +2527,59 @@ function tileFromPoint(position) {
   const el = document.elementFromPoint(position.x / dpr, position.y / dpr);
   return el ? el.closest(".tile[data-id]") : null;
 }
+// Where would a dropped file land? Aiming at the CENTER of a tile that accepts
+// drops (app = open-with, folder = move, group = pin inside, trash = delete)
+// targets that tile; anywhere else is an INSERTION between tiles — the bar
+// opens a visible gap there so pinning is deliberate and grouping can't happen
+// by accident (the reported "se mete en un grupo sin querer").
+function dropSpot(position) {
+  if (!position) return { target: null, index: null };
+  const dpr = window.devicePixelRatio || 1;
+  const x = position.x / dpr;
+  const y = position.y / dpr;
+  const el = document.elementFromPoint(x, y);
+  const tile = el ? el.closest(".tile[data-id]") : null;
+  if (tile) {
+    const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
+    const k = item && item.kind;
+    if (k === "app" || k === "folder" || k === "group" || k === "trash") {
+      const r = tile.getBoundingClientRect();
+      const inX = x > r.left + r.width * 0.24 && x < r.right - r.width * 0.24;
+      const inY = y > r.top + r.height * 0.24 && y < r.bottom - r.height * 0.24;
+      if (inX && inY) return { target: tile, index: null };
+    }
+  }
+  const vertical = isVertical();
+  const p = vertical ? y : x;
+  const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
+  let idx = tiles.length;
+  for (let i = 0; i < tiles.length; i++) {
+    const r = tiles[i].getBoundingClientRect();
+    const mid = vertical ? r.top + r.height / 2 : r.left + r.width / 2;
+    if (p < mid) { idx = i; break; }
+  }
+  return { target: null, index: idx };
+}
+
+// The visible insertion gap: the tile at the insertion index slides aside.
+let dropGap = null; // { el, cls }
+function setDropGap(index) {
+  const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
+  let el = null, cls = "drop-gap-before";
+  if (index != null && tiles.length) {
+    if (index < tiles.length) { el = tiles[index]; }
+    else { el = tiles[tiles.length - 1]; cls = "drop-gap-after"; }
+  }
+  if (dropGap && (dropGap.el !== el || dropGap.cls !== cls)) {
+    dropGap.el.classList.remove(dropGap.cls);
+    dropGap = null;
+  }
+  if (el && !dropGap) {
+    el.classList.add(cls);
+    dropGap = { el, cls };
+  }
+}
+
 let dropTargetEl = null;
 function setDropTarget(el) {
   // Only highlight tiles that actually accept a dropped file: apps (open with),
@@ -2814,20 +2871,27 @@ function setupFileDrop() {
       setHidden(false);
       dropOverlay.classList.add("active");
     },
-    onOver: (position) => setDropTarget(tileFromPoint(position)),
+    onOver: (position) => {
+      const spot = dropSpot(position);
+      setDropTarget(spot.target);
+      setDropGap(spot.target ? null : spot.index);
+    },
     onLeave: () => {
       draggingFile = false;
       pinnedReveal = false;
       dropOverlay.classList.remove("active");
       setDropTarget(null);
+      setDropGap(null);
       scheduleHide();
     },
     onDrop: async (paths, position) => {
       draggingFile = false;
       pinnedReveal = false;
       dropOverlay.classList.remove("active");
-      const target = tileFromPoint(position);
+      const spot = dropSpot(position);
+      const target = spot.target;
       setDropTarget(null);
+      setDropGap(null);
       if (!paths || !paths.length) return;
       // Dropped onto an app icon → open the files with that app.
       const item = target && cfg.pinned.find((p) => p.id === target.dataset.id);
@@ -2863,8 +2927,8 @@ function setupFileDrop() {
         reframe();
         return;
       }
-      // Otherwise pin them to the dock.
-      await addPaths(paths);
+      // Otherwise pin them exactly where the gap showed.
+      await addPaths(paths, null, spot.index);
     },
   });
 }

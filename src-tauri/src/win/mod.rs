@@ -23,7 +23,7 @@ mod windows_impl;
 #[cfg(windows)]
 pub use windows_impl::{
     app_icon_data_uri, cursor_at_edge, empty_trash, exclude_from_capture, focus_window, foreground_occludes,
-    get_autostart, is_fullscreen, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
+    get_autostart, is_fullscreen, known_folders, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
     media_toggle, move_paths, set_autostart, trash_count, trash_is_empty, trash_paths, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
@@ -33,7 +33,7 @@ mod stub;
 #[cfg(not(windows))]
 pub use stub::{
     app_icon_data_uri, cursor_at_edge, empty_trash, exclude_from_capture, focus_window, foreground_occludes,
-    get_autostart, is_fullscreen, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
+    get_autostart, is_fullscreen, known_folders, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
     media_toggle, move_paths, set_autostart, trash_count, trash_is_empty, trash_paths, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };

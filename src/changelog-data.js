@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.39.0",
+    date: "5 jul 2026",
+    headline: "Busca y ancla en segundos, y el dock te abre un hueco al arrastrar.",
+    sections: [
+      {
+        icon: "\ud83d\udd0d",
+        title: "Buscador en Ajustes",
+        notes: [
+          "En Apps ancladas: escribe y encuentra al instante cualquier app instalada, con su lupa, filtrado en vivo y bot\u00f3n de limpiar.",
+          "Tus carpetas importantes (Escritorio, Documentos, Descargas, Im\u00e1genes, V\u00eddeos, M\u00fasica) aparecen como chips: un clic y quedan ancladas. Tambi\u00e9n responden a la b\u00fasqueda.",
+        ],
+      },
+      {
+        icon: "\ud83e\uddf2",
+        title: "Anclar sin errores",
+        notes: [
+          "Al arrastrar algo desde el Explorador, el dock abre un HUECO donde va a caer \u2014 ves exactamente d\u00f3nde se ancla y ya no se mete en un grupo por accidente.",
+          "Para mandarlo a un grupo, apunta al centro del grupo: se ilumina el grupo y el hueco desaparece. Dos intenciones, dos se\u00f1ales claras.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.38.0",
     date: "5 jul 2026",
     headline: "Adi\u00f3s al parpadeo, el dock ya no salta solo, y eliges su distancia al borde.",
