@@ -3,6 +3,34 @@
 
 export const CHANGELOG = [
   {
+    version: "0.32.0",
+    date: "5 jul 2026",
+    headline: "Sin puntitos raros en la barra, la papelera se ancla bien y una guía al empezar.",
+    sections: [
+      {
+        icon: "✨",
+        title: "Detalles de la barra",
+        notes: [
+          "Se acabaron los «…» (tres puntos) que a veces se quedaban en un widget: ahora los valores se pintan al instante al cargar o reordenar.",
+        ],
+      },
+      {
+        icon: "🗑️",
+        title: "Anclar la Papelera",
+        notes: [
+          "Si arrastras la Papelera de reciclaje del escritorio al dock, ahora aparece el tile de papelera de Booki (con su contador y su «vaciar»), en vez de una carpeta rota.",
+        ],
+      },
+      {
+        icon: "👋",
+        title: "Por dónde empezar",
+        notes: [
+          "Ajustes muestra una breve introducción la primera vez, con un acceso directo para anclar tus apps.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.31.0",
     date: "5 jul 2026",
     headline: "Menos rarezas: sin .png en el escritorio, enlaces sin falsas alarmas y mejores iconos.",
