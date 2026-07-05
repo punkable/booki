@@ -658,14 +658,16 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     };
     let vertical = edge == "left" || edge == "right";
     // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
-    // slightly larger pill with a small margin. The window hugs the pill's HOVER
-    // size (146×18) closely — a small transparent margin only — so its click
-    // hitbox doesn't cover much of what's behind it.
+    // slightly larger pill with a small margin. The window stays tight ALONG the
+    // edge (small click hitbox) but keeps a bit of INWARD headroom on the
+    // perpendicular axis so the pill's soft glow/shadow has room to render
+    // instead of being clipped at the window edge. The pill hugs the outward
+    // edge (CSS align), so the extra depth is transparent space toward the screen.
     let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
-        (true, true) => (22.0, 156.0),
-        (true, false) => (156.0, 22.0),
-        (false, true) => (26.0, 168.0),
-        (false, false) => (168.0, 26.0),
+        (true, true) => (34.0, 156.0),
+        (true, false) => (156.0, 34.0),
+        (false, true) => (40.0, 168.0),
+        (false, false) => (168.0, 40.0),
     };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;

@@ -96,11 +96,11 @@ const SEARCH_INDEX = [
 ];
 
 const TABS = [
+  ["general", "tab.general", "sliders"],
   ["appearance", "tab.appearance", "palette"],
   ["behavior", "tab.behavior", "settings"],
   ["apps", "tab.apps", "grid"],
   ["shortcuts", "tab.shortcuts", "keyboard"],
-  ["general", "tab.general", "sliders"],
   ["faq", "tab.faq", "help"],
   ["about", "tab.about", "info"],
 ];
@@ -877,10 +877,10 @@ function Behavior({ cfg, set }) {
           setAutostart(real);
           set({ autostart: real });
         }} />
-      {cfg.autoHideMode === "edge" && (
-        <Row label={t("be.hideDelay")}>
-          <Slider value={cfg.autoHideDelay} min={0} max={2000} step={50}
-            fmt={(v) => `${v}ms`} onChange={(v) => set({ autoHideDelay: v })} />
+      {cfg.autoHideMode !== "off" && (
+        <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
+          <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
+            fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`} onChange={(v) => set({ autoHideDelay: v })} />
         </Row>
       )}
 
@@ -1187,16 +1187,61 @@ function Apps({ cfg, set }) {
   // drag it out of the group card to take it back onto the dock — no buttons.
   const kidDrag = useRef(null);
   const kidOutRef = useRef(-1);
+  const kidTargetRef = useRef(null); // another group id the child is hovering over → move it there
   const [kidOut, setKidOut] = useState(-1);
+  const [kidMenu, setKidMenu] = useState(null); // right-click menu on a group child: {gi,id,x,y}
+  useEffect(() => {
+    if (!kidMenu) return;
+    const close = () => setKidMenu(null);
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", close); };
+  }, [kidMenu]);
+  // Move a child from one group to another (dissolving the source if it's left
+  // with fewer than 2). Keyed by id so it survives the array shifting.
+  const moveChildToGroupById = (fromGroupId, childId, toGroupId) => {
+    if (fromGroupId === toGroupId) return;
+    const arr = pinnedRef.current;
+    const from = arr.find((p) => p.id === fromGroupId);
+    if (!from) return;
+    const child = (from.children || []).find((c) => c.id === childId);
+    if (!child) return;
+    const srcKids = (from.children || []).filter((c) => c.id !== childId);
+    let next = arr.map((p) => (p.id === toGroupId ? { ...p, children: [...(p.children || []), child] } : p));
+    if (srcKids.length < 2) next = next.flatMap((p) => (p.id === fromGroupId ? srcKids : [p]));
+    else next = next.map((p) => (p.id === fromGroupId ? { ...p, children: srcKids } : p));
+    set({ pinned: next });
+  };
   const startKidDrag = (gi, childId) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     const card = e.currentTarget.closest(".pin-card");
+    const srcGroupId = pinnedRef.current[gi].id;
     const startIndex = (pinnedRef.current[gi].children || []).findIndex((c) => c.id === childId);
-    kidDrag.current = { gi, id: childId, from: startIndex };
+    kidDrag.current = { gi, id: childId, from: startIndex, srcGroupId };
     kidOutRef.current = -1;
+    kidTargetRef.current = null;
     setKidOut(-1);
+    setMergeInto(-1);
     const onMove = (ev) => {
+      // Over ANOTHER group card → releasing moves the child into that group.
+      let overGroup = null;
+      for (const gc of gridRef.current.querySelectorAll(".pin-card.is-group")) {
+        const idx = +gc.dataset.idx;
+        const p = pinnedRef.current[idx];
+        if (!p || p.id === srcGroupId) continue;
+        const r = gc.getBoundingClientRect();
+        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { overGroup = p.id; break; }
+      }
+      if (overGroup) {
+        if (kidTargetRef.current !== overGroup) {
+          kidTargetRef.current = overGroup;
+          setMergeInto(pinnedRef.current.findIndex((p) => p.id === overGroup));
+        }
+        if (kidOutRef.current !== -1) { kidOutRef.current = -1; setKidOut(-1); }
+        return; // aiming at another group → don't reorder/takeout
+      }
+      if (kidTargetRef.current !== null) { kidTargetRef.current = null; setMergeInto(-1); }
       const cr = card.getBoundingClientRect();
       const out =
         ev.clientX < cr.left - 8 || ev.clientX > cr.right + 8 ||
@@ -1223,9 +1268,12 @@ function Apps({ cfg, set }) {
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
-      if (kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
+      if (kidTargetRef.current) moveChildToGroupById(srcGroupId, kidDrag.current.id, kidTargetRef.current);
+      else if (kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
+      kidTargetRef.current = null;
       kidOutRef.current = -1;
       setKidOut(-1);
+      setMergeInto(-1);
       kidDrag.current = null;
     };
     window.addEventListener("pointermove", onMove);
@@ -1392,18 +1440,16 @@ function Apps({ cfg, set }) {
                   <div className={"pin-card-kids" + (kidOut === i ? " taking-out" : "")}>
                     {(item.children || []).map((c) => (
                       <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
-                        onPointerDown={startKidDrag(i, c.id)}>
+                        onPointerDown={startKidDrag(i, c.id)}
+                        onContextMenu={(e) => { e.preventDefault(); setKidMenu({ gi: i, id: c.id, x: e.clientX, y: e.clientY }); }}>
                         <PinThumb item={c} />
                         <span className="pin-kid-name" title={c.path || ""}>{c.name}</span>
-                        <button className="pin-kid-x" title={t("apps.remove")}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => { e.stopPropagation(); removeChild(i, c.id); }}>×</button>
                       </div>
                     ))}
                     <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
                       onClick={() => addToFolder(i)}
                       dangerouslySetInnerHTML={{ __html: icon("plus") }} />
-                    <div className="pin-kids-hint">{t("apps.kidsHint")}</div>
+                    <div className="pin-kids-hint">{t("apps.kidsHint2")}</div>
                   </div>
                 )}
               </div>
@@ -1569,6 +1615,17 @@ function Apps({ cfg, set }) {
           onChange={(value) => setStyle(styleFor, value)}
           onClose={() => setStyleFor(-1)}
         />
+      )}
+      {kidMenu && (
+        <div className="pin-kid-menu" style={{ left: kidMenu.x, top: kidMenu.y }}
+          onPointerDown={(e) => e.stopPropagation()}>
+          <button onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
+            <span dangerouslySetInnerHTML={{ __html: icon("take-out") }} />{t("group.takeOut")}
+          </button>
+          <button className="danger" onClick={() => { removeChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
+            <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.remove")}
+          </button>
+        </div>
       )}
     </>
   );
@@ -1755,8 +1812,12 @@ function Faq({ version }) {
         <button className="s-link" onClick={() => open("https://github.com/punkable/booki/blob/main/LICENSE")}>
           {t("faq.link.license")} ↗
         </button>
+        <button className="s-link" onClick={() => dockApi.launch("mailto:punkable@protonmail.com")}>
+          {t("faq.link.contact")} ↗
+        </button>
       </div>
-      <p className="muted" style={{ marginTop: 12 }}>v{version} · {t("faq.foot")}</p>
+      <p className="muted" style={{ marginTop: 12 }}>{t("faq.contact")} <a className="s-inline-link" href="mailto:punkable@protonmail.com">punkable@protonmail.com</a></p>
+      <p className="muted" style={{ marginTop: 4 }}>v{version} · {t("faq.foot")}</p>
     </>
   );
 }
@@ -1905,6 +1966,9 @@ function About({ version, onWhatsNew, onReset }) {
         <button className="s-link" onClick={() => dockApi.launch("https://x.com/Punkabl3")}>
           <strong>@Punkabl3</strong> · X ↗
         </button>
+        <button className="s-link" onClick={() => dockApi.launch("mailto:punkable@protonmail.com")}>
+          {t("ab.contact")} · punkable@protonmail.com ↗
+        </button>
       </div>
       {partying && <p className="s-egg">🦫 {t("ab.egg")} 🦫</p>}
 
@@ -1929,7 +1993,7 @@ function App() {
   const [cfg, setCfg] = useState(null);
   // Reopen on the last tab the user was looking at.
   const [tab, setTabRaw] = useState(() => {
-    try { return localStorage.getItem("booki.lastTab") || "appearance"; } catch (_) { return "appearance"; }
+    try { return localStorage.getItem("booki.lastTab") || "general"; } catch (_) { return "general"; }
   });
   const setTab = (t) => {
     setTabRaw(t);
