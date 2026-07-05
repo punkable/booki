@@ -314,7 +314,7 @@ function fitDock() {
   invalidateMag(); // tile sizes/positions just changed → re-measure lazily
 }
 
-async function appTile(item) {
+function appTile(item) {
   const el = document.createElement("button");
   el.className = "tile";
   el.dataset.id = item.id;
@@ -332,15 +332,14 @@ async function appTile(item) {
   badge.className = "badge";
   el.appendChild(badge);
 
-  const src = await resolveIcon(item);
   const addGlyph = () => {
-    if (el.querySelector(".glyph")) return;
+    if (el.querySelector(".glyph, img")) return;
     const glyph = document.createElement("span");
     glyph.className = "glyph";
     glyph.textContent = (item.name || "?").trim().charAt(0).toUpperCase();
     el.appendChild(glyph);
   };
-  if (src) {
+  const addImg = (src) => {
     const img = document.createElement("img");
     img.alt = item.name;
     // If the icon fails to decode, drop it, show the initial glyph, and forget
@@ -352,8 +351,19 @@ async function appTile(item) {
     });
     img.src = src;
     el.appendChild(img);
+  };
+  // Show the icon we already have instantly; otherwise a shimmer skeleton while
+  // it extracts (cold app icons take a beat on Windows) — never a blank tile.
+  const now = syncIcon(item);
+  if (now) {
+    addImg(now);
   } else {
-    addGlyph();
+    const skel = document.createElement("span");
+    skel.className = "glyph skel";
+    el.appendChild(skel);
+    resolveIcon(item)
+      .then((src) => { skel.remove(); src ? addImg(src) : addGlyph(); })
+      .catch(() => { skel.remove(); addGlyph(); });
   }
 
   // Remove badge — only visible in edit mode.
@@ -375,7 +385,7 @@ async function appTile(item) {
 
 // A "folder"/group tile — shows up to four child icons in a mini grid (iOS-style)
 // and opens a flyout with its contents on click.
-async function groupTile(item) {
+function groupTile(item) {
   const el = document.createElement("button");
   el.className = "tile group";
   el.dataset.id = item.id;
@@ -384,18 +394,32 @@ async function groupTile(item) {
 
   const grid = document.createElement("span");
   grid.className = "group-grid";
+  const setMiniImg = (mini, src) => {
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = "";
+    mini.appendChild(img);
+  };
+  const setMiniLetter = (mini, child) => {
+    mini.textContent = (child.name || "?").trim().charAt(0).toUpperCase();
+  };
   const kids = (item.children || []).slice(0, 4);
   for (const child of kids) {
     const mini = document.createElement("span");
     mini.className = "group-mini";
-    const src = await resolveIcon(child);
-    if (src) {
-      const img = document.createElement("img");
-      img.src = src;
-      img.alt = "";
-      mini.appendChild(img);
+    if (child.kind === "widget") {
+      // A grouped widget previews as its emoji (it only goes live inside the group).
+      mini.innerHTML = emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
     } else {
-      mini.textContent = (child.name || "?").trim().charAt(0).toUpperCase();
+      const now = syncIcon(child);
+      if (now) {
+        setMiniImg(mini, now);
+      } else {
+        mini.classList.add("skel");
+        resolveIcon(child)
+          .then((src) => { mini.classList.remove("skel"); src ? setMiniImg(mini, src) : setMiniLetter(mini, child); })
+          .catch(() => { mini.classList.remove("skel"); setMiniLetter(mini, child); });
+      }
     }
     grid.appendChild(mini);
   }
@@ -808,6 +832,16 @@ async function addWidget(type) {
 
 // Pinned pictures show their own thumbnail instead of a generic file icon.
 const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|webp|ico)$/i;
+
+// The icon we can show RIGHT NOW without any async work (library glyph, custom
+// override, or a cached extraction). null → it needs async extraction, so the
+// caller shows a skeleton and fills in via resolveIcon().
+function syncIcon(item) {
+  if (isLibIcon(item.icon)) return resolveLibIcon(item.icon);
+  if (item.icon) return item.icon;
+  if (iconCache.has(item.path)) return iconCache.get(item.path);
+  return null;
+}
 
 async function resolveIcon(item) {
   if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
@@ -2850,11 +2884,28 @@ async function toggleStack(tileEl, item) {
     cell.className = "stack-item";
     cell.style.setProperty("--i", cellIdx++); // staggered entry
     cell.title = it.name;
-    const ic = isGroup ? await resolveIcon(it) : await dockApi.appIcon(it.path);
     const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
+    const fallbackGlyph = () => (isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase()));
+    // Show whatever icon we already have instantly; otherwise a shimmer skeleton
+    // and fill it in — resolved in PARALLEL across cells (was a sequential await
+    // per item, so a folder of 20 files opened one slow icon at a time).
+    const now = syncIcon(it);
     cell.innerHTML =
-      (ic ? `<img src="${esc(ic)}" alt="" />` : `<span class="stack-glyph">${isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase())}</span>`) +
+      (now ? `<img src="${esc(now)}" alt="" />` : `<span class="stack-glyph skel"></span>`) +
       `<span class="stack-name">${esc(it.name)}</span>`;
+    if (!now) {
+      resolveIcon(it)
+        .then((src) => {
+          const holder = cell.querySelector(".stack-glyph.skel");
+          if (!holder) return;
+          if (src) holder.outerHTML = `<img src="${esc(src)}" alt="" />`;
+          else { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
+        })
+        .catch(() => {
+          const holder = cell.querySelector(".stack-glyph.skel");
+          if (holder) { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
+        });
+    }
     cell.addEventListener("click", () => {
       if (cell._suppressClick) return; // a drag just happened → don't also launch
       if (it.path) dockApi.launch(it.path, it.args || []);
