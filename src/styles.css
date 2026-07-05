@@ -994,6 +994,16 @@ body.notch-body.style-windows.peek .notch-pill {
 }
 body.notch-body.style-windows .notch-pill::before,
 body.notch-body.style-windows .notch-pill::after { display: none; }
+/* Peek lives in a deliberately tight window (small click hitbox). The per-style
+   drop-shadows above (e.g. liquid's 0 4px 18px) spill past that window and get
+   clipped — reading as the tab being "cut off with a margin". Cap the outer
+   shadow in peek so it always fits, whatever the style. The two selectors beat
+   both the 3-class style rules and the 4-class windows-peek rule by specificity
+   + source order. Insets stay (they're inside the pill, never clipped). */
+body.notch-body.peek .notch-pill,
+body.notch-body.style-windows.peek .notch-pill {
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
 body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
@@ -2120,13 +2130,14 @@ select {
 .donate { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .donate-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 11px;
   padding: 9px 12px;
   border-radius: var(--r-md);
   background: var(--layer);
   border: 1px solid var(--stroke);
 }
+.donate-row .s-btn { flex: 0 0 auto; align-self: center; }
 .donate-ico {
   flex: 0 0 auto;
   display: grid;
@@ -2135,9 +2146,16 @@ select {
   height: 32px;
 }
 .donate-ico svg { display: block; }
-.donate-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.donate-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .donate-col strong { font-size: 13px; }
-.donate-col code { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; }
+/* Full address, selectable for copy/paste (wraps rather than truncating). */
+.donate-addr {
+  font-size: 11.5px; color: var(--ink); line-height: 1.5;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  word-break: break-all; user-select: all; cursor: text;
+  background: var(--layer-strong, var(--hover)); border: 1px solid var(--stroke);
+  border-radius: 7px; padding: 4px 7px;
+}
 
 /* Bundled Fluent emoji images (crisp, aligned with the text baseline). The
    explicit sizes beat the generic `.tile img` icon rules — emojis inside
@@ -2344,11 +2362,39 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-card .pin-missing { font-size: 11px; color: #e0a02a; }
 .pin-card-actions { display: flex; gap: 4px; justify-content: center; opacity: 0; transition: opacity 0.15s ease; }
 .pin-card:hover .pin-card-actions, .pin-card.open .pin-card-actions { opacity: 1; }
-.pin-card-children { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--stroke); }
-.pin-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke); border-radius: var(--r-pill); max-width: 100%; }
-.pin-chip .pin-thumb { width: 22px; height: 22px; font-size: 11px; }
-.pin-chip-name { font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pin-card-children .pin-add-btn { align-self: center; }
+/* A group opened in grid view: its children are draggable SQUARE tiles you can
+   reorder or drag out of the group — no per-item buttons except a hover ×. */
+.pin-card-kids {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px; width: 100%; margin-top: 6px; padding-top: 10px;
+  border-top: 1px dashed var(--stroke);
+  border-radius: 10px; transition: box-shadow 0.15s ease, background 0.15s ease;
+}
+/* When a child is dragged out past the edge, highlight that releasing removes it. */
+.pin-card-kids.taking-out { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.pin-kid {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 6px 8px; background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke);
+  border-radius: 12px; cursor: grab; touch-action: none; min-width: 0;
+  transition: transform 0.12s var(--ease-bounce), background 0.14s ease, box-shadow 0.14s ease;
+}
+.pin-kid:hover { background: var(--hover); transform: translateY(-2px); }
+.pin-kid:active { cursor: grabbing; transform: scale(0.97); }
+.pin-kid .pin-thumb { width: 34px; height: 34px; font-size: 14px; }
+.pin-kid-name { font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-kid-x {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
+  border: 0; background: #e23b3b; color: #fff; font-size: 13px; line-height: 1; cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+}
+.pin-kid:hover .pin-kid-x { display: flex; }
+.pin-kid-add {
+  color: var(--accent); border-style: dashed; cursor: pointer;
+  align-items: center; justify-content: center;
+}
+.pin-kid-add svg { width: 22px; height: 22px; }
+.pin-kid-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); transform: none; }
+.pin-kids-hint { grid-column: 1 / -1; font-size: 11px; color: var(--ink-2); text-align: center; padding-top: 2px; }
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }

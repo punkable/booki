@@ -3,6 +3,42 @@
 
 export const CHANGELOG = [
   {
+    version: "0.35.0",
+    date: "5 jul 2026",
+    headline: "Grupos con arrastrar y soltar, Ajustes más ordenados y direcciones completas.",
+    sections: [
+      {
+        icon: "🟦",
+        title: "Grupos en cuadros, arrastrables",
+        notes: [
+          "En la vista de cuadros, un grupo se abre y sus elementos son cuadros que arrastras: reordénalos, sácalos arrastrándolos fuera del grupo, o añade más — sin tantos botones.",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Ajustes más claros",
+        notes: [
+          "Nueva pestaña «General»: el idioma (ya no vive en Apariencia), las actualizaciones y la copia de seguridad, todo junto.",
+          "El aviso de «Actualización disponible» ahora te lleva directo a General.",
+        ],
+      },
+      {
+        icon: "🔑",
+        title: "Direcciones completas",
+        notes: [
+          "Las direcciones de Bitcoin y Solana se muestran completas: tócalas para seleccionarlas y copiarlas a mano, o usa el botón de copiar.",
+        ],
+      },
+      {
+        icon: "✂️",
+        title: "Menos recortes",
+        notes: [
+          "El notch ya no se ve «cortado»: su sombra se ajusta a su ventana en vez de derramarse y quedar recortada.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.34.0",
     date: "5 jul 2026",
     headline: "Nunca más una pantalla en blanco: skeletons mientras algo carga.",

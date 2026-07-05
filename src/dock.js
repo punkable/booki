@@ -3048,8 +3048,8 @@ async function checkUpdates() {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
     placeUpdatePill();
-    // Straight to About — that's where the install button and progress live.
-    pill.addEventListener("click", () => dockApi.openSettingsTab("about"), { once: true });
+    // Straight to General — that's where the install button and progress live.
+    pill.addEventListener("click", () => dockApi.openSettingsTab("general"), { once: true });
   }
 }
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.
