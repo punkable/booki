@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.34.0",
+    date: "5 jul 2026",
+    headline: "Nunca más una pantalla en blanco: skeletons mientras algo carga.",
+    sections: [
+      {
+        icon: "💀",
+        title: "Skeletons al cargar",
+        notes: [
+          "El dock aparece al instante con placeholders que brillan mientras se extraen los iconos, en vez de quedarse en blanco.",
+          "Al abrir una carpeta, las celdas salen ya con su nombre y un skeleton, y los iconos se cargan en paralelo (antes iban de uno en uno).",
+          "Ajustes muestra un esqueleto de su diseño mientras carga tu configuración.",
+        ],
+      },
+      {
+        icon: "⚡",
+        title: "Se siente más rápido",
+        notes: [
+          "La barra ya no espera a que TODOS los iconos estén listos para dibujarse; se ve enseguida y cada icono entra cuando está.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.33.0",
     date: "5 jul 2026",
     headline: "Agrupa también los widgets, y «grupo» es «grupo» (no «carpeta»).",
