@@ -535,6 +535,15 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   transform: scale(0.1) rotate(10deg);
   transition: transform 0.26s ease-in, opacity 0.26s ease-in;
 }
+/* Insertion gap while a file from Explorer hovers BETWEEN tiles: the tile at
+   the insertion point slides aside so you SEE exactly where the pin will land
+   (and that it will NOT join a group — that needs aiming at a group's center). */
+.tile.drop-gap-before, .tile.drop-gap-after { transition: margin 0.16s var(--ease); }
+body.edge-bottom .tile.drop-gap-before, body.edge-top .tile.drop-gap-before { margin-left: calc(var(--size) * 0.85); }
+body.edge-bottom .tile.drop-gap-after, body.edge-top .tile.drop-gap-after { margin-right: calc(var(--size) * 0.85); }
+body.edge-left .tile.drop-gap-before, body.edge-right .tile.drop-gap-before { margin-top: calc(var(--size) * 0.85); }
+body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { margin-bottom: calc(var(--size) * 0.85); }
+
 /* The slot left behind while dragging: ghosted; nearly gone when unpinning. */
 .tile.dragging { opacity: 0.35; }
 
@@ -2483,11 +2492,45 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .accent-hex { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 64px; text-align: right; }
 
 /* Installed-app suggestions */
-.sugg-search {
-  width: 100%; font: inherit; font-size: 13px; padding: 9px 12px; margin: 6px 0 12px;
-  color: var(--ink); background: var(--layer-strong);
-  border: 1px solid var(--stroke); border-radius: var(--r-sm);
+/* Modern search: magnifier icon inside, clear button, accent focus ring. */
+.sugg-searchwrap { position: relative; margin: 6px 0 12px; }
+.sugg-search-ico {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-2); pointer-events: none; display: inline-flex;
 }
+.sugg-search-ico svg { width: 15px; height: 15px; }
+.sugg-search {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13.5px;
+  padding: 10px 34px 10px 34px;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: var(--r-md);
+  outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sugg-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.sugg-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; border: 0; border-radius: 50%; cursor: pointer;
+  color: var(--ink-2); background: var(--hover); font-size: 14px; line-height: 1;
+}
+.sugg-clear:hover { color: var(--ink); }
+
+/* The user's shell folders (Documents, Pictures, …) as one-click pin chips. */
+.kf-head { font-size: 11.5px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 6px; }
+.kf-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.kf-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  font: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink);
+  background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-pill);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s var(--ease-bounce);
+}
+.kf-chip:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--layer-strong)); transform: translateY(-1px); }
+.kf-chip.pinned { opacity: 0.45; cursor: default; }
+.kf-ico { display: inline-flex; color: var(--accent); }
+.kf-ico svg { width: 14px; height: 14px; }
+.kf-plus { font-weight: 800; color: var(--accent); }
 .sugg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 /* Plain dropdown (used by the language picker — too many options for a segmented). */
 .s-select {

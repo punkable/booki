@@ -204,6 +204,15 @@ async function mockInvoke(cmd, args) {
       return [window.screen.availWidth, window.screen.availHeight];
     case "sync_context_menu":
       return null;
+    case "known_folders":
+      return [
+        ["desktop", "C:/Users/demo/Desktop"],
+        ["documents", "C:/Users/demo/Documents"],
+        ["downloads", "C:/Users/demo/Downloads"],
+        ["pictures", "C:/Users/demo/Pictures"],
+        ["videos", "C:/Users/demo/Videos"],
+        ["music", "C:/Users/demo/Music"],
+      ];
     case "export_config":
     case "import_config":
       console.info("[demo]", cmd, args);
@@ -322,6 +331,7 @@ export const dock = {
   setDockFrame: (edge, width, height, hidden = false) =>
     invoke("set_dock_frame", { edge, width, height, hidden }),
   dockCoverWorkarea: () => invoke("dock_cover_workarea"),
+  knownFolders: () => invoke("known_folders"),
   syncContextMenu: (enabled, labelPin, labelGroup) =>
     invoke("sync_context_menu", { enabled, labelPin, labelGroup }),
   hideDock: (edge) => invoke("hide_dock", { edge }),

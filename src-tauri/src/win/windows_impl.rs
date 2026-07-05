@@ -480,6 +480,39 @@ pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
     }
 }
 
+/// The user's important shell folders (Desktop, Documents, Downloads, Pictures,
+/// Videos, Music) resolved through the shell — correct even when redirected
+/// (OneDrive, custom locations). Returned as (key, absolute path); the frontend
+/// localizes the display name from the key.
+pub fn known_folders() -> Vec<(String, String)> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{
+        SHGetKnownFolderPath, FOLDERID_Desktop, FOLDERID_Documents, FOLDERID_Downloads,
+        FOLDERID_Music, FOLDERID_Pictures, FOLDERID_Videos, KF_FLAG_DEFAULT,
+    };
+    let ids = [
+        ("desktop", &FOLDERID_Desktop),
+        ("documents", &FOLDERID_Documents),
+        ("downloads", &FOLDERID_Downloads),
+        ("pictures", &FOLDERID_Pictures),
+        ("videos", &FOLDERID_Videos),
+        ("music", &FOLDERID_Music),
+    ];
+    let mut out = Vec::new();
+    for (key, id) in ids {
+        unsafe {
+            if let Ok(pw) = SHGetKnownFolderPath(id, KF_FLAG_DEFAULT, None) {
+                let s = pw.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(pw.0 as _));
+                if !s.is_empty() {
+                    out.push((key.to_string(), s));
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Atomically resize + move a window in one SetWindowPos call (no intermediate
 /// resized-but-not-yet-moved frame — that intermediate paint was the dock's
 /// "blink" whenever a flyout or menu grew/shrank the window).
