@@ -33,8 +33,9 @@
 | | |
 |---|---|
 | 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures (own thumbnail) and websites (favicon). Click to launch — or optionally **focus the open window** instead. Right-click a pin for your **recent files**. Icons **bounce** as they open. |
-| 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drag onto a folder to move a file in, drop on the bin to delete. Group pins into folders, reorder right on the bar. |
-| 🎛️ **Live widgets** | Clock, CPU, RAM, disk, network, uptime, battery, notes, **system volume** (scroll = change, click = mute) and a **now-playing card** with album art + transport controls. |
+| 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete. **Group** apps *and* widgets by dragging one onto another, reorder right on the bar, and drag the empty bar to another edge with a live **anchor-point preview**. |
+| 🎛️ **Live widgets** | Clock, CPU, RAM, disk, network, uptime, battery, notes, **system volume** (scroll = change, click = mute) and a **now-playing card** with album art + transport controls. Tuck PC-usage widgets into a **group** — they go live only when you open it. |
+| 🗂️ **Apps manager** | A **list *or* grid** view in Settings: open a group to its draggable **squares**, drag to reorder, onto another group, or out to the dock — plus a **General** tab for language, updates and backup. |
 | 🗑️ **Recycle Bin** | A bin tile that **shows how many items it holds** and empties (with a confirmation) from its right-click menu. |
 | 🫥 **Smart hide + notch** | Tucks away with a genie animation into a slim glass *notch*; push the cursor to the edge (or click it) to bring it back. Fullscreen games/movies black it out. |
 | 🧲 **One control for position** | A single mini-screen sets the dock's edge and the notch's spot at once — the notch always travels with the dock, in a horizontal or slim vertical bar. |
@@ -124,8 +125,11 @@ are welcome — totally optional, thank you 🙏
 
 | | Network | Address |
 |---|---------|---------|
-| <img src="https://img.shields.io/badge/₿-Bitcoin-f7931a?style=flat-square" alt="Bitcoin" /> | **Bitcoin** | `bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3` |
-| <img src="https://img.shields.io/badge/◎-Solana-9945ff?style=flat-square" alt="Solana" /> | **Solana** | `JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W` |
+| <img src="https://img.shields.io/badge/Bitcoin-121212?style=for-the-badge&logo=bitcoin&logoColor=F7931A" alt="Bitcoin" /> | **Bitcoin** | `bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3` |
+| <img src="https://img.shields.io/badge/Solana-121212?style=for-the-badge&logo=solana&logoColor=14F195" alt="Solana" /> | **Solana** | `JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W` |
+
+Questions, ideas or bug reports? Email **[punkable@protonmail.com](mailto:punkable@protonmail.com)**
+or open an issue — see [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## 🛠️ Tech stack
 
