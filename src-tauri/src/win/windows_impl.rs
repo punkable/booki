@@ -480,6 +480,19 @@ pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
     }
 }
 
+/// Atomically resize + move a window in one SetWindowPos call (no intermediate
+/// resized-but-not-yet-moved frame — that intermediate paint was the dock's
+/// "blink" whenever a flyout or menu grew/shrank the window).
+pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER,
+    };
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let _ = SetWindowPos(handle, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
 /// Install/refresh (or remove) the Explorer right-click "Booki" cascading menu
 /// for files (*) and folders (Directory). Per-user (HKCU\Software\Classes), so
 /// no admin is needed. `groups` = (id, label) → one "add to group" entry each;

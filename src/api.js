@@ -51,6 +51,7 @@ const DEMO_CONFIG = {
   notchTrigger: "click",
   compact: false,
   lastProfile: "",
+  edgeGap: 48,
   focusIfRunning: false,
 };
 let demoConfig = structuredClone(DEMO_CONFIG);

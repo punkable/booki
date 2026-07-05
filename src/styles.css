@@ -162,6 +162,17 @@ body.dock-body {
      tiles (must match SHADOW_PAD in dock.js so the window is sized to fit). */
   padding: 36px;
 }
+/* The anchored side's pad follows the user's "edge gap" setting so the bar can
+   sit closer to the taskbar/edge; the other sides keep full magnify headroom. */
+body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 36px); }
+body.dock-body.edge-top { padding-top: var(--edge-pad, 36px); }
+body.dock-body.edge-left { padding-left: var(--edge-pad, 36px); }
+body.dock-body.edge-right { padding-right: var(--edge-pad, 36px); }
+/* A tight gap has no room for the outward shadow — keep it subtle instead of
+   letting it clip against the window edge. */
+body.tight-edge .dock {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
 body.edge-left { align-items: center; justify-content: flex-start; }

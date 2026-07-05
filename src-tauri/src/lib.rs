@@ -90,10 +90,24 @@ fn set_dock_frame(
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
     let h = height.max(8);
+    let (x, y) = dock_xy(&window, &edge, w as i32, h as i32)?;
+    // Resize + reposition in ONE SetWindowPos: the old set_size-then-set_position
+    // pair painted an intermediate frame (resized but not yet moved), which read
+    // as a blink every time a menu/group flyout grew or shrank the window.
+    #[cfg(windows)]
+    {
+        if let Ok(hwnd) = window.hwnd() {
+            win::move_window(hwnd.0 as isize, x, y, w as i32, h as i32);
+            let _ = hidden;
+            return Ok(());
+        }
+    }
     window
         .set_size(PhysicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
-    position_dock(&window, &edge)?;
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
     let _ = hidden;
     Ok(())
 }
@@ -1256,11 +1270,12 @@ fn pick_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
 }
 
 /// Anchor a window to a screen edge of the chosen monitor.
-fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
+/// Where a dock window of `ww`×`wh` px should sit for `edge` — shared by
+/// position_dock (reposition only) and set_dock_frame (atomic resize+move).
+fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32, i32), String> {
     let monitor = pick_monitor(window).ok_or_else(|| "no monitor found".to_string())?;
     let mpos = monitor.position();
     let msize = monitor.size();
-    let wsize = window.outer_size().map_err(|e| e.to_string())?;
 
     // Use the monitor's WORK AREA (excludes the taskbar) so the dock never
     // sits on top of the taskbar, wherever it is. Falls back to the full
@@ -1271,24 +1286,31 @@ fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    let margin: i32 = 12;
-    let ww = wsize.width as i32;
-    let wh = wsize.height as i32;
+    let cfg = config::load();
+    // The bar's distance to the screen edge is user-tunable (edge_gap = the
+    // VISUAL gap in CSS px). The window itself carries up to 36px of transparent
+    // padding on the anchored side (shrunk in CSS when the gap is small), so the
+    // window margin only covers whatever the padding can't.
+    let dpr = window.scale_factor().unwrap_or(1.0);
+    let margin: i32 = ((cfg.edge_gap.min(96).saturating_sub(36) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
     // if the notch sits at the top-left, the dock reveals at the left too (not
     // stuck in the center). Only meaningful when the dock is narrower than the
     // span; a full-width dock simply clamps to filling it.
-    let cfg = config::load();
     let slot = cfg.notch_position.as_str();
-    let (x, y) = match edge {
+    Ok(match edge {
         "top" => (along_offset(ax, aw, ww, slot), ay + margin),
         "left" => (ax + margin, along_offset(ay, ah, wh, slot)),
         "right" => (ax + aw - ww - margin, along_offset(ay, ah, wh, slot)),
         // default: bottom
         _ => (along_offset(ax, aw, ww, slot), ay + ah - wh - margin),
-    };
+    })
+}
 
+fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
+    let wsize = window.outer_size().map_err(|e| e.to_string())?;
+    let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
