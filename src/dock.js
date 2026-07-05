@@ -39,6 +39,13 @@ const dropOverlay = document.getElementById("drop-overlay");
 // which would throw "closest is not a function".
 const closestSel = (target, sel) => (target && target.closest ? target.closest(sel) : null);
 
+// Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,
+// which the browser lets you drag out as an image — dropping one on the desktop
+// made Windows save a stray .png. All our dragging is pointer-event based, and
+// incoming file drops from Explorer use Tauri's own channel (not webview
+// dragstart), so suppressing this is purely the fix with no downside.
+window.addEventListener("dragstart", (e) => e.preventDefault());
+
 // Escape user-controlled text (file/app names) before it goes into innerHTML —
 // a file literally named "<img onerror=…>.txt" must render as text, not run.
 const esc = (s) =>
@@ -1653,6 +1660,89 @@ async function takeOutChild(group, childId) {
   }
 }
 
+// Remove a child from a group entirely (unpin), dissolving the folder if it's
+// left with fewer than 2 items — matches the dock's own pull-out-to-remove.
+async function removeChildFromGroup(group, childId) {
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  const grp = cfg.pinned[gi];
+  const kids = (grp.children || []).filter((c) => c.id !== childId);
+  let reopenId = grp.id;
+  if (kids.length < 2) {
+    cfg.pinned.splice(gi, 1, ...kids); // dissolve: leftover (if any) returns to the dock
+    reopenId = null;
+  } else {
+    grp.children = kids;
+  }
+  await persist();
+  closeStack();
+  await render();
+  reframe();
+  if (reopenId) {
+    const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
+    const it = cfg.pinned.find((p) => p.id === reopenId);
+    if (tileEl && it) toggleStack(tileEl, it);
+  }
+}
+
+// Let a flyout child be dragged out of the panel to unpin it. Pointer-based (no
+// native drag → no stray files); a floating clone follows the cursor and a poof
+// confirms removal. A plain click still launches (the drag suppresses it).
+function wireStackDragOut(cell, group, child) {
+  let st = null;
+  cell.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || closestSel(e.target, ".stack-rm")) return;
+    st = { x: e.clientX, y: e.clientY, moved: false, pointerId: e.pointerId };
+  });
+  cell.addEventListener("pointermove", (e) => {
+    if (!st) return;
+    if (!st.moved && Math.hypot(e.clientX - st.x, e.clientY - st.y) < 8) return;
+    if (!st.moved) {
+      st.moved = true;
+      try { cell.setPointerCapture(st.pointerId); } catch (_) {}
+      const r = cell.getBoundingClientRect();
+      st.clone = cell.cloneNode(true);
+      st.clone.className = "stack-item stack-drag-clone";
+      st.clone.style.width = `${r.width}px`;
+      st.clone.style.height = `${r.height}px`;
+      st.gx = e.clientX - r.left;
+      st.gy = e.clientY - r.top;
+      document.body.appendChild(st.clone);
+      cell.classList.add("dragging");
+    }
+    st.clone.style.left = `${e.clientX - st.gx}px`;
+    st.clone.style.top = `${e.clientY - st.gy}px`;
+    // Dragged clear of the flyout panel → releasing here removes it.
+    const sr = stackEl.getBoundingClientRect();
+    const out =
+      e.clientX < sr.left - 8 || e.clientX > sr.right + 8 ||
+      e.clientY < sr.top - 8 || e.clientY > sr.bottom + 8;
+    if (out !== st.out) { st.out = out; st.clone.classList.toggle("will-unpin", out); }
+  });
+  const finish = async () => {
+    if (!st) return;
+    const s = st;
+    st = null;
+    try { cell.releasePointerCapture(s.pointerId); } catch (_) {}
+    cell.classList.remove("dragging");
+    if (!s.moved) return; // a click, not a drag → the click handler launches
+    cell._suppressClick = true;
+    setTimeout(() => { cell._suppressClick = false; }, 0);
+    if (s.out) {
+      if (s.clone) {
+        const c = s.clone;
+        c.classList.add("poof");
+        setTimeout(() => c.remove(), 280);
+      }
+      await removeChildFromGroup(group, child.id);
+    } else if (s.clone) {
+      s.clone.remove();
+    }
+  };
+  cell.addEventListener("pointerup", finish);
+  cell.addEventListener("pointercancel", finish);
+}
+
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
   if (editMode && !closestSel(e.target, ".tile")) exitEdit();
@@ -2710,11 +2800,14 @@ async function toggleStack(tileEl, item) {
       (ic ? `<img src="${esc(ic)}" alt="" />` : `<span class="stack-glyph">${isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase())}</span>`) +
       `<span class="stack-name">${esc(it.name)}</span>`;
     cell.addEventListener("click", () => {
+      if (cell._suppressClick) return; // a drag just happened → don't also launch
       if (it.path) dockApi.launch(it.path, it.args || []);
       closeStack();
     });
     if (isGroup) {
-      // Pull this item out of the folder (back to the dock).
+      // Drag a child OUT of the flyout to unpin it (parity with the dock's
+      // pull-out-to-remove gesture); the × instead pops it back onto the dock.
+      wireStackDragOut(cell, item, it);
       const out = document.createElement("span");
       out.className = "stack-rm";
       out.textContent = "×";

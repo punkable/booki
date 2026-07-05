@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.31.0",
+    date: "5 jul 2026",
+    headline: "Menos rarezas: sin .png en el escritorio, enlaces sin falsas alarmas y mejores iconos.",
+    sections: [
+      {
+        icon: "🗑️",
+        title: "Sacar cosas de una carpeta",
+        notes: [
+          "Ya no se guarda un .png en el escritorio al arrastrar algo fuera de una carpeta.",
+          "Ahora puedes arrastrar un elemento fuera del grupo para desanclarlo (con su animación), igual que desde el dock. La × sigue devolviéndolo al dock.",
+        ],
+      },
+      {
+        icon: "🔗",
+        title: "Enlaces web",
+        notes: [
+          "Los enlaces anclados (YouTube y demás) ya no aparecen como «no encontrado»: son páginas, no archivos.",
+          "Iconos más nítidos y específicos para algunos sitios (por ejemplo, el sobre de Gmail en vez del icono genérico de Google).",
+        ],
+      },
+      {
+        icon: "🖼️",
+        title: "Iconos de programas",
+        notes: [
+          "Mejor extracción del icono de algunos programas (como Discord): si el acceso directo apunta a un lanzador sin icono, se usa el del propio acceso directo en vez de dejar el hueco.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.30.0",
     date: "4 jul 2026",
     headline: "Mueve el dock viéndolo, y organiza tus apps a tu manera.",
