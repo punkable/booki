@@ -268,6 +268,11 @@ async function render() {
   }
 
   fitDock();
+  // Repaint widget values right away so a freshly built card never lingers on
+  // its "…" placeholder (e.g. after adding a widget or any structural re-render).
+  // startPolls() does an immediate first paint and is idempotent (it resets its
+  // own timer); it self-guards while the dock is tucked away.
+  if (!hiddenState) startPolls();
 }
 
 // Smallest a shrunk icon may get before we stop shrinking and start scrolling —
@@ -911,8 +916,29 @@ async function onAddFolder() {
   await addPaths([path], "folder");
 }
 
+// The desktop Recycle Bin is a shell namespace item, not a normal folder — its
+// path (or a shortcut to it) carries one of these signatures. Pinning it should
+// give the Booki trash tile, not a broken folder pin.
+function isRecycleBin(path) {
+  const p = String(path).toLowerCase();
+  return (
+    p.includes("645ff040-5081-101b-9f08-00aa002f954e") || // Recycle Bin CLSID
+    p.includes("recyclebinfolder") ||
+    p.includes("$recycle.bin") ||
+    /(^|[\\/])recycle bin\.lnk$/.test(p) ||
+    /(^|[\\/])papelera( de reciclaje)?\.lnk$/.test(p)
+  );
+}
+
 async function addPaths(paths, forceKind) {
   for (const path of paths) {
+    if (isRecycleBin(path)) {
+      // Only one trash tile makes sense; if it's already there, skip silently.
+      if (!cfg.pinned.some((p) => p.kind === "trash")) {
+        cfg.pinned.push({ id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" });
+      }
+      continue;
+    }
     let kind = forceKind || "app";
     if (!forceKind) {
       try {
