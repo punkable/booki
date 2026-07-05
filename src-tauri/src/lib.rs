@@ -335,18 +335,32 @@ fn system_stats() -> SystemStats {
 #[tauri::command]
 fn fetch_favicon(url: String) -> Option<String> {
     use base64::Engine;
-    let host = url
+    let mut host = url
         .trim()
         .trim_start_matches("https://")
         .trim_start_matches("http://")
         .split('/')
         .next()
         .unwrap_or("")
-        .to_string();
+        .trim_start_matches("www.")
+        .to_ascii_lowercase();
     if host.is_empty() {
         return None;
     }
-    let api = format!("https://www.google.com/s2/favicons?sz=64&domain={host}");
+    // Some brands live on a subdomain but are pinned by their short name; map those
+    // to the host whose favicon is actually the product's (e.g. Gmail's envelope,
+    // not the generic Google "G").
+    host = match host.as_str() {
+        "gmail.com" | "google.com/gmail" => "mail.google.com".to_string(),
+        "maps.google.com" | "google.com/maps" => "maps.google.com".to_string(),
+        "meet.google.com" => "meet.google.com".to_string(),
+        "drive.google.com" => "drive.google.com".to_string(),
+        "youtu.be" => "youtube.com".to_string(),
+        "x.com" => "x.com".to_string(),
+        _ => host,
+    };
+    // sz=128 → a crisp icon on high-DPI tiles (downscaled cleanly when small).
+    let api = format!("https://www.google.com/s2/favicons?sz=128&domain={host}");
     let resp = ureq::get(&api)
         .timeout(std::time::Duration::from_secs(6))
         .call()
@@ -597,7 +611,14 @@ fn volume_mute() -> Result<bool, String> {
 fn paths_exist(paths: Vec<String>) -> Vec<bool> {
     paths
         .iter()
-        .map(|p| !p.is_empty() && std::path::Path::new(p).exists())
+        .map(|p| {
+            let p = p.trim();
+            // Web links (pinned URLs) aren't files — never flag them "not found".
+            if p.starts_with("http://") || p.starts_with("https://") {
+                return true;
+            }
+            !p.is_empty() && std::path::Path::new(p).exists()
+        })
         .collect()
 }
 
