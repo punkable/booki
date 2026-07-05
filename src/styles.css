@@ -541,6 +541,28 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .stack-item.dragging { opacity: 0.3; }
 .tile.dragging.unpin-slot { opacity: 0.12; }
 
+/* Skeleton shimmer shown in an icon slot while the real icon extracts (cold
+   app icons take a beat on Windows) — so a tile/cell is never blank, the user
+   sees it's loading. Applies to dock tiles, group minis and flyout cells. */
+.skel {
+  color: transparent !important;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--ink) 8%, transparent) 30%,
+    color-mix(in srgb, var(--ink) 20%, transparent) 50%,
+    color-mix(in srgb, var(--ink) 8%, transparent) 70%
+  );
+  background-size: 220% 100%;
+  animation: skel-shimmer 1.15s ease-in-out infinite;
+  border-radius: 8px;
+}
+.group-mini.skel { border-radius: 5px; }
+@keyframes skel-shimmer {
+  from { background-position: 220% 0; }
+  to { background-position: -220% 0; }
+}
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
 /* ───────────────────────── Trash pin ───────────────────────── */
 /* A Recycle Bin tile: drop files on it → Booki asks → sends to the bin. */
 .tile.trash .trash-glyph {
@@ -1616,6 +1638,27 @@ body.settings-body {
 }
 #root { height: 100%; }
 .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); }
+
+/* Settings loading skeleton — mirrors the shell so it reads as "loading". */
+.sk {
+  display: block; border-radius: 8px;
+  background-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--ink) 7%, transparent) 30%,
+    color-mix(in srgb, var(--ink) 16%, transparent) 50%,
+    color-mix(in srgb, var(--ink) 7%, transparent) 70%
+  );
+  background-size: 220% 100%;
+  animation: skel-shimmer 1.15s ease-in-out infinite;
+}
+.sk-logo { width: 30px; height: 30px; border-radius: 9px; }
+.sk-word { width: 78px; height: 18px; margin-left: 10px; }
+.sk-search { height: 34px; margin: 14px 0; border-radius: 10px; }
+.sk-nav { height: 34px; margin: 6px 0; border-radius: 10px; }
+.sk-title { width: 46%; height: 26px; margin: 4px 0 10px; }
+.sk-sub { width: 66%; height: 14px; margin-bottom: 18px; }
+.sk-card { height: 74px; margin-bottom: 12px; border-radius: 14px; }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
 
 .s-shell {
   display: grid;
