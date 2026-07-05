@@ -526,6 +526,19 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 }
 /* The slot left behind while dragging: ghosted; nearly gone when unpinning. */
 .tile.dragging { opacity: 0.35; }
+
+/* A flyout child being dragged out of its folder (pointer-based). */
+.stack-drag-clone {
+  position: fixed; z-index: 95; margin: 0; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0.94; transform: scale(1.06);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+  transition: transform 0.14s var(--ease), opacity 0.14s ease;
+}
+.stack-drag-clone .stack-rm, .stack-drag-clone .stack-name { display: none; }
+.stack-drag-clone.will-unpin { opacity: 0.55; transform: scale(0.82) rotate(-4deg); }
+.stack-drag-clone.poof { opacity: 0; transform: scale(0.1) rotate(10deg); transition: transform 0.26s ease-in, opacity 0.26s ease-in; }
+.stack-item.dragging { opacity: 0.3; }
 .tile.dragging.unpin-slot { opacity: 0.12; }
 
 /* ───────────────────────── Trash pin ───────────────────────── */

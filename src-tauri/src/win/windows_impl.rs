@@ -59,23 +59,13 @@ unsafe fn resolve_shortcut_target(path: &str) -> Option<String> {
     Some(String::from_utf16_lossy(&buf[..end]))
 }
 
-unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
-    // For .lnk shortcuts, read the TARGET's icon so the shell's shortcut-arrow
-    // overlay badge doesn't appear on the dock tile.
-    let mut target = path.to_string();
-    if path.to_ascii_lowercase().ends_with(".lnk") {
-        if let Some(t) = resolve_shortcut_target(path) {
-            if !t.is_empty() {
-                target = t;
-            }
-        }
-    }
-    let wtarget = wide(&target);
+/// Read the shell icon of a single file/exe/folder as PNG. No USEFILEATTRIBUTES,
+/// so custom executable icons come through.
+unsafe fn icon_png_from(path: &str) -> Option<Vec<u8>> {
+    let w = wide(path);
     let mut info = SHFILEINFOW::default();
-    // Read the real icon of the file/exe/shortcut/folder on disk (no
-    // USEFILEATTRIBUTES) so custom executable icons come through.
     let res = SHGetFileInfoW(
-        PCWSTR(wtarget.as_ptr()),
+        PCWSTR(w.as_ptr()),
         FILE_FLAGS_AND_ATTRIBUTES(0),
         Some(&mut info),
         std::mem::size_of::<SHFILEINFOW>() as u32,
@@ -87,6 +77,26 @@ unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
     let out = hicon_to_png(info.hIcon);
     let _ = DestroyIcon(info.hIcon);
     out
+}
+
+unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
+    // For .lnk shortcuts, prefer the TARGET's icon so the shell's shortcut-arrow
+    // overlay badge doesn't appear on the dock tile. But some installers (Discord
+    // and other Squirrel apps) point the shortcut at an icon-less Update.exe stub,
+    // so if the target has no usable icon, fall back to the shortcut itself —
+    // which carries the app's real IconLocation — and finally the original path.
+    // A correct icon with an overlay beats a blank tile.
+    let is_lnk = path.to_ascii_lowercase().ends_with(".lnk");
+    if is_lnk {
+        if let Some(t) = resolve_shortcut_target(path) {
+            if !t.is_empty() {
+                if let Some(png) = icon_png_from(&t) {
+                    return Some(png);
+                }
+            }
+        }
+    }
+    icon_png_from(path)
 }
 
 unsafe fn hicon_to_png(hicon: HICON) -> Option<Vec<u8>> {

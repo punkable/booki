@@ -1868,9 +1868,15 @@ function App() {
       dockApi.takePendingTab().then((tb) => tb && setTab(tb)).catch(() => {});
     showTab();
     onShowTab(showTab).then((u) => (un2 = u));
+    // Suppress native HTML5 image drag: the pinned-app icons are <img>, and
+    // dragging one out of the window let the OS save a stray .png. Our reorder
+    // dragging is pointer-event based, so this has no downside.
+    const noDrag = (e) => e.preventDefault();
+    window.addEventListener("dragstart", noDrag);
     return () => {
       un && un();
       un2 && un2();
+      window.removeEventListener("dragstart", noDrag);
     };
   }, []);
 
