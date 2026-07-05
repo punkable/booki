@@ -3,6 +3,45 @@
 
 export const CHANGELOG = [
   {
+    version: "0.36.0",
+    date: "5 jul 2026",
+    headline: "Menos parpadeo, dock más fluido, y grupos mucho más cómodos.",
+    sections: [
+      {
+        icon: "✨",
+        title: "Adiós al parpadeo",
+        notes: [
+          "Corregido el parpadeo del dock: ya no se reprocesaba a sí mismo al reordenar, quitar o agrupar (se ignoraba su propio eco de configuración).",
+          "El dock ya no se agranda/achica constantemente: absorbe los pequeños cambios de ancho de los widgets en su colchón en vez de redimensionar la ventana.",
+        ],
+      },
+      {
+        icon: "🧩",
+        title: "Grupos más cómodos",
+        notes: [
+          "En cuadros: arrastra un elemento de un grupo a otro para moverlo, fuera para sacarlo, o clic derecho para «sacar» o «eliminar» (se quitó la ×).",
+          "Agrupar en el dock es más fácil y rápido: diana más grande y menos espera.",
+        ],
+      },
+      {
+        icon: "🖱️",
+        title: "Comportamiento",
+        notes: [
+          "Con el modo «clic», el dock ya no aparece solo al pasar el cursor.",
+          "Puedes ajustar el tiempo que tarda en ocultarse tras dejar de usarlo (también en modo inteligente).",
+        ],
+      },
+      {
+        icon: "🎯",
+        title: "Notch y Ajustes",
+        notes: [
+          "El glow del notch ya no se recorta (su ventana tiene margen y la sombra está acotada).",
+          "El recuadro del menú lateral vuelve a estar bien alineado; «General» es la primera pestaña; hay un correo de contacto.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.35.0",
     date: "5 jul 2026",
     headline: "Grupos con arrastrar y soltar, Ajustes más ordenados y direcciones completas.",

@@ -14,7 +14,7 @@ import {
   onFullscreen,
   onLaunchIndex,
   onHotEdge,
-  emitConfigChanged,
+  emitConfigChanged as emitConfigChangedRaw,
   logMessage,
   isTauri,
 } from "./api.js";
@@ -52,6 +52,15 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let cfg = null;
+// Tauri's event.emit echoes back to the sender. When the DOCK changes config it
+// already has the new state, so it must ignore its own echoed config-changed
+// event (otherwise: redundant reloadConfig → re-render → reframe = flicker). We
+// mark a short window after any self-emit during which echoes are ignored.
+let selfChangeUntil = 0;
+function emitConfigChanged() {
+  selfChangeUntil = Date.now() + 400;
+  return emitConfigChangedRaw();
+}
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
 const isVertical = () => cfg.edge === "left" || cfg.edge === "right";
@@ -69,7 +78,12 @@ async function boot() {
     setupAutoHide();
     setupFileDrop();
     startPolls(); // starts the widget + running-app/trash polls together
-    onConfigChanged(reloadConfig);
+    // Only react to config changes made by OTHER windows (Settings). Tauri's
+    // emit echoes back to the sender, so without this guard every dock reorder /
+    // removal / grouping would trigger a redundant reloadConfig → re-render →
+    // reframe (visible flicker + the window grow/shrink churn). selfChangeUntil
+    // is bumped whenever the dock itself emits.
+    onConfigChanged(() => { if (Date.now() < selfChangeUntil) return; reloadConfig(); });
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
     // Position hotkeys (modifier+1…9): launch the Nth item on the bar.
@@ -1513,9 +1527,9 @@ function processMove(e) {
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
-        // Smaller bullseye → merging into a folder takes a deliberate aim at the
-        // very centre; anywhere else just reorders, so you don't group by mistake.
-        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.24) {
+        // Aim near the centre to group; anywhere else reorders. A roomy bullseye
+        // makes grouping easy without grouping by accident on a quick pass-over.
+        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
           centerTarget = s;
         }
         break;
@@ -1531,7 +1545,7 @@ function processMove(e) {
     }
     // Hold on the centre a moment longer before arming the merge — a quick pass
     // over a tile while reordering should never fold things into a folder.
-    if (Date.now() - mergeArm > 480) centerTarget.classList.add("merge-target");
+    if (Date.now() - mergeArm > 260) centerTarget.classList.add("merge-target");
     return; // aiming at the bullseye → hold for a merge, don't reorder
   }
 
@@ -2173,12 +2187,17 @@ function computeFrame() {
 let lastFrameEdge = null;
 function applyFrame() {
   const full = computeFrame();
-  // Skip the native resize+reposition when nothing actually changed (±1px) —
-  // otherwise every settings tweak (zoom, labels…) made the whole dock jump.
+  // Skip the native resize when the change is small: the transparent SHADOW_PAD
+  // (36px each side) absorbs minor bar-size jitter, so live widgets whose text
+  // width wiggles (net rates, media title, rolling numbers) don't make the whole
+  // window grow/shrink every second — that constant resize was a real flicker.
+  // Only resize once a change is big enough to threaten the shadow's headroom.
   const key = `${cfg.edge}:${cfg.monitor ?? -1}`;
+  const dpr = window.devicePixelRatio || 1;
+  const slack = Math.round(10 * dpr); // px; well under the 36px pad, keeps shadow safe
   if (
     lastFull && lastFrameEdge === key &&
-    Math.abs(full.w - lastFull.w) <= 1 && Math.abs(full.h - lastFull.h) <= 1
+    Math.abs(full.w - lastFull.w) <= slack && Math.abs(full.h - lastFull.h) <= slack
   ) {
     return;
   }
@@ -2314,6 +2333,9 @@ function setupAutoHide() {
 function reveal() {
   if (fullscreen) return; // stay out of the way during fullscreen
   if (manualHide) return; // user swiped the dock away — only the notch brings it back
+  // "Click" trigger means the dock comes back ONLY from a notch click (and the
+  // automatic smart-hide reveal), never just because the cursor passed over it.
+  if ((cfg.notchTrigger || "click") === "click") return;
   const mode = hideMode();
   if (mode === "off") return;
   // In smart mode, while you're working in another app, DON'T reveal on hover —
