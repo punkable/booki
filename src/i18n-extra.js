@@ -132,6 +132,8 @@ export const EXTRA = {
     "hide.offShort": "Nunca",
     "hide.smartShort": "Inteligente",
     "hide.edgeShort": "Borda",
+    "be.edgeGap": "Dist\u00e2ncia da borda",
+    "be.edgeGapHint": "Qu\u00e3o perto a dock fica da borda da tela (e da barra de tarefas)",
     "be.hideDelay": "Atraso para ocultar",
     "be.hideDelayHint": "Tempo ap\u00f3s parar de usar a dock antes de ela se esconder",
     "be.notchStart": "Início",
