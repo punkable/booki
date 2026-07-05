@@ -2235,6 +2235,22 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 @media (prefers-reduced-motion: reduce) { .empty-capy { animation: none; } }
 
 /* ── Apps toolbar: list/grid switch + clear-all ─────────────────────────── */
+/* One-time "start here" banner at the top of Settings. */
+.s-intro {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; margin: 0 0 14px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--layer));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--stroke));
+  border-radius: var(--r-md, 12px);
+}
+.s-intro-emoji { font-size: 22px; line-height: 1; }
+.s-intro-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.s-intro-body strong { font-size: 14px; }
+.s-intro-body .muted { font-size: 12.5px; }
+.s-intro-x { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 0; background: transparent; color: var(--ink-2); border-radius: var(--r-sm); cursor: pointer; flex: 0 0 auto; }
+.s-intro-x:hover { background: var(--hover); color: var(--ink); }
+.s-intro-x svg { width: 15px; height: 15px; }
+
 .pin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; flex-wrap: wrap; }
 .pin-view-toggle { display: inline-flex; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 2px; gap: 2px; }
 .pin-view-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 26px; border: 0; background: transparent; color: var(--ink-2); border-radius: calc(var(--r-sm) - 2px); cursor: pointer; }

@@ -1853,6 +1853,11 @@ function App() {
   const [version, setVersion] = useState("0.1.0");
   const [showChangelog, setShowChangelog] = useState(false);
   const [query, setQuery] = useState("");
+  // One-time "start here" banner so a new user knows where to begin.
+  const [introSeen, setIntroSeen] = useState(() => {
+    try { return localStorage.getItem("booki.introSeen") === "1"; } catch (_) { return true; }
+  });
+  const dismissIntro = () => { setIntroSeen(true); try { localStorage.setItem("booki.introSeen", "1"); } catch (_) {} };
   const saveTimer = useRef(null);
 
   // Show "What's new" when the dock asks us to: either it was requested before
@@ -1996,6 +2001,20 @@ function App() {
         </div>
       </aside>
       <main className="s-content">
+        {!introSeen && (
+          <div className="s-intro">
+            <span className="s-intro-emoji">👋</span>
+            <div className="s-intro-body">
+              <strong>{t("intro.title")}</strong>
+              <span className="muted">{t("intro.body")}</span>
+            </div>
+            <button className="s-btn s-btn-sm" onClick={() => { setTab("apps"); dismissIntro(); }}>
+              {t("intro.cta")}
+            </button>
+            <button className="s-intro-x" title={t("intro.dismiss")} onClick={dismissIntro}
+              dangerouslySetInnerHTML={{ __html: icon("x") }} />
+          </div>
+        )}
         {/* key={tab} remounts on switch → the panel fades/slides in smoothly. */}
         <div className="s-panel-in" key={tab}>
           {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
