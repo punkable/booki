@@ -548,11 +548,13 @@ function Suggestions({ cfg, set }) {
   const [groups, setGroups] = useState(null);
   const [q, setQ] = useState("");
   const [openGroups, setOpenGroups] = useState({}); // collapsed by default
+  const [kf, setKf] = useState([]); // the user's important shell folders
   const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
   useEffect(() => {
     // Memoized across tab switches: scanning the Start Menu and extracting every
     // icon is slow, and this panel remounts each time you open the Apps tab.
     installedAppsOnce().then((a) => setGroups(normalizeGroups(a)));
+    dockApi.knownFolders().then((v) => setKf(Array.isArray(v) ? v : [])).catch(() => {});
   }, []);
   if (!groups || groups.length === 0) return null;
   const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
@@ -575,6 +577,12 @@ function Suggestions({ cfg, set }) {
   const view = ql
     ? [{ name: "", items: groups.flatMap((g) => g.items).filter((a) => a.name.toLowerCase().includes(ql)).slice(0, 60) }]
     : groups;
+  // User folders also answer the search (by their localized name).
+  const kfView = ql ? kf.filter(([k]) => t("kf." + k).toLowerCase().includes(ql)) : kf;
+  const addKf = (k, p) => {
+    if (pinned.has((p || "").toLowerCase())) return;
+    set({ pinned: [...cfg.pinned, { id: uid(), name: t("kf." + k), path: p, args: [], kind: "folder" }] });
+  };
 
   const Tile = (a) => {
     const isPinned = pinned.has((a.path || "").toLowerCase());
@@ -591,8 +599,32 @@ function Suggestions({ cfg, set }) {
     <div className="s-card-inner">
       <h3>{t("apps.suggest")}</h3>
       <p className="muted">{t("apps.suggestHint")}</p>
-      <input className="sugg-search" placeholder={t("apps.search")} value={q}
-        onChange={(e) => setQ(e.target.value)} />
+      <div className="sugg-searchwrap">
+        <span className="sugg-search-ico" dangerouslySetInnerHTML={{ __html: icon("search") }} />
+        <input className="sugg-search" placeholder={t("apps.search")} value={q}
+          onChange={(e) => setQ(e.target.value)} />
+        {q && (
+          <button className="sugg-clear" title={t("apps.clearNo")} onClick={() => setQ("")}>×</button>
+        )}
+      </div>
+      {kfView.length > 0 && (
+        <>
+          <div className="kf-head">{t("apps.userFolders")}</div>
+          <div className="kf-row">
+            {kfView.map(([k, p]) => {
+              const isP = pinned.has((p || "").toLowerCase());
+              return (
+                <button key={k} type="button" className={"kf-chip" + (isP ? " pinned" : "")}
+                  disabled={isP} title={p} onClick={() => addKf(k, p)}>
+                  <span className="kf-ico" dangerouslySetInnerHTML={{ __html: icon("folder") }} />
+                  <span>{t("kf." + k)}</span>
+                  {!isP && <span className="kf-plus">+</span>}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
       {view.map((g, gi) => {
         const key = g.name || "general-" + gi;
         const open = ql || !!openGroups[key];
