@@ -218,7 +218,11 @@ async function persist() {
 let widgetEls = {};
 function cacheWidgetEls() {
   widgetEls = {};
-  dockEl.querySelectorAll(".tile.widget").forEach((el) => {
+  // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
+  // The flyout keeps its DOM after closing (until the next open), so gate on
+  // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
+  const sel = stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
+  document.querySelectorAll(sel).forEach((el) => {
     const w = el.dataset.widget || "";
     (widgetEls[w] || (widgetEls[w] = [])).push(el);
   });
@@ -487,11 +491,11 @@ function widgetLabel(type) {
   );
 }
 
-function widgetTile(item) {
+function widgetTile(item, { inFlyout = false } = {}) {
   const type = item.widget || "clock";
   const st = item.style || {};
   const el = document.createElement("button");
-  el.className = "tile widget";
+  el.className = "tile widget" + (inFlyout ? " in-flyout" : "");
   el.dataset.id = item.id;
   el.dataset.widget = type;
   el.dataset.variant = st.variant || "glass";
@@ -512,19 +516,23 @@ function widgetTile(item) {
     `</span>`;
   el.appendChild(card);
 
-  const rm = document.createElement("button");
-  rm.className = "rm";
-  rm.textContent = "×";
-  rm.title = t("apps.remove");
-  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
-  rm.addEventListener("click", (e) => {
-    e.stopPropagation();
-    removeItem(item.id);
-  });
-  el.appendChild(rm);
-
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  // On the bar the widget is a full dock tile (removable, draggable, right-click
+  // menu). Inside a group flyout it's just a live read-out — the flyout supplies
+  // its own take-out/remove and drag-out gestures, so skip the dock wiring.
+  if (!inFlyout) {
+    const rm = document.createElement("button");
+    rm.className = "rm";
+    rm.textContent = "×";
+    rm.title = t("apps.remove");
+    rm.addEventListener("pointerdown", (e) => e.stopPropagation());
+    rm.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeItem(item.id);
+    });
+    el.appendChild(rm);
+    el.addEventListener("contextmenu", (e) => openMenu(e, item));
+    el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
+  }
   if (type === "media") {
     el.classList.add("media");
     const art = document.createElement("img");
@@ -740,8 +748,12 @@ async function pollVolume() {
 // wakeups → lighter on the battery.
 let widgetPollTimer = null;
 let pollDue = { stats: 0, media: 0, volume: 0 };
+// DOM-based so it also sees widgets rendered inside an open group flyout (they
+// poll only while visible). widgetEls is rebuilt by cacheWidgetEls on every
+// render and on flyout open/close.
 function widgetPresent(w) {
-  return cfg.pinned.some((p) => p.kind === "widget" && (Array.isArray(w) ? w.includes(p.widget) : p.widget === w));
+  const has = (t) => !!(widgetEls[t] && widgetEls[t].length);
+  return Array.isArray(w) ? w.some(has) : has(w);
 }
 function stopPolls() {
   clearInterval(widgetPollTimer);
@@ -1455,13 +1467,14 @@ function processMove(e) {
 
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
 
-  // Hovering the CENTER of another tile → folder (merge) intent. Only apps merge
-  // into folders (groups can't nest; widgets/separators never form folders).
-  const canMerge = press.item.kind === "app";
+  // Hovering the CENTER of another tile → group (merge) intent. Apps and widgets
+  // can both be grouped now (widgets go live only inside the group). Separators,
+  // the trash tile and groups-into-groups never form a group.
+  const canMerge = press.item.kind === "app" || press.item.kind === "widget";
   let centerTarget = null;
   if (canMerge) {
     for (const s of sibs) {
-      if (s.classList.contains("separator") || s.classList.contains("widget")) continue;
+      if (s.classList.contains("separator") || s.classList.contains("trash")) continue;
       const r = s.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         const cx = r.left + r.width / 2;
@@ -2816,6 +2829,23 @@ async function toggleStack(tileEl, item) {
   }
   let cellIdx = 0;
   for (const it of items) {
+    // A grouped widget renders as its LIVE read-out (only here, inside the open
+    // group — never on the bar). It spans the row so the card gets full width.
+    if (isGroup && it.kind === "widget") {
+      const wCell = document.createElement("div");
+      wCell.className = "stack-item stack-widget";
+      wCell.style.setProperty("--i", cellIdx++);
+      wCell.appendChild(widgetTile(it, { inFlyout: true }));
+      wireStackDragOut(wCell, item, it);
+      const out = document.createElement("span");
+      out.className = "stack-rm";
+      out.textContent = "×";
+      out.title = t("group.takeOut");
+      out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
+      wCell.appendChild(out);
+      grid.appendChild(wCell);
+      continue;
+    }
     const cell = document.createElement("button");
     cell.className = "stack-item";
     cell.style.setProperty("--i", cellIdx++); // staggered entry
@@ -2863,6 +2893,9 @@ async function toggleStack(tileEl, item) {
 
   stackOpen = true;
   document.body.classList.add("stack-open");
+  // Pick up any widgets rendered inside the flyout so they poll live while open.
+  cacheWidgetEls();
+  startPolls();
   // Grow the window synchronously BEFORE the flyout becomes visible — same
   // pattern as the context menu / popovers, so opening a folder never flashes
   // a clipped panel while the window catches up.
@@ -2905,6 +2938,10 @@ function closeStack() {
   pendingReplace = null;
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open"); // plays the close transition
+  // Any grouped widgets that were live are gone now — drop them from the poll
+  // (stops the timer if nothing on the bar still needs it).
+  cacheWidgetEls();
+  startPolls();
   // Shrink the window only after the close animation has played, so it doesn't
   // get cut off mid-fade.
   clearTimeout(stackCloseTimer);

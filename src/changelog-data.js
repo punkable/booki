@@ -3,6 +3,35 @@
 
 export const CHANGELOG = [
   {
+    version: "0.33.0",
+    date: "5 jul 2026",
+    headline: "Agrupa también los widgets, y «grupo» es «grupo» (no «carpeta»).",
+    sections: [
+      {
+        icon: "🧩",
+        title: "Grupos de widgets",
+        notes: [
+          "Ahora puedes agrupar los widgets de uso del PC (CPU, RAM, disco…) arrastrando uno sobre otro, para no llenar la barra.",
+          "El widget se ve en vivo solo cuando abres el grupo; en la barra el grupo es un icono más.",
+        ],
+      },
+      {
+        icon: "🏷️",
+        title: "Grupo vs. carpeta",
+        notes: [
+          "Los conjuntos que tú creas se llaman «grupo»; «carpeta» queda para las carpetas reales de Windows. Se aclararon los textos («Editar grupo», «Añadir al grupo», «Sacar del grupo»…).",
+        ],
+      },
+      {
+        icon: "🧹",
+        title: "Repaso general",
+        notes: [
+          "Revisión para evitar glitches y parpadeos, incluido dejar de sondear un grupo de widgets en cuanto lo cierras.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.32.0",
     date: "5 jul 2026",
     headline: "Sin puntitos raros en la barra, la papelera se ancla bien y una guía al empezar.",

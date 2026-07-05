@@ -1470,6 +1470,19 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
+/* A grouped widget shown live inside the flyout: full-width read-out card. */
+.stack-item.stack-widget {
+  grid-column: 1 / -1;
+  flex-direction: row; align-items: center; justify-content: center;
+  padding: 4px; cursor: default;
+}
+.stack-item.stack-widget:hover { background: transparent; transform: none; }
+.stack-widget .tile.widget.in-flyout {
+  position: relative; margin: 0; width: 100%; transform: none !important;
+  display: flex; align-items: center; justify-content: center;
+}
+.stack-widget .tile.widget.in-flyout .w-card { width: 100%; }
+
 /* ───────────────────────── Tooltip ───────────────────────── */
 /* Booki-styled hover tooltip (replaces the OS one). Positioned via transform
    from JS; fades in softly. */

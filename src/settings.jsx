@@ -1098,7 +1098,8 @@ function Apps({ cfg, set }) {
         const center = ev.clientY > r.top + r.height * 0.3 && ev.clientY < r.bottom - r.height * 0.3;
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
-        const canMerge = dragged.kind === "app" && (target.kind === "app" || target.kind === "group");
+        const mergeable = (k) => k === "app" || k === "widget";
+        const canMerge = mergeable(dragged.kind) && (mergeable(target.kind) || target.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
           return; // aiming to merge → don't reorder
@@ -1180,7 +1181,8 @@ function Apps({ cfg, set }) {
           ev.clientY > r.top + r.height * 0.28 && ev.clientY < r.bottom - r.height * 0.28;
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
-        const canMerge = dragged.kind === "app" && (target.kind === "app" || target.kind === "group");
+        const mergeable = (k) => k === "app" || k === "widget";
+        const canMerge = mergeable(dragged.kind) && (mergeable(target.kind) || target.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
           return;
