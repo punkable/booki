@@ -426,6 +426,93 @@ fn reveal_running_dock(app: &AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// Install/refresh (or remove) the Explorer "Booki" right-click menu. The
+/// frontend sends the already-localized labels (`label_group` is a template
+/// with `{name}`); the group list comes from the current config, so removed
+/// groups drop off the menu on the next sync.
+#[tauri::command]
+fn sync_context_menu(enabled: bool, label_pin: String, label_group: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let cfg = config::load();
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe = exe.to_string_lossy().to_string();
+        let groups: Vec<(String, String)> = cfg
+            .pinned
+            .iter()
+            .filter(|p| p.kind == "group")
+            .map(|p| (p.id.clone(), label_group.replace("{name}", &p.name)))
+            .collect();
+        win::sync_context_menu(enabled, &exe, &label_pin, &groups)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (enabled, label_pin, label_group);
+        Ok(())
+    }
+}
+
+/// Handle `--pin <path>` / `--pin-group <id> <path>` from the Explorer context
+/// menu: add the item to the config (top-level or inside the group), save, and
+/// tell every window to re-read. Works both when Booki is already running (via
+/// the single-instance callback) and on a cold start (argv of this process).
+/// Returns true when a pin argument was actually handled.
+fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
+    let mut path: Option<String> = None;
+    let mut group: Option<String> = None;
+    let mut i = 0;
+    while i < argv.len() {
+        match argv[i].as_str() {
+            "--pin" => {
+                path = argv.get(i + 1).cloned();
+                i += 2;
+            }
+            "--pin-group" => {
+                group = argv.get(i + 1).cloned();
+                path = argv.get(i + 2).cloned();
+                i += 3;
+            }
+            _ => i += 1,
+        }
+    }
+    let Some(path) = path else { return false };
+    if path.is_empty() {
+        return false;
+    }
+    let p = std::path::Path::new(&path);
+    let name = p
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
+    let kind = if p.is_dir() { "folder" } else { "app" };
+    let item = config::PinnedApp {
+        id: format!(
+            "cm{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        ),
+        name,
+        path,
+        args: vec![],
+        kind: kind.into(),
+        widget: None,
+        style: None,
+        icon: None,
+        children: vec![],
+        recents: vec![],
+    };
+    let mut cfg = config::load();
+    match group.and_then(|gid| cfg.pinned.iter_mut().find(|g| g.kind == "group" && g.id == gid)) {
+        Some(g) => g.children.push(item),
+        None => cfg.pinned.push(item),
+    }
+    let _ = config::save(&cfg);
+    let _ = app.emit("booki://config-changed", ());
+    true
+}
+
 /// Set the dock's anchored edge (used when the user drags the notch to a screen
 /// edge, or clicks a notch that lives on another edge). Persists, repositions
 /// both windows, and tells the dock to re-read. The notch goes back to "auto"
@@ -1309,7 +1396,11 @@ pub fn run() {
         // (e.g. clicking the icon while the autostart copy is alive) just brings
         // the existing dock to the front and exits, instead of duplicating
         // everything. Windows startup then never ends up with two docks.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // A context-menu "Add to Booki" click launches a second instance
+            // with --pin args: apply them here, then surface the dock so the
+            // user SEES the item land on the bar.
+            let _ = handle_pin_argv(app, &argv);
             reveal_running_dock(app);
         }))
         .plugin(
@@ -1365,6 +1456,7 @@ pub fn run() {
             reposition_dock,
             set_dock_frame,
             dock_cover_workarea,
+            sync_context_menu,
             hide_dock,
             reveal_dock,
             notch_reveal,
@@ -1421,6 +1513,13 @@ pub fn run() {
         ])
         .setup(|app| {
             log::info!("Booki backend started");
+            // Cold start from the Explorer context menu ("Add to Booki" while
+            // Booki wasn't running): apply the pin args of THIS process before
+            // the dock loads, so the item is already on the bar at first paint.
+            {
+                let argv: Vec<String> = std::env::args().collect();
+                let _ = handle_pin_argv(app.handle(), &argv);
+            }
             // Self-heal the "start with Windows" entry: if the user has it on,
             // re-assert the Run key to the CURRENT exe on every launch. This fixes
             // a stale/missing entry (e.g. after moving or reinstalling the app) so
