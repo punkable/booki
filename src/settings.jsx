@@ -80,19 +80,19 @@ const ACCENTS = [
 const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
-  ["ap.translucency", "appearance"], ["ap.language", "appearance"], ["ap.backup", "appearance"],
+  ["ap.translucency", "appearance"], ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"],
   ["be.notchPeek", "behavior"], ["be.reveal", "behavior"], ["prof.title", "behavior"],
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
-  ["be.alwaysOnTop", "behavior"], ["be.autostart", "behavior"],
+  ["be.alwaysOnTop", "general"], ["be.autostart", "general"],
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
   ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
-  ["sc.title", "shortcuts"], ["sc.global", "shortcuts"], ["sc.positions", "shortcuts"],
+  ["sc.title", "general"], ["sc.global", "general"], ["sc.positions", "general"],
   ["faq.title", "faq"], ["faq.q.data", "faq"], ["faq.q.updates", "faq"],
   ["faq.q.smartscreen", "faq"], ["faq.q.uninstall", "faq"], ["faq.transparency", "faq"],
-  ["ab.updates", "about"], ["ab.whatsNew", "about"],
+  ["ab.updates", "general"], ["ab.whatsNew", "general"],
 ];
 
 const TABS = [
@@ -100,7 +100,6 @@ const TABS = [
   ["appearance", "tab.appearance", "palette"],
   ["behavior", "tab.behavior", "settings"],
   ["apps", "tab.apps", "grid"],
-  ["shortcuts", "tab.shortcuts", "keyboard"],
   ["faq", "tab.faq", "help"],
   ["about", "tab.about", "info"],
 ];
@@ -788,10 +787,8 @@ function Appearance({ cfg, set }) {
 
 function Behavior({ cfg, set }) {
   const [monitors, setMonitors] = useState([]);
-  const [autostart, setAutostart] = useState(!!cfg.autostart);
   useEffect(() => {
     dockApi.listMonitors().then((m) => setMonitors(m || []));
-    dockApi.getAutostart().then((v) => setAutostart(!!v));
   }, []);
   return (
     <>
@@ -830,6 +827,10 @@ function Behavior({ cfg, set }) {
               ]}
             />
           </Row>
+          <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
+            <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
+              fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`} onChange={(v) => set({ autoHideDelay: v })} />
+          </Row>
         </>
       )}
 
@@ -860,29 +861,6 @@ function Behavior({ cfg, set }) {
         onChange={(v) => set({ showIndicators: v })} />
       <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
         checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
-
-      <h2 className="s-subhead">{t("gp.system")}</h2>
-      <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
-        onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
-      <Toggle label={t("be.autostart")} checked={autostart}
-        onChange={async (v) => {
-          setAutostart(v);
-          try {
-            await dockApi.setAutostart(v);
-          } catch (e) {
-            console.error("autostart:", e);
-          }
-          // Trust the registry, not our optimism: re-read and reflect reality.
-          const real = !!(await dockApi.getAutostart().catch(() => v));
-          setAutostart(real);
-          set({ autostart: real });
-        }} />
-      {cfg.autoHideMode !== "off" && (
-        <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
-          <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
-            fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`} onChange={(v) => set({ autoHideDelay: v })} />
-        </Row>
-      )}
 
       <ProfilesCard cfg={cfg} set={set} />
     </>
@@ -1636,10 +1614,11 @@ function mkApp(path) {
   return { id: uid(), name: file.replace(/\.(exe|lnk|bat|cmd)$/i, ""), path, args: [], kind: "app" };
 }
 
-function Shortcuts({ cfg, set }) {
+// Keyboard shortcuts — a SECTION of the General tab (it never warranted a whole
+// tab of its own).
+function ShortcutsSection({ cfg, set }) {
   return (
     <>
-      <h1>{t("sc.title")}</h1>
       <Row label={t("sc.toggle")} hint={t("sc.global")}>
         <HotkeyInput
           value={cfg.hotkey}
@@ -1850,7 +1829,6 @@ function UpdatesCard({ onWhatsNew }) {
   };
   return (
     <div className="s-card-inner">
-      <h3>{t("ab.updates")}</h3>
       {status === "available" ? (
         <div className="upd-row">
           <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
@@ -1884,15 +1862,43 @@ function UpdatesCard({ onWhatsNew }) {
   );
 }
 
-// Language + updates + backup: the "everything general" tab.
+// The "everything general" tab: system toggles, language, shortcuts, updates
+// and backup — anything that isn't about how the dock looks or moves.
 function General({ cfg, set, onWhatsNew }) {
+  const [autostart, setAutostart] = useState(!!cfg.autostart);
+  useEffect(() => {
+    dockApi.getAutostart().then((v) => setAutostart(!!v));
+  }, []);
   return (
     <>
       <h1>{t("gen.title")}</h1>
       <p className="muted">{t("gen.hint")}</p>
 
+      <h2 className="s-subhead">{t("gp.system")}</h2>
+      <Toggle label={t("be.autostart")} checked={autostart}
+        onChange={async (v) => {
+          setAutostart(v);
+          try {
+            await dockApi.setAutostart(v);
+          } catch (e) {
+            console.error("autostart:", e);
+          }
+          // Trust the registry, not our optimism: re-read and reflect reality.
+          const real = !!(await dockApi.getAutostart().catch(() => v));
+          setAutostart(real);
+          set({ autostart: real });
+        }} />
+      <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
+        onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
+      <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
+        checked={cfg.contextMenu !== false}
+        onChange={(v) => set({ contextMenu: v })} />
+
       <h2 className="s-subhead">{t("ab.updates")}</h2>
       <UpdatesCard onWhatsNew={onWhatsNew} />
+
+      <h2 className="s-subhead">{t("sc.title")}</h2>
+      <ShortcutsSection cfg={cfg} set={set} />
 
       <h2 className="s-subhead">{t("gen.langSub")}</h2>
       <Row label={t("ap.language")} hint={t("gen.langHint")}>
@@ -2169,7 +2175,6 @@ function App() {
           {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
           {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
           {tab === "apps" && <Apps cfg={cfg} set={set} />}
-          {tab === "shortcuts" && <Shortcuts cfg={cfg} set={set} />}
           {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
           {tab === "faq" && <Faq version={version} />}
           {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
