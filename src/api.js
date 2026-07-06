@@ -1,6 +1,8 @@
 /* Thin wrapper over the Tauri bridge with browser fallbacks, so the UI can be
    previewed with `vite` in a normal browser during development. */
 
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
+
 const T = typeof window !== "undefined" ? window.__TAURI__ : undefined;
 export const isTauri = !!(T && T.core);
 
@@ -91,7 +93,12 @@ async function mockInvoke(cmd, args) {
     case "is_dir":
       return false;
     case "set_hit_rects":
+    case "open_with":
       return null;
+    case "file_thumbnail":
+      return null;
+    case "copy_text":
+      return true;
     case "list_dir":
       return [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
@@ -342,6 +349,27 @@ export const dock = {
     return T.event.listen("booki://cursor-inside", (e) => cb(!!e.payload));
   },
   dockCoverWorkarea: () => invoke("dock_cover_workarea"),
+  // Explorer-grade thumbnail for a file (photos/videos in folder flyouts).
+  fileThumbnail: (path) => invoke("file_thumbnail", { path }),
+  copyText: (text) => invoke("copy_text", { text }),
+  openWith: (path) => invoke("open_with", { path }),
+  // Native OLE drag-out: drag a file from the folder flyout into Explorer or
+  // any other app. The OS runs the drag, the target decides copy vs move.
+  dragOutFiles: async (paths, icon) => {
+    if (!isTauri) return false;
+    try {
+      await startDrag({
+        item: paths,
+        icon:
+          icon ||
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+      });
+      return true;
+    } catch (e) {
+      console.warn("drag-out failed", e);
+      return false;
+    }
+  },
   knownFolders: () => invoke("known_folders"),
   syncContextMenu: (enabled, labelPin, labelGroup) =>
     invoke("sync_context_menu", { enabled, labelPin, labelGroup }),

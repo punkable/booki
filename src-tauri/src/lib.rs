@@ -160,6 +160,38 @@ fn image_data_uri(path: String) -> Option<String> {
     util::read_image_data_uri(&path)
 }
 
+/// Explorer-grade thumbnail for a file in the folder flyout (async: the shell
+/// call + PNG encode stay off the main thread).
+#[tauri::command]
+async fn file_thumbnail(path: String) -> Option<String> {
+    win::file_thumbnail(&path, 96)
+}
+
+/// Copy plain text to the clipboard (e.g. a file's path from the flyout).
+#[tauri::command]
+fn copy_text(text: String) -> bool {
+    win::set_clipboard_text(&text)
+}
+
+/// Windows "Open with…" dialog for a file.
+#[tauri::command]
+fn open_with(path: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("rundll32.exe")
+            .arg("shell32.dll,OpenAs_RunDLL")
+            .arg(&path)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = path;
+        Ok(())
+    }
+}
+
 #[tauri::command]
 fn set_always_on_top(window: WebviewWindow, value: bool) -> Result<(), String> {
     window.set_always_on_top(value).map_err(|e| e.to_string())
@@ -1451,6 +1483,7 @@ pub fn run() {
         // (e.g. clicking the icon while the autostart copy is alive) just brings
         // the existing dock to the front and exits, instead of duplicating
         // everything. Windows startup then never ends up with two docks.
+        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // A context-menu "Add to Booki" click launches a second instance
             // with --pin args: apply them here, then surface the dock so the
@@ -1511,6 +1544,9 @@ pub fn run() {
             reposition_dock,
             set_dock_frame,
             set_hit_rects,
+            file_thumbnail,
+            copy_text,
+            open_with,
             dock_cover_workarea,
             sync_context_menu,
             known_folders,

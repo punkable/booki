@@ -3,6 +3,35 @@
 
 export const CHANGELOG = [
   {
+    version: "0.42.0",
+    date: "6 jul 2026",
+    headline: "Las carpetas ancladas se vuelven de verdad útiles: miniaturas, arrastrar afuera y acciones rápidas.",
+    sections: [
+      {
+        icon: "🖼️",
+        title: "Miniaturas reales",
+        notes: [
+          "Las fotos y los vídeos dentro de una carpeta anclada muestran su miniatura real (la misma del Explorador), no un icono genérico. Con caché, así que la segunda vez es instantáneo.",
+        ],
+      },
+      {
+        icon: "🖐️",
+        title: "Arrastra archivos hacia afuera",
+        notes: [
+          "Toma un archivo del panel de una carpeta y arrástralo al escritorio, al Explorador o a cualquier otra app — un arrastre nativo de Windows, como si viniera del propio Explorador.",
+        ],
+      },
+      {
+        icon: "⚡",
+        title: "Acciones al pasar el cursor",
+        notes: [
+          "Cada archivo del panel muestra al pasar el cursor tres accesos: copiar su ruta, mostrarlo seleccionado en el Explorador y “Abrir con…”.",
+          "Por dentro: dependencias actualizadas y avisos de seguridad de GitHub resueltos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.41.0",
     date: "6 jul 2026",
     headline: "Adiós al parpadeo: el dock ya no se mueve ni un píxel al abrir cosas.",

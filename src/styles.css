@@ -1530,6 +1530,22 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
 .stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Hover actions on a flyout file cell: copy path · Explorer · open with. */
+.stack-acts { position: absolute; top: 3px; left: 3px; display: none; gap: 3px; z-index: 2; }
+.stack-item:hover .stack-acts { display: flex; }
+.stack-act {
+  width: 19px; height: 19px; display: grid; place-items: center; padding: 0;
+  color: var(--ink-2); cursor: pointer;
+  background: var(--layer-strong); border: 1px solid var(--stroke-light); border-radius: 6px;
+}
+.stack-act:hover { color: var(--ink); background: var(--hover); }
+.stack-act svg { width: 11px; height: 11px; }
+/* Real thumbnails (photos/videos) fill their slot edge-to-edge. */
+.stack-item img.thumb {
+  width: 56px; height: 44px; object-fit: cover;
+  border-radius: 9px; border: 1px solid var(--stroke-light);
+}
+
 /* Placeholder cells while a big folder lists — the flyout opens instantly. */
 .stack-item.stack-skel { pointer-events: none; }
 .stack-item.stack-skel .stack-glyph { border: 0; }

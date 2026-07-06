@@ -106,6 +106,14 @@ pub fn move_window(_hwnd: isize, _x: i32, _y: i32, _w: i32, _h: i32) {}
 
 pub fn set_click_through(_hwnd: isize, _on: bool) {}
 
+pub fn file_thumbnail(_path: &str, _size: i32) -> Option<String> {
+    None
+}
+
+pub fn set_clipboard_text(_text: &str) -> bool {
+    false
+}
+
 pub fn cursor_in_rects(_hwnd: isize, _rects: &[(f64, f64, f64, f64)], _all: bool) -> Option<bool> {
     None
 }
