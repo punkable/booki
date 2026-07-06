@@ -276,6 +276,40 @@ unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
     encode_png(width as u32, height as u32, &buf)
 }
 
+/// Resolve a .lnk shortcut to its target path (public wrapper — used to map
+/// Recent-folder entries and pinned shortcuts to their real files).
+pub fn shortcut_target(path: &str) -> Option<String> {
+    unsafe { resolve_shortcut_target(path) }
+}
+
+/// The executable registered as the default "open" handler for a file
+/// extension (".pdf" → full path of the app), via the shell association API.
+pub fn assoc_executable(ext: &str) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::UI::Shell::{AssocQueryStringW, ASSOCF_NONE, ASSOCSTR_EXECUTABLE};
+    unsafe {
+        let w = wide(ext);
+        let mut buf = [0u16; 512];
+        let mut len = buf.len() as u32;
+        let hr = AssocQueryStringW(
+            ASSOCF_NONE,
+            ASSOCSTR_EXECUTABLE,
+            PCWSTR(w.as_ptr()),
+            PCWSTR::null(),
+            PWSTR(buf.as_mut_ptr()),
+            &mut len,
+        );
+        if hr.is_err() || len == 0 {
+            return None;
+        }
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        if end == 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&buf[..end]))
+    }
+}
+
 /// Put plain text on the Windows clipboard (CF_UNICODETEXT).
 pub fn set_clipboard_text(text: &str) -> bool {
     use windows::Win32::Foundation::HANDLE;

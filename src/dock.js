@@ -1904,7 +1904,9 @@ function openMenu(e, item) {
     ctxMenu.appendChild(s);
   };
 
-  if (item.kind !== "separator") {
+  // The menu adapts to what you clicked: widgets have nothing to "open",
+  // folders get a straight jump to Explorer, only apps get recents.
+  if (item.kind !== "separator" && item.kind !== "widget") {
     add("app", t("m.open"), () => {
       if (item.kind === "folder" || item.kind === "group") {
         const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
@@ -1915,6 +1917,8 @@ function openMenu(e, item) {
         dockApi.launch(item.path, item.args || []);
       }
     });
+    if (item.kind === "folder")
+      add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
     // Recents (a lightweight jump list of files opened with this app via Booki).
     if (item.kind === "app" && (item.recents || []).length) {
       sep();
@@ -1949,15 +1953,16 @@ function openMenu(e, item) {
   add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
-  if (recentsSlot) fillRecentFiles(recentsSlot, e);
+  if (recentsSlot) fillRecentFiles(recentsSlot, e, item);
 }
 
-// Load the OS "recent files" and drop them into the pin's context menu. Runs
-// after the menu is already on screen; re-places it once the items are in.
-async function fillRecentFiles(slot, e) {
+// Recent files for THIS app only (matched by file association in the backend)
+// dropped into the pin's context menu. Runs after the menu is already on
+// screen; re-places it once the items are in. Nothing relevant -> no section.
+async function fillRecentFiles(slot, e, item) {
   let recents = [];
   try {
-    recents = await dockApi.recentFiles(6);
+    recents = await dockApi.recentFilesFor(item.path, 6);
   } catch (_) {
     return;
   }
@@ -2069,16 +2074,20 @@ function placeMenu(e) {
     const gap = 10;
     const mw = ctxMenu.offsetWidth;
     const mh = ctxMenu.offsetHeight;
+    // Clamp BOTH axes into the window — a long menu near a corner used to get
+    // sliced at the window edge (worst on vertical docks).
     if (isVertical()) {
       const top = Math.min(Math.max(pad, cy - mh / 2), window.innerHeight - mh - pad);
       ctxMenu.style.top = `${top}px`;
-      ctxMenu.style.left =
-        cfg.edge === "left" ? `${dr.right + gap}px` : `${dr.left - mw - gap}px`;
+      let left = cfg.edge === "left" ? dr.right + gap : dr.left - mw - gap;
+      left = Math.min(Math.max(pad, left), window.innerWidth - mw - pad);
+      ctxMenu.style.left = `${left}px`;
     } else {
       const left = Math.min(Math.max(pad, cx - mw / 2), window.innerWidth - mw - pad);
       ctxMenu.style.left = `${left}px`;
-      ctxMenu.style.top =
-        cfg.edge === "top" ? `${dr.bottom + gap}px` : `${dr.top - mh - gap}px`;
+      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - mh - gap;
+      top = Math.min(Math.max(pad, top), window.innerHeight - mh - pad);
+      ctxMenu.style.top = `${top}px`;
     }
   };
   put();

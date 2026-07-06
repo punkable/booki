@@ -114,6 +114,14 @@ pub fn set_clipboard_text(_text: &str) -> bool {
     false
 }
 
+pub fn shortcut_target(_path: &str) -> Option<String> {
+    None
+}
+
+pub fn assoc_executable(_ext: &str) -> Option<String> {
+    None
+}
+
 pub fn cursor_in_rects(_hwnd: isize, _rects: &[(f64, f64, f64, f64)], _all: bool) -> Option<bool> {
     None
 }
