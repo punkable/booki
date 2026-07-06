@@ -737,7 +737,8 @@ function eachWidget(type, fn) {
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
   const now = new Date();
-  const loc = curLang() === "en" ? "en-US" : "es-ES";
+  const loc =
+    { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "de-DE" }[curLang()] || "en-US";
   const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
   const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
   eachWidget("clock", (el) => setText(el, date, time));
