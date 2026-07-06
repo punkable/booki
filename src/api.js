@@ -107,6 +107,8 @@ async function mockInvoke(cmd, args) {
       return [];
     case "clipboard_count":
       return demoClipboard.length;
+    case "clipboard_summary":
+      return { count: demoClipboard.length, preview: demoClipboard[0]?.text || null };
     case "clipboard_history":
       return demoClipboard.slice(0, args.limit || 60);
     case "clipboard_copy":
@@ -379,6 +381,7 @@ export const dock = {
   // Clipboard history widget: count for the badge, full list for the flyout,
   // copy-back/edit (bumps to front), delete one, clear all.
   clipboardCount: () => invoke("clipboard_count"),
+  clipboardSummary: () => invoke("clipboard_summary"),
   clipboardHistory: (limit = 60) => invoke("clipboard_history", { limit }),
   clipboardCopy: (text) => invoke("clipboard_copy", { text }),
   clipboardDelete: (id) => invoke("clipboard_delete", { id }),

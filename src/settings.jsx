@@ -2009,8 +2009,8 @@ function About({ version, onWhatsNew, onReset }) {
         <button className="s-link" onClick={() => dockApi.launch("https://github.com/punkable")}>
           {t("ab.by")} <strong>Punkable</strong> · GitHub ↗
         </button>
-        <button className="s-link" onClick={() => dockApi.launch("https://x.com/Punkabl3")}>
-          <strong>@Punkabl3</strong> · X ↗
+        <button className="s-link" onClick={() => dockApi.launch("https://x.com/0xPunki")}>
+          <strong>@0xPunki</strong> · X ↗
         </button>
         <button className="s-link" onClick={() => dockApi.launch("mailto:punkable@protonmail.com")}>
           {t("ab.contact")} · punkable@protonmail.com ↗
@@ -2293,7 +2293,7 @@ function ChangelogModal({ onClose }) {
           )}
         </div>
         <div className="cl-foot">
-          <span className="cl-credit">{t("cl.by")} Punkable · @Punkabl3</span>
+          <span className="cl-credit">{t("cl.by")} Punkable · @0xPunki</span>
           <button className="s-btn" onClick={onClose}>{t("cl.ok")}</button>
         </div>
       </div>

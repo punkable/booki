@@ -34,7 +34,7 @@
 |---|---|
 | 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures (own thumbnail) and websites (favicon). Click to launch — or optionally **focus the open window** instead. Right-click a pin for your **recent files**. Icons **bounce** as they open. |
 | 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete. **Group** apps *and* widgets by dragging one onto another, reorder right on the bar, and drag the empty bar to another edge with a live **anchor-point preview**. |
-| 🎛️ **Live widgets** | Clock, CPU, RAM, disk, network, uptime, battery, notes, **system volume** (scroll = change, click = mute) and a **now-playing card** with album art + transport controls. Tuck PC-usage widgets into a **group** — they go live only when you open it. |
+| 🎛️ **Live widgets, Windows-11 styled** | CPU/RAM/disk/battery/volume as **animated ring gauges**, clock, network, uptime, and **card widgets** with a colored icon + live preview for **notes** and a full **clipboard history** (copy anywhere, right-click → save, reopen to cut/edit/clear). Plus a **now-playing card** with album art + transport controls. Tuck any of them into a **group** — they go live only when you open it. |
 | 🗂️ **Apps manager** | A **list *or* grid** view in Settings: open a group to its draggable **squares**, drag to reorder, onto another group, or out to the dock — plus a **General** tab for language, updates and backup. |
 | 🗑️ **Recycle Bin** | A bin tile that **shows how many items it holds** and empties (with a confirmation) from its right-click menu. |
 | 🫥 **Smart hide + notch** | Tucks away with a genie animation into a slim glass *notch*; push the cursor to the edge (or click it) to bring it back. Fullscreen games/movies black it out. |
@@ -117,7 +117,7 @@
 ## 💛 A free project, made with love
 
 Booki is **free and open source** (MIT), made with care by
-**[Punkable](https://github.com/punkable)** ([@Punkabl3](https://x.com/Punkabl3) on X).
+**[Punkable](https://github.com/punkable)** ([@0xPunki](https://x.com/0xPunki) on X).
 Built with [Tauri 2](https://tauri.app) + Rust, and developed with the help of
 AI tooling ([Claude Code](https://claude.com/claude-code)) under human direction and testing.
 
@@ -126,8 +126,8 @@ are welcome — totally optional, thank you 🙏
 
 | | Network | Address |
 |---|---------|---------|
-| <img src="https://img.shields.io/badge/Bitcoin-121212?style=for-the-badge&logo=bitcoin&logoColor=F7931A" alt="Bitcoin" /> | **Bitcoin** | `bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3` |
-| <img src="https://img.shields.io/badge/Solana-121212?style=for-the-badge&logo=solana&logoColor=14F195" alt="Solana" /> | **Solana** | `JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W` |
+| <img src="assets/brand/svg/bitcoin.svg" alt="Bitcoin" width="28" height="28" /> | **Bitcoin** | `bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3` |
+| <img src="assets/brand/svg/solana.svg" alt="Solana" width="28" height="22" /> | **Solana** | `JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W` |
 
 Questions, ideas or bug reports? Email **[punkable@protonmail.com](mailto:punkable@protonmail.com)**
 or open an issue — see [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
@@ -165,5 +165,5 @@ MIT — do whatever makes you happy, credit is appreciated. 🦫
 
 <p align="center">
   <img src="assets/brand/svg/isotype.svg" alt="Booki the capybara" height="96" /><br/>
-  <sub>Made with 🧡 by <a href="https://github.com/punkable">Punkable</a> · <a href="https://x.com/Punkabl3">@Punkabl3</a></sub>
+  <sub>Made with 🧡 by <a href="https://github.com/punkable">Punkable</a> · <a href="https://x.com/0xPunki">@0xPunki</a></sub>
 </p>

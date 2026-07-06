@@ -3,6 +3,42 @@
 
 export const CHANGELOG = [
   {
+    version: "0.48.0",
+    date: "6 jul 2026",
+    headline: "Widgets con look de Windows 11: anillos animados y tarjetas con vista previa.",
+    sections: [
+      {
+        icon: "🟠",
+        title: "Anillos animados",
+        notes: [
+          "CPU, RAM, disco, batería y volumen ahora se ven como un anillo de progreso animado y a color, en vez de una simple barra — cada uno con su propio color (y la batería se pone roja si queda poca y no está cargando).",
+        ],
+      },
+      {
+        icon: "🗒️",
+        title: "Tarjetas con vista previa",
+        notes: [
+          "Los widgets de Nota y Portapapeles ahora son tarjetas con un icono a color y una vista previa real de su contenido (el estilo de los widgets de Windows), no solo un número.",
+        ],
+      },
+      {
+        icon: "📐",
+        title: "Fix: dock vertical",
+        notes: [
+          "En el borde izquierdo o derecho, las tarjetas de Nota y Portapapeles se veían enormes y con el texto cortado por ambos lados — ahora se ven compactas y alineadas, igual que el resto de widgets.",
+        ],
+      },
+      {
+        icon: "🛠️",
+        title: "Otros fixes",
+        notes: [
+          "El menú del clic derecho sobre un pin a veces fallaba silenciosamente al buscar sus archivos recientes — arreglado.",
+          "El aviso de “Booki se ocultó” (pensado para juegos/películas a pantalla completa) a veces aparecía solo por cambiar de ventana con Alt+Tab o la vista de tareas — ya no confunde eso con pantalla completa real.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.47.0",
     date: "6 jul 2026",
     headline: "Nuevo widget de portapapeles, ajustes más ordenados, y varios fixes del notch.",

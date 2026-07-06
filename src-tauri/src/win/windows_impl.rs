@@ -568,6 +568,13 @@ pub fn is_fullscreen() -> bool {
             || class == "WorkerW"
             || class == "Shell_TrayWnd"
             || class == "Shell_SecondaryTrayWnd"
+            // Alt-Tab / Task View / Snap-layout overlays: borderless, cover the
+            // whole monitor, and briefly become the foreground window while the
+            // user is just switching between apps — not an actual fullscreen
+            // game or movie. Without this, moving between windows could flash
+            // the "Booki hid itself" blackout+toast on every switch.
+            || class == "MultitaskingViewFrame"
+            || class == "XamlExplorerHostIslandWindow"
         {
             return false;
         }
