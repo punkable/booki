@@ -104,8 +104,6 @@ pub fn known_folders() -> Vec<(String, String)> {
 
 pub fn move_window(_hwnd: isize, _x: i32, _y: i32, _w: i32, _h: i32) {}
 
-pub fn set_click_through(_hwnd: isize, _on: bool) {}
-
 pub fn file_thumbnail(_path: &str, _size: i32) -> Option<String> {
     None
 }
