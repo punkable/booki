@@ -558,6 +558,21 @@ const WIDGET_ICONS = {
 };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
+// Percent-based widgets get a circular progress ring instead of a linear bar —
+// reads as a proper gauge (à la Docky/Cooldock) at a glance, and the number
+// lives INSIDE the ring instead of stealing space in the label row.
+const RING_WIDGETS = ["cpu", "ram", "disk", "battery", "volume"];
+const RING_R = 15.5; // SVG viewBox 0 0 36 36
+const RING_C = 2 * Math.PI * RING_R;
+// Content-carrying widgets get a "preview card": a colored icon square, a bold
+// title and a live one-line preview of the actual content — reads like a
+// real Windows widget (notification/media card), not a bare label+number.
+const PREVIEW_WIDGETS = ["notes", "clipboard"];
+// Sensible default ring color per stat, so a freshly-pinned widget already
+// reads at a glance (à la Docky/Cooldock) instead of every ring sharing the
+// same accent — still fully overridable per-widget via its style modal.
+const RING_DEFAULTS = { cpu: "#fb8b24", ram: "#3a86ff", disk: "#8338ec", battery: "#2ecc71", volume: "#06b6d4" };
+const BATTERY_LOW = "#e5484d";
 
 function widgetLabel(type) {
   return (
@@ -578,6 +593,10 @@ function widgetTile(item, { inFlyout = false } = {}) {
   el.dataset.widget = type;
   el.dataset.variant = st.variant || "glass";
   if (st.color) el.style.setProperty("--w-accent", st.color);
+  else if (RING_DEFAULTS[type]) {
+    el.style.setProperty("--w-accent", RING_DEFAULTS[type]);
+    el.dataset.autoAccent = "1"; // no custom color set → the battery ring may still shift to red when low
+  }
   if (st.animated) el.classList.add("animated");
   if (st.icon === false) el.classList.add("no-ico");
   el.style.setProperty("--size", `${baseSize()}px`);
@@ -585,13 +604,23 @@ function widgetTile(item, { inFlyout = false } = {}) {
 
   const card = document.createElement("span");
   card.className = "w-card";
-  card.innerHTML =
-    `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>` +
-    `<span class="w-main">` +
-    `<span class="w-label"></span>` +
-    `<span class="w-value">…</span>` +
-    `<span class="w-bar"><i></i></span>` +
-    `</span>`;
+  const isRing = RING_WIDGETS.includes(type);
+  const isPreview = PREVIEW_WIDGETS.includes(type);
+  if (isPreview) el.classList.add("preview");
+  card.innerHTML = isPreview
+    ? `<span class="w-pv-ico">${emo(WIDGET_ICONS[type] || "puzzle", 22)}<span class="w-pv-count"></span></span>` +
+      `<span class="w-pv-main"><span class="w-pv-title"></span><span class="w-pv-sub"></span></span>` +
+      `<span class="w-pv-badge">${icon(type === "notes" ? "pencil" : "chevron-right")}</span>`
+    : (isRing
+      ? `<span class="w-ring">` +
+        `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
+        `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>` +
+        `<span class="w-ring-num"></span></span>`
+      : `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>`) +
+      `<span class="w-main">` +
+      `<span class="w-label"></span>` +
+      (isRing ? "" : `<span class="w-value">…</span><span class="w-bar"><i></i></span>`) +
+      `</span>`;
   el.appendChild(card);
 
   // On the bar the widget is a full dock tile (removable, draggable, right-click
@@ -646,10 +675,13 @@ function widgetTile(item, { inFlyout = false } = {}) {
   }
   if (type === "clock") tickClocks();
   if (type === "notes") {
-    el.querySelector(".w-label").textContent = t("w.notes");
-    el.querySelector(".w-value").textContent = st.note || t("w.notesEmpty");
-    el.querySelector(".w-value").classList.add("w-note");
-    el.querySelector(".w-bar").style.display = "none";
+    el.querySelector(".w-pv-title").textContent = t("w.notes");
+    el.querySelector(".w-pv-sub").textContent = st.note || t("w.notesEmpty");
+    el.title = st.note ? `${t("w.notes")} — ${st.note}` : widgetLabel("notes");
+  }
+  if (type === "clipboard") {
+    el.querySelector(".w-pv-title").textContent = t("w.clipboard");
+    el.querySelector(".w-pv-sub").textContent = t("clip.empty");
   }
   return el;
 }
@@ -695,10 +727,18 @@ function tweenNumber(el, to, fmt) {
 // goes in the tooltip so nothing overflows the compact card.
 function setMetric(el, label, val, title) {
   el.querySelector(".w-label").textContent = label;
-  tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
-  const bar = el.querySelector(".w-bar");
-  bar.style.display = "";
-  bar.querySelector("i").style.width = `${Math.min(100, Math.max(0, val))}%`;
+  const pct = Math.min(100, Math.max(0, val));
+  const ring = el.querySelector(".w-ring-fill");
+  if (ring) {
+    // Ring widget: the number lives INSIDE the ring, not the label row.
+    tweenNumber(el.querySelector(".w-ring-num"), val, (n) => `${n}`);
+    ring.style.strokeDashoffset = `${(RING_C * (1 - pct / 100)).toFixed(2)}`;
+  } else {
+    tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
+    const bar = el.querySelector(".w-bar");
+    bar.style.display = "";
+    bar.querySelector("i").style.width = `${pct}%`;
+  }
   if (title) el.title = title;
 }
 
@@ -763,8 +803,14 @@ async function pollStats() {
     setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net")));
   eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
   eachWidget("battery", (el) => {
-    if (s.battery < 0) setText(el, t("w.battery"), "—");
-    else setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
+    if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
+    setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
+    // A ring left at its default color (never manually re-colored) turns red
+    // when running low and unplugged — the same "pay attention" cue Windows
+    // itself uses, without overriding a color the user picked on purpose.
+    if (el.dataset.autoAccent) {
+      el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
+    }
   });
 }
 
@@ -813,8 +859,6 @@ function renderVolume(pct, muted) {
   eachWidget("volume", (el) => {
     setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
     el.classList.toggle("muted", muted);
-    const img = el.querySelector(".w-ico img");
-    if (img) img.src = `/emoji/${muted ? "speaker-mute" : "speaker"}.png`;
   });
 }
 async function pollVolume() {
@@ -822,16 +866,22 @@ async function pollVolume() {
   if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
 }
 
-// Clipboard-history widget: the bar card only shows a live COUNT (cheap to
-// poll) — the full text list is fetched once, when the flyout actually opens.
-function renderClipboardCount(n) {
+// Clipboard-history widget: the bar card shows a live PREVIEW of the most
+// recent copy (not just a bare count) — reads at a glance, like a real
+// notification card. The full list is fetched once, when the flyout opens.
+function renderClipboardSummary(count, preview) {
   eachWidget("clipboard", (el) => {
-    setText(el, t("w.clipboard"), n > 0 ? String(n) : "—", n > 0 ? t("clip.countHint").replace("{n}", n) : t("clip.empty"));
+    const sub = el.querySelector(".w-pv-sub");
+    sub.textContent = preview || t("clip.empty");
+    sub.classList.toggle("empty", !preview);
+    const badge = el.querySelector(".w-pv-count");
+    badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
+    el.title = preview ? t("clip.countHint").replace("{n}", count) : t("clip.empty");
   });
 }
 async function pollClipboard() {
-  const n = await dockApi.clipboardCount().catch(() => 0);
-  renderClipboardCount(n);
+  const s = await dockApi.clipboardSummary().catch(() => ({ count: 0, preview: null }));
+  renderClipboardSummary(s.count, s.preview);
 }
 
 // ONE poll loop drives every live widget on its own cadence — a single timer
@@ -970,8 +1020,12 @@ function editNote(item) {
     item.style = { ...(item.style || {}), note: ta.value };
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
-      const val = el.querySelector(".w-value");
-      if (val) val.textContent = ta.value || t("w.notesEmpty");
+      const sub = el.querySelector(".w-pv-sub");
+      if (sub) {
+        sub.textContent = ta.value || t("w.notesEmpty");
+        sub.classList.toggle("empty", !ta.value);
+      }
+      el.title = ta.value ? `${t("w.notes")} — ${ta.value}` : widgetLabel("notes");
     });
     persist();
   };
@@ -1395,7 +1449,7 @@ dockEl.addEventListener(
     // (the natural gesture), not the visual variant.
     if (w.dataset.widget === "volume") {
       // Read the settled value (dataset.v), not the tween's mid-animation text.
-      const vEl = w.querySelector(".w-value");
+      const vEl = w.querySelector(".w-ring-num");
       const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
       const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
       renderVolume(next, false); // optimistic — the poll corrects if needed
@@ -1987,7 +2041,7 @@ async function fillRecentFiles(slot, e, item) {
   } catch (_) {
     return;
   }
-  if (!recents.length || !slot.isConnected) return;
+  if (!recents || !recents.length || !slot.isConnected) return;
   const head = document.createElement("div");
   head.className = "menu-label";
   head.textContent = t("m.recent");
@@ -3681,7 +3735,7 @@ function partyMode() {
 try {
   // eslint-disable-next-line no-console
   console.log(
-    "%c🦫 Booki Dock %c— hecho con cariño por Punkable (@Punkabl3). ¡Prueba el código Konami!",
+    "%c🦫 Booki Dock %c— hecho con cariño por Punkable (@0xPunki). ¡Prueba el código Konami!",
     "font-weight:700;color:#dfaa75",
     "color:inherit"
   );
