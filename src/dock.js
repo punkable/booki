@@ -2401,12 +2401,15 @@ function tryTuck() {
 window.addEventListener("pointerover", (e) => {
   if (e.relatedTarget) return;
   pointerInside = true;
+  if (pinnedReveal) pinTouched = true; // the summon got used
   // A visible dock never counts down while you're on it — any trigger mode.
   if (!hiddenState) clearTimeout(hideTimer);
 });
 window.addEventListener("pointerout", (e) => {
   if (e.relatedTarget) return;
   pointerInside = false;
+  // A used pin ends when you leave — the dock goes back to normal hiding.
+  if (pinnedReveal && pinTouched) pinnedReveal = false;
   // Leaving is the moment a wanted hide (edge mode, or smart while covered)
   // actually happens — after the grace delay.
   if (!hiddenState && wantsHideNow()) scheduleHide();
@@ -2473,9 +2476,11 @@ if (dockApi.onCursorInside)
     if (v === pointerInside) return;
     pointerInside = v;
     if (v) {
+      if (pinnedReveal) pinTouched = true;
       if (!hiddenState) clearTimeout(hideTimer);
-    } else if (!hiddenState && wantsHideNow()) {
-      scheduleHide();
+    } else {
+      if (pinnedReveal && pinTouched) pinnedReveal = false;
+      if (!hiddenState && wantsHideNow()) scheduleHide();
     }
   });
 
@@ -2570,21 +2575,37 @@ dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", () => { if (wantsHideNow()) scheduleHide(); });
 
 // The notch is now its own small window. Clicking it calls the backend, which
-// shows the dock window again and fires `booki://reveal` — we pin the dock open
-// (so the user can actually launch something) until they click away or launch.
-onReveal(() => {
-  manualHide = false; // explicit notch click always brings the dock back
+// shows the dock window again and fires `booki://reveal`. This must NOT go
+// through reveal() — that helper is the hover-trigger path and bails out in
+// click mode, which silently ate the notch click (the dock never came back in
+// \u201cal salir\u201d). An explicit summon always reveals, whatever the trigger.
+let pinTimer = null;
+let pinTouched = false; // the pointer actually visited the dock since the pin
+function pinOpen() {
+  if (fullscreen) return;
+  manualHide = false;
   pinnedReveal = true;
-  reveal();
-});
+  pinTouched = false;
+  clearTimeout(hideTimer);
+  setHidden(false);
+  // Outside clicks pass through the stage window now, so they can't release
+  // the pin — instead the pin ends when you visit the dock and leave, with a
+  // timeout valve for an accidental summon that's never used.
+  clearTimeout(pinTimer);
+  pinTimer = setTimeout(() => {
+    if (pinnedReveal && !pinTouched) {
+      pinnedReveal = false;
+      if (wantsHideNow()) scheduleHide();
+    }
+  }, 8000);
+}
+onReveal(pinOpen);
 
 // Hot edge: the cursor was pushed against the dock's screen edge — an explicit
 // "come out" gesture, treated exactly like clicking the notch.
 onHotEdge(() => {
   if (fullscreen || !hiddenState) return;
-  manualHide = false;
-  pinnedReveal = true;
-  reveal();
+  pinOpen();
 });
 
 // Clicking anywhere outside the dock releases a pinned reveal and lets the dock
@@ -3343,22 +3364,24 @@ async function toggleStack(tileEl, item) {
     const dr = dockEl.getBoundingClientRect();
     const gap = 10;
     stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
+    // Anchor the panel to the bar's real POSITION (not its size — that ignored
+    // the anchored-side padding and sat the flyout ON TOP of the bar's first row).
     if (!isVertical()) {
       const r = tileEl.getBoundingClientRect();
       const sw = stackEl.offsetWidth;
       let left = r.left + r.width / 2 - sw / 2;
       left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
       stackEl.style.left = `${left}px`;
-      if (cfg.edge === "top") stackEl.style.top = `${dr.height + gap}px`;
-      else stackEl.style.bottom = `${dr.height + gap}px`;
+      if (cfg.edge === "top") stackEl.style.top = `${dr.bottom + gap}px`;
+      else stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
     } else {
       const r = tileEl.getBoundingClientRect();
       const sh = stackEl.offsetHeight;
       let top = r.top + r.height / 2 - sh / 2;
       top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
       stackEl.style.top = `${top}px`;
-      if (cfg.edge === "left") stackEl.style.left = `${dr.width + gap}px`;
-      else stackEl.style.right = `${dr.width + gap}px`;
+      if (cfg.edge === "left") stackEl.style.left = `${dr.right + gap}px`;
+      else stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
     }
   };
   // The stage window never resizes for the flyout, so it can open on the very

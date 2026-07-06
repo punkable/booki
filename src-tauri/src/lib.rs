@@ -464,6 +464,9 @@ fn reveal_dock(app: AppHandle) {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
+        // A revealed dock must be immediately clickable — never wait for the
+        // cursor watcher's next tick to lift click-through.
+        let _ = dock.set_ignore_cursor_events(false);
         let _ = dock.show();
     }
 }
@@ -483,6 +486,7 @@ fn reveal_running_dock(app: &AppHandle) {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.set_ignore_cursor_events(false);
         let _ = dock.show();
         let _ = dock.set_focus();
     }
@@ -1847,14 +1851,18 @@ pub fn run() {
                                     // Window hidden → leave it interactive so the
                                     // next reveal is immediately usable; idle slower.
                                     if last != Some(true) {
-                                        win::set_click_through(hwnd, false);
+                                        let _ = watch.set_ignore_cursor_events(false);
                                         last = Some(true);
                                     }
                                     std::thread::sleep(std::time::Duration::from_millis(180));
                                 }
                                 Some(inside) => {
                                     if last != Some(inside) {
-                                        win::set_click_through(hwnd, !inside);
+                                        // Tauri's own path: applies the style with the
+                                        // proper frame refresh on the window's thread —
+                                        // a raw SetWindowLongPtr left the window in a
+                                        // half-applied state that could stop painting.
+                                        let _ = watch.set_ignore_cursor_events(!inside);
                                         last = Some(inside);
                                         let _ = handle.emit("booki://cursor-inside", inside);
                                     }

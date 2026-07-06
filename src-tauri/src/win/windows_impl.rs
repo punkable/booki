@@ -680,29 +680,6 @@ pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
     }
 }
 
-/// Toggle click-through on the dock window. The dock is a fixed-size
-/// transparent "stage" (it never resizes for flyouts/menus, which is what
-/// caused visible repaint jumps); a fast cursor watcher makes the window
-/// interactive only while the cursor is over the bar or an open panel, so the
-/// stage's empty regions never steal clicks from the apps behind it.
-pub fn set_click_through(hwnd: isize, on: bool) {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, WS_EX_LAYERED, WS_EX_TRANSPARENT,
-    };
-    let handle = HWND(hwnd as *mut c_void);
-    unsafe {
-        let ex = GetWindowLongPtrW(handle, GWL_EXSTYLE);
-        let new = if on {
-            ex | (WS_EX_TRANSPARENT.0 | WS_EX_LAYERED.0) as isize
-        } else {
-            ex & !(WS_EX_TRANSPARENT.0 as isize)
-        };
-        if new != ex {
-            SetWindowLongPtrW(handle, GWL_EXSTYLE, new);
-        }
-    }
-}
-
 /// Is the OS cursor inside any of the given window-relative CSS-px rects?
 /// `all` short-circuits to "the whole window is interactive" (used during
 /// internal drags and the edge-move overlay). Returns None while the window
