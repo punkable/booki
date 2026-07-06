@@ -99,6 +99,8 @@ async function mockInvoke(cmd, args) {
       return null;
     case "copy_text":
       return true;
+    case "recent_files_for":
+      return [];
     case "list_dir":
       return [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
@@ -352,6 +354,8 @@ export const dock = {
   // Explorer-grade thumbnail for a file (photos/videos in folder flyouts).
   fileThumbnail: (path) => invoke("file_thumbnail", { path }),
   copyText: (text) => invoke("copy_text", { text }),
+  // Recents filtered to one app (by file association) for its context menu.
+  recentFilesFor: (path, limit = 6) => invoke("recent_files_for", { appPath: path, limit }),
   openWith: (path) => invoke("open_with", { path }),
   // Native OLE drag-out: drag a file from the folder flyout into Explorer or
   // any other app. The OS runs the drag, the target decides copy vs move.
