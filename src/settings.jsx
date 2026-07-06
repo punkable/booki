@@ -713,7 +713,7 @@ function PinThumb({ item }) {
   );
 }
 
-const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes", volume: "speaker" };
+const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes", volume: "speaker", clipboard: "clipboard" };
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -809,6 +809,8 @@ function Appearance({ cfg, set }) {
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
+
+      <h2 className="s-subhead">{t("gp.notch")}</h2>
       <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
         <NotchStylePicker cfg={cfg} set={set} />
       </Row>
@@ -851,6 +853,7 @@ function Behavior({ cfg, set }) {
       </Row>
       {cfg.autoHideMode !== "off" && (
         <>
+          <h2 className="s-subhead">{t("gp.notch")}</h2>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
           <Row label={t("be.reveal")} hint={t("be.revealHint")}>
@@ -1584,6 +1587,7 @@ function Apps({ cfg, set }) {
           ["clock", t("w.clock")], ["cpu", "CPU"], ["ram", "RAM"], ["disk", t("w.disk")],
           ["net", t("w.net")], ["uptime", t("w.uptime")], ["battery", t("w.battery")],
           ["notes", t("w.notes")], ["media", t("w.media")], ["volume", t("w.volume")],
+          ["clipboard", t("w.clipboard")],
         ]
           // Hide widgets you already have — no point adding a second of the same.
           .filter(([w]) => !cfg.pinned.some((p) => p.kind === "widget" && p.widget === w))
@@ -2252,6 +2256,10 @@ function ChangelogModal({ onClose }) {
           <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
         </div>
         <div className="cl-list">
+          <div className="cl-beta">
+            <span className="cl-beta-badge">{t("cl.betaBadge")}</span>
+            <p className="cl-beta-body">{t("cl.betaBody")}</p>
+          </div>
           {CHANGELOG.slice(0, 1).map((entry, idx) => (
             <section key={entry.version} className={"cl-entry" + (idx === 0 ? " latest" : "")}>
               <div className="cl-entry-head">
@@ -2270,6 +2278,19 @@ function ChangelogModal({ onClose }) {
               ))}
             </section>
           ))}
+          {CHANGELOG.length > 1 && (
+            <div className="cl-recent">
+              <h4 className="cl-recent-title">{t("cl.recentTitle")}</h4>
+              <ul className="cl-recent-list">
+                {CHANGELOG.slice(1, 5).map((entry) => (
+                  <li key={entry.version}>
+                    <span className="cl-recent-ver">v{entry.version}</span>
+                    <span className="cl-recent-headline">{entry.headline}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="cl-foot">
           <span className="cl-credit">{t("cl.by")} Punkable · @Punkabl3</span>
