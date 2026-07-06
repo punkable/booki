@@ -90,6 +90,8 @@ async function mockInvoke(cmd, args) {
       return "#3a86ff";
     case "is_dir":
       return false;
+    case "set_hit_rects":
+      return null;
     case "list_dir":
       return [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
@@ -330,6 +332,15 @@ export const dock = {
   reposition: (edge) => invoke("reposition_dock", { edge }),
   setDockFrame: (edge, width, height, hidden = false) =>
     invoke("set_dock_frame", { edge, width, height, hidden }),
+  // Interactive regions of the stage window (window-relative CSS px); `all`
+  // keeps the whole window interactive during drags/overlays.
+  setHitRects: (rects, all = false) => invoke("set_hit_rects", { rects, all }),
+  // Backend cursor watcher: fires when the OS cursor enters/leaves the dock's
+  // live regions (DOM events can't see it once the window ignores the mouse).
+  onCursorInside: (cb) => {
+    if (!(T && T.event && T.event.listen)) return Promise.resolve(() => {});
+    return T.event.listen("booki://cursor-inside", (e) => cb(!!e.payload));
+  },
   dockCoverWorkarea: () => invoke("dock_cover_workarea"),
   knownFolders: () => invoke("known_folders"),
   syncContextMenu: (enabled, labelPin, labelGroup) =>

@@ -204,6 +204,11 @@ function applyAll() {
   setLang(cfg.language);
   applyTheme(cfg);
   applyEdge(cfg);
+  // The stage window spans the whole edge; the BAR aligns to the notch's
+  // along-edge slot with CSS (the window itself no longer travels).
+  const slot = cfg.notchPosition === "start" ? "start" : cfg.notchPosition === "end" ? "end" : "center";
+  ["slot-start", "slot-center", "slot-end"].forEach((c) => document.body.classList.remove(c));
+  document.body.classList.add(`slot-${slot}`);
   const root = document.documentElement;
   // The bar's frosted material is CSS-only now (no native vibrancy on the dock
   // window — that caused the gray box). Map material strength 0–100 → a sensible
@@ -2186,38 +2191,34 @@ function reframe() {
 // magnified tiles must fit here or the window edge slices them off.
 const SHADOW_PAD = 36;
 
+// Fixed headroom past the bar for everything that opens around it — group
+// flyouts, context menu, popovers, tooltips, the update pill, magnify and the
+// soft shadow. Reserving it permanently is THE anti-flicker design: opening a
+// group/menu is pure DOM inside a window that never resizes (every native
+// resize repaints a frame where the WebView's layout lags the new rect — that
+// lag was the visible jump/blink). Empty stage regions don't steal clicks: a
+// cursor watcher (backend) flips the window click-through outside the hit
+// rects the frontend reports (reportHitRects).
+const PANEL_ROOM = 440;
+
 let lastFull = null;
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
-  // The window is the bar plus a transparent shadow-pad margin. The dock surface
-  // is centered inside via body padding; magnify and the soft shadow live in the
-  // pad. The hover name uses the native OS tooltip (title attr).
+  // The STAGE: full length along the anchored edge; bar depth + panel headroom
+  // across it. It only changes when the bar's depth changes (icon size, labels,
+  // compact) or the screen does — never when something opens or closes.
   // Use offsetWidth/Height (layout size) — NOT getBoundingClientRect — so a dock
   // that's currently scaled by the minimize animation doesn't size the window too
   // small (which left the bar looking cut off after revealing, esp. at the top).
-  // The anchored side's transparent pad shrinks with the user's edge gap, so
-  // the window hugs the bar there; the other sides keep the full shadow pad.
   const edgePad = Math.min(SHADOW_PAD, Math.max(4, Math.min(96, cfg.edgeGap ?? 48)));
-  let wCss = dockEl.offsetWidth + (isVertical() ? SHADOW_PAD + edgePad : SHADOW_PAD * 2);
-  let hCss = dockEl.offsetHeight + (isVertical() ? SHADOW_PAD * 2 : SHADOW_PAD + edgePad);
-  // Make room for an open folder-stack flyout.
-  if (stackOpen && stackEl) {
-    const sr = stackEl.getBoundingClientRect();
-    hCss += sr.height + 16;
-    wCss = Math.max(wCss, sr.width + 32);
+  let wCss, hCss;
+  if (isVertical()) {
+    wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
+    hCss = window.screen.availHeight;
+  } else {
+    wCss = window.screen.availWidth;
+    hCss = dockEl.offsetHeight + edgePad + PANEL_ROOM;
   }
-  // …and for anything open beside the bar: popovers (trash confirm, first-run
-  // tips) and the context menu. Everything that isn't the bar itself must fit
-  // INSIDE the window or it gets clipped at the window edge.
-  const pop = document.querySelector(".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden)");
-  if (pop) {
-    if (isVertical()) wCss += pop.offsetWidth + 24;
-    else hCss += pop.offsetHeight + 24;
-    wCss = Math.max(wCss, pop.offsetWidth + 40);
-  }
-  // Never let the window exceed the screen — otherwise a very full dock (or a
-  // wide flyout) makes an over-screen window that the OS clips, and the dock
-  // looks broken. The bar itself is already capped to the screen in fitDock.
   wCss = Math.min(wCss, window.screen.availWidth);
   hCss = Math.min(hCss, window.screen.availHeight);
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
@@ -2401,6 +2402,73 @@ window.addEventListener("pointerout", (e) => {
   // actually happens — after the grace delay.
   if (!hiddenState && wantsHideNow()) scheduleHide();
 });
+
+// ───────────────── Hit regions of the stage window ─────────────────
+// The window spans the whole edge but only the bar (with its halo) and open
+// panels are interactive; everywhere else the backend flips it click-through.
+// Report those regions whenever the DOM changes.
+let lastHitSig = "";
+function reportHitRects() {
+  if (!dockApi.setHitRects) return;
+  // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
+  // drag over the dock) → the whole stage stays interactive; never yank the
+  // window out from under a gesture.
+  const all = !!(edgeMove || dragging || draggingFile || document.body.classList.contains("edit"));
+  const rects = [];
+  const add = (el, inflate) => {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    rects.push([r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2]);
+  };
+  // The bar's halo ≈ the old tight window, so hover/magnify/file-drop feel
+  // exactly like before — and clicks right past the shadow now reach the apps
+  // behind (the old window silently ate them).
+  add(dockEl, SHADOW_PAD);
+  if (stackOpen) add(stackEl, 14);
+  for (const el of document.querySelectorAll(
+    ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill"
+  ))
+    add(el, 10);
+  const sig = all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
+  if (sig === lastHitSig) return;
+  lastHitSig = sig;
+  dockApi.setHitRects(rects, all).catch(() => {});
+}
+let hitRafId = 0;
+function scheduleHitReport() {
+  if (hitRafId) return;
+  hitRafId = requestAnimationFrame(() => {
+    hitRafId = 0;
+    reportHitRects();
+  });
+}
+// Any open/close/move in the window re-reports (one measurement per frame);
+// a slow safety tick self-heals anything the observer can't see.
+new MutationObserver(scheduleHitReport).observe(document.body, {
+  subtree: true,
+  childList: true,
+  attributes: true,
+  attributeFilter: ["class", "style"],
+});
+window.addEventListener("resize", scheduleHitReport);
+setInterval(() => {
+  if (!hiddenState) reportHitRects();
+}, 900);
+
+// The backend cursor watcher is the source of truth for "is the pointer on
+// the dock" once the window can go click-through — DOM enter/leave events
+// stop arriving the moment the window starts ignoring the mouse.
+if (dockApi.onCursorInside)
+  dockApi.onCursorInside((v) => {
+    if (v === pointerInside) return;
+    pointerInside = v;
+    if (v) {
+      if (!hiddenState) clearTimeout(hideTimer);
+    } else if (!hiddenState && wantsHideNow()) {
+      scheduleHide();
+    }
+  });
 
 function setupAutoHide() {
   clearTimeout(hideTimer);
@@ -3199,13 +3267,13 @@ async function toggleStack(tileEl, item) {
       else stackEl.style.right = `${dr.width + gap}px`;
     }
   };
-  // Re-place when the window actually finishes resizing (async), plus a fallback.
-  pendingReplace = placeStack;
-  setTimeout(() => requestAnimationFrame(() => {
+  // The stage window never resizes for the flyout, so it can open on the very
+  // next frame — position it, then flip to .open so the transition plays.
+  pendingReplace = placeStack; // re-place if the window DOES resize (screen change)
+  requestAnimationFrame(() => {
     placeStack();
-    // Positioned in its closed state → flip to open so the transition plays.
-    stackEl.classList.add("open");
-  }), 90);
+    requestAnimationFrame(() => stackEl.classList.add("open"));
+  });
 }
 
 let stackCloseTimer = null;
