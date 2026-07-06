@@ -29,6 +29,14 @@ static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 /// "+" tile). Same read-and-clear pattern as PENDING_CHANGELOG.
 static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 
+/// Interactive regions of the dock "stage" window, reported by the frontend
+/// (window-relative CSS px). The stage is a fixed-size transparent window that
+/// never resizes for flyouts/menus; a cursor watcher flips it click-through
+/// whenever the cursor isn't over one of these rects. `bool` = the whole
+/// window is interactive (edge-move overlay, internal drags).
+#[allow(clippy::type_complexity)]
+static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), true));
+
 /// Generation counter for the notch preview: each preview bumps it, and only the
 /// timer holding the LATEST generation hides the notch again (rapid style
 /// changes in settings keep the preview alive instead of blinking it away).
@@ -110,6 +118,15 @@ fn set_dock_frame(
         .map_err(|e| e.to_string())?;
     let _ = hidden;
     Ok(())
+}
+
+/// The frontend reports which regions of the stage window are actually
+/// interactive (the bar with its halo, an open flyout/menu/popover). The
+/// cursor watcher consumes this to toggle click-through, so the big
+/// transparent window never blocks clicks meant for the apps behind it.
+#[tauri::command]
+fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
+    *HIT_RECTS.lock().unwrap() = (rects, all);
 }
 
 /// Grow the dock window to cover the whole work area so it can host the
@@ -734,6 +751,11 @@ fn paths_exist(paths: Vec<String>) -> Vec<bool> {
 /// is clamped on-screen without panicking when the span is tiny. Shared by the
 /// notch and the dock so they land aligned (the dock stays "parallel" to the notch).
 fn along_offset(start: i32, span: i32, win: i32, position: &str) -> i32 {
+    // A stage window that fills (or exceeds) the whole span just pins to the
+    // start — the bar aligns itself inside via CSS.
+    if win >= span {
+        return start;
+    }
     let want = match position {
         "start" => start + span / 6 - win / 2,
         "end" => start + span - span / 6 - win / 2,
@@ -1488,6 +1510,7 @@ pub fn run() {
             focus_window,
             reposition_dock,
             set_dock_frame,
+            set_hit_rects,
             dock_cover_workarea,
             sync_context_menu,
             known_folders,
@@ -1700,6 +1723,48 @@ pub fn run() {
                                 if edge_streak >= 2 && edge_cooldown == 0 {
                                     edge_cooldown = 6; // ≈1.8 s between triggers
                                     let _ = handle.emit("booki://hot-edge", ());
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Cursor watcher for the stage window: at ~30 ms it flips the
+                // dock between interactive and click-through against the hit
+                // rects reported by the frontend, and tells the frontend when
+                // the cursor enters/leaves the dock's live regions (DOM
+                // enter/leave events can't see that once the window is
+                // ignoring the mouse). GetCursorPos + a few rect tests — the
+                // per-tick cost is nanoseconds.
+                #[cfg(windows)]
+                {
+                    let watch = dock.clone();
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        let hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                        if hwnd == 0 {
+                            return;
+                        }
+                        let mut last: Option<bool> = None;
+                        loop {
+                            let (rects, all) = HIT_RECTS.lock().unwrap().clone();
+                            match win::cursor_in_rects(hwnd, &rects, all) {
+                                None => {
+                                    // Window hidden → leave it interactive so the
+                                    // next reveal is immediately usable; idle slower.
+                                    if last != Some(true) {
+                                        win::set_click_through(hwnd, false);
+                                        last = Some(true);
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(180));
+                                }
+                                Some(inside) => {
+                                    if last != Some(inside) {
+                                        win::set_click_through(hwnd, !inside);
+                                        last = Some(inside);
+                                        let _ = handle.emit("booki://cursor-inside", inside);
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(30));
                                 }
                             }
                         }
