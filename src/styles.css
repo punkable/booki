@@ -533,6 +533,59 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
   background: linear-gradient(90deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, black)); transition: width 0.4s var(--ease); }
 
+/* Preview card (notes, clipboard, …) — a colored icon square + bold title +
+   a live one-line preview of the real content, closer to a Windows
+   notification/widget card than a bare stat readout. Needs more width than
+   the default widget min, so it gets its own. */
+.tile.widget.preview { min-width: calc(var(--size) * 2.9); }
+.w-pv-ico {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--size) * 0.74);
+  height: calc(var(--size) * 0.74);
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--tile-r) * 0.7);
+  background: color-mix(in srgb, var(--w-accent) 22%, transparent);
+}
+.w-pv-ico img.emo { width: 62% !important; height: 62% !important; }
+.w-pv-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent);
+  border: 1.5px solid var(--layer-strong);
+  border-radius: var(--r-pill);
+}
+.w-pv-count:not(:empty) { display: flex; }
+.w-pv-main { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+.w-pv-title { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-pv-sub { font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-pv-sub.empty { font-style: italic; opacity: 0.75; }
+.w-pv-badge {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.w-pv-badge svg { width: 12px; height: 12px; }
+.tile.widget.preview:hover .w-pv-badge { color: var(--ink); background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.tile.widget[data-variant="solid"] .w-pv-ico, .tile.widget[data-variant="gradient"] .w-pv-ico { background: rgba(255, 255, 255, 0.22); }
+.tile.widget[data-variant="solid"] .w-pv-badge, .tile.widget[data-variant="gradient"] .w-pv-badge { background: rgba(255, 255, 255, 0.22); color: #fff; }
+
 /* Variants */
 .tile.widget[data-variant="glass"] .w-card { -webkit-backdrop-filter: blur(8px) saturate(150%); backdrop-filter: blur(8px) saturate(150%); }
 .tile.widget[data-variant="solid"] .w-card { background: var(--w-accent); border-color: transparent; }
@@ -809,6 +862,20 @@ body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value {
 body.edge-left .tile.widget .w-bar, body.edge-right .tile.widget .w-bar {
   width: 100%;
 }
+/* Preview cards collapse to just the icon (+ unread badge) — the narrow rail
+   has no room for a title/subtitle line, and centering long text like
+   "Portapapeles" / "algo copiado" in ~46px only clipped it unreadably on both
+   sides. The full text is still reachable via the native tooltip (el.title)
+   and by opening the card (edit note / clipboard flyout). This also keeps the
+   card's height in line with the other icon-only widgets instead of towering
+   over them. The trailing action badge is dropped too (no room). */
+body.edge-left .tile.widget.preview .w-card, body.edge-right .tile.widget.preview .w-card {
+  padding: 6px 3px 5px;
+}
+body.edge-left .tile.widget.preview .w-pv-main, body.edge-right .tile.widget.preview .w-pv-main,
+body.edge-left .tile.widget.preview .w-pv-badge, body.edge-right .tile.widget.preview .w-pv-badge {
+  display: none;
+}
 body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
   width: calc(var(--size) * 0.78);
   height: calc(var(--size) * 0.78);
@@ -888,9 +955,51 @@ body.edge-left .tile.widget.media .w-ctl svg, body.edge-right .tile.widget.media
   height: 11px;
 }
 
-/* Volume card: muted reads at a glance (dimmed value + bar). */
+/* Volume card: muted reads at a glance (dimmed value + bar/ring). */
 .tile.widget[data-widget="volume"].muted .w-value,
-.tile.widget[data-widget="volume"].muted .w-bar { opacity: 0.45; }
+.tile.widget[data-widget="volume"].muted .w-bar,
+.tile.widget[data-widget="volume"].muted .w-ring { opacity: 0.45; }
+
+/* Circular progress ring (CPU/RAM/disk/battery/volume) — a proper gauge
+   instead of a linear bar, à la Docky/Cooldock. The SVG only draws the two
+   circles; the number is a plain HTML span centered on top (crisper text,
+   no SVG text-baseline fiddling, and it can reuse tweenNumber like any
+   other widget value). */
+.w-ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: calc(var(--size) * 0.78);
+  height: calc(var(--size) * 0.78);
+  display: grid;
+  place-items: center;
+}
+.w-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.w-ring-track { fill: none; stroke: var(--track); stroke-width: 3; }
+.w-ring-fill {
+  fill: none;
+  stroke: var(--w-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s var(--ease);
+}
+@media (prefers-reduced-motion: reduce) { .w-ring-fill { transition: none; } }
+.w-ring-num {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--size) * 0.24);
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.tile.widget[data-variant="solid"] .w-ring-track,
+.tile.widget[data-variant="gradient"] .w-ring-track { stroke: rgba(255, 255, 255, 0.28); }
+.tile.widget[data-variant="solid"] .w-ring-fill,
+.tile.widget[data-variant="gradient"] .w-ring-fill { stroke: #fff; }
+.tile.widget[data-variant="solid"] .w-ring-num,
+.tile.widget[data-variant="gradient"] .w-ring-num { color: #fff; }
+.tile.widget[data-variant="outline"] .w-ring-num { color: var(--w-accent); }
 
 /* ─────────── Notch window (the always-reliable "home pill") ─────────── */
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
@@ -1287,8 +1396,6 @@ body.edit .dock { cursor: grab; }
 /* Highlight an icon when a file is dragged over it (drop-to-open). */
 .tile.drop-target { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: 0 0 0 2px var(--accent); }
 /* Running-app dot indicator. */
-/* Notes widget: allow a couple of wrapped lines. */
-.w-value.w-note { font-size: 12px; font-weight: 600; white-space: normal; line-height: 1.2; max-height: 2.5em; overflow: hidden; }
 .tile.merge-target::before {
   content: ""; position: absolute; inset: -3px; border-radius: 30%;
   box-shadow: 0 0 0 2px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);

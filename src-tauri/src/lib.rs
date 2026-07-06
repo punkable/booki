@@ -1110,6 +1110,23 @@ fn clipboard_count() -> usize {
     CLIP_HISTORY.lock().unwrap().len()
 }
 
+#[derive(serde::Serialize)]
+struct ClipSummary {
+    count: usize,
+    preview: Option<String>,
+}
+
+/// Count + the newest entry's text in ONE round trip — the bar widget shows a
+/// live preview of what you last copied, not just a bare number.
+#[tauri::command]
+fn clipboard_summary() -> ClipSummary {
+    let hist = CLIP_HISTORY.lock().unwrap();
+    ClipSummary {
+        count: hist.len(),
+        preview: hist.first().map(|e| e.text.clone()),
+    }
+}
+
 /// Put a history entry (or freshly-edited text) back on the OS clipboard, and
 /// record/bump it in history immediately — instant UI feedback instead of
 /// waiting for the background watcher's next tick.
@@ -1751,6 +1768,7 @@ pub fn run() {
             recent_files_for,
             clipboard_history,
             clipboard_count,
+            clipboard_summary,
             clipboard_copy,
             clipboard_delete,
             clipboard_clear,
