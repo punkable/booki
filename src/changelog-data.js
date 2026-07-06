@@ -30,9 +30,10 @@ export const CHANGELOG = [
       },
       {
         icon: "🛠️",
-        title: "Otro fix",
+        title: "Otros fixes",
         notes: [
           "El menú del clic derecho sobre un pin a veces fallaba silenciosamente al buscar sus archivos recientes — arreglado.",
+          "El aviso de “Booki se ocultó” (pensado para juegos/películas a pantalla completa) a veces aparecía solo por cambiar de ventana con Alt+Tab o la vista de tareas — ya no confunde eso con pantalla completa real.",
         ],
       },
     ],
