@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.41.0"
+version = "0.42.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -23,6 +23,8 @@ tauri-plugin-process = "2"
 # Ensure only one Booki runs: a second launch reveals the existing dock instead
 # of opening a duplicate (dock + notch + tray).
 tauri-plugin-single-instance = "2"
+# Native drag-out: drag a file from the folder flyout into Explorer/other apps.
+tauri-plugin-drag = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "5"
@@ -54,6 +56,8 @@ features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
     "Win32_System_Power",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
     "Win32_System_Registry",
     "Win32_System_Threading",
     "Win32_UI_HiDpi",
