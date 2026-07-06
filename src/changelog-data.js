@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.40.0",
+    date: "5 jul 2026",
+    headline: "Las carpetas grandes abren al instante, y con acceso directo al Explorador.",
+    sections: [
+      {
+        icon: "⚡",
+        title: "Carpetas sin espera",
+        notes: [
+          "Al abrir una carpeta anclada (como Descargas), el panel aparece AL INSTANTE con celdas de carga y se rellena en cuanto llega el contenido — ya no se queda pensando con carpetas llenas.",
+          "Si la carpeta tiene más elementos de los que caben en el panel, una fila te lo dice y te lleva al Explorador para verlo todo.",
+        ],
+      },
+      {
+        icon: "📂",
+        title: "Abrir en el Explorador",
+        notes: [
+          "Las carpetas ancladas ahora tienen un botón en la cabecera del panel para abrir la carpeta directamente en el Explorador de Windows.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.39.0",
     date: "5 jul 2026",
     headline: "Busca y ancla en segundos, y el dock te abre un hueco al arrastrar.",
