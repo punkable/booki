@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.41.0",
+    date: "6 jul 2026",
+    headline: "Adiós al parpadeo: el dock ya no se mueve ni un píxel al abrir cosas.",
+    sections: [
+      {
+        icon: "🎯",
+        title: "Estabilidad visual total",
+        notes: [
+          "Rediseñamos cómo vive el dock en pantalla: su ventana ahora es un escenario fijo que NUNCA cambia de tamaño al abrir grupos, menús o paneles. Antes, cada apertura redimensionaba la ventana y eso producía el salto/parpadeo que se veía siempre.",
+          "Abrir y cerrar grupos ahora es instantáneo y suave — es puro contenido moviéndose dentro de la ventana, sin que Windows tenga que tocar nada.",
+        ],
+      },
+      {
+        icon: "🖱️",
+        title: "Clics más limpios que nunca",
+        notes: [
+          "La zona invisible alrededor de la barra ya no roba clics: si haces clic justo al lado del dock, el clic llega a la app de atrás, como debe ser.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.40.0",
     date: "5 jul 2026",
     headline: "Las carpetas grandes abren al instante, y con acceso directo al Explorador.",

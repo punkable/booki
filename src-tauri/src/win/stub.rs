@@ -104,6 +104,12 @@ pub fn known_folders() -> Vec<(String, String)> {
 
 pub fn move_window(_hwnd: isize, _x: i32, _y: i32, _w: i32, _h: i32) {}
 
+pub fn set_click_through(_hwnd: isize, _on: bool) {}
+
+pub fn cursor_in_rects(_hwnd: isize, _rects: &[(f64, f64, f64, f64)], _all: bool) -> Option<bool> {
+    None
+}
+
 pub fn sync_context_menu(
     _enabled: bool,
     _exe: &str,
