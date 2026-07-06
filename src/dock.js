@@ -542,7 +542,7 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume"];
+const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume", "clipboard"];
 // Transport glyphs for the media card — filled, rounded, Fluent-like SVGs.
 const MEDIA_SVG = {
   prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
@@ -554,7 +554,7 @@ const MEDIA_SVG = {
 const WIDGET_ICONS = {
   clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna",
   uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes",
-  volume: "speaker",
+  volume: "speaker", clipboard: "clipboard",
 };
 const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
 const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
@@ -564,7 +564,7 @@ function widgetLabel(type) {
     {
       clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"),
       net: t("w.net"), uptime: t("w.uptime"), battery: t("w.battery"), notes: t("w.notes"),
-      media: t("w.media"), volume: t("w.volume"),
+      media: t("w.media"), volume: t("w.volume"), clipboard: t("w.clipboard"),
     }[type] || type
   );
 }
@@ -822,6 +822,18 @@ async function pollVolume() {
   if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
 }
 
+// Clipboard-history widget: the bar card only shows a live COUNT (cheap to
+// poll) — the full text list is fetched once, when the flyout actually opens.
+function renderClipboardCount(n) {
+  eachWidget("clipboard", (el) => {
+    setText(el, t("w.clipboard"), n > 0 ? String(n) : "—", n > 0 ? t("clip.countHint").replace("{n}", n) : t("clip.empty"));
+  });
+}
+async function pollClipboard() {
+  const n = await dockApi.clipboardCount().catch(() => 0);
+  renderClipboardCount(n);
+}
+
 // ONE poll loop drives every live widget on its own cadence — a single timer
 // instead of three, and it does nothing while the dock is tucked away. Fewer
 // wakeups → lighter on the battery.
@@ -851,16 +863,18 @@ function startPolls() {
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
   const hasVolume = widgetPresent("volume");
+  const hasClipboard = widgetPresent("clipboard");
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasStats && !hasMedia && !hasVolume) return;
+  if (!hasClock && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
   if (hasClock) tickClocks();
   if (hasStats) pollStats();
   if (hasMedia) pollMedia();
   if (hasVolume) pollVolume();
+  if (hasClipboard) pollClipboard();
   const t0 = Date.now();
-  pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000 };
+  pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000, clipboard: t0 + 4000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
   const base = hasClock ? 1000 : 1500;
@@ -871,11 +885,13 @@ function startPolls() {
     if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
     if (hasMedia && now >= pollDue.media) { pollDue.media = now + 3000; pollMedia(); }
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + 4000; pollVolume(); }
+    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000; pollClipboard(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
 function refreshMedia() { pollDue.media = 0; if (!hiddenState) pollMedia(); }
 function refreshVolume() { pollDue.volume = 0; if (!hiddenState) pollVolume(); }
+function refreshClipboard() { pollDue.clipboard = 0; if (!hiddenState) pollClipboard(); }
 
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
@@ -975,6 +991,7 @@ function launch(el, item) {
     if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia, () => {});
     if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
     if (item.widget === "notes") editNote(item);
+    if (item.widget === "clipboard") toggleClipboardStack(el);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -3375,37 +3392,40 @@ async function toggleStack(tileEl, item) {
   // pattern as the context menu / popovers, so opening a folder never flashes
   // a clipped panel while the window catches up.
   applyFrame();
-  const placeStack = () => {
-    const dr = dockEl.getBoundingClientRect();
-    const gap = 10;
-    stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
-    // Anchor the panel to the bar's real POSITION (not its size — that ignored
-    // the anchored-side padding and sat the flyout ON TOP of the bar's first row).
-    if (!isVertical()) {
-      const r = tileEl.getBoundingClientRect();
-      const sw = stackEl.offsetWidth;
-      let left = r.left + r.width / 2 - sw / 2;
-      left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
-      stackEl.style.left = `${left}px`;
-      if (cfg.edge === "top") stackEl.style.top = `${dr.bottom + gap}px`;
-      else stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
-    } else {
-      const r = tileEl.getBoundingClientRect();
-      const sh = stackEl.offsetHeight;
-      let top = r.top + r.height / 2 - sh / 2;
-      top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
-      stackEl.style.top = `${top}px`;
-      if (cfg.edge === "left") stackEl.style.left = `${dr.right + gap}px`;
-      else stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
-    }
-  };
   // The stage window never resizes for the flyout, so it can open on the very
   // next frame — position it, then flip to .open so the transition plays.
+  const placeStack = () => placeStackNear(tileEl);
   pendingReplace = placeStack; // re-place if the window DOES resize (screen change)
   requestAnimationFrame(() => {
     placeStack();
     requestAnimationFrame(() => stackEl.classList.add("open"));
   });
+}
+
+// Anchor #stack to a tile's real POSITION (not its size — that ignores the
+// anchored-side padding and sits the flyout ON TOP of the bar's first row).
+// Shared by the folder/group flyout and the clipboard-history flyout below.
+function placeStackNear(tileEl) {
+  const dr = dockEl.getBoundingClientRect();
+  const gap = 10;
+  stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
+  if (!isVertical()) {
+    const r = tileEl.getBoundingClientRect();
+    const sw = stackEl.offsetWidth;
+    let left = r.left + r.width / 2 - sw / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
+    stackEl.style.left = `${left}px`;
+    if (cfg.edge === "top") stackEl.style.top = `${dr.bottom + gap}px`;
+    else stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
+  } else {
+    const r = tileEl.getBoundingClientRect();
+    const sh = stackEl.offsetHeight;
+    let top = r.top + r.height / 2 - sh / 2;
+    top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
+    stackEl.style.top = `${top}px`;
+    if (cfg.edge === "left") stackEl.style.left = `${dr.right + gap}px`;
+    else stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
+  }
 }
 
 let stackCloseTimer = null;
@@ -3423,6 +3443,158 @@ function closeStack() {
   // get cut off mid-fade.
   clearTimeout(stackCloseTimer);
   stackCloseTimer = setTimeout(reframe, 240);
+}
+
+// Clipboard-history flyout: the "clipboard" widget's click target. Reuses the
+// same #stack panel/positioning as the folder/group flyout (one flyout
+// concept, different content) so it inherits the stage-window stability,
+// hit-region reporting and open/close transition for free.
+async function toggleClipboardStack(tileEl) {
+  if (stackOpen) {
+    closeStack();
+    return;
+  }
+  stackEl.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "stack-head";
+  const glyph = document.createElement("span");
+  glyph.className = "stack-head-icon";
+  glyph.innerHTML = emo("clipboard", 15);
+  head.appendChild(glyph);
+  const title = document.createElement("span");
+  title.className = "stack-title";
+  title.textContent = t("clip.title");
+  head.appendChild(title);
+  const close = document.createElement("button");
+  close.className = "stack-close";
+  close.title = t("stack.close");
+  close.innerHTML = icon("x");
+  close.addEventListener("click", closeStack);
+  head.appendChild(close);
+  stackEl.appendChild(head);
+
+  const grid = document.createElement("div");
+  grid.className = "stack-grid clip-list";
+  stackEl.appendChild(grid);
+
+  const foot = document.createElement("div");
+  foot.className = "clip-foot";
+  stackEl.appendChild(foot);
+
+  stackOpen = true;
+  document.body.classList.add("stack-open");
+  applyFrame();
+  const placeStack = () => placeStackNear(tileEl);
+  pendingReplace = placeStack;
+
+  await renderClipboardList(grid, foot);
+  requestAnimationFrame(() => {
+    placeStack();
+    requestAnimationFrame(() => stackEl.classList.add("open"));
+  });
+}
+
+// (Re)draw the clipboard list into an already-open panel — used both on first
+// open and after copy/edit/delete/clear so the list stays live without
+// closing the flyout.
+async function renderClipboardList(grid, foot) {
+  let items = [];
+  try {
+    items = await dockApi.clipboardHistory(60);
+  } catch (_) {}
+  grid.innerHTML = "";
+  foot.innerHTML = "";
+  if (!stackOpen) return; // closed while we were awaiting
+  if (!items.length) {
+    grid.innerHTML = `<div class="stack-empty">${t("clip.empty")}</div>`;
+    if (pendingReplace) requestAnimationFrame(pendingReplace);
+    return;
+  }
+  items.forEach((entry, i) => {
+    const row = document.createElement("div");
+    row.className = "clip-row";
+    row.style.setProperty("--i", i);
+    const text = document.createElement("div");
+    text.className = "clip-text";
+    text.textContent = entry.text;
+    text.title = entry.text;
+    row.appendChild(text);
+
+    const acts = document.createElement("div");
+    acts.className = "clip-acts";
+    const act = (ic, title, fn) => {
+      const b = document.createElement("button");
+      b.className = "clip-act";
+      b.title = title;
+      b.innerHTML = icon(ic);
+      b.addEventListener("click", async (ev) => {
+        ev.stopPropagation();
+        await fn();
+      });
+      acts.appendChild(b);
+    };
+    act("pencil", t("clip.edit"), () => startClipEdit(row, entry, grid, foot));
+    act("trash", t("clip.delete"), async () => {
+      await dockApi.clipboardDelete(entry.id);
+      refreshClipboard();
+      await renderClipboardList(grid, foot);
+    });
+    row.appendChild(acts);
+
+    row.addEventListener("click", async () => {
+      await dockApi.clipboardCopy(entry.text);
+      refreshClipboard();
+      row.classList.add("copied");
+      setTimeout(() => row.classList.remove("copied"), 700);
+    });
+    grid.appendChild(row);
+  });
+
+  const clear = document.createElement("button");
+  clear.className = "clip-clear";
+  clear.textContent = t("clip.clear");
+  clear.addEventListener("click", async () => {
+    await dockApi.clipboardClear();
+    refreshClipboard();
+    await renderClipboardList(grid, foot);
+  });
+  foot.appendChild(clear);
+  if (pendingReplace) requestAnimationFrame(pendingReplace);
+}
+
+// Turn one row into an inline editor; Save copies the edited text (bumping it
+// to the top of history) and refreshes the list, Cancel just redraws as-is.
+function startClipEdit(row, entry, grid, foot) {
+  row.innerHTML = "";
+  row.classList.add("editing");
+  const ta = document.createElement("textarea");
+  ta.className = "clip-edit-area";
+  ta.value = entry.text;
+  row.appendChild(ta);
+  const acts = document.createElement("div");
+  acts.className = "clip-acts";
+  const save = document.createElement("button");
+  save.className = "clip-act";
+  save.title = t("clip.save");
+  save.innerHTML = icon("check");
+  save.addEventListener("click", async (ev) => {
+    ev.stopPropagation();
+    const v = ta.value.trim();
+    if (v) { await dockApi.clipboardCopy(v); refreshClipboard(); }
+    await renderClipboardList(grid, foot);
+  });
+  const cancel = document.createElement("button");
+  cancel.className = "clip-act";
+  cancel.title = t("clip.cancel");
+  cancel.innerHTML = icon("x");
+  cancel.addEventListener("click", async (ev) => {
+    ev.stopPropagation();
+    await renderClipboardList(grid, foot);
+  });
+  acts.appendChild(save);
+  acts.appendChild(cancel);
+  row.appendChild(acts);
+  ta.focus();
 }
 
 // Add an app into a folder from its open flyout, then reopen it so you can keep

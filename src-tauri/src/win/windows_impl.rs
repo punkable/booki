@@ -287,6 +287,44 @@ unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
     encode_png(width as u32, height as u32, &buf)
 }
 
+/// Read the clipboard's plain text (CF_UNICODETEXT), if any.
+pub fn clipboard_get_text() -> Option<String> {
+    use windows::Win32::Foundation::HGLOBAL;
+    use windows::Win32::System::DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard};
+    use windows::Win32::System::Memory::{GlobalLock, GlobalSize, GlobalUnlock};
+    const CF_UNICODETEXT: u32 = 13;
+    unsafe {
+        if OpenClipboard(None).is_err() {
+            return None;
+        }
+        let result = (|| {
+            let h = GetClipboardData(CF_UNICODETEXT).ok()?;
+            if h.0.is_null() {
+                return None;
+            }
+            let hglobal = HGLOBAL(h.0);
+            let size = GlobalSize(hglobal);
+            let p = GlobalLock(hglobal) as *const u16;
+            if p.is_null() || size == 0 {
+                return None;
+            }
+            // GlobalSize is in bytes; CF_UNICODETEXT is UTF-16 + a NUL terminator.
+            let len_u16 = size / 2;
+            let slice = std::slice::from_raw_parts(p, len_u16);
+            let end = slice.iter().position(|&c| c == 0).unwrap_or(slice.len());
+            let text = String::from_utf16_lossy(&slice[..end]);
+            let _ = GlobalUnlock(hglobal);
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
+        })();
+        let _ = CloseClipboard();
+        result
+    }
+}
+
 /// Resolve a .lnk shortcut to its target path (public wrapper — used to map
 /// Recent-folder entries and pinned shortcuts to their real files).
 pub fn shortcut_target(path: &str) -> Option<String> {

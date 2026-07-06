@@ -3,6 +3,44 @@
 
 export const CHANGELOG = [
   {
+    version: "0.47.0",
+    date: "6 jul 2026",
+    headline: "Nuevo widget de portapapeles, ajustes más ordenados, y varios fixes del notch.",
+    sections: [
+      {
+        icon: "📋",
+        title: "Widget de portapapeles",
+        notes: [
+          "Booki ahora recuerda lo que copias. Ancla el nuevo widget \u201cPortapapeles\u201d y verás cuántos elementos tiene guardados; haz clic para abrir el historial.",
+          "Desde ahí: clic en cualquier entrada para volver a copiarla, edítala antes de copiarla, elimina las que no necesites o vacía todo el historial de una vez.",
+        ],
+      },
+      {
+        icon: "🛠️",
+        title: "Fixes del notch",
+        notes: [
+          "El margen invisible alrededor del notch (para el crecimiento al pasar el cursor) a veces se comportaba como si abriera el dock solo — ahora solo la pastilla visible responde a los clics.",
+          "El dock y el notch ahora se autocorrigen si cambia el espacio disponible en pantalla (por ejemplo, al activar \u201cOcultar automáticamente la barra de tareas\u201d de Windows), sin esperar a que abras Ajustes.",
+        ],
+      },
+      {
+        icon: "🗂️",
+        title: "Ajustes más claros",
+        notes: [
+          "Apariencia y Comportamiento separan ahora \u201cNotch\u201d de \u201cDock\u201d en secciones propias, con su título — más fácil de escanear.",
+          "El idioma del sistema, si no es de los que soportamos, cae en inglés (verificado).",
+        ],
+      },
+      {
+        icon: "🖼️",
+        title: "Detalles visuales",
+        notes: [
+          "Arreglado: el número de ventanas abiertas de una app a veces se veía detrás del icono en vez de encima.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.46.0",
     date: "6 jul 2026",
     headline: "Revisión completa del sistema: idiomas al 100% y verificación de todo.",

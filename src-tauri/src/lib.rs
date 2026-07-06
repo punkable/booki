@@ -37,6 +37,56 @@ static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 #[allow(clippy::type_complexity)]
 static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), true));
 
+/// One clipboard-history entry (newest first). `text` is capped to keep the
+/// list light; ids are monotonic so the frontend can key list items stably.
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct ClipEntry {
+    id: u64,
+    text: String,
+    ts: u64,
+}
+const CLIP_HISTORY_MAX: usize = 60;
+const CLIP_TEXT_MAX: usize = 8000; // guard against pasting a huge document
+static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
+static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+fn clip_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Add (or move to front if already the top entry) a piece of text — shared by
+/// the background watcher (new OS clipboard content) and the "copy from
+/// history" command (bumps an existing entry back to the top instead of
+/// duplicating it).
+fn clip_remember(text: &str) {
+    let text = if text.chars().count() > CLIP_TEXT_MAX {
+        text.chars().take(CLIP_TEXT_MAX).collect::<String>()
+    } else {
+        text.to_string()
+    };
+    if text.trim().is_empty() {
+        return;
+    }
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    if hist.first().map(|e| e.text == text).unwrap_or(false) {
+        return; // already the most recent entry — nothing changed
+    }
+    hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
+    hist.insert(
+        0,
+        ClipEntry {
+            id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            text,
+            ts: clip_now_ms(),
+        },
+    );
+    hist.truncate(CLIP_HISTORY_MAX);
+}
+
+
 /// Generation counter for the notch preview: each preview bumps it, and only the
 /// timer holding the LATEST generation hides the notch again (rapid style
 /// changes in settings keep the preview alive instead of blinking it away).
@@ -1046,6 +1096,42 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
     items.into_iter().take(cap).map(|(_, f)| f).collect()
 }
 
+/// Clipboard history for the widget flyout (newest first).
+#[tauri::command]
+fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
+    let hist = CLIP_HISTORY.lock().unwrap();
+    let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(CLIP_HISTORY_MAX);
+    hist.iter().take(cap).cloned().collect()
+}
+
+/// Just the count, for the widget's badge (cheap to poll often).
+#[tauri::command]
+fn clipboard_count() -> usize {
+    CLIP_HISTORY.lock().unwrap().len()
+}
+
+/// Put a history entry (or freshly-edited text) back on the OS clipboard, and
+/// record/bump it in history immediately — instant UI feedback instead of
+/// waiting for the background watcher's next tick.
+#[tauri::command]
+fn clipboard_copy(text: String) -> bool {
+    let ok = win::set_clipboard_text(&text);
+    if ok {
+        clip_remember(&text);
+    }
+    ok
+}
+
+#[tauri::command]
+fn clipboard_delete(id: u64) {
+    CLIP_HISTORY.lock().unwrap().retain(|e| e.id != id);
+}
+
+#[tauri::command]
+fn clipboard_clear() {
+    CLIP_HISTORY.lock().unwrap().clear();
+}
+
 /// Recent files RELEVANT to one pinned app: keeps only entries whose default
 /// "open" handler is that app (via the shell's file associations), so an app's
 /// right-click menu never lists documents it has nothing to do with. Returns
@@ -1663,6 +1749,11 @@ pub fn run() {
             empty_trash,
             recent_files,
             recent_files_for,
+            clipboard_history,
+            clipboard_count,
+            clipboard_copy,
+            clipboard_delete,
+            clipboard_clear,
             open_data_dir,
             wallpaper_accent,
             media_info,
@@ -1836,6 +1927,29 @@ pub fn run() {
                     });
                 }
 
+                // Clipboard watcher: samples the OS clipboard's plain text every
+                // ~800 ms and remembers it if it changed. Polling (vs. the native
+                // WM_CLIPBOARDUPDATE listener) keeps this on the same simple
+                // thread-per-concern pattern as the rest of the watchers and needs
+                // no message-only window; 800 ms is imperceptible for a paste
+                // history. Windows-only — clipboard_get_text stubs to None
+                // elsewhere, so the loop would just spin doing nothing.
+                #[cfg(windows)]
+                {
+                    std::thread::spawn(move || {
+                        let mut last: Option<String> = None;
+                        loop {
+                            std::thread::sleep(std::time::Duration::from_millis(800));
+                            if let Some(text) = win::clipboard_get_text() {
+                                if last.as_deref() != Some(text.as_str()) {
+                                    last = Some(text.clone());
+                                    clip_remember(&text);
+                                }
+                            }
+                        }
+                    });
+                }
+
                 // Cursor watcher for the stage window: at ~30 ms it flips the
                 // dock between interactive and click-through against the hit
                 // rects reported by the frontend, and tells the frontend when
@@ -1877,6 +1991,48 @@ pub fn run() {
                                     }
                                     std::thread::sleep(std::time::Duration::from_millis(30));
                                 }
+                            }
+                        }
+                    });
+                }
+
+                // Work-area self-heal: some setups change the usable screen space
+                // without any window-resize/monitor-change event reaching us — the
+                // big one being Windows' own "Automatically hide the taskbar"
+                // toggle, which grows/shrinks the work area live. Re-checking here
+                // (vs. only on config/monitor changes) means the dock and notch
+                // always sit at the CURRENT edge instead of leaving a stale gap —
+                // or, worse, sitting where a taskbar used to reserve space. This
+                // is purely position (never size), so it can't fight the stage
+                // window's own fixed-size contract from 0.41.
+                #[cfg(windows)]
+                {
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        let mut last_area: Option<(i32, i32, i32, i32)> = None;
+                        loop {
+                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                            let Some(dock) = handle.get_webview_window("dock") else { continue };
+                            let cfg = config::load();
+                            let Some(monitor) = pick_monitor(&dock) else { continue };
+                            let mpos = monitor.position();
+                            let msize = monitor.size();
+                            let area = win::work_area(
+                                mpos.x + msize.width as i32 / 2,
+                                mpos.y + msize.height as i32 / 2,
+                            )
+                            .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
+                            if last_area == Some(area) {
+                                continue;
+                            }
+                            let first_tick = last_area.is_none();
+                            last_area = Some(area);
+                            if first_tick {
+                                continue; // just establishing the baseline, nothing changed yet
+                            }
+                            let _ = position_dock(&dock, &cfg.edge);
+                            if let Some(notch) = handle.get_webview_window("notch") {
+                                let _ = position_notch(&notch, &cfg.edge);
                             }
                         }
                     });
