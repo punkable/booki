@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.43.0",
+    date: "6 jul 2026",
+    headline: "El menú del clic derecho ahora es inteligente y nunca se corta.",
+    sections: [
+      {
+        icon: "🧠",
+        title: "Menú contextual con criterio",
+        notes: [
+          "Los \u201cRecientes\u201d de una app ahora son SOLO suyos: filtramos los archivos recientes de Windows por la app que los abre, así Word muestra tus documentos y no cosas que no tienen nada que ver. Si no hay nada relevante, la sección no aparece.",
+          "El menú se adapta a lo que tocas: las carpetas ganan \u201cAbrir en el Explorador\u201d y los widgets ya no muestran opciones que no les aplican.",
+        ],
+      },
+      {
+        icon: "📐",
+        title: "Sin cortes en vertical",
+        notes: [
+          "El menú contextual queda siempre completo dentro de la pantalla, también con el dock a la izquierda o a la derecha; si es muy largo, hace scroll en vez de cortarse.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.42.0",
     date: "6 jul 2026",
     headline: "Las carpetas ancladas se vuelven de verdad útiles: miniaturas, arrastrar afuera y acciones rápidas.",
