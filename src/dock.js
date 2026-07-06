@@ -3065,6 +3065,39 @@ const stackEl = document.getElementById("stack");
 let stackOpen = false;
 let stackSeq = 0; // guards async fills against a flyout that was reopened meanwhile
 
+// Files that get a REAL thumbnail (Explorer-grade, via the shell) instead of
+// their type icon in folder flyouts. Cached per path for the session.
+const THUMB_RE = /\.(jpe?g|png|gif|bmp|webp|avif|heic|heif|tiff?|mp4|mkv|mov|avi|webm|m4v|wmv)$/i;
+const thumbCache = new Map(); // path → data uri (or null after a miss)
+
+// Drag a FILE out of a folder flyout into Explorer / another app — a real OS
+// drag (OLE), so the drop target decides copy vs move. Small threshold keeps
+// a plain click launching as always.
+function wireFileDragOut(cell, it) {
+  cell.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let started = false;
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", cleanup);
+    };
+    const move = (ev) => {
+      if (started) return;
+      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 12) return;
+      started = true;
+      cleanup();
+      cell._suppressClick = true;
+      setTimeout(() => (cell._suppressClick = false), 600);
+      const img = cell.querySelector("img");
+      dockApi.dragOutFiles([it.path], img ? img.src : null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", cleanup);
+  });
+}
+
 async function toggleStack(tileEl, item) {
   if (stackOpen) {
     closeStack();
@@ -3147,22 +3180,42 @@ async function toggleStack(tileEl, item) {
       // Show whatever icon we already have instantly; otherwise a shimmer skeleton
       // and fill it in — resolved in PARALLEL across cells (was a sequential await
       // per item, so a folder of 20 files opened one slow icon at a time).
-      const now = syncIcon(it);
+      // Photos and videos get a REAL thumbnail instead of their type icon.
+      const wantsThumb = !isGroup && !it.is_dir && THUMB_RE.test(it.name);
+      const cachedThumb = wantsThumb ? thumbCache.get(it.path) : undefined;
+      const now = cachedThumb || syncIcon(it);
       cell.innerHTML =
-        (now ? `<img src="${esc(now)}" alt="" />` : `<span class="stack-glyph skel"></span>`) +
+        (now
+          ? `<img${cachedThumb ? ' class="thumb"' : ""} src="${esc(now)}" alt="" />`
+          : `<span class="stack-glyph skel"></span>`) +
         `<span class="stack-name">${esc(it.name)}</span>`;
       if (!now) {
-        resolveIcon(it)
-          .then((src) => {
-            const holder = cell.querySelector(".stack-glyph.skel");
-            if (!holder) return;
-            if (src) holder.outerHTML = `<img src="${esc(src)}" alt="" />`;
-            else { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
-          })
-          .catch(() => {
-            const holder = cell.querySelector(".stack-glyph.skel");
-            if (holder) { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
-          });
+        const setImg = (src, isThumb) => {
+          const holder = cell.querySelector(".stack-glyph.skel");
+          if (holder)
+            holder.outerHTML = `<img${isThumb ? ' class="thumb"' : ""} src="${esc(src)}" alt="" />`;
+        };
+        const clearSkel = () => {
+          const holder = cell.querySelector(".stack-glyph.skel");
+          if (holder) { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
+        };
+        const resolveGeneric = () => {
+          resolveIcon(it)
+            .then((src) => { if (src) setImg(src, false); else clearSkel(); })
+            .catch(clearSkel);
+        };
+        if (wantsThumb && dockApi.fileThumbnail) {
+          dockApi
+            .fileThumbnail(it.path)
+            .then((src) => {
+              thumbCache.set(it.path, src || null);
+              if (src) setImg(src, true);
+              else resolveGeneric();
+            })
+            .catch(resolveGeneric);
+        } else {
+          resolveGeneric();
+        }
       }
       cell.addEventListener("click", () => {
         if (cell._suppressClick) return; // a drag just happened → don't also launch
@@ -3182,6 +3235,38 @@ async function toggleStack(tileEl, item) {
           takeOutChild(item, it.id);
         });
         cell.appendChild(out);
+      } else if (it.path && !it.is_dir) {
+        // Real files: hover actions (copy path · reveal in Explorer · open
+        // with…) and drag-out — pull the file into Explorer or any other app.
+        const acts = document.createElement("div");
+        acts.className = "stack-acts";
+        const act = (ic, title, fn) => {
+          const b = document.createElement("button");
+          b.className = "stack-act";
+          b.title = title;
+          b.innerHTML = icon(ic);
+          b.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+          b.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            fn(b);
+          });
+          acts.appendChild(b);
+        };
+        act("copy", t("stack.copyPath"), (b) => {
+          dockApi.copyText(it.path);
+          b.innerHTML = icon("check");
+          setTimeout(() => (b.innerHTML = icon("copy")), 900);
+        });
+        act("external", t("stack.showInExplorer"), () => {
+          dockApi.openLocation(it.path);
+          closeStack();
+        });
+        act("app", t("stack.openWith"), () => {
+          dockApi.openWith(it.path);
+          closeStack();
+        });
+        cell.appendChild(acts);
+        wireFileDragOut(cell, it);
       }
       grid.appendChild(cell);
     }
