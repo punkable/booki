@@ -272,6 +272,17 @@ unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
         for px in buf.chunks_exact_mut(4) {
             px[3] = 255;
         }
+    } else {
+        // Shell bitmaps are premultiplied ARGB; PNG wants straight alpha —
+        // un-premultiply or semi-transparent edges render darkened.
+        for px in buf.chunks_exact_mut(4) {
+            let a = px[3] as u32;
+            if a > 0 && a < 255 {
+                for c in 0..3 {
+                    px[c] = ((px[c] as u32 * 255 + a / 2) / a).min(255) as u8;
+                }
+            }
+        }
     }
     encode_png(width as u32, height as u32, &buf)
 }

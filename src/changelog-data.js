@@ -3,6 +3,23 @@
 
 export const CHANGELOG = [
   {
+    version: "0.45.0",
+    date: "6 jul 2026",
+    headline: "Pasada de mantenimiento: más robusto en los bordes raros.",
+    sections: [
+      {
+        icon: "🔍",
+        title: "Auditoría general",
+        notes: [
+          "Arrastrar un icono o un elemento de un grupo ya no puede perder el gesto a mitad de camino (la ventana se mantiene interactiva durante todo el arrastre).",
+          "Con el dock alineado a un lado (no centrado), una barra muy llena ya no puede desbordar la pantalla.",
+          "Las miniaturas con transparencia se ven con bordes limpios (corrección de alfa premultiplicado).",
+          "Los archivos de red inaccesibles ya no pueden colgar los recientes ni las miniaturas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.44.0",
     date: "6 jul 2026",
     headline: "Arreglado de raíz: «al salir» vuelve a abrir, y el dock vertical deja de perderse.",

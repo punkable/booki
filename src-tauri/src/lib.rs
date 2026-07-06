@@ -164,6 +164,11 @@ fn image_data_uri(path: String) -> Option<String> {
 /// call + PNG encode stay off the main thread).
 #[tauri::command]
 async fn file_thumbnail(path: String) -> Option<String> {
+    // Network paths can hang for seconds when the share is unreachable — a
+    // skeleton that resolves to the type icon beats a stuck cell.
+    if path.starts_with("\\\\") {
+        return None;
+    }
     win::file_thumbnail(&path, 96)
 }
 
@@ -1085,6 +1090,10 @@ async fn recent_files_for(app_path: String, limit: Option<usize>) -> Vec<RecentF
             .map(|n| n == exe_name)
             .unwrap_or(false)
         });
+        // exists() on a dead network share can block for seconds — skip UNC.
+        if target.starts_with("\\\\") {
+            continue;
+        }
         if hit && std::path::Path::new(&target).exists() {
             out.push(RecentFile {
                 name: r.name,
