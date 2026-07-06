@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.46.0",
+    date: "6 jul 2026",
+    headline: "Revisión completa del sistema: idiomas al 100% y verificación de todo.",
+    sections: [
+      {
+        icon: "🌐",
+        title: "Idiomas completos",
+        notes: [
+          "En francés, alemán y portugués faltaban textos (el control de distancia al borde, pistas de grupos…) y se veían claves crudas — los 5 idiomas quedaron completos y con verificación automática de paridad.",
+          "El widget de reloj muestra la fecha en TU idioma (antes salía en español para portugués, francés y alemán).",
+        ],
+      },
+      {
+        icon: "✅",
+        title: "Todo verificado",
+        notes: [
+          "Auditoría cruzada de todo el sistema: cada comando que usa la interfaz existe en el backend, cada icono existe, el buscador de Ajustes no apunta a nada roto, y el análisis estático del backend (clippy) está limpio.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.45.0",
     date: "6 jul 2026",
     headline: "Pasada de mantenimiento: más robusto en los bordes raros.",
