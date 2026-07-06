@@ -342,8 +342,11 @@ const MIN_TILE = 30;
 function fitDock() {
   setAllSizes(baseSize());
   const vertical = isVertical();
-  const usable =
-    (vertical ? window.screen.availHeight : window.screen.availWidth) - SHADOW_PAD * 2 - 24;
+  const span = vertical ? window.screen.availHeight : window.screen.availWidth;
+  // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
+  // usable, or a full bar would overflow past the far screen edge.
+  const slotPad = cfg && cfg.notchPosition && cfg.notchPosition !== "center" ? span * 0.12 : 0;
+  const usable = span - SHADOW_PAD * 2 - 24 - slotPad;
   let overflow = false;
   if (usable > 0) {
     const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
@@ -2425,7 +2428,10 @@ function reportHitRects() {
   // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
   // drag over the dock) → the whole stage stays interactive; never yank the
   // window out from under a gesture.
-  const all = !!(edgeMove || dragging || draggingFile || document.body.classList.contains("edit"));
+  const all = !!(
+    edgeMove || dragging || draggingFile || document.body.classList.contains("edit") ||
+    document.querySelector(".drag-clone, .stack-drag-clone")
+  );
   const rects = [];
   const add = (el, inflate) => {
     if (!el) return;
@@ -3099,6 +3105,14 @@ let stackSeq = 0; // guards async fills against a flyout that was reopened meanw
 // their type icon in folder flyouts. Cached per path for the session.
 const THUMB_RE = /\.(jpe?g|png|gif|bmp|webp|avif|heic|heif|tiff?|mp4|mkv|mov|avi|webm|m4v|wmv)$/i;
 const thumbCache = new Map(); // path → data uri (or null after a miss)
+const THUMB_CACHE_MAX = 400;
+function rememberThumb(path, src) {
+  if (thumbCache.size >= THUMB_CACHE_MAX) {
+    // drop the oldest entry (Map preserves insertion order)
+    thumbCache.delete(thumbCache.keys().next().value);
+  }
+  thumbCache.set(path, src);
+}
 
 // Drag a FILE out of a folder flyout into Explorer / another app — a real OS
 // drag (OLE), so the drop target decides copy vs move. Small threshold keeps
@@ -3238,7 +3252,7 @@ async function toggleStack(tileEl, item) {
           dockApi
             .fileThumbnail(it.path)
             .then((src) => {
-              thumbCache.set(it.path, src || null);
+              rememberThumb(it.path, src || null);
               if (src) setImg(src, true);
               else resolveGeneric();
             })
