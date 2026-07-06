@@ -59,6 +59,10 @@ const DEMO_CONFIG = {
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
 let demoVolume = { pct: 55, muted: false };
+let demoClipboard = [
+  { id: 2, text: "https://example.com/informe-final.pdf", ts: Date.now() - 60000 },
+  { id: 1, text: "Reunión de equipo — jueves 10:00", ts: Date.now() - 300000 },
+];
 let demoProfiles = { Trabajo: structuredClone(DEMO_CONFIG) };
 
 async function mockInvoke(cmd, args) {
@@ -101,6 +105,22 @@ async function mockInvoke(cmd, args) {
       return true;
     case "recent_files_for":
       return [];
+    case "clipboard_count":
+      return demoClipboard.length;
+    case "clipboard_history":
+      return demoClipboard.slice(0, args.limit || 60);
+    case "clipboard_copy":
+      demoClipboard = [
+        { id: Date.now(), text: args.text, ts: Date.now() },
+        ...demoClipboard.filter((e) => e.text !== args.text),
+      ].slice(0, 60);
+      return true;
+    case "clipboard_delete":
+      demoClipboard = demoClipboard.filter((e) => e.id !== args.id);
+      return null;
+    case "clipboard_clear":
+      demoClipboard = [];
+      return null;
     case "list_dir":
       return [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
@@ -356,6 +376,13 @@ export const dock = {
   copyText: (text) => invoke("copy_text", { text }),
   // Recents filtered to one app (by file association) for its context menu.
   recentFilesFor: (path, limit = 6) => invoke("recent_files_for", { appPath: path, limit }),
+  // Clipboard history widget: count for the badge, full list for the flyout,
+  // copy-back/edit (bumps to front), delete one, clear all.
+  clipboardCount: () => invoke("clipboard_count"),
+  clipboardHistory: (limit = 60) => invoke("clipboard_history", { limit }),
+  clipboardCopy: (text) => invoke("clipboard_copy", { text }),
+  clipboardDelete: (id) => invoke("clipboard_delete", { id }),
+  clipboardClear: () => invoke("clipboard_clear"),
   openWith: (path) => invoke("open_with", { path }),
   // Native OLE drag-out: drag a file from the folder flyout into Explorer or
   // any other app. The OS runs the drag, the target decides copy vs move.

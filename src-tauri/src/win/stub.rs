@@ -112,6 +112,10 @@ pub fn set_clipboard_text(_text: &str) -> bool {
     false
 }
 
+pub fn clipboard_get_text() -> Option<String> {
+    None
+}
+
 pub fn shortcut_target(_path: &str) -> Option<String> {
     None
 }
