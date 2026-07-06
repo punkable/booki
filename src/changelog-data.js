@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.44.0",
+    date: "6 jul 2026",
+    headline: "Arreglado de raíz: «al salir» vuelve a abrir, y el dock vertical deja de perderse.",
+    sections: [
+      {
+        icon: "🛠️",
+        title: "El notch vuelve a funcionar",
+        notes: [
+          "Con «Ocultar al salir», el clic en el notch no abría el dock: la señal llegaba pero un guard interno del modo clic la descartaba. Ahora una invocación explícita SIEMPRE abre el dock, sea cual sea el modo.",
+          "Al abrirlo desde el notch, el dock queda fijado hasta que lo visitas y sales (o pasan unos segundos sin usarlo) — y vuelve a esconderse solo, como corresponde.",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Vertical estable",
+        notes: [
+          "El dock ya no se vuelve fantasma ni se pierde: el cambio a «clic a través» de la ventana ahora usa el mecanismo oficial del sistema, que refresca la ventana correctamente (antes podía dejar de pintarse).",
+          "Al revelarse, la ventana queda clicable al instante.",
+          "El panel de grupos y carpetas se ancla a la posición real de la barra: ya no se montaba encima de la primera fila de iconos (pasaba en todos los bordes, peor en vertical).",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.43.0",
     date: "6 jul 2026",
     headline: "El menú del clic derecho ahora es inteligente y nunca se corta.",
