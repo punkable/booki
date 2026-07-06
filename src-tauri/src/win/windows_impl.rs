@@ -190,6 +190,126 @@ fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// Explorer-grade thumbnail for a file (photos, videos — anything the Shell
+/// can preview) via IShellItemImageFactory. Warm requests hit the system
+/// thumbnail cache, so they're near-instant. Returns a PNG data URI.
+pub fn file_thumbnail(path: &str, size: i32) -> Option<String> {
+    use windows::Win32::Foundation::SIZE;
+    use windows::Win32::UI::Shell::{
+        IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK,
+        SIIGBF_RESIZETOFIT,
+    };
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        let w = wide(path);
+        let item: IShellItemImageFactory =
+            SHCreateItemFromParsingName(PCWSTR(w.as_ptr()), None).ok()?;
+        let hbmp = item
+            .GetImage(
+                SIZE { cx: size, cy: size },
+                windows::Win32::UI::Shell::SIIGBF(SIIGBF_RESIZETOFIT.0 | SIIGBF_BIGGERSIZEOK.0),
+            )
+            .ok()?;
+        let png = hbitmap_png(hbmp);
+        let _ = DeleteObject(HGDIOBJ(hbmp.0));
+        let png = png?;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(png);
+        Some(format!("data:image/png;base64,{b64}"))
+    }
+}
+
+unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
+    let mut bm = BITMAP::default();
+    let got = GetObjectW(
+        HGDIOBJ(hbmp.0),
+        std::mem::size_of::<BITMAP>() as i32,
+        Some(&mut bm as *mut _ as *mut c_void),
+    );
+    if got == 0 {
+        return None;
+    }
+    let (width, height) = (bm.bmWidth, bm.bmHeight);
+    if width <= 0 || height <= 0 {
+        return None;
+    }
+    let mut bmi = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: width,
+            biHeight: -height, // negative => top-down rows
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0 as u32,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut buf = vec![0u8; (width * height) as usize * 4];
+    let hdc: HDC = CreateCompatibleDC(None);
+    let scan = GetDIBits(
+        hdc,
+        hbmp,
+        0,
+        height as u32,
+        Some(buf.as_mut_ptr() as *mut c_void),
+        &mut bmi,
+        DIB_RGB_COLORS,
+    );
+    let _ = DeleteDC(hdc);
+    if scan == 0 {
+        return None;
+    }
+    // BGRA → RGBA; JPEG-sourced thumbnails often carry a zeroed alpha channel —
+    // treat those as fully opaque.
+    let mut has_alpha = false;
+    for px in buf.chunks_exact_mut(4) {
+        px.swap(0, 2);
+        if px[3] != 0 {
+            has_alpha = true;
+        }
+    }
+    if !has_alpha {
+        for px in buf.chunks_exact_mut(4) {
+            px[3] = 255;
+        }
+    }
+    encode_png(width as u32, height as u32, &buf)
+}
+
+/// Put plain text on the Windows clipboard (CF_UNICODETEXT).
+pub fn set_clipboard_text(text: &str) -> bool {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::DataExchange::{
+        CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    };
+    use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    const CF_UNICODETEXT: u32 = 13;
+    unsafe {
+        let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        if OpenClipboard(None).is_err() {
+            return false;
+        }
+        let _ = EmptyClipboard();
+        let mut ok = false;
+        if let Ok(h) = GlobalAlloc(GMEM_MOVEABLE, wide.len() * 2) {
+            let p = GlobalLock(h) as *mut u16;
+            if !p.is_null() {
+                std::ptr::copy_nonoverlapping(wide.as_ptr(), p, wide.len());
+                let _ = GlobalUnlock(h);
+                // The clipboard owns the memory after a successful set.
+                ok = SetClipboardData(CF_UNICODETEXT, HANDLE(h.0)).is_ok();
+                if !ok {
+                    let _ = windows::Win32::System::Memory::GlobalFree(h);
+                }
+            } else {
+                let _ = windows::Win32::System::Memory::GlobalFree(h);
+            }
+        }
+        let _ = CloseClipboard();
+        ok
+    }
+}
+
 // ─────────────────────── Window enumeration ────────────────────────
 
 /// List visible, top-level application windows (skips tool/owned windows).

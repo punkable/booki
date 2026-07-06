@@ -2,7 +2,11 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for the Booki dock and settings windows.",
-  "windows": ["dock", "settings", "notch"],
+  "windows": [
+    "dock",
+    "settings",
+    "notch"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-show",
@@ -19,6 +23,7 @@
     "updater:allow-download",
     "updater:allow-install",
     "updater:allow-download-and-install",
-    "process:allow-restart"
+    "process:allow-restart",
+    "drag:default"
   ]
 }
