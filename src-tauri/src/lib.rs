@@ -1046,7 +1046,7 @@ struct DirItem {
 fn list_dir(path: String) -> Vec<DirItem> {
     let mut out: Vec<DirItem> = Vec::new();
     if let Ok(rd) = std::fs::read_dir(&path) {
-        for e in rd.flatten().take(80) {
+        for e in rd.flatten() {
             let name = e.file_name().to_string_lossy().to_string();
             if name.starts_with('.') {
                 continue;
@@ -1058,6 +1058,11 @@ fn list_dir(path: String) -> Vec<DirItem> {
                 path: p.to_string_lossy().to_string(),
                 is_dir,
             });
+            // Cap AFTER the hidden filter, so a full flyout reliably means
+            // "there may be more" (the UI shows an open-in-Explorer row at 80).
+            if out.len() >= 80 {
+                break;
+            }
         }
     }
     out.sort_by(|a, b| {
