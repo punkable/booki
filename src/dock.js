@@ -2995,6 +2995,7 @@ function startRunningPoll() {
 
 const stackEl = document.getElementById("stack");
 let stackOpen = false;
+let stackSeq = 0; // guards async fills against a flyout that was reopened meanwhile
 
 async function toggleStack(tileEl, item) {
   if (stackOpen) {
@@ -3002,14 +3003,7 @@ async function toggleStack(tileEl, item) {
     return;
   }
   const isGroup = item.kind === "group";
-  let items = [];
-  if (isGroup) {
-    items = item.children || [];
-  } else {
-    try {
-      items = await dockApi.listDir(item.path);
-    } catch (_) {}
-  }
+  const seq = ++stackSeq;
   stackEl.innerHTML = "";
   const head = document.createElement("div");
   head.className = "stack-head";
@@ -3030,6 +3024,19 @@ async function toggleStack(tileEl, item) {
     name.textContent = item.name;
     head.appendChild(name);
   }
+  if (!isGroup) {
+    // The flyout shows a slice of the folder — Explorer is the "see everything
+    // / do more" escape hatch, one click away.
+    const openDir = document.createElement("button");
+    openDir.className = "stack-close stack-opendir";
+    openDir.title = t("stack.openExplorer");
+    openDir.innerHTML = icon("external");
+    openDir.addEventListener("click", () => {
+      dockApi.launch(item.path, []);
+      closeStack();
+    });
+    head.appendChild(openDir);
+  }
   const close = document.createElement("button");
   close.className = "stack-close";
   close.title = t("stack.close");
@@ -3039,87 +3046,125 @@ async function toggleStack(tileEl, item) {
   stackEl.appendChild(head);
   const grid = document.createElement("div");
   grid.className = "stack-grid";
-  if (!items.length) {
-    grid.innerHTML = `<div class="stack-empty">${t("stack.empty")}</div>`;
-  }
-  let cellIdx = 0;
-  for (const it of items) {
-    // A grouped widget renders as its LIVE read-out (only here, inside the open
-    // group — never on the bar). It spans the row so the card gets full width.
-    if (isGroup && it.kind === "widget") {
-      const wCell = document.createElement("div");
-      wCell.className = "stack-item stack-widget";
-      wCell.style.setProperty("--i", cellIdx++);
-      wCell.appendChild(widgetTile(it, { inFlyout: true }));
-      wireStackDragOut(wCell, item, it);
-      const out = document.createElement("span");
-      out.className = "stack-rm";
-      out.textContent = "×";
-      out.title = t("group.takeOut");
-      out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
-      wCell.appendChild(out);
-      grid.appendChild(wCell);
-      continue;
+  const fillGrid = (items) => {
+    grid.innerHTML = "";
+    if (!items.length) {
+      grid.innerHTML = `<div class="stack-empty">${t("stack.empty")}</div>`;
     }
-    const cell = document.createElement("button");
-    cell.className = "stack-item";
-    cell.style.setProperty("--i", cellIdx++); // staggered entry
-    cell.title = it.name;
-    const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
-    const fallbackGlyph = () => (isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase()));
-    // Show whatever icon we already have instantly; otherwise a shimmer skeleton
-    // and fill it in — resolved in PARALLEL across cells (was a sequential await
-    // per item, so a folder of 20 files opened one slow icon at a time).
-    const now = syncIcon(it);
-    cell.innerHTML =
-      (now ? `<img src="${esc(now)}" alt="" />` : `<span class="stack-glyph skel"></span>`) +
-      `<span class="stack-name">${esc(it.name)}</span>`;
-    if (!now) {
-      resolveIcon(it)
-        .then((src) => {
-          const holder = cell.querySelector(".stack-glyph.skel");
-          if (!holder) return;
-          if (src) holder.outerHTML = `<img src="${esc(src)}" alt="" />`;
-          else { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
-        })
-        .catch(() => {
-          const holder = cell.querySelector(".stack-glyph.skel");
-          if (holder) { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
-        });
-    }
-    cell.addEventListener("click", () => {
-      if (cell._suppressClick) return; // a drag just happened → don't also launch
-      if (it.path) dockApi.launch(it.path, it.args || []);
-      closeStack();
-    });
-    if (isGroup) {
-      // Drag a child OUT of the flyout to unpin it (parity with the dock's
-      // pull-out-to-remove gesture); the × instead pops it back onto the dock.
-      wireStackDragOut(cell, item, it);
-      const out = document.createElement("span");
-      out.className = "stack-rm";
-      out.textContent = "×";
-      out.title = t("group.takeOut");
-      out.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        takeOutChild(item, it.id);
+    let cellIdx = 0;
+    for (const it of items) {
+      // A grouped widget renders as its LIVE read-out (only here, inside the open
+      // group — never on the bar). It spans the row so the card gets full width.
+      if (isGroup && it.kind === "widget") {
+        const wCell = document.createElement("div");
+        wCell.className = "stack-item stack-widget";
+        wCell.style.setProperty("--i", cellIdx++);
+        wCell.appendChild(widgetTile(it, { inFlyout: true }));
+        wireStackDragOut(wCell, item, it);
+        const out = document.createElement("span");
+        out.className = "stack-rm";
+        out.textContent = "×";
+        out.title = t("group.takeOut");
+        out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
+        wCell.appendChild(out);
+        grid.appendChild(wCell);
+        continue;
+      }
+      const cell = document.createElement("button");
+      cell.className = "stack-item";
+      cell.style.setProperty("--i", cellIdx++); // staggered entry
+      cell.title = it.name;
+      const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
+      const fallbackGlyph = () => (isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase()));
+      // Show whatever icon we already have instantly; otherwise a shimmer skeleton
+      // and fill it in — resolved in PARALLEL across cells (was a sequential await
+      // per item, so a folder of 20 files opened one slow icon at a time).
+      const now = syncIcon(it);
+      cell.innerHTML =
+        (now ? `<img src="${esc(now)}" alt="" />` : `<span class="stack-glyph skel"></span>`) +
+        `<span class="stack-name">${esc(it.name)}</span>`;
+      if (!now) {
+        resolveIcon(it)
+          .then((src) => {
+            const holder = cell.querySelector(".stack-glyph.skel");
+            if (!holder) return;
+            if (src) holder.outerHTML = `<img src="${esc(src)}" alt="" />`;
+            else { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
+          })
+          .catch(() => {
+            const holder = cell.querySelector(".stack-glyph.skel");
+            if (holder) { holder.classList.remove("skel"); holder.innerHTML = fallbackGlyph(); }
+          });
+      }
+      cell.addEventListener("click", () => {
+        if (cell._suppressClick) return; // a drag just happened → don't also launch
+        if (it.path) dockApi.launch(it.path, it.args || []);
+        closeStack();
       });
-      cell.appendChild(out);
+      if (isGroup) {
+        // Drag a child OUT of the flyout to unpin it (parity with the dock's
+        // pull-out-to-remove gesture); the × instead pops it back onto the dock.
+        wireStackDragOut(cell, item, it);
+        const out = document.createElement("span");
+        out.className = "stack-rm";
+        out.textContent = "×";
+        out.title = t("group.takeOut");
+        out.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          takeOutChild(item, it.id);
+        });
+        cell.appendChild(out);
+      }
+      grid.appendChild(cell);
     }
-    grid.appendChild(cell);
-  }
-  // Quick "add app to this folder" cell — makes filling a folder fast.
+    // Quick "add app to this folder" cell — makes filling a folder fast.
+    if (isGroup) {
+      const addCell = document.createElement("button");
+      addCell.className = "stack-item stack-add";
+      addCell.title = t("apps.addToFolder");
+      addCell.innerHTML =
+        `<span class="stack-glyph">＋</span><span class="stack-name">${t("apps.addToFolder")}</span>`;
+      addCell.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        addToFolderFromDock(item);
+      });
+      grid.appendChild(addCell);
+    } else if (items.length >= 80) {
+      // list_dir caps at 80 entries — say so and hand off to Explorer.
+      const more = document.createElement("button");
+      more.className = "stack-more";
+      more.textContent = t("stack.more");
+      more.addEventListener("click", () => {
+        dockApi.launch(item.path, []);
+        closeStack();
+      });
+      grid.appendChild(more);
+    }
+  };
   if (isGroup) {
-    const addCell = document.createElement("button");
-    addCell.className = "stack-item stack-add";
-    addCell.title = t("apps.addToFolder");
-    addCell.innerHTML =
-      `<span class="stack-glyph">＋</span><span class="stack-name">${t("apps.addToFolder")}</span>`;
-    addCell.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      addToFolderFromDock(item);
-    });
-    grid.appendChild(addCell);
+    fillGrid(item.children || []);
+  } else {
+    // Open NOW with shimmer placeholders and fill when the listing lands — a
+    // big folder (Downloads…) must not stall the flyout.
+    for (let i = 0; i < 8; i++) {
+      const c = document.createElement("div");
+      c.className = "stack-item stack-skel";
+      c.style.setProperty("--i", i);
+      c.innerHTML = `<span class="stack-glyph skel"></span><span class="stack-name skel"></span>`;
+      grid.appendChild(c);
+    }
+    dockApi
+      .listDir(item.path)
+      .then((items) => {
+        if (seq !== stackSeq || !stackOpen) return;
+        fillGrid(items || []);
+        applyFrame();
+        if (pendingReplace) requestAnimationFrame(pendingReplace);
+      })
+      .catch(() => {
+        if (seq !== stackSeq || !stackOpen) return;
+        fillGrid([]);
+      });
   }
   stackEl.appendChild(grid);
 

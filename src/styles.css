@@ -1523,6 +1523,25 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item.stack-add { color: var(--accent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, var(--stroke)); }
 .stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--accent); }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* Placeholder cells while a big folder lists — the flyout opens instantly. */
+.stack-item.stack-skel { pointer-events: none; }
+.stack-item.stack-skel .stack-glyph { border: 0; }
+.stack-item.stack-skel .stack-name { width: 62%; height: 9px; border-radius: 4px; }
+/* "There's more" row: the flyout shows a slice; Explorer has the whole folder. */
+.stack-more {
+  grid-column: 1 / -1;
+  padding: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 0;
+  border-radius: var(--r-sm);
+  transition: background 0.14s ease;
+}
+.stack-more:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 
 /* A grouped widget shown live inside the flyout: full-width read-out card. */
 .stack-item.stack-widget {
