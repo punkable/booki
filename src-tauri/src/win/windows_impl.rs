@@ -299,10 +299,10 @@ pub fn set_clipboard_text(text: &str) -> bool {
                 // The clipboard owns the memory after a successful set.
                 ok = SetClipboardData(CF_UNICODETEXT, HANDLE(h.0)).is_ok();
                 if !ok {
-                    let _ = windows::Win32::System::Memory::GlobalFree(h);
+                    let _ = windows::Win32::Foundation::GlobalFree(h);
                 }
             } else {
-                let _ = windows::Win32::System::Memory::GlobalFree(h);
+                let _ = windows::Win32::Foundation::GlobalFree(h);
             }
         }
         let _ = CloseClipboard();
