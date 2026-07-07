@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   config as configApi,
   dock as dockApi,
@@ -144,9 +145,9 @@ function widgetDisplayName(widget) {
 function widgetRefs(pinned, widget) {
   const refs = [];
   (pinned || []).forEach((item, i) => {
-    if (item.kind === "widget" && item.widget === widget) refs.push({ type: "top", i });
+    if (item.kind === "widget" && item.widget === widget) refs.push({ type: "top", id: item.id, i });
     (item.children || []).forEach((child) => {
-      if (child.kind === "widget" && child.widget === widget) refs.push({ type: "child", gi: i, id: child.id });
+      if (child.kind === "widget" && child.widget === widget) refs.push({ type: "child", groupId: item.id, gi: i, id: child.id });
     });
   });
   return refs;
@@ -154,17 +155,20 @@ function widgetRefs(pinned, widget) {
 
 function itemForWidgetRef(pinned, ref) {
   if (!ref) return null;
-  if (ref.type === "top") return pinned[ref.i] || null;
-  return (pinned[ref.gi]?.children || []).find((child) => child.id === ref.id) || null;
+  if (ref.type === "top") {
+    return (pinned || []).find((item) => item.id === ref.id) || pinned?.[ref.i] || null;
+  }
+  const group = (pinned || []).find((item) => item.id === ref.groupId) || pinned?.[ref.gi];
+  return (group?.children || []).find((child) => child.id === ref.id) || null;
 }
 
 function updateWidgetStyleForRef(pinned, ref, value) {
   if (!ref) return pinned;
   if (ref.type === "top") {
-    return pinned.map((item, i) => (i === ref.i ? { ...item, style: value } : item));
+    return pinned.map((item, i) => (item.id === ref.id || (!ref.id && i === ref.i) ? { ...item, style: value } : item));
   }
   return pinned.map((item, i) =>
-    i === ref.gi
+    item.id === ref.groupId || (!ref.groupId && i === ref.gi)
       ? { ...item, children: (item.children || []).map((child) => (child.id === ref.id ? { ...child, style: value } : child)) }
       : item
   );
@@ -211,6 +215,28 @@ function HelpTip({ text }) {
       <span dangerouslySetInnerHTML={{ __html: icon("help") }} />
     </button>
   );
+}
+
+function useModalControls(onClose) {
+  useEffect(() => {
+    const body = document.body;
+    const prev = body.style.overflow;
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = prev;
+    };
+  }, []);
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
 }
 
 function SectionTitle({ children, name = "settings" }) {
@@ -992,6 +1018,7 @@ function Behavior({ cfg, set }) {
 // Modal to choose a pin's icon: built-in library (with styles), upload an image,
 // or reset to the app's real icon.
 function IconPickerModal({ item, onPick, onClose }) {
+  useModalControls(onClose);
   const [style, setStyle] = useState(isLibIcon(item.icon) ? parseLibIcon(item.icon).style : "badge");
   const colors = currentAccentColors();
   const upload = async () => {
@@ -1000,12 +1027,12 @@ function IconPickerModal({ item, onPick, onClose }) {
     const uri = (await dockApi.imageDataUri(path)) || path;
     onPick(uri);
   };
-  return (
+  return createPortal((
     <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={t("icon.title")} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <strong>{t("icon.title")}</strong>
-          <button className="pin-btn" onClick={onClose}>✕</button>
+          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
         </div>
         <div className="icon-styles">
           {ICON_STYLES.map((s) => (
@@ -1038,22 +1065,81 @@ function IconPickerModal({ item, onPick, onClose }) {
         </div>
       </div>
     </div>
+  ), document.body);
+}
+
+function ClipboardSettingsPanel({ cfg, set }) {
+  return (
+    <div className="clip-policy clip-policy-embedded">
+      <div className="clip-policy-head">
+        <span className="clip-policy-icon" dangerouslySetInnerHTML={{ __html: icon("shield") }} />
+        <div>
+          <strong>{t("clip.privacyTitle")}</strong>
+          <p>{t("clip.privacyBody")}</p>
+        </div>
+      </div>
+      <Toggle
+        label={t("clip.memory")}
+        hint={t("clip.memoryHint")}
+        checked={!!cfg.clipboardPersist}
+        onChange={(v) => set({ clipboardPersist: v })}
+      />
+      <Toggle
+        label={t("clip.sensitive")}
+        hint={t("clip.sensitiveHint")}
+        checked={cfg.clipboardSensitiveGuard !== false}
+        onChange={(v) => set({ clipboardSensitiveGuard: v })}
+      />
+      <Toggle
+        label={t("clip.compact")}
+        hint={t("clip.compactHint")}
+        checked={!!cfg.clipboardCompact}
+        onChange={(v) => set({ clipboardCompact: v })}
+      />
+      <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
+        <Slider
+          value={cfg.clipboardRetentionDays ?? 7}
+          min={1}
+          max={90}
+          step={1}
+          fmt={(v) => t("clip.days").replace("{n}", v)}
+          onChange={(v) => set({ clipboardRetentionDays: v })}
+        />
+      </Row>
+      <Row label={t("clip.limit")} hint={t("clip.limitHint")}>
+        <Slider
+          value={cfg.clipboardHistoryLimit ?? 60}
+          min={10}
+          max={200}
+          step={10}
+          fmt={(v) => t("clip.items").replace("{n}", v)}
+          onChange={(v) => set({ clipboardHistoryLimit: v })}
+        />
+      </Row>
+      <div className="clip-policy-actions">
+        <button className="s-btn s-btn-soft" onClick={() => dockApi.clipboardClear()}>
+          {t("clip.clear")}
+        </button>
+      </div>
+    </div>
   );
 }
 
 // Visually edit a widget's look: variant, accent color, motion and icon.
-function WidgetStyleModal({ item, accent, onChange, onClose }) {
+function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
+  useModalControls(onClose);
   const st = item.style || {};
   const variant = st.variant || "glass";
   const meta = WIDGET_META[item.widget] || { emoji: "puzzle", accent, desc: "widget.defaultDesc" };
   const set1 = (patch) => onChange({ ...st, ...patch });
-  return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal widget-modal" onClick={(e) => e.stopPropagation()}>
+  return createPortal((
+    <div className="modal-scrim modal-scrim-locked">
+      <div className="modal widget-modal" role="dialog" aria-modal="true" aria-label={t("w.styleTitle")} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <strong>{t("w.styleTitle")}</strong>
-          <button className="pin-btn" onClick={onClose}>✕</button>
+          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
         </div>
+        <div className="widget-modal-body">
         <div className="widget-modal-hero" style={{ "--widget-accent": meta.accent || accent }}>
           <span className="widget-store-ico">
             <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
@@ -1082,6 +1168,8 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
             checked={!!st.scrollVolume}
             onChange={(v) => set1({ scrollVolume: v })}
           />
+        ) : item.widget === "clipboard" ? (
+          <ClipboardSettingsPanel cfg={cfg} set={set} />
         ) : item.widget !== "notes" ? (
           <div className="widget-no-extra">
             <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
@@ -1110,12 +1198,13 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
         </Row>
         <Toggle label={t("w.animated")} checked={!!st.animated} onChange={(v) => set1({ animated: v })} />
         <Toggle label={t("w.showIcon")} checked={st.icon !== false} onChange={(v) => set1({ icon: v })} />
-        <div className="s-actions" style={{ marginTop: 14 }}>
+        </div>
+        <div className="widget-modal-footer">
           <button className="s-btn" onClick={onClose}>{t("w.done")}</button>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
@@ -1127,11 +1216,11 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
         <span className="widget-store-ico">
           <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
         </span>
+        <div className="widget-store-body">
+          <strong>{label}</strong>
+          <p>{t(meta.desc)}</p>
+        </div>
         {pinned && <span className="widget-store-badge">{t("widget.pinned")}</span>}
-      </div>
-      <div className="widget-store-body">
-        <strong>{label}</strong>
-        <p>{t(meta.desc)}</p>
       </div>
       <div className="widget-store-caps">
         {(meta.caps || []).map((cap) => <span key={cap}>{t(cap)}</span>)}
@@ -1594,7 +1683,7 @@ function Apps({ cfg, set }) {
                 </div>
                 <div className="pin-card-actions">
                   {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", i })} />}
+                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", id: item.id, i })} />}
                   {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                     <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                   )}
@@ -1614,7 +1703,7 @@ function Apps({ cfg, set }) {
                             className="pin-kid-edit"
                             title={t("w.styleTitle")}
                             onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", gi: i, id: c.id }); }}
+                            onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id }); }}
                             dangerouslySetInnerHTML={{ __html: icon("sliders") }}
                           />
                         )}
@@ -1671,7 +1760,7 @@ function Apps({ cfg, set }) {
               </span>
               <span className="pin-actions">
                 {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", i })} />}
+                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", id: item.id, i })} />}
                 {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                   <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                 )}
@@ -1701,7 +1790,7 @@ function Apps({ cfg, set }) {
                   </span>
                   <span className="pin-actions">
                     {c.kind === "widget" && (
-                      <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "child", gi: i, id: c.id })} />
+                      <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id })} />
                     )}
                     <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
                     <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
@@ -1757,58 +1846,6 @@ function Apps({ cfg, set }) {
           );
         })}
       </div>
-      <div className="clip-policy">
-        <div className="clip-policy-head">
-          <span className="clip-policy-icon" dangerouslySetInnerHTML={{ __html: icon("shield") }} />
-          <div>
-            <strong>{t("clip.privacyTitle")}</strong>
-            <p>{t("clip.privacyBody")}</p>
-          </div>
-        </div>
-        <Toggle
-          label={t("clip.memory")}
-          hint={t("clip.memoryHint")}
-          checked={!!cfg.clipboardPersist}
-          onChange={(v) => set({ clipboardPersist: v })}
-        />
-        <Toggle
-          label={t("clip.sensitive")}
-          hint={t("clip.sensitiveHint")}
-          checked={cfg.clipboardSensitiveGuard !== false}
-          onChange={(v) => set({ clipboardSensitiveGuard: v })}
-        />
-        <Toggle
-          label={t("clip.compact")}
-          hint={t("clip.compactHint")}
-          checked={!!cfg.clipboardCompact}
-          onChange={(v) => set({ clipboardCompact: v })}
-        />
-        <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
-          <Slider
-            value={cfg.clipboardRetentionDays ?? 7}
-            min={1}
-            max={90}
-            step={1}
-            fmt={(v) => t("clip.days").replace("{n}", v)}
-            onChange={(v) => set({ clipboardRetentionDays: v })}
-          />
-        </Row>
-        <Row label={t("clip.limit")} hint={t("clip.limitHint")}>
-          <Slider
-            value={cfg.clipboardHistoryLimit ?? 60}
-            min={10}
-            max={200}
-            step={10}
-            fmt={(v) => t("clip.items").replace("{n}", v)}
-            onChange={(v) => set({ clipboardHistoryLimit: v })}
-          />
-        </Row>
-        <div className="clip-policy-actions">
-          <button className="s-btn s-btn-soft" onClick={() => dockApi.clipboardClear()}>
-            {t("clip.clear")}
-          </button>
-        </div>
-      </div>
       <SectionTitle name="external">{t("apps.web")}</SectionTitle>
       <p className="muted">{t("apps.webHint")}</p>
       <div className="web-add">
@@ -1842,6 +1879,8 @@ function Apps({ cfg, set }) {
         <WidgetStyleModal
           item={styleTarget}
           accent={cfg.accent}
+          cfg={cfg}
+          set={set}
           onChange={(value) => setStyle(styleFor, value)}
           onClose={() => setStyleFor(null)}
         />
@@ -2140,7 +2179,7 @@ function General({ cfg, set, onWhatsNew }) {
           setAutostart(real);
           set({ autostart: real });
         }} />
-      <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
+      <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")} checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <div className="capture-row">
         <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
@@ -2416,7 +2455,7 @@ function App() {
       <main className="s-content">
         {!introSeen && (
           <div className="s-intro">
-            <span className="s-intro-emoji">👋</span>
+            <span className="s-intro-icon" dangerouslySetInnerHTML={{ __html: icon("info") }} />
             <div className="s-intro-body">
               <strong>{t("intro.title")}</strong>
               <span className="muted">{t("intro.body")}</span>
@@ -2466,9 +2505,10 @@ function SettingsSkeleton() {
 
 // "What's new" shown as a modal inside Settings (no fragile extra window).
 function ChangelogModal({ onClose }) {
-  return (
+  useModalControls(onClose);
+  return createPortal((
     <div className="modal-scrim" onClick={onClose}>
-      <div className="modal cl-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <strong><img className="cl-capy" src="/brand/svg/isotype.svg" alt="" /> {t("cl.title")}</strong>
           <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
@@ -2516,7 +2556,7 @@ function ChangelogModal({ onClose }) {
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 createRoot(document.getElementById("root")).render(<App />);

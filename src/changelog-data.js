@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.5",
+    date: "7 jul 2026",
+    headline: "Ajustes mas intuitivos, texto limpio y editor de widgets robusto.",
+    sections: [
+      {
+        icon: "\u{1F9F9}",
+        title: "Sin simbolos raros",
+        notes: [
+          "Corrige iconos del changelog que podian aparecer como caracteres rotos en vez de emoji.",
+          "Agrega una comprobacion de texto para detectar mojibake antes de compilar o publicar otra beta.",
+        ],
+      },
+      {
+        icon: "\u{1F6E0}\uFE0F",
+        title: "Ajustes mas comodos",
+        notes: [
+          "El editor de widgets bloquea el scroll de fondo, mantiene su propio scroll interno y ya no se cierra por clicks accidentales fuera.",
+          "La configuracion del portapapeles vive dentro del editor del widget Portapapeles, no como un panel mezclado debajo de toda la galeria.",
+          "Corrige el toggle de flotar por encima para aplicarlo al dock real y explica que el auto-ocultado se controla desde Comportamiento.",
+        ],
+      },
+      {
+        icon: "\u{1F9F0}",
+        title: "Limpieza de produccion",
+        notes: [
+          "Quita ruido decorativo de consola y deja el dock mas limpio para depurar problemas reales.",
+          "La build y los workflows ahora revisan el texto visible antes de crear instaladores.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.4",
     date: "7 jul 2026",
     headline: "Portapapeles mas claro, widgets ajustables y UI adaptable.",
@@ -24,7 +56,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "ðŸ§©",
+        icon: "\u{1F9E9}",
         title: "Galeria de widgets",
         notes: [
           "Ajustes ahora presenta los widgets como un catalogo visual: ves que esta anclado, que hace cada widget y puedes abrir sus ajustes.",
@@ -33,7 +65,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "ðŸªŸ",
+        icon: "\u{1FA9F}",
         title: "Responsive y mas suave",
         notes: [
           "Ajustes se adapta mejor a ventanas estrechas con navegacion horizontal y controles que no se salen del contenedor.",
