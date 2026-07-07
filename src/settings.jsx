@@ -88,6 +88,7 @@ const SEARCH_INDEX = [
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
   ["be.alwaysOnTop", "general"], ["be.autostart", "general"],
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
+  ["clip.memory", "apps"], ["clip.retention", "apps"], ["clip.limit", "apps"],
   ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
   ["sc.title", "general"], ["sc.global", "general"], ["sc.positions", "general"],
   ["faq.title", "faq"], ["faq.q.data", "faq"], ["faq.q.updates", "faq"],
@@ -1605,6 +1606,39 @@ function Apps({ cfg, set }) {
               ＋ {label}
             </button>
           ))}
+      </div>
+      <div className="clip-policy">
+        <Toggle
+          label={t("clip.memory")}
+          hint={t("clip.memoryHint")}
+          checked={!!cfg.clipboardPersist}
+          onChange={(v) => set({ clipboardPersist: v })}
+        />
+        <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
+          <Slider
+            value={cfg.clipboardRetentionDays ?? 7}
+            min={1}
+            max={90}
+            step={1}
+            fmt={(v) => t("clip.days").replace("{n}", v)}
+            onChange={(v) => set({ clipboardRetentionDays: v })}
+          />
+        </Row>
+        <Row label={t("clip.limit")} hint={t("clip.limitHint")}>
+          <Slider
+            value={cfg.clipboardHistoryLimit ?? 60}
+            min={10}
+            max={200}
+            step={10}
+            fmt={(v) => t("clip.items").replace("{n}", v)}
+            onChange={(v) => set({ clipboardHistoryLimit: v })}
+          />
+        </Row>
+        <div className="clip-policy-actions">
+          <button className="s-btn s-btn-soft" onClick={() => dockApi.clipboardClear()}>
+            {t("clip.clear")}
+          </button>
+        </div>
       </div>
       <SectionTitle name="external">{t("apps.web")}</SectionTitle>
       <p className="muted">{t("apps.webHint")}</p>

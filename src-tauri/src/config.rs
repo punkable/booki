@@ -98,6 +98,12 @@ fn default_anim() -> String {
 fn default_edge_gap() -> u32 {
     48
 }
+fn default_clipboard_retention_days() -> u32 {
+    7
+}
+fn default_clipboard_history_limit() -> u32 {
+    60
+}
 
 fn default_true() -> bool {
     true
@@ -216,6 +222,16 @@ pub struct Config {
     /// launches; single-instance apps still focus themselves).
     #[serde(default)]
     pub focus_if_running: bool,
+    /// Store clipboard history on disk between app restarts. Off by default for
+    /// privacy; the in-session clipboard history still works either way.
+    #[serde(default)]
+    pub clipboard_persist: bool,
+    /// Delete clipboard-history entries older than this many days.
+    #[serde(default = "default_clipboard_retention_days")]
+    pub clipboard_retention_days: u32,
+    /// Maximum number of clipboard-history entries to keep.
+    #[serde(default = "default_clipboard_history_limit")]
+    pub clipboard_history_limit: u32,
 }
 
 fn default_hotkey_modifier() -> String {
@@ -265,6 +281,9 @@ impl Default for Config {
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
             focus_if_running: false,
+            clipboard_persist: false,
+            clipboard_retention_days: default_clipboard_retention_days(),
+            clipboard_history_limit: default_clipboard_history_limit(),
         }
     }
 }
