@@ -88,7 +88,10 @@ const SEARCH_INDEX = [
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
   ["be.alwaysOnTop", "general"], ["be.autostart", "general"],
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
+  ["w.mediaScrollVolume", "apps"],
   ["clip.memory", "apps"], ["clip.retention", "apps"], ["clip.limit", "apps"],
+  ["clip.sensitive", "apps"], ["clip.compact", "apps"],
+  ["gen.captureVisible", "general"],
   ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
   ["sc.title", "general"], ["sc.global", "general"], ["sc.positions", "general"],
   ["faq.title", "faq"], ["faq.q.data", "faq"], ["faq.q.updates", "faq"],
@@ -104,6 +107,68 @@ const TABS = [
   ["faq", "tab.faq", "help"],
   ["about", "tab.about", "info"],
 ];
+
+const WIDGET_ORDER = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume", "clipboard"];
+const WIDGET_META = {
+  clock: { emoji: "clock", accent: "#dfaa75", desc: "widget.clockDesc", caps: ["widget.cap.live", "widget.cap.clean"] },
+  cpu: { emoji: "brain", accent: "#fb8b24", desc: "widget.cpuDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
+  ram: { emoji: "ice", accent: "#3a86ff", desc: "widget.ramDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
+  disk: { emoji: "floppy", accent: "#8338ec", desc: "widget.diskDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
+  net: { emoji: "antenna", accent: "#06b6d4", desc: "widget.netDesc", caps: ["widget.cap.live", "widget.cap.compact"] },
+  uptime: { emoji: "stopwatch", accent: "#2bb673", desc: "widget.uptimeDesc", caps: ["widget.cap.live", "widget.cap.clean"] },
+  battery: { emoji: "battery", accent: "#2ecc71", desc: "widget.batteryDesc", caps: ["widget.cap.live", "widget.cap.warning"] },
+  notes: { emoji: "memo", accent: "#ffbe0b", desc: "widget.notesDesc", caps: ["widget.cap.editable", "widget.cap.preview"] },
+  media: { emoji: "notes", accent: "#ff006e", desc: "widget.mediaDesc", caps: ["widget.cap.controls", "widget.cap.smart"] },
+  volume: { emoji: "speaker", accent: "#06b6d4", desc: "widget.volumeDesc", caps: ["widget.cap.scroll", "widget.cap.ring"] },
+  clipboard: { emoji: "clipboard", accent: "#7c3aed", desc: "widget.clipboardDesc", caps: ["widget.cap.private", "widget.cap.search"] },
+};
+
+function widgetDisplayName(widget) {
+  return (
+    {
+      clock: t("w.clock"),
+      cpu: "CPU",
+      ram: "RAM",
+      disk: t("w.disk"),
+      net: t("w.net"),
+      uptime: t("w.uptime"),
+      battery: t("w.battery"),
+      notes: t("w.notes"),
+      media: t("w.media"),
+      volume: t("w.volume"),
+      clipboard: t("w.clipboard"),
+    }[widget] || widget
+  );
+}
+
+function widgetRefs(pinned, widget) {
+  const refs = [];
+  (pinned || []).forEach((item, i) => {
+    if (item.kind === "widget" && item.widget === widget) refs.push({ type: "top", i });
+    (item.children || []).forEach((child) => {
+      if (child.kind === "widget" && child.widget === widget) refs.push({ type: "child", gi: i, id: child.id });
+    });
+  });
+  return refs;
+}
+
+function itemForWidgetRef(pinned, ref) {
+  if (!ref) return null;
+  if (ref.type === "top") return pinned[ref.i] || null;
+  return (pinned[ref.gi]?.children || []).find((child) => child.id === ref.id) || null;
+}
+
+function updateWidgetStyleForRef(pinned, ref, value) {
+  if (!ref) return pinned;
+  if (ref.type === "top") {
+    return pinned.map((item, i) => (i === ref.i ? { ...item, style: value } : item));
+  }
+  return pinned.map((item, i) =>
+    i === ref.gi
+      ? { ...item, children: (item.children || []).map((child) => (child.id === ref.id ? { ...child, style: value } : child)) }
+      : item
+  );
+}
 
 // Scan the Start Menu once per settings session, then reuse — the scan +
 // icon extraction is costly and the Apps panel remounts on every tab switch.
@@ -137,6 +202,14 @@ function Toggle({ checked, onChange, label, hint }) {
       <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="r-switch" />
     </label>
+  );
+}
+
+function HelpTip({ text }) {
+  return (
+    <button type="button" className="help-dot" title={text} aria-label={text}>
+      <span dangerouslySetInnerHTML={{ __html: icon("help") }} />
+    </button>
   );
 }
 
@@ -972,14 +1045,25 @@ function IconPickerModal({ item, onPick, onClose }) {
 function WidgetStyleModal({ item, accent, onChange, onClose }) {
   const st = item.style || {};
   const variant = st.variant || "glass";
+  const meta = WIDGET_META[item.widget] || { emoji: "puzzle", accent, desc: "widget.defaultDesc" };
   const set1 = (patch) => onChange({ ...st, ...patch });
   return (
     <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal widget-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <strong>{t("w.styleTitle")}</strong>
           <button className="pin-btn" onClick={onClose}>✕</button>
         </div>
+        <div className="widget-modal-hero" style={{ "--widget-accent": meta.accent || accent }}>
+          <span className="widget-store-ico">
+            <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
+          </span>
+          <div>
+            <strong>{item.name || widgetDisplayName(item.widget)}</strong>
+            <p>{t(meta.desc)}</p>
+          </div>
+        </div>
+        <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>
         {item.widget === "notes" && (
           <Row label={t("w.note")}>
             <input
@@ -991,6 +1075,23 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
             />
           </Row>
         )}
+        {item.widget === "media" ? (
+          <Toggle
+            label={t("w.mediaScrollVolume")}
+            hint={t("w.mediaScrollVolumeHint")}
+            checked={!!st.scrollVolume}
+            onChange={(v) => set1({ scrollVolume: v })}
+          />
+        ) : item.widget !== "notes" ? (
+          <div className="widget-no-extra">
+            <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
+            <div>
+              <strong>{t("w.smartDefaults")}</strong>
+              <p>{t("w.smartDefaultsHint")}</p>
+            </div>
+          </div>
+        ) : null}
+        <SectionTitle name="palette">{t("w.appearance")}</SectionTitle>
         <Row label={t("w.variant")}>
           <SegmentedControl
             value={variant}
@@ -1017,6 +1118,36 @@ function WidgetStyleModal({ item, accent, onChange, onClose }) {
   );
 }
 
+function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
+  const meta = WIDGET_META[widget] || { emoji: "puzzle", accent: "var(--accent)", desc: "widget.defaultDesc", caps: [] };
+  const pinned = refs.length > 0;
+  return (
+    <article className={"widget-store-card" + (pinned ? " pinned" : "")} style={{ "--widget-accent": meta.accent }}>
+      <div className="widget-store-top">
+        <span className="widget-store-ico">
+          <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
+        </span>
+        {pinned && <span className="widget-store-badge">{t("widget.pinned")}</span>}
+      </div>
+      <div className="widget-store-body">
+        <strong>{label}</strong>
+        <p>{t(meta.desc)}</p>
+      </div>
+      <div className="widget-store-caps">
+        {(meta.caps || []).map((cap) => <span key={cap}>{t(cap)}</span>)}
+      </div>
+      <button
+        type="button"
+        className={"s-btn widget-store-btn" + (pinned ? " s-btn-soft" : "")}
+        onClick={pinned ? onEdit : onAdd}
+      >
+        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned ? "sliders" : "plus") }} />
+        <span>{pinned ? t("widget.edit") : t("widget.add")}</span>
+      </button>
+    </article>
+  );
+}
+
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
@@ -1027,7 +1158,7 @@ function Apps({ cfg, set }) {
   const mergeRef = useRef(-1);
   const [mergeInto, setMergeInto] = useState(-1);
   const [iconFor, setIconFor] = useState(-1);
-  const [styleFor, setStyleFor] = useState(-1);
+  const [styleFor, setStyleFor] = useState(null);
   const [webUrl, setWebUrl] = useState("");
   const [webName, setWebName] = useState("");
   const [openIds, setOpenIds] = useState({});
@@ -1039,8 +1170,13 @@ function Apps({ cfg, set }) {
   const [clearArm, setClearArm] = useState(false);
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
-  const setStyle = (i, value) =>
-    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, style: value } : p)) });
+  const setStyle = (ref, value) =>
+    set({ pinned: updateWidgetStyleForRef(cfg.pinned, ref, value) });
+  const widgetLabels = Object.fromEntries(WIDGET_ORDER.map((w) => [w, widgetDisplayName(w)]));
+  const openWidgetEditor = (widget) => {
+    const ref = widgetRefs(cfg.pinned, widget)[0];
+    if (ref) setStyleFor(ref);
+  };
   const addWebsite = async () => {
     let url = webUrl.trim();
     if (!url) return;
@@ -1396,6 +1532,7 @@ function Apps({ cfg, set }) {
         k === gi ? { ...p, children: (p.children || []).map((c) => (c.id === childId ? { ...c, name } : c)) } : p
       ),
     });
+  const styleTarget = itemForWidgetRef(cfg.pinned, styleFor);
 
   return (
     <>
@@ -1457,7 +1594,7 @@ function Apps({ cfg, set }) {
                 </div>
                 <div className="pin-card-actions">
                   {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
+                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", i })} />}
                   {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                     <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                   )}
@@ -1471,6 +1608,16 @@ function Apps({ cfg, set }) {
                         onContextMenu={(e) => { e.preventDefault(); setKidMenu({ gi: i, id: c.id, x: e.clientX, y: e.clientY }); }}>
                         <PinThumb item={c} />
                         <span className="pin-kid-name" title={c.path || ""}>{c.name}</span>
+                        {c.kind === "widget" && (
+                          <button
+                            type="button"
+                            className="pin-kid-edit"
+                            title={t("w.styleTitle")}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", gi: i, id: c.id }); }}
+                            dangerouslySetInnerHTML={{ __html: icon("sliders") }}
+                          />
+                        )}
                       </div>
                     ))}
                     <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
@@ -1524,7 +1671,7 @@ function Apps({ cfg, set }) {
               </span>
               <span className="pin-actions">
                 {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor(i)} />}
+                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", i })} />}
                 {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                   <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                 )}
@@ -1553,6 +1700,9 @@ function Apps({ cfg, set }) {
                     />
                   </span>
                   <span className="pin-actions">
+                    {c.kind === "widget" && (
+                      <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "child", gi: i, id: c.id })} />
+                    )}
                     <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
                     <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
                   </span>
@@ -1592,27 +1742,46 @@ function Apps({ cfg, set }) {
       </div>
       <SectionTitle name="sliders">{t("apps.widgets")}</SectionTitle>
       <p className="muted">{t("apps.widgetsHint")}</p>
-      <div className="s-actions">
-        {[
-          ["clock", t("w.clock")], ["cpu", "CPU"], ["ram", "RAM"], ["disk", t("w.disk")],
-          ["net", t("w.net")], ["uptime", t("w.uptime")], ["battery", t("w.battery")],
-          ["notes", t("w.notes")], ["media", t("w.media")], ["volume", t("w.volume")],
-          ["clipboard", t("w.clipboard")],
-        ]
-          // Hide widgets you already have — no point adding a second of the same.
-          .filter(([w]) => !cfg.pinned.some((p) => p.kind === "widget" && p.widget === w))
-          .map(([w, label]) => (
-            <button key={w} className="s-btn s-btn-soft" onClick={() => addWidget(w, label)}>
-              ＋ {label}
-            </button>
-          ))}
+      <div className="widget-store-grid">
+        {WIDGET_ORDER.map((w) => {
+          const refs = widgetRefs(cfg.pinned, w);
+          return (
+            <WidgetStoreCard
+              key={w}
+              widget={w}
+              label={widgetLabels[w] || w}
+              refs={refs}
+              onAdd={() => addWidget(w, widgetLabels[w] || w)}
+              onEdit={() => openWidgetEditor(w)}
+            />
+          );
+        })}
       </div>
       <div className="clip-policy">
+        <div className="clip-policy-head">
+          <span className="clip-policy-icon" dangerouslySetInnerHTML={{ __html: icon("shield") }} />
+          <div>
+            <strong>{t("clip.privacyTitle")}</strong>
+            <p>{t("clip.privacyBody")}</p>
+          </div>
+        </div>
         <Toggle
           label={t("clip.memory")}
           hint={t("clip.memoryHint")}
           checked={!!cfg.clipboardPersist}
           onChange={(v) => set({ clipboardPersist: v })}
+        />
+        <Toggle
+          label={t("clip.sensitive")}
+          hint={t("clip.sensitiveHint")}
+          checked={cfg.clipboardSensitiveGuard !== false}
+          onChange={(v) => set({ clipboardSensitiveGuard: v })}
+        />
+        <Toggle
+          label={t("clip.compact")}
+          hint={t("clip.compactHint")}
+          checked={!!cfg.clipboardCompact}
+          onChange={(v) => set({ clipboardCompact: v })}
         />
         <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
           <Slider
@@ -1669,12 +1838,12 @@ function Apps({ cfg, set }) {
           onPick={(value) => { setIcon(iconFor, value); setIconFor(-1); }}
         />
       )}
-      {styleFor >= 0 && cfg.pinned[styleFor] && (
+      {styleTarget && (
         <WidgetStyleModal
-          item={cfg.pinned[styleFor]}
+          item={styleTarget}
           accent={cfg.accent}
           onChange={(value) => setStyle(styleFor, value)}
-          onClose={() => setStyleFor(-1)}
+          onClose={() => setStyleFor(null)}
         />
       )}
       {kidMenu && (
@@ -1973,6 +2142,12 @@ function General({ cfg, set, onWhatsNew }) {
         }} />
       <Toggle label={t("be.alwaysOnTop")} checked={cfg.alwaysOnTop}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
+      <div className="capture-row">
+        <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
+          checked={!!cfg.captureVisible}
+          onChange={(v) => set({ captureVisible: v })} />
+        <HelpTip text={t("gen.captureHelp")} />
+      </div>
       <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
         checked={cfg.contextMenu !== false}
         onChange={(v) => set({ contextMenu: v })} />

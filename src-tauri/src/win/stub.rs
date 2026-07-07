@@ -17,6 +17,16 @@ pub fn focus_window(_hwnd: isize) -> bool {
 
 pub fn exclude_from_capture(_hwnd: isize) {}
 
+pub fn set_capture_visible(_hwnd: isize, _visible: bool) {}
+
+pub fn protect_data(data: &[u8]) -> Option<Vec<u8>> {
+    Some(data.to_vec())
+}
+
+pub fn unprotect_data(data: &[u8]) -> Option<Vec<u8>> {
+    Some(data.to_vec())
+}
+
 /// Work area (excluding the taskbar) of the monitor under a point.
 /// No native info off-Windows → caller falls back to the full monitor.
 pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {

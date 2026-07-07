@@ -52,6 +52,16 @@ export const iconCopy = () =>
   S(`<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`);
 export const iconSparkles = () =>
   S(`<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>`);
+export const iconStar = () =>
+  S(`<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2 7.5 14 3 9.6l6.2-.9Z"/>`);
+export const iconShield = () =>
+  S(`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9.5 12.5 11 14l3.5-4"/>`);
+export const iconEye = () =>
+  S(`<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`);
+export const iconEyeOff = () =>
+  S(`<path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.1 4.1"/><path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.4"/><path d="M6.6 6.6C3.7 8.6 2 12 2 12s3.5 8 10 8a10.5 10.5 0 0 0 4.1-.8"/>`);
+export const iconLock = () =>
+  S(`<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -80,6 +90,11 @@ const iconMap = {
   help: iconHelp,
   copy: iconCopy,
   sparkles: iconSparkles,
+  star: iconStar,
+  shield: iconShield,
+  eye: iconEye,
+  "eye-off": iconEyeOff,
+  lock: iconLock,
 };
 
 export function icon(name) {

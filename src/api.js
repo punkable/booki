@@ -58,6 +58,12 @@ const DEMO_CONFIG = {
   lastProfile: "",
   edgeGap: 48,
   focusIfRunning: false,
+  clipboardPersist: false,
+  clipboardRetentionDays: 7,
+  clipboardHistoryLimit: 60,
+  clipboardSensitiveGuard: true,
+  clipboardCompact: false,
+  captureVisible: false,
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
@@ -122,6 +128,12 @@ async function mockInvoke(cmd, args) {
       return true;
     case "clipboard_delete":
       demoClipboard = demoClipboard.filter((e) => e.id !== args.id);
+      return null;
+    case "clipboard_favorite":
+      demoClipboard = demoClipboard.map((e) => e.id === args.id ? { ...e, favorite: !!args.favorite } : e);
+      return null;
+    case "clipboard_private":
+      demoClipboard = demoClipboard.map((e) => e.id === args.id ? { ...e, private: !!args.private } : e);
       return null;
     case "clipboard_clear":
       demoClipboard = [];
@@ -388,6 +400,8 @@ export const dock = {
   clipboardHistory: (limit = 60) => invoke("clipboard_history", { limit }),
   clipboardCopy: (text) => invoke("clipboard_copy", { text }),
   clipboardDelete: (id) => invoke("clipboard_delete", { id }),
+  clipboardFavorite: (id, favorite) => invoke("clipboard_favorite", { id, favorite }),
+  clipboardPrivate: (id, value) => invoke("clipboard_private", { id, private: value }),
   clipboardClear: () => invoke("clipboard_clear"),
   openWith: (path) => invoke("open_with", { path }),
   // Native OLE drag-out: drag a file from the folder flyout into Explorer or

@@ -65,6 +65,14 @@ const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
 const isVertical = () => cfg.edge === "left" || cfg.edge === "right";
 const baseSize = () => cfg.iconSize || 48;
+function findPinnedById(id, items = cfg?.pinned || []) {
+  for (const item of items) {
+    if (item.id === id) return item;
+    const child = findPinnedById(id, item.children || []);
+    if (child) return child;
+  }
+  return null;
+}
 
 // ───────────────────────────── Boot ─────────────────────────────
 
@@ -593,6 +601,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   el.dataset.id = item.id;
   el.dataset.widget = type;
   el.dataset.variant = st.variant || "glass";
+  if (type === "media" && st.scrollVolume) el.dataset.scrollVolume = "1";
   if (st.color) el.style.setProperty("--w-accent", st.color);
   else if (RING_DEFAULTS[type]) {
     el.style.setProperty("--w-accent", RING_DEFAULTS[type]);
@@ -899,7 +908,11 @@ async function pollMedia() {
 }
 
 // System volume — scroll changes it, click toggles mute.
+let lastVolumePct = NaN;
+let volumeWheelTimer = null;
+let volumeInfoPending = false;
 function renderVolume(pct, muted) {
+  lastVolumePct = Number(pct);
   eachWidget("volume", (el) => {
     setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
     el.classList.toggle("muted", muted);
@@ -908,6 +921,40 @@ function renderVolume(pct, muted) {
 async function pollVolume() {
   const v = await dockApi.volumeInfo().catch(() => null);
   if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
+}
+function readVolumeFromTile(tile) {
+  const vEl = tile?.querySelector(".w-ring-num");
+  const dataValue = Number(vEl?.dataset.v);
+  if (Number.isFinite(dataValue)) return dataValue;
+  const textValue = parseInt(vEl?.textContent || "", 10);
+  return Number.isFinite(textValue) ? textValue : NaN;
+}
+function queueVolumeSet(next) {
+  const pct = Math.max(0, Math.min(100, Math.round(next)));
+  renderVolume(pct, false);
+  clearTimeout(volumeWheelTimer);
+  volumeWheelTimer = setTimeout(() => {
+    dockApi.volumeSet(pct).then(refreshVolume, () => {});
+  }, 70);
+}
+function adjustVolumeFromWheel(deltaY, sourceTile) {
+  let cur = Number.isFinite(lastVolumePct) ? lastVolumePct : readVolumeFromTile(sourceTile);
+  if (!Number.isFinite(cur)) {
+    if (volumeInfoPending) return;
+    volumeInfoPending = true;
+    dockApi.volumeInfo()
+      .then((v) => {
+        volumeInfoPending = false;
+        if (Array.isArray(v)) {
+          lastVolumePct = Number(v[0]);
+          adjustVolumeFromWheel(deltaY, sourceTile);
+        }
+      })
+      .catch(() => { volumeInfoPending = false; });
+    return;
+  }
+  const step = Math.abs(deltaY) > 80 ? 5 : 3;
+  queueVolumeSet(cur + (deltaY > 0 ? -step : step));
 }
 
 // Clipboard-history widget: the bar card shows a live PREVIEW of the most
@@ -939,6 +986,12 @@ function widgetPresent(w) {
   const has = (t) => !!(widgetEls[t] && widgetEls[t].length);
   return Array.isArray(w) ? w.some(has) : has(w);
 }
+function anyPinnedWidget(predicate, items = cfg?.pinned || []) {
+  return items.some((item) =>
+    (item.kind === "widget" && predicate(item)) ||
+    anyPinnedWidget(predicate, item.children || [])
+  );
+}
 function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
@@ -955,7 +1008,7 @@ function startPolls() {
   const hasClock = widgetPresent("clock");
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
-  const hasVolume = widgetPresent("volume");
+  const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
   const hasClipboard = widgetPresent("clipboard");
   // Nothing live pinned → no timer at all (zero idle cost).
   if (!hasClock && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
@@ -1484,6 +1537,12 @@ dockEl.addEventListener(
     const w = closestSel(e.target, ".tile.widget");
     if (!w) return;
     e.preventDefault();
+    const item = findPinnedById(w.dataset.id);
+    if (!item) return;
+    if (w.dataset.widget === "media" && item.style?.scrollVolume) {
+      adjustVolumeFromWheel(e.deltaY || e.deltaX, w);
+      return;
+    }
     // The volume card is the exception: scrolling it changes the volume
     // (the natural gesture), not the visual variant.
     if (w.dataset.widget === "volume") {
@@ -1491,12 +1550,9 @@ dockEl.addEventListener(
       const vEl = w.querySelector(".w-ring-num");
       const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
       const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
-      renderVolume(next, false); // optimistic — the poll corrects if needed
-      dockApi.volumeSet(next).catch(() => {});
+      queueVolumeSet(next);
       return;
     }
-    const item = cfg.pinned.find((p) => p.id === w.dataset.id);
-    if (!item) return;
     const cur = (item.style && item.style.variant) || "glass";
     const i = WIDGET_VARIANTS.indexOf(cur);
     const step = e.deltaY > 0 ? 1 : WIDGET_VARIANTS.length - 1;
@@ -3574,6 +3630,9 @@ function closeStack() {
 // same #stack panel/positioning as the folder/group flyout (one flyout
 // concept, different content) so it inherits the stage-window stability,
 // hit-region reporting and open/close transition for free.
+let clipStackQuery = "";
+let clipSearchTimer = null;
+let clipRenderSeq = 0;
 async function toggleClipboardStack(tileEl) {
   if (stackOpen) {
     closeStack();
@@ -3597,6 +3656,34 @@ async function toggleClipboardStack(tileEl) {
   close.addEventListener("click", closeStack);
   head.appendChild(close);
   stackEl.appendChild(head);
+
+  const guide = document.createElement("div");
+  guide.className = "clip-guide";
+  guide.innerHTML = `
+    <strong>${t("clip.howTitle")}</strong>
+    <span>${t("clip.howCopy")}</span>
+    <span>${t("clip.howStar")}</span>
+    <span>${t("clip.howPrivate")}</span>
+  `;
+  stackEl.appendChild(guide);
+
+  const tools = document.createElement("div");
+  tools.className = "clip-tools";
+  const searchWrap = document.createElement("label");
+  searchWrap.className = "clip-search";
+  searchWrap.innerHTML = `<span>${icon("search")}</span>`;
+  const search = document.createElement("input");
+  search.type = "search";
+  search.placeholder = t("clip.search");
+  search.value = clipStackQuery;
+  search.addEventListener("input", () => {
+    clipStackQuery = search.value;
+    clearTimeout(clipSearchTimer);
+    clipSearchTimer = setTimeout(() => renderClipboardList(grid, foot), 80);
+  });
+  searchWrap.appendChild(search);
+  tools.appendChild(searchWrap);
+  stackEl.appendChild(tools);
 
   const grid = document.createElement("div");
   grid.className = "stack-grid clip-list";
@@ -3623,21 +3710,29 @@ async function toggleClipboardStack(tileEl) {
 // open and after copy/edit/delete/clear so the list stays live without
 // closing the flyout.
 async function renderClipboardList(grid, foot) {
+  const seq = ++clipRenderSeq;
   let items = [];
   try {
-    items = await dockApi.clipboardHistory(60);
+    items = await dockApi.clipboardHistory(200);
   } catch (_) {}
+  if (seq !== clipRenderSeq || !stackOpen) return;
+  const rawCount = items.length;
+  const q = clipStackQuery.trim().toLowerCase();
+  if (q) {
+    items = items.filter((entry) => (entry.text || "").toLowerCase().includes(q));
+  }
   grid.innerHTML = "";
   foot.innerHTML = "";
+  grid.classList.toggle("compact", !!cfg.clipboardCompact || rawCount > 18);
   if (!stackOpen) return; // closed while we were awaiting
   if (!items.length) {
-    grid.innerHTML = `<div class="stack-empty">${t("clip.empty")}</div>`;
+    grid.innerHTML = `<div class="stack-empty">${q ? t("clip.noMatches") : t("clip.empty")}</div>`;
     if (pendingReplace) requestAnimationFrame(pendingReplace);
     return;
   }
   items.forEach((entry, i) => {
     const row = document.createElement("div");
-    row.className = "clip-row";
+    row.className = "clip-row" + (entry.favorite ? " favorite" : "") + (entry.private ? " private" : "");
     row.style.setProperty("--i", i);
     const text = document.createElement("div");
     text.className = "clip-text";
@@ -3658,6 +3753,14 @@ async function renderClipboardList(grid, foot) {
       });
       acts.appendChild(b);
     };
+    act(entry.favorite ? "star" : "star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), async () => {
+      await dockApi.clipboardFavorite(entry.id, !entry.favorite);
+      await renderClipboardList(grid, foot);
+    });
+    act("shield", entry.private ? t("clip.makePersistent") : t("clip.private"), async () => {
+      await dockApi.clipboardPrivate(entry.id, !entry.private);
+      await renderClipboardList(grid, foot);
+    });
     act("pencil", t("clip.edit"), () => startClipEdit(row, entry, grid, foot));
     act("trash", t("clip.delete"), async () => {
       await dockApi.clipboardDelete(entry.id);
@@ -3684,6 +3787,10 @@ async function renderClipboardList(grid, foot) {
     await renderClipboardList(grid, foot);
   });
   foot.appendChild(clear);
+  const meta = document.createElement("div");
+  meta.className = "clip-meta";
+  meta.textContent = t("clip.countHint").replace("{n}", rawCount);
+  foot.appendChild(meta);
   if (pendingReplace) requestAnimationFrame(pendingReplace);
 }
 

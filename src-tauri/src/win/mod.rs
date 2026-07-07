@@ -24,7 +24,7 @@ mod windows_impl;
 pub use windows_impl::{
     app_icon_data_uri, cursor_at_edge, empty_trash, exclude_from_capture, focus_window, foreground_occludes,
     assoc_executable, cursor_in_rects, file_thumbnail, get_autostart, is_fullscreen, known_folders, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
-    clipboard_get_text, media_toggle, move_paths, set_autostart, set_clipboard_text, shortcut_target, trash_count, trash_is_empty, trash_paths, volume_get,
+    clipboard_get_text, media_toggle, move_paths, protect_data, set_autostart, set_capture_visible, set_clipboard_text, shortcut_target, trash_count, trash_is_empty, trash_paths, unprotect_data, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
 
@@ -34,6 +34,6 @@ mod stub;
 pub use stub::{
     app_icon_data_uri, cursor_at_edge, empty_trash, exclude_from_capture, focus_window, foreground_occludes,
     assoc_executable, cursor_in_rects, file_thumbnail, get_autostart, is_fullscreen, known_folders, list_windows, media_next, media_now_playing, media_prev, move_window, sync_context_menu,
-    clipboard_get_text, media_toggle, move_paths, set_autostart, set_clipboard_text, shortcut_target, trash_count, trash_is_empty, trash_paths, volume_get,
+    clipboard_get_text, media_toggle, move_paths, protect_data, set_autostart, set_capture_visible, set_clipboard_text, shortcut_target, trash_count, trash_is_empty, trash_paths, unprotect_data, volume_get,
     volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };

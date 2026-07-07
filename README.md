@@ -31,12 +31,20 @@
 |---|---|
 | 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures and websites. Click to launch, or focus an already-open window. Right-click a pin for recent files; icons bounce as they open. |
 | 🧩 **Everything can be arranged** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete, group apps and widgets, and reorder directly on the bar. |
-| 🎛️ **Live widgets that stay aligned** | CPU/RAM/disk/battery/volume ring gauges, clock, network, uptime, notes, clipboard history and now-playing controls live in compact cards that do not stretch the dock. |
+| 🎛️ **Live widgets that stay aligned** | CPU/RAM/disk/battery/volume ring gauges, clock, network, uptime, notes, clipboard history and now-playing controls live in compact cards that do not stretch the dock. Widgets can be tuned from Settings. |
 | 🫥 **Smart hide + floating notch** | The dock tucks away into a slim notch and comes back when you ask for it. It also stays out of fullscreen games and videos. |
 | 🎯 **Precise interaction** | The transparent window leaves room for shadows and flyouts, but clicks outside the painted dock pass through to the app behind it. |
 | 🎨 **Designed to fit Windows** | Light/dark/system themes, wallpaper-aware accent, translucent glass, size/spacing/radius controls, multi-monitor support and six languages. |
-| 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`. |
+| 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
+
+## Beta 0.49.4 highlights
+
+- **Widget gallery:** Settings now shows native widgets like a small catalog. You can see what is pinned, add missing widgets, and tune widget-specific behavior without hunting through generic controls.
+- **Media wheel volume:** the Media widget can optionally use the mouse wheel for system volume only while the pointer is over that widget.
+- **Clipboard history that explains itself:** search, favorites, session-only entries, compact mode, retention limits and protected restart memory are all in one local privacy panel.
+- **Capture visibility:** choose whether Booki appears in compatible screenshots, recordings and screen shares.
+- **More responsive UI:** Settings, dock flyouts and clipboard rows adapt better to narrow windows, vertical docks and long copied text.
 
 <a id="gallery"></a>
 
@@ -92,6 +100,7 @@
 | **Middle-click** a pin | Open its location in Explorer |
 | Right-click the dock | Add apps / widgets / profiles / settings |
 | Double-click a widget | Jump to its style editor |
+| Mouse wheel over Media (optional) | Raise or lower system volume |
 | `Alt` + `1…9` | Launch the Nth pin (modifier is configurable) |
 | Push cursor into the screen edge | Reveal a hidden dock |
 
@@ -101,6 +110,12 @@
   releases), and — only if you pin a website — fetching its favicon. **No
   telemetry, no accounts, no data collection.**
 - Everything is stored locally in `%APPDATA%\Booki\config.json`.
+- Clipboard history is local. Restart memory is **off by default**; when enabled
+  it is protected for your Windows user, can auto-expire after a chosen number
+  of days, and supports session-only entries that are never written to disk.
+- Booki is hidden from compatible captures by default; Settings lets you choose
+  whether the dock/notch should appear in screenshots, recordings and screen
+  shares.
 - **Updates** are delivered in-app: Booki checks the latest GitHub release,
   downloads the **signed** installer, updates itself in place for your user and
   **keeps your settings**. You can also check manually in *Settings → About*.
