@@ -36,6 +36,9 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - name: Check visible text encoding
+        run: npm run check:text
+
       - name: Build Tauri app (installers + exe)
         run: npm run tauri:build
         env:

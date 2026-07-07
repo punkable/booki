@@ -11,10 +11,6 @@ on:
   push:
     tags:
       - "v*"
-    # Releases publish from main: every push there with a new version in
-    # package.json produces a signed installer release.
-    branches:
-      - "main"
   workflow_dispatch:
     inputs:
       tag:
@@ -51,10 +47,11 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      # Derive the release tag from the app version (package.json), so bumping
-      # the version is all it takes to publish a new release — no hardcoded tag
-      # to forget. A push that doesn't change the version just re-uploads to the
-      # same tag (idempotent).
+      - name: Check visible text encoding
+        run: npm run check:text
+
+      # Derive the release tag from package.json for manual runs. Normal
+      # publishing is tag-based, so a version ships exactly once.
       - name: Resolve release tag
         id: ver
         shell: bash
@@ -77,7 +74,7 @@ jobs:
 
             Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
 
-            This beta patch focuses on a more solid everyday dock: aligned widgets, a clearer local clipboard, a widget gallery in Settings, per-widget Media volume scroll, capture visibility controls and better responsive layouts for dock flyouts/settings.
+            This beta patch focuses on a more solid everyday dock: polished Settings UX, a sturdier widget editor, clipboard controls inside the Clipboard widget, cleaner text/emoji rendering, aligned widgets, capture visibility controls and better responsive layouts for dock flyouts/settings.
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 

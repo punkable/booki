@@ -3885,7 +3885,7 @@ async function checkUpdates() {
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.
 setInterval(checkUpdates, 4 * 3600 * 1000);
 
-// ─────────────────── Easter egg: Konami → party 🦫 ───────────────────
+// Easter egg: Konami party.
 const KONAMI = [
   "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
   "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a",
@@ -3908,15 +3908,5 @@ function partyMode() {
     tiles.forEach((t) => (t.style.animationDelay = ""));
   }, 4200);
 }
-
-// A friendly signature in the console for the curious. 🦫
-try {
-  // eslint-disable-next-line no-console
-  console.log(
-    "%c🦫 Booki Dock %c— hecho con cariño por Punkable (@0xPunki). ¡Prueba el código Konami!",
-    "font-weight:700;color:#dfaa75",
-    "color:inherit"
-  );
-} catch (_) {}
 
 boot();

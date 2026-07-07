@@ -302,6 +302,7 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
     let result = config::save(&config);
     if result.is_ok() {
         clip_apply_config(&config);
+        apply_always_on_top(&app, config.always_on_top);
         apply_capture_policy(&app, config.capture_visible);
     }
     result
@@ -450,9 +451,19 @@ fn open_with(path: String) -> Result<(), String> {
     }
 }
 
+fn apply_always_on_top(app: &AppHandle, value: bool) {
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.set_always_on_top(value);
+    }
+}
+
 #[tauri::command]
-fn set_always_on_top(window: WebviewWindow, value: bool) -> Result<(), String> {
-    window.set_always_on_top(value).map_err(|e| e.to_string())
+fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
+    if let Some(dock) = app.get_webview_window("dock") {
+        dock.set_always_on_top(value).map_err(|e| e.to_string())
+    } else {
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -466,6 +477,7 @@ fn reset_config(app: AppHandle) -> Result<Config, String> {
     let mut c = Config::default();
     c.pinned = config::load().pinned;
     config::save(&c)?;
+    apply_always_on_top(&app, c.always_on_top);
     apply_capture_policy(&app, c.capture_visible);
     Ok(c)
 }
