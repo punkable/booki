@@ -3,6 +3,42 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.0",
+    date: "7 jul 2026",
+    headline: "Dock alineado: widgets compactos, portapapeles controlado y captura principal corregida.",
+    sections: [
+      {
+        icon: "📐",
+        title: "Dock horizontal alineado",
+        notes: [
+          "Notas y Portapapeles ya no se levantan ni descuadran el dock: ahora comparten el mismo eje visual que apps, reloj, CPU, grupos y papelera.",
+        ],
+      },
+      {
+        icon: "📋",
+        title: "Portapapeles bajo control",
+        notes: [
+          "La tarjeta de Portapapeles tiene un ancho máximo fijo: los textos largos ya no estiran el dock y se desplazan dentro de la tarjeta cuando hace falta.",
+          "La misma protección se aplica a las vistas previas de Nota, evitando saltos o crecimiento inesperado.",
+        ],
+      },
+      {
+        icon: "🖼️",
+        title: "README actualizado",
+        notes: [
+          "La captura principal del README ahora enseña el dock corregido y alineado. Los GIFs y el resto de la galería se mantienen como estaban.",
+        ],
+      },
+      {
+        icon: "🧭",
+        title: "Preview más fiel",
+        notes: [
+          "El preview del navegador arranca sin onboarding y usa el notch flotante por defecto, para revisar el dock sin overlays ni estados engañosos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.48.0",
     date: "6 jul 2026",
     headline: "Widgets con look de Windows 11: anillos animados y tarjetas con vista previa.",

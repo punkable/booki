@@ -19,6 +19,8 @@ const DEMO_CONFIG = {
     { id: "g", name: "Proyectos", path: "C:/Users/Proyectos", args: [], kind: "folder" },
     { id: "w1", name: "Reloj", path: "", args: [], kind: "widget", widget: "clock" },
     { id: "w2", name: "CPU", path: "", args: [], kind: "widget", widget: "cpu" },
+    { id: "w3", name: "Notas", path: "", args: [], kind: "widget", widget: "notes", style: { note: "Comprar leche y huevos" } },
+    { id: "w4", name: "Portapapeles", path: "", args: [], kind: "widget", widget: "clipboard" },
     {
       id: "grp", name: "Diseño", path: "", args: [], kind: "group",
       children: [
@@ -42,7 +44,7 @@ const DEMO_CONFIG = {
   autoHideMode: "smart",
   autoHideDelay: 650,
   notchPosition: "center",
-  notchPeek: true,
+  notchPeek: false,
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
@@ -52,6 +54,7 @@ const DEMO_CONFIG = {
   language: "system",
   notchTrigger: "click",
   compact: false,
+  onboarded: true,
   lastProfile: "",
   edgeGap: 48,
   focusIfRunning: false,

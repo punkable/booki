@@ -304,6 +304,7 @@ async function render() {
   dockEl.replaceChildren(...tiles);
   lastRenderIds = new Set(cfg.pinned.map((p) => p.id));
   cacheWidgetEls();
+  requestAnimationFrame(refreshPreviewMarquees);
 
   // Friendly empty state: a "+" tile that opens Settings on the Pinned-apps tab
   // (suggestions, widgets, tips) — much clearer than a bare file picker.
@@ -676,12 +677,12 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (type === "clock") tickClocks();
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
-    el.querySelector(".w-pv-sub").textContent = st.note || t("w.notesEmpty");
+    setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
     el.title = st.note ? `${t("w.notes")} — ${st.note}` : widgetLabel("notes");
   }
   if (type === "clipboard") {
     el.querySelector(".w-pv-title").textContent = t("w.clipboard");
-    el.querySelector(".w-pv-sub").textContent = t("clip.empty");
+    setPreviewSubText(el, t("clip.empty"), true);
   }
   return el;
 }
@@ -766,6 +767,35 @@ function setMediaText(el, artist, title) {
     v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
     v.classList.add("scroll");
   }
+}
+
+function setMarqueeText(el, text, keyName) {
+  if (!el) return;
+  if (el.dataset[keyName] === text) return;
+  el.dataset[keyName] = text;
+  el.classList.remove("scroll");
+  el.textContent = text;
+  if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
+  const safe = esc(text);
+  el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
+  el.classList.add("scroll");
+}
+
+function setPreviewSubText(el, text, empty = false) {
+  const sub = el.querySelector(".w-pv-sub");
+  if (!sub) return;
+  sub.classList.toggle("empty", empty);
+  setMarqueeText(sub, text, "mqPreview");
+}
+
+function refreshPreviewMarquees() {
+  document.querySelectorAll(".tile.widget.preview").forEach((el) => {
+    const sub = el.querySelector(".w-pv-sub");
+    if (!sub) return;
+    const text = sub.dataset.mqPreview || sub.textContent || "";
+    delete sub.dataset.mqPreview;
+    setPreviewSubText(el, text, sub.classList.contains("empty"));
+  });
 }
 
 // Run fn over every cached element of a widget type (no per-tick DOM query).
@@ -871,9 +901,7 @@ async function pollVolume() {
 // notification card. The full list is fetched once, when the flyout opens.
 function renderClipboardSummary(count, preview) {
   eachWidget("clipboard", (el) => {
-    const sub = el.querySelector(".w-pv-sub");
-    sub.textContent = preview || t("clip.empty");
-    sub.classList.toggle("empty", !preview);
+    setPreviewSubText(el, preview || t("clip.empty"), !preview);
     const badge = el.querySelector(".w-pv-count");
     badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
     el.title = preview ? t("clip.countHint").replace("{n}", count) : t("clip.empty");
@@ -1020,11 +1048,7 @@ function editNote(item) {
     item.style = { ...(item.style || {}), note: ta.value };
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
-      const sub = el.querySelector(".w-pv-sub");
-      if (sub) {
-        sub.textContent = ta.value || t("w.notesEmpty");
-        sub.classList.toggle("empty", !ta.value);
-      }
+      setPreviewSubText(el, ta.value || t("w.notesEmpty"), !ta.value);
       el.title = ta.value ? `${t("w.notes")} — ${ta.value}` : widgetLabel("notes");
     });
     persist();
