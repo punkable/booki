@@ -40,3 +40,13 @@ welcome.
 
 Because this beta isn't signed with a commercial certificate yet, Windows
 SmartScreen may warn on first run — that's expected and not a vulnerability.
+
+## Dependency advisory notes
+
+- `glib` / `RUSTSEC-2024-0429`: Booki currently ships Windows-only installers
+  built on WebView2. The vulnerable `glib 0.18.x` entry is pulled into
+  `Cargo.lock` through Tauri/Wry's Linux GTK3/WebKitGTK bindings
+  (`webkit2gtk -> gtk -> glib`) and is not compiled or distributed in the
+  Windows release. Dependabot cannot update it to `glib 0.20+` until upstream
+  Tauri/Wry migrates that Linux stack. We keep Tauri/Wry updated and suppress
+  only this non-shipped advisory in Dependabot.

@@ -13,6 +13,14 @@ updates:
     directory: /src-tauri
     schedule:
       interval: weekly
+    # Booki only ships Windows builds. Tauri/Wry still records the Linux
+    # GTK3/WebKitGTK stack in Cargo.lock, and that stack currently pins
+    # gtk-rs/glib 0.18.x while RUSTSEC-2024-0429 is fixed in glib 0.20+.
+    # Dependabot cannot raise this transitively without a Wry/Tauri GTK
+    # migration, so keep normal Cargo updates on but suppress this one
+    # non-shipped Linux binding until upstream can move past GTK3.
+    ignore:
+      - dependency-name: glib
     groups:
       cargo-all:
         patterns: ["*"]
