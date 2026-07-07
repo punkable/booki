@@ -769,32 +769,46 @@ function setMediaText(el, artist, title) {
   }
 }
 
-function setMarqueeText(el, text, keyName) {
+function setMarqueeText(el, text, keyName, force = false) {
   if (!el) return;
-  if (el.dataset[keyName] === text) return;
+  if (!force && el.dataset[keyName] === text) return;
   el.dataset[keyName] = text;
   el.classList.remove("scroll");
+  el.style.removeProperty("--mq-duration");
   el.textContent = text;
   if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
   const safe = esc(text);
   el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
+  const mq = el.querySelector(".mq");
+  const distance = mq ? mq.scrollWidth / 2 : el.scrollWidth;
+  const duration = Math.max(8, Math.min(28, distance / 28));
+  el.style.setProperty("--mq-duration", `${duration.toFixed(2)}s`);
   el.classList.add("scroll");
 }
 
-function setPreviewSubText(el, text, empty = false) {
+function setPreviewSubText(el, text, empty = false, force = false) {
   const sub = el.querySelector(".w-pv-sub");
   if (!sub) return;
   sub.classList.toggle("empty", empty);
-  setMarqueeText(sub, text, "mqPreview");
+  setMarqueeText(sub, text, "mqPreview", force);
+}
+
+function dockPreviewSnippet(text, max = 180) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 3).trimEnd()}...`;
 }
 
 function refreshPreviewMarquees() {
   document.querySelectorAll(".tile.widget.preview").forEach((el) => {
     const sub = el.querySelector(".w-pv-sub");
     if (!sub) return;
-    const text = sub.dataset.mqPreview || sub.textContent || "";
-    delete sub.dataset.mqPreview;
-    setPreviewSubText(el, text, sub.classList.contains("empty"));
+    const text =
+      sub.dataset.mqPreview ||
+      sub.querySelector(".mq > span")?.textContent ||
+      sub.textContent ||
+      "";
+    setPreviewSubText(el, text, sub.classList.contains("empty"), true);
   });
 }
 
@@ -901,7 +915,8 @@ async function pollVolume() {
 // notification card. The full list is fetched once, when the flyout opens.
 function renderClipboardSummary(count, preview) {
   eachWidget("clipboard", (el) => {
-    setPreviewSubText(el, preview || t("clip.empty"), !preview);
+    const shown = preview ? dockPreviewSnippet(preview) : t("clip.empty");
+    setPreviewSubText(el, shown, !preview);
     const badge = el.querySelector(".w-pv-count");
     badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
     el.title = preview ? t("clip.countHint").replace("{n}", count) : t("clip.empty");
@@ -2382,6 +2397,7 @@ window.addEventListener("resize", () => {
   // The bar's viewport rect (cached for magnify) shifts when the window resizes
   // — re-measure lazily so magnify never maps the pointer against a stale rect.
   invalidateMag();
+  requestAnimationFrame(refreshPreviewMarquees);
   // An open menu/flyout grew the window; now that it actually resized, snap it
   // back into place so it's never clipped by the resize lagging behind.
   if (pendingReplace) { try { pendingReplace(); } catch (_) {} }

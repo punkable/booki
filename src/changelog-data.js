@@ -3,6 +3,21 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.2",
+    date: "7 jul 2026",
+    headline: "Portapapeles más estable: marquee controlado aunque copies mucho contenido.",
+    sections: [
+      {
+        icon: "📋",
+        title: "Marquee del portapapeles corregido",
+        notes: [
+          "La vista previa del portapapeles ya no reenvuelve texto duplicado al recalcular el layout, evitando que la animación se acelere o se vuelva errática.",
+          "Cuando copias textos enormes o muchos elementos seguidos, el dock muestra una vista previa corta y estable; el historial completo sigue disponible al abrir el widget.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.1",
     date: "7 jul 2026",
     headline: "Dock sin hitbox invisible, smart-hide más estable y toast del notch sin recorte.",
