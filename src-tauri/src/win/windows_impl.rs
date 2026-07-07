@@ -609,14 +609,27 @@ pub fn is_fullscreen() -> bool {
 /// tool…). WDA_EXCLUDEFROMCAPTURE (Win10 2004+) makes the window render normally
 /// on screen but appear blank/absent to any capture — so Booki never shows up as
 /// a shareable window and never covers what you're actually sharing.
-pub fn exclude_from_capture(hwnd: isize) {
+pub fn set_capture_visible(hwnd: isize, visible: bool) {
     use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
     };
     let handle = HWND(hwnd as *mut c_void);
+    let affinity = if visible { WDA_NONE } else { WDA_EXCLUDEFROMCAPTURE };
     unsafe {
-        let _ = SetWindowDisplayAffinity(handle, WDA_EXCLUDEFROMCAPTURE);
+        let _ = SetWindowDisplayAffinity(handle, affinity);
     }
+}
+
+pub fn exclude_from_capture(hwnd: isize) {
+    set_capture_visible(hwnd, false);
+}
+
+pub fn protect_data(data: &[u8]) -> Option<Vec<u8>> {
+    windows_dpapi::encrypt_data(data, windows_dpapi::Scope::User, None).ok()
+}
+
+pub fn unprotect_data(data: &[u8]) -> Option<Vec<u8>> {
+    windows_dpapi::decrypt_data(data, windows_dpapi::Scope::User, None).ok()
 }
 
 /// Bring a window to the foreground, restoring it if minimized.

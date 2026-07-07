@@ -3,6 +3,46 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.4",
+    date: "7 jul 2026",
+    headline: "Portapapeles mas claro, widgets ajustables y UI adaptable.",
+    sections: [
+      {
+        icon: "🛡️",
+        title: "Portapapeles entendido de un vistazo",
+        notes: [
+          "El flyout ahora explica cómo usarlo: clic para copiar, estrella para conservar y escudo para mantener solo en la sesión.",
+          "Añade búsqueda, vista compacta, favoritos que no caducan y entradas privadas que no se guardan en disco.",
+          "La memoria entre reinicios se guarda protegida por Windows para tu usuario cuando está activada.",
+        ],
+      },
+      {
+        icon: "🎥",
+        title: "Capturas y grabaciones",
+        notes: [
+          "Nuevo ajuste en General para decidir si Booki aparece o no en screenshots, grabaciones y pantalla compartida compatibles.",
+        ],
+      },
+      {
+        icon: "ðŸ§©",
+        title: "Galeria de widgets",
+        notes: [
+          "Ajustes ahora presenta los widgets como un catalogo visual: ves que esta anclado, que hace cada widget y puedes abrir sus ajustes.",
+          "El widget Media estrena una opcion propia para subir o bajar el volumen con la rueda del mouse solo cuando el cursor esta encima.",
+          "Los widgets dentro de grupos tambien pueden abrir su editor desde Ajustes.",
+        ],
+      },
+      {
+        icon: "ðŸªŸ",
+        title: "Responsive y mas suave",
+        notes: [
+          "Ajustes se adapta mejor a ventanas estrechas con navegacion horizontal y controles que no se salen del contenedor.",
+          "Los flyouts del dock limitan su alto y ancho al viewport, y el portapapeles evita renders viejos cuando buscas rapido.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.3",
     date: "7 jul 2026",
     headline: "Memoria configurable para el portapapeles y limpieza automática.",

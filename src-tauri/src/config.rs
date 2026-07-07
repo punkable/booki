@@ -104,6 +104,9 @@ fn default_clipboard_retention_days() -> u32 {
 fn default_clipboard_history_limit() -> u32 {
     60
 }
+fn default_clipboard_sensitive_guard() -> bool {
+    true
+}
 
 fn default_true() -> bool {
     true
@@ -232,6 +235,15 @@ pub struct Config {
     /// Maximum number of clipboard-history entries to keep.
     #[serde(default = "default_clipboard_history_limit")]
     pub clipboard_history_limit: u32,
+    /// Local-only privacy guard: skip obvious secrets/tokens from clipboard history.
+    #[serde(default = "default_clipboard_sensitive_guard")]
+    pub clipboard_sensitive_guard: bool,
+    /// Denser clipboard flyout rows for long histories.
+    #[serde(default)]
+    pub clipboard_compact: bool,
+    /// Whether Booki should be visible in screen captures / recordings.
+    #[serde(default)]
+    pub capture_visible: bool,
 }
 
 fn default_hotkey_modifier() -> String {
@@ -284,6 +296,9 @@ impl Default for Config {
             clipboard_persist: false,
             clipboard_retention_days: default_clipboard_retention_days(),
             clipboard_history_limit: default_clipboard_history_limit(),
+            clipboard_sensitive_guard: default_clipboard_sensitive_guard(),
+            clipboard_compact: false,
+            capture_visible: false,
         }
     }
 }

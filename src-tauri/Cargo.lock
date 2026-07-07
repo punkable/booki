@@ -343,7 +343,7 @@ dependencies = [
 
 [[package]]
 name = "booki-dock"
-version = "0.49.3"
+version = "0.49.4"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
@@ -364,6 +364,7 @@ dependencies = [
  "tauri-plugin-updater",
  "ureq",
  "window-vibrancy",
+ "windows-dpapi",
  "windows 0.58.0",
 ]
 
@@ -5315,6 +5316,17 @@ checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
 dependencies = [
  "windows-core 0.58.0",
  "windows-targets 0.52.6",
+]
+
+[[package]]
+name = "windows-dpapi"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2981752d6f11bdcab4db52be8ad5c0e6a6d4d6d566764b3058cc1ee473e6479e"
+dependencies = [
+ "anyhow",
+ "log",
+ "winapi",
 ]
 
 [[package]]

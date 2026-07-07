@@ -45,14 +45,24 @@ struct ClipEntry {
     id: u64,
     text: String,
     ts: u64,
+    #[serde(default)]
+    favorite: bool,
+    #[serde(default)]
+    private: bool,
 }
 const CLIP_HISTORY_MAX: usize = 60;
 const CLIP_HISTORY_HARD_MAX: usize = 200;
 const CLIP_TEXT_MAX: usize = 8000; // guard against pasting a huge document
+const CLIP_DPAPI_MAGIC: &[u8] = b"booki-dpapi-v1\n";
+const CLIP_JSON_MAGIC: &[u8] = b"booki-json-v1\n";
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn clip_history_path() -> std::path::PathBuf {
+    config::config_dir().join("clipboard-history.dat")
+}
+
+fn clip_legacy_history_path() -> std::path::PathBuf {
     config::config_dir().join("clipboard-history.json")
 }
 
@@ -67,6 +77,23 @@ fn clip_now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+fn apply_capture_policy(app: &AppHandle, visible: bool) {
+    #[cfg(windows)]
+    {
+        for label in ["dock", "notch"] {
+            if let Some(window) = app.get_webview_window(label) {
+                if let Ok(hwnd) = window.hwnd() {
+                    win::set_capture_visible(hwnd.0 as isize, visible);
+                }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, visible);
+    }
+}
+
 /// Keep clipboard history bounded by the user's privacy and size policy.
 fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
     let before = hist.len();
@@ -74,9 +101,24 @@ fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
         let days = cfg.clipboard_retention_days.min(365) as u64;
         let max_age = days.saturating_mul(24 * 60 * 60 * 1000);
         let cutoff = clip_now_ms().saturating_sub(max_age);
-        hist.retain(|entry| entry.ts >= cutoff);
+        hist.retain(|entry| entry.favorite || entry.ts >= cutoff);
     }
-    hist.truncate(clip_limit(cfg));
+    let limit = clip_limit(cfg);
+    if hist.len() > limit {
+        let mut kept = Vec::with_capacity(limit);
+        for entry in hist.iter().filter(|entry| entry.favorite).take(limit) {
+            kept.push(entry.clone());
+        }
+        if kept.len() < limit {
+            for entry in hist.iter().filter(|entry| !entry.favorite) {
+                if kept.len() >= limit {
+                    break;
+                }
+                kept.push(entry.clone());
+            }
+        }
+        *hist = kept;
+    }
     hist.len() != before
 }
 
@@ -84,17 +126,36 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
         let _ = fs::remove_file(path);
+        let _ = fs::remove_file(clip_legacy_history_path());
         return;
     }
     if let Some(dir) = path.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    if let Ok(text) = serde_json::to_string_pretty(hist) {
+    let persistable: Vec<ClipEntry> = hist.iter().filter(|entry| !entry.private).cloned().collect();
+    if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
+        let payload = if let Some(protected) = win::protect_data(&text) {
+            [CLIP_DPAPI_MAGIC, protected.as_slice()].concat()
+        } else {
+            [CLIP_JSON_MAGIC, text.as_slice()].concat()
+        };
         let tmp = path.with_extension("json.tmp");
-        if fs::write(&tmp, text).is_ok() {
+        if fs::write(&tmp, payload).is_ok() {
             let _ = fs::rename(tmp, path);
+            let _ = fs::remove_file(clip_legacy_history_path());
         }
     }
+}
+
+fn clip_parse_disk(bytes: &[u8]) -> Option<Vec<ClipEntry>> {
+    if let Some(body) = bytes.strip_prefix(CLIP_DPAPI_MAGIC) {
+        let plain = win::unprotect_data(body)?;
+        return serde_json::from_slice::<Vec<ClipEntry>>(&plain).ok();
+    }
+    if let Some(body) = bytes.strip_prefix(CLIP_JSON_MAGIC) {
+        return serde_json::from_slice::<Vec<ClipEntry>>(body).ok();
+    }
+    serde_json::from_slice::<Vec<ClipEntry>>(bytes).ok()
 }
 
 fn clip_apply_config(cfg: &Config) {
@@ -105,14 +166,19 @@ fn clip_apply_config(cfg: &Config) {
 
 fn clip_load_from_disk() {
     let cfg = config::load();
-    let path = clip_history_path();
     if !cfg.clipboard_persist {
-        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(clip_history_path());
+        let _ = fs::remove_file(clip_legacy_history_path());
         return;
     }
-    let mut hist = fs::read_to_string(&path)
+    let (mut hist, loaded_legacy) = fs::read(clip_history_path())
         .ok()
-        .and_then(|text| serde_json::from_str::<Vec<ClipEntry>>(&text).ok())
+        .and_then(|bytes| clip_parse_disk(&bytes).map(|hist| (hist, false)))
+        .or_else(|| {
+            fs::read(clip_legacy_history_path())
+                .ok()
+                .and_then(|bytes| clip_parse_disk(&bytes).map(|hist| (hist, true)))
+        })
         .unwrap_or_default();
     clip_prune_locked(&mut hist, &cfg);
     let next_id = hist
@@ -124,7 +190,9 @@ fn clip_load_from_disk() {
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
     let mut current = CLIP_HISTORY.lock().unwrap();
     *current = hist;
-    clip_write_disk(&current, &cfg);
+    if loaded_legacy || cfg.clipboard_persist {
+        clip_write_disk(&current, &cfg);
+    }
 }
 
 fn clip_enforce_current_policy() {
@@ -133,6 +201,45 @@ fn clip_enforce_current_policy() {
     if clip_prune_locked(&mut hist, &cfg) || !cfg.clipboard_persist {
         clip_write_disk(&hist, &cfg);
     }
+}
+
+fn clip_looks_sensitive(text: &str) -> bool {
+    let trimmed = text.trim();
+    if trimmed.len() < 8 {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.contains("-----begin ") && lower.contains(" private key-----") {
+        return true;
+    }
+    if lower.starts_with("bearer ") && trimmed.len() > 20 {
+        return true;
+    }
+    if lower.matches('.').count() == 2 && lower.starts_with("eyj") && trimmed.len() > 80 {
+        return true;
+    }
+    for prefix in ["sk-", "ghp_", "gho_", "github_pat_", "xoxb-", "xoxp-", "akia"] {
+        if lower.starts_with(prefix) && trimmed.len() >= 20 {
+            return true;
+        }
+    }
+    let has_secret_label = [
+        "password",
+        "passwd",
+        "pwd",
+        "contraseña",
+        "contrasena",
+        "api_key",
+        "apikey",
+        "access_key",
+        "client_secret",
+        "private_key",
+        "secret",
+        "token",
+    ]
+    .iter()
+    .any(|label| lower.contains(label));
+    has_secret_label && (lower.contains('=') || lower.contains(':')) && trimmed.len() <= 2000
 }
 
 /// Add or move to front a piece of clipboard text.
@@ -146,6 +253,9 @@ fn clip_remember(text: &str) {
     if text.trim().is_empty() {
         return;
     }
+    if cfg.clipboard_sensitive_guard && clip_looks_sensitive(&text) {
+        return;
+    }
     let mut hist = CLIP_HISTORY.lock().unwrap();
     let pruned = clip_prune_locked(&mut hist, &cfg);
     if hist.first().map(|e| e.text == text).unwrap_or(false) {
@@ -154,6 +264,11 @@ fn clip_remember(text: &str) {
         }
         return; // already the most recent entry — nothing changed
     }
+    let (favorite, private) = hist
+        .iter()
+        .find(|entry| entry.text == text)
+        .map(|entry| (entry.favorite, entry.private))
+        .unwrap_or((false, false));
     hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
     hist.insert(
         0,
@@ -161,6 +276,8 @@ fn clip_remember(text: &str) {
             id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
             text,
             ts: clip_now_ms(),
+            favorite,
+            private,
         },
     );
     clip_prune_locked(&mut hist, &cfg);
@@ -181,10 +298,11 @@ fn get_config() -> Config {
 }
 
 #[tauri::command]
-fn save_config(config: Config) -> Result<(), String> {
+fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
     let result = config::save(&config);
     if result.is_ok() {
         clip_apply_config(&config);
+        apply_capture_policy(&app, config.capture_visible);
     }
     result
 }
@@ -344,10 +462,11 @@ fn app_version(app: AppHandle) -> String {
 
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
-fn reset_config() -> Result<Config, String> {
+fn reset_config(app: AppHandle) -> Result<Config, String> {
     let mut c = Config::default();
     c.pinned = config::load().pinned;
     config::save(&c)?;
+    apply_capture_policy(&app, c.capture_visible);
     Ok(c)
 }
 
@@ -1239,6 +1358,27 @@ fn clipboard_delete(id: u64) {
 }
 
 #[tauri::command]
+fn clipboard_favorite(id: u64, favorite: bool) {
+    let cfg = config::load();
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+        entry.favorite = favorite;
+    }
+    clip_prune_locked(&mut hist, &cfg);
+    clip_write_disk(&hist, &cfg);
+}
+
+#[tauri::command]
+fn clipboard_private(id: u64, private: bool) {
+    let cfg = config::load();
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+        entry.private = private;
+    }
+    clip_write_disk(&hist, &cfg);
+}
+
+#[tauri::command]
 fn clipboard_clear() {
     let cfg = config::load();
     let mut hist = CLIP_HISTORY.lock().unwrap();
@@ -1868,6 +2008,8 @@ pub fn run() {
             clipboard_summary,
             clipboard_copy,
             clipboard_delete,
+            clipboard_favorite,
+            clipboard_private,
             clipboard_clear,
             open_data_dir,
             wallpaper_accent,
@@ -1946,7 +2088,7 @@ pub fn run() {
                 let _ = notch.hide();
                 #[cfg(windows)]
                 if let Ok(h) = notch.hwnd() {
-                    win::exclude_from_capture(h.0 as isize);
+                    win::set_capture_visible(h.0 as isize, cfg.capture_visible);
                 }
             }
             // Position and reveal the dock.
@@ -1961,7 +2103,7 @@ pub fn run() {
                 let _ = dock.show();
                 #[cfg(windows)]
                 if let Ok(h) = dock.hwnd() {
-                    win::exclude_from_capture(h.0 as isize);
+                    win::set_capture_visible(h.0 as isize, cfg.capture_visible);
                 }
 
                 // Register the global hotkey, if configured.
