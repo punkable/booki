@@ -928,12 +928,14 @@ fn notch_toast(app: AppHandle, text: String) {
                 mpos.y + msize.height as i32 / 2,
             )
             .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
-            let ww = (320.0 * dpr).round() as i32;
-            let wh = (48.0 * dpr).round() as i32;
+            let m = (14.0 * dpr).round() as i32;
+            let desired_w = ((text.chars().count() as f64 * 7.4) + 88.0).clamp(320.0, 560.0);
+            let max_w = ((aw - m * 2).max(260) as f64 / dpr).max(260.0);
+            let ww = (desired_w.min(max_w) * dpr).round() as i32;
+            let wh = (52.0 * dpr).round() as i32;
             let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
             // Show the toast on the dock's anchored edge — a side-docked bar
             // must not flash a pill at the bottom of the screen.
-            let m = (14.0 * dpr).round() as i32;
             let (x, y) = match config::load().edge.as_str() {
                 "top" => (ax + (aw - ww) / 2, ay + m),
                 "left" => (ax + m, ay + (ah - wh) / 2),

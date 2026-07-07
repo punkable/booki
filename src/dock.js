@@ -2403,6 +2403,7 @@ let draggingFile = false; // an OS file drag is over the dock → keep it open
 let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
 let occRevealTimer = null; // debounce for the smart-mode auto-reveal
+const SMART_REVEAL_DELAY = 1100;
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
 // brief toast, then hide BOTH the bar and the notch. Restore when it ends.
@@ -2499,6 +2500,10 @@ function tryTuck() {
 // not just moved between elements inside it.
 window.addEventListener("pointerover", (e) => {
   if (e.relatedTarget) return;
+  if (!pointInLiveHitArea(e.clientX, e.clientY)) {
+    pointerInside = false;
+    return;
+  }
   pointerInside = true;
   if (pinnedReveal) pinTouched = true; // the summon got used
   // A visible dock never counts down while you're on it — any trigger mode.
@@ -2515,10 +2520,37 @@ window.addEventListener("pointerout", (e) => {
 });
 
 // ───────────────── Hit regions of the stage window ─────────────────
-// The window spans the whole edge but only the bar (with its halo) and open
+// The window spans the whole edge, but only the painted bar/tiles and open
 // panels are interactive; everywhere else the backend flips it click-through.
 // Report those regions whenever the DOM changes.
 let lastHitSig = "";
+const DOCK_HIT_PAD = 0;
+const TILE_HIT_PAD = 2;
+const PANEL_HIT_PAD = 4;
+
+function rectFromElement(el, inflate = 0) {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
+}
+
+function pointInRect(x, y, rect) {
+  return !!rect && x >= rect[0] && x < rect[0] + rect[2] && y >= rect[1] && y < rect[1] + rect[3];
+}
+
+function pointInLiveHitArea(x, y) {
+  if (edgeMove || dragging || draggingFile) return true;
+  const rects = [
+    rectFromElement(dockEl, DOCK_HIT_PAD),
+    ...[...dockEl.querySelectorAll(".tile")].map((el) => rectFromElement(el, TILE_HIT_PAD)),
+    stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
+    ...[...document.querySelectorAll(
+      ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
+    )].map((el) => rectFromElement(el, PANEL_HIT_PAD)),
+  ];
+  return rects.some((rect) => pointInRect(x, y, rect));
+}
 function reportHitRects() {
   if (!dockApi.setHitRects) return;
   // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
@@ -2529,21 +2561,20 @@ function reportHitRects() {
     document.querySelector(".drag-clone, .stack-drag-clone")
   );
   const rects = [];
-  const add = (el, inflate) => {
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height) return;
-    rects.push([r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2]);
+  const add = (el, inflate = 0) => {
+    const rect = rectFromElement(el, inflate);
+    if (rect) rects.push(rect);
   };
-  // The bar's halo ≈ the old tight window, so hover/magnify/file-drop feel
-  // exactly like before — and clicks right past the shadow now reach the apps
-  // behind (the old window silently ate them).
-  add(dockEl, SHADOW_PAD);
-  if (stackOpen) add(stackEl, 14);
+  // Keep the shadow room visual. The clickable region follows the bar,
+  // transformed tiles and live panels, so apps behind Booki receive near-edge
+  // clicks immediately.
+  add(dockEl, DOCK_HIT_PAD);
+  for (const tile of dockEl.querySelectorAll(".tile")) add(tile, TILE_HIT_PAD);
+  if (stackOpen) add(stackEl, PANEL_HIT_PAD);
   for (const el of document.querySelectorAll(
-    ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill"
+    ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
   ))
-    add(el, 10);
+    add(el, PANEL_HIT_PAD);
   const sig = all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
   if (sig === lastHitSig) return;
   lastHitSig = sig;
@@ -2655,7 +2686,7 @@ function onOcclusionSignal(value) {
       pinnedReveal = false;
       manualReveal = false;
       setHidden(false);
-    }, 500);
+    }, SMART_REVEAL_DELAY);
   } else if (pointerInside || interacting()) {
     clearTimeout(occRevealTimer); // covered again → drop any pending reveal
     // Another window covers the dock's spot, but the user is ON the dock right

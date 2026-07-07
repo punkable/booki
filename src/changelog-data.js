@@ -3,6 +3,42 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.1",
+    date: "7 jul 2026",
+    headline: "Dock sin hitbox invisible, smart-hide más estable y toast del notch sin recorte.",
+    sections: [
+      {
+        icon: "🎯",
+        title: "Hitbox precisa",
+        notes: [
+          "La ventana transparente del dock sigue dejando espacio para sombras y paneles, pero los clics solo pertenecen al dock, tiles transformados y popovers visibles.",
+          "Un clic apenas fuera del dock vuelve a llegar a la app que está detrás, sin romper menús, flyouts ni ventanas contextuales de Booki.",
+        ],
+      },
+      {
+        icon: "🪟",
+        title: "Smart-hide más tranquilo",
+        notes: [
+          "Al cambiar entre ventanas, Booki espera más tiempo antes de reaparecer por escritorio despejado, evitando flashes por huecos momentáneos del sistema.",
+        ],
+      },
+      {
+        icon: "💬",
+        title: "Toast del notch completo",
+        notes: [
+          "El aviso de pantalla completa ahora calcula su ancho según el mensaje y ya no corta el texto “Booki se ocultó”.",
+        ],
+      },
+      {
+        icon: "✨",
+        title: "Ajustes más claros",
+        notes: [
+          "Los títulos de sección en Ajustes ahora tienen icono, acento visual y mejor separación para escanear opciones sin hacer la interfaz pesada.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.0",
     date: "7 jul 2026",
     headline: "Dock alineado: widgets compactos, portapapeles controlado y captura principal corregida.",

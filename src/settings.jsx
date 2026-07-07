@@ -139,6 +139,15 @@ function Toggle({ checked, onChange, label, hint }) {
   );
 }
 
+function SectionTitle({ children, name = "settings" }) {
+  return (
+    <h2 className="s-subhead">
+      <span className="s-subhead-icon" dangerouslySetInnerHTML={{ __html: icon(name) }} />
+      <span>{children}</span>
+    </h2>
+  );
+}
+
 function Slider({ value, min, max, step, onChange, fmt }) {
   const pct = Math.min(100, Math.max(0, max > min ? ((value - min) / (max - min)) * 100 : 0));
   const fill = `linear-gradient(to right, var(--accent) ${pct}%, var(--track) ${pct}%)`;
@@ -754,7 +763,7 @@ function Appearance({ cfg, set }) {
       <h1>{t("ap.title")}</h1>
       <MiniDockPreview cfg={cfg} />
 
-      <h2 className="s-subhead">{t("gp.theme")}</h2>
+      <SectionTitle name="palette">{t("gp.theme")}</SectionTitle>
       <Row label={t("ap.theme")}>
         <SegmentedControl
           value={cfg.theme || "system"}
@@ -787,7 +796,7 @@ function Appearance({ cfg, set }) {
         </div>
       </Row>
 
-      <h2 className="s-subhead">{t("gp.icons")}</h2>
+      <SectionTitle name="grid">{t("gp.icons")}</SectionTitle>
       <Row label={t("ap.iconSize")}>
         <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
           onChange={(v) => set({ iconSize: v })} />
@@ -803,14 +812,14 @@ function Appearance({ cfg, set }) {
       <Toggle label={t("ap.compact")} checked={!!cfg.compact}
         onChange={(v) => set({ compact: v })} />
 
-      <h2 className="s-subhead">{t("gp.material")}</h2>
+      <SectionTitle name="sliders">{t("gp.material")}</SectionTitle>
       <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
 
-      <h2 className="s-subhead">{t("gp.notch")}</h2>
+      <SectionTitle name="power">{t("gp.notch")}</SectionTitle>
       <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
         <NotchStylePicker cfg={cfg} set={set} />
       </Row>
@@ -828,7 +837,7 @@ function Behavior({ cfg, set }) {
     <>
       <h1>{t("be.title")}</h1>
 
-      <h2 className="s-subhead">{t("gp.dock")}</h2>
+      <SectionTitle name="app">{t("gp.dock")}</SectionTitle>
       <Row label={t("be.position")} hint={t("be.positionHint")}>
         <PositionPicker cfg={cfg} set={set} />
       </Row>
@@ -853,7 +862,7 @@ function Behavior({ cfg, set }) {
       </Row>
       {cfg.autoHideMode !== "off" && (
         <>
-          <h2 className="s-subhead">{t("gp.notch")}</h2>
+          <SectionTitle name="power">{t("gp.notch")}</SectionTitle>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
           <Row label={t("be.reveal")} hint={t("be.revealHint")}>
@@ -873,7 +882,7 @@ function Behavior({ cfg, set }) {
         </>
       )}
 
-      <h2 className="s-subhead">{t("gp.icons")}</h2>
+      <SectionTitle name="grid">{t("gp.icons")}</SectionTitle>
       <Row label={t("be.anim")}>
         <SegmentedControl
           value={cfg.magnifyStyle || "spring"}
@@ -1580,7 +1589,7 @@ function Apps({ cfg, set }) {
           )}
         </div>
       </div>
-      <h2 className="s-subhead">{t("apps.widgets")}</h2>
+      <SectionTitle name="sliders">{t("apps.widgets")}</SectionTitle>
       <p className="muted">{t("apps.widgetsHint")}</p>
       <div className="s-actions">
         {[
@@ -1597,7 +1606,7 @@ function Apps({ cfg, set }) {
             </button>
           ))}
       </div>
-      <h2 className="s-subhead">{t("apps.web")}</h2>
+      <SectionTitle name="external">{t("apps.web")}</SectionTitle>
       <p className="muted">{t("apps.webHint")}</p>
       <div className="web-add">
         <input
@@ -1809,7 +1818,7 @@ function Faq({ version }) {
         ))}
       </div>
 
-      <h2 className="s-subhead">{t("faq.transparency")}</h2>
+      <SectionTitle name="info">{t("faq.transparency")}</SectionTitle>
       <div className="s-card-inner faq-facts">
         <p><strong>{t("faq.fact.dataTitle")}</strong><br />
           <code>%APPDATA%\Booki\config.json</code> — {t("faq.fact.data")}</p>
@@ -1914,7 +1923,7 @@ function General({ cfg, set, onWhatsNew }) {
       <h1>{t("gen.title")}</h1>
       <p className="muted">{t("gen.hint")}</p>
 
-      <h2 className="s-subhead">{t("gp.system")}</h2>
+      <SectionTitle name="power">{t("gp.system")}</SectionTitle>
       <Toggle label={t("be.autostart")} checked={autostart}
         onChange={async (v) => {
           setAutostart(v);
@@ -1934,13 +1943,13 @@ function General({ cfg, set, onWhatsNew }) {
         checked={cfg.contextMenu !== false}
         onChange={(v) => set({ contextMenu: v })} />
 
-      <h2 className="s-subhead">{t("ab.updates")}</h2>
+      <SectionTitle name="sparkles">{t("ab.updates")}</SectionTitle>
       <UpdatesCard onWhatsNew={onWhatsNew} />
 
-      <h2 className="s-subhead">{t("sc.title")}</h2>
+      <SectionTitle name="keyboard">{t("sc.title")}</SectionTitle>
       <ShortcutsSection cfg={cfg} set={set} />
 
-      <h2 className="s-subhead">{t("gen.langSub")}</h2>
+      <SectionTitle name="help">{t("gen.langSub")}</SectionTitle>
       <Row label={t("ap.language")} hint={t("gen.langHint")}>
         <select className="s-select" value={cfg.language || "system"}
           onChange={(e) => set({ language: e.target.value })}>
@@ -1953,7 +1962,7 @@ function General({ cfg, set, onWhatsNew }) {
         </select>
       </Row>
 
-      <h2 className="s-subhead">{t("ap.backup")}</h2>
+      <SectionTitle name="copy">{t("ap.backup")}</SectionTitle>
       <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
         <div className="s-actions" style={{ margin: 0 }}>
           <button className="s-btn s-btn-soft" onClick={async () => {
