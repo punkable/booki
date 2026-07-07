@@ -347,8 +347,41 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
   .edge-zone, .edge-ghost, .edge-zone-dot { transition: none; }
 }
 
-/* Settings sub-heading (e.g. the Widgets group in the Apps panel). */
-.s-subhead { margin: 22px 0 4px; font-size: 13px; font-weight: 700; color: var(--ink); }
+/* Settings section headers: compact, scannable, and visually anchored without
+   turning every group into another card. */
+.s-subhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 26px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+.s-subhead::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: 24px;
+  background: linear-gradient(to right, var(--stroke), transparent);
+}
+.s-subhead-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--layer));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--stroke));
+  border-radius: 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.s-subhead-icon svg {
+  width: 14px;
+  height: 14px;
+}
 /* Grouped app suggestions (by Start-menu folder). */
 .sugg-group { margin-top: 12px; }
 .sugg-group-head { display: flex; align-items: center; gap: 7px; margin: 0 0 6px; }
@@ -1216,8 +1249,10 @@ body.notch-body.toast { padding: 4px; }
 .notch-toast {
   display: none;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  max-width: 96%;
+  max-width: calc(100vw - 8px);
+  box-sizing: border-box;
   padding: 8px 14px;
   border-radius: var(--r-pill);
   background: var(--layer-strong);
@@ -1231,7 +1266,11 @@ body.notch-body.toast { padding: 4px; }
   animation: notch-toast-in 0.24s var(--ease-bounce);
 }
 .notch-emoji { font-size: 15px; }
-.notch-text { overflow: hidden; text-overflow: ellipsis; }
+.notch-text {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+}
 body.notch-body.toast .notch-pill { display: none; }
 body.notch-body.toast .notch-toast { display: flex; }
 @keyframes notch-toast-in {
@@ -2147,7 +2186,12 @@ body.settings-body {
 .s-panel-in { animation: s-panel-in 0.24s var(--ease); }
 @keyframes s-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .s-panel-in { animation: none; } }
-.s-content h1 { margin: 0 0 18px; font-size: 22px; font-weight: 650; }
+.s-content h1 {
+  margin: 0 0 18px;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
 .s-content h3 { margin: 18px 0 8px; font-size: 14px; }
 .muted { color: var(--ink-2); font-size: 13px; }
 .muted-list { color: var(--ink-2); font-size: 13px; padding-left: 18px; margin: 4px 0; line-height: 1.7; }
@@ -2919,7 +2963,7 @@ body.tight-edge .dock {
 
 /* The sliding indicator pill is the ONLY active highlight — a static background
    here doubled up with it mid-transition (two tabs looked selected at once). */
-.s-content h1 { letter-spacing: -0.01em; }
+.s-content h1 { letter-spacing: 0; }
 .s-card { transition: box-shadow 0.18s ease; }
 .s-btn {
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 26%, transparent);
