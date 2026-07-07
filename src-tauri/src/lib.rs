@@ -16,6 +16,7 @@ use tauri::{
 };
 
 use config::Config;
+use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
@@ -46,9 +47,18 @@ struct ClipEntry {
     ts: u64,
 }
 const CLIP_HISTORY_MAX: usize = 60;
+const CLIP_HISTORY_HARD_MAX: usize = 200;
 const CLIP_TEXT_MAX: usize = 8000; // guard against pasting a huge document
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+fn clip_history_path() -> std::path::PathBuf {
+    config::config_dir().join("clipboard-history.json")
+}
+
+fn clip_limit(cfg: &Config) -> usize {
+    (cfg.clipboard_history_limit as usize).clamp(1, CLIP_HISTORY_HARD_MAX)
+}
 
 fn clip_now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -57,11 +67,77 @@ fn clip_now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Add (or move to front if already the top entry) a piece of text — shared by
-/// the background watcher (new OS clipboard content) and the "copy from
-/// history" command (bumps an existing entry back to the top instead of
-/// duplicating it).
+/// Keep clipboard history bounded by the user's privacy and size policy.
+fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
+    let before = hist.len();
+    if cfg.clipboard_retention_days > 0 {
+        let days = cfg.clipboard_retention_days.min(365) as u64;
+        let max_age = days.saturating_mul(24 * 60 * 60 * 1000);
+        let cutoff = clip_now_ms().saturating_sub(max_age);
+        hist.retain(|entry| entry.ts >= cutoff);
+    }
+    hist.truncate(clip_limit(cfg));
+    hist.len() != before
+}
+
+fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
+    let path = clip_history_path();
+    if !cfg.clipboard_persist {
+        let _ = fs::remove_file(path);
+        return;
+    }
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(hist) {
+        let tmp = path.with_extension("json.tmp");
+        if fs::write(&tmp, text).is_ok() {
+            let _ = fs::rename(tmp, path);
+        }
+    }
+}
+
+fn clip_apply_config(cfg: &Config) {
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    clip_prune_locked(&mut hist, cfg);
+    clip_write_disk(&hist, cfg);
+}
+
+fn clip_load_from_disk() {
+    let cfg = config::load();
+    let path = clip_history_path();
+    if !cfg.clipboard_persist {
+        let _ = fs::remove_file(path);
+        return;
+    }
+    let mut hist = fs::read_to_string(&path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Vec<ClipEntry>>(&text).ok())
+        .unwrap_or_default();
+    clip_prune_locked(&mut hist, &cfg);
+    let next_id = hist
+        .iter()
+        .map(|entry| entry.id)
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
+    CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
+    let mut current = CLIP_HISTORY.lock().unwrap();
+    *current = hist;
+    clip_write_disk(&current, &cfg);
+}
+
+fn clip_enforce_current_policy() {
+    let cfg = config::load();
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    if clip_prune_locked(&mut hist, &cfg) || !cfg.clipboard_persist {
+        clip_write_disk(&hist, &cfg);
+    }
+}
+
+/// Add or move to front a piece of clipboard text.
 fn clip_remember(text: &str) {
+    let cfg = config::load();
     let text = if text.chars().count() > CLIP_TEXT_MAX {
         text.chars().take(CLIP_TEXT_MAX).collect::<String>()
     } else {
@@ -71,7 +147,11 @@ fn clip_remember(text: &str) {
         return;
     }
     let mut hist = CLIP_HISTORY.lock().unwrap();
+    let pruned = clip_prune_locked(&mut hist, &cfg);
     if hist.first().map(|e| e.text == text).unwrap_or(false) {
+        if pruned || !cfg.clipboard_persist {
+            clip_write_disk(&hist, &cfg);
+        }
         return; // already the most recent entry — nothing changed
     }
     hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
@@ -83,7 +163,8 @@ fn clip_remember(text: &str) {
             ts: clip_now_ms(),
         },
     );
-    hist.truncate(CLIP_HISTORY_MAX);
+    clip_prune_locked(&mut hist, &cfg);
+    clip_write_disk(&hist, &cfg);
 }
 
 
@@ -101,7 +182,11 @@ fn get_config() -> Config {
 
 #[tauri::command]
 fn save_config(config: Config) -> Result<(), String> {
-    config::save(&config)
+    let result = config::save(&config);
+    if result.is_ok() {
+        clip_apply_config(&config);
+    }
+    result
 }
 
 #[tauri::command]
@@ -1101,14 +1186,17 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
 /// Clipboard history for the widget flyout (newest first).
 #[tauri::command]
 fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
+    clip_enforce_current_policy();
     let hist = CLIP_HISTORY.lock().unwrap();
-    let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(CLIP_HISTORY_MAX);
+    let cfg = config::load();
+    let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(clip_limit(&cfg));
     hist.iter().take(cap).cloned().collect()
 }
 
 /// Just the count, for the widget's badge (cheap to poll often).
 #[tauri::command]
 fn clipboard_count() -> usize {
+    clip_enforce_current_policy();
     CLIP_HISTORY.lock().unwrap().len()
 }
 
@@ -1122,6 +1210,7 @@ struct ClipSummary {
 /// live preview of what you last copied, not just a bare number.
 #[tauri::command]
 fn clipboard_summary() -> ClipSummary {
+    clip_enforce_current_policy();
     let hist = CLIP_HISTORY.lock().unwrap();
     ClipSummary {
         count: hist.len(),
@@ -1143,12 +1232,18 @@ fn clipboard_copy(text: String) -> bool {
 
 #[tauri::command]
 fn clipboard_delete(id: u64) {
-    CLIP_HISTORY.lock().unwrap().retain(|e| e.id != id);
+    let cfg = config::load();
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    hist.retain(|e| e.id != id);
+    clip_write_disk(&hist, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_clear() {
-    CLIP_HISTORY.lock().unwrap().clear();
+    let cfg = config::load();
+    let mut hist = CLIP_HISTORY.lock().unwrap();
+    hist.clear();
+    clip_write_disk(&hist, &cfg);
 }
 
 /// Recent files RELEVANT to one pinned app: keeps only entries whose default
@@ -1788,6 +1883,7 @@ pub fn run() {
         ])
         .setup(|app| {
             log::info!("Booki backend started");
+            clip_load_from_disk();
             // Cold start from the Explorer context menu ("Add to Booki" while
             // Booki wasn't running): apply the pin args of THIS process before
             // the dock loads, so the item is already on the bar at first paint.

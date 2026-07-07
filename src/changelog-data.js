@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.3",
+    date: "7 jul 2026",
+    headline: "Memoria configurable para el portapapeles y limpieza automática.",
+    sections: [
+      {
+        icon: "📋",
+        title: "Portapapeles con retención",
+        notes: [
+          "Ajustes ahora permite decidir si el historial del portapapeles se recuerda entre reinicios.",
+          "Booki limpia entradas antiguas por días y limita la cantidad total para que muchas copias no saturen el widget.",
+          "La persistencia en disco queda apagada por defecto por privacidad; el historial de la sesión sigue funcionando igual.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.2",
     date: "7 jul 2026",
     headline: "Portapapeles más estable: marquee controlado aunque copies mucho contenido.",

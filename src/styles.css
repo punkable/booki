@@ -2196,6 +2196,19 @@ body.settings-body {
 .muted { color: var(--ink-2); font-size: 13px; }
 .muted-list { color: var(--ink-2); font-size: 13px; padding-left: 18px; margin: 4px 0; line-height: 1.7; }
 .s-card-inner { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--stroke); }
+.clip-policy {
+  margin-top: 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--layer) 76%, transparent);
+}
+.clip-policy .row:first-of-type { margin-top: 6px; }
+.clip-policy-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
 
 /* FAQ / transparency tab: a native <details> accordion. */
 .faq-list { display: flex; flex-direction: column; gap: 8px; }
