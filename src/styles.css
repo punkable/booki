@@ -860,7 +860,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 /* Overflowing titles scroll in a gentle loop (the text is doubled in .mq, so a
    -50% slide lands exactly on the seam). Built in dock.js only on overflow. */
 .tile.widget.media .w-value.scroll { text-overflow: clip; }
-.w-value .mq, .w-pv-sub .mq { display: inline-flex; white-space: nowrap; animation: w-mq 9s linear 1.2s infinite; }
+.w-value .mq, .w-pv-sub .mq { display: inline-flex; white-space: nowrap; animation: w-mq var(--mq-duration, 9s) linear 1.2s infinite; }
 .w-value .mq > span, .w-pv-sub .mq > span { padding-right: 26px; }
 @keyframes w-mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .w-value .mq, .w-pv-sub .mq { animation: none; } }
