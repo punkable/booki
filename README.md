@@ -1,48 +1,44 @@
-<p align="center">
-  <img src="assets/brand/svg/logo.svg" alt="Booki" height="72" />
-</p>
-
-<h1 align="center">Booki Dock</h1>
+<h1 align="center">Booki</h1>
 
 <p align="center">
-  <b>A modern, lightweight macOS-style dock for Windows.</b><br/>
-  Pin your apps, folders, files and live widgets to a beautiful glass bar<br/>
-  that magnifies on hover and gets out of your way when you work.
+  <b>Smart dock for Windows.</b><br/>
+  A polished glass dock for apps, folders, files, live widgets, clipboard history and a floating notch.
 </p>
 
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=release&color=dfaa75&style=flat-square" alt="Latest release" /></a>
+  <img src="assets/screenshots/dock.png" alt="Booki Dock on a Windows laptop with live widgets and a floating notch" width="980" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/badge/Download_latest_installer-dfaa75?style=for-the-badge&logo=windows&logoColor=1f1f24" alt="Download the latest installer" /></a>
+  <a href="https://github.com/punkable/booki/releases"><img src="https://img.shields.io/badge/Releases-302f35?style=for-the-badge&logo=github&logoColor=white" alt="Releases" /></a>
+  <a href="#gallery"><img src="https://img.shields.io/badge/See_the_dock-0078d4?style=for-the-badge" alt="See the dock" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=latest&color=dfaa75&style=flat-square" alt="Latest release" /></a>
   <a href="https://github.com/punkable/booki/releases"><img src="https://img.shields.io/github/downloads/punkable/booki/total?label=downloads&color=b9875f&style=flat-square" alt="Downloads" /></a>
-  <img src="https://img.shields.io/badge/platform-Windows%2010%20%2F%2011-0078d4?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?style=flat-square" alt="Windows 10/11" />
   <img src="https://img.shields.io/badge/installer-~4%20MB-2ea043?style=flat-square" alt="Installer size" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-302f35?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><b>⬇&nbsp;&nbsp;Download the latest installer</b></a>
-</p>
-
-<p align="center">
-  <img src="assets/screenshots/dock.png" alt="Booki Dock — a glass bar with apps, live widgets and the Recycle Bin" width="760" />
-</p>
-
 ---
 
-## ✨ Highlights
+## ✨ What makes it feel good
 
 | | |
 |---|---|
-| 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures (own thumbnail) and websites (favicon). Click to launch — or optionally **focus the open window** instead. Right-click a pin for your **recent files**. Icons **bounce** as they open. |
-| 🖱️ **Drag to organise** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete. **Group** apps *and* widgets by dragging one onto another, reorder right on the bar, and drag the empty bar to another edge with a live **anchor-point preview**. |
-| 🎛️ **Live widgets, Windows-11 styled** | CPU/RAM/disk/battery/volume as **animated ring gauges**, clock, network, uptime, and **card widgets** with a colored icon + live preview for **notes** and a full **clipboard history** (copy anywhere, right-click → save, reopen to cut/edit/clear). Plus a **now-playing card** with album art + transport controls. Tuck any of them into a **group** — they go live only when you open it. |
-| 🗂️ **Apps manager** | A **list *or* grid** view in Settings: open a group to its draggable **squares**, drag to reorder, onto another group, or out to the dock — plus a **General** tab for language, updates and backup. |
-| 🗑️ **Recycle Bin** | A bin tile that **shows how many items it holds** and empties (with a confirmation) from its right-click menu. |
-| 🫥 **Smart hide + notch** | Tucks away with a genie animation into a slim glass *notch*; push the cursor to the edge (or click it) to bring it back. Fullscreen games/movies black it out. |
-| 🧲 **One control for position** | A single mini-screen sets the dock's edge and the notch's spot at once — the notch always travels with the dock, in a horizontal or slim vertical bar. |
-| 💾 **Dock profiles** | Save whole setups (e.g. *Work* / *Gaming*) and switch with one click from Settings or the right-click menu. |
-| 🎨 **Deep customization** | Light / dark / system / **auto-by-hour** theme, accent from a palette / system / **your wallpaper**, size, spacing, roundness, translucency, five notch finishes, multi-monitor and **6 languages**. |
-| 🔒 **Private by design** | No accounts, no telemetry, nothing phones home. A built-in **Help & FAQ** tab explains exactly what touches your PC. |
-| 🪶 **Featherweight** | Tauri 2 + Rust on the built-in WebView2 — a ~4 MB installer, tiny memory use, and timers that pause the moment the dock is hidden. |
+| 🚀 **A dock, not a taskbar** | Pin apps, folders, files, pictures and websites. Click to launch, or focus an already-open window. Right-click a pin for recent files; icons bounce as they open. |
+| 🧩 **Everything can be arranged** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete, group apps and widgets, and reorder directly on the bar. |
+| 🎛️ **Live widgets that stay aligned** | CPU/RAM/disk/battery/volume ring gauges, clock, network, uptime, notes, clipboard history and now-playing controls live in compact cards that do not stretch the dock. |
+| 🫥 **Smart hide + floating notch** | The dock tucks away into a slim notch and comes back when you ask for it. It also stays out of fullscreen games and videos. |
+| 🎯 **Precise interaction** | The transparent window leaves room for shadows and flyouts, but clicks outside the painted dock pass through to the app behind it. |
+| 🎨 **Designed to fit Windows** | Light/dark/system themes, wallpaper-aware accent, translucent glass, size/spacing/radius controls, multi-monitor support and six languages. |
+| 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`. |
+| 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
+
+<a id="gallery"></a>
 
 ## 🖼️ Gallery
 
