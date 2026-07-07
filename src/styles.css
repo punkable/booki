@@ -214,8 +214,7 @@ body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
 body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
 body.edge-left .dock { --sh-x: -6px; --sh-y: 0; }
 body.edge-right .dock { --sh-x: 6px; --sh-y: 0; }
-body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: flex-end; }
-body.edge-top .dock { align-items: flex-start; }
+body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: center; }
 /* Vertical: center every child (app icons AND widget cards) so the side bar
    reads as one tidy column. Thin cross-axis padding keeps its WIDTH close to
    the horizontal bar's HEIGHT — a slim column, not a fat panel. */
@@ -537,7 +536,11 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
    a live one-line preview of the real content, closer to a Windows
    notification/widget card than a bare stat readout. Needs more width than
    the default widget min, so it gets its own. */
-.tile.widget.preview { min-width: calc(var(--size) * 2.9); }
+.tile.widget.preview {
+  width: min(calc(var(--size) * 3.45), 176px);
+  min-width: min(calc(var(--size) * 3.45), 176px);
+  max-width: min(calc(var(--size) * 3.45), 176px);
+}
 .w-pv-ico {
   position: relative;
   flex: 0 0 auto;
@@ -567,9 +570,10 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   border-radius: var(--r-pill);
 }
 .w-pv-count:not(:empty) { display: flex; }
-.w-pv-main { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
+.w-pv-main { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; overflow: hidden; }
 .w-pv-title { font-size: 12.5px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-pv-sub { font-size: 10.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-pv-sub.scroll { text-overflow: clip; }
 .w-pv-sub.empty { font-style: italic; opacity: 0.75; }
 .w-pv-badge {
   flex: 0 0 auto;
@@ -823,10 +827,10 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 /* Overflowing titles scroll in a gentle loop (the text is doubled in .mq, so a
    -50% slide lands exactly on the seam). Built in dock.js only on overflow. */
 .tile.widget.media .w-value.scroll { text-overflow: clip; }
-.w-value .mq { display: inline-flex; white-space: nowrap; animation: w-mq 9s linear 1.2s infinite; }
-.w-value .mq > span { padding-right: 26px; }
+.w-value .mq, .w-pv-sub .mq { display: inline-flex; white-space: nowrap; animation: w-mq 9s linear 1.2s infinite; }
+.w-value .mq > span, .w-pv-sub .mq > span { padding-right: 26px; }
 @keyframes w-mq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .w-value .mq { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .w-value .mq, .w-pv-sub .mq { animation: none; } }
 
 /* Vertical dock → EVERY widget card turns into a compact column (icon or art
    on top, label/value/bar below) with one shared width, so the side bar stays
@@ -834,6 +838,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 body.edge-left .tile.widget, body.edge-right .tile.widget {
   width: auto;
   min-width: 0;
+  max-width: none;
   height: auto;
 }
 body.edge-left .tile.widget .w-card, body.edge-right .tile.widget .w-card {
@@ -2530,7 +2535,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .monpick-box.primary { font-weight: 800; }
 
 /* Live mini-dock preview */
-.preview {
+.preview:not(.tile) {
   position: relative; height: 150px; margin: 0 0 22px; border-radius: var(--r-lg);
   border: 1px solid var(--stroke-light); overflow: hidden; display: flex;
   background:
@@ -2899,8 +2904,13 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .dock {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    0 18px 50px rgba(15, 15, 25, 0.32),
-    0 4px 12px rgba(15, 15, 25, 0.16);
+    var(--sh-x, 0) var(--sh-y, 6px) 22px rgba(15, 15, 25, 0.32),
+    0 0 10px rgba(15, 15, 25, 0.14);
+}
+body.tight-edge .dock {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    0 0 10px rgba(0, 0, 0, 0.22);
 }
 .tile img,
 .tile .glyph { transition: transform 0.12s var(--ease); }
