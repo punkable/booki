@@ -1585,6 +1585,19 @@ function Apps({ cfg, set }) {
   const kidTargetRef = useRef(null); // another group id the child is hovering over → move it there
   const [kidOut, setKidOut] = useState(-1);
   const [kidMenu, setKidMenu] = useState(null); // right-click menu on a group child: {gi,id,x,y}
+  const openKidMenu = (e, gi, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pad = 8;
+    const w = 204;
+    const h = 92;
+    setKidMenu({
+      gi,
+      id,
+      x: Math.min(Math.max(pad, e.clientX), Math.max(pad, window.innerWidth - w - pad)),
+      y: Math.min(Math.max(pad, e.clientY), Math.max(pad, window.innerHeight - h - pad)),
+    });
+  };
   useEffect(() => {
     if (!kidMenu) return;
     const close = () => setKidMenu(null);
@@ -1813,16 +1826,22 @@ function Apps({ cfg, set }) {
           <div className="s-more">
             <button className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
               onClick={() => setMoreOpen((v) => !v)}>
-              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("settings") }} />
+              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("chevron-down") }} />
               <span>{t("apps.more")}</span>
             </button>
             {moreOpen && (
               <div className="s-more-menu" onClick={() => setMoreOpen(false)}>
-                <button onClick={addFolder}>{t("apps.addFolder")}</button>
-                <button onClick={newFolder}>{t("apps.newFolder")}</button>
-                <button onClick={addSep}>{t("apps.addSep")}</button>
+                <button onClick={addFolder}>
+                  <span dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />{t("apps.addFolder")}
+                </button>
+                <button onClick={newFolder}>
+                  <span dangerouslySetInnerHTML={{ __html: icon("folder") }} />{t("apps.newFolder")}
+                </button>
+                <button onClick={addSep}>
+                  <span dangerouslySetInnerHTML={{ __html: icon("list") }} />{t("apps.addSep")}
+                </button>
                 <button onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
-                  {t("apps.addTrash")}
+                  <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.addTrash")}
                 </button>
               </div>
             )}
@@ -1882,7 +1901,7 @@ function Apps({ cfg, set }) {
                     {(item.children || []).map((c) => (
                       <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
                         onPointerDown={startKidDrag(i, c.id)}
-                        onContextMenu={(e) => { e.preventDefault(); setKidMenu({ gi: i, id: c.id, x: e.clientX, y: e.clientY }); }}>
+                        onContextMenu={(e) => openKidMenu(e, i, c.id)}>
                         <PinThumb item={c} />
                         <span className="pin-kid-name" title={c.path || ""}>{c.name}</span>
                         {c.kind === "widget" && (

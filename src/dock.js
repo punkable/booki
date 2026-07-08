@@ -2069,8 +2069,9 @@ function openMenu(e, item) {
   e.preventDefault();
   e.stopPropagation();
   ctxMenu.innerHTML = "";
-  const add = (iconName, text, fn) => {
+  const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
+    if (tone) b.classList.add(tone);
     b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
       closeMenu();
@@ -2087,7 +2088,8 @@ function openMenu(e, item) {
   // The menu adapts to what you clicked: widgets have nothing to "open",
   // folders get a straight jump to Explorer, only apps get recents.
   if (item.kind !== "separator" && item.kind !== "widget") {
-    add("app", t("m.open"), () => {
+    const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
+    add(openIcon, t("m.open"), () => {
       if (item.kind === "folder" || item.kind === "group") {
         const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
         if (tileEl) toggleStack(tileEl, item);
@@ -2114,7 +2116,7 @@ function openMenu(e, item) {
       if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
-    if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true));
+    if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
     sep();
   }
   // Slot for the system's recent files (filled asynchronously for app pins so
@@ -2153,7 +2155,7 @@ async function fillRecentFiles(slot, e, item) {
   slot.appendChild(head);
   recents.forEach((r) => {
     const b = document.createElement("button");
-    b.innerHTML = `${icon("app")}<span>${esc(r.name)}</span>`;
+    b.innerHTML = `${icon("external")}<span>${esc(r.name)}</span>`;
     b.title = r.name;
     b.addEventListener("click", async () => {
       closeMenu();
@@ -2172,9 +2174,10 @@ async function openBackgroundMenu(e) {
   e.preventDefault();
   e.stopPropagation();
   ctxMenu.innerHTML = "";
-  const add = (iconName, text, fn) => {
+  const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
-    b.innerHTML = `${icon(iconName)}<span>${text}</span>`;
+    if (tone) b.classList.add(tone);
+    b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
       closeMenu();
       await fn();
@@ -2187,7 +2190,7 @@ async function openBackgroundMenu(e) {
     ctxMenu.appendChild(s);
   };
   add("plus", t("m.addApp"), onAddApp);
-  add("app", t("m.addFolder"), onAddFolder);
+  add("folder-plus", t("m.addFolder"), onAddFolder);
   sep();
   // Widgets as a compact chip grid (emoji + tooltip) — ten text rows would
   // make the menu taller than the screen's worth of attention.
@@ -2205,7 +2208,7 @@ async function openBackgroundMenu(e) {
       const chip = document.createElement("button");
       chip.className = "menu-chip";
       chip.title = widgetLabel(type);
-      chip.innerHTML = emo(WIDGET_ICONS[type] || "puzzle", 20);
+      chip.innerHTML = `${emo(WIDGET_ICONS[type] || "puzzle", 18)}<span>${esc(widgetLabel(type))}</span>`;
       chip.addEventListener("click", async () => {
         closeMenu();
         await addWidget(type);
@@ -2221,7 +2224,7 @@ async function openBackgroundMenu(e) {
     sep();
     for (const name of profiles.slice(0, 6)) {
       const active = name === (cfg.lastProfile || "");
-      add(active ? "check" : "sparkles", `${t("m.profile")}: ${esc(name)}`, async () => {
+      add(active ? "check" : "sparkles", `${t("m.profile")}: ${name}`, async () => {
         const fresh = await dockApi.profileApply(name).catch(() => null);
         if (fresh) {
           cfg = fresh;

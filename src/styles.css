@@ -73,6 +73,15 @@ input:focus-visible,
 
   --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
     system-ui, -apple-system, sans-serif;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 14px;
+  --text-xl: 16px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-bounce: cubic-bezier(0.34, 1.4, 0.5, 1);
@@ -2060,14 +2069,15 @@ body.edge-right .stack { transform-origin: center right; }
 .menu {
   position: fixed;
   z-index: 50;
-  min-width: 200px;
+  min-width: 248px;
+  max-width: min(320px, calc(100vw - 16px));
   /* Never taller than the window: long menus (recents…) scroll instead of
      getting sliced at the window edge. */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  padding: 5px;
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke);
+  padding: 6px;
+  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
+  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
   border-radius: var(--r-md);
   box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
@@ -2080,12 +2090,12 @@ body.edge-right .stack { transform-origin: center right; }
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 6px 8px;
+  gap: 9px;
+  min-height: 36px;
+  padding: 7px 9px;
   font: inherit;
-  font-size: 13px;
-  font-weight: 560;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
   color: var(--ink);
   background: transparent;
   border: 0;
@@ -2094,47 +2104,68 @@ body.edge-right .stack { transform-origin: center right; }
   text-align: left;
   transition: background 0.12s var(--ease), color 0.12s var(--ease), transform 0.12s var(--ease);
 }
-.menu button:hover { background: var(--hover); }
+.menu button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--hover));
+}
 .menu button:active { transform: scale(0.98); }
 .menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
 .menu button svg {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  opacity: 0.86;
-  padding: 5px;
-  border-radius: 8px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  width: 27px;
+  height: 27px;
+  padding: 6px;
+  border-radius: var(--r-sm);
+  color: color-mix(in srgb, var(--ink) 72%, var(--accent));
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
 }
 .menu button span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu .sep { height: 1px; margin: 5px 8px; background: var(--stroke); }
+.menu button.danger { color: color-mix(in srgb, #e23b3b 88%, var(--ink)); }
+.menu button.danger svg {
+  color: #e23b3b;
+  background: color-mix(in srgb, #e23b3b 12%, transparent);
+  border-color: color-mix(in srgb, #e23b3b 26%, transparent);
+}
+.menu button.danger:hover {
+  color: #fff;
+  background: #d92d2d;
+}
+.menu button.danger:hover svg {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.menu .sep { height: 1px; margin: 6px 8px; background: color-mix(in srgb, var(--stroke) 82%, transparent); }
 /* Widget chips: a compact emoji grid instead of ten text rows. */
 .menu .menu-label {
-  padding: 4px 10px 2px;
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  padding: 7px 10px 4px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--ink-2);
 }
 .menu .menu-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
-  padding: 2px 6px 4px;
+  padding: 2px 6px 6px;
 }
 .menu .menu-chip {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
   width: auto;
-  padding: 7px 0;
+  min-height: 34px;
+  padding: 6px 9px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--ink) 5%, transparent);
   transition: background 0.12s var(--ease), transform 0.12s var(--ease);
 }
 .menu .menu-chip:hover { background: var(--hover); transform: translateY(-1px); }
-.menu .menu-chip img.emo { width: 20px; height: 20px; }
+.menu .menu-chip img.emo { flex: 0 0 auto; width: 18px; height: 18px; }
+.menu .menu-chip span { font-size: var(--text-sm); font-weight: var(--weight-medium); }
 .hidden { display: none !important; }
 @keyframes menu-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .menu { animation: none; } }
@@ -2329,25 +2360,43 @@ body.settings-body::before {
   z-index: 40;
   display: flex;
   flex-direction: column;
-  min-width: 180px;
-  padding: 5px;
+  min-width: 212px;
+  padding: 6px;
   border-radius: var(--r-md);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
+  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
+  box-shadow: var(--shadow);
   animation: notch-toast-in 0.16s var(--ease-bounce);
 }
 .s-more-menu button {
-  font: 500 13px var(--font);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  font: var(--weight-medium) var(--text-md) var(--font);
   color: var(--ink);
   text-align: left;
   background: transparent;
   border: 0;
   border-radius: var(--r-sm);
-  padding: 8px 10px;
+  padding: 7px 9px;
   cursor: pointer;
 }
-.s-more-menu button:hover { background: var(--hover); }
+.s-more-menu button span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.s-more-menu button svg {
+  width: 27px;
+  height: 27px;
+  padding: 6px;
+  border-radius: var(--r-sm);
+  color: color-mix(in srgb, var(--ink) 72%, var(--accent));
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+}
+.s-more-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, var(--hover)); }
 .s-more-menu button:disabled { opacity: 0.45; cursor: default; }
 .pin-toolbar-actions .s-more-menu { left: auto; right: 0; }
 
@@ -3428,21 +3477,37 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .s-inline-link:hover { text-decoration: underline; }
 /* Right-click menu on a group child square (take out / remove). */
 .pin-kid-menu {
-  position: fixed; z-index: 60; min-width: 160px; padding: 5px;
-  background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke);
-  border-radius: var(--r-md); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+  position: fixed; z-index: 60; min-width: 188px; padding: 6px;
+  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
+  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
+  border-radius: var(--r-md); box-shadow: var(--shadow);
   display: flex; flex-direction: column; gap: 2px;
   animation: kidmenu-in 0.12s var(--ease);
 }
 @keyframes kidmenu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 .pin-kid-menu button {
   display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
-  padding: 7px 9px; border: 0; background: transparent; color: var(--ink);
-  border-radius: var(--r-sm); font: inherit; font-size: 13px; cursor: pointer;
+  min-height: 36px; padding: 7px 9px; border: 0; background: transparent; color: var(--ink);
+  border-radius: var(--r-sm); font: var(--weight-medium) var(--text-md) var(--font); cursor: pointer;
 }
-.pin-kid-menu button svg { width: 16px; height: 16px; }
-.pin-kid-menu button:hover { background: var(--hover); }
-.pin-kid-menu button.danger:hover { background: #e23b3b; color: #fff; }
+.pin-kid-menu button span { display: grid; place-items: center; flex: 0 0 auto; }
+.pin-kid-menu button svg {
+  width: 27px; height: 27px; padding: 6px; border-radius: var(--r-sm);
+  color: color-mix(in srgb, var(--ink) 72%, var(--accent));
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+}
+.pin-kid-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, var(--hover)); }
+.pin-kid-menu button.danger { color: color-mix(in srgb, #e23b3b 88%, var(--ink)); }
+.pin-kid-menu button.danger svg {
+  color: #e23b3b;
+  background: color-mix(in srgb, #e23b3b 12%, transparent);
+  border-color: color-mix(in srgb, #e23b3b 26%, transparent);
+}
+.pin-kid-menu button.danger:hover { background: #d92d2d; color: #fff; }
+.pin-kid-menu button.danger:hover svg {
+  color: #fff; background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.22);
+}
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
@@ -3891,3 +3956,50 @@ body.tight-edge .dock {
 .s-btn:hover { transform: none; }
 .s-btn-soft,
 .s-btn-ghost { box-shadow: none; }
+
+/* Type scale normalization: keep Settings, dock menus and widget surfaces on a
+   small Fluent-like ladder instead of one-off sizes per component. */
+.s-content { font-size: var(--text-md); line-height: 1.42; }
+.s-content h1 {
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: var(--weight-bold);
+}
+.settings-section-head h2,
+.widget-store-body strong,
+.pin-name,
+.pin-card-name,
+.stack-title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.22;
+}
+.settings-section-head p,
+.r-hint,
+.muted,
+.widget-store-body p,
+.widget-modal-hero p,
+.widget-no-extra p {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: 1.42;
+}
+.r-label,
+.s-btn,
+.seg-item,
+.s-select,
+.pin-name-edit {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.s-btn {
+  font-weight: var(--weight-semibold);
+}
+.widget-store-badge,
+.widget-store-caps span,
+.settings-pill,
+.pin-badge {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}

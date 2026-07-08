@@ -38,6 +38,13 @@
 | 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
 
+## Beta 0.49.10 highlights
+
+- **Clearer context menus:** dock and Settings menus use consistent icon wells,
+  safer danger styling, readable widget labels and better edge clamping.
+- **Cleaner type hierarchy:** menus, Settings sections, widget cards and pinned
+  app rows now share a tighter typography scale.
+
 ## Beta 0.49.9 highlights
 
 - **Quiet smart-hide for creative apps:** in click mode, Booki no longer

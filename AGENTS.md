@@ -14,12 +14,12 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.49.9` focused on reliable
+- Current public beta context at this writing: `0.49.10` focused on reliable
   notch reveal while other apps are active, smart-hide based on the dock's real
   screen rect, quiet click-only smart-hide for creative apps with floating
-  windows, a cleaner Mica dock/notch with fewer outer shadows, update badge
-  placement near the dock, clipboard controls inside the Clipboard widget
-  editor, and text encoding checks.
+  windows, clearer context menus, a tighter typography scale, a cleaner Mica
+  dock/notch with fewer outer shadows, update badge placement near the dock,
+  clipboard controls inside the Clipboard widget editor, and text encoding checks.
 
 ## Important Files
 
@@ -120,7 +120,7 @@ Clipboard features are sensitive. Keep the UX explicit and boringly trustworthy:
   - `src-tauri/Cargo.toml`
   - `src-tauri/Cargo.lock`
   - `src-tauri/tauri.conf.json`
-- `release.yml` publishes from tags like `v0.49.9`.
+- `release.yml` publishes from tags like `v0.49.10`.
 - The release is intentionally marked as a normal GitHub release, even when the
   title/body say beta, so the updater endpoint
   `releases/latest/download/latest.json` resolves correctly.
