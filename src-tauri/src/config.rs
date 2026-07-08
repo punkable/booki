@@ -186,8 +186,7 @@ pub struct Config {
     /// Explorer right-click "Add to Booki" menu (files + folders).
     #[serde(default = "default_true")]
     pub context_menu: bool,
-    /// Visual gap (CSS px) between the bar and its screen edge. Default 48
-    /// (12px window margin + the 36px transparent shadow pad).
+    /// Visual gap (CSS px) between the bar and its screen edge.
     #[serde(default = "default_edge_gap")]
     pub edge_gap: u32,
     /// UI language: "system" | "es" | "en".

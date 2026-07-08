@@ -74,7 +74,7 @@ jobs:
 
             Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
 
-            This beta patch focuses on a cleaner everyday dock: a more structured Settings experience, clearer quick themes and accent colors, easier pinned-app management, calmer Mica-aligned surfaces, better responsive behavior for narrow windows, and more comfortable interaction targets across dock flyouts, menus and modals.
+            This beta patch focuses on reliability while working in other apps: clicking the notch now brings the dock to the front, smart-hide uses the dock's real screen rect, the update badge stays beside the dock, outer shadows were removed for a cleaner Mica surface, and the confusing always-on-top setting is handled internally.
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 

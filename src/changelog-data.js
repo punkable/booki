@@ -3,6 +3,36 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.7",
+    date: "8 jul 2026",
+    headline: "Notch mas fiable, dock mas limpio y menos area invisible.",
+    sections: [
+      {
+        icon: "\u{1F9ED}",
+        title: "El notch siempre trae el dock",
+        notes: [
+          "Al pulsar el notch, Booki recoloca el dock, lo sube al frente y lo deja clicable aunque estes usando otra app.",
+          "Smart hide usa el rect real del dock para evitar apariciones raras al cambiar entre ventanas.",
+        ],
+      },
+      {
+        icon: "\u{1FA9F}",
+        title: "Mica sin sombras grandes",
+        notes: [
+          "Reduce el stage transparente y elimina sombras exteriores del dock/notch para evitar cortes visuales y zonas invisibles que intercepten clicks.",
+          "La pastilla de actualizacion ahora se posiciona junto al dock en vez de quedar perdida en medio del stage.",
+        ],
+      },
+      {
+        icon: "\u{2699}\uFE0F",
+        title: "Ajustes mas claros",
+        notes: [
+          "Quita de Ajustes la opcion confusa de flotar por encima: Booki lo gestiona internamente para que el notch sea fiable.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.6",
     date: "8 jul 2026",
     headline: "Ajustes con mas jerarquia, dock responsive y controles mas claros.",

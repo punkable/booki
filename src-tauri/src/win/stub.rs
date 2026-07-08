@@ -15,6 +15,8 @@ pub fn focus_window(_hwnd: isize) -> bool {
     false
 }
 
+pub fn raise_window(_hwnd: isize) {}
+
 pub fn exclude_from_capture(_hwnd: isize) {}
 
 pub fn set_capture_visible(_hwnd: isize, _visible: bool) {}
