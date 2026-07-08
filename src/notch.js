@@ -8,6 +8,17 @@ import { applyAccent } from "./util-color.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
+const inTauri = !!winApi;
+
+function availW() {
+  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
+  return inTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
+}
+
+function availH() {
+  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
+  return inTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
+}
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
 
@@ -108,8 +119,8 @@ pill.addEventListener("pointerup", (e) => {
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.
-  const sw = window.screen.availWidth || window.screen.width || 1920;
-  const sh = window.screen.availHeight || window.screen.height || 1080;
+  const sw = availW();
+  const sh = availH();
   const dist = { left: e.screenX, right: sw - e.screenX, top: e.screenY, bottom: sh - e.screenY };
   let edge = "bottom";
   let best = Infinity;
