@@ -43,10 +43,13 @@ function IconBtn({ name, title, onClick, danger, onPointerDown }) {
       type="button"
       className={"pin-btn ico" + (danger ? " del" : "")}
       title={title}
+      aria-label={title}
+      data-action-label={title}
       onClick={onClick}
       onPointerDown={onPointerDown}
-      dangerouslySetInnerHTML={{ __html: icon(name) }}
-    />
+    >
+      <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon(name) }} />
+    </button>
   );
 }
 import {
@@ -206,6 +209,59 @@ function Toggle({ checked, onChange, label, hint }) {
       <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="r-switch" />
     </label>
+  );
+}
+
+function PageHeader({ icon: iconName, title, children, meta }) {
+  return (
+    <header className="settings-page-head">
+      <div className="settings-page-title">
+        <span className="settings-page-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
+        <div>
+          <h1>{title}</h1>
+          {children ? <p className="settings-page-copy">{children}</p> : null}
+        </div>
+      </div>
+      {meta ? <div className="settings-page-meta">{meta}</div> : null}
+    </header>
+  );
+}
+
+function SettingsSection({ title, icon: iconName = "settings", hint, children, className = "" }) {
+  return (
+    <section className={"settings-section " + className}>
+      <div className="settings-section-head">
+        <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
+        <div>
+          <h2>{title}</h2>
+          {hint ? <p>{hint}</p> : null}
+        </div>
+      </div>
+      <div className="settings-section-body">{children}</div>
+    </section>
+  );
+}
+
+function CollapsibleSection({ title, icon: iconName = "settings", hint, count, defaultOpen = false, children, className = "" }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className={"settings-section settings-collapsible " + className + (open ? " open" : "")}>
+      <button
+        type="button"
+        className="settings-collapse-head"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
+        <span className="settings-collapse-copy">
+          <strong>{title}</strong>
+          {hint ? <small>{hint}</small> : null}
+        </span>
+        {count != null ? <span className="settings-count">{count}</span> : null}
+        <span className="settings-collapse-chev" dangerouslySetInnerHTML={{ __html: icon(open ? "chevron-down" : "chevron-right") }} />
+      </button>
+      {open ? <div className="settings-section-body settings-collapse-body">{children}</div> : null}
+    </section>
   );
 }
 
@@ -369,9 +425,7 @@ function ProfilesCard({ cfg, set }) {
   }, []);
   const active = (cfg && cfg.lastProfile) || "";
   return (
-    <div className="s-card-inner">
-      <h3>{t("prof.title")}</h3>
-      <p className="muted">{t("prof.hint")}</p>
+    <SettingsSection title={t("prof.title")} icon="copy" hint={t("prof.hint")} className="profiles-section">
       {profiles.map((n) => (
         <div key={n} className={"prof-row" + (n === active ? " prof-active" : "")}>
           <span className="prof-name">
@@ -419,7 +473,7 @@ function ProfilesCard({ cfg, set }) {
           {t("prof.save")}
         </button>
       </div>
-    </div>
+    </SettingsSection>
   );
 }
 
@@ -634,6 +688,68 @@ function AccentPicker({ value, onChange }) {
   );
 }
 
+function AccentPickerEnhanced({ value, onChange }) {
+  const v = (value || "").toLowerCase();
+  const isPreset = ACCENTS.some(([, val]) => val.toLowerCase() === v);
+  return (
+    <div className="accent-picker accent-picker-enhanced">
+      <div className="accent-swatches">
+        {ACCENTS.map(([name, val]) => (
+          <button
+            key={val}
+            type="button"
+            className={"accent-sw" + (v === val.toLowerCase() ? " active" : "")}
+            style={{ "--sw": val }}
+            title={name}
+            aria-label={name}
+            onClick={() => onChange(val)}
+          >
+            <span className="accent-dot" />
+            <span className="accent-name">{name}</span>
+            <span className="accent-check" dangerouslySetInnerHTML={{ __html: icon("check") }} />
+          </button>
+        ))}
+        <label
+          className={"accent-custom" + (!isPreset ? " active" : "")}
+          style={{ "--sw": value }}
+          title={t("ap.custom")}
+          aria-label={t("ap.custom")}
+        >
+          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
+          <span className="accent-dot" />
+          <span className="accent-name">{t("ap.custom")}</span>
+          <span className="accent-plus" dangerouslySetInnerHTML={{ __html: icon(isPreset ? "plus" : "check") }} />
+        </label>
+        <button
+          type="button"
+          className="accent-src"
+          title={t("ap.system")}
+          onClick={async () => {
+            const hex = await dockApi.systemAccent();
+            if (hex) onChange(hex);
+          }}
+        >
+          <span className="accent-src-dot" />
+          {t("ap.systemShort")}
+        </button>
+        <button
+          type="button"
+          className="accent-src"
+          title={t("ap.wallpaper")}
+          onClick={async () => {
+            const hex = await dockApi.wallpaperAccent().catch(() => null);
+            if (hex) onChange(hex);
+          }}
+        >
+          <img className="emo" src={emoSrc("picture")} alt="" width="15" height="15" />
+          {t("ap.wallpaperShort")}
+        </button>
+      </div>
+      <span className="accent-hex">{(value || "").toUpperCase()}</span>
+    </div>
+  );
+}
+
 // One installed-app suggestion icon (native icon, falls back to a letter).
 function SuggIcon({ path, name }) {
   const [src, setSrc] = useState(null);
@@ -705,9 +821,15 @@ function Suggestions({ cfg, set }) {
   };
 
   return (
-    <div className="s-card-inner">
-      <h3>{t("apps.suggest")}</h3>
-      <p className="muted">{t("apps.suggestHint")}</p>
+    <CollapsibleSection
+      title={t("apps.suggest")}
+      icon="search"
+      hint={t("apps.suggestHint")}
+      count={groups.reduce((n, g) => n + g.items.length, 0)}
+      defaultOpen={false}
+      className="suggestions-section"
+    >
+      <div className="suggestions-panel">
       <div className="sugg-searchwrap">
         <span className="sugg-search-ico" dangerouslySetInnerHTML={{ __html: icon("search") }} />
         <input className="sugg-search" placeholder={t("apps.search")} value={q}
@@ -756,7 +878,8 @@ function Suggestions({ cfg, set }) {
           </div>
         );
       })}
-    </div>
+      </div>
+    </CollapsibleSection>
   );
 }
 
@@ -860,10 +983,10 @@ function HotkeyInput({ value, onChange }) {
 function Appearance({ cfg, set }) {
   return (
     <>
-      <h1>{t("ap.title")}</h1>
+      <PageHeader icon="palette" title={t("ap.title")} />
       <MiniDockPreview cfg={cfg} />
 
-      <SectionTitle name="palette">{t("gp.theme")}</SectionTitle>
+      <SettingsSection title={t("gp.theme")} icon="palette">
       <Row label={t("ap.theme")}>
         <SegmentedControl
           value={cfg.theme || "system"}
@@ -877,26 +1000,41 @@ function Appearance({ cfg, set }) {
         />
       </Row>
       <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
-        <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
+        <AccentPickerEnhanced value={cfg.accent} onChange={(v) => set({ accent: v })} />
       </Row>
       <Row label={t("ap.presets")} hint={t("ap.presetsHint")}>
         <div className="preset-row">
-          {THEME_PRESETS.map((p) => (
-            <button
-              key={p.name}
-              type="button"
-              className="preset-chip"
-              title={p.name}
-              style={{ background: p.accent }}
-              onClick={() => set({ accent: p.accent, theme: p.theme })}
-            >
-              <span className="preset-dot" data-theme={p.theme} />
-            </button>
-          ))}
+          {THEME_PRESETS.map((p) => {
+            const active =
+              (cfg.accent || "").toLowerCase() === p.accent.toLowerCase() &&
+              (cfg.theme || "system") === p.theme;
+            return (
+              <button
+                key={p.name}
+                type="button"
+                className={"preset-chip" + (active ? " active" : "")}
+                title={`${p.name} - ${t(`theme.${p.theme}`)}`}
+                style={{ "--preset": p.accent }}
+                onClick={() => set({ accent: p.accent, theme: p.theme })}
+              >
+                <span className="preset-preview">
+                  <span className="preset-bar" />
+                  <span className="preset-tile" />
+                  <span className="preset-tile small" />
+                </span>
+                <span className="preset-copy">
+                  <strong>{p.name}</strong>
+                  <small>{t(`theme.${p.theme}`)}</small>
+                </span>
+                <span className="preset-dot" data-theme={p.theme} />
+              </button>
+            );
+          })}
         </div>
       </Row>
+      </SettingsSection>
 
-      <SectionTitle name="grid">{t("gp.icons")}</SectionTitle>
+      <SettingsSection title={t("gp.icons")} icon="grid">
       <Row label={t("ap.iconSize")}>
         <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
           onChange={(v) => set({ iconSize: v })} />
@@ -911,18 +1049,19 @@ function Appearance({ cfg, set }) {
       </Row>
       <Toggle label={t("ap.compact")} checked={!!cfg.compact}
         onChange={(v) => set({ compact: v })} />
+      </SettingsSection>
 
-      <SectionTitle name="sliders">{t("gp.material")}</SectionTitle>
+      <SettingsSection title={t("gp.material")} icon="sliders">
       <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
         <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
           fmt={(v) => `${v}%`}
           onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
       </Row>
 
-      <SectionTitle name="power">{t("gp.notch")}</SectionTitle>
       <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
         <NotchStylePicker cfg={cfg} set={set} />
       </Row>
+      </SettingsSection>
 
     </>
   );
@@ -935,9 +1074,9 @@ function Behavior({ cfg, set }) {
   }, []);
   return (
     <>
-      <h1>{t("be.title")}</h1>
+      <PageHeader icon="settings" title={t("be.title")} />
 
-      <SectionTitle name="app">{t("gp.dock")}</SectionTitle>
+      <SettingsSection title={t("gp.dock")} icon="app">
       <Row label={t("be.position")} hint={t("be.positionHint")}>
         <PositionPicker cfg={cfg} set={set} />
       </Row>
@@ -949,6 +1088,9 @@ function Behavior({ cfg, set }) {
         <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
           fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
       </Row>
+      </SettingsSection>
+
+      <SettingsSection title={t("gp.notch")} icon="eye">
       <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
         <SegmentedControl
           value={cfg.autoHideMode || "smart"}
@@ -962,7 +1104,6 @@ function Behavior({ cfg, set }) {
       </Row>
       {cfg.autoHideMode !== "off" && (
         <>
-          <SectionTitle name="power">{t("gp.notch")}</SectionTitle>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
           <Row label={t("be.reveal")} hint={t("be.revealHint")}>
@@ -981,8 +1122,9 @@ function Behavior({ cfg, set }) {
           </Row>
         </>
       )}
+      </SettingsSection>
 
-      <SectionTitle name="grid">{t("gp.icons")}</SectionTitle>
+      <SettingsSection title={t("gp.icons")} icon="grid">
       <Row label={t("be.anim")}>
         <SegmentedControl
           value={cfg.magnifyStyle || "spring"}
@@ -1009,6 +1151,7 @@ function Behavior({ cfg, set }) {
         onChange={(v) => set({ showIndicators: v })} />
       <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
         checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
+      </SettingsSection>
 
       <ProfilesCard cfg={cfg} set={set} />
     </>
@@ -1622,31 +1765,69 @@ function Apps({ cfg, set }) {
       ),
     });
   const styleTarget = itemForWidgetRef(cfg.pinned, styleFor);
+  const widgetPinnedCount = (cfg.pinned || []).reduce(
+    (n, item) => n + (item.kind === "widget" ? 1 : 0) + (item.children || []).filter((c) => c.kind === "widget").length,
+    0
+  );
 
   return (
     <>
-      <h1>{t("apps.title")}</h1>
-      <p className="muted">{t("apps.hint")}</p>
-      {cfg.pinned.length === 0 && (
-        <div className="s-tips">
-          <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
-          <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
-          <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
+      <PageHeader
+        icon="grid"
+        title={t("apps.title")}
+        meta={(
+          <>
+            <span>{cfg.pinned.length}</span>
+            <span>{widgetPinnedCount} {t("apps.widgets")}</span>
+          </>
+        )}
+      >
+        {t("apps.hint")}
+      </PageHeader>
+      <SettingsSection title={t("apps.title")} icon="app" className="apps-primary-section">
+      <div className="pin-toolbar">
+        <div className="pin-toolbar-main">
+          {cfg.pinned.length > 0 ? (
+            <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
+              <button className={"pin-view-btn" + (view === "list" ? " active" : "")}
+                title={t("apps.viewList")} onClick={() => pickView("list")}>
+                <span dangerouslySetInnerHTML={{ __html: icon("list") }} />
+              </button>
+              <button className={"pin-view-btn" + (view === "grid" ? " active" : "")}
+                title={t("apps.viewGrid")} onClick={() => pickView("grid")}>
+                <span dangerouslySetInnerHTML={{ __html: icon("grid") }} />
+              </button>
+            </div>
+          ) : (
+            <div className="pin-list-summary">
+              <strong>{cfg.pinned.length}</strong>
+              <span>{t("apps.title")}</span>
+            </div>
+          )}
         </div>
-      )}
-      {cfg.pinned.length > 0 && (
-        <div className="pin-toolbar">
-          <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
-            <button className={"pin-view-btn" + (view === "list" ? " active" : "")}
-              title={t("apps.viewList")} onClick={() => pickView("list")}>
-              <span dangerouslySetInnerHTML={{ __html: icon("list") }} />
+        <div className="pin-toolbar-actions">
+          <button className="s-btn pin-add-main" onClick={addApp}>
+            <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("plus") }} />
+            <span>{t("apps.addApp")}</span>
+          </button>
+          <div className="s-more">
+            <button className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
+              onClick={() => setMoreOpen((v) => !v)}>
+              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("settings") }} />
+              <span>{t("apps.more")}</span>
             </button>
-            <button className={"pin-view-btn" + (view === "grid" ? " active" : "")}
-              title={t("apps.viewGrid")} onClick={() => pickView("grid")}>
-              <span dangerouslySetInnerHTML={{ __html: icon("grid") }} />
-            </button>
+            {moreOpen && (
+              <div className="s-more-menu" onClick={() => setMoreOpen(false)}>
+                <button onClick={addFolder}>{t("apps.addFolder")}</button>
+                <button onClick={newFolder}>{t("apps.newFolder")}</button>
+                <button onClick={addSep}>{t("apps.addSep")}</button>
+                <button onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
+                  {t("apps.addTrash")}
+                </button>
+              </div>
+            )}
           </div>
-          {clearArm ? (
+          {cfg.pinned.length > 0 && (clearArm ? (
             <span className="pin-clear-confirm">
               {t("apps.clearConfirm")}
               <button className="s-btn s-btn-danger s-btn-sm" onClick={clearAll}>{t("apps.clearYes")}</button>
@@ -1657,7 +1838,14 @@ function Apps({ cfg, set }) {
               <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("trash") }} />
               <span>{t("apps.clearAll")}</span>
             </button>
-          )}
+          ))}
+        </div>
+      </div>
+      {cfg.pinned.length === 0 && (
+        <div className="s-tips">
+          <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
+          <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
+          <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
         </div>
       )}
       {view === "grid" && cfg.pinned.length > 0 ? (
@@ -1809,45 +1997,31 @@ function Apps({ cfg, set }) {
         })}
       </ul>
       )}
-      <div className="s-actions">
-        <button className="s-btn" onClick={addApp}>{t("apps.addApp")}</button>
-        <div className="s-more">
-          <button className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
-            onClick={() => setMoreOpen((v) => !v)}>
-            <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("settings") }} />
-            <span>{t("apps.more")}</span>
-          </button>
-          {moreOpen && (
-            <div className="s-more-menu" onClick={() => setMoreOpen(false)}>
-              <button onClick={addFolder}>{t("apps.addFolder")}</button>
-              <button onClick={newFolder}>{t("apps.newFolder")}</button>
-              <button onClick={addSep}>{t("apps.addSep")}</button>
-              <button onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
-                {t("apps.addTrash")}
-              </button>
-            </div>
-          )}
+      </SettingsSection>
+      <CollapsibleSection
+        title={t("apps.widgets")}
+        icon="sliders"
+        hint={t("apps.widgetsHint")}
+        count={WIDGET_ORDER.length}
+        defaultOpen={false}
+      >
+        <div className="widget-store-grid">
+          {WIDGET_ORDER.map((w) => {
+            const refs = widgetRefs(cfg.pinned, w);
+            return (
+              <WidgetStoreCard
+                key={w}
+                widget={w}
+                label={widgetLabels[w] || w}
+                refs={refs}
+                onAdd={() => addWidget(w, widgetLabels[w] || w)}
+                onEdit={() => openWidgetEditor(w)}
+              />
+            );
+          })}
         </div>
-      </div>
-      <SectionTitle name="sliders">{t("apps.widgets")}</SectionTitle>
-      <p className="muted">{t("apps.widgetsHint")}</p>
-      <div className="widget-store-grid">
-        {WIDGET_ORDER.map((w) => {
-          const refs = widgetRefs(cfg.pinned, w);
-          return (
-            <WidgetStoreCard
-              key={w}
-              widget={w}
-              label={widgetLabels[w] || w}
-              refs={refs}
-              onAdd={() => addWidget(w, widgetLabels[w] || w)}
-              onEdit={() => openWidgetEditor(w)}
-            />
-          );
-        })}
-      </div>
-      <SectionTitle name="external">{t("apps.web")}</SectionTitle>
-      <p className="muted">{t("apps.webHint")}</p>
+      </CollapsibleSection>
+      <SettingsSection title={t("apps.web")} icon="external" hint={t("apps.webHint")}>
       <div className="web-add">
         <input
           className="r-hotkey-input web-url"
@@ -1867,6 +2041,7 @@ function Apps({ cfg, set }) {
         />
         <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
       </div>
+      </SettingsSection>
       <Suggestions cfg={cfg} set={set} />
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal

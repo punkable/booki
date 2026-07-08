@@ -35,6 +35,16 @@ const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 
+function availW() {
+  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
+  return isTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
+}
+
+function availH() {
+  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
+  return isTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
+}
+
 // Safe .closest() — pointer/keyboard targets can be non-Element (document/window),
 // which would throw "closest is not a function".
 const closestSel = (target, sel) => (target && target.closest ? target.closest(sel) : null);
@@ -351,7 +361,7 @@ const MIN_TILE = 30;
 function fitDock() {
   setAllSizes(baseSize());
   const vertical = isVertical();
-  const span = vertical ? window.screen.availHeight : window.screen.availWidth;
+  const span = vertical ? availH() : availW();
   // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
   // usable, or a full bar would overflow past the far screen edge.
   const slotPad = cfg && cfg.notchPosition && cfg.notchPosition !== "center" ? span * 0.12 : 0;
@@ -2393,13 +2403,13 @@ function computeFrame() {
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
-    hCss = window.screen.availHeight;
+    hCss = availH();
   } else {
-    wCss = window.screen.availWidth;
+    wCss = availW();
     hCss = dockEl.offsetHeight + edgePad + PANEL_ROOM;
   }
-  wCss = Math.min(wCss, window.screen.availWidth);
-  hCss = Math.min(hCss, window.screen.availHeight);
+  wCss = Math.min(wCss, availW());
+  hCss = Math.min(hCss, availH());
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -3863,10 +3873,19 @@ function placeUpdatePill() {
   // Position by explicit px, NOT transform: the breathe animation owns the
   // pill's transform, so a translateX(-50%) centering would be stomped on.
   const r = dockEl.getBoundingClientRect();
+  const pad = 4;
   if (isVertical()) {
-    pill.style.top = `${r.top + r.height / 2 - pill.offsetHeight / 2}px`;
+    const top = Math.min(
+      Math.max(pad, r.top + r.height / 2 - pill.offsetHeight / 2),
+      Math.max(pad, window.innerHeight - pill.offsetHeight - pad)
+    );
+    pill.style.top = `${top}px`;
   } else {
-    pill.style.left = `${r.left + r.width / 2 - pill.offsetWidth / 2}px`;
+    const left = Math.min(
+      Math.max(pad, r.left + r.width / 2 - pill.offsetWidth / 2),
+      Math.max(pad, window.innerWidth - pill.offsetWidth - pad)
+    );
+    pill.style.left = `${left}px`;
   }
 }
 
