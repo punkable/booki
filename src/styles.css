@@ -161,20 +161,20 @@ body.dock-body {
   background: transparent;
   overflow: hidden;
   display: flex;
-  /* Transparent breathing room around the bar for the drop shadow + magnified
-     tiles (must match SHADOW_PAD in dock.js so the window is sized to fit). */
-  padding: 36px;
+  /* Transparent breathing room around magnified tiles; must match SHADOW_PAD in
+     dock.js so the window is sized to fit without a wide invisible hitbox. */
+  padding: 18px;
 }
 /* The anchored side's pad follows the user's "edge gap" setting so the bar can
    sit closer to the taskbar/edge; the other sides keep full magnify headroom. */
-body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 36px); }
-body.dock-body.edge-top { padding-top: var(--edge-pad, 36px); }
-body.dock-body.edge-left { padding-left: var(--edge-pad, 36px); }
-body.dock-body.edge-right { padding-right: var(--edge-pad, 36px); }
+body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 18px); }
+body.dock-body.edge-top { padding-top: var(--edge-pad, 18px); }
+body.dock-body.edge-left { padding-left: var(--edge-pad, 18px); }
+body.dock-body.edge-right { padding-right: var(--edge-pad, 18px); }
 /* A tight gap has no room for the outward shadow — keep it subtle instead of
    letting it clip against the window edge. */
 body.tight-edge .dock {
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
@@ -210,7 +210,7 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
      top/side dock throws its depth in the natural direction, not always down.
      Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
      gets clipped by the window's transparent margin. */
-  box-shadow: var(--sh-x, 0) var(--sh-y, 6px) 18px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
 }
 body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
@@ -1138,15 +1138,12 @@ body.notch-body.vertical { align-items: center; }
   padding: 0;
   cursor: pointer;
   border-radius: 999px;
-  /* "Dynamic island" glass: deep charcoal capsule with a soft accent tint, a
-     specular top sheen, a hairline light border and real depth in the shadow. */
+  /* Compact Mica/glass capsule: tint, hairline border and inner sheen. */
   background:
     radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 58%),
     color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.80));
   border: 1px solid rgba(255, 255, 255, 0.20);
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
   /* No pulsing animation — a steady pill (no blinking). */
@@ -1160,8 +1157,6 @@ body.notch-body.vertical { align-items: center; }
     radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 58%),
     color-mix(in srgb, var(--accent) 30%, rgba(15, 15, 20, 0.78));
   box-shadow:
-    0 6px 22px rgba(0, 0, 0, 0.5),
-    0 0 18px color-mix(in srgb, var(--accent) 35%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
@@ -1185,7 +1180,6 @@ body.notch-body.peek .notch-pill {
   border-bottom: 0;
   transform-origin: center bottom;
   box-shadow:
-    0 -3px 14px rgba(0, 0, 0, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -2px 4px rgba(0, 0, 0, 0.25);
 }
@@ -1246,7 +1240,6 @@ body.notch-body.style-liquid .notch-pill {
     var(--glass);
   border-color: rgba(255, 255, 255, 0.55);
   box-shadow:
-    0 4px 18px rgba(0, 0, 0, 0.25),
     inset 0 1px 1px rgba(255, 255, 255, 0.6),
     inset 0 -2px 4px rgba(0, 0, 0, 0.12);
 }
@@ -1255,7 +1248,7 @@ body.notch-body.style-mica .notch-pill {
   --glass: color-mix(in srgb, var(--accent) 10%, rgba(58, 58, 64, 0.96));
   background: var(--glass);
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 /* Acrylic: milky translucency with a faint sheen. */
 body.notch-body.style-acrylic .notch-pill {
@@ -1264,7 +1257,7 @@ body.notch-body.style-acrylic .notch-pill {
     linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08)),
     var(--glass);
   border-color: rgba(255, 255, 255, 0.35);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 /* Windows: squared taskbar-style tab with an accent underline. */
 body.notch-body.style-windows .notch-pill,
@@ -1273,7 +1266,7 @@ body.notch-body.style-windows.peek .notch-pill {
   border-radius: 4px 4px 0 0;
   background: var(--glass);
   border-color: rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 2px 0 var(--accent), 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 body.notch-body.style-windows .notch-pill::before,
 body.notch-body.style-windows .notch-pill::after { display: none; }
@@ -1286,7 +1279,6 @@ body.notch-body.style-windows .notch-pill::after { display: none; }
 body.notch-body.peek .notch-pill,
 body.notch-body.style-windows.peek .notch-pill {
   box-shadow:
-    0 0 9px color-mix(in srgb, var(--accent) 30%, rgba(0, 0, 0, 0.4)),
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
@@ -1324,7 +1316,7 @@ body.notch-body.toast { padding: 4px; }
   border-radius: var(--r-pill);
   background: var(--layer-strong);
   border: 1px solid var(--stroke-light);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(20px) saturate(160%);
   color: var(--ink);
@@ -2153,8 +2145,8 @@ body.edge-right .stack { transform-origin: center right; }
    translateX(-50%) was silently ignored → the pill sat half a width off). */
 .update-pill {
   position: fixed;
-  top: 4px;
-  left: 40px;
+  top: 8px;
+  left: 8px;
   z-index: 30;
   font: inherit;
   font-size: 12px;
@@ -2164,20 +2156,16 @@ body.edge-right .stack { transform-origin: center right; }
   border: 0;
   padding: 5px 12px;
   border-radius: var(--r-pill);
-  box-shadow: var(--shadow);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   cursor: pointer;
-  transition: box-shadow 0.16s var(--ease), filter 0.16s var(--ease), transform 0.12s var(--ease);
+  transition: filter 0.16s var(--ease), transform 0.12s var(--ease);
   animation: update-attention 2.8s var(--ease) infinite;
 }
-.update-pill:hover { filter: brightness(1.05); box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 28%, transparent); }
+.update-pill:hover { filter: brightness(1.05); }
 .update-pill:active { transform: scale(0.98); }
-/* Sit in the magnify-headroom side so it never overlaps the icons. */
-body.edge-top .update-pill { top: auto; bottom: 4px; }
-body.edge-left .update-pill { left: auto; right: 4px; top: 40px; }
-body.edge-right .update-pill { left: 4px; right: auto; top: 40px; }
 @keyframes update-attention {
-  0%, 100% { box-shadow: var(--shadow), 0 0 0 0 color-mix(in srgb, var(--accent) 22%, transparent); }
-  50% { box-shadow: var(--shadow), 0 0 0 4px color-mix(in srgb, var(--accent) 0%, transparent); }
+  0%, 100% { outline: 0 solid color-mix(in srgb, var(--accent) 22%, transparent); }
+  50% { outline: 4px solid color-mix(in srgb, var(--accent) 0%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .update-pill { animation: none; } }
 
@@ -3882,15 +3870,10 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 /* ═══════════════════════════ Premium polish ═══════════════════════════ */
 /* Subtle, additive refinements (depth, accent touches) over the base. */
 .dock {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    var(--sh-x, 0) var(--sh-y, 6px) 22px rgba(15, 15, 25, 0.32),
-    0 0 10px rgba(15, 15, 25, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 body.tight-edge .dock {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    0 0 10px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 .tile img,
 .tile .glyph { transition: transform 0.12s var(--ease); }

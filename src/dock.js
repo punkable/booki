@@ -242,7 +242,7 @@ function applyAll() {
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
   // How close the bar sits to its screen edge (user-tunable). The transparent
   // pad on the anchored side shrinks down to the requested gap; anything past
-  // 36px is handled by the window's own margin (backend dock_xy).
+  // the stage pad is handled by the window's own margin (backend dock_xy).
   const edgeGap = Math.max(4, Math.min(96, cfg.edgeGap ?? 48));
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
@@ -1721,7 +1721,7 @@ function processMove(e) {
     dragClone.style.top = `${e.clientY - press.grabY}px`;
   }
 
-  // Pulled clearly out of the bar's window (its pad is ~36px) → dropping here
+  // Pulled clearly out of the bar's window → dropping here
   // unpins (macOS-style). Reachable now that the pointer is captured.
   const pulling = pullDistance(e) > 64;
   if (pulling !== willUnpin) {
@@ -2374,11 +2374,10 @@ function reframe() {
   );
 }
 
-// Transparent breathing room around the bar so the dock's drop shadow and the
-// magnified tiles have room to render without being clipped by the window edge.
-// Room around the bar inside the transparent window: the soft shadow AND
-// magnified tiles must fit here or the window edge slices them off.
-const SHADOW_PAD = 36;
+// Tight visual breathing room around the bar. Booki now leans on Mica-style
+// tint instead of large drop shadows, so the native transparent stage can stay
+// smaller and clicks just outside the painted dock reach the app underneath.
+const SHADOW_PAD = 18;
 
 // Fixed headroom past the bar for everything that opens around it — group
 // flyouts, context menu, popovers, tooltips, the update pill, magnify and the
@@ -2388,7 +2387,7 @@ const SHADOW_PAD = 36;
 // lag was the visible jump/blink). Empty stage regions don't steal clicks: a
 // cursor watcher (backend) flips the window click-through outside the hit
 // rects the frontend reports (reportHitRects).
-const PANEL_ROOM = 440;
+const PANEL_ROOM = 320;
 
 let lastFull = null;
 function computeFrame() {
@@ -2417,13 +2416,13 @@ let lastFrameEdge = null;
 function applyFrame() {
   const full = computeFrame();
   // Skip the native resize when the change is small: the transparent SHADOW_PAD
-  // (36px each side) absorbs minor bar-size jitter, so live widgets whose text
+  // absorbs minor bar-size jitter, so live widgets whose text
   // width wiggles (net rates, media title, rolling numbers) don't make the whole
   // window grow/shrink every second — that constant resize was a real flicker.
   // Only resize once a change is big enough to threaten the shadow's headroom.
   const key = `${cfg.edge}:${cfg.monitor ?? -1}`;
   const dpr = window.devicePixelRatio || 1;
-  const slack = Math.round(10 * dpr); // px; well under the 36px pad, keeps shadow safe
+  const slack = Math.round(8 * dpr); // px; small enough to keep the tighter stage accurate
   if (
     lastFull && lastFrameEdge === key &&
     Math.abs(full.w - lastFull.w) <= slack && Math.abs(full.h - lastFull.h) <= slack
@@ -3870,22 +3869,35 @@ window.addEventListener("pointerdown", (e) => {
 function placeUpdatePill() {
   const pill = document.getElementById("update-pill");
   if (!pill || pill.classList.contains("hidden")) return;
-  // Position by explicit px, NOT transform: the breathe animation owns the
-  // pill's transform, so a translateX(-50%) centering would be stomped on.
   const r = dockEl.getBoundingClientRect();
-  const pad = 4;
+  const pad = 8;
+  const gap = 8;
+  pill.style.left = "";
+  pill.style.right = "";
+  pill.style.top = "";
+  pill.style.bottom = "";
   if (isVertical()) {
     const top = Math.min(
       Math.max(pad, r.top + r.height / 2 - pill.offsetHeight / 2),
       Math.max(pad, window.innerHeight - pill.offsetHeight - pad)
     );
+    const left =
+      (cfg.edge || "bottom") === "left"
+        ? Math.min(r.right + gap, window.innerWidth - pill.offsetWidth - pad)
+        : Math.max(pad, r.left - pill.offsetWidth - gap);
     pill.style.top = `${top}px`;
+    pill.style.left = `${left}px`;
   } else {
     const left = Math.min(
       Math.max(pad, r.left + r.width / 2 - pill.offsetWidth / 2),
       Math.max(pad, window.innerWidth - pill.offsetWidth - pad)
     );
+    const top =
+      (cfg.edge || "bottom") === "top"
+        ? Math.min(r.bottom + gap, window.innerHeight - pill.offsetHeight - pad)
+        : Math.max(pad, r.top - pill.offsetHeight - gap);
     pill.style.left = `${left}px`;
+    pill.style.top = `${top}px`;
   }
 }
 

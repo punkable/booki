@@ -90,7 +90,7 @@ const SEARCH_INDEX = [
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
-  ["be.alwaysOnTop", "general"], ["be.autostart", "general"],
+  ["be.autostart", "general"],
   ["apps.title", "apps"], ["apps.widgets", "apps"], ["apps.web", "apps"],
   ["w.mediaScrollVolume", "apps"],
   ["clip.memory", "apps"], ["clip.retention", "apps"], ["clip.limit", "apps"],
@@ -2354,8 +2354,6 @@ function General({ cfg, set, onWhatsNew }) {
           setAutostart(real);
           set({ autostart: real });
         }} />
-      <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")} checked={cfg.alwaysOnTop}
-        onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <div className="capture-row">
         <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
           checked={!!cfg.captureVisible}

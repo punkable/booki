@@ -38,6 +38,8 @@ static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 #[allow(clippy::type_complexity)]
 static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), true));
 
+static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
+
 /// One clipboard-history entry (newest first). `text` is capped to keep the
 /// list light; ids are monotonic so the frontend can key list items stably.
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -298,11 +300,12 @@ fn get_config() -> Config {
 }
 
 #[tauri::command]
-fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
+fn save_config(app: AppHandle, mut config: Config) -> Result<(), String> {
+    config.always_on_top = true;
     let result = config::save(&config);
     if result.is_ok() {
         clip_apply_config(&config);
-        apply_always_on_top(&app, config.always_on_top);
+        apply_always_on_top(&app);
         apply_capture_policy(&app, config.capture_visible);
     }
     result
@@ -353,6 +356,9 @@ fn set_dock_frame(
     let w = width.max(8);
     let h = height.max(8);
     let (x, y) = dock_xy(&window, &edge, w as i32, h as i32)?;
+    if hidden != Some(true) {
+        *DOCK_HOME_RECT.lock().unwrap() = (x, y, x + w as i32, y + h as i32);
+    }
     // Resize + reposition in ONE SetWindowPos: the old set_size-then-set_position
     // pair painted an intermediate frame (resized but not yet moved), which read
     // as a blink every time a menu/group flyout grew or shrank the window.
@@ -451,16 +457,25 @@ fn open_with(path: String) -> Result<(), String> {
     }
 }
 
-fn apply_always_on_top(app: &AppHandle, value: bool) {
+fn apply_always_on_top(app: &AppHandle) {
     if let Some(dock) = app.get_webview_window("dock") {
-        let _ = dock.set_always_on_top(value);
+        let _ = dock.set_always_on_top(true);
+    }
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.set_always_on_top(true);
     }
 }
 
 #[tauri::command]
-fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
+fn set_always_on_top(app: AppHandle, _value: bool) -> Result<(), String> {
+    let mut cfg = config::load();
+    if !cfg.always_on_top {
+        cfg.always_on_top = true;
+        let _ = config::save(&cfg);
+    }
+    apply_always_on_top(&app);
     if let Some(dock) = app.get_webview_window("dock") {
-        dock.set_always_on_top(value).map_err(|e| e.to_string())
+        dock.set_always_on_top(true).map_err(|e| e.to_string())
     } else {
         Ok(())
     }
@@ -476,8 +491,9 @@ fn app_version(app: AppHandle) -> String {
 fn reset_config(app: AppHandle) -> Result<Config, String> {
     let mut c = Config::default();
     c.pinned = config::load().pinned;
+    c.always_on_top = true;
     config::save(&c)?;
-    apply_always_on_top(&app, c.always_on_top);
+    apply_always_on_top(&app);
     apply_capture_policy(&app, c.capture_visible);
     Ok(c)
 }
@@ -737,8 +753,16 @@ fn reveal_dock(app: AppHandle) {
     if let Some(dock) = app.get_webview_window("dock") {
         // A revealed dock must be immediately clickable — never wait for the
         // cursor watcher's next tick to lift click-through.
+        let cfg = config::load();
+        let _ = dock.set_always_on_top(true);
+        let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         let _ = dock.show();
+        #[cfg(windows)]
+        if let Ok(hwnd) = dock.hwnd() {
+            win::raise_window(hwnd.0 as isize);
+        }
+        let _ = dock.set_focus();
     }
 }
 
@@ -746,6 +770,7 @@ fn reveal_dock(app: AppHandle) {
 /// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
 #[tauri::command]
 fn notch_reveal(app: AppHandle) {
+    reveal_dock(app.clone());
     let _ = app.emit("booki://reveal", ());
 }
 
@@ -757,8 +782,15 @@ fn reveal_running_dock(app: &AppHandle) {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
+        let cfg = config::load();
+        let _ = dock.set_always_on_top(true);
+        let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         let _ = dock.show();
+        #[cfg(windows)]
+        if let Ok(hwnd) = dock.hwnd() {
+            win::raise_window(hwnd.0 as isize);
+        }
         let _ = dock.set_focus();
     }
     let _ = app.emit("booki://reveal", ());
@@ -1775,11 +1807,11 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
 
     let cfg = config::load();
     // The bar's distance to the screen edge is user-tunable (edge_gap = the
-    // VISUAL gap in CSS px). The window itself carries up to 36px of transparent
+    // VISUAL gap in CSS px). The window itself carries a small transparent
     // padding on the anchored side (shrunk in CSS when the gap is small), so the
     // window margin only covers whatever the padding can't.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let margin: i32 = ((cfg.edge_gap.min(96).saturating_sub(36) as f64) * dpr).round() as i32;
+    let margin: i32 = ((cfg.edge_gap.min(96).saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
     // if the notch sits at the top-left, the dock reveals at the left too (not
@@ -1798,6 +1830,12 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
 fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
     let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
+    *DOCK_HOME_RECT.lock().unwrap() = (
+        x,
+        y,
+        x + wsize.width as i32,
+        y + wsize.height as i32,
+    );
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
@@ -2111,7 +2149,7 @@ pub fn run() {
                 // radius and translucency and avoids the native-Mica corner/resize
                 // quirks. So no Mica/DWM rounding is applied to the window here.
                 let _ = position_dock(&dock, &cfg.edge);
-                let _ = dock.set_always_on_top(cfg.always_on_top);
+                let _ = dock.set_always_on_top(true);
                 let _ = dock.show();
                 #[cfg(windows)]
                 if let Ok(h) = dock.hwnd() {
@@ -2170,8 +2208,9 @@ pub fn run() {
                             // smart-hide consumes this signal, so skip the Win32
                             // work entirely in the other modes.
                             if cfg_cache.auto_hide_mode == "smart" {
+                                let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
                                 if let Some(v) =
-                                    debounce(&mut occ, win::foreground_occludes(0, 0, 0, 0, self_hwnd))
+                                    debounce(&mut occ, win::foreground_occludes(dl, dt, dr, db, self_hwnd))
                                 {
                                     let _ = handle.emit("booki://occlusion", v);
                                 }

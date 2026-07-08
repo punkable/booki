@@ -26,8 +26,9 @@ use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_L
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
     GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-    IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON,
-    ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
+    IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GWL_EXSTYLE,
+    GW_OWNER, HICON, HWND_TOPMOST, ICONINFO, SWP_NOMOVE, SWP_NOACTIVATE, SWP_NOSIZE,
+    SW_RESTORE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -531,8 +532,14 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
         // require the window to overlap the dock: it should stay out of the way
         // whenever you're in another window, not only when physically covered. It
         // returns on the desktop, or when the notch is clicked.
-        let _ = (dl, dt, dr, db);
-        true
+        if dr <= dl || db <= dt {
+            return true;
+        }
+        let mut wr = RECT::default();
+        if GetWindowRect(hwnd, &mut wr).is_err() {
+            return false;
+        }
+        wr.left < dr && wr.right > dl && wr.top < db && wr.bottom > dt
     }
 }
 
@@ -640,6 +647,22 @@ pub fn focus_window(hwnd: isize) -> bool {
             let _ = ShowWindow(handle, SW_RESTORE);
         }
         SetForegroundWindow(handle).as_bool()
+    }
+}
+
+/// Put a tool window back at the top of the topmost band without activating it.
+pub fn raise_window(hwnd: isize) {
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let _ = SetWindowPos(
+            handle,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
     }
 }
 
