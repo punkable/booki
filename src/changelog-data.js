@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.10",
+    date: "8 jul 2026",
+    headline: "Menus mas claros y tipografia mas consistente.",
+    sections: [
+      {
+        icon: "\u{1F5B1}\uFE0F",
+        title: "Menus contextuales mas entendibles",
+        notes: [
+          "Acciones, recientes, carpetas, widgets y opciones peligrosas ahora usan iconos y colores con jerarquia clara.",
+          "Los menus de Ajustes y de grupos se alinean mejor y evitan salirse del borde de la ventana.",
+        ],
+      },
+      {
+        icon: "\u{1F524}",
+        title: "Escala tipografica",
+        notes: [
+          "Se normalizan tamanios y pesos en menus, Ajustes, cards de widgets y listas de apps para que la UI se sienta menos fragmentada.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.9",
     date: "8 jul 2026",
     headline: "Smart-hide mas silencioso para apps con ventanas flotantes.",

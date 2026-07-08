@@ -74,7 +74,7 @@ jobs:
 
             Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
 
-            This beta patch focuses on reliability while working in other apps: click-mode smart-hide no longer auto-reveals when floating panels or dialogs briefly uncover the dock area, fullscreen restore keeps a previously hidden dock tucked in the notch, and clicking the notch still brings the dock to the front through Tauri's own window layer.
+            This beta patch focuses on UI clarity: dock and Settings context menus now use clearer iconography, safer danger styling, readable widget labels, better edge clamping, and a tighter typography scale across Settings, widget cards and pinned app rows.
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 
