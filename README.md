@@ -38,6 +38,16 @@
 | 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
 
+## Beta 0.49.11 highlights
+
+- **Dock context menus redesigned:** right-click menus now use a native Windows
+  rhythm with a clear header, grouped actions, quieter icons and separated
+  destructive choices.
+- **Calmer media marquee:** long song/video titles scroll at a stable,
+  distance-aware speed instead of racing when metadata refreshes.
+- **More native typography:** dock, menus, widgets and Settings lean harder on
+  Segoe UI Variable, with Spanish accents/ñ and menu labels cleaned up.
+
 ## Beta 0.49.10 highlights
 
 - **Clearer context menus:** dock and Settings menus use consistent icon wells,

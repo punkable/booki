@@ -3,23 +3,53 @@
 
 export const CHANGELOG = [
   {
-    version: "0.49.10",
+    version: "0.49.11",
     date: "8 jul 2026",
-    headline: "Menus mas claros y tipografia mas consistente.",
+    headline: "Menús del dock más nativos, marquee más calmado y texto español pulido.",
     sections: [
       {
         icon: "\u{1F5B1}\uFE0F",
-        title: "Menus contextuales mas entendibles",
+        title: "Click derecho más claro",
         notes: [
-          "Acciones, recientes, carpetas, widgets y opciones peligrosas ahora usan iconos y colores con jerarquia clara.",
-          "Los menus de Ajustes y de grupos se alinean mejor y evitan salirse del borde de la ventana.",
+          "El menú contextual del dock ahora tiene encabezado, secciones entendibles, iconos discretos y acciones peligrosas separadas.",
+          "Los widgets, separadores, apps, carpetas y perfiles muestran solo acciones que tienen sentido para cada caso.",
+        ],
+      },
+      {
+        icon: "\u{1F3B5}",
+        title: "Media sin marquee acelerado",
+        notes: [
+          "Los títulos largos de música y video usan una velocidad estable según su longitud, sin carreras visuales al refrescarse.",
         ],
       },
       {
         icon: "\u{1F524}",
-        title: "Escala tipografica",
+        title: "Tipografía y español",
         notes: [
-          "Se normalizan tamanios y pesos en menus, Ajustes, cards de widgets y listas de apps para que la UI se sienta menos fragmentada.",
+          "Dock, menús, widgets y Ajustes refuerzan Segoe UI Variable para sentirse más integrados en Windows.",
+          "Corrige textos visibles con ñ, acentos y traducciones faltantes en el menú para los cinco idiomas.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "0.49.10",
+    date: "8 jul 2026",
+    headline: "Menús más claros y tipografía más consistente.",
+    sections: [
+      {
+        icon: "\u{1F5B1}\uFE0F",
+        title: "Menús contextuales más entendibles",
+        notes: [
+          "Acciones, recientes, carpetas, widgets y opciones peligrosas ahora usan iconos y colores con jerarquía clara.",
+          "Los menús de Ajustes y de grupos se alinean mejor y evitan salirse del borde de la ventana.",
+        ],
+      },
+      {
+        icon: "\u{1F524}",
+        title: "Escala tipográfica",
+        notes: [
+          "Se normalizan tamaños y pesos en menús, Ajustes, cards de widgets y listas de apps para que la UI se sienta menos fragmentada.",
         ],
       },
     ],
@@ -27,13 +57,13 @@ export const CHANGELOG = [
   {
     version: "0.49.9",
     date: "8 jul 2026",
-    headline: "Smart-hide mas silencioso para apps con ventanas flotantes.",
+    headline: "Smart-hide más silencioso para apps con ventanas flotantes.",
     sections: [
       {
         icon: "\u{1F3AF}",
         title: "El dock vuelve solo cuando lo pides",
         notes: [
-          "En modo Clic, Booki ya no aparece automaticamente cuando una ventana deja un hueco sobre el area del dock.",
+          "En modo Clic, Booki ya no aparece automáticamente cuando una ventana deja un hueco sobre el área del dock.",
           "Al salir de pantalla completa, si el dock ya estaba escondido, vuelve al notch y espera tu clic.",
         ],
       },
@@ -41,7 +71,7 @@ export const CHANGELOG = [
         icon: "\u{1F9E0}",
         title: "Mejor para Photoshop y apps creativas",
         notes: [
-          "El algoritmo evita confundir paneles flotantes, dialogos o cambios de foco con una intencion de abrir el dock.",
+          "El algoritmo evita confundir paneles flotantes, diálogos o cambios de foco con una intención de abrir el dock.",
         ],
       },
     ],
@@ -49,13 +79,13 @@ export const CHANGELOG = [
   {
     version: "0.49.8",
     date: "8 jul 2026",
-    headline: "Notch mas fiable, dock mas limpio y reveal reforzado.",
+    headline: "Notch más fiable, dock más limpio y reveal reforzado.",
     sections: [
       {
         icon: "\u{1F9ED}",
         title: "El notch siempre trae el dock",
         notes: [
-          "Al pulsar el notch, Booki recoloca el dock, lo relifta con Tauri y lo deja clicable aunque estes usando otra app.",
+          "Al pulsar el notch, Booki recoloca el dock, lo relifta con Tauri y lo deja clicable aunque estés usando otra app.",
           "Smart hide usa el rect real del dock para evitar apariciones raras al cambiar entre ventanas.",
         ],
       },
@@ -64,14 +94,14 @@ export const CHANGELOG = [
         title: "Mica sin sombras grandes",
         notes: [
           "Reduce el stage transparente y elimina sombras exteriores del dock/notch para evitar cortes visuales y zonas invisibles que intercepten clicks.",
-          "La pastilla de actualizacion ahora se posiciona junto al dock en vez de quedar perdida en medio del stage.",
+          "La pastilla de actualización ahora se posiciona junto al dock en vez de quedar perdida en medio del stage.",
         ],
       },
       {
         icon: "\u{2699}\uFE0F",
-        title: "Ajustes mas claros",
+        title: "Ajustes más claros",
         notes: [
-          "Quita de Ajustes la opcion confusa de flotar por encima: Booki lo gestiona internamente para que el notch sea fiable.",
+          "Quita de Ajustes la opción confusa de flotar por encima: Booki lo gestiona internamente para que el notch sea fiable.",
         ],
       },
     ],
@@ -79,30 +109,30 @@ export const CHANGELOG = [
   {
     version: "0.49.6",
     date: "8 jul 2026",
-    headline: "Ajustes con mas jerarquia, dock responsive y controles mas claros.",
+    headline: "Ajustes con más jerarquía, dock responsive y controles más claros.",
     sections: [
       {
         icon: "\u{1FA9F}",
-        title: "Ajustes mas modernos",
+        title: "Ajustes más modernos",
         notes: [
-          "Redisenia Ajustes con secciones mas claras, jerarquia visual y una apariencia alineada con Mica/Windows.",
-          "Temas rapidos, color de acento y Apps ancladas ahora explican mejor que puedes cambiar sin depender de iconos cripticos.",
+          "Rediseña Ajustes con secciones más claras, jerarquía visual y una apariencia alineada con Mica/Windows.",
+          "Temas rápidos, color de acento y Apps ancladas ahora explican mejor qué puedes cambiar sin depender de iconos crípticos.",
         ],
       },
       {
         icon: "\u{1F9ED}",
         title: "Responsive revisado",
         notes: [
-          "Revisa Settings, dock, notch, modales y menus en ventanas estrechas para evitar overflow horizontal y cortes visuales.",
-          "La pastilla de actualizacion se mantiene cerca del dock y dentro del viewport.",
+          "Revisa Settings, dock, notch, modales y menús en ventanas estrechas para evitar overflow horizontal y cortes visuales.",
+          "La pastilla de actualización se mantiene cerca del dock y dentro del viewport.",
         ],
       },
       {
         icon: "\u{2728}",
-        title: "Microinteracciones utiles",
+        title: "Microinteracciones útiles",
         notes: [
-          "Agranda controles de arrastre, cierre y acciones rapidas para que sean mas faciles de usar.",
-          "Pulsa, hover y foco tienen respuestas mas suaves sin recargar la interfaz.",
+          "Agranda controles de arrastre, cierre y acciones rápidas para que sean más fáciles de usar.",
+          "Pulsa, hover y foco tienen respuestas más suaves sin recargar la interfaz.",
         ],
       },
     ],
@@ -110,30 +140,30 @@ export const CHANGELOG = [
   {
     version: "0.49.5",
     date: "7 jul 2026",
-    headline: "Ajustes mas intuitivos, texto limpio y editor de widgets robusto.",
+    headline: "Ajustes más intuitivos, texto limpio y editor de widgets robusto.",
     sections: [
       {
         icon: "\u{1F9F9}",
-        title: "Sin simbolos raros",
+        title: "Sin símbolos raros",
         notes: [
-          "Corrige iconos del changelog que podian aparecer como caracteres rotos en vez de emoji.",
-          "Agrega una comprobacion de texto para detectar mojibake antes de compilar o publicar otra beta.",
+          "Corrige iconos del changelog que podían aparecer como caracteres rotos en vez de emoji.",
+          "Agrega una comprobación de texto para detectar mojibake antes de compilar o publicar otra beta.",
         ],
       },
       {
         icon: "\u{1F6E0}\uFE0F",
-        title: "Ajustes mas comodos",
+        title: "Ajustes más cómodos",
         notes: [
           "El editor de widgets bloquea el scroll de fondo, mantiene su propio scroll interno y ya no se cierra por clicks accidentales fuera.",
-          "La configuracion del portapapeles vive dentro del editor del widget Portapapeles, no como un panel mezclado debajo de toda la galeria.",
+          "La configuración del portapapeles vive dentro del editor del widget Portapapeles, no como un panel mezclado debajo de toda la galería.",
           "Corrige el toggle de flotar por encima para aplicarlo al dock real y explica que el auto-ocultado se controla desde Comportamiento.",
         ],
       },
       {
         icon: "\u{1F9F0}",
-        title: "Limpieza de produccion",
+        title: "Limpieza de producción",
         notes: [
-          "Quita ruido decorativo de consola y deja el dock mas limpio para depurar problemas reales.",
+          "Quita ruido decorativo de consola y deja el dock más limpio para depurar problemas reales.",
           "La build y los workflows ahora revisan el texto visible antes de crear instaladores.",
         ],
       },
@@ -142,7 +172,7 @@ export const CHANGELOG = [
   {
     version: "0.49.4",
     date: "7 jul 2026",
-    headline: "Portapapeles mas claro, widgets ajustables y UI adaptable.",
+    headline: "Portapapeles más claro, widgets ajustables y UI adaptable.",
     sections: [
       {
         icon: "🛡️",
@@ -162,19 +192,19 @@ export const CHANGELOG = [
       },
       {
         icon: "\u{1F9E9}",
-        title: "Galeria de widgets",
+        title: "Galería de widgets",
         notes: [
-          "Ajustes ahora presenta los widgets como un catalogo visual: ves que esta anclado, que hace cada widget y puedes abrir sus ajustes.",
-          "El widget Media estrena una opcion propia para subir o bajar el volumen con la rueda del mouse solo cuando el cursor esta encima.",
-          "Los widgets dentro de grupos tambien pueden abrir su editor desde Ajustes.",
+          "Ajustes ahora presenta los widgets como un catálogo visual: ves qué está anclado, qué hace cada widget y puedes abrir sus ajustes.",
+          "El widget Media estrena una opción propia para subir o bajar el volumen con la rueda del mouse solo cuando el cursor está encima.",
+          "Los widgets dentro de grupos también pueden abrir su editor desde Ajustes.",
         ],
       },
       {
         icon: "\u{1FA9F}",
-        title: "Responsive y mas suave",
+        title: "Responsive y más suave",
         notes: [
-          "Ajustes se adapta mejor a ventanas estrechas con navegacion horizontal y controles que no se salen del contenedor.",
-          "Los flyouts del dock limitan su alto y ancho al viewport, y el portapapeles evita renders viejos cuando buscas rapido.",
+          "Ajustes se adapta mejor a ventanas estrechas con navegación horizontal y controles que no se salen del contenedor.",
+          "Los flyouts del dock limitan su alto y ancho al viewport, y el portapapeles evita renders viejos cuando buscas rápido.",
         ],
       },
     ],
