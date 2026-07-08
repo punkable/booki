@@ -784,8 +784,17 @@ function setMediaText(el, artist, title) {
   if (v.scrollWidth > v.clientWidth + 2) {
     const safe = esc(title);
     v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
+    const mq = v.querySelector(".mq");
+    const distance = mq ? mq.scrollWidth / 2 : v.scrollWidth;
+    v.style.setProperty("--mq-duration", `${marqueeDuration(distance).toFixed(2)}s`);
     v.classList.add("scroll");
   }
+}
+
+function marqueeDuration(distance) {
+  // Slow, distance-aware marquee. The old media fallback used 9s for every
+  // title, which made long tracks rush across the card.
+  return Math.max(18, Math.min(48, distance / 14));
 }
 
 function setMarqueeText(el, text, keyName, force = false) {
@@ -800,7 +809,7 @@ function setMarqueeText(el, text, keyName, force = false) {
   el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
   const mq = el.querySelector(".mq");
   const distance = mq ? mq.scrollWidth / 2 : el.scrollWidth;
-  const duration = Math.max(8, Math.min(28, distance / 28));
+  const duration = marqueeDuration(distance);
   el.style.setProperty("--mq-duration", `${duration.toFixed(2)}s`);
   el.classList.add("scroll");
 }
@@ -2065,6 +2074,38 @@ window.addEventListener("pointerdown", (e) => {
 
 // ───────────────────────── Context menu ─────────────────────────
 
+function menuPinTitle(item) {
+  if (!item) return "Booki";
+  if (item.kind === "separator") return t("m.separator");
+  if (item.kind === "trash") return t("trash.name");
+  if (item.kind === "widget") return widgetLabel(item.widget);
+  return item.name || baseName(item.path || "") || t("m.pin");
+}
+
+function menuKindLabel(item) {
+  if (!item) return t("m.system");
+  if (item.kind === "widget") return t("m.widgets");
+  if (item.kind === "folder") return t("m.folder");
+  if (item.kind === "group") return t("m.group");
+  if (item.kind === "separator") return t("m.separator");
+  if (item.kind === "trash") return t("trash.name");
+  return t("m.app");
+}
+
+function addMenuHead(title, subtitle) {
+  const head = document.createElement("div");
+  head.className = "menu-head";
+  head.innerHTML = `<strong>${esc(title)}</strong><span>${esc(subtitle || "")}</span>`;
+  ctxMenu.appendChild(head);
+}
+
+function addMenuLabel(text) {
+  const label = document.createElement("div");
+  label.className = "menu-label";
+  label.textContent = text;
+  ctxMenu.appendChild(label);
+}
+
 function openMenu(e, item) {
   e.preventDefault();
   e.stopPropagation();
@@ -2084,10 +2125,14 @@ function openMenu(e, item) {
     s.className = "sep";
     ctxMenu.appendChild(s);
   };
+  addMenuHead(menuPinTitle(item), menuKindLabel(item));
 
   // The menu adapts to what you clicked: widgets have nothing to "open",
   // folders get a straight jump to Explorer, only apps get recents.
+  let hasPrimaryActions = false;
   if (item.kind !== "separator" && item.kind !== "widget") {
+    addMenuLabel(t("m.actions"));
+    hasPrimaryActions = true;
     const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
     add(openIcon, t("m.open"), () => {
       if (item.kind === "folder" || item.kind === "group") {
@@ -2104,10 +2149,10 @@ function openMenu(e, item) {
     // Recents (a lightweight jump list of files opened with this app via Booki).
     if (item.kind === "app" && (item.recents || []).length) {
       sep();
+      addMenuLabel(t("m.recent"));
       item.recents.slice(0, 6).forEach((rp) =>
-        add("app", baseName(rp), () => dockApi.launch(item.path, [rp]))
+        add("external", baseName(rp), () => dockApi.launch(item.path, [rp]))
       );
-      sep();
     }
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card) — so don't offer it for those.
@@ -2117,7 +2162,6 @@ function openMenu(e, item) {
     }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
     if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
-    sep();
   }
   // Slot for the system's recent files (filled asynchronously for app pins so
   // opening the menu stays instant).
@@ -2127,11 +2171,14 @@ function openMenu(e, item) {
     recentsSlot.className = "ctx-recents";
     ctxMenu.appendChild(recentsSlot);
   }
+  if (hasPrimaryActions) sep();
+  addMenuLabel(t("m.add"));
   add("plus", t("m.addApp"), onAddApp);
-  add("app", t("m.addFolder"), onAddFolder);
+  add("folder-plus", t("m.addFolder"), onAddFolder);
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
-  add("trash", t("m.remove"), () => removeItem(item.id));
   sep();
+  add("trash", t("m.remove"), () => removeItem(item.id), "danger");
+  addMenuLabel(t("m.system"));
   add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
@@ -2189,19 +2236,18 @@ async function openBackgroundMenu(e) {
     s.className = "sep";
     ctxMenu.appendChild(s);
   };
+  addMenuHead("Booki", t("m.dockMenu"));
+  addMenuLabel(t("m.add"));
   add("plus", t("m.addApp"), onAddApp);
   add("folder-plus", t("m.addFolder"), onAddFolder);
-  sep();
   // Widgets as a compact chip grid (emoji + tooltip) — ten text rows would
   // make the menu taller than the screen's worth of attention.
   // Only offer widgets you don't already have — no point adding a second CPU
   // meter or clock. When they're all added, the whole section disappears.
   const availableWidgets = WIDGETS.filter((type) => !widgetPresent(type));
   if (availableWidgets.length) {
-    const gridLabel = document.createElement("div");
-    gridLabel.className = "menu-label";
-    gridLabel.textContent = t("m.widgets");
-    ctxMenu.appendChild(gridLabel);
+    sep();
+    addMenuLabel(t("m.widgets"));
     const grid = document.createElement("div");
     grid.className = "menu-grid";
     for (const type of availableWidgets) {
@@ -2222,9 +2268,10 @@ async function openBackgroundMenu(e) {
   const profiles = await dockApi.profileList().catch(() => []);
   if (Array.isArray(profiles) && profiles.length) {
     sep();
+    addMenuLabel(t("m.profiles"));
     for (const name of profiles.slice(0, 6)) {
       const active = name === (cfg.lastProfile || "");
-      add(active ? "check" : "sparkles", `${t("m.profile")}: ${name}`, async () => {
+      add(active ? "check" : "sparkles", name, async () => {
         const fresh = await dockApi.profileApply(name).catch(() => null);
         if (fresh) {
           cfg = fresh;
@@ -2236,6 +2283,7 @@ async function openBackgroundMenu(e) {
     }
   }
   sep();
+  addMenuLabel(t("m.system"));
   add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
