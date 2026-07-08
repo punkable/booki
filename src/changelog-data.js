@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.6",
+    date: "8 jul 2026",
+    headline: "Ajustes con mas jerarquia, dock responsive y controles mas claros.",
+    sections: [
+      {
+        icon: "\u{1FA9F}",
+        title: "Ajustes mas modernos",
+        notes: [
+          "Redisenia Ajustes con secciones mas claras, jerarquia visual y una apariencia alineada con Mica/Windows.",
+          "Temas rapidos, color de acento y Apps ancladas ahora explican mejor que puedes cambiar sin depender de iconos cripticos.",
+        ],
+      },
+      {
+        icon: "\u{1F9ED}",
+        title: "Responsive revisado",
+        notes: [
+          "Revisa Settings, dock, notch, modales y menus en ventanas estrechas para evitar overflow horizontal y cortes visuales.",
+          "La pastilla de actualizacion se mantiene cerca del dock y dentro del viewport.",
+        ],
+      },
+      {
+        icon: "\u{2728}",
+        title: "Microinteracciones utiles",
+        notes: [
+          "Agranda controles de arrastre, cierre y acciones rapidas para que sean mas faciles de usar.",
+          "Pulsa, hover y foco tienen respuestas mas suaves sin recargar la interfaz.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.5",
     date: "7 jul 2026",
     headline: "Ajustes mas intuitivos, texto limpio y editor de widgets robusto.",
