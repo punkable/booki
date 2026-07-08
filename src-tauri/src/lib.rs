@@ -751,19 +751,20 @@ fn reveal_dock(app: AppHandle) {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
-        // A revealed dock must be immediately clickable — never wait for the
-        // cursor watcher's next tick to lift click-through.
+        // A revealed dock must be immediately clickable and visible above the
+        // active app; never wait for the cursor watcher's next tick.
         let cfg = config::load();
-        let _ = dock.set_always_on_top(true);
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
-        let _ = dock.show();
-        #[cfg(windows)]
-        if let Ok(hwnd) = dock.hwnd() {
-            win::raise_window(hwnd.0 as isize);
-        }
-        let _ = dock.set_focus();
+        lift_dock_window(&dock);
     }
+}
+
+fn lift_dock_window(dock: &tauri::WebviewWindow) {
+    let _ = dock.set_always_on_top(false);
+    let _ = dock.set_always_on_top(true);
+    let _ = dock.show();
+    let _ = dock.set_focus();
 }
 
 /// Fired by the notch window when the user clicks it: just signal the dock to
@@ -783,15 +784,9 @@ fn reveal_running_dock(app: &AppHandle) {
     }
     if let Some(dock) = app.get_webview_window("dock") {
         let cfg = config::load();
-        let _ = dock.set_always_on_top(true);
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
-        let _ = dock.show();
-        #[cfg(windows)]
-        if let Ok(hwnd) = dock.hwnd() {
-            win::raise_window(hwnd.0 as isize);
-        }
-        let _ = dock.set_focus();
+        lift_dock_window(&dock);
     }
     let _ = app.emit("booki://reveal", ());
 }

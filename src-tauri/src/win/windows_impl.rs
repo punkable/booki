@@ -27,8 +27,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
     GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
     IsIconic, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GWL_EXSTYLE,
-    GW_OWNER, HICON, HWND_TOPMOST, ICONINFO, SWP_NOMOVE, SWP_NOACTIVATE, SWP_NOSIZE,
-    SW_RESTORE, WS_EX_TOOLWINDOW,
+    GW_OWNER, HICON, ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -647,22 +646,6 @@ pub fn focus_window(hwnd: isize) -> bool {
             let _ = ShowWindow(handle, SW_RESTORE);
         }
         SetForegroundWindow(handle).as_bool()
-    }
-}
-
-/// Put a tool window back at the top of the topmost band without activating it.
-pub fn raise_window(hwnd: isize) {
-    let handle = HWND(hwnd as *mut c_void);
-    unsafe {
-        let _ = SetWindowPos(
-            handle,
-            Some(HWND_TOPMOST),
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        );
     }
 }
 
