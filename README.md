@@ -38,10 +38,11 @@
 | 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
 
-## Beta 0.49.7 highlights
+## Beta 0.49.8 highlights
 
 - **Notch reveal fixed:** clicking the notch now brings the dock to the front
-  reliably instead of letting it appear behind the active app.
+  reliably, using the same Tauri window APIs across the app instead of a brittle
+  extra native raise call.
 - **Cleaner Mica dock:** outer shadows were removed from the dock/notch so the
   surface feels calmer and no longer needs a wide transparent click area.
 - **Update pill placement:** the update badge stays next to the dock instead of

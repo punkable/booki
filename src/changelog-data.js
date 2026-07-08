@@ -3,15 +3,15 @@
 
 export const CHANGELOG = [
   {
-    version: "0.49.7",
+    version: "0.49.8",
     date: "8 jul 2026",
-    headline: "Notch mas fiable, dock mas limpio y menos area invisible.",
+    headline: "Notch mas fiable, dock mas limpio y reveal reforzado.",
     sections: [
       {
         icon: "\u{1F9ED}",
         title: "El notch siempre trae el dock",
         notes: [
-          "Al pulsar el notch, Booki recoloca el dock, lo sube al frente y lo deja clicable aunque estes usando otra app.",
+          "Al pulsar el notch, Booki recoloca el dock, lo relifta con Tauri y lo deja clicable aunque estes usando otra app.",
           "Smart hide usa el rect real del dock para evitar apariciones raras al cambiar entre ventanas.",
         ],
       },
