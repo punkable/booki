@@ -38,6 +38,14 @@
 | 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
 
+## Beta 0.49.9 highlights
+
+- **Quiet smart-hide for creative apps:** in click mode, Booki no longer
+  auto-reveals just because a floating panel or dialog briefly uncovers the
+  dock area.
+- **Fullscreen restore is calmer:** if the dock was hidden before fullscreen,
+  it returns to the notch after fullscreen and waits for your click.
+
 ## Beta 0.49.8 highlights
 
 - **Notch reveal fixed:** clicking the notch now brings the dock to the front

@@ -3,6 +3,28 @@
 
 export const CHANGELOG = [
   {
+    version: "0.49.9",
+    date: "8 jul 2026",
+    headline: "Smart-hide mas silencioso para apps con ventanas flotantes.",
+    sections: [
+      {
+        icon: "\u{1F3AF}",
+        title: "El dock vuelve solo cuando lo pides",
+        notes: [
+          "En modo Clic, Booki ya no aparece automaticamente cuando una ventana deja un hueco sobre el area del dock.",
+          "Al salir de pantalla completa, si el dock ya estaba escondido, vuelve al notch y espera tu clic.",
+        ],
+      },
+      {
+        icon: "\u{1F9E0}",
+        title: "Mejor para Photoshop y apps creativas",
+        notes: [
+          "El algoritmo evita confundir paneles flotantes, dialogos o cambios de foco con una intencion de abrir el dock.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.8",
     date: "8 jul 2026",
     headline: "Notch mas fiable, dock mas limpio y reveal reforzado.",

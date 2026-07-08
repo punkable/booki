@@ -2484,6 +2484,7 @@ let draggingFile = false; // an OS file drag is over the dock → keep it open
 let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
 let occRevealTimer = null; // debounce for the smart-mode auto-reveal
+let hiddenBeforeFullscreen = false;
 const SMART_REVEAL_DELAY = 1100;
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
@@ -2492,6 +2493,7 @@ function onFullscreenSignal(value) {
   fullscreen = value;
   clearTimeout(blackoutTimer);
   if (value) {
+    hiddenBeforeFullscreen = hiddenState;
     pinnedReveal = false;
     manualReveal = false;
     hiddenState = true;
@@ -2504,8 +2506,16 @@ function onFullscreenSignal(value) {
   } else {
     // Back to normal: re-evaluate smart-hide and show the right window.
     document.body.classList.remove("tucked");
-    hiddenState = false;
-    setupAutoHide();
+    if (hiddenBeforeFullscreen && hideMode() === "smart" && (cfg.notchTrigger || "click") === "click") {
+      hiddenState = true;
+      stopPolls();
+      document.body.classList.add("tucked");
+      dockApi.hideDock(cfg.edge);
+    } else {
+      hiddenState = false;
+      setupAutoHide();
+    }
+    hiddenBeforeFullscreen = false;
   }
 }
 
@@ -2757,6 +2767,10 @@ function onOcclusionSignal(value) {
   if (manualHide) return; // stay hidden until the user asks for the dock again
   if (hideMode() !== "smart") return;
   if (!value) {
+    if ((cfg.notchTrigger || "click") === "click") {
+      clearTimeout(occRevealTimer);
+      return;
+    }
     // Back on the desktop → bring the dock out automatically, but only after
     // the desktop has stayed clear for a beat. Switching/moving windows opens
     // transient gaps over the dock's spot, and revealing on those made the dock

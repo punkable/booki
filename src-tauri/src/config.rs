@@ -61,8 +61,8 @@ fn default_zoom() -> f32 {
 }
 fn default_auto_hide_mode() -> String {
     // Smart by default: visible on the desktop, slides to the notch when a window
-    // covers the dock area, and reappears when the desktop is clear. Measured
-    // against a stable home rect so it can't flap.
+    // covers the dock area, and returns by explicit notch click unless the user
+    // opts into hover/edge reveal. Measured against a stable home rect.
     "smart".into()
 }
 fn default_monitor() -> i32 {
