@@ -38,20 +38,18 @@
 | 🔒 **Private by design** | No accounts, no telemetry, no cloud sync. Your setup stays local in `%APPDATA%\Booki`, with clipboard memory opt-in and local-only controls. |
 | 🪶 **Small and native** | Tauri 2 + Rust on the system WebView2 runtime: a small installer and timers that pause when the dock is hidden. |
 
-## Beta 0.49.5 highlights
+## Beta 0.49.6 highlights
 
-- **Clean text pass**: fixes broken changelog icons that could show mojibake
-  symbols instead of emoji.
-- **Encoding guard**: local and CI builds now check visible text for common
-  UTF-8/Latin-1 corruption before publishing another beta.
-- **Widget editor polish**: widget settings now open in a sturdier dialog with
-  its own scroll, stable widget targeting and fewer accidental exits.
-- **Clipboard settings where they belong**: memory, privacy, retention and clear
-  history now live inside the Clipboard widget editor.
-- **Always-on-top fix**: the setting now targets the actual dock window and its
-  label explains how it differs from auto-hide.
-- **Production cleanup**: removes decorative console noise so real diagnostics
-  are easier to spot.
+- **Settings visual overhaul**: clearer hierarchy, calmer Mica-style surfaces,
+  stronger sections and fewer generic AI-looking panels.
+- **Quick themes with more intent**: accent colors and presets now have richer
+  previews so the choice reads visually before you click.
+- **Pinned apps are easier to scan**: list/grid controls, action buttons and
+  folder rows are more legible in narrow Settings windows.
+- **Dock and popups reviewed responsively**: menus, flyouts, modals, notch and
+  the update pill stay inside the viewport on compact sizes.
+- **Better interaction targets**: drag handles, close buttons and quick actions
+  are larger, keyboard-labeled and respond with subtle motion.
 
 ## Beta 0.49.4 highlights
 
