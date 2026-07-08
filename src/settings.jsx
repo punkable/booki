@@ -1921,7 +1921,7 @@ function Apps({ cfg, set }) {
           const rows = [
             <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
               <span className="pin-left">
-                <button className="pin-handle" title={t("apps.drag")}
+                <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
                   onPointerDown={startDrag(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                 {isGroup && (
                   <IconBtn name={open ? "chevron-down" : "chevron-right"} title={t("apps.editFolder")}
@@ -1967,7 +1967,7 @@ function Apps({ cfg, set }) {
               rows.push(
                 <li key={item.id + ":" + c.id} className="pin-item pin-child pin-child-item" data-folder={i}>
                   <span className="pin-left">
-                    <button className="pin-handle" title={t("apps.drag")}
+                    <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
                       onPointerDown={startDragChild(i, ci)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                     <PinThumb item={c} />
                     <input
@@ -2638,7 +2638,7 @@ function App() {
             <button className="s-btn s-btn-sm" onClick={() => { setTab("apps"); dismissIntro(); }}>
               {t("intro.cta")}
             </button>
-            <button className="s-intro-x" title={t("intro.dismiss")} onClick={dismissIntro}
+            <button className="s-intro-x" title={t("intro.dismiss")} aria-label={t("intro.dismiss")} onClick={dismissIntro}
               dangerouslySetInnerHTML={{ __html: icon("x") }} />
           </div>
         )}
