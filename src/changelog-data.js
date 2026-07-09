@@ -3,6 +3,49 @@
 
 export const CHANGELOG = [
   {
+    version: "0.50.0",
+    date: "9 jul 2026",
+    headline: "Gran pulido de diseño: movimiento más fluido, más accesibilidad y detalles al estilo Apple.",
+    sections: [
+      {
+        icon: "\u{2728}",
+        title: "Movimiento más fluido",
+        notes: [
+          "El dock oculto ahora aparece al instante y desacelera al llegar, en vez de arrancar lento.",
+          "Menús, toasts y paneles entran con una curva limpia; el rebote queda solo para momentos físicos como soltar archivos en la papelera.",
+          "El texto largo de widgets hace una pausa legible en cada vuelta del marquee, y las barras de progreso avanzan de forma constante.",
+        ],
+      },
+      {
+        icon: "\u{267F}",
+        title: "Accesibilidad",
+        notes: [
+          "Si Windows pide reducir transparencia, todas las superficies de vidrio se vuelven sólidas; con contraste alto, ganan bordes definidos.",
+          "Con movimiento reducido, los textos largos se recortan con puntos suspensivos en vez de quedar cortados.",
+          "Los diálogos de Ajustes atrapan el foco del teclado: Tab ya no se escapa detrás de la ventana.",
+        ],
+      },
+      {
+        icon: "\u{1F9ED}",
+        title: "Más intuitivo",
+        notes: [
+          "El menú contextual crece desde el punto donde hiciste clic, y las confirmaciones del dock se anclan a la barra sin salirse de la pantalla.",
+          "Borrar un perfil guardado ahora pide un segundo clic de confirmación.",
+          "Los toasts y burbujas se despiden por el mismo camino por el que entraron.",
+        ],
+      },
+      {
+        icon: "\u{1F3A8}",
+        title: "Detalles visuales",
+        notes: [
+          "Un solo rojo para acciones peligrosas, contadores más legibles sobre el acento y texto secundario con mejor contraste sobre el vidrio.",
+          "Los títulos de Ajustes usan tracking tipográfico apropiado y la escala de texto respeta el tamaño configurado en tu sistema.",
+          "El pill del notch respira menos: crece suave al pasar el mouse sin parpadeos ni saltos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.49.11",
     date: "8 jul 2026",
     headline: "Menús del dock más nativos, marquee más calmado y texto español pulido.",
