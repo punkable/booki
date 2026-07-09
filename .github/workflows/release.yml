@@ -74,7 +74,12 @@ jobs:
 
             Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
 
-            This beta patch focuses on UI clarity: dock and Settings context menus now use clearer iconography, safer danger styling, readable widget labels, better edge clamping, and a tighter typography scale across Settings, widget cards and pinned app rows.
+            **This is a big beta update** — a full design pass over the whole app, guided by Apple's fluid-interface principles:
+
+            - ✨ **Fluid motion** — the hidden dock now snaps out instantly and decelerates into place; menus, toasts and panels use clean easing (bounce is reserved for physical moments like feeding the trash); widget marquees pause readably on every loop.
+            - ♿ **Accessibility** — Windows' reduced-transparency and high-contrast settings are now respected on every glass surface, reduced motion gets proper ellipsized text, and Settings dialogs keep keyboard focus trapped where it belongs.
+            - 🧭 **More intuitive** — context menus grow from the exact point you clicked, dock confirmations anchor to the bar and never leave the screen, deleting a saved profile asks for a confirming second click, and popups exit the way they entered.
+            - 🎨 **Visual polish** — one consistent danger red, higher-contrast badges and secondary text over glass, size-aware heading tracking, a text scale that follows your system text size, and a calmer notch pill with compositor-smooth hover.
 
             Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
 
