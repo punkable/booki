@@ -3126,6 +3126,14 @@ function placePop(pop) {
       pop.style.visibility = "";
     });
   }, 70);
+  // The coach swaps its content per step WITHOUT re-calling placePop; since the
+  // popover is now hard-positioned (no translate centering), re-run put() on
+  // any size change so every step stays centered on the bar and in-viewport.
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(() => {
+      if (pop.isConnected) put();
+    }).observe(pop);
+  }
 }
 
 function confirmTrash(paths, emptyBin = false) {
