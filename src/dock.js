@@ -757,7 +757,7 @@ function setMetric(el, label, val, title) {
     tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
     const bar = el.querySelector(".w-bar");
     bar.style.display = "";
-    bar.querySelector("i").style.width = `${pct}%`;
+    bar.querySelector("i").style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
   }
   if (title) el.title = title;
 }
@@ -1387,9 +1387,10 @@ async function maybeOnboard() {
       if (i < steps.length) {
         showStep();
       } else {
-        pop.remove();
-        document.body.classList.remove("pop-open");
-        reframe();
+        dismissPop(pop, () => {
+          document.body.classList.remove("pop-open");
+          reframe();
+        });
         cfg.onboarded = true;
         await persist();
         pinnedReveal = false;
@@ -2330,6 +2331,11 @@ function placeMenu(e) {
       top = Math.min(Math.max(pad, top), window.innerHeight - mh - pad);
       ctxMenu.style.top = `${top}px`;
     }
+    // Scale the menu out from the point that opened it (the cursor/tile), not
+    // its own center — keeps the spatial link between trigger and content.
+    const r = ctxMenu.getBoundingClientRect();
+    ctxMenu.style.transformOrigin =
+      `${Math.min(Math.max(0, cx - r.left), r.width)}px ${Math.min(Math.max(0, cy - r.top), r.height)}px`;
   };
   put();
   // The window resizes asynchronously after applyFrame(); reposition again the
@@ -3080,11 +3086,32 @@ dockEl.addEventListener("pointerdown", hideTip, true);
 // Files go to the Recycle Bin (undoable), never a permanent delete.
 
 let trashPop = null;
+// Dismiss a popover along the same path it entered (fade + slight drop), then
+// run `done`. Under reduced motion the removal is immediate.
+function dismissPop(pop, done) {
+  const finish = () => {
+    pop.remove();
+    if (done) done();
+  };
+  if (!pop || !pop.isConnected) {
+    if (pop) pop.remove();
+    if (done) done();
+    return;
+  }
+  if (REDUCE_MOTION) return finish();
+  pop.classList.add("closing");
+  setTimeout(finish, 180);
+}
 function closeTrashPop() {
-  if (trashPop) trashPop.remove();
+  const pop = trashPop;
   trashPop = null;
-  document.body.classList.remove("pop-open");
-  reframe();
+  dismissPop(pop, () => {
+    // Shrink the window only after the exit finishes, or it would clip it.
+    if (!trashPop) {
+      document.body.classList.remove("pop-open");
+      reframe();
+    }
+  });
 }
 
 // Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never

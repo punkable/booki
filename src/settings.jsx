@@ -449,6 +449,15 @@ function PositionPicker({ cfg, set }) {
 function ProfilesCard({ cfg, set }) {
   const [profiles, setProfiles] = useState([]);
   const [name, setName] = useState("");
+  // Deleting a saved snapshot is irreversible: arm on first click (auto-disarms)
+  // and only delete on an explicit second click — same forgiveness model as
+  // "clear all pins" and factory reset.
+  const [delArm, setDelArm] = useState("");
+  useEffect(() => {
+    if (!delArm) return;
+    const id = setTimeout(() => setDelArm(""), 3500);
+    return () => clearTimeout(id);
+  }, [delArm]);
   const refresh = () => dockApi.profileList().then((p) => setProfiles(p || []));
   useEffect(() => {
     refresh();
@@ -472,14 +481,16 @@ function ProfilesCard({ cfg, set }) {
             {t("prof.apply")}
           </button>
           <button
-            className="s-btn s-btn-soft"
-            title={t("apps.remove")}
+            className={"s-btn " + (delArm === n ? "s-btn-danger" : "s-btn-soft")}
+            title={delArm === n ? t("prof.deleteConfirm") : t("apps.remove")}
             onClick={async () => {
+              if (delArm !== n) return setDelArm(n);
+              setDelArm("");
               await dockApi.profileDelete(n).catch(() => {});
               refresh();
             }}
           >
-            ×
+            {delArm === n ? t("prof.deleteConfirm") : "×"}
           </button>
         </div>
       ))}
@@ -2352,12 +2363,12 @@ function UpdatesCard({ onWhatsNew }) {
       ) : status === "downloading" ? (
         <div className="upd-row">
           <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
-          <div className="upd-bar"><i style={{ width: `${Math.round(pct * 100)}%` }} /></div>
+          <div className="upd-bar"><i style={{ transform: `scaleX(${pct.toFixed(3)})` }} /></div>
         </div>
       ) : status === "installing" ? (
         <div className="upd-row">
           <span><img className="emo" src={emoSrc("sparkles")} alt="" width="16" height="16" /> <strong>{t("ab.installing")}</strong></span>
-          <div className="upd-bar"><i style={{ width: "100%" }} /></div>
+          <div className="upd-bar"><i style={{ transform: "scaleX(1)" }} /></div>
         </div>
       ) : (
         <div className="upd-row">
