@@ -77,11 +77,12 @@ input:focus-visible,
 
   --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
     system-ui, -apple-system, sans-serif;
-  --text-xs: 11px;
-  --text-sm: 12px;
-  --text-md: 13px;
-  --text-lg: 14px;
-  --text-xl: 16px;
+  /* rem so the ladder tracks the user's text-size setting (Dynamic Type). */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-md: 0.8125rem;
+  --text-lg: 0.875rem;
+  --text-xl: 1rem;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
@@ -213,7 +214,7 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
      Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
      gets clipped by the window's transparent margin. */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transition: transform 0.34s var(--ease), opacity 0.3s ease, background 0.18s ease;
+  transition: transform 0.24s var(--ease), opacity 0.24s ease, background 0.18s ease;
 }
 body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
 body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
@@ -268,7 +269,9 @@ body.compact .w-card { padding: 4px 8px; gap: 6px; }
    the notch sits along its edge, and the genie-* class (set in dock.js) at the
    EDGE the notch lives on — which may differ from the dock's own edge. */
 body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
-body.autohide .dock { transition: transform 0.34s cubic-bezier(0.5, 0, 0.9, 0.4), opacity 0.3s ease, filter 0.3s ease; }
+/* Reveal is ease-out and quick: the dock appears instantly and decelerates
+   into place — it shows dozens of times a day, so it must never crawl. */
+body.autohide .dock { transition: transform 0.22s var(--ease), opacity 0.22s ease, filter 0.22s ease; }
 body.autohide.tucked.genie-bottom .dock {
   transform-origin: var(--genie-ox, 50%) 100%;
   transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
@@ -297,7 +300,7 @@ body.edge-swap .dock {
   transition: none !important;
 }
 body:not(.edge-swap):not(.tucked) .dock {
-  transition: transform 0.32s var(--ease-bounce), opacity 0.22s ease;
+  transition: transform 0.24s var(--ease), opacity 0.22s ease;
 }
 @media (prefers-reduced-motion: reduce) {
   body.edge-swap .dock { transform: none; }
@@ -321,7 +324,7 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
   border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: 16px;
   background: color-mix(in srgb, var(--accent) 6%, transparent);
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--ease-bounce);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--ease);
 }
 .edge-zone-top    { top: 8px;  left: 12%; right: 12%; height: 74px; }
 .edge-zone-bottom { bottom: 8px; left: 12%; right: 12%; height: 74px; }
@@ -330,7 +333,7 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
 .edge-zone-dot {
   width: 12px; height: 12px; border-radius: 50%;
   background: color-mix(in srgb, var(--accent) 60%, transparent);
-  transition: transform 0.18s var(--ease-bounce), background 0.18s ease;
+  transition: transform 0.18s var(--ease), background 0.18s ease;
 }
 .edge-zone.active {
   background: color-mix(in srgb, var(--accent) 20%, transparent);
@@ -344,8 +347,8 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
   background: color-mix(in srgb, var(--accent) 26%, transparent);
   border: 1.5px solid var(--accent);
   box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 40%, transparent);
-  transition: top 0.22s var(--ease-bounce), left 0.22s var(--ease-bounce),
-              width 0.22s var(--ease-bounce), height 0.22s var(--ease-bounce);
+  transition: top 0.22s var(--ease), left 0.22s var(--ease),
+              width 0.22s var(--ease), height 0.22s var(--ease);
 }
 @media (prefers-reduced-motion: reduce) {
   #edge-overlay { animation: none; }
@@ -522,10 +525,11 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
 .s-link {
   font: inherit; font-size: var(--text-md); cursor: pointer; color: var(--ink);
   background: var(--layer); border: 1px solid var(--stroke);
-  border-radius: var(--r-pill); padding: 6px 13px; transition: all 0.14s ease;
+  border-radius: var(--r-pill); padding: 6px 13px;
+  transition: background 0.14s var(--ease), transform 0.14s var(--ease);
 }
 .s-link:hover { background: var(--hover); transform: translateY(-1px); }
-.s-about-logo { cursor: pointer; transition: transform 0.3s var(--ease-bounce); }
+.s-about-logo { cursor: pointer; transition: transform 0.3s var(--ease); }
 .s-about-logo.spin { animation: capy-spin 0.9s var(--ease-bounce); }
 @keyframes capy-spin { to { transform: rotate(360deg) scale(1.1); } }
 .s-egg { margin-top: 12px; font-weight: 600; color: var(--accent); }
@@ -625,14 +629,22 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
   /* Brighter than plain secondary ink so the tiny uppercase label stays legible
      on the translucent glass card — especially in dark mode. */
-  text-transform: uppercase; color: color-mix(in srgb, var(--ink) 52%, var(--ink-2));
+  text-transform: uppercase; color: color-mix(in srgb, var(--ink) 64%, var(--ink-2));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .w-value { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.w-sub { font-size: 9px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-sub {
+  font-size: 9px; font-weight: 600;
+  /* Over translucent glass, flat secondary gray washes out — mix toward ink. */
+  color: color-mix(in srgb, var(--ink) 68%, var(--ink-2));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .w-bar { display: block; height: 4px; margin-top: 3px; border-radius: 999px; background: var(--track); overflow: hidden; }
-.w-bar > i { display: block; height: 100%; width: 0%; border-radius: inherit;
-  background: linear-gradient(90deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, black)); transition: width 0.4s var(--ease); }
+.w-bar > i { display: block; height: 100%; width: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, black));
+  /* Progress fills animate transform (compositor-only) with linear timing —
+     constant motion should not decelerate, and width would re-layout. */
+  transform: scaleX(0); transform-origin: left; transition: transform 0.4s linear; }
 
 /* Preview card (notes, clipboard, …) — a colored icon square + bold title +
    a live one-line preview of the real content, closer to a Windows
@@ -732,7 +744,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .tile.drag-clone.poof {
   opacity: 0;
   transform: scale(0.1) rotate(10deg);
-  transition: transform 0.26s ease-in, opacity 0.26s ease-in;
+  transition: transform 0.26s var(--ease), opacity 0.26s var(--ease);
 }
 /* Insertion gap while a file from Explorer hovers BETWEEN tiles: the tile at
    the insertion point slides aside so you SEE exactly where the pin will land
@@ -756,7 +768,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 }
 .stack-drag-clone .stack-rm, .stack-drag-clone .stack-name { display: none; }
 .stack-drag-clone.will-unpin { opacity: 0.55; transform: scale(0.82) rotate(-4deg); }
-.stack-drag-clone.poof { opacity: 0; transform: scale(0.1) rotate(10deg); transition: transform 0.26s ease-in, opacity 0.26s ease-in; }
+.stack-drag-clone.poof { opacity: 0; transform: scale(0.1) rotate(10deg); transition: transform 0.26s var(--ease), opacity 0.26s var(--ease); }
 .stack-item.dragging { opacity: 0.3; }
 .tile.dragging.unpin-slot { opacity: 0.12; }
 
@@ -831,7 +843,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   color: var(--ink);
   font: 600 12.5px var(--font);
   white-space: nowrap;
-  animation: notch-toast-in 0.2s var(--ease-bounce);
+  animation: notch-toast-in 0.2s var(--ease);
 }
 .trash-pop > svg { flex: 0 0 auto; color: var(--danger); }
 .tp-emoji { font-size: 18px; }
@@ -874,7 +886,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   backdrop-filter: blur(24px) saturate(160%);
   color: var(--ink);
   font: 500 12.5px var(--font);
-  animation: notch-toast-in 0.24s var(--ease-bounce);
+  animation: notch-toast-in 0.24s var(--ease);
 }
 .coach-emoji { font-size: 18px; flex: 0 0 auto; }
 .coach-text { min-width: 0; }
@@ -890,6 +902,15 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   cursor: pointer;
 }
 .coach-btn:active { transform: scale(0.96); }
+
+/* Symmetric exit: popovers leave along the path they entered (notch-toast-in
+   reversed). Added as .closing by dismissPop() in dock.js just before removal. */
+.trash-pop.closing, .coach.closing {
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transition: opacity 0.16s var(--ease), transform 0.16s var(--ease);
+  pointer-events: none;
+}
 
 /* ───────────────── Now-playing (media) widget card ───────────────── */
 .tile.widget.media .w-art {
@@ -1016,11 +1037,11 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
   opacity: 0;
   pointer-events: none;
   transform: scale(0.96);
-  transition: opacity 0.2s var(--ease), transform 0.24s var(--ease-bounce);
+  transition: opacity 0.2s var(--ease), transform 0.24s var(--ease);
 }
 .tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; transform: scale(1); }
 /* Each transport button eases in with a tiny stagger for a smooth reveal. */
-.tile.widget.media:hover .w-ctl { animation: w-ctl-in 0.26s var(--ease-bounce) backwards; }
+.tile.widget.media:hover .w-ctl { animation: w-ctl-in 0.26s var(--ease) backwards; }
 .tile.widget.media:hover .w-ctl:nth-child(1) { animation-delay: 0.02s; }
 .tile.widget.media:hover .w-ctl:nth-child(2) { animation-delay: 0.06s; }
 .tile.widget.media:hover .w-ctl:nth-child(3) { animation-delay: 0.1s; }
@@ -1160,13 +1181,16 @@ body.notch-body.vertical { align-items: center; }
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+  /* Hover growth rides the compositor: `scale` instead of width/height, so
+     the constantly-hovered pill never re-layouts. Ratios per variant below. */
+  --pill-gx: 1.24;
+  --pill-gy: 1.38;
   /* No pulsing animation — a steady pill (no blinking). */
-  transition: width 0.2s var(--ease-bounce), height 0.2s var(--ease-bounce),
+  transition: scale 0.2s var(--ease),
     background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 .notch-pill:hover {
-  width: 146px;
-  height: 18px;
+  scale: var(--pill-gx) var(--pill-gy);
   background:
     radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 58%),
     color-mix(in srgb, var(--accent) 30%, rgba(15, 15, 20, 0.78));
@@ -1174,10 +1198,11 @@ body.notch-body.vertical { align-items: center; }
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
-.notch-pill:active { cursor: grabbing; transform: scaleY(0.88); }
-body.notch-body.vertical .notch-pill:active { transform: scaleX(0.88); }
-body.notch-body.vertical .notch-pill { width: 13px; height: 118px; }
-body.notch-body.vertical .notch-pill:hover { width: 18px; height: 146px; }
+.notch-pill:active { cursor: grabbing; scale: 1 0.88; }
+.notch-pill:hover:active { scale: var(--pill-gx) calc(var(--pill-gy) * 0.88); }
+body.notch-body.vertical .notch-pill:active { scale: 0.88 1; }
+body.notch-body.vertical .notch-pill:hover:active { scale: calc(var(--pill-gx) * 0.88) var(--pill-gy); }
+body.notch-body.vertical .notch-pill { width: 13px; height: 118px; --pill-gx: 1.38; --pill-gy: 1.24; }
 
 /* Peek style: a tab that emerges from behind the taskbar. The window slides a
    few px past the work area into the taskbar band (backend), and the pill sits
@@ -1188,6 +1213,8 @@ body.notch-body.peek.edge-top { align-items: flex-start; }
 body.notch-body.peek.edge-left { justify-content: flex-start; }
 body.notch-body.peek.edge-right { justify-content: flex-end; }
 body.notch-body.peek .notch-pill {
+  --pill-gx: 1.23;
+  --pill-gy: 1.42;
   width: 112px;
   height: 12px;
   border-radius: 11px 11px 0 0;
@@ -1197,7 +1224,7 @@ body.notch-body.peek .notch-pill {
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -2px 4px rgba(0, 0, 0, 0.25);
 }
-body.notch-body.peek .notch-pill:hover { width: 138px; height: 17px; }
+
 /* iPhone-notch corner fillets: small concave curves that blend the tab into the
    taskbar edge, so it reads as part of the bar instead of a floating chip. */
 body.notch-body.peek .notch-pill::before,
@@ -1296,8 +1323,7 @@ body.notch-body.style-windows.peek .notch-pill {
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
-body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; }
-body.notch-body.peek.vertical .notch-pill:hover { width: 17px; height: 138px; }
+body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; --pill-gx: 1.42; --pill-gy: 1.23; }
 body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; transform-origin: left center; }
 body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; transform-origin: right center; }
 /* The concave corner fillets blend the tab into the *taskbar* — that only makes
@@ -1313,6 +1339,13 @@ body.notch-body.toast { padding: 4px; }
 /* Toast message on the notch ("Booki se ocultó · pantalla completa"). */
 .notch-toast {
   display: none;
+  /* Overlaid on the pill (not flowed next to it) so the cross-fade between
+     pill and toast never shifts the layout mid-transition. */
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -1328,7 +1361,12 @@ body.notch-body.toast { padding: 4px; }
   color: var(--ink);
   font: 600 12.5px var(--font);
   white-space: nowrap;
-  animation: notch-toast-in 0.24s var(--ease-bounce);
+  /* Transition-driven (not keyframes) so a re-triggered toast retargets
+     smoothly instead of restarting from zero, and the exit mirrors the entry. */
+  opacity: 0;
+  transform: translateY(8px) scale(0.96);
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease),
+    display 0.2s allow-discrete;
 }
 .notch-emoji { font-size: 15px; }
 .notch-text {
@@ -1338,8 +1376,16 @@ body.notch-body.toast { padding: 4px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-body.notch-body.toast .notch-pill { display: none; }
-body.notch-body.toast .notch-toast { display: flex; }
+body.notch-body.toast .notch-pill { opacity: 0; pointer-events: none; }
+body.notch-body.toast .notch-toast {
+  display: flex;
+  opacity: 1;
+  transform: none;
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
 @keyframes notch-toast-in {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }
   to { opacity: 1; transform: none; }
@@ -1446,8 +1492,8 @@ body.edit .dock { cursor: grab; }
 /* Press feedback (icon squishes in) */
 .tile:active img,
 .tile:active .glyph {
-  transform: scale(0.88);
-  transition: transform 0.09s ease;
+  transform: scale(0.94);
+  transition: transform 0.12s var(--ease);
 }
 .dock.dragging .tile { transition: none; }
 /* Magnify: while actively tracking the pointer, drive the transform per-frame
@@ -1633,7 +1679,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: var(--tile-r, 12px);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+  transition: background 0.14s ease, transform 0.14s var(--ease);
 }
 .hint-plus svg { width: 55%; height: 55%; }
 .tile.hint:hover .hint-plus { background: color-mix(in srgb, var(--accent) 20%, transparent); transform: scale(1.06); }
@@ -1645,7 +1691,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center;
   width: 44%; height: 44%; color: var(--accent-contrast, #fff); background: var(--accent);
   border-radius: 50%; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-  transition: transform 0.14s var(--ease-bounce);
+  transition: transform 0.14s var(--ease);
 }
 .hint-plus-badge svg { width: 58%; height: 58%; }
 .tile.hint:hover .hint-plus-badge { transform: scale(1.14); }
@@ -1708,7 +1754,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   visibility: hidden;
   pointer-events: none;
   transform: translateY(10px) scale(0.94);
-  transition: opacity 0.18s var(--ease), transform 0.24s var(--ease-bounce),
+  transition: opacity 0.18s var(--ease), transform 0.24s var(--ease),
     visibility 0s linear 0.24s;
 }
 .stack.open {
@@ -1716,7 +1762,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   visibility: visible;
   pointer-events: auto;
   transform: none;
-  transition: opacity 0.18s var(--ease), transform 0.26s var(--ease-bounce);
+  transition: opacity 0.18s var(--ease), transform 0.26s var(--ease);
 }
 body.edge-top .stack { transform-origin: top center; }
 body.edge-left .stack { transform-origin: center left; }
@@ -1790,7 +1836,7 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item:active { transform: scale(0.96); }
 /* Staggered entry of the folder items when the flyout opens. */
 @media (prefers-reduced-motion: no-preference) {
-  .stack.open .stack-item { animation: stack-cell-in 0.26s var(--ease-bounce) backwards; animation-delay: calc(var(--i, 0) * 28ms); }
+  .stack.open .stack-item { animation: stack-cell-in 0.26s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
 }
 @keyframes stack-cell-in { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
@@ -1912,8 +1958,8 @@ body.edge-right .stack { transform-origin: center right; }
   border-radius: var(--r-sm);
   cursor: pointer;
   transition: background 0.14s ease;
-  animation: stack-cell-in 0.22s var(--ease-bounce) backwards;
-  animation-delay: calc(var(--i, 0) * 22ms);
+  animation: stack-cell-in 0.22s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 30ms);
 }
 @media (prefers-reduced-motion: reduce) { .clip-row { animation: none; } }
 .clip-row:hover { background: var(--hover); }
@@ -2227,7 +2273,7 @@ body.edge-right .stack { transform-origin: center right; }
 /* Update controls (settings) */
 .upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
-.upd-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.2s ease; }
+.upd-bar i { display: block; height: 100%; width: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.2s linear; }
 
 /* ═══════════════════════ Settings window (React) ═══════════════════════ */
 
@@ -2326,7 +2372,7 @@ body.settings-body::before {
   background: color-mix(in srgb, var(--accent) 20%, var(--hover));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
   transform: translateY(calc(var(--active, 0) * (var(--navh) + var(--navgap))));
-  transition: transform 0.32s var(--ease-bounce);
+  transition: transform 0.32s var(--ease);
   pointer-events: none;
 }
 /* Settings search (Windows 11-style: type → jump to the section). */
@@ -2390,7 +2436,7 @@ body.settings-body::before {
   background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
   border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
   box-shadow: var(--shadow);
-  animation: notch-toast-in 0.16s var(--ease-bounce);
+  animation: notch-toast-in 0.16s var(--ease);
 }
 .s-more-menu button {
   display: flex;
@@ -2486,7 +2532,8 @@ body.settings-body::before {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
-  letter-spacing: 0;
+  /* Large text wants slightly negative tracking; body stays at 0. */
+  letter-spacing: -0.015em;
   line-height: 1.12;
 }
 .s-content h3 { margin: 18px 0 8px; font-size: var(--text-lg); }
@@ -2651,7 +2698,8 @@ body.settings-body::before {
 }
 .clip-policy-embedded {
   margin: 2px 0 10px;
-  background: color-mix(in srgb, var(--layer) 88%, transparent);
+  /* Innermost card is opaque: three stacked translucent layers erode contrast. */
+  background: var(--layer-strong);
 }
 .clip-policy-head {
   display: flex;
@@ -2930,7 +2978,7 @@ select {
   background: color-mix(in srgb, var(--ink) 14%, transparent);
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
   pointer-events: none;
-  animation: pospick-in 0.28s var(--ease-bounce);
+  animation: pospick-in 0.28s var(--ease);
 }
 .pospick-bar > i { width: 8px; height: 8px; border-radius: 2.5px; background: var(--accent); opacity: 0.85; }
 .pospick-bar > i:nth-child(odd) { opacity: 0.55; }
@@ -2971,7 +3019,7 @@ select {
   width: 30px;
   height: 7px;
   background: color-mix(in srgb, var(--ink) 16%, transparent);
-  transition: background 0.14s ease, transform 0.14s var(--ease-bounce);
+  transition: background 0.14s ease, transform 0.14s var(--ease);
 }
 .npe-bottom .notchpick-tab { margin-top: auto; margin-bottom: 3px; border-radius: 6px 6px 0 0; }
 .npe-top .notchpick-tab { margin-bottom: auto; margin-top: 3px; border-radius: 0 0 6px 6px; }
@@ -3032,7 +3080,7 @@ select {
   border: 1px solid var(--stroke);
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: background 0.12s var(--ease), color 0.12s var(--ease), border-color 0.12s var(--ease);
 }
 .mod-chip.active {
   color: var(--accent-contrast, #fff);
@@ -3173,7 +3221,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .preview-tile {
   display: flex; align-items: center; justify-content: center; overflow: hidden;
-  border-radius: 8px; transition: width 0.2s var(--ease-bounce), height 0.2s var(--ease-bounce), transform 0.2s var(--ease-bounce);
+  border-radius: 8px; transition: width 0.2s var(--ease), height 0.2s var(--ease), transform 0.2s var(--ease);
 }
 .preview-tile img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)); }
 .preview-glyph {
@@ -3461,7 +3509,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
   padding: 10px 6px 8px; background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke);
   border-radius: 12px; cursor: grab; touch-action: none; min-width: 0;
-  transition: transform 0.12s var(--ease-bounce), background 0.14s ease, box-shadow 0.14s ease;
+  transition: transform 0.12s var(--ease), background 0.14s ease, box-shadow 0.14s ease;
 }
 .pin-kid:hover { background: var(--hover); transform: translateY(-2px); }
 .pin-kid:active { cursor: grabbing; transform: scale(0.97); }
@@ -3541,7 +3589,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   border: 2px solid transparent; cursor: pointer; padding: 0;
   background: var(--sw);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.18);
-  transition: transform 0.12s var(--ease-bounce), box-shadow 0.12s ease;
+  transition: transform 0.12s var(--ease), box-shadow 0.12s ease;
 }
 .accent-sw:hover, .accent-custom:hover { transform: scale(1.12); }
 .accent-sw.active, .accent-custom.active {
@@ -3574,7 +3622,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   color: var(--ink);
   background: var(--layer);
   border: 1px dashed var(--stroke);
-  transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease;
+  transition: transform 0.12s var(--ease), border-color 0.12s ease;
 }
 .accent-src:hover { transform: scale(1.05); border-color: var(--accent); }
 .accent-src-dot {
@@ -3719,7 +3767,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
   font: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink);
   background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-pill);
-  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s var(--ease-bounce);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s var(--ease);
 }
 .kf-chip:hover:not(:disabled) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--layer-strong)); transform: translateY(-1px); }
 .kf-chip.pinned { opacity: 0.45; cursor: default; }
@@ -3778,7 +3826,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   width: min(520px, calc(100vw - 28px)); max-height: 80vh; overflow-y: auto; padding: 18px 20px;
   background: var(--acrylic); border: 1px solid var(--stroke-light); border-radius: var(--r-lg);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4); -webkit-backdrop-filter: blur(34px); backdrop-filter: blur(34px);
-  animation: pop-in 0.18s var(--ease-bounce);
+  animation: pop-in 0.18s var(--ease);
   overscroll-behavior: contain;
 }
 @keyframes pop-in { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -3788,14 +3836,14 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .icon-styles { display: flex; gap: 6px; margin-bottom: 14px; }
 .seg-mini {
   font: inherit; font-size: 12.5px; padding: 6px 12px; cursor: pointer; color: var(--ink-2);
-  background: var(--track); border: 1px solid var(--stroke); border-radius: var(--r-pill); transition: all 0.14s ease;
+  background: var(--track); border: 1px solid var(--stroke); border-radius: var(--r-pill); transition: background 0.14s var(--ease), color 0.14s var(--ease), border-color 0.14s var(--ease);
 }
 .seg-mini.active { color: var(--accent-contrast); background: var(--accent); border-color: transparent; font-weight: 600; }
 .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; }
 .icon-cell {
   display: flex; align-items: center; justify-content: center; padding: 8px; cursor: pointer;
   background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-md);
-  transition: transform 0.12s var(--ease-bounce), border-color 0.12s ease, background 0.12s ease;
+  transition: transform 0.12s var(--ease), border-color 0.12s ease, background 0.12s ease;
 }
 .icon-cell:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke)); background: var(--hover); }
 .icon-cell img { width: 34px; height: 34px; }
@@ -3971,7 +4019,7 @@ body.tight-edge .dock {
 
 /* The sliding indicator pill is the ONLY active highlight — a static background
    here doubled up with it mid-transition (two tabs looked selected at once). */
-.s-content h1 { letter-spacing: 0; }
+.s-content h1 { letter-spacing: -0.015em; }
 .s-card { transition: box-shadow 0.18s ease; }
 .s-btn {
   box-shadow: none;
@@ -3988,6 +4036,7 @@ body.tight-edge .dock {
   font-size: 22px;
   line-height: 1.15;
   font-weight: var(--weight-bold);
+  letter-spacing: -0.015em;
 }
 .settings-section-head h2,
 .widget-store-body strong,
@@ -4065,4 +4114,38 @@ textarea {
 .clock-time,
 .battery-pct {
   font-variant-numeric: tabular-nums;
+}
+
+/* ─────────── Accessibility: transparency & contrast preferences ─────────── */
+/* Frost the glass solid when the OS asks for reduced transparency: raise the
+   background to opaque and drop the blur on every translucent surface. */
+@media (prefers-reduced-transparency: reduce) {
+  .dock, .notch-pill, .notch-toast, .stack, .menu, .dock-tip, .trash-pop,
+  .coach, .note-editor, .tile .label, .tile.widget.media .w-controls,
+  .s-sidebar, .s-content, .modal {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .dock, .notch-pill { background: var(--surface-tint); }
+  .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .coach, .note-editor,
+  .tile .label, .modal, .s-sidebar, .s-content { background: var(--bg); }
+}
+/* High contrast: solid surfaces with a clearly defined border. */
+@media (prefers-contrast: more) {
+  .dock, .notch-pill, .stack, .menu, .dock-tip, .trash-pop, .coach,
+  .note-editor, .modal {
+    background: var(--bg);
+    border-color: var(--ink-2);
+  }
+}
+
+/* Touch: a tap fires a sticky synthetic hover — suppress decorative hover
+   motion. Functional hover reveals (media controls, tile labels) are kept:
+   on touch they are the only way to reach those controls. */
+@media (hover: none), (pointer: coarse) {
+  .preset-chip:hover, .s-link:hover, .s-navitem:hover, .pin-card:hover,
+  .pin-kid:hover, .kf-chip:hover:not(:disabled), .sugg-item:hover,
+  .icon-cell:hover, .accent-sw:hover, .accent-custom:hover, .accent-src:hover,
+  .tile:hover .glyph, .tile.hint:hover .hint-plus,
+  .tile.hint:hover .hint-plus-badge { transform: none; }
 }
