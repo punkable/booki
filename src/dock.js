@@ -781,6 +781,9 @@ function setMediaText(el, artist, title) {
   const v = el.querySelector(".w-value");
   v.classList.remove("scroll");
   v.textContent = title;
+  // Reduced motion: keep the plain single line (ellipsized by CSS) — never
+  // build the doubled-span marquee that would sit clipped and frozen.
+  if (REDUCE_MOTION) return;
   if (v.scrollWidth > v.clientWidth + 2) {
     const safe = esc(title);
     v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
@@ -793,8 +796,10 @@ function setMediaText(el, artist, title) {
 
 function marqueeDuration(distance) {
   // Slow, distance-aware marquee. The old media fallback used 9s for every
-  // title, which made long tracks rush across the card.
-  return Math.max(18, Math.min(48, distance / 14));
+  // title, which made long tracks rush across the card. The keyframes hold at
+  // rest for the first 12% of each cycle (a readable pause every loop), so the
+  // duration is stretched to keep the actual scroll speed unchanged.
+  return Math.max(18, Math.min(48, distance / 14)) / 0.88;
 }
 
 function setMarqueeText(el, text, keyName, force = false) {
@@ -804,6 +809,7 @@ function setMarqueeText(el, text, keyName, force = false) {
   el.classList.remove("scroll");
   el.style.removeProperty("--mq-duration");
   el.textContent = text;
+  if (REDUCE_MOTION) return; // plain ellipsized line instead of a frozen marquee
   if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
   const safe = esc(text);
   el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
@@ -985,7 +991,11 @@ function renderClipboardSummary(count, preview) {
     setPreviewSubText(el, shown, !preview);
     const badge = el.querySelector(".w-pv-count");
     badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
-    el.title = preview ? t("clip.countHint").replace("{n}", count) : t("clip.empty");
+    // The tooltip carries the preview snippet too: in a vertical dock the card
+    // collapses to icon+badge, so el.title is the only glanceable content.
+    el.title = preview
+      ? `${t("clip.countHint").replace("{n}", count)} — ${dockPreviewSnippet(preview, 120)}`
+      : t("clip.empty");
   });
 }
 async function pollClipboard() {
@@ -3085,19 +3095,27 @@ function placePop(pop) {
   document.body.classList.add("pop-open");
   applyFrame(); // grow the window before anything is visible
   const put = () => {
+    // Center on the BAR (not the window: a slot-aligned dock sits off-center)
+    // and clamp both axes into the viewport, like placeMenu does.
     const dr = dockEl.getBoundingClientRect();
     const gap = 12;
+    const pad = 8;
+    const pw = pop.offsetWidth;
+    const ph = pop.offsetHeight;
     pop.style.left = pop.style.right = pop.style.top = pop.style.bottom = "";
+    pop.style.transform = "";
     if (isVertical()) {
-      pop.style.top = "50%";
-      pop.style.transform = "translateY(-50%)";
-      if (cfg.edge === "left") pop.style.left = `${dr.width + gap}px`;
-      else pop.style.right = `${dr.width + gap}px`;
+      const top = Math.min(Math.max(pad, dr.top + dr.height / 2 - ph / 2), window.innerHeight - ph - pad);
+      pop.style.top = `${top}px`;
+      let left = cfg.edge === "left" ? dr.right + gap : dr.left - pw - gap;
+      left = Math.min(Math.max(pad, left), window.innerWidth - pw - pad);
+      pop.style.left = `${left}px`;
     } else {
-      pop.style.left = "50%";
-      pop.style.transform = "translateX(-50%)";
-      if (cfg.edge === "top") pop.style.top = `${dr.height + gap}px`;
-      else pop.style.bottom = `${dr.height + gap}px`;
+      const left = Math.min(Math.max(pad, dr.left + dr.width / 2 - pw / 2), window.innerWidth - pw - pad);
+      pop.style.left = `${left}px`;
+      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - ph - gap;
+      top = Math.min(Math.max(pad, top), window.innerHeight - ph - pad);
+      pop.style.top = `${top}px`;
     }
   };
   put();

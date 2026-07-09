@@ -293,6 +293,36 @@ function useModalControls(onClose) {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
+  // Keyboard focus: move it INTO the dialog on open, keep Tab cycling inside
+  // (aria-modal alone doesn't trap anything), and give it back on close.
+  useEffect(() => {
+    const prevFocus = document.activeElement;
+    const modals = document.querySelectorAll(".modal");
+    const modal = modals[modals.length - 1]; // this hook's dialog is the topmost
+    if (!modal) return;
+    modal.tabIndex = -1;
+    const sel = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const focusables = () =>
+      Array.from(modal.querySelectorAll(sel)).filter((el) => !el.disabled && el.offsetParent !== null);
+    (focusables()[0] || modal).focus();
+    const onKey = (e) => {
+      if (e.key !== "Tab") return;
+      const all = document.querySelectorAll(".modal");
+      if (all[all.length - 1] !== modal) return; // a newer dialog is on top
+      const list = focusables();
+      if (!list.length) { e.preventDefault(); modal.focus(); return; }
+      const first = list[0];
+      const last = list[list.length - 1];
+      if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      if (prevFocus && typeof prevFocus.focus === "function") prevFocus.focus();
+    };
+  }, []);
 }
 
 function SectionTitle({ children, name = "settings" }) {
