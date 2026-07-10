@@ -1191,9 +1191,6 @@ function launch(el, item) {
     dockApi.focusWindow(Number(hwnd));
     return;
   }
-  el.classList.remove("launching");
-  void el.offsetWidth;
-  el.classList.add("launching");
   dockApi.launch(item.path, item.args || []);
 }
 
