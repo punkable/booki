@@ -139,7 +139,7 @@ pill.addEventListener("pointerup", (e) => {
     : edge === "right" ? { x: sw - W - m, y: (sh - H) / 2 }
     : { x: (sw - W) / 2, y: sh - H - m };
   const from = { x: e.screenX - W / 2, y: e.screenY - H / 2 };
-  tweenNotch(from, target, 340, () => invoke("set_dock_edge", { edge }));
+  tweenNotch(from, target, 260, () => invoke("set_dock_edge", { edge }));
 });
 
 // Glide the notch window from `from` to `to` over `ms` (easeOutCubic), then `done`.

@@ -1,7 +1,7 @@
 /* Booki Dock — Settings (React). Modern sidebar + tabbed panels.
    Shares the config bridge in api.js; changes apply to the dock live. */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import {
@@ -102,6 +102,64 @@ const SEARCH_INDEX = [
   ["faq.q.smartscreen", "faq"], ["faq.q.uninstall", "faq"], ["faq.transparency", "faq"],
   ["ab.updates", "general"], ["ab.whatsNew", "general"],
 ];
+
+const SEARCH_ALIASES = {
+  "ap.theme": "tema theme claro oscuro light dark modo mode",
+  "ap.accent": "color colour acento accent fondo wallpaper",
+  "be.autoHide": "ocultar esconder auto hide hidden",
+  "be.position": "posicion position borde edge arriba abajo izquierda derecha",
+  "be.magnify": "zoom ampliar enlargement magnify",
+  "apps.title": "aplicaciones programas pinned apps ancladas",
+  "apps.widgets": "widget reloj cpu ram bateria media musica",
+  "clip.memory": "portapapeles clipboard privacidad privacy historial history",
+  "sc.title": "atajo shortcut hotkey teclado keyboard",
+  "prof.title": "perfil profile configuracion setup",
+  "gen.backup": "respaldo backup exportar importar export import",
+};
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim();
+}
+
+function fuzzySearchScore(text, term) {
+  let cursor = 0;
+  let gaps = 0;
+  for (const char of term) {
+    const next = text.indexOf(char, cursor);
+    if (next < 0) return 0;
+    gaps += next - cursor;
+    cursor = next + 1;
+  }
+  return Math.max(1, 22 - gaps);
+}
+
+function findSettings(query) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return [];
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  return SEARCH_INDEX
+    .map(([key, tab]) => {
+      const label = t(key);
+      const tabLabel = t(`tab.${tab}`);
+      const normalizedLabel = normalizeSearchText(label);
+      const searchable = `${normalizedLabel} ${normalizeSearchText(tabLabel)} ${normalizeSearchText(SEARCH_ALIASES[key])}`;
+      let score = normalizedLabel === normalizedQuery ? 200 : normalizedLabel.startsWith(normalizedQuery) ? 140 : 0;
+      for (const term of terms) {
+        const position = searchable.indexOf(term);
+        const termScore = position >= 0 ? 70 - Math.min(position, 45) : fuzzySearchScore(searchable, term);
+        if (!termScore) return null;
+        score += termScore;
+      }
+      return { key, tab, label, tabLabel, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
+    .slice(0, 8);
+}
 
 const TABS = [
   ["general", "tab.general", "sliders"],
@@ -1424,6 +1482,8 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
+  const moreButtonRef = useRef(null);
+  const kidMenuRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
   const drag = useRef(null);
@@ -1629,22 +1689,35 @@ function Apps({ cfg, set }) {
   const openKidMenu = (e, gi, id) => {
     e.preventDefault();
     e.stopPropagation();
-    const pad = 8;
-    const w = 204;
-    const h = 92;
-    setKidMenu({
-      gi,
-      id,
-      x: Math.min(Math.max(pad, e.clientX), Math.max(pad, window.innerWidth - w - pad)),
-      y: Math.min(Math.max(pad, e.clientY), Math.max(pad, window.innerHeight - h - pad)),
-    });
+    // Text scale and translated labels make fixed menu dimensions unreliable.
+    setKidMenu({ gi, id, x: e.clientX, y: e.clientY });
   };
+  useLayoutEffect(() => {
+    if (!kidMenu || !kidMenuRef.current) return;
+    const place = () => {
+      const rect = kidMenuRef.current.getBoundingClientRect();
+      const pad = 8;
+      const x = Math.min(Math.max(pad, kidMenu.x), Math.max(pad, window.innerWidth - rect.width - pad));
+      const y = Math.min(Math.max(pad, kidMenu.y), Math.max(pad, window.innerHeight - rect.height - pad));
+      setKidMenu((current) => current && (current.x !== x || current.y !== y) ? { ...current, x, y } : current);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [kidMenu]);
   useEffect(() => {
     if (!kidMenu) return;
+    kidMenuRef.current?.querySelector("button")?.focus();
     const close = () => setKidMenu(null);
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+      }
+    };
     window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", close);
-    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", close); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", onKeyDown); };
   }, [kidMenu]);
   // Move a child from one group to another (dissolving the source if it's left
   // with fewer than 2). Keyed by id so it survives the array shifting.
@@ -1783,6 +1856,17 @@ function Apps({ cfg, set }) {
     window.addEventListener("pointerdown", close);
     return () => window.removeEventListener("pointerdown", close);
   }, [moreOpen]);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setMoreOpen(false);
+      moreButtonRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [moreOpen]);
   const addTrash = () =>
     !hasTrash &&
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
@@ -1844,11 +1928,11 @@ function Apps({ cfg, set }) {
           {cfg.pinned.length > 0 ? (
             <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
               <button className={"pin-view-btn" + (view === "list" ? " active" : "")}
-                title={t("apps.viewList")} onClick={() => pickView("list")}>
+                title={t("apps.viewList")} aria-label={t("apps.viewList")} aria-selected={view === "list"} onClick={() => pickView("list")}>
                 <span dangerouslySetInnerHTML={{ __html: icon("list") }} />
               </button>
               <button className={"pin-view-btn" + (view === "grid" ? " active" : "")}
-                title={t("apps.viewGrid")} onClick={() => pickView("grid")}>
+                title={t("apps.viewGrid")} aria-label={t("apps.viewGrid")} aria-selected={view === "grid"} onClick={() => pickView("grid")}>
                 <span dangerouslySetInnerHTML={{ __html: icon("grid") }} />
               </button>
             </div>
@@ -1865,23 +1949,23 @@ function Apps({ cfg, set }) {
             <span>{t("apps.addApp")}</span>
           </button>
           <div className="s-more">
-            <button className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
-              onClick={() => setMoreOpen((v) => !v)}>
+            <button ref={moreButtonRef} className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
+              aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
               <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("chevron-down") }} />
               <span>{t("apps.more")}</span>
             </button>
             {moreOpen && (
-              <div className="s-more-menu" onClick={() => setMoreOpen(false)}>
-                <button onClick={addFolder}>
+              <div className="s-more-menu" role="menu" aria-label={t("apps.more")} onClick={() => setMoreOpen(false)}>
+                <button role="menuitem" onClick={addFolder}>
                   <span dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />{t("apps.addFolder")}
                 </button>
-                <button onClick={newFolder}>
+                <button role="menuitem" onClick={newFolder}>
                   <span dangerouslySetInnerHTML={{ __html: icon("folder") }} />{t("apps.newFolder")}
                 </button>
-                <button onClick={addSep}>
+                <button role="menuitem" onClick={addSep}>
                   <span dangerouslySetInnerHTML={{ __html: icon("list") }} />{t("apps.addSep")}
                 </button>
-                <button onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
+                <button role="menuitem" onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
                   <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.addTrash")}
                 </button>
               </div>
@@ -1917,7 +2001,7 @@ function Apps({ cfg, set }) {
               <div key={item.id} data-idx={i}
                 className={"pin-card" + (isGroup ? " is-group" : "") + (item.kind === "separator" ? " is-sep" : "") +
                   (mergeInto === i ? " merge-into" : "") + (open ? " open" : "")}>
-                <button className="pin-card-grip" title={t("apps.drag")}
+                <button className="pin-card-grip" title={t("apps.drag")} aria-label={t("apps.drag")}
                   onPointerDown={startDragGrid(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                 <div className={"pin-card-body" + (isGroup ? " clickable" : "")}
                   onClick={isGroup ? () => toggleOpen(item.id) : undefined}
@@ -2121,12 +2205,12 @@ function Apps({ cfg, set }) {
         />
       )}
       {kidMenu && (
-        <div className="pin-kid-menu" style={{ left: kidMenu.x, top: kidMenu.y }}
+        <div ref={kidMenuRef} className="pin-kid-menu" role="menu" aria-label="Acciones del elemento" style={{ left: kidMenu.x, top: kidMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}>
-          <button onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
+          <button role="menuitem" onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
             <span dangerouslySetInnerHTML={{ __html: icon("take-out") }} />{t("group.takeOut")}
           </button>
-          <button className="danger" onClick={() => { removeChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
+          <button role="menuitem" className="danger" onClick={() => { removeChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
             <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.remove")}
           </button>
         </div>
@@ -2527,6 +2611,8 @@ function About({ version, onWhatsNew, onReset }) {
 
 function App() {
   const [cfg, setCfg] = useState(null);
+  const contentRef = useRef(null);
+  const searchRef = useRef(null);
   // Reopen on the last tab the user was looking at.
   const [tab, setTabRaw] = useState(() => {
     try { return localStorage.getItem("booki.lastTab") || "general"; } catch (_) { return "general"; }
@@ -2534,10 +2620,15 @@ function App() {
   const setTab = (t) => {
     setTabRaw(t);
     try { localStorage.setItem("booki.lastTab", t); } catch (_) {}
+    requestAnimationFrame(() => {
+      if (contentRef.current) contentRef.current.scrollTop = 0;
+    });
   };
   const [version, setVersion] = useState("0.1.0");
   const [showChangelog, setShowChangelog] = useState(false);
   const [query, setQuery] = useState("");
+  const searchResults = useMemo(() => findSettings(query), [query]);
+  const [activeSearchResult, setActiveSearchResult] = useState(0);
   // One-time "start here" banner so a new user knows where to begin.
   const [introSeen, setIntroSeen] = useState(() => {
     try { return localStorage.getItem("booki.introSeen") === "1"; } catch (_) { return true; }
@@ -2579,6 +2670,48 @@ function App() {
     dockApi.appVersion().then(setVersion);
   }, []);
 
+  useEffect(() => {
+    setActiveSearchResult(0);
+  }, [query]);
+
+  const chooseSearchResult = (result) => {
+    if (!result) return;
+    setTab(result.tab);
+    setQuery("");
+  };
+
+  const onSearchKeyDown = (e) => {
+    if (!searchResults.length) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setQuery("");
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      setActiveSearchResult((index) => (index + delta + searchResults.length) % searchResults.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      chooseSearchResult(searchResults[activeSearchResult]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setQuery("");
+    }
+  };
+
+  useEffect(() => {
+    const focusSearch = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
+
   const set = (patch) => {
     setCfg((prev) => {
       const next = { ...prev, ...patch };
@@ -2609,7 +2742,7 @@ function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== "Escape") return;
+      if (e.defaultPrevented || e.key !== "Escape") return;
       // Escape closes the changelog modal first, then the window.
       if (showChangelog) setShowChangelog(false);
       else closeSelf();
@@ -2643,23 +2776,30 @@ function App() {
         </div>
         <div className="s-search">
           <input
+            ref={searchRef}
             type="search"
             placeholder={t("search.placeholder")}
             value={query}
+            aria-expanded={!!query.trim()}
+            aria-controls={query.trim() ? "settings-search-results" : undefined}
+            aria-activedescendant={query.trim() && searchResults[activeSearchResult] ? `settings-search-${searchResults[activeSearchResult].key}` : undefined}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onSearchKeyDown}
           />
           {query.trim() && (
-            <div className="s-search-results">
-              {SEARCH_INDEX
-                .filter(([k]) => t(k).toLowerCase().includes(query.trim().toLowerCase()))
-                .slice(0, 8)
-                .map(([k, tb]) => (
-                  <button key={k} onClick={() => { setTab(tb); setQuery(""); }}>
-                    <span>{t(k)}</span>
-                    <span className="s-search-tab">{t(`tab.${tb}`)}</span>
+            <div id="settings-search-results" className="s-search-results">
+              {searchResults.map((result, index) => (
+                  <button
+                    key={result.key}
+                    id={`settings-search-${result.key}`}
+                    className={index === activeSearchResult ? "active" : ""}
+                    onClick={() => chooseSearchResult(result)}
+                  >
+                    <span>{result.label}</span>
+                    <span className="s-search-tab">{result.tabLabel}</span>
                   </button>
-                ))}
-              {!SEARCH_INDEX.some(([k]) => t(k).toLowerCase().includes(query.trim().toLowerCase())) && (
+              ))}
+              {!searchResults.length && (
                 <div className="s-search-none">
                   <img className="empty-capy sm" src="/brand/svg/isotype.svg" alt="" />
                   {t("search.none")}
@@ -2685,7 +2825,7 @@ function App() {
           <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
         </div>
       </aside>
-      <main className="s-content">
+      <main ref={contentRef} className="s-content">
         {!introSeen && (
           <div className="s-intro">
             <span className="s-intro-icon" dangerouslySetInnerHTML={{ __html: icon("info") }} />
@@ -2700,8 +2840,7 @@ function App() {
               dangerouslySetInnerHTML={{ __html: icon("x") }} />
           </div>
         )}
-        {/* key={tab} remounts on switch → the panel fades/slides in smoothly. */}
-        <div className="s-panel-in" key={tab}>
+        <div key={tab}>
           {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
           {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
           {tab === "apps" && <Apps cfg={cfg} set={set} />}
@@ -2792,4 +2931,10 @@ function ChangelogModal({ onClose }) {
   ), document.body);
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+const settingsRoot = import.meta.hot?.data.settingsRoot || createRoot(document.getElementById("root"));
+settingsRoot.render(<App />);
+if (import.meta.hot) {
+  import.meta.hot.dispose((data) => {
+    data.settingsRoot = settingsRoot;
+  });
+}

@@ -923,11 +923,6 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   transition: opacity 0.35s var(--ease); /* cross-fade when the track art changes */
 }
-.tile.widget.media.playing .w-art { animation: media-pulse 3s ease-in-out infinite; }
-@keyframes media-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
 .tile.widget.media .w-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The media card keeps a FIXED footprint: async title/art loads (a long song
    name arriving after the bar was laid out) must never resize — and jump —
@@ -1040,15 +1035,8 @@ body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-
   transition: opacity 0.2s var(--ease), transform 0.24s var(--ease);
 }
 .tile.widget.media:hover .w-controls { opacity: 1; pointer-events: auto; transform: scale(1); }
-/* Each transport button eases in with a tiny stagger for a smooth reveal. */
-.tile.widget.media:hover .w-ctl { animation: w-ctl-in 0.26s var(--ease) backwards; }
-.tile.widget.media:hover .w-ctl:nth-child(1) { animation-delay: 0.02s; }
-.tile.widget.media:hover .w-ctl:nth-child(2) { animation-delay: 0.06s; }
-.tile.widget.media:hover .w-ctl:nth-child(3) { animation-delay: 0.1s; }
-@keyframes w-ctl-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) {
   .tile.widget.media .w-controls { transition: opacity 0.12s ease; transform: none; }
-  .tile.widget.media:hover .w-ctl { animation: none; }
 }
 .w-ctl {
   border: 0;
@@ -1483,10 +1471,7 @@ body.edit .tile:not(.separator):not(.hint) .rm { display: flex; }
   100% { transform: rotate(-1.6deg); }
 }
 body.edit .tile:not(.separator):not(.hint) {
-  animation: booki-jiggle 0.32s ease-in-out infinite;
-}
-body.edit .tile:nth-child(even):not(.separator):not(.hint) {
-  animation-delay: -0.16s;
+  animation: booki-jiggle 0.22s var(--ease);
 }
 body.edit .dock { cursor: grab; }
 /* Press feedback (icon squishes in) */
@@ -1570,59 +1555,16 @@ body.edit .dock { cursor: grab; }
   height: 3px;
   border-radius: var(--r-pill);
   background: var(--accent);
-  /* A soft halo in the accent colour makes the running dot feel alive. */
-  box-shadow: 0 0 6px 1px color-mix(in srgb, var(--accent) 65%, transparent);
-  animation: run-pulse 2.6s var(--ease) infinite;
+  box-shadow: 0 0 4px color-mix(in srgb, var(--accent) 36%, transparent);
 }
 body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -5px; }
 body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
-@keyframes run-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .tile[data-running="true"]::after { animation: none; } }
-
-/* Launch feedback: the icon bounces off its edge (twice, macOS-style) while
-   the app opens. Direction follows the anchored edge. */
-@keyframes booki-bounce {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(0, -24px); }
-  44% { transform: translate(0, 0); }
-  62% { transform: translate(0, -10px); }
-  80% { transform: translate(0, 0); }
-}
-@keyframes booki-bounce-down {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(0, 24px); }
-  44% { transform: translate(0, 0); }
-  62% { transform: translate(0, 10px); }
-  80% { transform: translate(0, 0); }
-}
-@keyframes booki-bounce-right {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(24px, 0); }
-  44% { transform: translate(0, 0); }
-  62% { transform: translate(10px, 0); }
-  80% { transform: translate(0, 0); }
-}
-@keyframes booki-bounce-left {
-  0%, 100% { transform: translate(0, 0); }
-  20% { transform: translate(-24px, 0); }
-  44% { transform: translate(0, 0); }
-  62% { transform: translate(-10px, 0); }
-  80% { transform: translate(0, 0); }
-}
-.tile.launching { animation: booki-bounce 0.9s var(--ease); }
-body.edge-top .tile.launching { animation-name: booki-bounce-down; }
-body.edge-left .tile.launching { animation-name: booki-bounce-right; }
-body.edge-right .tile.launching { animation-name: booki-bounce-left; }
-@media (prefers-reduced-motion: reduce) {
-  .tile.launching { animation: none; }
-}
-
 /* Pin / unpin: tiles fade+scale in when added and out when removed. */
-.tile.tile-in { animation: tile-in 0.24s var(--ease-bounce); }
-.tile.tile-out { animation: tile-out 0.17s var(--ease) forwards; pointer-events: none; }
-@keyframes tile-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
-@keyframes tile-out { to { opacity: 0; transform: scale(0.4); } }
+.tile.tile-in { animation: tile-in 0.16s var(--ease); }
+.tile.tile-out { animation: tile-out 0.14s var(--ease) forwards; pointer-events: none; }
+@keyframes tile-in { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes tile-out { to { opacity: 0; transform: translateY(3px) scale(0.96); } }
 @media (prefers-reduced-motion: reduce) {
   .tile.tile-in, .tile.tile-out { animation: none; }
 }
@@ -1668,7 +1610,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
 }
 
 /* Empty-state hint */
-.tile.hint { cursor: pointer; opacity: 0.95; animation: booki-breathe 2.6s var(--ease) infinite; }
+.tile.hint { cursor: pointer; opacity: 0.95; }
 /* Empty-dock "+" tile: a friendly dashed add button that opens Settings. */
 .hint-plus {
   display: grid;
@@ -1683,7 +1625,6 @@ body.edge-left .sep-line, body.edge-right .sep-line {
 }
 .hint-plus svg { width: 55%; height: 55%; }
 .tile.hint:hover .hint-plus { background: color-mix(in srgb, var(--accent) 20%, transparent); transform: scale(1.06); }
-@keyframes booki-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 /* Empty-dock capybara: the mascot with a little "+" badge, inviting a first pin. */
 .hint-capy { position: relative; display: grid; place-items: center; width: 82%; height: 82%; }
 .hint-capy img { width: 84%; height: 84%; object-fit: contain; }
@@ -2260,16 +2201,9 @@ body.edge-right .stack { transform-origin: center right; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   cursor: pointer;
   transition: filter 0.16s var(--ease), transform 0.12s var(--ease);
-  animation: update-attention 2.8s var(--ease) infinite;
 }
 .update-pill:hover { filter: brightness(1.05); }
 .update-pill:active { transform: scale(0.98); }
-@keyframes update-attention {
-  0%, 100% { outline: 0 solid color-mix(in srgb, var(--accent) 22%, transparent); }
-  50% { outline: 4px solid color-mix(in srgb, var(--accent) 0%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) { .update-pill { animation: none; } }
-
 /* Update controls (settings) */
 .upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
@@ -2402,6 +2336,9 @@ body.settings-body::before {
   background: var(--layer-strong);
   border: 1px solid var(--stroke-light);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  max-height: min(360px, calc(100vh - 156px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .s-search-results button {
   display: flex;
@@ -2418,6 +2355,8 @@ body.settings-body::before {
   cursor: pointer;
 }
 .s-search-results button:hover { background: var(--hover); }
+.s-search-results button.active { background: color-mix(in srgb, var(--accent) 14%, var(--hover)); }
+.s-search-results button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .s-search-tab { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-2); }
 .s-search-none { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 500 12px var(--font); color: var(--ink-2); padding: 12px 9px; }
 
@@ -2436,6 +2375,11 @@ body.settings-body::before {
   background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
   border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
   box-shadow: var(--shadow);
+  max-width: min(260px, calc(100vw - 16px));
+  max-height: min(320px, calc(100vh - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform-origin: top right;
   animation: notch-toast-in 0.16s var(--ease);
 }
 .s-more-menu button {
@@ -2468,6 +2412,8 @@ body.settings-body::before {
 }
 .s-more-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, var(--hover)); }
 .s-more-menu button:disabled { opacity: 0.45; cursor: default; }
+.s-more-menu button:focus-visible,
+.pin-kid-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .pin-toolbar-actions .s-more-menu { left: auto; right: 0; }
 
 /* Button with a leading icon (e.g. "What's new" in About). */
@@ -2524,10 +2470,6 @@ body.settings-body::before {
   backdrop-filter: blur(20px) saturate(140%);
   min-width: 0;
 }
-/* Tab content eases in when you switch tabs (keyed remount in settings.jsx). */
-.s-panel-in { animation: s-panel-in 0.24s var(--ease); }
-@keyframes s-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .s-panel-in { animation: none; } }
 .s-content h1 {
   margin: 0;
   font-size: 24px;
@@ -3373,9 +3315,8 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-btn.del:hover { background: var(--danger); color: #fff; }
 .pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--text-md); padding: 20px 2px; text-align: center; }
 /* Capybara mascot in empty states — friendly, not loud. */
-.empty-capy { width: 56px; height: 56px; opacity: 0.9; animation: booki-breathe 3s var(--ease) infinite; }
+.empty-capy { width: 56px; height: 56px; opacity: 0.9; }
 .empty-capy.sm { width: 34px; height: 34px; }
-@media (prefers-reduced-motion: reduce) { .empty-capy { animation: none; } }
 
 /* ── Apps toolbar: list/grid switch + clear-all ─────────────────────────── */
 /* One-time "start here" banner at the top of Settings. */
@@ -3549,11 +3490,12 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .s-inline-link:hover { text-decoration: underline; }
 /* Right-click menu on a group child square (take out / remove). */
 .pin-kid-menu {
-  position: fixed; z-index: 60; min-width: 188px; padding: 6px;
+  position: fixed; z-index: 60; min-width: 188px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; padding: 6px;
   background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
   border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
   border-radius: var(--r-md); box-shadow: var(--shadow);
   display: flex; flex-direction: column; gap: 2px;
+  transform-origin: top left;
   animation: kidmenu-in 0.12s var(--ease);
 }
 @keyframes kidmenu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
@@ -3725,6 +3667,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   .pin-toolbar-actions .s-more,
   .pin-toolbar-actions .s-more > .s-btn { width: 100%; }
   .pin-toolbar-actions { margin-left: 0; }
+  .pin-toolbar-actions .s-more-menu { left: 0; right: auto; width: min(100%, 300px); }
   .pin-view-toggle { width: 100%; justify-content: stretch; }
   .pin-view-btn { flex: 1 1 0; }
   .pin-clear-confirm { width: 100%; justify-content: space-between; }
@@ -4019,7 +3962,6 @@ body.tight-edge .dock {
 
 /* The sliding indicator pill is the ONLY active highlight — a static background
    here doubled up with it mid-transition (two tabs looked selected at once). */
-.s-content h1 { letter-spacing: -0.015em; }
 .s-card { transition: box-shadow 0.18s ease; }
 .s-btn {
   box-shadow: none;

@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.50.1",
+    date: "9 jul 2026",
+    headline: "Dock y ajustes mas claros, rapidos y comodos.",
+    sections: [
+      {
+        icon: "\\u{1F50E}",
+        title: "Ajustes faciles de encontrar",
+        notes: [
+          "La busqueda entiende terminos relacionados, ordena los resultados por relevancia y se puede recorrer con el teclado.",
+          "Los resultados, submenus y menus de acciones se mantienen dentro de la ventana y se desplazan cuando hace falta.",
+        ],
+      },
+      {
+        icon: "\\u{1F5B1}\\uFE0F",
+        title: "Dock mas directo",
+        notes: [
+          "Abrir una app ya no espera un rebote: la accion sale inmediatamente.",
+          "Los indicadores de apps activas y avisos permanecen visibles sin llamar la atencion de forma continua.",
+        ],
+      },
+      {
+        icon: "\\u{2728}",
+        title: "Movimiento con proposito",
+        notes: [
+          "Anclar o quitar elementos usa una transicion breve y estable; el notch termina su cambio de borde con mayor rapidez.",
+          "Los ajustes no se animan al cambiar de seccion, para que el uso con mouse y teclado se sienta inmediato.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.0",
     date: "9 jul 2026",
     headline: "Gran pulido de diseño: movimiento más fluido, más accesibilidad y detalles al estilo Apple.",
