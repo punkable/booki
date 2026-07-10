@@ -34,6 +34,7 @@ window.addEventListener("unhandledrejection", (e) =>
 const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
+const undoToast = document.getElementById("undo-toast");
 
 function availW() {
   const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
@@ -62,6 +63,37 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let cfg = null;
+let undoRemoval = null;
+let undoRemovalTimer = null;
+
+function hideUndoToast() {
+  clearTimeout(undoRemovalTimer);
+  undoRemovalTimer = null;
+  undoRemoval = null;
+  undoToast?.classList.add("hidden");
+  if (undoToast) undoToast.innerHTML = "";
+}
+
+function showUndoToast(item, index) {
+  if (!undoToast) return;
+  clearTimeout(undoRemovalTimer);
+  undoRemoval = { item: structuredClone(item), index };
+  undoToast.innerHTML = `<span>${esc(item.name || baseName(item.path || "Booki"))}</span><button type="button">${esc(t("act.undo"))}</button>`;
+  undoToast.classList.remove("hidden");
+  undoToast.querySelector("button")?.addEventListener("click", undoLastRemoval, { once: true });
+  undoRemovalTimer = setTimeout(hideUndoToast, 5000);
+}
+
+async function undoLastRemoval() {
+  if (!undoRemoval || !cfg) return;
+  const { item, index } = undoRemoval;
+  hideUndoToast();
+  if (cfg.pinned.some((entry) => entry.id === item.id)) return;
+  cfg.pinned.splice(Math.min(index, cfg.pinned.length), 0, item);
+  await persist();
+  await render();
+  reframe();
+}
 // Tauri's event.emit echoes back to the sender. When the DOCK changes config it
 // already has the new state, so it must ignore its own echoed config-changed
 // event (otherwise: redundant reloadConfig → re-render → reframe = flicker). We
@@ -1853,7 +1885,6 @@ async function onPressUp() {
       }
       willUnpin = false;
       await removeItem(p.item.id);
-      await emitConfigChanged();
       return;
     }
     // Settle the floating copy into the tile's final slot, then drop it.
@@ -2403,6 +2434,9 @@ async function addSeparatorAfter(id) {
   reframe();
 }
 async function removeItem(id) {
+  const index = cfg.pinned.findIndex((a) => a.id === id);
+  const removed = index >= 0 ? cfg.pinned[index] : null;
+  if (!removed) return;
   // Play a quick fade+scale-out on the tile before the re-render swaps it away.
   const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
   if (el && !REDUCE_MOTION) {
@@ -2411,9 +2445,9 @@ async function removeItem(id) {
   }
   cfg.pinned = cfg.pinned.filter((a) => a.id !== id);
   await persist();
-  await emitConfigChanged(); // keep the Settings "pinned apps" list in sync
   await render();
   reframe();
+  showUndoToast(removed, index);
 }
 
 // ─────────────────── Window frame (magnify headroom) ───────────────────
@@ -2701,7 +2735,7 @@ function pointInLiveHitArea(x, y) {
     ...[...dockEl.querySelectorAll(".tile")].map((el) => rectFromElement(el, TILE_HIT_PAD)),
     stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
     ...[...document.querySelectorAll(
-      ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
+      ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
     )].map((el) => rectFromElement(el, PANEL_HIT_PAD)),
   ];
   return rects.some((rect) => pointInRect(x, y, rect));
@@ -2727,7 +2761,7 @@ function reportHitRects() {
   for (const tile of dockEl.querySelectorAll(".tile")) add(tile, TILE_HIT_PAD);
   if (stackOpen) add(stackEl, PANEL_HIT_PAD);
   for (const el of document.querySelectorAll(
-    ".trash-pop, .coach, .note-editor, #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
+    ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
   ))
     add(el, PANEL_HIT_PAD);
   const sig = all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
@@ -2754,7 +2788,7 @@ new MutationObserver(scheduleHitReport).observe(document.body, {
 window.addEventListener("resize", scheduleHitReport);
 setInterval(() => {
   if (!hiddenState) reportHitRects();
-}, 900);
+}, 5000);
 
 // The backend cursor watcher is the source of truth for "is the pointer on
 // the dock" once the window can go click-through — DOM enter/leave events

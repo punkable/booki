@@ -2204,6 +2204,40 @@ body.edge-right .stack { transform-origin: center right; }
 }
 .update-pill:hover { filter: brightness(1.05); }
 .update-pill:active { transform: scale(0.98); }
+
+.undo-toast {
+  position: fixed;
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 8px 10px 8px 12px;
+  color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke-light);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+  font: 600 var(--text-sm) var(--font);
+  transform: translate(-50%, 0);
+  left: 50%;
+  bottom: 18px;
+  animation: notch-toast-in 0.18s var(--ease);
+}
+.undo-toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  color: var(--accent-contrast);
+  background: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.undo-toast button:active { transform: scale(0.97); }
 /* Update controls (settings) */
 .upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
@@ -2470,6 +2504,20 @@ body.settings-body::before {
   backdrop-filter: blur(20px) saturate(140%);
   min-width: 0;
 }
+.s-save-status {
+  min-height: 16px;
+  margin: -10px 0 8px;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  text-align: right;
+  opacity: 0;
+  transition: opacity 0.16s ease, color 0.16s ease;
+}
+.s-save-status.status-saving,
+.s-save-status.status-saved,
+.s-save-status.status-error { opacity: 1; }
+.s-save-status.status-error { color: var(--danger); }
+.suggestions-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-bottom: 10px; }
 .s-content h1 {
   margin: 0;
   font-size: 24px;
@@ -4062,19 +4110,19 @@ textarea {
 /* Frost the glass solid when the OS asks for reduced transparency: raise the
    background to opaque and drop the blur on every translucent surface. */
 @media (prefers-reduced-transparency: reduce) {
-  .dock, .notch-pill, .notch-toast, .stack, .menu, .dock-tip, .trash-pop,
+  .dock, .notch-pill, .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .undo-toast,
   .coach, .note-editor, .tile .label, .tile.widget.media .w-controls,
   .s-sidebar, .s-content, .modal {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   .dock, .notch-pill { background: var(--surface-tint); }
-  .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .coach, .note-editor,
+  .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .undo-toast, .coach, .note-editor,
   .tile .label, .modal, .s-sidebar, .s-content { background: var(--bg); }
 }
 /* High contrast: solid surfaces with a clearly defined border. */
 @media (prefers-contrast: more) {
-  .dock, .notch-pill, .stack, .menu, .dock-tip, .trash-pop, .coach,
+  .dock, .notch-pill, .stack, .menu, .dock-tip, .trash-pop, .undo-toast, .coach,
   .note-editor, .modal {
     background: var(--bg);
     border-color: var(--ink-2);

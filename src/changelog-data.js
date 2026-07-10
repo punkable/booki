@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.50.2",
+    date: "10 jul 2026",
+    headline: "Ajustes mas claros, mejor recuperacion y menos trabajo en segundo plano.",
+    sections: [
+      {
+        icon: "\\u{1F50E}",
+        title: "Busqueda y guardado",
+        notes: [
+          "La busqueda de ajustes anuncia correctamente sus resultados y conserva el foco al navegar con teclado.",
+          "Ahora puedes ver cuando los cambios se estan guardando, cuando ya quedaron guardados y si ocurrio un error.",
+          "La lista de apps instaladas se puede actualizar sin cerrar Settings.",
+        ],
+      },
+      {
+        icon: "\\u{21A9}",
+        title: "Edicion mas segura",
+        notes: [
+          "Quitar un elemento del dock muestra una accion breve para deshacerlo.",
+          "Los menus de acciones y el undo respetan los limites de la ventana y el modo de transparencia reducida.",
+        ],
+      },
+      {
+        icon: "\\u{26A1}",
+        title: "Menos trabajo en reposo",
+        notes: [
+          "El reporte de hitboxes se repara por cambios reales y usa una comprobacion de seguridad mas espaciada.",
+          "El portapapeles solo se consulta cuando la funcion esta activa y el cursor usa una cadencia mas ligera fuera del dock.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.1",
     date: "9 jul 2026",
     headline: "Dock y ajustes mas claros, rapidos y comodos.",

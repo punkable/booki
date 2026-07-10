@@ -286,6 +286,15 @@ fn clip_remember(text: &str) {
     clip_write_disk(&hist, &cfg);
 }
 
+fn clipboard_feature_active(cfg: &config::Config) -> bool {
+    fn has_pin(items: &[config::PinnedApp]) -> bool {
+        items.iter().any(|item| {
+            item.widget.as_deref() == Some("clipboard") || has_pin(&item.children)
+        })
+    }
+    cfg.clipboard_persist || has_pin(&cfg.pinned)
+}
+
 
 /// Generation counter for the notch preview: each preview bumps it, and only the
 /// timer holding the LATEST generation hides the notch again (rapid style
@@ -2232,10 +2241,11 @@ pub fn run() {
                 }
 
                 // Clipboard watcher: samples the OS clipboard's plain text every
-                // ~800 ms and remembers it if it changed. Polling (vs. the native
+                // ~1000 ms when the feature is active and remembers it if it changed.
+                // Polling (vs. the native
                 // WM_CLIPBOARDUPDATE listener) keeps this on the same simple
                 // thread-per-concern pattern as the rest of the watchers and needs
-                // no message-only window; 800 ms is imperceptible for a paste
+                // no message-only window; this cadence is imperceptible for a paste
                 // history. Windows-only — clipboard_get_text stubs to None
                 // elsewhere, so the loop would just spin doing nothing.
                 #[cfg(windows)]
@@ -2243,7 +2253,14 @@ pub fn run() {
                     std::thread::spawn(move || {
                         let mut last: Option<String> = None;
                         loop {
-                            std::thread::sleep(std::time::Duration::from_millis(800));
+                            std::thread::sleep(std::time::Duration::from_millis(1000));
+                            // Do not read the OS clipboard when the feature is not
+                            // in use. The watcher wakes cheaply so enabling the
+                            // widget later takes effect without restarting Booki.
+                            if !clipboard_feature_active(&config::load()) {
+                                last = None;
+                                continue;
+                            }
                             if let Some(text) = win::clipboard_get_text() {
                                 if last.as_deref() != Some(text.as_str()) {
                                     last = Some(text.clone());
@@ -2293,7 +2310,12 @@ pub fn run() {
                                         last = Some(inside);
                                         let _ = handle.emit("booki://cursor-inside", inside);
                                     }
-                                    std::thread::sleep(std::time::Duration::from_millis(30));
+                                    // Keep the interactive state snappy while the
+                                    // cursor is over Booki, and use a lighter scan
+                                    // cadence while the window is click-through.
+                                    std::thread::sleep(std::time::Duration::from_millis(
+                                        if inside { 30 } else { 80 },
+                                    ));
                                 }
                             }
                         }

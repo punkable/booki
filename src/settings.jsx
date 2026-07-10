@@ -238,8 +238,13 @@ function updateWidgetStyleForRef(pinned, ref, value) {
 // Scan the Start Menu once per settings session, then reuse — the scan +
 // icon extraction is costly and the Apps panel remounts on every tab switch.
 let _installedApps = null;
-function installedAppsOnce() {
-  if (!_installedApps) _installedApps = dockApi.listInstalledApps().catch(() => []);
+function installedAppsOnce(force = false) {
+  if (force || !_installedApps) {
+    _installedApps = dockApi.listInstalledApps().catch(() => {
+      _installedApps = null;
+      return [];
+    });
+  }
   return _installedApps;
 }
 
@@ -871,6 +876,7 @@ function SuggIcon({ path, name }) {
 function Suggestions({ cfg, set }) {
   const [groups, setGroups] = useState(null);
   const [q, setQ] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const [openGroups, setOpenGroups] = useState({}); // collapsed by default
   const [kf, setKf] = useState([]); // the user's important shell folders
   const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
@@ -929,6 +935,21 @@ function Suggestions({ cfg, set }) {
       className="suggestions-section"
     >
       <div className="suggestions-panel">
+      <div className="suggestions-tools">
+        <button
+          type="button"
+          className="s-btn s-btn-soft s-btn-sm"
+          disabled={refreshing}
+          onClick={async () => {
+            setRefreshing(true);
+            const fresh = await installedAppsOnce(true);
+            setGroups(normalizeGroups(fresh));
+            setRefreshing(false);
+          }}
+        >
+          {refreshing ? "..." : t("apps.refresh")}
+        </button>
+      </div>
       <div className="sugg-searchwrap">
         <span className="sugg-search-ico" dangerouslySetInnerHTML={{ __html: icon("search") }} />
         <input className="sugg-search" placeholder={t("apps.search")} value={q}
@@ -2624,8 +2645,9 @@ function App() {
       if (contentRef.current) contentRef.current.scrollTop = 0;
     });
   };
-  const [version, setVersion] = useState("0.1.0");
+  const [version, setVersion] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [saveState, setSaveState] = useState("idle");
   const [query, setQuery] = useState("");
   const searchResults = useMemo(() => findSettings(query), [query]);
   const [activeSearchResult, setActiveSearchResult] = useState(0);
@@ -2635,6 +2657,8 @@ function App() {
   });
   const dismissIntro = () => { setIntroSeen(true); try { localStorage.setItem("booki.introSeen", "1"); } catch (_) {} };
   const saveTimer = useRef(null);
+
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   // Show "What's new" when the dock asks us to: either it was requested before
   // this window existed (pending flag, asked once on mount) or it arrives live
@@ -2678,6 +2702,7 @@ function App() {
     if (!result) return;
     setTab(result.tab);
     setQuery("");
+    requestAnimationFrame(() => searchRef.current?.focus());
   };
 
   const onSearchKeyDown = (e) => {
@@ -2722,10 +2747,16 @@ function App() {
         setLang(next.language);
       }
       applyTheme(next);
+      setSaveState("saving");
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
-        await configApi.save(next);
-        await emitConfigChanged();
+        try {
+          await configApi.save(next);
+          await emitConfigChanged();
+          setSaveState("saved");
+        } catch (_) {
+          setSaveState("error");
+        }
       }, 120);
       return next;
     });
@@ -2780,6 +2811,8 @@ function App() {
             type="search"
             placeholder={t("search.placeholder")}
             value={query}
+            role="combobox"
+            aria-autocomplete="list"
             aria-expanded={!!query.trim()}
             aria-controls={query.trim() ? "settings-search-results" : undefined}
             aria-activedescendant={query.trim() && searchResults[activeSearchResult] ? `settings-search-${searchResults[activeSearchResult].key}` : undefined}
@@ -2787,12 +2820,15 @@ function App() {
             onKeyDown={onSearchKeyDown}
           />
           {query.trim() && (
-            <div id="settings-search-results" className="s-search-results">
+            <div id="settings-search-results" className="s-search-results" role="listbox">
               {searchResults.map((result, index) => (
                   <button
                     key={result.key}
+                    type="button"
+                    role="option"
                     id={`settings-search-${result.key}`}
                     className={index === activeSearchResult ? "active" : ""}
+                    aria-selected={index === activeSearchResult}
                     onClick={() => chooseSearchResult(result)}
                   >
                     <span>{result.label}</span>
@@ -2814,6 +2850,8 @@ function App() {
             <button
               key={id}
               className={"s-navitem" + (tab === id ? " active" : "")}
+              aria-current={tab === id ? "page" : undefined}
+              type="button"
               onClick={() => setTab(id)}
             >
               <span className="s-navicon" dangerouslySetInnerHTML={{ __html: icon(ico) }} />
@@ -2841,12 +2879,15 @@ function App() {
           </div>
         )}
         <div key={tab}>
+          <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
+            {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
+          </div>
           {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
           {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
           {tab === "apps" && <Apps cfg={cfg} set={set} />}
           {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
-          {tab === "faq" && <Faq version={version} />}
-          {tab === "about" && <About version={version} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
+          {tab === "faq" && <Faq version={version || "..."} />}
+          {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
         </div>
       </main>
       {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}

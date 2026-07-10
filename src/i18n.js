@@ -52,6 +52,11 @@ const DICT = {
     "faq.link.data": "Abrir carpeta de datos",
     "act.reset": "Restablecer",
     "act.quit": "Salir",
+    "act.undo": "Deshacer",
+    "apps.refresh": "Actualizar lista",
+    "status.saving": "Guardando...",
+    "status.saved": "Guardado",
+    "status.saveError": "No se pudo guardar",
 
     "ap.title": "Apariencia",
     "ap.theme": "Tema",
@@ -459,6 +464,11 @@ const DICT = {
     "faq.link.data": "Open data folder",
     "act.reset": "Reset",
     "act.quit": "Quit",
+    "act.undo": "Undo",
+    "apps.refresh": "Refresh list",
+    "status.saving": "Saving...",
+    "status.saved": "Saved",
+    "status.saveError": "Couldn't save",
 
     "ap.title": "Appearance",
     "ap.theme": "Theme",
