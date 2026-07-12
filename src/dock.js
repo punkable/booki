@@ -2346,17 +2346,19 @@ function placeMenu(e) {
     const mh = ctxMenu.offsetHeight;
     // Clamp BOTH axes into the window — a long menu near a corner used to get
     // sliced at the window edge (worst on vertical docks).
+    const maxTop = Math.max(pad, window.innerHeight - mh - pad);
+    const maxLeft = Math.max(pad, window.innerWidth - mw - pad);
     if (isVertical()) {
-      const top = Math.min(Math.max(pad, cy - mh / 2), window.innerHeight - mh - pad);
+      const top = Math.min(Math.max(pad, cy - mh / 2), maxTop);
       ctxMenu.style.top = `${top}px`;
       let left = cfg.edge === "left" ? dr.right + gap : dr.left - mw - gap;
-      left = Math.min(Math.max(pad, left), window.innerWidth - mw - pad);
+      left = Math.min(Math.max(pad, left), maxLeft);
       ctxMenu.style.left = `${left}px`;
     } else {
-      const left = Math.min(Math.max(pad, cx - mw / 2), window.innerWidth - mw - pad);
+      const left = Math.min(Math.max(pad, cx - mw / 2), maxLeft);
       ctxMenu.style.left = `${left}px`;
       let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - mh - gap;
-      top = Math.min(Math.max(pad, top), window.innerHeight - mh - pad);
+      top = Math.min(Math.max(pad, top), maxTop);
       ctxMenu.style.top = `${top}px`;
     }
     // Scale the menu out from the point that opened it (the cursor/tile), not
@@ -2370,12 +2372,12 @@ function placeMenu(e) {
   // moment it actually settles (via the resize hook) AND on a short fallback, so
   // the menu can never end up clipped by a window that grew a beat too late.
   pendingReplace = put;
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       put();
       ctxMenu.style.visibility = "";
     });
-  }, 90);
+  });
 }
 function closeMenu() {
   if (ctxMenu.classList.contains("hidden")) return;
@@ -2485,7 +2487,7 @@ const SHADOW_PAD = 18;
 // lag was the visible jump/blink). Empty stage regions don't steal clicks: a
 // cursor watcher (backend) flips the window click-through outside the hit
 // rects the frontend reports (reportHitRects).
-const PANEL_ROOM = 320;
+const PANEL_ROOM = 420;
 
 let lastFull = null;
 function computeFrame() {

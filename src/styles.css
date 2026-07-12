@@ -2391,9 +2391,7 @@ body.settings-body::before {
 /* "More options" dropdown next to "+ Add app" (Pinned apps tab). */
 .s-more { position: relative; display: inline-block; }
 .s-more-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  position: fixed;
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -2442,7 +2440,6 @@ body.settings-body::before {
 .s-more-menu button:disabled { opacity: 0.45; cursor: default; }
 .s-more-menu button:focus-visible,
 .pin-kid-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.pin-toolbar-actions .s-more-menu { left: auto; right: 0; }
 
 /* Button with a leading icon (e.g. "What's new" in About). */
 .s-btn-ico { display: inline-flex; align-items: center; gap: 7px; }
@@ -3226,15 +3223,15 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .r-hotkey input { font: inherit; font-size: var(--text-md); padding: 7px 10px; min-width: 180px; text-align: center; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); }
 
 
-.pin-list { list-style: none; margin: 10px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.pin-list { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .pin-item {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 48px;
-  padding: 9px 10px;
+  min-height: 42px;
+  padding: 6px 8px;
   background: color-mix(in srgb, var(--layer-strong) 62%, transparent);
   border: 1px solid var(--stroke);
   border-radius: var(--r-md);
@@ -3255,10 +3252,9 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
 .pin-item:hover {
-  transform: translateY(-1px);
   background: var(--layer-strong);
   border-color: color-mix(in srgb, var(--accent) 24%, var(--stroke));
-  box-shadow: 0 8px 20px color-mix(in srgb, #000 10%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
 }
 .pin-item:hover::before { opacity: 1; transform: scaleY(1); }
 .pin-item.sep .pin-name { color: var(--ink-2); font-style: italic; }
@@ -3404,8 +3400,8 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 0 0 12px;
-  padding: 8px;
+  margin: 0 0 8px;
+  padding: 6px;
   flex-wrap: wrap;
   background: color-mix(in srgb, var(--layer-strong) 58%, transparent);
   border: 1px solid var(--stroke);
@@ -3462,14 +3458,14 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-list-summary strong { color: var(--ink); font-size: var(--text-md); font-variant-numeric: tabular-nums; }
 
 /* ── Grid view: cards that wrap; a group card spans the row when opened ──── */
-.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; margin: 8px 0 12px; }
+.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 6px; margin: 6px 0 10px; }
 .pin-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 14px 8px 10px; background: color-mix(in srgb, var(--layer-strong) 58%, transparent); border: 1px solid var(--stroke);
+  padding: 10px 7px 7px; background: color-mix(in srgb, var(--layer-strong) 58%, transparent); border: 1px solid var(--stroke);
   border-radius: var(--r-md, 12px); text-align: center; min-width: 0;
   transition: box-shadow 0.18s var(--ease), background 0.18s var(--ease), transform 0.14s var(--ease);
 }
-.pin-card:hover { transform: translateY(-1px); background: var(--layer-strong); }
+.pin-card:hover { background: var(--layer-strong); }
 .pin-card.is-group { background: color-mix(in srgb, var(--accent) 6%, var(--layer)); }
 .pin-card.is-sep { opacity: 0.7; }
 .pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
@@ -3712,14 +3708,18 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 
 @media (max-width: 560px) {
-  .pin-toolbar { align-items: stretch; }
-  .pin-toolbar-main,
-  .pin-toolbar-actions,
+  .pin-toolbar { display: grid; grid-template-columns: 1fr; align-items: stretch; }
+  .pin-toolbar-main { width: 100%; }
+  .pin-toolbar-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    width: 100%;
+    margin-left: 0;
+    gap: 6px;
+  }
   .pin-add-main,
   .pin-toolbar-actions .s-more,
-  .pin-toolbar-actions .s-more > .s-btn { width: 100%; }
-  .pin-toolbar-actions { margin-left: 0; }
-  .pin-toolbar-actions .s-more-menu { left: 0; right: auto; width: min(100%, 300px); }
+  .pin-toolbar-actions .s-more > .s-btn { width: 100%; min-width: 0; justify-content: center; }
   .pin-view-toggle { width: 100%; justify-content: stretch; }
   .pin-view-btn { flex: 1 1 0; }
   .pin-clear-confirm { width: 100%; justify-content: space-between; }
@@ -3727,6 +3727,12 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   .accent-picker-enhanced .accent-swatches { width: 100%; min-width: 0; }
   .accent-picker-enhanced .accent-swatches { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
   .preset-row { grid-template-columns: 1fr; width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .pin-clear { width: 34px; height: 32px; padding: 0; justify-content: center; }
+  .pin-clear > span:last-child { display: none; }
+  .pin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Installed-app suggestions */

@@ -73,7 +73,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => invoke("notch_reveal"), 120);
+  hoverTimer = setTimeout(() => invoke("reveal_dock"), 120);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 
