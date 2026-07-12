@@ -309,8 +309,7 @@ fn get_config() -> Config {
 }
 
 #[tauri::command]
-fn save_config(app: AppHandle, mut config: Config) -> Result<(), String> {
-    config.always_on_top = true;
+fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
     let result = config::save(&config);
     if result.is_ok() {
         clip_apply_config(&config);
@@ -467,24 +466,25 @@ fn open_with(path: String) -> Result<(), String> {
 }
 
 fn apply_always_on_top(app: &AppHandle) {
+    let cfg = config::load();
     if let Some(dock) = app.get_webview_window("dock") {
-        let _ = dock.set_always_on_top(true);
+        let _ = dock.set_always_on_top(cfg.always_on_top);
     }
+    // The notch remains reachable while the dock is hidden. This does not
+    // raise or focus the larger dock window.
     if let Some(notch) = app.get_webview_window("notch") {
         let _ = notch.set_always_on_top(true);
     }
 }
 
 #[tauri::command]
-fn set_always_on_top(app: AppHandle, _value: bool) -> Result<(), String> {
+fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
     let mut cfg = config::load();
-    if !cfg.always_on_top {
-        cfg.always_on_top = true;
-        let _ = config::save(&cfg);
-    }
+    cfg.always_on_top = value;
+    config::save(&cfg)?;
     apply_always_on_top(&app);
     if let Some(dock) = app.get_webview_window("dock") {
-        dock.set_always_on_top(true).map_err(|e| e.to_string())
+        dock.set_always_on_top(value).map_err(|e| e.to_string())
     } else {
         Ok(())
     }
@@ -760,18 +760,24 @@ fn reveal_dock(app: AppHandle) {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
-        // A revealed dock must be immediately clickable and visible above the
-        // active app; never wait for the cursor watcher's next tick.
+        // Automatic/hover reveals must not steal keyboard focus from the app
+        // the user is working in. A direct notch click uses notch_reveal below.
         let cfg = config::load();
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
-        lift_dock_window(&dock);
+        let _ = dock.set_always_on_top(cfg.always_on_top);
+        let _ = dock.show();
     }
 }
 
 fn lift_dock_window(dock: &tauri::WebviewWindow) {
-    let _ = dock.set_always_on_top(false);
-    let _ = dock.set_always_on_top(true);
+    let cfg = config::load();
+    if cfg.always_on_top {
+        let _ = dock.set_always_on_top(false);
+        let _ = dock.set_always_on_top(true);
+    } else {
+        let _ = dock.set_always_on_top(false);
+    }
     let _ = dock.show();
     let _ = dock.set_focus();
 }
@@ -780,7 +786,15 @@ fn lift_dock_window(dock: &tauri::WebviewWindow) {
 /// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
 #[tauri::command]
 fn notch_reveal(app: AppHandle) {
-    reveal_dock(app.clone());
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let cfg = config::load();
+        let _ = position_dock(&dock, &cfg.edge);
+        let _ = dock.set_ignore_cursor_events(false);
+        lift_dock_window(&dock);
+    }
     let _ = app.emit("booki://reveal", ());
 }
 
@@ -2153,7 +2167,7 @@ pub fn run() {
                 // radius and translucency and avoids the native-Mica corner/resize
                 // quirks. So no Mica/DWM rounding is applied to the window here.
                 let _ = position_dock(&dock, &cfg.edge);
-                let _ = dock.set_always_on_top(true);
+                let _ = dock.set_always_on_top(cfg.always_on_top);
                 let _ = dock.show();
                 #[cfg(windows)]
                 if let Ok(h) = dock.hwnd() {

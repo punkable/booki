@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.50.4",
+    date: "12 jul 2026",
+    headline: "Dock mas estable, menus completos y Apps ancladas mas compactas.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Comportamiento predecible",
+        notes: [
+          "Las revelaciones automaticas ya no roban el foco de la ventana en la que estas trabajando.",
+          "La opcion Flotar por encima vuelve a respetar su estado en lugar de permanecer forzada.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Menus sin recortes",
+        notes: [
+          "Los menus del dock disponen de mas espacio y se limitan correctamente en ambos ejes.",
+          "Mas opciones se monta fuera de las secciones de Ajustes y elige automaticamente si debe abrir arriba o abajo.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Apps ancladas ordenadas",
+        notes: [
+          "La barra de acciones, las filas y la cuadricula ocupan menos alto sin perder controles.",
+          "La distribucion responsive mantiene las acciones principales en una linea incluso a 320 px.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.3",
     date: "12 jul 2026",
     headline: "Booki se siente mas cercano a Windows y se adapta mejor a ventanas estrechas.",

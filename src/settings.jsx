@@ -1525,6 +1525,7 @@ function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const moreButtonRef = useRef(null);
+  const moreMenuRef = useRef(null);
   const kidMenuRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
@@ -1889,11 +1890,40 @@ function Apps({ cfg, set }) {
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
   const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [moreMenuPos, setMoreMenuPos] = useState(null);
+  useLayoutEffect(() => {
+    if (!moreOpen || !moreButtonRef.current || !moreMenuRef.current) return;
+    const place = () => {
+      const trigger = moreButtonRef.current.getBoundingClientRect();
+      const menu = moreMenuRef.current.getBoundingClientRect();
+      const pad = 8;
+      const gap = 6;
+      const left = Math.min(
+        Math.max(pad, trigger.right - menu.width),
+        Math.max(pad, window.innerWidth - menu.width - pad)
+      );
+      const below = trigger.bottom + gap;
+      const above = trigger.top - menu.height - gap;
+      const top = below + menu.height <= window.innerHeight - pad
+        ? below
+        : Math.max(pad, above);
+      setMoreMenuPos({ left, top });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [moreOpen]);
   // Close the "more options" dropdown when clicking anywhere else.
   useEffect(() => {
     if (!moreOpen) return;
     const close = (e) => {
-      if (!e.target.closest || !e.target.closest(".s-more")) setMoreOpen(false);
+      if (!e.target.closest || (!e.target.closest(".s-more") && !e.target.closest(".s-more-menu"))) {
+        setMoreOpen(false);
+      }
     };
     window.addEventListener("pointerdown", close);
     return () => window.removeEventListener("pointerdown", close);
@@ -1996,8 +2026,10 @@ function Apps({ cfg, set }) {
               <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("chevron-down") }} />
               <span>{t("apps.more")}</span>
             </button>
-            {moreOpen && (
-              <div className="s-more-menu" role="menu" aria-label={t("apps.more")} onClick={() => setMoreOpen(false)}>
+            {moreOpen && createPortal(
+              <div ref={moreMenuRef} className="s-more-menu" role="menu" aria-label={t("apps.more")}
+                style={{ left: moreMenuPos?.left ?? 0, top: moreMenuPos?.top ?? 0, visibility: moreMenuPos ? "visible" : "hidden" }}
+                onClick={() => setMoreOpen(false)}>
                 <button role="menuitem" onClick={addFolder}>
                   <span dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />{t("apps.addFolder")}
                 </button>
@@ -2010,7 +2042,8 @@ function Apps({ cfg, set }) {
                 <button role="menuitem" onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
                   <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.addTrash")}
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           {cfg.pinned.length > 0 && (clearArm ? (
