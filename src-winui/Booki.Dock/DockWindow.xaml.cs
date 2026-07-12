@@ -45,6 +45,7 @@ public sealed partial class DockWindow : Window
 
     public void Refresh()
     {
+        _hideTimer.Interval = TimeSpan.FromMilliseconds(Math.Clamp(App.Store.Value.AutoHideDelay, 150, 3000));
         ApplyAdaptiveTileSize();
         PinnedItems.ItemsSource = null;
         PinnedItems.ItemsSource = App.Store.Value.Pinned;
@@ -61,7 +62,7 @@ public sealed partial class DockWindow : Window
         var vertical = App.Store.Value.Edge is "Left" or "Right";
         var count = Math.Max(1, App.Store.Value.Pinned.Count);
         var tileSize = App.Store.Value.Pinned.FirstOrDefault()?.TileSize ?? App.Store.Value.IconSize + 8;
-        var length = 12 + count * (tileSize + 2);
+        var length = 12 + count * (tileSize + Math.Clamp(App.Store.Value.Spacing, 0, 12));
         var width = vertical ? (int)tileSize + 12 : (int)Math.Min(length, work.Width - 24);
         var height = vertical ? (int)Math.Min(length, work.Height - 24) : (int)tileSize + 12;
         var x = App.Store.Value.Edge switch
@@ -94,7 +95,7 @@ public sealed partial class DockWindow : Window
         var count = Math.Max(1, App.Store.Value.Pinned.Count);
         var requested = Math.Clamp(App.Store.Value.IconSize, 28, 64);
         var fitted = Math.Clamp((available / count) - 10, 28, requested);
-        foreach (var item in App.Store.Value.Pinned) item.SetIconSize(fitted);
+        foreach (var item in App.Store.Value.Pinned) item.SetLayout(fitted, App.Store.Value.Spacing);
     }
 
     private async Task LoadIconsAsync()
@@ -119,7 +120,7 @@ public sealed partial class DockWindow : Window
         {
             if (item.Kind == "widget" && item.Widget == "clock") item.SetWidgetDisplay(DateTime.Now.ToString("HH:mm"));
             var name = Path.GetFileNameWithoutExtension(item.Path);
-            item.SetRunning(!string.IsNullOrWhiteSpace(name) && running.Contains(name));
+            item.SetRunning(App.Store.Value.ShowIndicators && !string.IsNullOrWhiteSpace(name) && running.Contains(name));
         }
     }
 
@@ -207,7 +208,12 @@ public sealed partial class DockWindow : Window
             ShowGroup(item, button);
             return;
         }
-        if (item.Kind != "widget") Launch(item);
+        if (item.Kind == "trash")
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", "shell:RecycleBinFolder") { UseShellExecute = true });
+            return;
+        }
+        if (item.Kind is not ("widget" or "separator")) Launch(item);
     }
 
     private static void ShowGroup(PinnedItem group, FrameworkElement anchor)

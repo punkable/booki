@@ -42,6 +42,6 @@ public sealed partial class NotchWindow : Window
     private void Reveal_Click(object sender, RoutedEventArgs e) => App.ShowDock();
     private void Reveal_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
-        if (App.Store.Value.AutoHide) App.ShowDock();
+        if (App.Store.Value.AutoHide && string.Equals(App.Store.Value.NotchTrigger, "Hover", StringComparison.OrdinalIgnoreCase)) App.ShowDock();
     }
 }

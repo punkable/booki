@@ -44,7 +44,7 @@
                         PointerExited="Tile_PointerExited"
                         Width="{Binding TileSize}"
                         Height="{Binding TileSize}"
-                        Margin="1"
+                        Margin="{Binding TileMargin}"
                         AutomationProperties.Name="{Binding Name}"
                         Background="Transparent"
                         CornerRadius="7"

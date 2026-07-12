@@ -40,9 +40,15 @@ public sealed partial class SettingsPage : Page
         SelectByTag(ThemeBox, value.Theme);
         SelectByTag(EdgeBox, value.Edge);
         IconSizeSlider.Value = value.IconSize;
+        SpacingSlider.Value = value.Spacing;
+        RadiusSlider.Value = value.CornerRadius;
+        HideDelaySlider.Value = value.AutoHideDelay;
+        SelectByTag(NotchTriggerBox, value.NotchTrigger);
         AlwaysOnTop.IsOn = value.AlwaysOnTop;
         AutoHide.IsOn = value.AutoHide;
         Magnification.IsOn = value.Magnification;
+        ShowLabels.IsOn = value.ShowLabels;
+        ShowIndicators.IsOn = value.ShowIndicators;
         StartWithWindows.IsOn = value.AutoStart;
         ContextMenu.IsOn = value.ContextMenu;
         AccentPicker.Color = ColorHelper.ToColor(value.Accent);
@@ -61,9 +67,15 @@ public sealed partial class SettingsPage : Page
         App.Store.Value.Theme = (ThemeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "System";
         App.Store.Value.Edge = (EdgeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Bottom";
         App.Store.Value.IconSize = (int)IconSizeSlider.Value;
+        App.Store.Value.Spacing = (int)SpacingSlider.Value;
+        App.Store.Value.CornerRadius = (int)RadiusSlider.Value;
+        App.Store.Value.AutoHideDelay = (int)HideDelaySlider.Value;
+        App.Store.Value.NotchTrigger = (NotchTriggerBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Click";
         App.Store.Value.AlwaysOnTop = AlwaysOnTop.IsOn;
         App.Store.Value.AutoHide = AutoHide.IsOn;
         App.Store.Value.Magnification = Magnification.IsOn;
+        App.Store.Value.ShowLabels = ShowLabels.IsOn;
+        App.Store.Value.ShowIndicators = ShowIndicators.IsOn;
         App.Store.Value.ContextMenu = ContextMenu.IsOn;
         await App.Store.SaveAsync();
         ContextMenuService.Sync(App.Store.Value.ContextMenu);
@@ -129,6 +141,18 @@ public sealed partial class SettingsPage : Page
         await RefreshPinnedAsync();
     }
 
+    private async void AddSeparator_Click(object sender, RoutedEventArgs e)
+    {
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = "Separador", Kind = "separator" });
+        await RefreshPinnedAsync();
+    }
+
+    private async void AddTrash_Click(object sender, RoutedEventArgs e)
+    {
+        if (App.Store.Value.Pinned.Any(item => item.Kind == "trash")) return;
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = "Papelera", Kind = "trash" });
+        await RefreshPinnedAsync();
+    }
     private async void StartWithWindows_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;

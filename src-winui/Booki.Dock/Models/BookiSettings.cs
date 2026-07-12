@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
 namespace Booki_Dock.Models;
@@ -38,6 +39,8 @@ public sealed class PinnedItem : INotifyPropertyChanged
     public string Initial => Kind switch
     {
         "group" => "\uE902",
+        "separator" => "\uE94A",
+        "trash" => "\uE74D",
         "widget" => Widget switch { "clock" => "\uE121", "cpu" => "%", "note" => "\uE70B", _ => "\uE9F9" },
         _ => string.IsNullOrWhiteSpace(Name) ? "?" : Name[..1].ToUpperInvariant()
     };
@@ -52,6 +55,7 @@ public sealed class PinnedItem : INotifyPropertyChanged
     [JsonIgnore] public double TileSize { get; private set; } = 48;
     [JsonIgnore] public double ImageSize { get; private set; } = 40;
     [JsonIgnore] public double InitialFontSize { get; private set; } = 16;
+    [JsonIgnore] public Thickness TileMargin { get; private set; } = new(1);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -73,13 +77,15 @@ public sealed class PinnedItem : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new(nameof(WidgetDisplay)));
     }
 
-    public void SetIconSize(int size)
+    public void SetLayout(int size, int spacing)
     {
         TileSize = size + 8;
         ImageSize = size;
         InitialFontSize = Math.Max(14, size * 0.38);
+        TileMargin = new Thickness(Math.Clamp(spacing, 0, 12) / 2d);
         PropertyChanged?.Invoke(this, new(nameof(TileSize)));
         PropertyChanged?.Invoke(this, new(nameof(ImageSize)));
         PropertyChanged?.Invoke(this, new(nameof(InitialFontSize)));
+        PropertyChanged?.Invoke(this, new(nameof(TileMargin)));
     }
 }

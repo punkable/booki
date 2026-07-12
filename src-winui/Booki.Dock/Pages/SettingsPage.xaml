@@ -38,7 +38,14 @@
                             <Slider x:Name="IconSizeSlider" Minimum="32" Maximum="72" StepFrequency="4"
                                     ValueChanged="Setting_Changed" />
                         </StackPanel>
-                        <StackPanel Spacing="8">
+                        <StackPanel>
+                            <TextBlock Text="Separación" />
+                            <Slider x:Name="SpacingSlider" Minimum="0" Maximum="12" StepFrequency="1" ValueChanged="Setting_Changed" />
+                        </StackPanel>
+                        <StackPanel>
+                            <TextBlock Text="Radio de esquinas" />
+                            <Slider x:Name="RadiusSlider" Minimum="6" Maximum="24" StepFrequency="2" ValueChanged="Setting_Changed" />
+                        </StackPanel>                        <StackPanel Spacing="8">
                             <TextBlock Text="Color de acento" />
                             <ColorPicker x:Name="AccentPicker"
                                          IsAlphaEnabled="False" ColorChanged="AccentPicker_ColorChanged" />
@@ -63,6 +70,16 @@
                         <ToggleSwitch x:Name="AutoHide" Header="Ocultar automáticamente" Toggled="Setting_Changed" />
                         <ToggleSwitch x:Name="Magnification" Header="Ampliar iconos al pasar el puntero"
                                       Toggled="Setting_Changed" />
+                        <StackPanel>
+                            <TextBlock Text="Retraso al ocultar" />
+                            <Slider x:Name="HideDelaySlider" Minimum="150" Maximum="2000" StepFrequency="50" ValueChanged="Setting_Changed" />
+                        </StackPanel>
+                        <ComboBox x:Name="NotchTriggerBox" Header="Mostrar desde el notch" SelectionChanged="Setting_Changed">
+                            <ComboBoxItem Content="Al hacer clic" Tag="Click" />
+                            <ComboBoxItem Content="Al pasar el puntero" Tag="Hover" />
+                        </ComboBox>
+                        <ToggleSwitch x:Name="ShowLabels" Header="Mostrar nombres" Toggled="Setting_Changed" />
+                        <ToggleSwitch x:Name="ShowIndicators" Header="Mostrar indicador de apps abiertas" Toggled="Setting_Changed" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -83,7 +100,8 @@
                             <MenuFlyout>
                                 <MenuFlyoutItem Text="Aplicación" Click="AddApp_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8A5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                 <MenuFlyoutItem Text="Grupo" Click="AddGroup_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
-                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Separador" Click="AddSeparator_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE94A;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Papelera" Click="AddTrash_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>                                <MenuFlyoutSeparator />
                                 <MenuFlyoutSubItem Text="Widget">
                                     <MenuFlyoutItem Text="Reloj" Tag="clock" Click="AddWidget_Click" />
                                     <MenuFlyoutItem Text="CPU" Tag="cpu" Click="AddWidget_Click" />
