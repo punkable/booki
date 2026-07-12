@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Booki.Dock (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Booki.Dock (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
