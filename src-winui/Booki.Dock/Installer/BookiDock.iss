@@ -24,5 +24,5 @@ Source: "Booki-Punkable.cer"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "BookiDock.appinstaller"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Run]
-Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPeople \"{tmp}\Booki-Punkable.cer\""; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command \"Add-AppxPackage -AppInstallerFile '{tmp}\BookiDock.appinstaller'\""; Flags: waituntilterminated
+Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPeople ""{tmp}\Booki-Punkable.cer"""; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Add-AppxPackage -AppInstallerFile '{tmp}\BookiDock.appinstaller'"""; Flags: waituntilterminated

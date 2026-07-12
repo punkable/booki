@@ -68,13 +68,19 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
-          releaseName: "Booki Legacy ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
           releaseBody: |
-            **Booki Legacy** is the original Tauri-based edition of Booki for Windows 10 and Windows 11.
+            ## Booki Dock (WinUI 3) - recomendado
+
+            La nueva generación nativa para Windows 10 y Windows 11, con Fluent Design, identidad Booki, integración con el Explorador y actualizaciones mediante Windows App Installer.
+
+            Descarga **`Booki-Dock-WinUI3-Setup.exe`** para la instalación normal. También se publican el paquete MSIX y el feed App Installer para instalaciones administradas.
+
+            ## Booki Legacy
+
+            La edición original basada en Tauri continúa disponible mientras Booki Dock completa su transición nativa.
 
             Download the **`Booki_*_x64-setup.exe`** installer for the normal per-user installation. An MSI package is also included for managed Windows environments.
-
-            Booki Legacy remains available while the new native WinUI 3 generation is developed. WebView2 is downloaded automatically when it is missing.
 
             **SmartScreen note:** Booki does not yet use a commercial code-signing certificate, so Windows may display a warning. Choose **More info**, verify that the publisher and source are expected, and then choose **Run anyway**.
 
