@@ -343,7 +343,7 @@ dependencies = [
 
 [[package]]
 name = "booki-dock"
-version = "0.50.2"
+version = "0.50.3"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",

@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Rust
@@ -70,28 +70,31 @@ jobs:
           tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
           releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }} (beta)"
           releaseBody: |
-            **Booki Dock** — a modern, lightweight dock for Windows. 🦫 _Beta._
+            **Booki Dock** is a lightweight, customizable dock for Windows 10 and Windows 11.
 
-            Download **`Booki_*_x64-setup.exe`** below and run it (per-user install, no admin needed).
+            Download the **`Booki_*_x64-setup.exe`** installer for the normal per-user installation. An MSI package is also included for managed Windows environments.
 
-            **This is a big beta update** — a full design pass over the whole app, guided by Apple's fluid-interface principles:
+            This release improves Fluent styling, keyboard accessibility, responsive Settings layouts, context-menu placement, motion, and idle performance. WebView2 is downloaded automatically when it is missing.
 
-            - ✨ **Fluid motion** — the hidden dock now snaps out instantly and decelerates into place; menus, toasts and panels use clean easing (bounce is reserved for physical moments like feeding the trash); widget marquees pause readably on every loop.
-            - ♿ **Accessibility** — Windows' reduced-transparency and high-contrast settings are now respected on every glass surface, reduced motion gets proper ellipsized text, and Settings dialogs keep keyboard focus trapped where it belongs.
-            - 🧭 **More intuitive** — context menus grow from the exact point you clicked, dock confirmations anchor to the bar and never leave the screen, deleting a saved profile asks for a confirming second click, and popups exit the way they entered.
-            - 🎨 **Visual polish** — one consistent danger red, higher-contrast badges and secondary text over glass, size-aware heading tracking, a text scale that follows your system text size, and a calmer notch pill with compositor-smooth hover.
+            **SmartScreen note:** Booki does not yet use a commercial code-signing certificate, so Windows may display a warning. Choose **More info**, verify that the publisher and source are expected, and then choose **Run anyway**.
 
-            Requires Windows 10/11. The WebView2 runtime is fetched automatically if missing.
-
-            **SmartScreen / Defender note:** this beta isn't signed with a commercial certificate yet, so Windows may show "Windows protected your PC" — choose *More info → Run anyway*. Booki only touches its own folder, your dock settings and the per-user startup entry; deletions from the dock's trash go to the Recycle Bin (recoverable). If Defender's *Controlled folder access* blocks a delete, allow Booki in Windows Security → Ransomware protection.
-
-            Created by **Punkable** ([GitHub](https://github.com/punkable) · [@0xPunki on X](https://x.com/0xPunki)).
-
-            > Beta build — only the latest version is kept available. The in-app updater keeps you current.
+            Created by **Punkable** ([GitHub](https://github.com/punkable) and [@0xPunki on X](https://x.com/0xPunki)).
           releaseDraft: false
           # Must be a full release (not prerelease) so the updater endpoint
           # `releases/latest/download/latest.json` resolves. "Beta" is a label only.
           prerelease: false
+
+      - name: Verify published installers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          assets="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          echo "$assets"
+          grep -Eq 'x64-setup\.exe$' <<< "$assets"
+          grep -Eq '\.msi$' <<< "$assets"
+          grep -Eq 'latest\.json$' <<< "$assets"
 
       # Keep only the just-published release downloadable: delete every older
       # release (and its tag) so users always grab the latest beta.
