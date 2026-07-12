@@ -280,8 +280,10 @@ public sealed partial class SettingsPage : Page
             UpdateInfo.IsOpen = true;
             if (result.IsAvailable)
             {
-                CheckUpdatesButton.Content = "Instalar actualización";
-                await Launcher.LaunchUriAsync(new Uri(UpdateService.AppInstallerUri));
+                CheckUpdatesButton.Content = "Descargando...";
+                var installer = await UpdateService.DownloadInstallerAsync();
+                UpdateService.LaunchInstaller(installer);
+                Application.Current.Exit();
             }
         }
         catch (Exception ex)

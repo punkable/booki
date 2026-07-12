@@ -164,6 +164,20 @@ jobs:
           Copy-Item $package.FullName "src-winui/Booki.Dock/Installer/Booki.Dock_$env:WINUI_VERSION`_x64.msix"
           Copy-Item "src-winui/Booki.Dock/Installer/BookiDock.appinstaller.template" "src-winui/Booki.Dock/Installer/BookiDock.appinstaller"
 
+      - name: Publish unpackaged WinUI application
+        shell: pwsh
+        run: |
+          Remove-Item "src-winui/Booki.Dock/Installer/publish" -Recurse -Force -ErrorAction SilentlyContinue
+          dotnet publish src-winui/Booki.Dock/Booki.Dock.csproj `
+            -c Release -r win-x64 -p:Platform=x64 `
+            -p:WindowsPackageType=None `
+            -p:GenerateAppxPackageOnBuild=false `
+            --self-contained true `
+            -o "src-winui/Booki.Dock/Installer/publish"
+          if (-not (Test-Path "src-winui/Booki.Dock/Installer/publish/Booki.Dock.exe")) {
+            throw "The unpackaged WinUI executable was not generated."
+          }
+
       - name: Build familiar setup executable
         shell: pwsh
         run: |
