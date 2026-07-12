@@ -1,8 +1,10 @@
 using Booki_Dock.Models;
+using Booki_Dock.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -38,6 +40,9 @@ public sealed partial class SettingsPage : Page
         AlwaysOnTop.IsOn = value.AlwaysOnTop;
         AutoHide.IsOn = value.AutoHide;
         Magnification.IsOn = value.Magnification;
+        StartWithWindows.IsOn = value.AutoStart;
+        ContextMenu.IsOn = value.ContextMenu;
+        AccentPicker.Color = ColorHelper.ToColor(value.Accent);
         PinnedAppsList.ItemsSource = value.Pinned;
         MigrationInfo.IsOpen = File.Exists(App.Store.LegacyPath);
         _loading = false;
@@ -52,7 +57,10 @@ public sealed partial class SettingsPage : Page
         App.Store.Value.AlwaysOnTop = AlwaysOnTop.IsOn;
         App.Store.Value.AutoHide = AutoHide.IsOn;
         App.Store.Value.Magnification = Magnification.IsOn;
+        App.Store.Value.ContextMenu = ContextMenu.IsOn;
         await App.Store.SaveAsync();
+        ContextMenuService.Sync(App.Store.Value.ContextMenu);
+        App.SetDockAlwaysOnTop(App.Store.Value.AlwaysOnTop);
         App.RefreshDock();
     }
 
@@ -61,6 +69,7 @@ public sealed partial class SettingsPage : Page
         if (_loading) return;
         App.Store.Value.Accent = $"#{args.NewColor.R:X2}{args.NewColor.G:X2}{args.NewColor.B:X2}";
         await App.Store.SaveAsync();
+        App.ApplyAccent(App.Store.Value.Accent);
     }
 
     private async void ImportLegacy_Click(object sender, RoutedEventArgs e)
@@ -79,7 +88,7 @@ public sealed partial class SettingsPage : Page
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add(".exe");
         picker.FileTypeFilter.Add(".lnk");
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.SettingsWindow));
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.SettingsWindow!));
         var file = await picker.PickSingleFileAsync();
         if (file is null) return;
         App.Store.Value.Pinned.Add(new PinnedItem { Name = Path.GetFileNameWithoutExtension(file.Name), Path = file.Path });
@@ -93,6 +102,44 @@ public sealed partial class SettingsPage : Page
     {
         if (sender is not Button { Tag: PinnedItem item }) return;
         App.Store.Value.Pinned.RemoveAll(entry => entry.Id == item.Id);
+        await App.Store.SaveAsync();
+        PinnedAppsList.ItemsSource = null;
+        PinnedAppsList.ItemsSource = App.Store.Value.Pinned;
+        App.RefreshDock();
+    }
+
+    private async void AddGroup_Click(object sender, RoutedEventArgs e)
+    {
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = "Nuevo grupo", Kind = "group" });
+        await RefreshPinnedAsync();
+    }
+
+    private async void AddWidget_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuFlyoutItem { Tag: string widget }) return;
+        var name = widget switch { "clock" => "Reloj", "cpu" => "CPU", "note" => "Notas", _ => "Portapapeles" };
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = name, Kind = "widget", Widget = widget });
+        await RefreshPinnedAsync();
+    }
+
+    private async void StartWithWindows_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        App.Store.Value.AutoStart = StartWithWindows.IsOn;
+        AutostartService.Set(StartWithWindows.IsOn);
+        await App.Store.SaveAsync();
+    }
+
+    private async void PinnedAppsList_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    {
+        if (args.DropResult == DataPackageOperation.None) return;
+        App.Store.Value.Pinned = PinnedAppsList.Items.OfType<PinnedItem>().ToList();
+        await App.Store.SaveAsync();
+        App.RefreshDock();
+    }
+
+    private async Task RefreshPinnedAsync()
+    {
         await App.Store.SaveAsync();
         PinnedAppsList.ItemsSource = null;
         PinnedAppsList.ItemsSource = App.Store.Value.Pinned;

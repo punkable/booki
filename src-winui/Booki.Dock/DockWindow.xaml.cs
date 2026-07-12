@@ -40,10 +40,12 @@ public sealed partial class DockWindow : Window
 
     public void Refresh()
     {
+        foreach (var item in App.Store.Value.Pinned) item.SetIconSize(App.Store.Value.IconSize);
         PinnedList.ItemsSource = null;
         PinnedList.ItemsSource = App.Store.Value.Pinned;
         ApplyOrientation();
         Position();
+        _ = LoadIconsAsync();
     }
 
     public void Position()
@@ -51,8 +53,9 @@ public sealed partial class DockWindow : Window
         var display = DisplayArea.Primary;
         var work = display.WorkArea;
         var vertical = App.Store.Value.Edge is "Left" or "Right";
-        var width = vertical ? 76 : Math.Clamp(32 + App.Store.Value.Pinned.Count * 56, 144, 720);
-        var height = vertical ? Math.Clamp(32 + App.Store.Value.Pinned.Count * 56, 144, 720) : 76;
+        var tileSize = App.Store.Value.IconSize + 20;
+        var width = vertical ? tileSize + 24 : Math.Clamp(24 + App.Store.Value.Pinned.Count * tileSize, 144, 720);
+        var height = vertical ? Math.Clamp(24 + App.Store.Value.Pinned.Count * tileSize, 144, 720) : tileSize + 24;
         var x = App.Store.Value.Edge switch
         {
             "Left" => work.X + 12,
@@ -78,7 +81,14 @@ public sealed partial class DockWindow : Window
     private async Task LoadIconsAsync()
     {
         foreach (var item in App.Store.Value.Pinned)
-            item.SetIcon(await AppIconService.LoadAsync(item.Path));
+        {
+            if (item.Kind == "widget")
+            {
+                item.SetWidgetDisplay(item.Widget == "clock" ? DateTime.Now.ToString("HH:mm") : item.Name);
+                continue;
+            }
+            if (item.Kind != "group") item.SetIcon(await AppIconService.LoadAsync(item.Path));
+        }
     }
 
     private void RefreshRunningState()
@@ -88,6 +98,7 @@ public sealed partial class DockWindow : Window
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var item in App.Store.Value.Pinned)
         {
+            if (item.Kind == "widget" && item.Widget == "clock") item.SetWidgetDisplay(DateTime.Now.ToString("HH:mm"));
             var name = Path.GetFileNameWithoutExtension(item.Path);
             item.SetRunning(!string.IsNullOrWhiteSpace(name) && running.Contains(name));
         }
@@ -152,6 +163,10 @@ public sealed partial class DockWindow : Window
     {
         if (sender is MenuFlyoutItem { Tag: PinnedItem item }) Launch(item);
     }
+
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) => App.OpenSettings();
+
+    private void Quit_Click(object sender, RoutedEventArgs e) => App.Quit();
 
     private async void RemoveItem_Click(object sender, RoutedEventArgs e)
     {

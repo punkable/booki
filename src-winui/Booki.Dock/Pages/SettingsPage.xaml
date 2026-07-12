@@ -15,8 +15,8 @@
                          Message="Puedes importar tus apps y preferencias sin modificar la instalación anterior." />
                 <Border Style="{StaticResource SettingsCardStyle}">
                     <StackPanel>
-                        <ToggleSwitch x:Name="StartWithWindows" Header="Iniciar con Windows" />
-                        <ToggleSwitch x:Name="ContextMenu" Header="Añadir a Booki desde el Explorador" IsOn="True" />
+                        <ToggleSwitch x:Name="StartWithWindows" Header="Iniciar con Windows" Toggled="StartWithWindows_Toggled" />
+                        <ToggleSwitch x:Name="ContextMenu" Header="Añadir a Booki desde el Explorador" IsOn="True" Toggled="Setting_Changed" />
                     </StackPanel>
                 </Border>
                 <Button HorizontalAlignment="Left" Click="ImportLegacy_Click" Content="Importar desde Booki Legacy" />
@@ -73,14 +73,30 @@
                         <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Apps ancladas" />
                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Ordena y edita lo que aparece en el dock." />
                     </StackPanel>
-                    <Button Grid.Column="1" VerticalAlignment="Center" Click="AddApp_Click">
+                    <DropDownButton Grid.Column="1" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE710;" />
-                            <TextBlock Text="Añadir app" />
+                            <TextBlock Text="Añadir" />
                         </StackPanel>
-                    </Button>
+                        <DropDownButton.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Aplicación" Click="AddApp_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8A5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Grupo" Click="AddGroup_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutSubItem Text="Widget">
+                                    <MenuFlyoutItem Text="Reloj" Tag="clock" Click="AddWidget_Click" />
+                                    <MenuFlyoutItem Text="CPU" Tag="cpu" Click="AddWidget_Click" />
+                                    <MenuFlyoutItem Text="Notas" Tag="note" Click="AddWidget_Click" />
+                                    <MenuFlyoutItem Text="Portapapeles" Tag="clipboard" Click="AddWidget_Click" />
+                                </MenuFlyoutSubItem>
+                            </MenuFlyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
                 </Grid>
-                <ListView x:Name="PinnedAppsList" CanReorderItems="True" AllowDrop="True">
+                <InfoBar IsOpen="True" IsClosable="False" Severity="Informational"
+                         Message="Arrastra las filas para ordenar el dock. Los cambios se guardan automáticamente." />
+                <ListView x:Name="PinnedAppsList" CanReorderItems="True" AllowDrop="True"
+                          DragItemsCompleted="PinnedAppsList_DragItemsCompleted">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid Padding="8" ColumnSpacing="12">

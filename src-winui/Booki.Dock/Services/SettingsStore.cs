@@ -58,6 +58,17 @@ public sealed class SettingsStore
         Value.AutoHide = ReadBool(root, "autoHide", Value.AutoHide);
         Value.Magnification = ReadBool(root, "magnification", Value.Magnification);
         Value.IconSize = ReadInt(root, "iconSize", Value.IconSize);
+        Value.Spacing = ReadInt(root, "spacing", Value.Spacing);
+        Value.CornerRadius = ReadInt(root, "cornerRadius", Value.CornerRadius);
+        Value.MaterialStrength = ReadInt(root, "materialStrength", Value.MaterialStrength);
+        Value.AutoHideDelay = ReadInt(root, "autoHideDelay", Value.AutoHideDelay);
+        Value.MonitorIndex = ReadInt(root, "monitor", Value.MonitorIndex);
+        Value.NotchTrigger = ReadString(root, "notchTrigger", Value.NotchTrigger);
+        Value.ShowLabels = ReadBool(root, "showLabels", Value.ShowLabels);
+        Value.ShowIndicators = ReadBool(root, "showIndicators", Value.ShowIndicators);
+        Value.FocusIfRunning = ReadBool(root, "focusIfRunning", Value.FocusIfRunning);
+        Value.AutoStart = ReadBool(root, "autostart", Value.AutoStart);
+        Value.ContextMenu = ReadBool(root, "contextMenu", Value.ContextMenu);
         Value.Pinned.Clear();
         if (root.TryGetProperty("pinned", out var pinned) && pinned.ValueKind == JsonValueKind.Array)
         {

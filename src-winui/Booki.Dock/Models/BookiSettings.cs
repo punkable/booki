@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 using Microsoft.UI.Xaml.Media;
 
 namespace Booki_Dock.Models;
@@ -12,6 +13,17 @@ public sealed class BookiSettings
     public bool AutoHide { get; set; }
     public bool Magnification { get; set; } = true;
     public int IconSize { get; set; } = 48;
+    public int Spacing { get; set; } = 4;
+    public int CornerRadius { get; set; } = 12;
+    public int MaterialStrength { get; set; } = 70;
+    public int AutoHideDelay { get; set; } = 650;
+    public int MonitorIndex { get; set; } = -1;
+    public string NotchTrigger { get; set; } = "Click";
+    public bool ShowLabels { get; set; } = true;
+    public bool ShowIndicators { get; set; } = true;
+    public bool FocusIfRunning { get; set; } = true;
+    public bool AutoStart { get; set; }
+    public bool ContextMenu { get; set; } = true;
     public List<PinnedItem> Pinned { get; set; } = [];
 }
 
@@ -31,6 +43,12 @@ public sealed class PinnedItem : INotifyPropertyChanged
     };
     public ImageSource? IconSource { get; private set; }
     public double RunningOpacity { get; private set; }
+    public string WidgetDisplay { get; private set; } = "";
+    public double WidgetOpacity => Kind == "widget" ? 1 : 0;
+    public double IconOpacity => Kind == "widget" ? 0 : 1;
+    [JsonIgnore] public double TileSize { get; private set; } = 52;
+    [JsonIgnore] public double ImageSize { get; private set; } = 36;
+    [JsonIgnore] public double InitialFontSize { get; private set; } = 16;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -44,5 +62,21 @@ public sealed class PinnedItem : INotifyPropertyChanged
     {
         RunningOpacity = running ? 1 : 0;
         PropertyChanged?.Invoke(this, new(nameof(RunningOpacity)));
+    }
+
+    public void SetWidgetDisplay(string value)
+    {
+        WidgetDisplay = value;
+        PropertyChanged?.Invoke(this, new(nameof(WidgetDisplay)));
+    }
+
+    public void SetIconSize(int size)
+    {
+        TileSize = size + 16;
+        ImageSize = size;
+        InitialFontSize = Math.Max(14, size * 0.38);
+        PropertyChanged?.Invoke(this, new(nameof(TileSize)));
+        PropertyChanged?.Invoke(this, new(nameof(ImageSize)));
+        PropertyChanged?.Invoke(this, new(nameof(InitialFontSize)));
     }
 }

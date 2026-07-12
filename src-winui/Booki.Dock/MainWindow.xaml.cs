@@ -18,6 +18,14 @@ public sealed partial class MainWindow : Window
         NavFrame.Navigate(typeof(SettingsPage), "general");
     }
 
+    public void NavigateTo(string section)
+    {
+        var item = NavView.MenuItems.OfType<NavigationViewItem>()
+            .FirstOrDefault(entry => string.Equals(entry.Tag?.ToString(), section, StringComparison.OrdinalIgnoreCase));
+        if (item is not null) NavView.SelectedItem = item;
+        NavFrame.Navigate(typeof(SettingsPage), section);
+    }
+
     private void TitleBar_PaneToggleRequested(TitleBar sender, object args) =>
         NavView.IsPaneOpen = !NavView.IsPaneOpen;
 
