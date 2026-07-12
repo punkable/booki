@@ -39,6 +39,7 @@ public sealed partial class SettingsPage : Page
         var value = App.Store.Value;
         SelectByTag(ThemeBox, value.Theme);
         SelectByTag(EdgeBox, value.Edge);
+        PopulateMonitors(value.MonitorIndex);
         IconSizeSlider.Value = value.IconSize;
         SpacingSlider.Value = value.Spacing;
         RadiusSlider.Value = value.CornerRadius;
@@ -66,6 +67,7 @@ public sealed partial class SettingsPage : Page
         if (_loading) return;
         App.Store.Value.Theme = (ThemeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "System";
         App.Store.Value.Edge = (EdgeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Bottom";
+        App.Store.Value.MonitorIndex = int.TryParse((MonitorBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var monitor) ? monitor : -1;
         App.Store.Value.IconSize = (int)IconSizeSlider.Value;
         App.Store.Value.Spacing = (int)SpacingSlider.Value;
         App.Store.Value.CornerRadius = (int)RadiusSlider.Value;
@@ -117,6 +119,77 @@ public sealed partial class SettingsPage : Page
         App.RefreshDock();
     }
 
+    private async void AddFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FolderPicker();
+        picker.FileTypeFilter.Add("*");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(App.SettingsWindow!));
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is null) return;
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = folder.Name, Path = folder.Path, Kind = "folder" });
+        await RefreshPinnedAsync();
+    }
+
+    private async void AddWebsite_Click(object sender, RoutedEventArgs e)
+    {
+        var nameBox = new TextBox { Header = "Nombre", PlaceholderText = "Mi sitio" };
+        var urlBox = new TextBox { Header = "Dirección", PlaceholderText = "https://example.com" };
+        var content = new StackPanel { Spacing = 12 };
+        content.Children.Add(nameBox);
+        content.Children.Add(urlBox);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Añadir sitio web",
+            Content = content,
+            PrimaryButtonText = "Añadir",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var raw = urlBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(raw)) return;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri))
+        {
+            raw = $"https://{raw}";
+            if (!Uri.TryCreate(raw, UriKind.Absolute, out uri)) return;
+        }
+        var name = string.IsNullOrWhiteSpace(nameBox.Text) ? uri.Host : nameBox.Text.Trim();
+        App.Store.Value.Pinned.Add(new PinnedItem { Name = name, Path = uri.AbsoluteUri, Kind = "web" });
+        await RefreshPinnedAsync();
+    }
+
+    private async void MoveToGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: PinnedItem item } || item.Kind == "group") return;
+        var groups = App.Store.Value.Pinned.Where(entry => entry.Kind == "group" && entry.Id != item.Id).ToList();
+        if (groups.Count == 0)
+        {
+            var notice = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Primero crea un grupo",
+                Content = "Añade un grupo y después podrás mover aplicaciones, carpetas y widgets dentro de él.",
+                CloseButtonText = "Entendido"
+            };
+            await notice.ShowAsync();
+            return;
+        }
+        var groupBox = new ComboBox { Header = "Grupo", ItemsSource = groups, DisplayMemberPath = nameof(PinnedItem.Name), SelectedIndex = 0 };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = $"Mover {item.Name}",
+            Content = groupBox,
+            PrimaryButtonText = "Mover",
+            CloseButtonText = "Cancelar",
+            DefaultButton = ContentDialogButton.Primary
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary || groupBox.SelectedItem is not PinnedItem group) return;
+        App.Store.Value.Pinned.RemoveAll(entry => entry.Id == item.Id);
+        group.Children.Add(item);
+        await RefreshPinnedAsync();
+    }
     private async void RemovePinned_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: PinnedItem item }) return;
@@ -225,6 +298,21 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    private void PopulateMonitors(int selected)
+    {
+        MonitorBox.Items.Clear();
+        MonitorBox.Items.Add(new ComboBoxItem { Content = "Automática (principal)", Tag = "-1" });
+        foreach (var monitor in WindowStateService.GetMonitors())
+        {
+            var suffix = monitor.IsPrimary ? " · Principal" : "";
+            MonitorBox.Items.Add(new ComboBoxItem
+            {
+                Content = $"Pantalla {monitor.Index + 1}{suffix}",
+                Tag = monitor.Index.ToString()
+            });
+        }
+        SelectByTag(MonitorBox, selected.ToString());
+    }
     private static void SelectByTag(ComboBox combo, string value)
     {
         foreach (var item in combo.Items.OfType<ComboBoxItem>())

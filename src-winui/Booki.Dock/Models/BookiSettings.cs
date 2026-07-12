@@ -20,7 +20,7 @@ public sealed class BookiSettings
     public int AutoHideDelay { get; set; } = 650;
     public int MonitorIndex { get; set; } = -1;
     public string NotchTrigger { get; set; } = "Click";
-    public bool ShowLabels { get; set; } = true;
+    public bool ShowLabels { get; set; }
     public bool ShowIndicators { get; set; } = true;
     public bool FocusIfRunning { get; set; } = true;
     public bool AutoStart { get; set; }
@@ -36,6 +36,24 @@ public sealed class PinnedItem : INotifyPropertyChanged
     public string Kind { get; set; } = "app";
     public string Widget { get; set; } = "";
     public List<PinnedItem> Children { get; set; } = [];
+    public string KindGlyph => Kind switch
+    {
+        "group" => "\uE8B7",
+        "folder" => "\uE8B7",
+        "web" => "\uE774",
+        "widget" => "\uE9F9",
+        "separator" => "\uE94A",
+        "trash" => "\uE74D",
+        _ => "\uE8A5"
+    };
+    public string Description => Kind switch
+    {
+        "group" => $"{Children.Count} elementos",
+        "widget" => "Widget",
+        "separator" => "Separador visual",
+        "trash" => "Papelera de reciclaje",
+        _ => Path
+    };
     public string Initial => Kind switch
     {
         "group" => "\uE902",
@@ -54,6 +72,8 @@ public sealed class PinnedItem : INotifyPropertyChanged
     public double IconOpacity => Kind == "widget" ? 0 : 1;
     [JsonIgnore] public double TileSize { get; private set; } = 48;
     [JsonIgnore] public double ImageSize { get; private set; } = 40;
+    [JsonIgnore] public double TileHeight { get; private set; } = 48;
+    [JsonIgnore] public double LabelOpacity { get; private set; }
     [JsonIgnore] public double InitialFontSize { get; private set; } = 16;
     [JsonIgnore] public Thickness TileMargin { get; private set; } = new(1);
 
@@ -77,15 +97,19 @@ public sealed class PinnedItem : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new(nameof(WidgetDisplay)));
     }
 
-    public void SetLayout(int size, int spacing)
+    public void SetLayout(int size, int spacing, bool showLabel)
     {
         TileSize = size + 8;
         ImageSize = size;
         InitialFontSize = Math.Max(14, size * 0.38);
         TileMargin = new Thickness(Math.Clamp(spacing, 0, 12) / 2d);
+        TileHeight = TileSize + (showLabel && Kind is not ("separator" or "widget") ? 14 : 0);
+        LabelOpacity = showLabel && Kind is not ("separator" or "widget") ? 1 : 0;
         PropertyChanged?.Invoke(this, new(nameof(TileSize)));
         PropertyChanged?.Invoke(this, new(nameof(ImageSize)));
         PropertyChanged?.Invoke(this, new(nameof(InitialFontSize)));
         PropertyChanged?.Invoke(this, new(nameof(TileMargin)));
+        PropertyChanged?.Invoke(this, new(nameof(TileHeight)));
+        PropertyChanged?.Invoke(this, new(nameof(LabelOpacity)));
     }
 }

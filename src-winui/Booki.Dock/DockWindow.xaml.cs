@@ -17,6 +17,7 @@ public sealed partial class DockWindow : Window
     private readonly DispatcherTimer _runningTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
     private bool _transitioning;
+    private bool _fullscreen;
 
     public DockWindow()
     {
@@ -33,7 +34,11 @@ public sealed partial class DockWindow : Window
         }
         Refresh();
         Position();
-        _runningTimer.Tick += (_, _) => RefreshRunningState();
+        _runningTimer.Tick += (_, _) =>
+        {
+            RefreshRunningState();
+            RefreshFullscreenState();
+        };
         _runningTimer.Start();
         _hideTimer.Tick += (_, _) => { _hideTimer.Stop(); if (App.Store.Value.AutoHide) App.HideDock(); };
         DockSurface.Loaded += async (_, _) =>
@@ -62,9 +67,10 @@ public sealed partial class DockWindow : Window
         var vertical = App.Store.Value.Edge is "Left" or "Right";
         var count = Math.Max(1, App.Store.Value.Pinned.Count);
         var tileSize = App.Store.Value.Pinned.FirstOrDefault()?.TileSize ?? App.Store.Value.IconSize + 8;
+        var tileHeight = App.Store.Value.Pinned.FirstOrDefault()?.TileHeight ?? tileSize;
         var length = 12 + count * (tileSize + Math.Clamp(App.Store.Value.Spacing, 0, 12));
         var width = vertical ? (int)tileSize + 12 : (int)Math.Min(length, work.Width - 24);
-        var height = vertical ? (int)Math.Min(length, work.Height - 24) : (int)tileSize + 12;
+        var height = vertical ? (int)Math.Min(length, work.Height - 24) : (int)tileHeight + 12;
         var x = App.Store.Value.Edge switch
         {
             "Left" => work.X + 12,
@@ -89,26 +95,33 @@ public sealed partial class DockWindow : Window
 
     private void ApplyAdaptiveTileSize()
     {
-        var work = DisplayArea.Primary.WorkArea;
+        var work = WindowStateService.GetWorkArea(App.Store.Value.MonitorIndex);
         var vertical = App.Store.Value.Edge is "Left" or "Right";
         var available = (vertical ? work.Height : work.Width) - 36;
         var count = Math.Max(1, App.Store.Value.Pinned.Count);
         var requested = Math.Clamp(App.Store.Value.IconSize, 28, 64);
         var fitted = Math.Clamp((available / count) - 10, 28, requested);
-        foreach (var item in App.Store.Value.Pinned) item.SetLayout(fitted, App.Store.Value.Spacing);
+        foreach (var item in App.Store.Value.Pinned) item.SetLayout(fitted, App.Store.Value.Spacing, App.Store.Value.ShowLabels);
     }
 
     private async Task LoadIconsAsync()
     {
-        foreach (var item in App.Store.Value.Pinned)
+        foreach (var item in App.Store.Value.Pinned) await LoadItemAsync(item);
+    }
+
+    private static async Task LoadItemAsync(PinnedItem item)
+    {
+        if (item.Kind == "widget")
         {
-            if (item.Kind == "widget")
-            {
-                item.SetWidgetDisplay(item.Widget == "clock" ? DateTime.Now.ToString("HH:mm") : item.Name);
-                continue;
-            }
-            if (item.Kind != "group") item.SetIcon(await AppIconService.LoadAsync(item.Path));
+            item.SetWidgetDisplay(item.Widget == "clock" ? DateTime.Now.ToString("HH:mm") : item.Name);
+            return;
         }
+        if (item.Kind == "group")
+        {
+            foreach (var child in item.Children) await LoadItemAsync(child);
+            return;
+        }
+        if (item.Kind != "separator") item.SetIcon(await AppIconService.LoadAsync(item.Path));
     }
 
     private void RefreshRunningState()
@@ -124,6 +137,13 @@ public sealed partial class DockWindow : Window
         }
     }
 
+    private void RefreshFullscreenState()
+    {
+        var fullscreen = WindowStateService.IsForegroundFullscreen();
+        if (fullscreen == _fullscreen) return;
+        _fullscreen = fullscreen;
+        App.SetFullscreenMode(fullscreen);
+    }
     private void DockSurface_PointerEntered(object sender, PointerRoutedEventArgs e) => _hideTimer.Stop();
     private void DockSurface_PointerExited(object sender, PointerRoutedEventArgs e)
     {
@@ -222,6 +242,7 @@ public sealed partial class DockWindow : Window
         foreach (var child in group.Children)
         {
             var menuItem = new MenuFlyoutItem { Text = child.Name, Tag = child };
+            if (child.IconSource is not null) menuItem.Icon = new ImageIcon { Source = child.IconSource };
             menuItem.Click += (_, _) => Launch(child);
             flyout.Items.Add(menuItem);
         }

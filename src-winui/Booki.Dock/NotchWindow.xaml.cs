@@ -1,4 +1,5 @@
 using Microsoft.UI.Windowing;
+using Booki_Dock.Services;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
 
@@ -20,7 +21,7 @@ public sealed partial class NotchWindow : Window
 
     public void PositionNearDock()
     {
-        var work = DisplayArea.Primary.WorkArea;
+        var work = WindowStateService.GetWorkArea(App.Store.Value.MonitorIndex);
         var vertical = App.Store.Value.Edge is "Left" or "Right";
         var width = vertical ? 16 : 64;
         var height = vertical ? 64 : 16;

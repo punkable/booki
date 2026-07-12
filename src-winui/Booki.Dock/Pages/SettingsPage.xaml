@@ -65,6 +65,7 @@
                             <ComboBoxItem Content="Izquierda" Tag="Left" />
                             <ComboBoxItem Content="Derecha" Tag="Right" />
                         </ComboBox>
+                        <ComboBox x:Name="MonitorBox" Header="Pantalla" SelectionChanged="Setting_Changed" />
                         <ToggleSwitch x:Name="AlwaysOnTop" Header="Flotar por encima de otras ventanas"
                                       Toggled="Setting_Changed" />
                         <ToggleSwitch x:Name="AutoHide" Header="Ocultar automáticamente" Toggled="Setting_Changed" />
@@ -99,9 +100,12 @@
                         <DropDownButton.Flyout>
                             <MenuFlyout>
                                 <MenuFlyoutItem Text="Aplicación" Click="AddApp_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8A5;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Carpeta" Click="AddFolder_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutItem Text="Sitio web" Click="AddWebsite_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE774;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                 <MenuFlyoutItem Text="Grupo" Click="AddGroup_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8B7;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
                                 <MenuFlyoutItem Text="Separador" Click="AddSeparator_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE94A;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
-                                <MenuFlyoutItem Text="Papelera" Click="AddTrash_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Papelera" Click="AddTrash_Click"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                                <MenuFlyoutSeparator />
                                 <MenuFlyoutSubItem Text="Widget">
                                     <MenuFlyoutItem Text="Reloj" Tag="clock" Click="AddWidget_Click" />
                                     <MenuFlyoutItem Text="CPU" Tag="cpu" Click="AddWidget_Click" />
@@ -122,15 +126,20 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <FontIcon Glyph="&#xE8A5;" />
+                                <FontIcon Glyph="{Binding KindGlyph}" />
                                 <StackPanel Grid.Column="1">
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                    <TextBlock Text="{Binding Path}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    <TextBlock Text="{Binding Description}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <Button Grid.Column="2" Click="RemovePinned_Click" Tag="{Binding}" ToolTipService.ToolTip="Quitar">
-                                    <FontIcon Glyph="&#xE74D;" />
-                                </Button>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                    <Button Click="MoveToGroup_Click" Tag="{Binding}" ToolTipService.ToolTip="Mover a grupo">
+                                        <FontIcon Glyph="&#xE8B7;" />
+                                    </Button>
+                                    <Button Click="RemovePinned_Click" Tag="{Binding}" ToolTipService.ToolTip="Quitar">
+                                        <FontIcon Glyph="&#xE74D;" />
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

@@ -86,6 +86,25 @@ public partial class App : Application
         _dockWindow.ShowFromNotch();
     }
 
+    public static void SetFullscreenMode(bool fullscreen)
+    {
+        if (_dockWindow is null || _notchWindow is null) return;
+        if (fullscreen)
+        {
+            _dockWindow.AppWindow.Hide();
+            _notchWindow.AppWindow.Hide();
+            return;
+        }
+        if (Store.Value.AutoHide)
+        {
+            _notchWindow.PositionNearDock();
+            _notchWindow.AppWindow.Show();
+        }
+        else
+        {
+            _dockWindow.ShowFromNotch();
+        }
+    }
     public static void Quit()
     {
         Instance.Dispose();
