@@ -63,15 +63,8 @@ public sealed class SettingsStore
         {
             foreach (var item in pinned.EnumerateArray())
             {
-                var kind = ReadString(item, "kind", "app");
-                if (kind is "separator" or "widget") continue;
-                Value.Pinned.Add(new PinnedItem
-                {
-                    Id = ReadString(item, "id", Guid.NewGuid().ToString("N")),
-                    Name = ReadString(item, "name", "App"),
-                    Path = ReadString(item, "path", ""),
-                    Kind = kind
-                });
+                var parsed = ParsePinned(item);
+                if (parsed is not null) Value.Pinned.Add(parsed);
             }
         }
         await SaveAsync();
@@ -91,4 +84,27 @@ public sealed class SettingsStore
             ? value.GetBoolean() : fallback;
     private static int ReadInt(JsonElement root, string name, int fallback) =>
         root.TryGetProperty(name, out var value) && value.TryGetInt32(out var result) ? result : fallback;
+
+    private static PinnedItem? ParsePinned(JsonElement item)
+    {
+        var kind = ReadString(item, "kind", "app");
+        if (kind == "separator") return null;
+        var parsed = new PinnedItem
+        {
+            Id = ReadString(item, "id", Guid.NewGuid().ToString("N")),
+            Name = ReadString(item, "name", kind == "widget" ? "Widget" : "App"),
+            Path = ReadString(item, "path", ""),
+            Kind = kind,
+            Widget = ReadString(item, "widget", "")
+        };
+        if (item.TryGetProperty("children", out var children) && children.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var child in children.EnumerateArray())
+            {
+                var parsedChild = ParsePinned(child);
+                if (parsedChild is not null) parsed.Children.Add(parsedChild);
+            }
+        }
+        return parsed;
+    }
 }

@@ -9,27 +9,40 @@ public partial class App : Application
     public static MainWindow SettingsWindow { get; private set; } = null!;
     private static DockWindow? _dockWindow;
 
-    public App() => InitializeComponent();
+    public App()
+    {
+        InitializeComponent();
+    }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         await Store.LoadAsync();
-        RequestedTheme = Store.Value.Theme switch
-        {
-            "Light" => ApplicationTheme.Light,
-            "Dark" => ApplicationTheme.Dark,
-            _ => RequestedTheme
-        };
         SettingsWindow = new MainWindow();
         SettingsWindow.Activate();
         _dockWindow = new DockWindow();
         _dockWindow.Activate();
+        _notchWindow = new NotchWindow();
+        _notchWindow.AppWindow.Hide();
     }
 
     public static void RefreshDock() => _dockWindow?.Refresh();
 
-    public static void ShowSettings()
+    private static NotchWindow? _notchWindow;
+
+    public static void HideDock()
     {
-        SettingsWindow.Activate();
+        if (_dockWindow is null || _notchWindow is null) return;
+        _dockWindow.AppWindow.Hide();
+        _notchWindow.PositionNearDock();
+        _notchWindow.AppWindow.Show();
     }
+
+    public static void ShowDock()
+    {
+        if (_dockWindow is null || _notchWindow is null) return;
+        _notchWindow.AppWindow.Hide();
+        _dockWindow.Position();
+        _dockWindow.AppWindow.Show();
+    }
+
 }
