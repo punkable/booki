@@ -65,8 +65,7 @@
 
   <!-- Publish Properties -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishReadyToRun>False</PublishReadyToRun>
     <!-- Packaged framework-dependent WinUI builds are not self-contained, so
          trimming is unsupported and can remove JSON migration metadata. -->
     <PublishTrimmed>False</PublishTrimmed>
