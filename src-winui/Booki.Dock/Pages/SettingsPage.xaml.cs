@@ -5,6 +5,8 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.ApplicationModel;
+using Windows.System;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -45,6 +47,8 @@ public sealed partial class SettingsPage : Page
         AccentPicker.Color = ColorHelper.ToColor(value.Accent);
         PinnedAppsList.ItemsSource = value.Pinned;
         MigrationInfo.IsOpen = File.Exists(App.Store.LegacyPath);
+        var packageVersion = Package.Current.Id.Version;
+        VersionText.Text = $"Versión {packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build} · WinUI 3 · Windows App SDK 2.2";
         _loading = false;
     }
 
@@ -125,8 +129,13 @@ public sealed partial class SettingsPage : Page
     private async void StartWithWindows_Toggled(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        App.Store.Value.AutoStart = StartWithWindows.IsOn;
-        AutostartService.Set(StartWithWindows.IsOn);
+        App.Store.Value.AutoStart = await AutostartService.SetAsync(StartWithWindows.IsOn);
+        if (StartWithWindows.IsOn != App.Store.Value.AutoStart)
+        {
+            _loading = true;
+            StartWithWindows.IsOn = App.Store.Value.AutoStart;
+            _loading = false;
+        }
         await App.Store.SaveAsync();
     }
 
@@ -144,6 +153,12 @@ public sealed partial class SettingsPage : Page
         PinnedAppsList.ItemsSource = null;
         PinnedAppsList.ItemsSource = App.Store.Value.Pinned;
         App.RefreshDock();
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        await Launcher.LaunchUriAsync(new Uri(
+            "https://github.com/punkable/booki/releases/latest/download/BookiDock.appinstaller"));
     }
 
     private static void SelectByTag(ComboBox combo, string value)

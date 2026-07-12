@@ -16,9 +16,10 @@ public static class ContextMenuService
             return;
         }
 
-        if (Environment.ProcessPath is not { Length: > 0 } path) return;
-        Write(FileKey, path);
-        Write(FolderKey, path);
+        var command = IsPackaged() ? "bookidock.exe" : Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(command)) return;
+        Write(FileKey, command);
+        Write(FolderKey, command);
     }
 
     private static void Write(string keyPath, string executable)
@@ -28,5 +29,11 @@ public static class ContextMenuService
         shell.SetValue("Icon", executable);
         using var command = shell.CreateSubKey("command");
         command.SetValue(null, $"\"{executable}\" --pin \"%1\"");
+    }
+
+    private static bool IsPackaged()
+    {
+        try { return !string.IsNullOrWhiteSpace(Windows.ApplicationModel.Package.Current.Id.Name); }
+        catch { return false; }
     }
 }

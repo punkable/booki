@@ -111,3 +111,84 @@ jobs:
               gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
             fi
           done
+
+  winui-release:
+    name: Publish Booki Dock WinUI 3
+    needs: release
+    runs-on: windows-latest
+    env:
+      WINUI_VERSION: 0.51.0.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore signing certificate
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.BOOKI_WINUI_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.BOOKI_WINUI_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64)) {
+            throw "BOOKI_WINUI_PFX_BASE64 is not configured."
+          }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\booki.pfx", [Convert]::FromBase64String($env:PFX_BASE64))
+          $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+          Import-PfxCertificate -FilePath "$env:RUNNER_TEMP\booki.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $password | Out-Null
+
+      - name: Build signed MSIX
+        shell: pwsh
+        env:
+          PFX_PASSWORD: ${{ secrets.BOOKI_WINUI_PFX_PASSWORD }}
+        run: |
+          dotnet restore src-winui/Booki.Dock/Booki.Dock.csproj -r win-x64
+          dotnet publish src-winui/Booki.Dock/Booki.Dock.csproj `
+            -c Release -r win-x64 -p:Platform=x64 `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateKeyFile="$env:RUNNER_TEMP\booki.pfx" `
+            -p:PackageCertificatePassword="$env:PFX_PASSWORD" `
+            -p:AppxPackageDir="$env:RUNNER_TEMP\msix\"
+          $package = Get-ChildItem "$env:RUNNER_TEMP\msix" -Recurse -Filter *.msix | Select-Object -First 1
+          if (-not $package) { throw "The WinUI MSIX was not generated." }
+          Copy-Item $package.FullName "src-winui/Booki.Dock/Installer/Booki.Dock_$env:WINUI_VERSION`_x64.msix"
+          Copy-Item "src-winui/Booki.Dock/Installer/BookiDock.appinstaller.template" "src-winui/Booki.Dock/Installer/BookiDock.appinstaller"
+
+      - name: Build familiar setup executable
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "src-winui/Booki.Dock/Installer/BookiDock.iss"
+
+      - name: Publish WinUI installer and update feed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:GITHUB_REF_NAME }
+          if (-not $tag.StartsWith("v")) { $tag = "v0.51.0" }
+          gh release upload $tag `
+            "src-winui/Booki.Dock/Installer/Booki.Dock_$env:WINUI_VERSION`_x64.msix" `
+            "src-winui/Booki.Dock/Installer/BookiDock.appinstaller" `
+            "src-winui/Booki.Dock/Installer/Booki-Punkable.cer" `
+            "src-winui/Booki.Dock/Installer/output/Booki-Dock-WinUI3-Setup.exe" `
+            --repo $env:GITHUB_REPOSITORY --clobber
+
+      - name: Verify WinUI release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:GITHUB_REF_NAME }
+          if (-not $tag.StartsWith("v")) { $tag = "v0.51.0" }
+          $assets = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          $assets
+          if ($assets -notcontains "Booki-Dock-WinUI3-Setup.exe") { throw "WinUI setup is missing." }
+          if ($assets -notcontains "BookiDock.appinstaller") { throw "App Installer feed is missing." }
+          if ($assets -notcontains "Booki.Dock_$env:WINUI_VERSION`_x64.msix") { throw "MSIX is missing." }

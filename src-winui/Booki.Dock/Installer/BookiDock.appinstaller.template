@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AppInstaller xmlns="http://schemas.microsoft.com/appx/appinstaller/2021"
+              Version="0.51.0.0"
+              Uri="https://github.com/punkable/booki/releases/latest/download/BookiDock.appinstaller">
+  <MainPackage Name="Punkable.BookiDock"
+               Publisher="CN=Punkable"
+               Version="0.51.0.0"
+               ProcessorArchitecture="x64"
+               Uri="https://github.com/punkable/booki/releases/latest/download/Booki.Dock_0.51.0.0_x64.msix" />
+  <UpdateSettings>
+    <OnLaunch HoursBetweenUpdateChecks="4" ShowPrompt="true" UpdateBlocksActivation="false" />
+    <AutomaticBackgroundTask />
+  </UpdateSettings>
+</AppInstaller>

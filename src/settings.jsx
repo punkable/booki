@@ -23,12 +23,16 @@ import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
 import {
   ArrowUndo24Regular,
+  ArrowDownload24Regular,
+  Color24Regular,
   Flash24Regular,
   Info24Regular,
   Search24Regular,
 } from "@fluentui/react-icons";
 
 const CHANGELOG_ICONS = {
+  appearance: Color24Regular,
+  download: ArrowDownload24Regular,
   search: Search24Regular,
   undo: ArrowUndo24Regular,
   performance: Flash24Regular,

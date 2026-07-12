@@ -121,12 +121,23 @@
             <StackPanel x:Name="AboutPanel" Spacing="16" Visibility="Collapsed">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Acerca de" />
                 <Border Style="{StaticResource SettingsCardStyle}">
-                    <StackPanel Spacing="8">
-                        <TextBlock FontSize="28" FontWeight="SemiBold" Text="Booki Dock" />
-                        <TextBlock Text="Nueva generación nativa para Windows, construida con WinUI 3." />
-                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   Text="Windows App SDK 2.2 · .NET 10 · Punkable" />
-                    </StackPanel>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="64" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Border Width="56" Height="56" Background="{ThemeResource BookiAccentBrush}" CornerRadius="8">
+                            <Image Source="/Assets/StoreLogo.png" Margin="8" Stretch="Uniform" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="6">
+                            <TextBlock FontSize="24" FontWeight="SemiBold" Text="Booki Dock" />
+                            <TextBlock Text="Dock nativo de Punkable para Windows." />
+                            <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Button Margin="0,8,0,0" HorizontalAlignment="Left" Click="CheckUpdates_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE895;" />
+                                    <TextBlock Text="Buscar actualizaciones" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </StackPanel>
         </Grid>

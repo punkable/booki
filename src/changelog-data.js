@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.51.0",
+    date: "12 jul 2026",
+    headline: "Booki Dock estrena instalacion nativa WinUI 3 e identidad visual completa.",
+    sections: [
+      {
+        icon: "download",
+        title: "Instalador WinUI 3",
+        notes: [
+          "La edicion nativa incluye un instalador familiar, un paquete MSIX y un canal App Installer.",
+          "Windows comprueba actualizaciones al iniciar y puede aplicarlas en segundo plano.",
+        ],
+      },
+      {
+        icon: "appearance",
+        title: "Identidad Booki",
+        notes: [
+          "El icono, los mosaicos, el splash y Ajustes usan el isotipo y los colores oficiales de Booki.",
+          "La interfaz conserva Fluent Design con una presencia de marca clara y contenida.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Base nativa funcional",
+        notes: [
+          "Apps, grupos, widgets, reordenamiento, autoinicio e integracion con el Explorador quedan conectados a la configuracion.",
+          "Una sola instancia controla el dock y recibe nuevas apps sin duplicar ventanas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.4",
     date: "12 jul 2026",
     headline: "Dock mas estable, menus completos y Apps ancladas mas compactas.",
