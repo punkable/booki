@@ -1,5 +1,7 @@
 #define MyAppName "Booki Dock"
+#ifndef MyAppVersion
 #define MyAppVersion "0.51.0"
+#endif
 #define MyAppExeName "Booki.Dock.exe"
 
 [Setup]

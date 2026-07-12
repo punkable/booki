@@ -1,12 +1,5 @@
 name: Release Booki Legacy (Windows)
 
-# Publishes a GitHub Release with the Windows installers (.exe / .msi)
-# attached, so anyone can download Booki Dock directly — no login or
-# digging through CI artifacts required.
-#
-# Trigger by pushing a tag like `v0.1.0`, or run manually from the
-# Actions tab (workflow_dispatch) providing a tag name.
-
 on:
   push:
     tags:
@@ -14,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0)"
+        description: "Legacy release tag (for example v0.51.0)"
         required: true
-        default: "v0.1.0"
+        default: "v0.51.0"
 
 permissions:
   contents: write
@@ -44,171 +37,49 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install frontend deps
+      - name: Install frontend dependencies
         run: npm ci
 
       - name: Check visible text encoding
         run: npm run check:text
 
-      # Derive the release tag from package.json for manual runs. Normal
-      # publishing is tag-based, so a version ships exactly once.
       - name: Resolve release tag
-        id: ver
+        id: version
         shell: bash
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        run: echo "tag=v$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
-      - name: Build and publish release
+      - name: Build and publish Booki Legacy
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Auto-updater signing. Add these as repo secrets to enable signed
-          # update artifacts (latest.json + .sig). Until then, builds are
-          # unsigned and the in-app updater simply finds no update.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
-          releaseName: "Booki Dock ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.version.outputs.tag }}
+          releaseName: "Booki Legacy ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.version.outputs.tag }}"
           releaseBody: |
-            ## Booki Dock (WinUI 3) - recomendado
-
-            La nueva generación nativa para Windows 10 y Windows 11, con Fluent Design, identidad Booki, integración con el Explorador y actualizaciones mediante Windows App Installer.
-
-            Descarga **`Booki-Dock-WinUI3-Setup.exe`** para la instalación normal. También se publican el paquete MSIX y el feed App Installer para instalaciones administradas.
-
             ## Booki Legacy
 
-            La edición original basada en Tauri continúa disponible mientras Booki Dock completa su transición nativa.
+            The original, stable Tauri-based edition of Booki for Windows.
 
-            Download the **`Booki_*_x64-setup.exe`** installer for the normal per-user installation. An MSI package is also included for managed Windows environments.
+            Download **`Booki.Legacy_*_x64-setup.exe`** for the standard per-user installation. An MSI package is also included for managed Windows environments.
 
-            **SmartScreen note:** Booki does not yet use a commercial code-signing certificate, so Windows may display a warning. Choose **More info**, verify that the publisher and source are expected, and then choose **Run anyway**.
+            Booki Legacy remains available and maintained while the native WinUI 3 edition continues its preview phase.
 
-            Created by **Punkable** ([GitHub](https://github.com/punkable) and [@0xPunki on X](https://x.com/0xPunki)).
+            **Windows SmartScreen:** Booki does not yet use a commercial code-signing certificate. Windows may display a warning. Verify that the download comes from `punkable/booki`, then select **More info** and **Run anyway**.
+
+            Created by **Punkable**.
           releaseDraft: false
-          # Must be a full release (not prerelease) so the updater endpoint
-          # `releases/latest/download/latest.json` resolves. "Beta" is a label only.
           prerelease: false
 
-      - name: Verify published installers
+      - name: Verify Legacy installers
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          tag="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.version.outputs.tag }}"
           assets="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
           echo "$assets"
-          grep -Eq 'x64-setup\.exe$' <<< "$assets"
-          grep -Eq '\.msi$' <<< "$assets"
+          grep -Eq 'Booki\.Legacy_.*_x64-setup\.exe$' <<< "$assets"
+          grep -Eq 'Booki\.Legacy_.*\.msi$' <<< "$assets"
           grep -Eq 'latest\.json$' <<< "$assets"
-
-      # Keep only the just-published release downloadable: delete every older
-      # release (and its tag) so users always grab the latest beta.
-      - name: Prune old releases
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          keep="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
-          echo "Keeping latest release: $keep"
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
-            if [ -n "$tag" ] && [ "$tag" != "$keep" ]; then
-              echo "Deleting old release $tag"
-              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-            fi
-          done
-
-  winui-release:
-    name: Publish Booki Dock WinUI 3
-    needs: release
-    runs-on: windows-latest
-    env:
-      WINUI_VERSION: 0.51.0.0
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Restore signing certificate
-        shell: pwsh
-        env:
-          PFX_BASE64: ${{ secrets.BOOKI_WINUI_PFX_BASE64 }}
-          PFX_PASSWORD: ${{ secrets.BOOKI_WINUI_PFX_PASSWORD }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64)) {
-            throw "BOOKI_WINUI_PFX_BASE64 is not configured."
-          }
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\booki.pfx", [Convert]::FromBase64String($env:PFX_BASE64))
-          $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
-          Import-PfxCertificate -FilePath "$env:RUNNER_TEMP\booki.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $password | Out-Null
-
-      - name: Build signed MSIX
-        shell: pwsh
-        env:
-          PFX_PASSWORD: ${{ secrets.BOOKI_WINUI_PFX_PASSWORD }}
-        run: |
-          dotnet restore src-winui/Booki.Dock/Booki.Dock.csproj -r win-x64
-          dotnet publish src-winui/Booki.Dock/Booki.Dock.csproj `
-            -c Release -r win-x64 -p:Platform=x64 `
-            -p:GenerateAppxPackageOnBuild=true `
-            -p:AppxPackageSigningEnabled=true `
-            -p:PackageCertificateKeyFile="$env:RUNNER_TEMP\booki.pfx" `
-            -p:PackageCertificatePassword="$env:PFX_PASSWORD" `
-            -p:AppxPackageDir="$env:RUNNER_TEMP\msix\"
-          $package = Get-ChildItem "$env:RUNNER_TEMP\msix" -Recurse -Filter *.msix | Select-Object -First 1
-          if (-not $package) { throw "The WinUI MSIX was not generated." }
-          Copy-Item $package.FullName "src-winui/Booki.Dock/Installer/Booki.Dock_$env:WINUI_VERSION`_x64.msix"
-          Copy-Item "src-winui/Booki.Dock/Installer/BookiDock.appinstaller.template" "src-winui/Booki.Dock/Installer/BookiDock.appinstaller"
-
-      - name: Publish unpackaged WinUI application
-        shell: pwsh
-        run: |
-          Remove-Item "src-winui/Booki.Dock/Installer/publish" -Recurse -Force -ErrorAction SilentlyContinue
-          dotnet publish src-winui/Booki.Dock/Booki.Dock.csproj `
-            -c Release -r win-x64 -p:Platform=x64 `
-            -p:WindowsPackageType=None `
-            -p:GenerateAppxPackageOnBuild=false `
-            --self-contained true `
-            -o "src-winui/Booki.Dock/Installer/publish"
-          if (-not (Test-Path "src-winui/Booki.Dock/Installer/publish/Booki.Dock.exe")) {
-            throw "The unpackaged WinUI executable was not generated."
-          }
-
-      - name: Build familiar setup executable
-        shell: pwsh
-        run: |
-          choco install innosetup --no-progress -y
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "src-winui/Booki.Dock/Installer/BookiDock.iss"
-
-      - name: Publish WinUI installer and update feed
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = "${{ github.event.inputs.tag }}"
-          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:GITHUB_REF_NAME }
-          if (-not $tag.StartsWith("v")) { $tag = "v0.51.0" }
-          gh release upload $tag `
-            "src-winui/Booki.Dock/Installer/Booki.Dock_$env:WINUI_VERSION`_x64.msix" `
-            "src-winui/Booki.Dock/Installer/BookiDock.appinstaller" `
-            "src-winui/Booki.Dock/Installer/Booki-Punkable.cer" `
-            "src-winui/Booki.Dock/Installer/output/Booki-Dock-WinUI3-Setup.exe" `
-            --repo $env:GITHUB_REPOSITORY --clobber
-
-      - name: Verify WinUI release assets
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $tag = "${{ github.event.inputs.tag }}"
-          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = $env:GITHUB_REF_NAME }
-          if (-not $tag.StartsWith("v")) { $tag = "v0.51.0" }
-          $assets = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
-          $assets
-          if ($assets -notcontains "Booki-Dock-WinUI3-Setup.exe") { throw "WinUI setup is missing." }
-          if ($assets -notcontains "BookiDock.appinstaller") { throw "App Installer feed is missing." }
-          if ($assets -notcontains "Booki.Dock_$env:WINUI_VERSION`_x64.msix") { throw "MSIX is missing." }

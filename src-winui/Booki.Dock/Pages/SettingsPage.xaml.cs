@@ -281,7 +281,7 @@ public sealed partial class SettingsPage : Page
             if (result.IsAvailable)
             {
                 CheckUpdatesButton.Content = "Descargando...";
-                var installer = await UpdateService.DownloadInstallerAsync();
+                var installer = await UpdateService.DownloadInstallerAsync(result.InstallerUri!);
                 UpdateService.LaunchInstaller(installer);
                 Application.Current.Exit();
             }
