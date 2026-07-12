@@ -35,7 +35,7 @@ public sealed partial class DockWindow : Window
     private void Position()
     {
         var display = DisplayArea.Primary;
-        var width = Math.Clamp(32 + App.Store.Value.Pinned.Count * 56, 144, 720);
+        var width = Math.Clamp(80 + App.Store.Value.Pinned.Count * 56, 192, 768);
         const int height = 76;
         var work = display.WorkArea;
         var x = work.X + (work.Width - width) / 2;
@@ -47,6 +47,8 @@ public sealed partial class DockWindow : Window
     {
         if (e.ClickedItem is PinnedItem item) Launch(item);
     }
+
+    private void Settings_Click(object sender, RoutedEventArgs e) => App.ShowSettings();
 
     private void OpenItem_Click(object sender, RoutedEventArgs e)
     {

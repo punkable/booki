@@ -16,6 +16,11 @@
         BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="12">
+        <Grid ColumnSpacing="6">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
         <ListView
             x:Name="PinnedList"
             IsItemClickEnabled="True"
@@ -70,5 +75,10 @@
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
+        <Button Grid.Column="1" Width="42" Height="52" Click="Settings_Click"
+                Background="Transparent" ToolTipService.ToolTip="Ajustes">
+            <FontIcon Glyph="&#xE713;" />
+        </Button>
+        </Grid>
     </Border>
 </Window>

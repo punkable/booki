@@ -14,6 +14,12 @@ public partial class App : Application
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
         await Store.LoadAsync();
+        RequestedTheme = Store.Value.Theme switch
+        {
+            "Light" => ApplicationTheme.Light,
+            "Dark" => ApplicationTheme.Dark,
+            _ => RequestedTheme
+        };
         SettingsWindow = new MainWindow();
         SettingsWindow.Activate();
         _dockWindow = new DockWindow();
@@ -21,4 +27,9 @@ public partial class App : Application
     }
 
     public static void RefreshDock() => _dockWindow?.Refresh();
+
+    public static void ShowSettings()
+    {
+        SettingsWindow.Activate();
+    }
 }
