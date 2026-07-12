@@ -313,14 +313,16 @@ function PageHeader({ icon: iconName, title, children, meta }) {
 
 function SettingsSection({ title, icon: iconName = "settings", hint, children, className = "" }) {
   return (
-    <section className={"settings-section " + className}>
-      <div className="settings-section-head">
-        <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
-        <div>
-          <h2>{title}</h2>
-          {hint ? <p>{hint}</p> : null}
+    <section className={"settings-section " + (!title ? "settings-section-headless " : "") + className}>
+      {title ? (
+        <div className="settings-section-head">
+          <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
+          <div>
+            <h2>{title}</h2>
+            {hint ? <p>{hint}</p> : null}
+          </div>
         </div>
-      </div>
+      ) : null}
       <div className="settings-section-body">{children}</div>
     </section>
   );
@@ -1994,7 +1996,7 @@ function Apps({ cfg, set }) {
       >
         {t("apps.hint")}
       </PageHeader>
-      <SettingsSection title={t("apps.title")} icon="app" className="apps-primary-section">
+      <SettingsSection title={null} className="apps-primary-section">
       <div className="pin-toolbar">
         <div className="pin-toolbar-main">
           {cfg.pinned.length > 0 ? (
@@ -2442,9 +2444,9 @@ function Faq({ version }) {
   const open = (url) => dockApi.launch(url);
   return (
     <>
-      <h1>{t("faq.title")}</h1>
-      <p className="muted" style={{ marginTop: -4, marginBottom: 14 }}>{t("faq.intro")}</p>
+      <PageHeader icon="help" title={t("faq.title")}>{t("faq.intro")}</PageHeader>
 
+      <SettingsSection title={null} className="faq-questions-section">
       <div className="faq-list">
         {items.map((k) => (
           <details className="faq-item" key={k}>
@@ -2453,9 +2455,10 @@ function Faq({ version }) {
           </details>
         ))}
       </div>
+      </SettingsSection>
 
-      <SectionTitle name="info">{t("faq.transparency")}</SectionTitle>
-      <div className="s-card-inner faq-facts">
+      <SettingsSection title={t("faq.transparency")} icon="info">
+      <div className="faq-facts">
         <p><strong>{t("faq.fact.dataTitle")}</strong><br />
           <code>%APPDATA%\Booki\config.json</code> — {t("faq.fact.data")}</p>
         <p><strong>{t("faq.fact.netTitle")}</strong><br />{t("faq.fact.net")}</p>
@@ -2463,7 +2466,7 @@ function Faq({ version }) {
           <code>HKCU\…\Run\Booki</code> — {t("faq.fact.startup")}</p>
       </div>
 
-      <div className="s-credits" style={{ marginTop: 14 }}>
+      <div className="s-credits faq-links">
         <button className="s-link" onClick={() => dockApi.openDataDir().catch(() => {})}>
           {t("faq.link.data")}
         </button>
@@ -2482,6 +2485,7 @@ function Faq({ version }) {
       </div>
       <p className="muted" style={{ marginTop: 12 }}>{t("faq.contact")} <a className="s-inline-link" href="mailto:punkable@protonmail.com">punkable@protonmail.com</a></p>
       <p className="muted" style={{ marginTop: 4 }}>v{version} · {t("faq.foot")}</p>
+      </SettingsSection>
     </>
   );
 }
@@ -2556,10 +2560,9 @@ function General({ cfg, set, onWhatsNew }) {
   }, []);
   return (
     <>
-      <h1>{t("gen.title")}</h1>
-      <p className="muted">{t("gen.hint")}</p>
+      <PageHeader icon="settings" title={t("gen.title")}>{t("gen.hint")}</PageHeader>
 
-      <SectionTitle name="power">{t("gp.system")}</SectionTitle>
+      <SettingsSection title={t("gp.system")} icon="power">
       <Toggle label={t("be.autostart")} checked={autostart}
         onChange={async (v) => {
           setAutostart(v);
@@ -2582,14 +2585,17 @@ function General({ cfg, set, onWhatsNew }) {
       <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
         checked={cfg.contextMenu !== false}
         onChange={(v) => set({ contextMenu: v })} />
+      </SettingsSection>
 
-      <SectionTitle name="sparkles">{t("ab.updates")}</SectionTitle>
+      <SettingsSection title={t("ab.updates")} icon="sparkles">
       <UpdatesCard onWhatsNew={onWhatsNew} />
+      </SettingsSection>
 
-      <SectionTitle name="keyboard">{t("sc.title")}</SectionTitle>
+      <SettingsSection title={t("sc.title")} icon="keyboard">
       <ShortcutsSection cfg={cfg} set={set} />
+      </SettingsSection>
 
-      <SectionTitle name="help">{t("gen.langSub")}</SectionTitle>
+      <SettingsSection title={t("gen.langSub")} icon="help">
       <Row label={t("ap.language")} hint={t("gen.langHint")}>
         <select className="s-select" value={cfg.language || "system"}
           onChange={(e) => set({ language: e.target.value })}>
@@ -2601,8 +2607,9 @@ function General({ cfg, set, onWhatsNew }) {
           <option value="de">Deutsch</option>
         </select>
       </Row>
+      </SettingsSection>
 
-      <SectionTitle name="copy">{t("ap.backup")}</SectionTitle>
+      <SettingsSection title={t("ap.backup")} icon="copy">
       <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
         <div className="s-actions" style={{ margin: 0 }}>
           <button className="s-btn s-btn-soft" onClick={async () => {
@@ -2617,6 +2624,7 @@ function General({ cfg, set, onWhatsNew }) {
           }}>{t("ap.import")}</button>
         </div>
       </Row>
+      </SettingsSection>
     </>
   );
 }
@@ -2634,7 +2642,8 @@ function About({ version, onWhatsNew, onReset }) {
 
   return (
     <>
-      <h1>{t("ab.title")}</h1>
+      <PageHeader icon="info" title={t("ab.title")}>{t("ab.tagline")}</PageHeader>
+      <SettingsSection title={null} className="about-identity-section">
       <div className="s-about">
         <img
           className={"s-about-logo" + (partying ? " spin" : "")}
@@ -2650,7 +2659,6 @@ function About({ version, onWhatsNew, onReset }) {
           </span>{" "}
           <span className="s-ver">v{version}</span>{" "}
           <span className="s-beta">BETA</span>
-          <p className="muted" style={{ marginTop: 4 }}>{t("ab.tagline")}</p>
         </div>
       </div>
 
@@ -2666,7 +2674,9 @@ function About({ version, onWhatsNew, onReset }) {
         </button>
       </div>
       {partying && <p className="s-egg">🦫 {t("ab.egg")} 🦫</p>}
+      </SettingsSection>
 
+      <SettingsSection title={t("ab.free")} icon="sparkles" className="about-project-section">
       <DonateCard />
 
       {/* A quick way back to the changelog; full update controls live in General. */}
@@ -2674,10 +2684,13 @@ function About({ version, onWhatsNew, onReset }) {
         <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
         <span>{t("ab.whatsNew")}</span>
       </button>
+      </SettingsSection>
 
+      <SettingsSection title={t("ab.danger")} icon="trash" className="about-reset-section">
       <ResetZone onReset={onReset} />
 
       <p className="muted" style={{ marginTop: 14 }}>{t("ab.made")}</p>
+      </SettingsSection>
     </>
   );
 }

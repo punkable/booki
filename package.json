@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.50.4",
   "type": "module",
-  "description": "Booki — a modern, lightweight dock for Windows",
+  "description": "Booki Legacy — the original lightweight dock for Windows",
   "license": "MIT",
   "homepage": "https://github.com/punkable/booki#readme",
   "repository": {
