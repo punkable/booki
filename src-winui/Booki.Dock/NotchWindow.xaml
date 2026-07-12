@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="Booki_Dock.NotchWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Booki Dock">
+    <Window.SystemBackdrop><DesktopAcrylicBackdrop /></Window.SystemBackdrop>
+    <Button Click="Reveal_Click" PointerEntered="Reveal_PointerEntered"
+            Background="{StaticResource BookiSurfaceBrush}" BorderBrush="{StaticResource BookiStrokeBrush}"
+            BorderThickness="1" CornerRadius="10" Padding="12,4">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE76C;" FontSize="12" Foreground="{StaticResource BookiAccentBrush}" />
+            <TextBlock Text="Booki" FontWeight="SemiBold" />
+        </StackPanel>
+    </Button>
+</Window>

@@ -11,16 +11,13 @@
 
     <Border
         x:Name="DockSurface"
+        PointerEntered="DockSurface_PointerEntered"
+        PointerExited="DockSurface_PointerExited"
         Padding="8"
         Background="{ThemeResource LayerFillColorAltBrush}"
         BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
         BorderThickness="1"
         CornerRadius="12">
-        <Grid ColumnSpacing="6">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
         <ListView
             x:Name="PinnedList"
             IsItemClickEnabled="True"
@@ -34,6 +31,8 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:PinnedItem">
                     <Button
+                        PointerEntered="Tile_PointerEntered"
+                        PointerExited="Tile_PointerExited"
                         Width="52"
                         Height="52"
                         Margin="2"
@@ -70,15 +69,15 @@
                                 FontWeight="SemiBold"
                                 Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                 Text="{x:Bind Initial}" />
+                            <Image Width="36" Height="36" Source="{x:Bind IconSource, Mode=OneWay}" Stretch="Uniform" />
+                            <Ellipse Width="5" Height="5" Margin="0,0,0,-6"
+                                     HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                     Fill="{StaticResource BookiAccentBrush}"
+                                     Opacity="{x:Bind RunningOpacity, Mode=OneWay}" />
                         </Grid>
                     </Button>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
-        <Button Grid.Column="1" Width="42" Height="52" Click="Settings_Click"
-                Background="Transparent" ToolTipService.ToolTip="Ajustes">
-            <FontIcon Glyph="&#xE713;" />
-        </Button>
-        </Grid>
     </Border>
 </Window>
