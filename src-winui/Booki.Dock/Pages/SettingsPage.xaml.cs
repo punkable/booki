@@ -30,6 +30,7 @@ public sealed partial class SettingsPage : Page
         AppearancePanel.Visibility = section == "appearance" ? Visibility.Visible : Visibility.Collapsed;
         BehaviorPanel.Visibility = section == "behavior" ? Visibility.Visible : Visibility.Collapsed;
         PinnedPanel.Visibility = section == "pinned" ? Visibility.Visible : Visibility.Collapsed;
+        UpdatesPanel.Visibility = section == "updates" ? Visibility.Visible : Visibility.Collapsed;
         AboutPanel.Visibility = section == "about" ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -48,7 +49,9 @@ public sealed partial class SettingsPage : Page
         PinnedAppsList.ItemsSource = value.Pinned;
         MigrationInfo.IsOpen = File.Exists(App.Store.LegacyPath);
         var packageVersion = Package.Current.Id.Version;
-        VersionText.Text = $"Versión {packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build} · WinUI 3 · Windows App SDK 2.2";
+        var displayVersion = $"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}";
+        VersionText.Text = $"Versión {displayVersion} · WinUI 3 · Windows App SDK 2.2";
+        UpdateVersionText.Text = $"Versión instalada: {displayVersion}";
         _loading = false;
     }
 
@@ -135,6 +138,17 @@ public sealed partial class SettingsPage : Page
             _loading = true;
             StartWithWindows.IsOn = App.Store.Value.AutoStart;
             _loading = false;
+            StartupInfo.Severity = InfoBarSeverity.Warning;
+            StartupInfo.Title = "Windows no permitió activar el inicio automático";
+            StartupInfo.Message = "Puedes habilitar Booki Dock desde Configuración > Aplicaciones > Inicio.";
+            StartupInfo.IsOpen = true;
+        }
+        else
+        {
+            StartupInfo.Severity = InfoBarSeverity.Success;
+            StartupInfo.Title = StartWithWindows.IsOn ? "Booki Dock se iniciará con Windows" : "Inicio automático desactivado";
+            StartupInfo.Message = "El cambio se guardó correctamente.";
+            StartupInfo.IsOpen = true;
         }
         await App.Store.SaveAsync();
     }
@@ -157,8 +171,34 @@ public sealed partial class SettingsPage : Page
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        await Launcher.LaunchUriAsync(new Uri(
-            "https://github.com/punkable/booki/releases/latest/download/BookiDock.appinstaller"));
+        CheckUpdatesButton.IsEnabled = false;
+        CheckUpdatesButton.Content = "Buscando...";
+        UpdateInfo.IsOpen = false;
+        try
+        {
+            var result = await UpdateService.CheckAsync();
+            UpdateInfo.Severity = result.IsAvailable ? InfoBarSeverity.Success : InfoBarSeverity.Informational;
+            UpdateInfo.Title = result.IsAvailable ? "Actualización disponible" : "Booki Dock está actualizado";
+            UpdateInfo.Message = result.Message;
+            UpdateInfo.IsOpen = true;
+            if (result.IsAvailable)
+            {
+                CheckUpdatesButton.Content = "Instalar actualización";
+                await Launcher.LaunchUriAsync(new Uri(UpdateService.AppInstallerUri));
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateInfo.Severity = InfoBarSeverity.Error;
+            UpdateInfo.Title = "No se pudo buscar actualizaciones";
+            UpdateInfo.Message = ex.Message;
+            UpdateInfo.IsOpen = true;
+        }
+        finally
+        {
+            CheckUpdatesButton.Content = "Buscar actualizaciones";
+            CheckUpdatesButton.IsEnabled = true;
+        }
     }
 
     private static void SelectByTag(ComboBox combo, string value)

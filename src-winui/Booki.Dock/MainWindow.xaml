@@ -44,6 +44,9 @@
                 <NavigationViewItem Content="Apps ancladas" Tag="pinned">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE71D;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Actualizaciones" Tag="updates">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE895;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItemSeparator />
                 <NavigationViewItem Content="Acerca de" Tag="about">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>

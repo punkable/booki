@@ -14,7 +14,7 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         AppWindow.SetIcon("Assets/AppIcon.ico");
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(900, 720));
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(780, 620));
         NavFrame.Navigate(typeof(SettingsPage), "general");
     }
 

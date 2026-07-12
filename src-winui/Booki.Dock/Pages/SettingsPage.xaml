@@ -5,7 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer>
-        <Grid MaxWidth="920" Padding="32,24,32,40" HorizontalAlignment="Stretch">
+        <Grid MaxWidth="760" Padding="24,20,24,32" HorizontalAlignment="Stretch">
             <StackPanel x:Name="GeneralPanel" Spacing="16">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="General" />
                 <TextBlock Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -16,6 +16,7 @@
                 <Border Style="{StaticResource SettingsCardStyle}">
                     <StackPanel>
                         <ToggleSwitch x:Name="StartWithWindows" Header="Iniciar con Windows" Toggled="StartWithWindows_Toggled" />
+                        <InfoBar x:Name="StartupInfo" IsOpen="False" IsClosable="False" />
                         <ToggleSwitch x:Name="ContextMenu" Header="Añadir a Booki desde el Explorador" IsOn="True" Toggled="Setting_Changed" />
                     </StackPanel>
                 </Border>
@@ -118,6 +119,28 @@
                 </ListView>
             </StackPanel>
 
+            <StackPanel x:Name="UpdatesPanel" Spacing="14" Visibility="Collapsed">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Actualizaciones" />
+                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Text="Booki puede comprobar e instalar nuevas versiones mediante Windows App Installer." />
+                <Border Style="{StaticResource SettingsCardStyle}">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="40" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE895;" FontSize="20" Foreground="{StaticResource BookiAccentBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock FontWeight="SemiBold" Text="Booki Dock" />
+                            <TextBlock x:Name="UpdateVersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button x:Name="CheckUpdatesButton" Grid.Column="2" Click="CheckUpdates_Click" Content="Buscar actualizaciones" />
+                    </Grid>
+                </Border>
+                <InfoBar x:Name="UpdateInfo" IsOpen="False" IsClosable="True" />
+            </StackPanel>
+
             <StackPanel x:Name="AboutPanel" Spacing="16" Visibility="Collapsed">
                 <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Acerca de" />
                 <Border Style="{StaticResource SettingsCardStyle}">
@@ -130,12 +153,7 @@
                             <TextBlock FontSize="24" FontWeight="SemiBold" Text="Booki Dock" />
                             <TextBlock Text="Dock nativo de Punkable para Windows." />
                             <TextBlock x:Name="VersionText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <Button Margin="0,8,0,0" HorizontalAlignment="Left" Click="CheckUpdates_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE895;" />
-                                    <TextBlock Text="Buscar actualizaciones" />
-                                </StackPanel>
-                            </Button>
+
                         </StackPanel>
                     </Grid>
                 </Border>

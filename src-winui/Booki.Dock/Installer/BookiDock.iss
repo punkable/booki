@@ -25,4 +25,5 @@ Source: "BookiDock.appinstaller"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Run]
 Filename: "certutil.exe"; Parameters: "-user -addstore TrustedPeople ""{tmp}\Booki-Punkable.cer"""; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Command ""Add-AppxPackage -AppInstallerFile '{tmp}\BookiDock.appinstaller'"""; Flags: waituntilterminated
+; Hand the package to Windows App Installer. This keeps installation native and avoids flashing a PowerShell console.
+Filename: "{tmp}\BookiDock.appinstaller"; Description: "Instalar Booki Dock"; Flags: shellexec waituntilidle

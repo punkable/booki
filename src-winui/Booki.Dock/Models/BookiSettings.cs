@@ -12,7 +12,7 @@ public sealed class BookiSettings
     public bool AlwaysOnTop { get; set; } = true;
     public bool AutoHide { get; set; }
     public bool Magnification { get; set; } = true;
-    public int IconSize { get; set; } = 48;
+    public int IconSize { get; set; } = 40;
     public int Spacing { get; set; } = 4;
     public int CornerRadius { get; set; } = 12;
     public int MaterialStrength { get; set; } = 70;
@@ -37,17 +37,20 @@ public sealed class PinnedItem : INotifyPropertyChanged
     public List<PinnedItem> Children { get; set; } = [];
     public string Initial => Kind switch
     {
-        "group" => "▦",
-        "widget" => Widget switch { "clock" => "◷", "cpu" => "%", "note" => "N", _ => "W" },
+        "group" => "\uE902",
+        "widget" => Widget switch { "clock" => "\uE121", "cpu" => "%", "note" => "\uE70B", _ => "\uE9F9" },
         _ => string.IsNullOrWhiteSpace(Name) ? "?" : Name[..1].ToUpperInvariant()
     };
+    public FontFamily InitialFontFamily => Kind is "group" or "widget"
+        ? new FontFamily("Segoe Fluent Icons")
+        : new FontFamily("Segoe UI Variable Text");
     public ImageSource? IconSource { get; private set; }
     public double RunningOpacity { get; private set; }
     public string WidgetDisplay { get; private set; } = "";
     public double WidgetOpacity => Kind == "widget" ? 1 : 0;
     public double IconOpacity => Kind == "widget" ? 0 : 1;
-    [JsonIgnore] public double TileSize { get; private set; } = 52;
-    [JsonIgnore] public double ImageSize { get; private set; } = 36;
+    [JsonIgnore] public double TileSize { get; private set; } = 48;
+    [JsonIgnore] public double ImageSize { get; private set; } = 40;
     [JsonIgnore] public double InitialFontSize { get; private set; } = 16;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -72,7 +75,7 @@ public sealed class PinnedItem : INotifyPropertyChanged
 
     public void SetIconSize(int size)
     {
-        TileSize = size + 16;
+        TileSize = size + 8;
         ImageSize = size;
         InitialFontSize = Math.Max(14, size * 0.38);
         PropertyChanged?.Invoke(this, new(nameof(TileSize)));

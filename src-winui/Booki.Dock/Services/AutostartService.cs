@@ -8,6 +8,19 @@ public static class AutostartService
     private const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "BookiDock";
 
+    public static async Task<StartupTaskState?> GetStateAsync()
+    {
+        try
+        {
+            var task = await StartupTask.GetAsync("BookiDockStartup");
+            return task.State;
+        }
+        catch
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(KeyPath);
+            return key?.GetValue(ValueName) is string ? StartupTaskState.Enabled : StartupTaskState.Disabled;
+        }
+    }
     public static async Task<bool> SetAsync(bool enabled)
     {
         try

@@ -13,11 +13,11 @@
         x:Name="DockSurface"
         PointerEntered="DockSurface_PointerEntered"
         PointerExited="DockSurface_PointerExited"
-        Padding="8"
+        Padding="6"
         Background="{ThemeResource LayerFillColorAltBrush}"
         BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
         BorderThickness="1"
-        CornerRadius="12">
+        CornerRadius="14">
         <Border.ContextFlyout>
             <MenuFlyout>
                 <MenuFlyoutItem Text="Ajustes" Click="OpenSettings_Click">
@@ -29,71 +29,69 @@
                 </MenuFlyoutItem>
             </MenuFlyout>
         </Border.ContextFlyout>
-        <ListView
-            x:Name="PinnedList"
-            IsItemClickEnabled="True"
-            ItemClick="PinnedList_ItemClick"
-            SelectionMode="None">
-            <ListView.ItemsPanel>
+        <ItemsControl x:Name="PinnedItems">
+            <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <ItemsStackPanel Orientation="Horizontal" />
+                    <StackPanel Orientation="Horizontal" />
                 </ItemsPanelTemplate>
-            </ListView.ItemsPanel>
-            <ListView.ItemTemplate>
-                <DataTemplate x:DataType="models:PinnedItem">
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
                     <Button
+                        Click="Tile_Click"
+                        Tag="{Binding}"
                         PointerEntered="Tile_PointerEntered"
                         PointerExited="Tile_PointerExited"
-                        Width="{x:Bind TileSize, Mode=OneWay}"
-                        Height="{x:Bind TileSize, Mode=OneWay}"
-                        Margin="2"
-                        AutomationProperties.Name="{x:Bind Name}"
+                        Width="{Binding TileSize}"
+                        Height="{Binding TileSize}"
+                        Margin="1"
+                        AutomationProperties.Name="{Binding Name}"
                         Background="Transparent"
-                        CornerRadius="8"
-                        ToolTipService.ToolTip="{x:Bind Name}">
+                        CornerRadius="7"
+                        ToolTipService.ToolTip="{Binding Name}">
                         <Button.ContextFlyout>
                             <MenuFlyout>
-                                <MenuFlyoutItem Click="OpenItem_Click" Tag="{x:Bind}">
-                                    <MenuFlyoutItem.Icon>
-                                        <FontIcon Glyph="&#xE8A7;" />
-                                    </MenuFlyoutItem.Icon>
+                                <MenuFlyoutItem Click="OpenItem_Click" Tag="{Binding}">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8A7;" /></MenuFlyoutItem.Icon>
                                     Abrir
                                 </MenuFlyoutItem>
-                                <MenuFlyoutItem Click="RemoveItem_Click" Tag="{x:Bind}">
-                                    <MenuFlyoutItem.Icon>
-                                        <FontIcon Glyph="&#xE74D;" />
-                                    </MenuFlyoutItem.Icon>
+                                <MenuFlyoutItem Click="RemoveItem_Click" Tag="{Binding}">
+                                    <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
                                     Quitar del dock
                                 </MenuFlyoutItem>
                             </MenuFlyout>
                         </Button.ContextFlyout>
                         <Grid>
                             <Border
-                                Width="{x:Bind ImageSize, Mode=OneWay}"
-                                Height="{x:Bind ImageSize, Mode=OneWay}"
+                                Width="{Binding ImageSize}"
+                                Height="{Binding ImageSize}"
                                 Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                CornerRadius="8" />
+                                CornerRadius="7" />
                             <TextBlock
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                FontSize="{x:Bind InitialFontSize, Mode=OneWay}"
+                                FontSize="{Binding InitialFontSize}"
                                 FontWeight="SemiBold"
+                                FontFamily="{Binding InitialFontFamily}"
                                 Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                                Opacity="{x:Bind IconOpacity}"
-                                Text="{x:Bind Initial}" />
-                            <Image Width="{x:Bind ImageSize, Mode=OneWay}" Height="{x:Bind ImageSize, Mode=OneWay}"
-                                   Opacity="{x:Bind IconOpacity}" Source="{x:Bind IconSource, Mode=OneWay}" Stretch="Uniform" />
+                                Opacity="{Binding IconOpacity}"
+                                Text="{Binding Initial}" />
+                            <Image Width="{Binding ImageSize}"
+                                   Height="{Binding ImageSize}"
+                                   Opacity="{Binding IconOpacity}"
+                                   Source="{Binding IconSource}"
+                                   Stretch="Uniform" />
                             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       FontSize="14" FontWeight="SemiBold" Opacity="{x:Bind WidgetOpacity}"
-                                       Text="{x:Bind WidgetDisplay, Mode=OneWay}" />
-                            <Ellipse Width="5" Height="5" Margin="0,0,0,-6"
+                                       FontSize="13" FontWeight="SemiBold" Opacity="{Binding WidgetOpacity}"
+                                       Text="{Binding WidgetDisplay}" />
+                            <Ellipse Width="5" Height="5" Margin="0,0,0,-4"
                                      HorizontalAlignment="Center" VerticalAlignment="Bottom"
                                      Fill="{StaticResource BookiAccentBrush}"
-                                     Opacity="{x:Bind RunningOpacity, Mode=OneWay}" />
+                                     Opacity="{Binding RunningOpacity}" />
                         </Grid>
                     </Button>
                 </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Border>
 </Window>

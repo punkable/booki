@@ -16,6 +16,7 @@ public sealed partial class DockWindow : Window
 {
     private readonly DispatcherTimer _runningTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
+    private bool _transitioning;
 
     public DockWindow()
     {
@@ -35,14 +36,19 @@ public sealed partial class DockWindow : Window
         _runningTimer.Tick += (_, _) => RefreshRunningState();
         _runningTimer.Start();
         _hideTimer.Tick += (_, _) => { _hideTimer.Stop(); if (App.Store.Value.AutoHide) App.HideDock(); };
-        DockSurface.Loaded += async (_, _) => await LoadIconsAsync();
+        DockSurface.Loaded += async (_, _) =>
+        {
+            await LoadIconsAsync();
+            if (App.Store.Value.AutoHide) _hideTimer.Start();
+        };
     }
 
     public void Refresh()
     {
-        foreach (var item in App.Store.Value.Pinned) item.SetIconSize(App.Store.Value.IconSize);
-        PinnedList.ItemsSource = null;
-        PinnedList.ItemsSource = App.Store.Value.Pinned;
+        ApplyAdaptiveTileSize();
+        PinnedItems.ItemsSource = null;
+        PinnedItems.ItemsSource = App.Store.Value.Pinned;
+        DockSurface.CornerRadius = new CornerRadius(Math.Clamp(App.Store.Value.CornerRadius, 6, 24));
         ApplyOrientation();
         Position();
         _ = LoadIconsAsync();
@@ -53,9 +59,11 @@ public sealed partial class DockWindow : Window
         var display = DisplayArea.Primary;
         var work = display.WorkArea;
         var vertical = App.Store.Value.Edge is "Left" or "Right";
-        var tileSize = App.Store.Value.IconSize + 20;
-        var width = vertical ? tileSize + 24 : Math.Clamp(24 + App.Store.Value.Pinned.Count * tileSize, 144, 720);
-        var height = vertical ? Math.Clamp(24 + App.Store.Value.Pinned.Count * tileSize, 144, 720) : tileSize + 24;
+        var count = Math.Max(1, App.Store.Value.Pinned.Count);
+        var tileSize = App.Store.Value.Pinned.FirstOrDefault()?.TileSize ?? App.Store.Value.IconSize + 8;
+        var length = 12 + count * (tileSize + 2);
+        var width = vertical ? (int)tileSize + 12 : (int)Math.Min(length, work.Width - 24);
+        var height = vertical ? (int)Math.Min(length, work.Height - 24) : (int)tileSize + 12;
         var x = App.Store.Value.Edge switch
         {
             "Left" => work.X + 12,
@@ -74,8 +82,19 @@ public sealed partial class DockWindow : Window
     private void ApplyOrientation()
     {
         var orientation = App.Store.Value.Edge is "Left" or "Right" ? "Vertical" : "Horizontal";
-        PinnedList.ItemsPanel = (ItemsPanelTemplate)XamlReader.Load(
-            $"<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><ItemsStackPanel Orientation='{orientation}' /></ItemsPanelTemplate>");
+        PinnedItems.ItemsPanel = (ItemsPanelTemplate)XamlReader.Load(
+            $"<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><StackPanel Orientation='{orientation}' /></ItemsPanelTemplate>");
+    }
+
+    private void ApplyAdaptiveTileSize()
+    {
+        var work = DisplayArea.Primary.WorkArea;
+        var vertical = App.Store.Value.Edge is "Left" or "Right";
+        var available = (vertical ? work.Height : work.Width) - 36;
+        var count = Math.Max(1, App.Store.Value.Pinned.Count);
+        var requested = Math.Clamp(App.Store.Value.IconSize, 28, 64);
+        var fitted = Math.Clamp((available / count) - 10, 28, requested);
+        foreach (var item in App.Store.Value.Pinned) item.SetIconSize(fitted);
     }
 
     private async Task LoadIconsAsync()
@@ -121,6 +140,51 @@ public sealed partial class DockWindow : Window
         if (sender is UIElement element) AnimateScale(element, 1f);
     }
 
+    public async Task HideToNotchAsync()
+    {
+        if (_transitioning || !AppWindow.IsVisible) return;
+        _transitioning = true;
+        var visual = ElementCompositionPreview.GetElementVisual(DockSurface);
+        visual.CenterPoint = new System.Numerics.Vector3(
+            (float)DockSurface.ActualSize.X / 2,
+            (float)DockSurface.ActualSize.Y / 2,
+            0);
+        var opacity = visual.Compositor.CreateScalarKeyFrameAnimation();
+        opacity.InsertKeyFrame(1, 0);
+        opacity.Duration = TimeSpan.FromMilliseconds(140);
+        var scale = visual.Compositor.CreateVector3KeyFrameAnimation();
+        scale.InsertKeyFrame(1, new System.Numerics.Vector3(0.92f, 0.92f, 1));
+        scale.Duration = opacity.Duration;
+        visual.StartAnimation(nameof(visual.Opacity), opacity);
+        visual.StartAnimation(nameof(visual.Scale), scale);
+        await Task.Delay(opacity.Duration);
+        AppWindow.Hide();
+        visual.Opacity = 1;
+        visual.Scale = System.Numerics.Vector3.One;
+        _transitioning = false;
+    }
+
+    public void ShowFromNotch()
+    {
+        Position();
+        AppWindow.Show();
+        var visual = ElementCompositionPreview.GetElementVisual(DockSurface);
+        visual.CenterPoint = new System.Numerics.Vector3(
+            (float)DockSurface.ActualSize.X / 2,
+            (float)DockSurface.ActualSize.Y / 2,
+            0);
+        visual.Opacity = 0;
+        visual.Scale = new System.Numerics.Vector3(0.92f, 0.92f, 1);
+        var opacity = visual.Compositor.CreateScalarKeyFrameAnimation();
+        opacity.InsertKeyFrame(1, 1);
+        opacity.Duration = TimeSpan.FromMilliseconds(180);
+        var scale = visual.Compositor.CreateVector3KeyFrameAnimation();
+        scale.InsertKeyFrame(1, System.Numerics.Vector3.One);
+        scale.Duration = opacity.Duration;
+        visual.StartAnimation(nameof(visual.Opacity), opacity);
+        visual.StartAnimation(nameof(visual.Scale), scale);
+    }
+
     private static void AnimateScale(UIElement element, float target)
     {
         var visual = ElementCompositionPreview.GetElementVisual(element);
@@ -135,18 +199,18 @@ public sealed partial class DockWindow : Window
         visual.StartAnimation(nameof(visual.Scale), animation);
     }
 
-    private void PinnedList_ItemClick(object sender, ItemClickEventArgs e)
+    private void Tile_Click(object sender, RoutedEventArgs e)
     {
-        if (e.ClickedItem is not PinnedItem item) return;
+        if (sender is not Button { Tag: PinnedItem item } button) return;
         if (item.Kind == "group")
         {
-            ShowGroup(item);
+            ShowGroup(item, button);
             return;
         }
         if (item.Kind != "widget") Launch(item);
     }
 
-    private void ShowGroup(PinnedItem group)
+    private static void ShowGroup(PinnedItem group, FrameworkElement anchor)
     {
         var flyout = new MenuFlyout();
         foreach (var child in group.Children)
@@ -155,8 +219,7 @@ public sealed partial class DockWindow : Window
             menuItem.Click += (_, _) => Launch(child);
             flyout.Items.Add(menuItem);
         }
-        if (PinnedList.ContainerFromItem(group) is FrameworkElement anchor)
-            flyout.ShowAt(anchor);
+        flyout.ShowAt(anchor);
     }
 
     private void OpenItem_Click(object sender, RoutedEventArgs e)

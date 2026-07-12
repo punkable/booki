@@ -71,10 +71,10 @@ public partial class App : Application
         catch { }
     }
 
-    public static void HideDock()
+    public static async void HideDock()
     {
         if (_dockWindow is null || _notchWindow is null) return;
-        _dockWindow.AppWindow.Hide();
+        await _dockWindow.HideToNotchAsync();
         _notchWindow.PositionNearDock();
         _notchWindow.AppWindow.Show();
     }
@@ -83,8 +83,7 @@ public partial class App : Application
     {
         if (_dockWindow is null || _notchWindow is null) return;
         _notchWindow.AppWindow.Hide();
-        _dockWindow.Position();
-        _dockWindow.AppWindow.Show();
+        _dockWindow.ShowFromNotch();
     }
 
     public static void Quit()

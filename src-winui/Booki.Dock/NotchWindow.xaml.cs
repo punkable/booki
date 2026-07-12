@@ -22,8 +22,8 @@ public sealed partial class NotchWindow : Window
     {
         var work = DisplayArea.Primary.WorkArea;
         var vertical = App.Store.Value.Edge is "Left" or "Right";
-        var width = vertical ? 30 : 92;
-        var height = vertical ? 92 : 30;
+        var width = vertical ? 16 : 64;
+        var height = vertical ? 64 : 16;
         var x = App.Store.Value.Edge switch
         {
             "Left" => work.X + 2,
