@@ -555,7 +555,17 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 .cl-headline { margin: 8px 0 12px; font-size: var(--text-lg); font-weight: 600; color: var(--ink); }
 .cl-section { margin: 12px 0; }
 .cl-section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: var(--text-md); font-weight: 700; }
-.cl-ico { font-size: var(--text-xl); }
+.cl-ico {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--r-sm);
+}
+.cl-ico svg { width: 16px; height: 16px; }
 .cl-notes { margin: 0; padding-left: 0; list-style: none; }
 .cl-notes li { position: relative; padding: 3px 0 3px 18px; font-size: var(--text-md); color: var(--ink-2); line-height: 1.5; }
 .cl-notes li::before { content: ""; position: absolute; left: 4px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
@@ -2245,29 +2255,14 @@ body.edge-right .stack { transform-origin: center right; }
 
 /* ═══════════════════════ Settings window (React) ═══════════════════════ */
 
-/* The settings window is opaque (a transparent one rendered blank on real
-   Windows). A soft tinted background sits behind the floating acrylic-style
-   sidebar + content card so the layered look is preserved. */
+/* Persistent Settings surfaces stay opaque and calm, like Windows Settings.
+   Acrylic remains reserved for transient menus, dialogs and dock surfaces. */
 body.settings-body {
   overflow: hidden;
-  background:
-    radial-gradient(90% 70% at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 58%),
-    linear-gradient(135deg, color-mix(in srgb, var(--bg) 88%, var(--accent)), var(--bg) 42%, color-mix(in srgb, var(--bg) 94%, #000 6%)),
-    var(--bg);
+  background: color-mix(in srgb, var(--bg) 97%, var(--accent));
 }
 body.settings-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(color-mix(in srgb, var(--ink) 3%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--ink) 3%, transparent) 1px, transparent 1px);
-  background-size: 36px 36px;
-  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 72%);
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 72%);
-  opacity: 0.32;
-  z-index: 0;
+  content: none;
 }
 #root { position: relative; z-index: 1; height: 100%; }
 .loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-2); }
@@ -2295,26 +2290,25 @@ body.settings-body::before {
 
 .s-shell {
   display: grid;
-  grid-template-columns: 212px 1fr;
-  gap: 12px;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
   height: 100vh;
-  padding: 12px;
+  padding: 0;
   background: transparent;
   min-width: 0;
 }
 
-/* Floating acrylic sidebar */
+/* NavigationView-style pane */
 .s-sidebar {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 14px 12px;
-  background: var(--acrylic);
-  border: 1px solid var(--stroke-light);
-  border-radius: var(--r-lg);
-  box-shadow: 0 12px 34px rgba(15, 15, 25, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  -webkit-backdrop-filter: blur(30px) saturate(160%);
-  backdrop-filter: blur(30px) saturate(160%);
+  background: color-mix(in srgb, var(--layer-strong) 82%, var(--bg));
+  border: 0;
+  border-right: 1px solid var(--stroke);
+  border-radius: 0;
+  box-shadow: none;
   min-width: 0;
 }
 .s-brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 14px; }
@@ -2340,7 +2334,7 @@ body.settings-body::before {
   background: color-mix(in srgb, var(--accent) 20%, var(--hover));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
   transform: translateY(calc(var(--active, 0) * (var(--navh) + var(--navgap))));
-  transition: transform 0.32s var(--ease);
+  transition: transform var(--motion-med) var(--ease);
   pointer-events: none;
 }
 /* Settings search (Windows 11-style: type → jump to the section). */
@@ -2487,21 +2481,19 @@ body.settings-body::before {
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.s-navitem:hover { color: var(--accent-deep); transform: translateX(1px); }
+.s-navitem:hover { color: var(--accent-deep); }
 .s-navitem:hover .s-navicon { background: var(--hover); }
 .s-navitem.active { font-weight: 600; }
 .s-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 2px; }
 
-/* Content card over the Mica */
+/* Stable content surface */
 .s-content {
   padding: 24px 28px;
   overflow-y: auto;
-  background: var(--acrylic-soft);
-  border: 1px solid var(--stroke-light);
-  border-radius: var(--r-lg);
-  box-shadow: 0 12px 34px rgba(15, 15, 25, 0.14);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  backdrop-filter: blur(20px) saturate(140%);
+  background: color-mix(in srgb, var(--bg) 98%, var(--accent));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   min-width: 0;
 }
 .s-save-status {
@@ -2586,13 +2578,11 @@ body.settings-body::before {
 }
 .settings-section {
   margin: 12px 0;
-  border-radius: var(--r-lg);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--layer-strong) 78%, transparent), color-mix(in srgb, var(--layer) 84%, transparent));
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--layer-strong) 92%, var(--bg));
   box-shadow:
     0 0 0 1px var(--stroke),
-    0 10px 28px color-mix(in srgb, #000 10%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
+    0 2px 4px color-mix(in srgb, #000 6%, transparent);
   overflow: hidden;
 }
 .settings-section-head {
@@ -2808,7 +2798,7 @@ body.settings-body::before {
 
 /* Narrow window: tighter chrome, controls under their labels. */
 @media (max-width: 720px) {
-  .s-shell { grid-template-columns: 164px 1fr; gap: 10px; padding: 10px; }
+  .s-shell { grid-template-columns: 172px 1fr; gap: 0; padding: 0; }
   .s-content { padding: 16px 14px; }
   .s-brand { font-size: 15px; }
   .s-navitem { font-size: var(--text-md); padding: 0 9px; }
@@ -2829,10 +2819,12 @@ body.settings-body::before {
     height: auto;
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-    gap: 8px;
-    padding: 8px;
+    gap: 0;
+    padding: 0;
   }
   .s-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--stroke);
     position: sticky;
     top: 0;
     z-index: 20;
@@ -2862,7 +2854,7 @@ body.settings-body::before {
   .s-content {
     overflow: visible;
     padding: 14px 12px;
-    border-radius: var(--r-md);
+    border-radius: 0;
   }
   .s-actions .s-btn { white-space: normal; }
   .pin-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
@@ -3394,6 +3386,18 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .s-intro-x:hover { background: var(--hover); color: var(--ink); }
 .s-intro-x:active { transform: scale(0.96); }
 .s-intro-x svg { width: 15px; height: 15px; }
+
+@media (max-width: 360px) {
+  .s-intro {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 30px;
+    align-items: start;
+    gap: 8px 10px;
+    padding: 12px;
+  }
+  .s-intro .s-btn { grid-column: 2; justify-self: start; }
+  .s-intro-x { grid-column: 3; grid-row: 1; }
+}
 
 .pin-toolbar {
   display: flex;

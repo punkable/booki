@@ -3,12 +3,43 @@
 
 export const CHANGELOG = [
   {
+    version: "0.50.3",
+    date: "12 jul 2026",
+    headline: "Booki se siente mas cercano a Windows y se adapta mejor a ventanas estrechas.",
+    sections: [
+      {
+        icon: "search",
+        title: "Ajustes mas nativos",
+        notes: [
+          "La ventana de ajustes usa una jerarquia tipo NavigationView, con contenido mas estable y menos capas decorativas.",
+          "La bienvenida y los controles conservan una lectura comoda incluso a 320 px de ancho.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Fluent y movimiento",
+        notes: [
+          "Las novedades usan iconos SVG oficiales de Fluent System Icons en lugar de codigos Unicode visibles.",
+          "La navegacion responde en 180 ms y evita desplazamientos decorativos en acciones frecuentes.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Instalacion Windows",
+        notes: [
+          "La publicacion incluye el instalador normal NSIS y un paquete MSI para entornos administrados.",
+          "El instalador comprueba WebView2, bloquea retrocesos de version y la publicacion valida sus archivos antes de cerrar el release.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.2",
     date: "10 jul 2026",
     headline: "Ajustes mas claros, mejor recuperacion y menos trabajo en segundo plano.",
     sections: [
       {
-        icon: "\\u{1F50E}",
+        icon: "search",
         title: "Busqueda y guardado",
         notes: [
           "La busqueda de ajustes anuncia correctamente sus resultados y conserva el foco al navegar con teclado.",
@@ -17,7 +48,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "\\u{21A9}",
+        icon: "undo",
         title: "Edicion mas segura",
         notes: [
           "Quitar un elemento del dock muestra una accion breve para deshacerlo.",
@@ -25,7 +56,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "\\u{26A1}",
+        icon: "performance",
         title: "Menos trabajo en reposo",
         notes: [
           "El reporte de hitboxes se repara por cambios reales y usa una comprobacion de seguridad mas espaciada.",
@@ -40,7 +71,7 @@ export const CHANGELOG = [
     headline: "Dock y ajustes mas claros, rapidos y comodos.",
     sections: [
       {
-        icon: "\\u{1F50E}",
+        icon: "search",
         title: "Ajustes faciles de encontrar",
         notes: [
           "La busqueda entiende terminos relacionados, ordena los resultados por relevancia y se puede recorrer con el teclado.",
@@ -48,7 +79,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "\\u{1F5B1}\\uFE0F",
+        icon: "performance",
         title: "Dock mas directo",
         notes: [
           "Abrir una app ya no espera un rebote: la accion sale inmediatamente.",
@@ -56,7 +87,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "\\u{2728}",
+        icon: "performance",
         title: "Movimiento con proposito",
         notes: [
           "Anclar o quitar elementos usa una transicion breve y estable; el notch termina su cambio de borde con mayor rapidez.",

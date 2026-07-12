@@ -21,6 +21,27 @@ import {
 } from "./api.js";
 import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
+import {
+  ArrowUndo24Regular,
+  Flash24Regular,
+  Info24Regular,
+  Search24Regular,
+} from "@fluentui/react-icons";
+
+const CHANGELOG_ICONS = {
+  search: Search24Regular,
+  undo: ArrowUndo24Regular,
+  performance: Flash24Regular,
+};
+
+function ChangelogIcon({ name }) {
+  const FluentIcon = CHANGELOG_ICONS[name] || Info24Regular;
+  return (
+    <span className="cl-ico" aria-hidden="true">
+      <FluentIcon />
+    </span>
+  );
+}
 
 // One-click theme presets (accent + light/dark).
 const THEME_PRESETS = [
@@ -2941,7 +2962,7 @@ function ChangelogModal({ onClose }) {
               {entry.headline && <p className="cl-headline">{entry.headline}</p>}
               {entry.sections.map((sec, k) => (
                 <div key={k} className="cl-section">
-                  <h3 className="cl-section-title"><span className="cl-ico">{sec.icon}</span>{sec.title}</h3>
+                  <h3 className="cl-section-title"><ChangelogIcon name={sec.icon} />{sec.title}</h3>
                   <ul className="cl-notes">
                     {sec.notes.map((n, j) => <li key={j}>{n}</li>)}
                   </ul>
