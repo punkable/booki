@@ -3,6 +3,39 @@
 
 export const CHANGELOG = [
   {
+    version: "0.54.0",
+    date: "13 jul 2026",
+    headline: "Integracion con Fluent UI, Apps ancladas mas inteligentes y ajustes mejor ordenados.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Fluent UI en Ajustes",
+        notes: [
+          "Los toggles, sliders, botones y dropdowns ahora usan componentes reales de @fluentui/react-components.",
+          "FluentProvider sincroniza el color de acento y el modo claro/oscuro con el tema de Booki.",
+          "Las tarjetas de ajustes usan Fluent Card manteniendo la elevacion y estilo de Booki.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Apps ancladas mas inteligentes",
+        notes: [
+          "El menu superior de Apps ancladas se adapta a ventanas pequenas sin romper ni desbordarse.",
+          "Las acciones principales y secundarias se colapsan con logica responsive: Add app primero, el resto agrupado.",
+          "El menu 'Mas' ahora usa Fluent Menu con posicionamiento automatico y atajos de teclado nativos.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Ajustes mas claros",
+        notes: [
+          "La pestana General ahora agrupa idioma con Sistema, reduciendo el numero de secciones.",
+          "Se simplifico la jerarquia para que cualquier usuario encuentre las opciones sin sobrecarga.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.53.0",
     date: "13 jul 2026",
     headline: "Clicks confiables, transicion dock-notch mas fluida y look mas nativo de Windows.",

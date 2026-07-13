@@ -22,11 +22,35 @@ import {
 import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
 import {
+  FluentProvider,
+  Switch,
+  Slider as FluentSlider,
+  Button,
+  Menu,
+  MenuTrigger,
+  MenuList,
+  MenuItem,
+  MenuPopover,
+  Dropdown,
+  Option,
+  Card,
+  CardHeader,
+} from "@fluentui/react-components";
+import {
+  AddRegular,
+  ChevronDownRegular,
+  FolderRegular,
+  FolderAddRegular,
+  LineHorizontal3Regular,
+  DeleteRegular,
+  GridRegular,
+  ListRegular,
   ArrowUndo24Regular,
   Flash24Regular,
   Info24Regular,
   Search24Regular,
 } from "@fluentui/react-icons";
+import { buildFluentTheme } from "./fluent-theme.js";
 
 const CHANGELOG_ICONS = {
   search: Search24Regular,
@@ -113,6 +137,15 @@ const ACCENTS = [
   ["Violeta", "#8338ec"],
   ["Azul", "#3a86ff"],
   ["Verde", "#2ecc71"],
+];
+
+const LANG_OPTIONS = [
+  { value: "system", key: "lang.system" },
+  { value: "es", label: "Español" },
+  { value: "en", label: "English" },
+  { value: "pt", label: "Português" },
+  { value: "fr", label: "Français" },
+  { value: "de", label: "Deutsch" },
 ];
 
 // Searchable option index: i18n key → tab that hosts it (settings search).
@@ -299,13 +332,15 @@ function Row({ label, children, hint }) {
 
 function Toggle({ checked, onChange, label, hint }) {
   return (
-    <label className="r-toggle">
+    <label className="r-toggle fui-toggle">
       <span className="r-toggle-text">
         {label}
         {hint ? <small className="r-toggle-hint">{hint}</small> : null}
       </span>
-      <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="r-switch" />
+      <Switch
+        checked={!!checked}
+        onChange={(_e, data) => onChange(data.checked)}
+      />
     </label>
   );
 }
@@ -327,7 +362,7 @@ function PageHeader({ icon: iconName, title, children, meta }) {
 
 function SettingsSection({ title, icon: iconName = "settings", hint, children, className = "" }) {
   return (
-    <section className={"settings-section " + (!title ? "settings-section-headless " : "") + className}>
+    <Card className={"settings-section " + (!title ? "settings-section-headless " : "") + className}>
       {title ? (
         <div className="settings-section-head">
           <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
@@ -338,7 +373,7 @@ function SettingsSection({ title, icon: iconName = "settings", hint, children, c
         </div>
       ) : null}
       <div className="settings-section-body">{children}</div>
-    </section>
+    </Card>
   );
 }
 
@@ -435,25 +470,16 @@ function SectionTitle({ children, name = "settings" }) {
 }
 
 function Slider({ value, min, max, step, onChange, fmt }) {
-  const pct = Math.min(100, Math.max(0, max > min ? ((value - min) / (max - min)) * 100 : 0));
-  const fill = `linear-gradient(to right, var(--accent) ${pct}%, var(--track) ${pct}%)`;
   return (
-    <div className="r-slider">
-      <div className="slider-wrap">
-        <input
-          type="range"
-          className="slider-input"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          style={{ background: fill }}
-          onChange={(e) => onChange(Number(e.target.value))}
-        />
-        <span className="slider-bubble" style={{ left: `${pct}%` }}>
-          {fmt ? fmt(value) : value}
-        </span>
-      </div>
+    <div className="r-slider fui-slider">
+      <FluentSlider
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(_e, data) => onChange(data.value)}
+      />
+      <span className="slider-bubble">{fmt ? fmt(value) : value}</span>
     </div>
   );
 }
@@ -1543,8 +1569,6 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
-  const moreButtonRef = useRef(null);
-  const moreMenuRef = useRef(null);
   const kidMenuRef = useRef(null);
   const pinnedRef = useRef(cfg.pinned);
   pinnedRef.current = cfg.pinned;
@@ -1908,56 +1932,6 @@ function Apps({ cfg, set }) {
   const addSep = () =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
   const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [moreMenuPos, setMoreMenuPos] = useState(null);
-  useLayoutEffect(() => {
-    if (!moreOpen || !moreButtonRef.current || !moreMenuRef.current) return;
-    const place = () => {
-      const trigger = moreButtonRef.current.getBoundingClientRect();
-      const menu = moreMenuRef.current.getBoundingClientRect();
-      const pad = 8;
-      const gap = 6;
-      const left = Math.min(
-        Math.max(pad, trigger.right - menu.width),
-        Math.max(pad, window.innerWidth - menu.width - pad)
-      );
-      const below = trigger.bottom + gap;
-      const above = trigger.top - menu.height - gap;
-      const top = below + menu.height <= window.innerHeight - pad
-        ? below
-        : Math.max(pad, above);
-      setMoreMenuPos({ left, top });
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [moreOpen]);
-  // Close the "more options" dropdown when clicking anywhere else.
-  useEffect(() => {
-    if (!moreOpen) return;
-    const close = (e) => {
-      if (!e.target.closest || (!e.target.closest(".s-more") && !e.target.closest(".s-more-menu"))) {
-        setMoreOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [moreOpen]);
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onKeyDown = (e) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      setMoreOpen(false);
-      moreButtonRef.current?.focus();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [moreOpen]);
   const addTrash = () =>
     !hasTrash &&
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
@@ -2018,14 +1992,22 @@ function Apps({ cfg, set }) {
         <div className="pin-toolbar-main">
           {cfg.pinned.length > 0 ? (
             <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
-              <button className={"pin-view-btn" + (view === "list" ? " active" : "")}
-                title={t("apps.viewList")} aria-label={t("apps.viewList")} aria-selected={view === "list"} onClick={() => pickView("list")}>
-                <span dangerouslySetInnerHTML={{ __html: icon("list") }} />
-              </button>
-              <button className={"pin-view-btn" + (view === "grid" ? " active" : "")}
-                title={t("apps.viewGrid")} aria-label={t("apps.viewGrid")} aria-selected={view === "grid"} onClick={() => pickView("grid")}>
-                <span dangerouslySetInnerHTML={{ __html: icon("grid") }} />
-              </button>
+              <Button
+                appearance={view === "list" ? "primary" : "subtle"}
+                icon={<ListRegular />}
+                title={t("apps.viewList")}
+                aria-label={t("apps.viewList")}
+                aria-selected={view === "list"}
+                onClick={() => pickView("list")}
+              />
+              <Button
+                appearance={view === "grid" ? "primary" : "subtle"}
+                icon={<GridRegular />}
+                title={t("apps.viewGrid")}
+                aria-label={t("apps.viewGrid")}
+                aria-selected={view === "grid"}
+                onClick={() => pickView("grid")}
+              />
             </div>
           ) : (
             <div className="pin-list-summary">
@@ -2035,47 +2017,32 @@ function Apps({ cfg, set }) {
           )}
         </div>
         <div className="pin-toolbar-actions">
-          <button className="s-btn pin-add-main" onClick={addApp}>
-            <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("plus") }} />
-            <span>{t("apps.addApp")}</span>
-          </button>
-          <div className="s-more">
-            <button ref={moreButtonRef} className="s-btn s-btn-soft s-btn-ico" title={t("apps.more")}
-              aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
-              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("chevron-down") }} />
-              <span>{t("apps.more")}</span>
-            </button>
-            {moreOpen && createPortal(
-              <div ref={moreMenuRef} className="s-more-menu" role="menu" aria-label={t("apps.more")}
-                style={{ left: moreMenuPos?.left ?? 0, top: moreMenuPos?.top ?? 0, visibility: moreMenuPos ? "visible" : "hidden" }}
-                onClick={() => setMoreOpen(false)}>
-                <button role="menuitem" onClick={addFolder}>
-                  <span dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />{t("apps.addFolder")}
-                </button>
-                <button role="menuitem" onClick={newFolder}>
-                  <span dangerouslySetInnerHTML={{ __html: icon("folder") }} />{t("apps.newFolder")}
-                </button>
-                <button role="menuitem" onClick={addSep}>
-                  <span dangerouslySetInnerHTML={{ __html: icon("list") }} />{t("apps.addSep")}
-                </button>
-                <button role="menuitem" onClick={addTrash} disabled={hasTrash} title={t("apps.trashHint")}>
-                  <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.addTrash")}
-                </button>
-              </div>,
-              document.body
-            )}
-          </div>
+          <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={addApp}>
+            {t("apps.addApp")}
+          </Button>
+          <Menu>
+            <MenuTrigger>
+              <Button className="pin-more-btn" icon={<ChevronDownRegular />} iconPosition="after">{t("apps.more")}</Button>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem icon={<FolderAddRegular />} onClick={addFolder}>{t("apps.addFolder")}</MenuItem>
+                <MenuItem icon={<FolderRegular />} onClick={newFolder}>{t("apps.newFolder")}</MenuItem>
+                <MenuItem icon={<LineHorizontal3Regular />} onClick={addSep}>{t("apps.addSep")}</MenuItem>
+                <MenuItem icon={<DeleteRegular />} disabled={hasTrash} onClick={addTrash}>{t("apps.addTrash")}</MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
           {cfg.pinned.length > 0 && (clearArm ? (
-            <span className="pin-clear-confirm">
-              {t("apps.clearConfirm")}
-              <button className="s-btn s-btn-danger s-btn-sm" onClick={clearAll}>{t("apps.clearYes")}</button>
-              <button className="s-btn s-btn-soft s-btn-sm" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</button>
-            </span>
+            <div className="pin-clear-confirm">
+              <span>{t("apps.clearConfirm")}</span>
+              <Button appearance="primary" size="small" onClick={clearAll}>{t("apps.clearYes")}</Button>
+              <Button size="small" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</Button>
+            </div>
           ) : (
-            <button className="s-btn s-btn-soft s-btn-sm pin-clear" onClick={() => setClearArm(true)}>
-              <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("trash") }} />
-              <span>{t("apps.clearAll")}</span>
-            </button>
+            <Button className="pin-clear" icon={<DeleteRegular />} onClick={() => setClearArm(true)}>
+              {t("apps.clearAll")}
+            </Button>
           ))}
         </div>
       </div>
@@ -2580,6 +2547,18 @@ function General({ cfg, set, onWhatsNew }) {
       <PageHeader icon="settings" title={t("gen.title")}>{t("gen.hint")}</PageHeader>
 
       <SettingsSection title={t("gp.system")} icon="power">
+      <Row label={t("ap.language")} hint={t("gen.langHint")}>
+        <Dropdown
+          className="s-lang-dropdown"
+          value={LANG_OPTIONS.find((o) => o.value === (cfg.language || "system"))?.label || t("lang.system")}
+          selectedOptions={[cfg.language || "system"]}
+          onOptionSelect={(_e, data) => set({ language: data.optionValue })}
+        >
+          {LANG_OPTIONS.map((o) => (
+            <Option key={o.value} value={o.value}>{o.key ? t(o.key) : o.label}</Option>
+          ))}
+        </Dropdown>
+      </Row>
       <Toggle label={t("be.autostart")} checked={autostart}
         onChange={async (v) => {
           setAutostart(v);
@@ -2604,41 +2583,27 @@ function General({ cfg, set, onWhatsNew }) {
         onChange={(v) => set({ contextMenu: v })} />
       </SettingsSection>
 
-      <SettingsSection title={t("ab.updates")} icon="sparkles">
-      <UpdatesCard onWhatsNew={onWhatsNew} />
-      </SettingsSection>
-
       <SettingsSection title={t("sc.title")} icon="keyboard">
       <ShortcutsSection cfg={cfg} set={set} />
       </SettingsSection>
 
-      <SettingsSection title={t("gen.langSub")} icon="help">
-      <Row label={t("ap.language")} hint={t("gen.langHint")}>
-        <select className="s-select" value={cfg.language || "system"}
-          onChange={(e) => set({ language: e.target.value })}>
-          <option value="system">{t("lang.system")}</option>
-          <option value="es">Español</option>
-          <option value="en">English</option>
-          <option value="pt">Português</option>
-          <option value="fr">Français</option>
-          <option value="de">Deutsch</option>
-        </select>
-      </Row>
+      <SettingsSection title={t("ab.updates")} icon="sparkles">
+      <UpdatesCard onWhatsNew={onWhatsNew} />
       </SettingsSection>
 
       <SettingsSection title={t("ap.backup")} icon="copy">
       <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
         <div className="s-actions" style={{ margin: 0 }}>
-          <button className="s-btn s-btn-soft" onClick={async () => {
+          <Button onClick={async () => {
             const p = await pickSavePath("booki-config.json");
             if (p) await dockApi.exportConfig(p);
-          }}>{t("ap.export")}</button>
-          <button className="s-btn s-btn-soft" onClick={async () => {
+          }}>{t("ap.export")}</Button>
+          <Button appearance="secondary" onClick={async () => {
             const p = await pickJsonFile();
             if (!p) return;
             const fresh = await dockApi.importConfig(p);
             if (fresh) set(fresh);
-          }}>{t("ap.import")}</button>
+          }}>{t("ap.import")}</Button>
         </div>
       </Row>
       </SettingsSection>
@@ -2735,6 +2700,7 @@ function App() {
   const [query, setQuery] = useState("");
   const searchResults = useMemo(() => findSettings(query), [query]);
   const [activeSearchResult, setActiveSearchResult] = useState(0);
+  const fluentTheme = useMemo(() => buildFluentTheme(cfg?.accent, cfg?.theme), [cfg?.accent, cfg?.theme]);
   // One-time "start here" banner so a new user knows where to begin.
   const [introSeen, setIntroSeen] = useState(() => {
     try { return localStorage.getItem("booki.introSeen") === "1"; } catch (_) { return true; }
@@ -2882,103 +2848,111 @@ function App() {
     return () => un && un();
   }, []);
 
-  if (!cfg) return <SettingsSkeleton />;
+  if (!cfg) {
+    return (
+      <FluentProvider theme={buildFluentTheme(null, "system")}>
+        <SettingsSkeleton />
+      </FluentProvider>
+    );
+  }
 
   return (
-    <div className="s-shell">
-      <aside className="s-sidebar">
-        <div className="s-brand">
-          <img src="/brand/svg/isotype.svg" alt="" />
-          <img className="brand-word word-black" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
-          <img className="brand-word word-white" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
-        </div>
-        <div className="s-search">
-          <input
-            ref={searchRef}
-            type="search"
-            placeholder={t("search.placeholder")}
-            value={query}
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={!!query.trim()}
-            aria-controls={query.trim() ? "settings-search-results" : undefined}
-            aria-activedescendant={query.trim() && searchResults[activeSearchResult] ? `settings-search-${searchResults[activeSearchResult].key}` : undefined}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onSearchKeyDown}
-          />
-          {query.trim() && (
-            <div id="settings-search-results" className="s-search-results" role="listbox">
-              {searchResults.map((result, index) => (
-                  <button
-                    key={result.key}
-                    type="button"
-                    role="option"
-                    id={`settings-search-${result.key}`}
-                    className={index === activeSearchResult ? "active" : ""}
-                    aria-selected={index === activeSearchResult}
-                    onClick={() => chooseSearchResult(result)}
-                  >
-                    <span>{result.label}</span>
-                    <span className="s-search-tab">{result.tabLabel}</span>
-                  </button>
-              ))}
-              {!searchResults.length && (
-                <div className="s-search-none">
-                  <img className="empty-capy sm" src="/brand/svg/isotype.svg" alt="" />
-                  {t("search.none")}
-                </div>
-              )}
+    <FluentProvider theme={fluentTheme}>
+      <div className="s-shell">
+        <aside className="s-sidebar">
+          <div className="s-brand">
+            <img src="/brand/svg/isotype.svg" alt="" />
+            <img className="brand-word word-black" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
+            <img className="brand-word word-white" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
+          </div>
+          <div className="s-search">
+            <input
+              ref={searchRef}
+              type="search"
+              placeholder={t("search.placeholder")}
+              value={query}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={!!query.trim()}
+              aria-controls={query.trim() ? "settings-search-results" : undefined}
+              aria-activedescendant={query.trim() && searchResults[activeSearchResult] ? `settings-search-${searchResults[activeSearchResult].key}` : undefined}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+            />
+            {query.trim() && (
+              <div id="settings-search-results" className="s-search-results" role="listbox">
+                {searchResults.map((result, index) => (
+                    <button
+                      key={result.key}
+                      type="button"
+                      role="option"
+                      id={`settings-search-${result.key}`}
+                      className={index === activeSearchResult ? "active" : ""}
+                      aria-selected={index === activeSearchResult}
+                      onClick={() => chooseSearchResult(result)}
+                    >
+                      <span>{result.label}</span>
+                      <span className="s-search-tab">{result.tabLabel}</span>
+                    </button>
+                ))}
+                {!searchResults.length && (
+                  <div className="s-search-none">
+                    <img className="empty-capy sm" src="/brand/svg/isotype.svg" alt="" />
+                    {t("search.none")}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
+            <span className="s-nav-indicator" aria-hidden="true" />
+            {TABS.map(([id, label, ico]) => (
+              <button
+                key={id}
+                className={"s-navitem" + (tab === id ? " active" : "")}
+                aria-current={tab === id ? "page" : undefined}
+                type="button"
+                onClick={() => setTab(id)}
+              >
+                <span className="s-navicon" dangerouslySetInnerHTML={{ __html: icon(ico) }} />
+                <span>{t(label)}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="s-sidebar-foot">
+            <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
+          </div>
+        </aside>
+        <main ref={contentRef} className="s-content">
+          {!introSeen && (
+            <div className="s-intro">
+              <span className="s-intro-icon" dangerouslySetInnerHTML={{ __html: icon("info") }} />
+              <div className="s-intro-body">
+                <strong>{t("intro.title")}</strong>
+                <span className="muted">{t("intro.body")}</span>
+              </div>
+              <button className="s-btn s-btn-sm" onClick={() => { setTab("apps"); dismissIntro(); }}>
+                {t("intro.cta")}
+              </button>
+              <button className="s-intro-x" title={t("intro.dismiss")} aria-label={t("intro.dismiss")} onClick={dismissIntro}
+                dangerouslySetInnerHTML={{ __html: icon("x") }} />
             </div>
           )}
-        </div>
-        <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
-          <span className="s-nav-indicator" aria-hidden="true" />
-          {TABS.map(([id, label, ico]) => (
-            <button
-              key={id}
-              className={"s-navitem" + (tab === id ? " active" : "")}
-              aria-current={tab === id ? "page" : undefined}
-              type="button"
-              onClick={() => setTab(id)}
-            >
-              <span className="s-navicon" dangerouslySetInnerHTML={{ __html: icon(ico) }} />
-              <span>{t(label)}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="s-sidebar-foot">
-          <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
-        </div>
-      </aside>
-      <main ref={contentRef} className="s-content">
-        {!introSeen && (
-          <div className="s-intro">
-            <span className="s-intro-icon" dangerouslySetInnerHTML={{ __html: icon("info") }} />
-            <div className="s-intro-body">
-              <strong>{t("intro.title")}</strong>
-              <span className="muted">{t("intro.body")}</span>
+          <div key={tab}>
+            <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
+              {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
-            <button className="s-btn s-btn-sm" onClick={() => { setTab("apps"); dismissIntro(); }}>
-              {t("intro.cta")}
-            </button>
-            <button className="s-intro-x" title={t("intro.dismiss")} aria-label={t("intro.dismiss")} onClick={dismissIntro}
-              dangerouslySetInnerHTML={{ __html: icon("x") }} />
+            {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
+            {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
+            {tab === "apps" && <Apps cfg={cfg} set={set} />}
+            {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
+            {tab === "faq" && <Faq version={version || "..."} />}
+            {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
           </div>
-        )}
-        <div key={tab}>
-          <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
-            {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
-          </div>
-          {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
-          {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
-          {tab === "apps" && <Apps cfg={cfg} set={set} />}
-          {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
-          {tab === "faq" && <Faq version={version || "..."} />}
-          {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
-        </div>
-      </main>
-      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
-    </div>
+        </main>
+        {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      </div>
+    </FluentProvider>
   );
 }
 
