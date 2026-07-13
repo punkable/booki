@@ -3,14 +3,18 @@
 //! (Win32 bindings). Validated to compile against `x86_64-pc-windows-msvc`.
 
 use std::ffi::c_void;
+use std::path::Path;
 
 use base64::Engine;
-use windows::core::{Interface, PCWSTR};
+use windows::core::{Interface, PCWSTR, PWSTR};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_ALL, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED, STGM_READ,
+};
+use windows::Win32::System::Threading::{
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
@@ -495,6 +499,30 @@ pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
         } else {
             None
         }
+    }
+}
+
+/// Lowercased executable name (without .exe) of the currently foreground window.
+pub fn foreground_app_name() -> Option<String> {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return None;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 {
+            return None;
+        }
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 512];
+        let mut size = buf.len() as u32;
+        QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut size)
+            .ok()?;
+        let path = String::from_utf16_lossy(&buf[..size as usize]);
+        Path::new(&path)
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_lowercase())
     }
 }
 

@@ -4281,3 +4281,85 @@ textarea {
   .pin-clear.fui-Button { width: 34px; padding: 0; justify-content: center; }
   .pin-clear > span:last-child { display: none; }
 }
+
+/* ─────────── Multi-notch: intelligent dot-mode notch ─────────── */
+
+/* Dot mode: shrink the pill to a small reactive circle. */
+body.notch-dot .notch-pill {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  --pill-gx: 1.35;
+  --pill-gy: 1.35;
+}
+body.notch-dot .notch-pill::before,
+body.notch-dot .notch-pill::after { display: none; }
+body.notch-dot.vertical .notch-pill {
+  width: 18px;
+  height: 18px;
+}
+body.notch-dot.peek .notch-pill {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+/* Settings UI for multi-notch app list and suggestions. */
+.mn-suggest-group { margin: 12px 0 8px; }
+.mn-suggest-group strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  text-transform: capitalize;
+}
+.mn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--layer-strong);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.mn-chip:hover { background: var(--hover); border-color: var(--accent); }
+.mn-chip.active {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
+  cursor: default;
+}
+.mn-add { display: flex; gap: 8px; margin: 8px 0; }
+.mn-add input { flex: 1 1 auto; min-width: 0; }
+.mn-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mn-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 11px;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 10%, var(--layer-strong));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--stroke));
+  border-radius: var(--r-pill);
+}
+.mn-tag button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--layer);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.mn-tag button:hover { color: var(--danger); background: var(--hover); }
+.mn-tag button svg { width: 10px; height: 10px; }

@@ -3,6 +3,32 @@
 
 export const CHANGELOG = [
   {
+    version: "0.54.2",
+    date: "13 jul 2026",
+    headline: "Multi-notch inteligente: el notch muta a un punto en apps de productividad.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Notch que se adapta a la app activa",
+        notes: [
+          "Nueva opcion en Comportamiento -> Notch: Multi-notch inteligente.",
+          "En apps de productividad (navegadores, editores, diseno, codigo) el notch se convierte en un punto discreto.",
+          "En apps normales o juegos el notch conserva su forma habitual.",
+          "El backend detecta la app en primer plano y notifica al notch cada 300 ms.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Lista y sugerencias de apps",
+        notes: [
+          "Puedes añadir o quitar manualmente los ejecutables que activan el modo punto.",
+          "Sugerencias por categoria: navegadores, diseno, edicion, desarrollo y productividad.",
+          "Opcion para que Booki sugiera automaticamente apps de productividad conocidas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.54.1",
     date: "13 jul 2026",
     headline: "Dock siempre visible: control de 'flotar por encima' y re-assert de topmost.",

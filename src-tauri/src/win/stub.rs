@@ -37,6 +37,10 @@ pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: i
     false
 }
 
+pub fn foreground_app_name() -> Option<String> {
+    None
+}
+
 pub fn is_fullscreen() -> bool {
     false
 }

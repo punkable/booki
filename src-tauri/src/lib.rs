@@ -495,6 +495,21 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// Current foreground app + whether multi-notch would shrink the notch to a dot.
+#[tauri::command]
+fn current_foreground_app() -> serde_json::Value {
+    let cfg = config::load();
+    let app = win::foreground_app_name().unwrap_or_default();
+    let dot = if cfg.multi_notch_enabled {
+        cfg.multi_notch_apps
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case(&app))
+    } else {
+        false
+    };
+    serde_json::json!({ "app": app, "dot": dot })
+}
+
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
 fn reset_config(app: AppHandle) -> Result<Config, String> {
@@ -2060,6 +2075,7 @@ pub fn run() {
             image_data_uri,
             set_always_on_top,
             app_version,
+            current_foreground_app,
             reset_config,
             open_settings,
             open_location,
@@ -2255,6 +2271,20 @@ pub fn run() {
                             // fullscreen game / movie / presentation → get out of the way.
                             if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
                                 let _ = handle.emit("booki://fullscreen", v);
+                            }
+                            // Multi-notch: when enabled, tell the notch whether the active
+                            // app should shrink it to a dot (productivity / focus apps).
+                            if cfg_cache.multi_notch_enabled {
+                                if let Some(app) = win::foreground_app_name() {
+                                    let dot = cfg_cache
+                                        .multi_notch_apps
+                                        .iter()
+                                        .any(|a| a.eq_ignore_ascii_case(&app));
+                                    let _ = handle.emit(
+                                        "booki://active-app",
+                                        serde_json::json!({ "app": app, "dot": dot }),
+                                    );
+                                }
                             }
                             // Cursor pressed against the dock's edge → reveal signal.
                             if cfg_cache.notch_trigger == "hover" {
