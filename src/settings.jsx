@@ -35,10 +35,24 @@ const CHANGELOG_ICONS = {
 };
 
 function ChangelogIcon({ name }) {
-  const FluentIcon = CHANGELOG_ICONS[name] || Info24Regular;
+  const FluentIcon = CHANGELOG_ICONS[name];
+  if (FluentIcon) {
+    return (
+      <span className="cl-ico" aria-hidden="true">
+        <FluentIcon />
+      </span>
+    );
+  }
+  if (name) {
+    return (
+      <span className="cl-ico cl-ico-emoji" aria-hidden="true">
+        {name}
+      </span>
+    );
+  }
   return (
     <span className="cl-ico" aria-hidden="true">
-      <FluentIcon />
+      <Info24Regular />
     </span>
   );
 }
@@ -238,19 +252,19 @@ function widgetRefs(pinned, widget) {
 function itemForWidgetRef(pinned, ref) {
   if (!ref) return null;
   if (ref.type === "top") {
-    return (pinned || []).find((item) => item.id === ref.id) || pinned?.[ref.i] || null;
+    return (pinned || []).find((item) => item.id === ref.id) || null;
   }
-  const group = (pinned || []).find((item) => item.id === ref.groupId) || pinned?.[ref.gi];
+  const group = (pinned || []).find((item) => item.id === ref.groupId);
   return (group?.children || []).find((child) => child.id === ref.id) || null;
 }
 
 function updateWidgetStyleForRef(pinned, ref, value) {
   if (!ref) return pinned;
   if (ref.type === "top") {
-    return pinned.map((item, i) => (item.id === ref.id || (!ref.id && i === ref.i) ? { ...item, style: value } : item));
+    return pinned.map((item) => (item.id === ref.id ? { ...item, style: value } : item));
   }
-  return pinned.map((item, i) =>
-    item.id === ref.groupId || (!ref.groupId && i === ref.gi)
+  return pinned.map((item) =>
+    item.id === ref.groupId
       ? { ...item, children: (item.children || []).map((child) => (child.id === ref.id ? { ...child, style: value } : child)) }
       : item
   );
@@ -2812,7 +2826,10 @@ function App() {
       const next = { ...prev, ...patch };
       // Switching language may need its dictionary → load then re-render.
       if (prev && prev.language !== next.language) {
-        ensureLang(next.language).then(() => setCfg((c) => ({ ...c })));
+        ensureLang(next.language).then(() => {
+          setLang(next.language);
+          setCfg((c) => ({ ...c }));
+        });
       } else {
         setLang(next.language);
       }

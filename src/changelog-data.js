@@ -3,6 +3,39 @@
 
 export const CHANGELOG = [
   {
+    version: "0.52.0",
+    date: "13 jul 2026",
+    headline: "Revision completa: iconos del changelog, animacion de inicio y robustez del dock.",
+    sections: [
+      {
+        icon: "search",
+        title: "Changelog legible",
+        notes: [
+          "Los iconos del changelog ahora se renderizan correctamente tanto los SVG de Fluent como los emojis de versiones anteriores.",
+          "Ya no aparecen codigos raros ni el icono de informacion generico en todas las entradas.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Dock mas robusto",
+        notes: [
+          "Al editar una nota, el guardado espera a completarse antes de cerrar el editor: no se pierde texto si el dock se oculta rapido.",
+          "Mover el dock a otro borde ahora persiste la configuracion inmediatamente.",
+          "La animacion de inicio solo se ejecuta una vez; cambiar de borde despues ya no la repite.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Menos bloqueos y referencias seguras",
+        notes: [
+          "Los comandos de listar carpetas y descargar favicons son ahora asincronos en el backend, asi no congelan el hilo principal.",
+          "El cambio de idioma carga el diccionario antes de aplicarlo, evitando textos en blanco.",
+          "Las referencias a widgets ya no usan indices como respaldo, previniendo cambios en el widget equivocado.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.50.4",
     date: "12 jul 2026",
     headline: "Dock mas estable, menus completos y Apps ancladas mas compactas.",

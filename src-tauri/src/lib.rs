@@ -692,7 +692,7 @@ fn system_stats() -> SystemStats {
 /// real icon. Uses Google's favicon service (one well-known host) and caches the
 /// bytes into the pin's icon, so it only hits the network when you add the site.
 #[tauri::command]
-fn fetch_favicon(url: String) -> Option<String> {
+async fn fetch_favicon(url: String) -> Option<String> {
     use base64::Engine;
     let mut host = url
         .trim()
@@ -1577,7 +1577,7 @@ struct DirItem {
 
 /// List a folder's contents for the "stack" flyout.
 #[tauri::command]
-fn list_dir(path: String) -> Vec<DirItem> {
+async fn list_dir(path: String) -> Vec<DirItem> {
     let mut out: Vec<DirItem> = Vec::new();
     if let Ok(rd) = std::fs::read_dir(&path) {
         for e in rd.flatten() {

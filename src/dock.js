@@ -130,6 +130,8 @@ async function boot() {
     startPolls(); // starts the widget + running-app/trash polls together
     // Remove booting class to trigger the slide-in animation.
     document.body.classList.remove("booting");
+    document.body.classList.add("boot-animate");
+    setTimeout(() => document.body.classList.remove("boot-animate"), 500);
     // Only react to config changes made by OTHER windows (Settings). Tauri's
     // emit echoes back to the sender, so without this guard every dock reorder /
     // removal / grouping would trigger a redundant reloadConfig → re-render →
@@ -1175,20 +1177,20 @@ function editNote(item) {
   };
   place();
   setTimeout(() => { place(); ta.focus(); ta.select(); }, 80);
-  const save = () => {
+  const save = async () => {
     item.style = { ...(item.style || {}), note: ta.value };
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
       setPreviewSubText(el, ta.value || t("w.notesEmpty"), !ta.value);
       el.title = ta.value ? `${t("w.notes")} — ${ta.value}` : widgetLabel("notes");
     });
-    persist();
+    await persist();
   };
-  ta.addEventListener("keydown", (e) => {
+  ta.addEventListener("keydown", async (e) => {
     e.stopPropagation();
-    if (e.key === "Escape") { save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); }
+    if (e.key === "Escape") { await save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); }
   });
-  ta.addEventListener("blur", () => { save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); });
+  ta.addEventListener("blur", async () => { await save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); });
 }
 
 // ─────────────────────────── Launch ───────────────────────────
@@ -1528,7 +1530,7 @@ async function enterEdgeMove() {
   updateEdgePreview(edgeMove.lastX, edgeMove.lastY);
 }
 
-function endEdgeMove(commit) {
+async function endEdgeMove(commit) {
   const mv = edgeMove;
   edgeMove = null;
   if (edgeOverlay) edgeOverlay.classList.add("hidden");
@@ -1546,7 +1548,8 @@ function endEdgeMove(commit) {
     fitDock();
     document.body.classList.add("edge-swap");
     applyFrame();
-    dockApi.setDockEdge(target).catch(() => {});
+    await dockApi.setDockEdge(target);
+    await persist();
     setTimeout(() => requestAnimationFrame(() => document.body.classList.remove("edge-swap")), 90);
   } else {
     applyFrame(); // same edge or cancelled → just shrink the window back to the bar
@@ -1575,10 +1578,10 @@ window.addEventListener("pointermove", (e) => {
   }
   updateEdgePreview(e.clientX, e.clientY);
 });
-window.addEventListener("pointerup", () => { if (edgeMove) endEdgeMove(true); });
-window.addEventListener("pointercancel", () => { if (edgeMove) endEdgeMove(false); });
+window.addEventListener("pointerup", () => { if (edgeMove) endEdgeMove(true).catch(() => {}); });
+window.addEventListener("pointercancel", () => { if (edgeMove) endEdgeMove(false).catch(() => {}); });
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && edgeMove) endEdgeMove(false);
+  if (e.key === "Escape" && edgeMove) endEdgeMove(false).catch(() => {});
 });
 
 // Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
@@ -1903,8 +1906,8 @@ async function onPressUp() {
     if (armed && armed !== p.item.id) {
       await createGroup(p.item.id, armed);
     } else {
-      const ids = [...dockEl.querySelectorAll(".tile[data-id]")].map((t) => t.dataset.id);
-      cfg.pinned.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      const idToIndex = new Map([...dockEl.querySelectorAll(".tile[data-id]")].map((t, i) => [t.dataset.id, i]));
+      cfg.pinned.sort((a, b) => (idToIndex.get(a.id) ?? 0) - (idToIndex.get(b.id) ?? 0));
       await persist();
       await emitConfigChanged(); // keep the Settings list in sync with the new order
       await render();
