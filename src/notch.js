@@ -3,7 +3,7 @@
    move the dock (and notch) there. It's its own small window (never resized
    mid-flight) so the click target and repaint stay rock-solid. */
 
-import { config as configApi, invoke, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
+import { config as configApi, invoke, onActiveApp, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
 import { applyAccent } from "./util-color.js";
 
 const root = document.documentElement;
@@ -44,6 +44,21 @@ async function applyLook() {
 
 applyLook();
 onConfigChanged(applyLook);
+
+// Multi-notch intelligence: shrink the notch to a dot when the active app is in
+// the user's productivity list (browsers, editors, design tools, etc.).
+let dotMode = false;
+function applyDotMode(active) {
+  dotMode = !!active;
+  document.body.classList.toggle("notch-dot", dotMode);
+}
+onActiveApp((payload) => applyDotMode(payload.dot));
+(async function initDotMode() {
+  try {
+    const payload = await invoke("current_foreground_app");
+    applyDotMode(payload.dot);
+  } catch (_) {}
+})();
 
 const pill = document.getElementById("notch-pill");
 const textEl = document.getElementById("notch-text");

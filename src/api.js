@@ -58,6 +58,9 @@ const DEMO_CONFIG = {
   lastProfile: "",
   edgeGap: 48,
   focusIfRunning: false,
+  multiNotchEnabled: false,
+  multiNotchApps: [],
+  multiNotchAutoSuggest: true,
   clipboardPersist: false,
   clipboardRetentionDays: 7,
   clipboardHistoryLimit: 60,
@@ -524,4 +527,10 @@ export async function onFullscreen(cb) {
 export async function onNotchToast(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://notch-toast", (e) => cb(e.payload || ""));
+}
+
+/** Listen for the active foreground app changing (multi-notch intelligence). */
+export async function onActiveApp(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://active-app", (e) => cb(e.payload || { app: "", dot: false }));
 }

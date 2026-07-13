@@ -1313,6 +1313,8 @@ function Behavior({ cfg, set }) {
       )}
       </SettingsSection>
 
+      <MultiNotchSection cfg={cfg} set={set} />
+
       <SettingsSection title={t("gp.icons")} icon="grid">
       <Row label={t("be.anim")}>
         <SegmentedControl
@@ -1344,6 +1346,91 @@ function Behavior({ cfg, set }) {
 
       <ProfilesCard cfg={cfg} set={set} />
     </>
+  );
+}
+
+const MULTI_NOTCH_SUGGESTIONS = {
+  browsers: ["chrome", "firefox", "edge", "brave", "opera", "vivaldi", "arc"],
+  design: ["photoshop", "illustrator", "figma", "gimp", "blender", "maya", "cinema4d"],
+  editors: ["premiere", "aftereffects", "davinciresolve", "capcut", "obs"],
+  code: [
+    "opencode", "cursor", "code", "vscodium", "sublime_text", "atom", "notepad++",
+    "idea64", "webstorm64", "pycharm64", "datagrip64", "goland64", "rustrover64", "rider64",
+    "clion64", "phpstorm64", "rubymine64", "rider64", "fleet", "zed",
+  ],
+  productivity: ["notion", "obsidian", "evernote", "onenote", "todoist", "ticktick", "slack", "teams", "discord", "telegram", "whatsapp"],
+};
+
+function MultiNotchSection({ cfg, set }) {
+  const [custom, setCustom] = useState("");
+  const enabled = !!cfg.multiNotchEnabled;
+  const apps = cfg.multiNotchApps || [];
+  const add = (name) => {
+    const key = String(name).toLowerCase().trim().replace(/\.exe$/i, "");
+    if (!key || apps.some((a) => a.toLowerCase() === key)) return;
+    set({ multiNotchApps: [...apps, key] });
+  };
+  const remove = (key) => {
+    set({ multiNotchApps: apps.filter((a) => a.toLowerCase() !== key.toLowerCase()) });
+  };
+  return (
+    <SettingsSection title={t("be.multiNotch")} icon="eye" hint={t("be.multiNotchHint")}>
+      <Toggle label={t("be.multiNotch")} checked={enabled}
+        onChange={(v) => set({ multiNotchEnabled: v })} />
+      {enabled && (
+        <>
+          <Toggle label={t("be.multiNotchAutoSuggest")}
+            checked={cfg.multiNotchAutoSuggest !== false}
+            onChange={(v) => set({ multiNotchAutoSuggest: v })} />
+          <div className="s-card-inner">
+            <h3>{t("be.multiNotchSuggest")}</h3>
+            {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
+              <div key={cat} className="mn-suggest-group">
+                <strong>{t(`mn.${cat}`)}</strong>
+                <div className="mn-chips">
+                  {list.map((app) => {
+                    const active = apps.some((a) => a.toLowerCase() === app);
+                    return (
+                      <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
+                        onClick={() => active ? remove(app) : add(app)} disabled={active}>
+                        {app}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="s-card-inner">
+            <h3>{t("be.multiNotchApps")}</h3>
+            <div className="mn-add">
+              <input
+                className="r-hotkey-input"
+                value={custom}
+                placeholder="opencode"
+                onChange={(e) => setCustom(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
+              />
+              <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
+            </div>
+            {apps.length === 0 ? (
+              <p className="muted">{t("be.multiNotchHint")}</p>
+            ) : (
+              <div className="mn-list">
+                {apps.map((app) => (
+                  <span key={app} className="mn-tag">
+                    {app}
+                    <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
+                      <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </SettingsSection>
   );
 }
 

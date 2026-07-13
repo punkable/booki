@@ -247,6 +247,16 @@ pub struct Config {
     /// there's always a visible anchor on the screen edge.
     #[serde(default)]
     pub notch_always_visible: bool,
+    /// Multi-notch: shrink the notch to a dot when the active window belongs to
+    /// a productivity app (browser, editor, design tool, etc.).
+    #[serde(default)]
+    pub multi_notch_enabled: bool,
+    /// Executable names (without .exe, lowercased) that trigger dot mode.
+    #[serde(default)]
+    pub multi_notch_apps: Vec<String>,
+    /// Suggest productivity apps for multi-notch automatically.
+    #[serde(default = "default_true")]
+    pub multi_notch_auto_suggest: bool,
 }
 
 fn default_hotkey_modifier() -> String {
@@ -303,6 +313,9 @@ impl Default for Config {
             clipboard_compact: false,
             capture_visible: false,
             notch_always_visible: false,
+            multi_notch_enabled: false,
+            multi_notch_apps: Vec::new(),
+            multi_notch_auto_suggest: true,
         }
     }
 }
