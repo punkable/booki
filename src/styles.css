@@ -5,6 +5,44 @@
    restrained translucency, light borders, depth, Segoe UI.
    ─────────────────────────────────────────────────────────── */
 
+/* Boot animation: the dock starts invisible and slides in from its edge once
+   positioned by the backend. This prevents the "dock in the middle" flash. */
+body.booting .dock { opacity: 0; }
+body:not(.booting) .dock {
+  animation: dock-boot-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes dock-boot-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+body.booting.genie-top .dock,
+body:not(.booting).genie-top .dock {
+  animation-name: dock-boot-in-top;
+}
+@keyframes dock-boot-in-top {
+  from { opacity: 0; transform: translateY(-20px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+body.booting.genie-left .dock,
+body:not(.booting).genie-left .dock {
+  animation-name: dock-boot-in-left;
+}
+@keyframes dock-boot-in-left {
+  from { opacity: 0; transform: translateX(-20px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+body.booting.genie-right .dock,
+body:not(.booting).genie-right .dock {
+  animation-name: dock-boot-in-right;
+}
+@keyframes dock-boot-in-right {
+  from { opacity: 0; transform: translateX(20px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body:not(.booting) .dock { animation: none; }
+}
+
 /* Respect "reduce motion" everywhere: kill decorative loops and near-instant
    any remaining transitions, without disabling functionality. */
 @media (prefers-reduced-motion: reduce) {

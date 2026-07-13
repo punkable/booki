@@ -128,6 +128,8 @@ async function boot() {
     setupAutoHide();
     setupFileDrop();
     startPolls(); // starts the widget + running-app/trash polls together
+    // Remove booting class to trigger the slide-in animation.
+    document.body.classList.remove("booting");
     // Only react to config changes made by OTHER windows (Settings). Tauri's
     // emit echoes back to the sender, so without this guard every dock reorder /
     // removal / grouping would trigger a redundant reloadConfig → re-render →

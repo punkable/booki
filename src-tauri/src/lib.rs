@@ -751,18 +751,21 @@ fn hide_dock(app: AppHandle, edge: String) {
     }
 }
 
-/// Bring the dock back: hide the notch window and show the dock window. Called by
-/// the dock frontend itself (it then slides the bar back in). Does NOT emit, so a
-/// boot/config-reload window-sync never spuriously pins the dock open.
+/// Bring the dock back: hide the notch window (unless notch_always_visible is on)
+/// and show the dock window. Called by the dock frontend itself (it then slides
+/// the bar back in). Does NOT emit, so a boot/config-reload window-sync never
+/// spuriously pins the dock open.
 #[tauri::command]
 fn reveal_dock(app: AppHandle) {
+    let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
+        if !cfg.notch_always_visible {
+            let _ = notch.hide();
+        }
     }
     if let Some(dock) = app.get_webview_window("dock") {
         // Automatic/hover reveals must not steal keyboard focus from the app
         // the user is working in. A direct notch click uses notch_reveal below.
-        let cfg = config::load();
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         let _ = dock.set_always_on_top(cfg.always_on_top);
@@ -786,11 +789,13 @@ fn lift_dock_window(dock: &tauri::WebviewWindow) {
 /// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
 #[tauri::command]
 fn notch_reveal(app: AppHandle) {
+    let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
+        if !cfg.notch_always_visible {
+            let _ = notch.hide();
+        }
     }
     if let Some(dock) = app.get_webview_window("dock") {
-        let cfg = config::load();
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         lift_dock_window(&dock);
@@ -799,14 +804,17 @@ fn notch_reveal(app: AppHandle) {
 }
 
 /// Bring the already-running Booki's dock to the front (used when a second
-/// instance is launched). Shows + focuses the dock window, hides the notch, and
-/// tells the frontend to un-hide and pin itself open.
+/// instance is launched). Shows + focuses the dock window, hides the notch
+/// (unless notch_always_visible is on), and tells the frontend to un-hide and
+/// pin itself open.
 fn reveal_running_dock(app: &AppHandle) {
+    let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
+        if !cfg.notch_always_visible {
+            let _ = notch.hide();
+        }
     }
     if let Some(dock) = app.get_webview_window("dock") {
-        let cfg = config::load();
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         lift_dock_window(&dock);
@@ -2153,7 +2161,11 @@ pub fn run() {
             if let Some(notch) = app.get_webview_window("notch") {
                 let cfg = config::load();
                 let _ = position_notch(&notch, &cfg.edge);
-                let _ = notch.hide();
+                if cfg.notch_always_visible {
+                    let _ = notch.show();
+                } else {
+                    let _ = notch.hide();
+                }
                 #[cfg(windows)]
                 if let Ok(h) = notch.hwnd() {
                     win::set_capture_visible(h.0 as isize, cfg.capture_visible);

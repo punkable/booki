@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Booki Legacy",
+  "productName": "Booki",
   "version": "0.50.4",
   "identifier": "com.booki.dock",
   "build": {
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "dock",
-        "title": "Booki Legacy",
+        "title": "Booki",
         "url": "index.html",
         "width": 760,
         "height": 240,
@@ -35,7 +35,7 @@
       },
       {
         "label": "notch",
-        "title": "Booki Legacy",
+        "title": "Booki",
         "url": "notch.html",
         "width": 184,
         "height": 26,
@@ -63,11 +63,11 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "createUpdaterArtifacts": true,
-    "publisher": "Booki Legacy",
+    "publisher": "Booki",
     "copyright": "© 2026 Booki contributors. MIT licensed.",
     "category": "Utility",
-    "shortDescription": "The original Booki dock for Windows.",
-    "longDescription": "Booki Legacy is the original Tauri-based edition of Booki. It remains available while the native WinUI 3 generation is developed.",
+    "shortDescription": "A smart dock for Windows.",
+    "longDescription": "Booki is a Tauri-based smart dock for Windows 10 and 11.",
     "licenseFile": "../LICENSE",
     "icon": [
       "icons/32x32.png",
