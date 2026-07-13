@@ -77,6 +77,16 @@ pill.addEventListener("pointerenter", () => {
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 
+// Re-run the entrance animation every time the notch window is shown,
+// so the dock→notch transition reads as a continuous transformation.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  pill.classList.remove("notch-enter");
+  void pill.offsetWidth; // force reflow
+  pill.classList.add("notch-enter");
+  setTimeout(() => pill.classList.remove("notch-enter"), 400);
+});
+
 pill.addEventListener("pointerdown", (e) => {
   drag = { sx: e.screenX, sy: e.screenY, moved: false };
   try {
