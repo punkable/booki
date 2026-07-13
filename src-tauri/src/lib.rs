@@ -2233,6 +2233,13 @@ pub fn run() {
                             tick = tick.wrapping_add(1);
                             if tick % 10 == 0 {
                                 cfg_cache = config::load();
+                                // Some apps create their own topmost window after Booki
+                                // and can slide above the dock. Re-assert topmost status
+                                // every few seconds so the dock stays reachable.
+                                if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
+                                    let _ = watch.set_always_on_top(false);
+                                    let _ = watch.set_always_on_top(true);
+                                }
                             }
                             // foreground_occludes = "the user is in an app". Only
                             // smart-hide consumes this signal, so skip the Win32
