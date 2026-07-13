@@ -6,41 +6,34 @@
    ─────────────────────────────────────────────────────────── */
 
 /* Boot animation: the dock starts invisible and slides in from its edge once
-   positioned by the backend. This prevents the "dock in the middle" flash. */
+   positioned by the backend. This prevents the "dock in the middle" flash.
+   The .boot-animate class is added only once at startup and removed after the
+   animation finishes, so changing edges later does not re-trigger it. */
 body.booting .dock { opacity: 0; }
-body:not(.booting) .dock {
+body.boot-animate .dock {
   animation: dock-boot-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes dock-boot-in {
   from { opacity: 0; transform: translateY(20px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
-body.booting.genie-top .dock,
-body:not(.booting).genie-top .dock {
-  animation-name: dock-boot-in-top;
-}
+body.boot-animate.genie-top .dock { animation-name: dock-boot-in-top; }
 @keyframes dock-boot-in-top {
   from { opacity: 0; transform: translateY(-20px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
-body.booting.genie-left .dock,
-body:not(.booting).genie-left .dock {
-  animation-name: dock-boot-in-left;
-}
+body.boot-animate.genie-left .dock { animation-name: dock-boot-in-left; }
 @keyframes dock-boot-in-left {
   from { opacity: 0; transform: translateX(-20px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
-body.booting.genie-right .dock,
-body:not(.booting).genie-right .dock {
-  animation-name: dock-boot-in-right;
-}
+body.boot-animate.genie-right .dock { animation-name: dock-boot-in-right; }
 @keyframes dock-boot-in-right {
   from { opacity: 0; transform: translateX(20px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  body:not(.booting) .dock { animation: none; }
+  body.boot-animate .dock { animation: none; }
 }
 
 /* Respect "reduce motion" everywhere: kill decorative loops and near-instant
@@ -604,6 +597,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   border-radius: var(--r-sm);
 }
 .cl-ico svg { width: 16px; height: 16px; }
+.cl-ico-emoji { font-size: 16px; line-height: 1; }
 .cl-notes { margin: 0; padding-left: 0; list-style: none; }
 .cl-notes li { position: relative; padding: 3px 0 3px 18px; font-size: var(--text-md); color: var(--ink-2); line-height: 1.5; }
 .cl-notes li::before { content: ""; position: absolute; left: 4px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
