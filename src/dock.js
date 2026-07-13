@@ -2647,12 +2647,18 @@ function setHidden(v) {
     }, 360); // let the minimize animation play before the window hides
   } else {
     // Show the dock window (and hide the notch), make sure it's sized to the full
-    // bar, then slide the bar back in.
+    // bar, then slide the bar back in. Force the stage fully interactive during
+    // the reveal animation so early clicks aren't lost to stale hit rects.
+    document.body.classList.add("revealing");
     dockApi.revealDock();
     applyFrame();
     setTimeout(() => {
       if (!hiddenState) document.body.classList.remove("tucked");
     }, 60);
+    setTimeout(() => {
+      document.body.classList.remove("revealing");
+      reportHitRects();
+    }, 500);
   }
 }
 
@@ -2752,8 +2758,12 @@ function reportHitRects() {
   // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
   // drag over the dock) → the whole stage stays interactive; never yank the
   // window out from under a gesture.
+  // During reveal (and a short grace after it) the whole stage must stay
+  // interactive so the cursor watcher doesn't flip the window click-through
+  // before the frontend has reported fresh hit rects.
   const all = !!(
     edgeMove || dragging || draggingFile || document.body.classList.contains("edit") ||
+    document.body.classList.contains("revealing") ||
     document.querySelector(".drag-clone, .stack-drag-clone")
   );
   const rects = [];

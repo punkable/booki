@@ -244,7 +244,9 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
      top/side dock throws its depth in the natural direction, not always down.
      Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
      gets clipped by the window's transparent margin. */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    var(--sh-x, 0) var(--sh-y, 6px) 18px color-mix(in srgb, #000 28%, transparent);
   transition: transform 0.24s var(--ease), opacity 0.24s ease, background 0.18s ease;
 }
 body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
@@ -1218,6 +1220,18 @@ body.notch-body.vertical { align-items: center; }
   /* No pulsing animation — a steady pill (no blinking). */
   transition: scale 0.2s var(--ease),
     background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  /* Enter animation when the notch window appears: scale up from the dock's
+     collapsed state so the hand-off from dock feels like a transformation. */
+}
+.notch-pill.notch-enter {
+  animation: notch-enter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes notch-enter {
+  from { opacity: 0; transform: scale(0.50); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notch-pill.notch-enter { animation: none; }
 }
 .notch-pill:hover {
   scale: var(--pill-gx) var(--pill-gy);
@@ -1444,7 +1458,8 @@ body.notch-body.toast .notch-toast {
 /* Center origin → the icon scales symmetrically and stays inside the bar's
    padding (contained magnify, no clipping in the bar-sized window). */
 .tile { transform-origin: center center; }
-.tile:hover { background: var(--hover); }
+.tile:hover { background: color-mix(in srgb, var(--hover) 90%, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent); }
+.tile:active { background: color-mix(in srgb, var(--hover) 80%, var(--accent)); transform: scale(0.96); }
 /* The hover name uses the native OS tooltip (title attr); hide the in-page one. */
 .tile .label { display: none !important; }
 
@@ -2381,8 +2396,13 @@ body.settings-body::before {
   border-radius: var(--r-md);
   padding: 7px 10px;
   outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
-.s-search input:focus { border-color: var(--accent); }
+.s-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--layer-strong) 96%, var(--accent));
+}
 .s-search-results {
   position: absolute;
   top: calc(100% + 4px);
@@ -2510,9 +2530,10 @@ body.settings-body::before {
   cursor: pointer;
   transition: color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.s-navitem:hover { color: var(--accent-deep); }
-.s-navitem:hover .s-navicon { background: var(--hover); }
+.s-navitem:hover { color: var(--accent-deep); background: var(--hover); }
+.s-navitem:hover .s-navicon { background: transparent; }
 .s-navitem.active { font-weight: 600; }
+.s-navitem:active { transform: scale(0.98); }
 .s-sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 4px 2px; }
 
 /* Stable content surface */
@@ -2611,8 +2632,16 @@ body.settings-body::before {
   background: color-mix(in srgb, var(--layer-strong) 92%, var(--bg));
   box-shadow:
     0 0 0 1px var(--stroke),
-    0 2px 4px color-mix(in srgb, #000 6%, transparent);
+    0 2px 6px color-mix(in srgb, #000 8%, transparent),
+    0 8px 24px color-mix(in srgb, #000 4%, transparent);
   overflow: hidden;
+  transition: box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.settings-section:hover {
+  box-shadow:
+    0 0 0 1px var(--stroke),
+    0 4px 10px color-mix(in srgb, #000 10%, transparent),
+    0 12px 32px color-mix(in srgb, #000 6%, transparent);
 }
 .settings-section-head {
   display: flex;
@@ -3274,10 +3303,11 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .r-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .r-toggle-text { display: flex; flex-direction: column; gap: 2px; }
 .r-toggle-hint { font-size: 11.5px; color: var(--ink-2); font-weight: 400; line-height: 1.3; }
-.r-switch { position: relative; width: 42px; height: 24px; flex: 0 0 auto; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink-2) 46%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 10%, transparent); transition: background 0.18s var(--ease); }
-.r-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px color-mix(in srgb, #000 26%, transparent); transition: transform 0.18s var(--ease); }
-.r-toggle input:checked + .r-switch { background: var(--accent); }
+.r-switch { position: relative; width: 42px; height: 24px; flex: 0 0 auto; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink-2) 38%, transparent); border: 1px solid color-mix(in srgb, var(--ink-2) 30%, transparent); box-shadow: inset 0 1px 2px color-mix(in srgb, #000 10%, transparent); transition: background 0.18s var(--ease), border-color 0.18s var(--ease); }
+.r-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px color-mix(in srgb, #000 30%, transparent), inset 0 -1px 1px rgba(0,0,0,0.06); transition: transform 0.22s var(--ease); }
+.r-toggle input:checked + .r-switch { background: var(--accent); border-color: color-mix(in srgb, var(--accent) 80%, transparent); }
 .r-toggle input:checked + .r-switch::after { transform: translateX(18px); }
+.r-toggle input:focus-visible + .r-switch { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .r-hotkey { display: flex; gap: 8px; align-items: center; }
 .r-hotkey input { font: inherit; font-size: var(--text-md); padding: 7px 10px; min-width: 180px; text-align: center; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); }
@@ -3910,10 +3940,12 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .icon-cell img { width: 34px; height: 34px; }
 
 .s-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.s-btn { font: inherit; font-size: var(--text-lg); font-weight: 600; padding: 9px 16px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--r-sm); cursor: pointer; transition: filter 0.15s ease; }
-.s-btn:hover { filter: brightness(1.06); }
-.s-btn-soft { background: var(--hover); color: var(--ink); }
-.s-btn-ghost { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.s-btn { font: inherit; font-size: var(--text-lg); font-weight: 600; padding: 9px 16px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--r-sm); cursor: pointer; transition: filter 0.15s ease, transform 0.12s var(--ease), box-shadow 0.15s ease; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px color-mix(in srgb, #000 14%, transparent); }
+.s-btn:hover { filter: brightness(1.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 5px color-mix(in srgb, #000 18%, transparent); }
+.s-btn:active { transform: scale(0.98); }
+.s-btn-soft { background: var(--hover); color: var(--ink); box-shadow: inset 0 0 0 1px var(--stroke-light); }
+.s-btn-soft:hover { background: color-mix(in srgb, var(--hover) 92%, var(--accent)); }
+.s-btn-ghost { background: transparent; color: var(--danger); border: 1px solid var(--danger); box-shadow: none; }
 .s-btn-ghost:hover { background: var(--danger); color: #fff; filter: none; }
 .s-danger { text-align: center; background: transparent; border: 0; box-shadow: none; padding-top: 0; }
 

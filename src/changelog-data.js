@@ -3,6 +3,41 @@
 
 export const CHANGELOG = [
   {
+    version: "0.53.0",
+    date: "13 jul 2026",
+    headline: "Clicks confiables, transicion dock-notch mas fluida y look mas nativo de Windows.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Clicks que si responden",
+        notes: [
+          "Durante el revelado del dock la ventana se mantiene completamente interactiva por 500 ms, evitando que el watcher de cursor la vuelva click-through antes de que los hit rects esten actualizados.",
+          "Esto arregla los casos en los que hacias clic en el dock o un icono y no pasaba nada.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Transicion dock ↔ notch",
+        notes: [
+          "El notch ahora entra con una animacion de escala cada vez que aparece, como si el dock se colapsara en la pestana y esta se expandiera.",
+          "La animacion respeta prefers-reduced-motion.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Look mas WinUI / Windows 11",
+        notes: [
+          "El dock recupera su sombra exterior direccional (antes solo tenia variables sin usar).",
+          "Las tarjetas de Ajustes tienen elevacion con sombra en dos niveles y hover sutil.",
+          "Botones primarios tienen relieve, sombra y estado activo con escala.",
+          "Toggles estan mas alineados con el estilo de Windows 11: borde, sombra interior y thumb con relieve.",
+          "Tiles del dock tienen hover mas suave con tinte de acento y feedback al clic.",
+          "La busqueda de Ajustes resalta con anillo de foco al estilo Fluent.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.52.0",
     date: "13 jul 2026",
     headline: "Revision completa: iconos del changelog, animacion de inicio y robustez del dock.",
