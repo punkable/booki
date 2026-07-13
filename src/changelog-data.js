@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.54.1",
+    date: "13 jul 2026",
+    headline: "Dock siempre visible: control de 'flotar por encima' y re-assert de topmost.",
+    sections: [
+      {
+        icon: "performance",
+        title: "No pierdas el dock detras de otras apps",
+        notes: [
+          "Ajustes -> Comportamiento ahora expone 'Flotar por encima de otras ventanas' (alwaysOnTop).",
+          "El backend re-asserta el estado topmost del dock cada pocos segundos para que apps que crean ventanas topmost no lo tapen.",
+          "Si el dock se esconde, revisa Comportamiento -> Ocultar automaticamente: 'Nunca' lo mantiene siempre visible.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.54.0",
     date: "13 jul 2026",
     headline: "Integracion con Fluent UI, Apps ancladas mas inteligentes y ajustes mejor ordenados.",

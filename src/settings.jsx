@@ -1271,6 +1271,9 @@ function Behavior({ cfg, set }) {
         <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
           fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
       </Row>
+      <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
+        checked={cfg.alwaysOnTop !== false}
+        onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       </SettingsSection>
 
       <SettingsSection title={t("gp.notch")} icon="eye">
