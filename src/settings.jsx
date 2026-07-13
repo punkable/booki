@@ -1249,6 +1249,9 @@ function Behavior({ cfg, set }) {
         <>
           <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
             onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
+          <Toggle label={t("be.notchAlwaysVisible")} hint={t("be.notchAlwaysVisibleHint")}
+            checked={!!cfg.notchAlwaysVisible}
+            onChange={(v) => set({ notchAlwaysVisible: v })} />
           <Row label={t("be.reveal")} hint={t("be.revealHint")}>
             <SegmentedControl
               value={cfg.notchTrigger || "click"}

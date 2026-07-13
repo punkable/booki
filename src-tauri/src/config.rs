@@ -243,6 +243,10 @@ pub struct Config {
     /// Whether Booki should be visible in screen captures / recordings.
     #[serde(default)]
     pub capture_visible: bool,
+    /// Keep the notch pill always visible (even when the dock is shown), so
+    /// there's always a visible anchor on the screen edge.
+    #[serde(default)]
+    pub notch_always_visible: bool,
 }
 
 fn default_hotkey_modifier() -> String {
@@ -298,6 +302,7 @@ impl Default for Config {
             clipboard_sensitive_guard: default_clipboard_sensitive_guard(),
             clipboard_compact: false,
             capture_visible: false,
+            notch_always_visible: false,
         }
     }
 }
