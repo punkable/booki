@@ -3502,22 +3502,13 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-toolbar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pin-toolbar-actions { justify-content: flex-end; margin-left: auto; }
 .pin-view-toggle { display: inline-flex; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 3px; gap: 2px; }
-.pin-view-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.pin-view-toggle .fui-Button {
   width: 34px;
   height: 28px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border-radius: calc(var(--r-sm) - 2px);
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+  padding: 0;
+  justify-content: center;
 }
-.pin-view-btn svg { width: 16px; height: 16px; display: block; }
-.pin-view-btn:hover { color: var(--ink); background: var(--hover); }
-.pin-view-btn.active { background: var(--accent); color: var(--accent-contrast); }
+.pin-view-toggle .fui-Button svg { width: 16px; height: 16px; display: block; }
 .s-btn-sm { padding: 4px 10px; font-size: var(--text-sm); }
 .pin-add-main,
 .pin-clear { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -3801,28 +3792,22 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   .pin-toolbar { display: grid; grid-template-columns: 1fr; align-items: stretch; }
   .pin-toolbar-main { width: 100%; }
   .pin-toolbar-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    display: flex;
+    flex-wrap: wrap;
     width: 100%;
     margin-left: 0;
     gap: 6px;
   }
-  .pin-add-main,
-  .pin-toolbar-actions .s-more,
-  .pin-toolbar-actions .s-more > .s-btn { width: 100%; min-width: 0; justify-content: center; }
+  .pin-add-main { flex: 1 1 auto; min-width: 0; justify-content: center; }
+  .pin-more-btn { flex: 0 0 auto; }
+  .pin-clear { flex: 0 0 auto; margin-left: auto; }
   .pin-view-toggle { width: 100%; justify-content: stretch; }
-  .pin-view-btn { flex: 1 1 0; }
-  .pin-clear-confirm { width: 100%; justify-content: space-between; }
+  .pin-view-toggle .fui-Button { flex: 1 1 0; }
+  .pin-clear-confirm { flex: 1 1 100%; justify-content: space-between; }
   .accent-picker-enhanced,
   .accent-picker-enhanced .accent-swatches { width: 100%; min-width: 0; }
   .accent-picker-enhanced .accent-swatches { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
   .preset-row { grid-template-columns: 1fr; width: 100%; }
-}
-
-@media (max-width: 420px) {
-  .pin-clear { width: 34px; height: 32px; padding: 0; justify-content: center; }
-  .pin-clear > span:last-child { display: none; }
-  .pin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Installed-app suggestions */
@@ -4240,4 +4225,59 @@ textarea {
   .icon-cell:hover, .accent-sw:hover, .accent-custom:hover, .accent-src:hover,
   .tile:hover .glyph, .tile.hint:hover .hint-plus,
   .tile.hint:hover .hint-plus-badge { transform: none; }
+}
+
+/* ─────────── Fluent UI integration overrides ─────────── */
+
+/* Card: reset Fluent padding so our settings-section classes own spacing. */
+.settings-section.fui-Card {
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--layer-strong) 92%, var(--bg));
+  box-shadow:
+    0 0 0 1px var(--stroke),
+    0 2px 6px color-mix(in srgb, #000 8%, transparent),
+    0 8px 24px color-mix(in srgb, #000 4%, transparent);
+}
+.settings-section.fui-Card:hover {
+  box-shadow:
+    0 0 0 1px var(--stroke),
+    0 4px 10px color-mix(in srgb, #000 10%, transparent),
+    0 12px 32px color-mix(in srgb, #000 6%, transparent);
+}
+.settings-section-headless.fui-Card {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Toggle: align Fluent Switch to the right, keep label on left. */
+.r-toggle.fui-toggle { cursor: default; }
+.r-toggle.fui-toggle .fui-Switch { margin-left: auto; align-items: center; }
+
+/* Slider: keep value bubble beside Fluent Slider. */
+.r-slider.fui-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.r-slider.fui-slider .fui-Slider { flex: 1 1 auto; min-width: 0; }
+.r-slider.fui-slider .slider-bubble {
+  position: static;
+  transform: none;
+  flex: 0 0 auto;
+}
+
+/* Dropdown: match Booki field width. */
+.s-lang-dropdown { min-width: 180px; }
+
+/* Pinned-apps toolbar: Fluent Button sizing. */
+.pin-toolbar .fui-Button { min-width: auto; }
+.pin-clear-confirm .fui-Button { white-space: nowrap; }
+
+/* Responsive pinned-apps toolbar: collapse gracefully without overflow. */
+@media (max-width: 420px) {
+  .pin-toolbar-actions { grid-template-columns: 1fr auto; }
+  .pin-clear.fui-Button { width: 34px; padding: 0; justify-content: center; }
+  .pin-clear > span:last-child { display: none; }
 }
