@@ -1350,7 +1350,7 @@ function Behavior({ cfg, set }) {
 }
 
 const MULTI_NOTCH_SUGGESTIONS = {
-  browsers: ["chrome", "firefox", "edge", "brave", "opera", "vivaldi", "arc"],
+  browsers: ["chrome", "firefox", "edge", "brave", "opera", "vivaldi", "arc", "helium"],
   design: ["photoshop", "illustrator", "figma", "gimp", "blender", "maya", "cinema4d"],
   editors: ["premiere", "aftereffects", "davinciresolve", "capcut", "obs"],
   code: [
@@ -1384,6 +1384,7 @@ function MultiNotchSection({ cfg, set }) {
             onChange={(v) => set({ multiNotchAutoSuggest: v })} />
           <div className="s-card-inner">
             <h3>{t("be.multiNotchSuggest")}</h3>
+            <p className="muted">{t("be.multiNotchSuggestHint")}</p>
             {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
               <div key={cat} className="mn-suggest-group">
                 <strong>{t(`mn.${cat}`)}</strong>

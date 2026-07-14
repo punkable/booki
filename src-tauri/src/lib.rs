@@ -758,6 +758,9 @@ async fn fetch_favicon(url: String) -> Option<String> {
 #[tauri::command]
 fn hide_dock(app: AppHandle, edge: String) {
     if let Some(notch) = app.get_webview_window("notch") {
+        // Re-assert topmost every time the notch surfaces so it never slides
+        // behind a swarm of newly-opened windows.
+        let _ = notch.set_always_on_top(true);
         let _ = position_notch(&notch, &edge);
         let _ = notch.show();
     }
@@ -2244,17 +2247,31 @@ pub fn run() {
                         let mut tick: u32 = 0;
                         let mut edge_streak: u8 = 0;
                         let mut edge_cooldown: u8 = 0;
+                        // Multi-notch: only emit when the foreground app / dot state
+                        // actually changes, so the notch doesn't flicker from redundant
+                        // events every 300 ms. We also cache the foreground HWND to
+                        // skip the more expensive process-name lookup when the same
+                        // window is still focused.
+                        let mut last_active_app: Option<String> = None;
+                        let mut last_dot: Option<bool> = None;
+                        let mut last_fg_hwnd: Option<isize> = None;
+                        let mut cfg_just_reloaded: bool = true;
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(300));
                             tick = tick.wrapping_add(1);
                             if tick % 10 == 0 {
                                 cfg_cache = config::load();
+                                cfg_just_reloaded = true;
                                 // Some apps create their own topmost window after Booki
-                                // and can slide above the dock. Re-assert topmost status
-                                // every few seconds so the dock stays reachable.
+                                // and can slide above the dock/notch. Re-assert topmost
+                                // status every few seconds so both stay reachable.
                                 if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
                                     let _ = watch.set_always_on_top(false);
                                     let _ = watch.set_always_on_top(true);
+                                }
+                                if let Some(notch) = app.get_webview_window("notch") {
+                                    let _ = notch.set_always_on_top(false);
+                                    let _ = notch.set_always_on_top(true);
                                 }
                             }
                             // foreground_occludes = "the user is in an app". Only
@@ -2275,15 +2292,27 @@ pub fn run() {
                             // Multi-notch: when enabled, tell the notch whether the active
                             // app should shrink it to a dot (productivity / focus apps).
                             if cfg_cache.multi_notch_enabled {
-                                if let Some(app) = win::foreground_app_name() {
-                                    let dot = cfg_cache
-                                        .multi_notch_apps
-                                        .iter()
-                                        .any(|a| a.eq_ignore_ascii_case(&app));
-                                    let _ = handle.emit(
-                                        "booki://active-app",
-                                        serde_json::json!({ "app": app, "dot": dot }),
-                                    );
+                                let fg = win::foreground_window_handle();
+                                let hwnd_changed = last_fg_hwnd != Some(fg);
+                                if hwnd_changed || cfg_just_reloaded || last_dot.is_none() {
+                                    last_fg_hwnd = Some(fg);
+                                    cfg_just_reloaded = false;
+                                    if let Some(app) = win::foreground_app_name() {
+                                        if last_active_app.as_ref() != Some(&app) {
+                                            last_active_app = Some(app.clone());
+                                            let dot = cfg_cache
+                                                .multi_notch_apps
+                                                .iter()
+                                                .any(|a| a.eq_ignore_ascii_case(&app));
+                                            if last_dot != Some(dot) {
+                                                last_dot = Some(dot);
+                                                let _ = handle.emit(
+                                                    "booki://active-app",
+                                                    serde_json::json!({ "app": app, "dot": dot }),
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             // Cursor pressed against the dock's edge → reveal signal.

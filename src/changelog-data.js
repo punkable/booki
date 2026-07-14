@@ -3,6 +3,37 @@
 
 export const CHANGELOG = [
   {
+    version: "0.54.3",
+    date: "13 jul 2026",
+    headline: "Notch siempre al frente, transición fluida y watcher más ligero.",
+    sections: [
+      {
+        icon: "performance",
+        title: "El notch no se pierde entre ventanas",
+        notes: [
+          "El notch se re-asegura como topmost cada vez que aparece y cada pocos segundos mientras está visible.",
+          "Tanto en modo inteligente como en multinotch, la pestaña/punto prevalece sobre otras ventanas abiertas.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Transformación notch ↔ punto más fluida",
+        notes: [
+          "La pastilla ahora muta de ancho a círculo con una transición orgánica tipo agua (overshoot sutil, sin parpadeos).",
+          "Se redujo el trabajo del watcher de multinotch: solo consulta el ejecutable de la ventana activa cuando el foco cambia o se recarga la config.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Sugerencias más claras",
+        notes: [
+          "Añadida una pista en Multi-notch que explica que las sugerencias son presets, no apps detectadas automáticamente.",
+          "Traducciones completas en inglés, español, francés, alemán y portugués.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.54.2",
     date: "13 jul 2026",
     headline: "Multi-notch inteligente: el notch muta a un punto en apps de productividad.",
