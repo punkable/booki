@@ -1217,8 +1217,14 @@ body.notch-body.vertical { align-items: center; }
      the constantly-hovered pill never re-layouts. Ratios per variant below. */
   --pill-gx: 1.24;
   --pill-gy: 1.38;
-  /* No pulsing animation — a steady pill (no blinking). */
-  transition: scale 0.2s var(--ease),
+  /* No pulsing animation — a steady pill (no blinking).
+     Width/height/border-radius animate fluidly for the multi-notch
+     wide ↔ dot transformation, while hover still uses cheap scale. */
+  transition:
+    width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    scale 0.2s var(--ease),
     background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   /* Enter animation when the notch window appears: scale up from the dock's
      collapsed state so the hand-off from dock feels like a transformation. */
