@@ -2269,7 +2269,7 @@ pub fn run() {
                                     let _ = watch.set_always_on_top(false);
                                     let _ = watch.set_always_on_top(true);
                                 }
-                                if let Some(notch) = app.get_webview_window("notch") {
+                                if let Some(notch) = handle.get_webview_window("notch") {
                                     let _ = notch.set_always_on_top(false);
                                     let _ = notch.set_always_on_top(true);
                                 }
