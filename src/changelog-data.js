@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.55.1",
+    date: "18 jul 2026",
+    headline: "Limpieza premium: glifos, rendimiento del magnify y menos ruido.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Magnify más ligero",
+        notes: [
+          "El MutationObserver de hit-rects ignora transform/z-index durante mag-live, así el hover no dispara layout/IPC por frame.",
+          "Se eliminaron emitConfigChanged duplicados tras persist() y polls redundantes en boot/reload.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Glifos y sistema de iconos",
+        notes: [
+          "Nuevos iconos: sol, luna, reloj, alerta, zap; warn en iconos desconocidos.",
+          "Botones ×, avisos de pin faltante, tema claro/oscuro y portapapeles privado usan el set de iconos (lock/eye-off).",
+          "Emojis con onerror seguro; donaciones usan assets/brand en vez de SVG inline duplicado.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Basura retirada",
+        notes: [
+          "Eliminado el workflow WinUI 3 que apuntaba a código ya borrado.",
+          "Docs WINUI3 actualizadas; alias de búsqueda de backup corregido.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.55.0",
     date: "18 jul 2026",
     headline: "Dock premium tipo Cool Dock: ola de magnificación, cristal más limpio y presets de estilo.",

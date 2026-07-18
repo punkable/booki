@@ -93,7 +93,7 @@ async function mockInvoke(cmd, args) {
     case "list_windows":
       return [];
     case "app_version":
-      return "0.55.0";
+      return "0.55.1";
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);
