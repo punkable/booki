@@ -770,9 +770,9 @@ fn hide_dock(app: AppHandle, edge: String) {
 }
 
 /// Bring the dock back: hide the notch window (unless notch_always_visible is on)
-/// and show the dock window. Called by the dock frontend itself (it then slides
-/// the bar back in). Does NOT emit, so a boot/config-reload window-sync never
-/// spuriously pins the dock open.
+/// and show the dock window. Used for hover / automatic reveals that must NOT
+/// steal keyboard focus. Emits `booki://soft-reveal` so the frontend can clear
+/// its hidden state without pinning the dock open (unlike notch click).
 #[tauri::command]
 fn reveal_dock(app: AppHandle) {
     let cfg = config::load();
@@ -789,6 +789,7 @@ fn reveal_dock(app: AppHandle) {
         let _ = dock.set_always_on_top(cfg.always_on_top);
         let _ = dock.show();
     }
+    let _ = app.emit("booki://soft-reveal", ());
 }
 
 fn lift_dock_window(dock: &tauri::WebviewWindow) {

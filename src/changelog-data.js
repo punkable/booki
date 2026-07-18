@@ -3,6 +3,40 @@
 
 export const CHANGELOG = [
   {
+    version: "0.55.0",
+    date: "18 jul 2026",
+    headline: "Dock premium tipo Cool Dock: ola de magnificación, cristal más limpio y presets de estilo.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Magnificación con ola",
+        notes: [
+          "Los iconos ya no solo crecen: se empujan a lo largo de la barra para hacer sitio, con lift y z-index como en el dock de macOS.",
+          "Los widgets responden al hover con un lift suave propio, sin romper el layout de las tarjetas.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Cristal y flyouts más premium",
+        notes: [
+          "El dock gana un sheen de estante, profundidad de contacto en iconos y un material un poco más saturado.",
+          "Las carpetas/flyouts abren desde el icono que los disparó, con blur-to-sharp y stagger más corto.",
+        ],
+      },
+      {
+        icon: "search",
+        title: "Usabilidad y presets",
+        notes: [
+          "Nuevo preset Apariencia -> Estilo del dock: Cristal premium, Clásico y Compacto.",
+          "Corregido 'Mostrar nombres al pasar el cursor' (las etiquetas estilizadas vuelven a verse).",
+          "En modo overflow la rueda siempre desplaza el dock; Alt+rueda conserva los gestos de widgets.",
+          "Hover del notch ahora sincroniza el estado del frontend (soft-reveal) sin robar el foco.",
+          "Arrastrar el notch en bordes laterales usa el tamaño real de la ventana, no 184x26 fijo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.54.3",
     date: "13 jul 2026",
     headline: "Notch siempre al frente, transición fluida y watcher más ligero.",
