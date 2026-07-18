@@ -124,11 +124,10 @@ async function boot() {
     cfg = await configApi.get();
     await ensureLang(cfg.language); // load pt/fr/de before the first paint
     applyAll();
-    await render();
+    await render(); // render() starts widget polls when visible
     reframe();
     setupAutoHide();
     setupFileDrop();
-    startPolls(); // starts the widget + running-app/trash polls together
     // Remove booting class to trigger the slide-in animation.
     document.body.classList.remove("booting");
     document.body.classList.add("boot-animate");
@@ -208,8 +207,7 @@ async function reloadConfig() {
   // toggles in Settings shouldn't make the whole dock flash.
   const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
-    await render();
-    startPolls();
+    await render(); // render() restarts polls when visible
   } else {
     fitDock(); // size/spacing may still have changed
   }
@@ -479,8 +477,8 @@ function appTile(item) {
   // Remove badge — only visible in edit mode.
   const rm = document.createElement("button");
   rm.className = "rm";
-  rm.textContent = "×";
-  rm.title = "Quitar";
+  rm.innerHTML = icon("x");
+  rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
   rm.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -541,8 +539,8 @@ function groupTile(item) {
 
   const rm = document.createElement("button");
   rm.className = "rm";
-  rm.textContent = "×";
-  rm.title = "Quitar";
+  rm.innerHTML = icon("x");
+  rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
   rm.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -686,7 +684,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (!inFlyout) {
     const rm = document.createElement("button");
     rm.className = "rm";
-    rm.textContent = "×";
+    rm.innerHTML = icon("x");
     rm.title = t("apps.remove");
     rm.addEventListener("pointerdown", (e) => e.stopPropagation());
     rm.addEventListener("click", (e) => {
@@ -919,7 +917,8 @@ async function pollStats() {
   eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
   eachWidget("battery", (el) => {
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
-    setMetric(el, (s.charging ? "⚡ " : "") + t("w.battery"), s.battery);
+    setMetric(el, t("w.battery"), s.battery);
+    el.classList.toggle("charging", !!s.charging);
     // A ring left at its default color (never manually re-colored) turns red
     // when running low and unplugged — the same "pay attention" cue Windows
     // itself uses, without overriding a color the user picked on purpose.
@@ -1108,7 +1107,6 @@ function refreshClipboard() { pollDue.clipboard = 0; if (!hiddenState) pollClipb
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
   await persist();
-  await emitConfigChanged();
   await render();
   reframe();
 }
@@ -1631,10 +1629,7 @@ dockEl.addEventListener(
     item.style = { ...(item.style || {}), variant: next };
     w.dataset.variant = next;
     clearTimeout(wheelSaveTimer);
-    wheelSaveTimer = setTimeout(async () => {
-      await persist();
-      await emitConfigChanged();
-    }, 350);
+    wheelSaveTimer = setTimeout(() => { persist(); }, 350);
   },
   { passive: false }
 );
@@ -1916,7 +1911,6 @@ async function onPressUp() {
       const idToIndex = new Map([...dockEl.querySelectorAll(".tile[data-id]")].map((t, i) => [t.dataset.id, i]));
       cfg.pinned.sort((a, b) => (idToIndex.get(a.id) ?? 0) - (idToIndex.get(b.id) ?? 0));
       await persist();
-      await emitConfigChanged(); // keep the Settings list in sync with the new order
       await render();
       reframe();
     }
@@ -1974,7 +1968,6 @@ async function createGroup(draggedId, targetId) {
   cfg.pinned.splice(di, 1);
   exitEdit();
   await persist();
-  await emitConfigChanged();
   await render();
   reframe();
 }
@@ -2803,7 +2796,24 @@ function scheduleHitReport() {
 }
 // Any open/close/move in the window re-reports (one measurement per frame);
 // a slow safety tick self-heals anything the observer can't see.
-new MutationObserver(scheduleHitReport).observe(document.body, {
+// Magnify writes transform/z-index every pointer frame — layout slots stay put,
+// so ignore style-only mutations on tiles while mag-live is on.
+new MutationObserver((mutations) => {
+  if (dockEl.classList.contains("mag-live")) {
+    const meaningful = mutations.some((m) => {
+      if (m.type === "childList") return true;
+      if (m.attributeName === "class") return true;
+      if (m.attributeName === "style") {
+        const t = m.target;
+        if (t && t.classList && t.classList.contains("tile")) return false;
+        return true;
+      }
+      return false;
+    });
+    if (!meaningful) return;
+  }
+  scheduleHitReport();
+}).observe(document.body, {
   subtree: true,
   childList: true,
   attributes: true,
@@ -3419,7 +3429,6 @@ function setupFileDrop() {
           });
         }
         await persist();
-        await emitConfigChanged();
         await render();
         reframe();
         return;
@@ -3601,7 +3610,7 @@ async function toggleStack(tileEl, item) {
         wireStackDragOut(wCell, item, it);
         const out = document.createElement("span");
         out.className = "stack-rm";
-        out.textContent = "×";
+        out.innerHTML = icon("x");
         out.title = t("group.takeOut");
         out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
         wCell.appendChild(out);
@@ -3665,7 +3674,7 @@ async function toggleStack(tileEl, item) {
         wireStackDragOut(cell, item, it);
         const out = document.createElement("span");
         out.className = "stack-rm";
-        out.textContent = "×";
+        out.innerHTML = icon("x");
         out.title = t("group.takeOut");
         out.addEventListener("click", (ev) => {
           ev.stopPropagation();
@@ -3959,11 +3968,11 @@ async function renderClipboardList(grid, foot) {
       });
       acts.appendChild(b);
     };
-    act(entry.favorite ? "star" : "star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), async () => {
+    act("star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), async () => {
       await dockApi.clipboardFavorite(entry.id, !entry.favorite);
       await renderClipboardList(grid, foot);
     });
-    act("shield", entry.private ? t("clip.makePersistent") : t("clip.private"), async () => {
+    act(entry.private ? "lock" : "eye-off", entry.private ? t("clip.makePersistent") : t("clip.private"), async () => {
       await dockApi.clipboardPrivate(entry.id, !entry.private);
       await renderClipboardList(grid, foot);
     });
@@ -4047,7 +4056,6 @@ async function addToFolderFromDock(group) {
     { id: uid(), name: baseName(path), path, args: [], kind: "app" },
   ];
   await persist();
-  await emitConfigChanged();
   closeStack();
   await render();
   reframe();

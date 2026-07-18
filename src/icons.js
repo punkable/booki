@@ -1,5 +1,6 @@
 /* Lucide-style SVG icons — 24×24 viewBox, 1.5px stroke, currentColor.
-   Salvaged from Booki's original icon set. Usage: icon("settings"). */
+   App chrome / actions. User-selectable pin glyphs live in icon-library.js.
+   Usage: icon("settings"). */
 
 const S = (paths) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
@@ -62,6 +63,16 @@ export const iconEyeOff = () =>
   S(`<path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.1 4.1"/><path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.4"/><path d="M6.6 6.6C3.7 8.6 2 12 2 12s3.5 8 10 8a10.5 10.5 0 0 0 4.1-.8"/>`);
 export const iconLock = () =>
   S(`<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>`);
+export const iconSun = () =>
+  S(`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>`);
+export const iconMoon = () =>
+  S(`<path d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5Z"/>`);
+export const iconClock = () =>
+  S(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`);
+export const iconZap = () =>
+  S(`<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>`);
+export const iconAlert = () =>
+  S(`<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -95,16 +106,23 @@ const iconMap = {
   eye: iconEye,
   "eye-off": iconEyeOff,
   lock: iconLock,
+  sun: iconSun,
+  moon: iconMoon,
+  clock: iconClock,
+  zap: iconZap,
+  alert: iconAlert,
+  "alert-triangle": iconAlert,
 };
 
 export function icon(name) {
-  const fn = iconMap[name] || iconAppWindow;
+  const fn = iconMap[name];
+  if (!fn) {
+    if (typeof console !== "undefined") console.warn(`[booki] unknown icon: ${name}`);
+    return iconAppWindow();
+  }
   return fn();
 }
 
-/** Inject icons into any [data-icon] element. */
-export function injectIcons(root = document) {
-  root.querySelectorAll("[data-icon]").forEach((el) => {
-    el.innerHTML = icon(el.getAttribute("data-icon"));
-  });
+export function hasIcon(name) {
+  return Object.prototype.hasOwnProperty.call(iconMap, name);
 }

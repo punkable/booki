@@ -248,7 +248,7 @@ const SEARCH_ALIASES = {
   "clip.memory": "portapapeles clipboard privacidad privacy historial history",
   "sc.title": "atajo shortcut hotkey teclado keyboard",
   "prof.title": "perfil profile configuracion setup",
-  "gen.backup": "respaldo backup exportar importar export import",
+  "ap.backup": "respaldo backup exportar importar export import",
 };
 
 function normalizeSearchText(value) {
@@ -564,7 +564,11 @@ function SegmentedControl({ value, options, onChange }) {
           onClick={() => onChange(o.value)}
           title={o.label}
         >
-          {o.icon && <span className="seg-ico">{o.icon}</span>}
+          {o.icon && (
+            typeof o.icon === "string" && o.icon.includes("<svg")
+              ? <span className="seg-ico" dangerouslySetInnerHTML={{ __html: o.icon }} />
+              : <span className="seg-ico">{o.icon}</span>
+          )}
           <span className="seg-lbl">{o.label}</span>
         </button>
       ))}
@@ -660,7 +664,9 @@ function ProfilesCard({ cfg, set }) {
       {profiles.map((n) => (
         <div key={n} className={"prof-row" + (n === active ? " prof-active" : "")}>
           <span className="prof-name">
-            {n === active && <span className="prof-check">✓</span>}
+            {n === active && (
+              <span className="prof-check" dangerouslySetInnerHTML={{ __html: icon("check") }} />
+            )}
             {n}
           </span>
           <button
@@ -682,7 +688,9 @@ function ProfilesCard({ cfg, set }) {
               refresh();
             }}
           >
-            {delArm === n ? t("prof.deleteConfirm") : "×"}
+            {delArm === n
+              ? t("prof.deleteConfirm")
+              : <span dangerouslySetInnerHTML={{ __html: icon("x") }} />}
           </button>
         </div>
       ))}
@@ -853,7 +861,7 @@ function PreviewIcon({ item }) {
   useEffect(() => {
     let alive = true;
     if (item && !item.icon && item.path) {
-      dockApi.appIcon(item.path).then((u) => alive && setSrc(u));
+      dockApi.appIcon(item.path).then((u) => alive && setSrc(u)).catch(() => {});
     }
     return () => {
       alive = false;
@@ -988,7 +996,7 @@ function SuggIcon({ path, name }) {
   const [src, setSrc] = useState(null);
   useEffect(() => {
     let alive = true;
-    dockApi.appIcon(path).then((u) => alive && setSrc(u));
+    dockApi.appIcon(path).then((u) => alive && setSrc(u)).catch(() => {});
     return () => {
       alive = false;
     };
@@ -1084,7 +1092,12 @@ function Suggestions({ cfg, set }) {
         <input className="sugg-search" placeholder={t("apps.search")} value={q}
           onChange={(e) => setQ(e.target.value)} />
         {q && (
-          <button className="sugg-clear" title={t("apps.clearNo")} onClick={() => setQ("")}>×</button>
+          <button
+            className="sugg-clear"
+            title={t("apps.clearNo")}
+            onClick={() => setQ("")}
+            dangerouslySetInnerHTML={{ __html: icon("x") }}
+          />
         )}
       </div>
       {kfView.length > 0 && (
@@ -1164,9 +1177,9 @@ function PinThumb({ item }) {
       setSrc(item.icon);
     } else if (item.path && /\.(png|jpe?g|gif|bmp|webp|ico)$/i.test(item.path)) {
       // Pinned pictures preview their own thumbnail.
-      dockApi.imageDataUri(item.path).then((u) => alive && u && setSrc(u));
+      dockApi.imageDataUri(item.path).then((u) => alive && u && setSrc(u)).catch(() => {});
     } else if (item.path) {
-      dockApi.appIcon(item.path).then((u) => alive && setSrc(u));
+      dockApi.appIcon(item.path).then((u) => alive && setSrc(u)).catch(() => {});
     }
     return () => {
       alive = false;
@@ -1183,7 +1196,7 @@ function PinThumb({ item }) {
       <span className="pin-thumb widget">
         {WIDGET_EMOJI[item.widget]
           ? <img className="emo" src={emoSrc(WIDGET_EMOJI[item.widget])} alt="" width="18" height="18" />
-          : "▦"}
+          : <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />}
       </span>
     );
   }
@@ -1242,9 +1255,9 @@ function Appearance({ cfg, set }) {
           onChange={(v) => set({ theme: v })}
           options={[
             { value: "system", label: t("theme.system") },
-            { value: "light", label: t("theme.light"), icon: "☀" },
-            { value: "dark", label: t("theme.dark"), icon: "☾" },
-            { value: "auto", label: t("theme.auto"), icon: "🕐" },
+            { value: "light", label: t("theme.light"), icon: icon("sun") },
+            { value: "dark", label: t("theme.dark"), icon: icon("moon") },
+            { value: "auto", label: t("theme.auto"), icon: icon("clock") },
           ]}
         />
       </Row>
@@ -2261,7 +2274,13 @@ function Apps({ cfg, set }) {
                     {item.kind === "separator" ? t("apps.sep") : item.name}
                   </span>
                   {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
-                  {missing[item.id] && <span className="pin-missing" title={t("apps.missing")}>⚠</span>}
+                  {missing[item.id] && (
+                    <span
+                      className="pin-missing"
+                      title={t("apps.missing")}
+                      dangerouslySetInnerHTML={{ __html: icon("alert") }}
+                    />
+                  )}
                 </div>
                 <div className="pin-card-actions">
                   {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
@@ -2336,7 +2355,10 @@ function Apps({ cfg, set }) {
                   </span>
                 )}
                 {missing[item.id] && (
-                  <span className="pin-missing" title={t("apps.missing")}>⚠ {t("apps.missingShort")}</span>
+                  <span className="pin-missing" title={t("apps.missing")}>
+                    <span dangerouslySetInnerHTML={{ __html: icon("alert") }} />
+                    {" "}{t("apps.missingShort")}
+                  </span>
                 )}
                 {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
               </span>
@@ -2525,14 +2547,11 @@ function capybaraParade() {
   }
 }
 
-// Real network logos (official marks, drawn inline so they ship offline).
-const BTC_SVG = `<svg viewBox="0 0 32 32" width="30" height="30"><circle cx="16" cy="16" r="16" fill="#F7931A"/><path fill="#fff" d="M22.4 14.1c.3-2.1-1.3-3.2-3.5-4l.7-2.8-1.7-.4-.7 2.7c-.45-.11-.91-.22-1.37-.32l.7-2.75-1.7-.43-.7 2.83c-.37-.08-.73-.17-1.08-.26l-2.36-.59-.46 1.83s1.27.29 1.24.31c.69.17.82.63.8.99l-.8 3.22c.05.01.11.03.18.06l-.18-.05-1.13 4.51c-.08.21-.3.53-.78.41.02.02-1.24-.31-1.24-.31l-.85 1.96 2.22.55c.41.11.82.21 1.22.32l-.71 2.86 1.7.43.71-2.84c.47.13.92.24 1.36.35l-.7 2.82 1.7.43.71-2.86c2.92.55 5.11.33 6.03-2.31.75-2.12-.03-3.35-1.57-4.15 1.12-.26 1.96-1 2.18-2.52zm-3.9 5.49c-.53 2.12-4.1.98-5.26.69l.94-3.77c1.16.29 4.87.86 4.32 3.08zm.53-5.52c-.48 1.93-3.45.95-4.42.71l.85-3.42c.96.24 4.07.69 3.57 2.71z"/></svg>`;
-const SOL_SVG = `<svg viewBox="0 0 398 312" width="26" height="26"><defs><linearGradient id="solg" x1="360" y1="-40" x2="40" y2="340" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs><path fill="url(#solg)" d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7zM64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8zM333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z"/></svg>`;
-
+// Official marks from assets/brand/svg — kept offline with the rest of the UI.
 const DONATE = [
-  { key: "btc", name: "Bitcoin", svg: BTC_SVG,
+  { key: "btc", name: "Bitcoin", src: "/brand/svg/bitcoin.svg",
     addr: "bc1pltth9wcqnctc2nqa6he6puqpqs83a2rdkxhyk8gk53uvk6v2mnustsq7t3" },
-  { key: "sol", name: "Solana", svg: SOL_SVG,
+  { key: "sol", name: "Solana", src: "/brand/svg/solana.svg",
     addr: "JCRkiVEm5sPBNnna1j16CRu5E4VeNWtoj6TThxmVFB4W" },
 ];
 
@@ -2553,7 +2572,7 @@ function DonateCard() {
       <div className="donate">
         {DONATE.map((d) => (
           <div key={d.key} className="donate-row">
-            <span className="donate-ico" dangerouslySetInnerHTML={{ __html: d.svg }} />
+            <span className="donate-ico"><img src={d.src} alt="" width="30" height="30" /></span>
             <span className="donate-col">
               <strong>{d.name}</strong>
               {/* Full address, selectable for manual copy/paste; the button is an

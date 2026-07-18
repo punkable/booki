@@ -700,6 +700,13 @@ body.edge-right .tile.widget:hover .w-card { transform: translateX(-2px) scale(1
   text-transform: uppercase; color: color-mix(in srgb, var(--ink) 64%, var(--ink-2));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Charging battery: accent cue without relying on emoji glyphs in textContent. */
+.tile.widget[data-widget="battery"].charging .w-label {
+  color: var(--w-accent, var(--accent));
+}
+.tile.widget[data-widget="battery"].charging .w-ring-fill {
+  stroke: var(--w-accent, var(--accent));
+}
 .w-value { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-sub {
   font-size: 9px; font-weight: 600;
@@ -1551,6 +1558,11 @@ body.show-labels .tile .label { display: block; }
   z-index: 6;
   padding: 0;
 }
+.tile .rm svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.2;
+}
 body.edit .tile:not(.separator):not(.hint) .rm { display: flex; }
 
 /* iOS-style jiggle in edit mode */
@@ -1860,7 +1872,9 @@ body.edge-right .stack.open { transform: none; }
   align-items: center; justify-content: center; font-size: var(--text-md); line-height: 1; color: #fff;
   background: var(--danger); border: 1px solid color-mix(in srgb, #fff 32%, transparent); border-radius: 50%; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.28);
   transition: transform 0.12s var(--ease), filter 0.12s var(--ease);
+  padding: 0;
 }
+.stack-rm svg { width: 14px; height: 14px; stroke-width: 2.2; }
 .stack-item:hover .stack-rm { display: flex; }
 .stack-rm:hover { filter: brightness(1.06); }
 .stack-rm:active { transform: scale(0.92); }
@@ -3058,7 +3072,8 @@ select {
 }
 .seg-item:active { transform: scale(0.98); }
 .seg-item.active { color: var(--ink); font-weight: 600; }
-.seg-ico { flex: 0 0 auto; font-size: var(--text-md); }
+.seg-ico { flex: 0 0 auto; font-size: var(--text-md); display: inline-flex; }
+.seg-ico svg { width: 14px; height: 14px; display: block; }
 .seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Edge picker (mini screen) */
@@ -3209,6 +3224,9 @@ select {
 /* Missing-path pill on a pinned item (moved / uninstalled / imported config). */
 .pin-missing {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font: 700 10.5px var(--font);
   color: #b25c00;
   background: color-mix(in srgb, #ffab40 22%, transparent);
@@ -3217,6 +3235,7 @@ select {
   padding: 2px 8px;
   white-space: nowrap;
 }
+.pin-missing svg { width: 12px; height: 12px; flex: 0 0 auto; }
 [data-theme="dark"] .pin-missing { color: #ffc46b; }
 
 /* Donations (About): free project made with love. */
@@ -3238,7 +3257,8 @@ select {
   width: 32px;
   height: 32px;
 }
-.donate-ico svg { display: block; }
+.donate-ico svg,
+.donate-ico img { display: block; width: 30px; height: 30px; object-fit: contain; }
 .donate-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .donate-col strong { font-size: var(--text-md); }
 /* Full address, selectable for copy/paste (wraps rather than truncating). */
@@ -3291,7 +3311,11 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .prof-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .prof-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Active profile: accent check + subtle tint so it reads at a glance. */
-.prof-check { color: var(--accent); font-weight: 800; margin-right: 6px; }
+.prof-check {
+  color: var(--accent); font-weight: 800; margin-right: 6px;
+  display: inline-flex; vertical-align: middle;
+}
+.prof-check svg { width: 14px; height: 14px; }
 .prof-active .prof-name { color: var(--accent); }
 .prof-new { margin-top: 8px; }
 .prof-new .sugg-search { flex: 1; }
@@ -3883,7 +3907,9 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 24px; height: 24px; border: 0; border-radius: 50%; cursor: pointer;
   color: var(--ink-2); background: var(--hover); font-size: var(--text-lg); line-height: 1;
+  display: grid; place-items: center; padding: 0;
 }
+.sugg-clear svg { width: 12px; height: 12px; }
 .sugg-clear:hover { color: var(--ink); }
 
 /* The user's shell folders (Documents, Pictures, …) as one-click pin chips. */
