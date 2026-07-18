@@ -236,8 +236,8 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
      slider), with a fully tunable corner radius (--dock-r). No native Mica, so
      the OUTER corner rounds exactly as the slider says — no fixed system corner. */
   background: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(165%);
-  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  backdrop-filter: blur(24px) saturate(175%);
   border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
   border-radius: var(--dock-r);
   /* Shadow is cast AWAY from the anchored screen edge (--sh-x/--sh-y), so a
@@ -245,10 +245,26 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
      Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
      gets clipped by the window's transparent margin. */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
     var(--sh-x, 0) var(--sh-y, 6px) 18px color-mix(in srgb, #000 28%, transparent);
   transition: transform 0.24s var(--ease), opacity 0.24s ease, background 0.18s ease;
+  isolation: isolate;
 }
+/* Soft shelf sheen — reads as glass catching light, not a fake reflection strip. */
+.dock::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 42%),
+    radial-gradient(90% 140% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 58%);
+  opacity: 0.7;
+}
+.dock > * { position: relative; z-index: 1; }
 body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
 body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
 body.edge-left .dock { --sh-x: -6px; --sh-y: 0; }
@@ -663,9 +679,17 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   border: 1px solid var(--stroke);
   text-align: left;
   overflow: hidden;
-  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s var(--mag-ease);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.22s var(--mag-ease),
+    box-shadow 0.22s var(--ease);
 }
-.tile.widget:hover .w-card { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.tile.widget:hover .w-card {
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  transform: translateY(-2px) scale(1.025);
+  box-shadow: 0 6px 14px color-mix(in srgb, #000 16%, transparent);
+}
+body.edge-top .tile.widget:hover .w-card { transform: translateY(2px) scale(1.025); }
+body.edge-left .tile.widget:hover .w-card { transform: translateX(2px) scale(1.025); }
+body.edge-right .tile.widget:hover .w-card { transform: translateX(-2px) scale(1.025); }
 .w-ico { flex: 0 0 auto; font-size: calc(var(--size) * 0.32); line-height: 1; }
 .tile.widget.no-ico .w-ico { display: none; }
 .w-main { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
@@ -1466,8 +1490,10 @@ body.notch-body.toast .notch-toast {
 .tile { transform-origin: center center; }
 .tile:hover { background: color-mix(in srgb, var(--hover) 90%, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent); }
 .tile:active { background: color-mix(in srgb, var(--hover) 80%, var(--accent)); transform: scale(0.96); }
-/* The hover name uses the native OS tooltip (title attr); hide the in-page one. */
-.tile .label { display: none !important; }
+/* In-page labels stay hidden unless "show names on hover" is on (then they
+   replace the floating custom tip). Native title remains the a11y fallback. */
+.tile .label { display: none; }
+body.show-labels .tile .label { display: block; }
 
 /* Focused tile — accent glow (the scale itself conveys the lift). */
 .tile.focus { z-index: 5; }
@@ -1558,7 +1584,9 @@ body.edit .dock { cursor: grab; }
   object-fit: contain;
   pointer-events: none;
   -webkit-user-drag: none;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.22));
+  /* Contact depth under icons — calmer than a full fake reflection. */
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.12))
+    drop-shadow(0 3px 6px rgba(0, 0, 0, 0.2));
 }
 .tile .glyph {
   display: flex;
@@ -1655,6 +1683,12 @@ body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; rig
   z-index: 6;
 }
 body.show-labels .tile:hover .label { opacity: 1; transform: translateX(-50%) translateY(0); }
+body.edge-top .tile .label {
+  bottom: auto;
+  top: calc(100% + 10px);
+  transform: translateX(-50%) translateY(-4px);
+}
+body.edge-top.show-labels .tile:hover .label { transform: translateX(-50%) translateY(0); }
 body.edge-left .tile .label { bottom: 50%; left: calc(100% + 10px); transform: translateY(50%) translateX(-4px); }
 body.edge-right .tile .label { bottom: 50%; left: auto; right: calc(100% + 10px); transform: translateY(50%) translateX(4px); }
 body.edge-left.show-labels .tile:hover .label,
@@ -1752,25 +1786,31 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   contain: layout paint;
-  /* Open/close via transition (reliable in WebView2) — grows from the tile. */
+  /* Open/close via transition (reliable in WebView2) — grows from the tile.
+     transform-origin is set per-open from placeStackNear(). */
   transform-origin: bottom center;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(10px) scale(0.94);
-  transition: opacity 0.18s var(--ease), transform 0.24s var(--ease),
-    visibility 0s linear 0.24s;
+  transform: translateY(8px) scale(0.96);
+  filter: blur(2px);
+  transition: opacity 0.16s var(--ease), transform 0.22s var(--ease), filter 0.2s ease,
+    visibility 0s linear 0.22s;
 }
 .stack.open {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
   transform: none;
-  transition: opacity 0.18s var(--ease), transform 0.26s var(--ease);
+  filter: none;
+  transition: opacity 0.16s var(--ease), transform 0.24s var(--ease), filter 0.18s ease;
 }
-body.edge-top .stack { transform-origin: top center; }
-body.edge-left .stack { transform-origin: center left; }
-body.edge-right .stack { transform-origin: center right; }
+body.edge-top .stack { transform: translateY(-8px) scale(0.96); }
+body.edge-left .stack { transform: translateX(-8px) scale(0.96); }
+body.edge-right .stack { transform: translateX(8px) scale(0.96); }
+body.edge-top .stack.open,
+body.edge-left .stack.open,
+body.edge-right .stack.open { transform: none; }
 .stack-head {
   display: flex;
   align-items: center;
@@ -1840,7 +1880,11 @@ body.edge-right .stack { transform-origin: center right; }
 .stack-item:active { transform: scale(0.96); }
 /* Staggered entry of the folder items when the flyout opens. */
 @media (prefers-reduced-motion: no-preference) {
-  .stack.open .stack-item { animation: stack-cell-in 0.26s var(--ease) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+  /* --i is capped in JS so large folders don't feel sluggish. */
+  .stack.open .stack-item {
+    animation: stack-cell-in 0.22s var(--ease) backwards;
+    animation-delay: calc(var(--i, 0) * 22ms);
+  }
 }
 @keyframes stack-cell-in { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }

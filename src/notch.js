@@ -5,6 +5,7 @@
 
 import { config as configApi, invoke, onActiveApp, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
 import { applyAccent } from "./util-color.js";
+import { t, setLang, ensureLang } from "./i18n.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -25,6 +26,11 @@ let hoverTrigger = false; // reveal the dock when the pill is hovered
 async function applyLook() {
   try {
     const cfg = await configApi.get();
+    await ensureLang(cfg.language || "system");
+    setLang(cfg.language || "system");
+    const label = t("notch.show");
+    pill.title = label;
+    pill.setAttribute("aria-label", label);
     if (cfg.accent) applyAccent(root, cfg.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
@@ -41,6 +47,9 @@ async function applyLook() {
     /* keep defaults */
   }
 }
+
+const pill = document.getElementById("notch-pill");
+const textEl = document.getElementById("notch-text");
 
 applyLook();
 onConfigChanged(applyLook);
@@ -59,9 +68,6 @@ onActiveApp((payload) => applyDotMode(payload.dot));
     applyDotMode(payload.dot);
   } catch (_) {}
 })();
-
-const pill = document.getElementById("notch-pill");
-const textEl = document.getElementById("notch-text");
 
 // Brief toast message (e.g. "Booki se ocultó · pantalla completa").
 let toastTimer = null;
@@ -102,8 +108,24 @@ document.addEventListener("visibilitychange", () => {
   setTimeout(() => pill.classList.remove("notch-enter"), 400);
 });
 
+/** Current notch window size — vertical notches are tall, not 184×26. */
+function notchSize() {
+  const w = Math.max(24, Math.round(window.innerWidth || 184));
+  const h = Math.max(16, Math.round(window.innerHeight || 26));
+  return { w, h };
+}
+
 pill.addEventListener("pointerdown", (e) => {
-  drag = { sx: e.screenX, sy: e.screenY, moved: false };
+  const { w, h } = notchSize();
+  drag = {
+    sx: e.screenX,
+    sy: e.screenY,
+    moved: false,
+    ox: Math.round(w / 2),
+    oy: Math.round(h / 2),
+    w,
+    h,
+  };
   try {
     pill.setPointerCapture(e.pointerId);
   } catch (_) {}
@@ -117,7 +139,7 @@ pill.addEventListener("pointermove", (e) => {
   drag.moved = true;
   // Coalesce to one window move per frame — moving the OS window is an IPC, so
   // firing it on every raw pointer event would flood it at high refresh rates.
-  dragPos = { x: Math.round(e.screenX - 92), y: Math.round(e.screenY - 13) };
+  dragPos = { x: Math.round(e.screenX - drag.ox), y: Math.round(e.screenY - drag.oy) };
   if (dragRaf || !winApi) return;
   dragRaf = requestAnimationFrame(() => {
     dragRaf = 0;
@@ -157,7 +179,9 @@ pill.addEventListener("pointerup", (e) => {
   }
   // Animate the notch gliding to the chosen edge (a natural travel), then let the
   // backend place + resize it authoritatively for that edge.
-  const W = 184, H = 26, m = 3;
+  const W = d.w;
+  const H = d.h;
+  const m = 3;
   const target =
     edge === "top" ? { x: (sw - W) / 2, y: m }
     : edge === "left" ? { x: m, y: (sh - H) / 2 }

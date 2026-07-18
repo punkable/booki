@@ -11,6 +11,7 @@ import {
   onConfigChanged,
   onOcclusion,
   onReveal,
+  onSoftReveal,
   onFullscreen,
   onLaunchIndex,
   onHotEdge,
@@ -1294,6 +1295,7 @@ function setAllSizes(size) {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
     t.style.transform = "";
+    t.style.zIndex = "";
     t.classList.remove("focus");
   });
 }
@@ -1304,6 +1306,7 @@ function resetMagnify() {
   dockEl.classList.remove("mag-live");
   dockEl.querySelectorAll(".tile").forEach((t) => {
     t.style.transform = "";
+    t.style.zIndex = "";
     t.classList.remove("focus");
   });
   magFocus = null;
@@ -1335,10 +1338,9 @@ function buildMagCache() {
   }));
 }
 
-// Booki magnify — tasteful, CONTAINED scaling. Tiles keep their layout slot and
-// scale visually (CSS transform), growing into the bar's edge-side padding so
-// nothing overflows the window (no clipping, no resize per frame). The hovered
-// tile gets a subtle glow. The measuring pass is cached; this loop only writes.
+// Booki magnify — Apple/Cool Dock style wave: tiles scale + lift toward the
+// screen interior AND nudge along the main axis so neighbours make room
+// instead of stacking. Geometry is cached; this loop only writes transforms.
 function magnify(clientX, clientY) {
   if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || editMode) return;
@@ -1351,8 +1353,9 @@ function magnify(clientX, clientY) {
   dockEl.classList.add("mag-live");
   const base = baseSize();
   const maxScale = Math.max(1, cfg.zoom || 1.25);
-  const spread = base * 1.5;
+  const spread = base * 2.0;
   const vertical = isVertical();
+  const mainAxis = vertical ? "Y" : "X";
   const liftAxis = vertical ? "X" : "Y";
   const liftSign = (vertical ? cfg.edge === "left" : cfg.edge === "top") ? 1 : -1;
   const dr = magDockRect;
@@ -1360,13 +1363,17 @@ function magnify(clientX, clientY) {
   let best = null;
   let bestInf = 0;
   for (const item of magCache) {
-    const influence = item.noMag ? 0 : Math.max(0, 1 - (Math.abs(pointer - item.center) / spread) ** 2);
+    const delta = item.center - pointer;
+    const influence = item.noMag ? 0 : Math.max(0, 1 - (Math.abs(delta) / spread) ** 2);
     const scale = item.noMag ? 1 : 1 + (maxScale - 1) * influence;
-    // A small lift toward the screen interior (translate BEFORE scale so it
-    // stays a constant px amount regardless of zoom).
-    const lift = Math.round(influence * 6);
+    // Lift toward the screen interior (translate BEFORE scale so it stays a
+    // constant px amount). Neighbours also push along the bar — the wave.
+    const lift = Math.round(influence * 8);
     const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    item.el.style.transform = `${liftTf}scale(${scale.toFixed(3)})`;
+    const push = item.noMag ? 0 : Math.sign(delta || 1) * influence * base * 0.2;
+    const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
+    item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
+    item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
     if (!item.noMag && influence > bestInf) {
       bestInf = influence;
       best = item.el;
@@ -1589,9 +1596,9 @@ let wheelSaveTimer = null;
 dockEl.addEventListener(
   "wheel",
   (e) => {
-    // In overflow (scroll) mode, the wheel pans the bar so you can reach the
-    // side items — unless you're over a widget (which keeps its own wheel use).
-    if (document.body.classList.contains("dock-overflow") && !closestSel(e.target, ".tile.widget")) {
+    // In overflow (scroll) mode the wheel always pans the bar so crowded docks
+    // stay reachable. Hold Alt to keep widget-specific wheel gestures.
+    if (document.body.classList.contains("dock-overflow") && !e.altKey) {
       e.preventDefault();
       const amt = (e.deltaY || e.deltaX) * 1.2;
       if (isVertical()) dockEl.scrollTop += amt;
@@ -2944,6 +2951,18 @@ function pinOpen() {
 }
 onReveal(pinOpen);
 
+// Soft reveal from notch hover: show the dock without stealing focus or pinning
+// it open — it can tuck again once the pointer leaves / smart-hide decides.
+// Only act when JS still thinks we're tucked; otherwise reveal_dock's emit
+// (also used by setHidden / setupAutoHide) would clear pending hide timers.
+function softOpen() {
+  if (fullscreen || !hiddenState) return;
+  manualHide = false;
+  clearTimeout(hideTimer);
+  setHidden(false);
+}
+onSoftReveal(softOpen);
+
 // Hot edge: the cursor was pushed against the dock's screen edge — an explicit
 // "come out" gesture, treated exactly like clicking the notch.
 onHotEdge(() => {
@@ -3577,7 +3596,7 @@ async function toggleStack(tileEl, item) {
       if (isGroup && it.kind === "widget") {
         const wCell = document.createElement("div");
         wCell.className = "stack-item stack-widget";
-        wCell.style.setProperty("--i", cellIdx++);
+        wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
         wCell.appendChild(widgetTile(it, { inFlyout: true }));
         wireStackDragOut(wCell, item, it);
         const out = document.createElement("span");
@@ -3591,7 +3610,7 @@ async function toggleStack(tileEl, item) {
       }
       const cell = document.createElement("button");
       cell.className = "stack-item";
-      cell.style.setProperty("--i", cellIdx++); // staggered entry
+      cell.style.setProperty("--i", Math.min(cellIdx++, 6)); // staggered entry (capped)
       cell.title = it.name;
       const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
       const fallbackGlyph = () => (isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase()));
@@ -3720,7 +3739,7 @@ async function toggleStack(tileEl, item) {
     for (let i = 0; i < 8; i++) {
       const c = document.createElement("div");
       c.className = "stack-item stack-skel";
-      c.style.setProperty("--i", i);
+      c.style.setProperty("--i", Math.min(i, 6));
       c.innerHTML = `<span class="stack-glyph skel"></span><span class="stack-name skel"></span>`;
       grid.appendChild(c);
     }
@@ -3764,23 +3783,35 @@ async function toggleStack(tileEl, item) {
 function placeStackNear(tileEl) {
   const dr = dockEl.getBoundingClientRect();
   const gap = 10;
+  const r = tileEl.getBoundingClientRect();
   stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
+  // Grow the flyout from the triggering tile's center so the open feels attached.
   if (!isVertical()) {
-    const r = tileEl.getBoundingClientRect();
     const sw = stackEl.offsetWidth;
     let left = r.left + r.width / 2 - sw / 2;
     left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
     stackEl.style.left = `${left}px`;
-    if (cfg.edge === "top") stackEl.style.top = `${dr.bottom + gap}px`;
-    else stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
+    const originX = ((r.left + r.width / 2 - left) / Math.max(1, sw)) * 100;
+    if (cfg.edge === "top") {
+      stackEl.style.top = `${dr.bottom + gap}px`;
+      stackEl.style.transformOrigin = `${originX.toFixed(1)}% 0%`;
+    } else {
+      stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
+      stackEl.style.transformOrigin = `${originX.toFixed(1)}% 100%`;
+    }
   } else {
-    const r = tileEl.getBoundingClientRect();
     const sh = stackEl.offsetHeight;
     let top = r.top + r.height / 2 - sh / 2;
     top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
     stackEl.style.top = `${top}px`;
-    if (cfg.edge === "left") stackEl.style.left = `${dr.right + gap}px`;
-    else stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
+    const originY = ((r.top + r.height / 2 - top) / Math.max(1, sh)) * 100;
+    if (cfg.edge === "left") {
+      stackEl.style.left = `${dr.right + gap}px`;
+      stackEl.style.transformOrigin = `0% ${originY.toFixed(1)}%`;
+    } else {
+      stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
+      stackEl.style.transformOrigin = `100% ${originY.toFixed(1)}%`;
+    }
   }
 }
 
@@ -3908,7 +3939,7 @@ async function renderClipboardList(grid, foot) {
   items.forEach((entry, i) => {
     const row = document.createElement("div");
     row.className = "clip-row" + (entry.favorite ? " favorite" : "") + (entry.private ? " private" : "");
-    row.style.setProperty("--i", i);
+    row.style.setProperty("--i", Math.min(i, 6));
     const text = document.createElement("div");
     text.className = "clip-text";
     text.textContent = entry.text;

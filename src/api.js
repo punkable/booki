@@ -93,7 +93,7 @@ async function mockInvoke(cmd, args) {
     case "list_windows":
       return [];
     case "app_version":
-      return "0.53.0";
+      return "0.55.0";
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);
@@ -509,6 +509,12 @@ export async function onOcclusion(cb) {
 export async function onReveal(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://reveal", () => cb());
+}
+
+/** Notch hover / non-focus reveal — show the dock without pinning it open. */
+export async function onSoftReveal(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://soft-reveal", () => cb());
 }
 
 /** Listen for the "show what's new" signal (settings shows the changelog modal). */

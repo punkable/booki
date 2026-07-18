@@ -90,6 +90,71 @@ const THEME_PRESETS = [
   { name: "Uva", accent: "#8338ec", theme: "dark" },
   { name: "Rosa", accent: "#ff006e", theme: "light" },
 ];
+
+// Dock look presets — material, magnification and geometry in one click.
+const LOOK_PRESETS = [
+  {
+    id: "premium",
+    nameKey: "ap.look.premium",
+    hintKey: "ap.look.premiumHint",
+    patch: {
+      magnification: true,
+      zoom: 1.35,
+      materialStrength: 68,
+      cornerRadius: 20,
+      spacing: 6,
+      edgeGap: 28,
+      iconSize: 44,
+      compact: false,
+      notchStyle: "liquid",
+      magnifyStyle: "spring",
+    },
+  },
+  {
+    id: "classic",
+    nameKey: "ap.look.classic",
+    hintKey: "ap.look.classicHint",
+    patch: {
+      magnification: false,
+      zoom: 1.25,
+      materialStrength: 70,
+      cornerRadius: 12,
+      spacing: 6,
+      edgeGap: 48,
+      iconSize: 36,
+      compact: false,
+      notchStyle: "island",
+      magnifyStyle: "spring",
+    },
+  },
+  {
+    id: "compact",
+    nameKey: "ap.look.compact",
+    hintKey: "ap.look.compactHint",
+    patch: {
+      magnification: true,
+      zoom: 1.2,
+      materialStrength: 55,
+      cornerRadius: 10,
+      spacing: 2,
+      edgeGap: 16,
+      iconSize: 32,
+      compact: true,
+      notchStyle: "mica",
+      magnifyStyle: "spring",
+    },
+  },
+];
+
+function lookPresetActive(cfg, patch) {
+  const keys = Object.keys(patch);
+  return keys.every((k) => {
+    const a = cfg[k];
+    const b = patch[k];
+    if (typeof b === "number") return Math.abs(Number(a) - b) < 0.02;
+    return a === b;
+  });
+}
 import { applyTheme } from "./theme.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
@@ -151,6 +216,7 @@ const LANG_OPTIONS = [
 // Searchable option index: i18n key → tab that hosts it (settings search).
 const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
+  ["ap.look", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.translucency", "appearance"], ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
@@ -560,10 +626,10 @@ function PositionPicker({ cfg, set }) {
           )}
       </div>
       <p className="pospick-caption">
-        Dock: <strong>{t(`edge.${dockEdge}`)}</strong>
+        {t("be.dockLabel")}: <strong>{t(`edge.${dockEdge}`)}</strong>
         {showNotch && (
           <>
-            {" · "}Notch: <strong>{posLabel(pos)}</strong>
+            {" · "}{t("be.notchLabel")}: <strong>{posLabel(pos)}</strong>
           </>
         )}
       </p>
@@ -1210,6 +1276,38 @@ function Appearance({ cfg, set }) {
                   <small>{t(`theme.${p.theme}`)}</small>
                 </span>
                 <span className="preset-dot" data-theme={p.theme} />
+              </button>
+            );
+          })}
+        </div>
+      </Row>
+      <Row label={t("ap.look")} hint={t("ap.lookHint")}>
+        <div className="preset-row look-presets">
+          {LOOK_PRESETS.map((p) => {
+            const active = lookPresetActive(cfg, p.patch);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={"preset-chip look-chip" + (active ? " active" : "")}
+                title={t(p.hintKey)}
+                style={{ "--preset": cfg.accent || "#dfaa75" }}
+                onClick={() => {
+                  set({ ...p.patch });
+                  if (typeof p.patch.materialStrength === "number") {
+                    dockApi.setMaterial(p.patch.materialStrength);
+                  }
+                }}
+              >
+                <span className="preset-preview">
+                  <span className="preset-bar" />
+                  <span className="preset-tile" />
+                  <span className="preset-tile small" />
+                </span>
+                <span className="preset-copy">
+                  <strong>{t(p.nameKey)}</strong>
+                  <small>{t(p.hintKey)}</small>
+                </span>
               </button>
             );
           })}
@@ -2357,7 +2455,7 @@ function Apps({ cfg, set }) {
         />
       )}
       {kidMenu && (
-        <div ref={kidMenuRef} className="pin-kid-menu" role="menu" aria-label="Acciones del elemento" style={{ left: kidMenu.x, top: kidMenu.y }}
+        <div ref={kidMenuRef} className="pin-kid-menu" role="menu" aria-label={t("apps.itemActions")} style={{ left: kidMenu.x, top: kidMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}>
           <button role="menuitem" onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
             <span dangerouslySetInnerHTML={{ __html: icon("take-out") }} />{t("group.takeOut")}
