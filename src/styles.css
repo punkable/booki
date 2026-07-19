@@ -2022,6 +2022,12 @@ body.edge-right .stack.open { transform: none; }
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel-fill, var(--layer)) 80%, transparent);
   pointer-events: none;
 }
+.stack-item.drop-before {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.stack-item.drop-after {
+  box-shadow: inset -3px 0 0 var(--accent);
+}
 .stack-item:hover {
   background: var(--hover);
   transform: translateY(-1px);
