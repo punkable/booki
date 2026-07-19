@@ -42,12 +42,11 @@
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 
-## What's new in 0.57
+## What's new in 0.58
 
-- **Unified surface** — Mica / Acrylic / Tinted / Solid apply to dock and notch together.
-- **Notch size fixed** — the 70%–150% slider actually scales the pill.
-- **Clearer Appearance** — compact theme + accent row, no redundant preset cards.
-- **Crisper motion** — stronger ease-out, natural enter scales, press feedback.
+- **Settings survive uninstall** — reinstalling Booki keeps `%APPDATA%\Booki` unless you check *Delete app data*.
+- **Clearer groups** — open/switch flyouts, reorder inside the stack, add apps or folders, running dots on group children.
+- **One surface** — Mica / Acrylic / Tinted / Solid for dock and notch together; notch size slider works.
 
 Older notes live in Settings → What's new.
 
@@ -109,11 +108,12 @@ Older notes live in Settings → What's new.
 ## Privacy
 
 - Fully offline except: GitHub update checks (signed releases), and favicon fetch if you pin a website. **No telemetry, no accounts, no data collection.**
-- Config: `%APPDATA%\Booki\config.json`.
+- Config: `%APPDATA%\Booki\config.json` (plus a `config.bak.json` safety copy). Export/import from Settings anytime.
+- Uninstall keeps that folder by default so a reinstall restores your dock. Only the uninstaller checkbox *Delete app data* wipes it.
 - Clipboard history is local. Restart memory is **off by default**; when enabled it is protected for your Windows user and can expire.
 - Hidden from compatible captures by default; Settings can show the dock/notch in screenshots and recordings.
 - In-app updates download the signed installer and keep your settings.
-- "Start with Windows" writes `HKCU\…\Run\Booki`; the uninstaller removes app data folders.
+- "Start with Windows" writes `HKCU\…\Run\Booki`; uninstall clears that entry (and Explorer shell verbs) without deleting your config unless you ask.
 
 ## Support
 

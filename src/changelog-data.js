@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.58.0",
+    date: "19 jul 2026",
+    headline: "Tu configuraci\u00f3n sobrevive a desinstalar; grupos m\u00e1s \u00fatiles en el dock.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Ajustes que no se pierden",
+        notes: [
+          "Desinstalar ya no borra %APPDATA%\\Booki por defecto: al reinstalar recuperas pines, grupos y apariencia.",
+          "Solo se limpia esa carpeta si marcas \u00abEliminar datos de la aplicaci\u00f3n\u00bb en el desinstalador.",
+          "FAQ y README actualizados; el men\u00fa de Explorador se limpia sin tocar tu config.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Grupos en el flyout",
+        notes: [
+          "Reordena hijos arrastrando dentro del stack; saca uno al dock arrastrando fuera.",
+          "Botones para a\u00f1adir app o carpeta al grupo abierto.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.57.1",
     date: "19 jul 2026",
     headline: "Grupos del dock más claros: abrir, fusionar, indicadores y confirmación al quitar.",

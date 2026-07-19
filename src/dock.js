@@ -2067,13 +2067,37 @@ async function removeChildFromGroup(group, childId) {
   }
 }
 
-// Let a flyout child be dragged out of the panel to unpin it. Pointer-based (no
-// native drag → no stray files); a floating clone follows the cursor and a poof
-// confirms removal. A plain click still launches (the drag suppresses it).
+/** Reorder a child inside its group and reopen the flyout. */
+async function reorderGroupChild(group, childId, beforeId) {
+  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  if (gi < 0) return;
+  const kids = [...(cfg.pinned[gi].children || [])];
+  const from = kids.findIndex((c) => c.id === childId);
+  if (from < 0) return;
+  const [moved] = kids.splice(from, 1);
+  let to = beforeId ? kids.findIndex((c) => c.id === beforeId) : kids.length;
+  if (to < 0) to = kids.length;
+  kids.splice(to, 0, moved);
+  cfg.pinned[gi].children = kids;
+  await persist();
+  closeStack();
+  await render();
+  reframe();
+  const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  const it = cfg.pinned.find((p) => p.id === group.id);
+  if (el && it) openStack(el, it);
+}
+
+// Let a flyout child be dragged to reorder inside the panel, or dragged out to
+// return it to the dock. Pointer-based (no native drag → no stray files).
 function wireStackDragOut(cell, group, child) {
   let st = null;
+  const clearDropHint = () => {
+    stackEl.querySelectorAll(".stack-item.drop-before, .stack-item.drop-after")
+      .forEach((n) => n.classList.remove("drop-before", "drop-after"));
+  };
   cell.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 || closestSel(e.target, ".stack-rm")) return;
+    if (e.button !== 0 || closestSel(e.target, ".stack-rm, .stack-acts, .stack-act")) return;
     st = { x: e.clientX, y: e.clientY, moved: false, pointerId: e.pointerId };
     try {
       cell.setPointerCapture(e.pointerId);
@@ -2097,12 +2121,41 @@ function wireStackDragOut(cell, group, child) {
     }
     st.clone.style.left = `${e.clientX - st.gx}px`;
     st.clone.style.top = `${e.clientY - st.gy}px`;
-    // Dragged clear of the flyout panel → releasing here removes it.
     const sr = stackEl.getBoundingClientRect();
     const out =
       e.clientX < sr.left - 8 || e.clientX > sr.right + 8 ||
       e.clientY < sr.top - 8 || e.clientY > sr.bottom + 8;
-    if (out !== st.out) { st.out = out; st.clone.classList.toggle("will-unpin", out); }
+    if (out !== st.out) {
+      st.out = out;
+      st.clone.classList.toggle("will-unpin", out);
+      if (out) clearDropHint();
+    }
+    if (out) {
+      st.beforeId = undefined;
+      return;
+    }
+    clearDropHint();
+    st.beforeId = null;
+    const sibs = [...stackEl.querySelectorAll(".stack-item[data-child-id]")].filter((n) => n !== cell);
+    let target = null;
+    for (const s of sibs) {
+      const r = s.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        target = s;
+        break;
+      }
+    }
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    const before = e.clientX < r.left + r.width / 2;
+    target.classList.add(before ? "drop-before" : "drop-after");
+    const tid = target.dataset.childId;
+    if (before) st.beforeId = tid;
+    else {
+      const kids = group.children || [];
+      const idx = kids.findIndex((c) => c.id === tid);
+      st.beforeId = idx >= 0 && idx + 1 < kids.length ? kids[idx + 1].id : null;
+    }
   });
   const finish = async () => {
     if (!st) return;
@@ -2110,7 +2163,8 @@ function wireStackDragOut(cell, group, child) {
     st = null;
     try { cell.releasePointerCapture(s.pointerId); } catch (_) {}
     cell.classList.remove("dragging");
-    if (!s.moved) return; // a click, not a drag → the click handler launches
+    clearDropHint();
+    if (!s.moved) return;
     cell._suppressClick = true;
     setTimeout(() => { cell._suppressClick = false; }, 0);
     if (s.out) {
@@ -2119,9 +2173,15 @@ function wireStackDragOut(cell, group, child) {
         c.classList.add("poof");
         setTimeout(() => c.remove(), 280);
       }
-      // Drag out of the flyout = take out to the dock (same as Settings / ×).
-      // Unpinning is a separate destructive action, not a casual drag.
       await takeOutChild(group, child.id);
+    } else if ("beforeId" in s && s.beforeId !== child.id) {
+      if (s.clone) s.clone.remove();
+      const kids = group.children || [];
+      const from = kids.findIndex((c) => c.id === child.id);
+      const to = s.beforeId ? kids.findIndex((c) => c.id === s.beforeId) : kids.length;
+      if (from >= 0 && to !== from && to !== from + 1) {
+        await reorderGroupChild(group, child.id, s.beforeId);
+      }
     } else if (s.clone) {
       s.clone.remove();
     }
@@ -3845,18 +3905,23 @@ async function openStack(tileEl, item) {
       }
       grid.appendChild(cell);
     }
-    // Quick "add app to this folder" cell — makes filling a folder fast.
+    // Quick add cells — app and folder — so filling a group is one tap each.
     if (isGroup) {
-      const addCell = document.createElement("button");
-      addCell.className = "stack-item stack-add";
-      addCell.title = t("apps.addToFolder");
-      addCell.innerHTML =
-        `<span class="stack-glyph">＋</span><span class="stack-name">${t("apps.addToFolder")}</span>`;
-      addCell.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        addToFolderFromDock(item);
-      });
-      grid.appendChild(addCell);
+      const mkAdd = (label, kind) => {
+        const addCell = document.createElement("button");
+        addCell.className = "stack-item stack-add";
+        addCell.title = label;
+        const glyph = kind === "folder" ? icon("folder") : "＋";
+        addCell.innerHTML =
+          `<span class="stack-glyph">${glyph}</span><span class="stack-name">${esc(label)}</span>`;
+        addCell.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          addToFolderFromDock(item, kind);
+        });
+        grid.appendChild(addCell);
+      };
+      mkAdd(t("apps.addToFolder"), "app");
+      mkAdd(t("m.addFolder"), "folder");
     } else if (items.length >= 80) {
       // list_dir caps at 80 entries — say so and hand off to Explorer.
       const more = document.createElement("button");
@@ -4183,14 +4248,17 @@ function startClipEdit(row, entry, grid, foot) {
   ta.focus();
 }
 
-// Add an app/folder into a group from its open flyout, then reopen it so you
-// can keep adding several in a row.
-async function addToFolderFromDock(group) {
-  const path = await pickAppFile();
+// Add an app or folder into a group from its open flyout, then reopen it so
+// you can keep adding several in a row.
+async function addToFolderFromDock(group, preferKind = "app") {
+  const path = preferKind === "folder" ? await pickFolder() : await pickAppFile();
   if (!path) return;
   const gi = cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
-  const kind = await kindForPath(path, (p) => dockApi.isDir(p));
+  const kind =
+    preferKind === "folder"
+      ? "folder"
+      : await kindForPath(path, (p) => dockApi.isDir(p));
   cfg.pinned[gi].children = [
     ...(cfg.pinned[gi].children || []),
     { id: uid(), name: baseName(path), path, args: [], kind },

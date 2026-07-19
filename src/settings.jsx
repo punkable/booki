@@ -2060,12 +2060,12 @@ function Apps({ cfg, set }) {
     if (!child) return;
     settleFolder(gi, (grp.children || []).filter((c) => c.id !== childId), [child]);
   };
-  const addToFolder = async (gi) => {
-    const path = await pickAppFile();
+  const addToFolder = async (gi, kind = "app") => {
+    const path = kind === "folder" ? await pickFolder() : await pickAppFile();
     if (!path) return;
     set({
       pinned: cfg.pinned.map((p, k) =>
-        k === gi ? { ...p, children: [...(p.children || []), mkPin(path, "app")] } : p
+        k === gi ? { ...p, children: [...(p.children || []), mkPin(path, kind === "folder" ? "folder" : "app")] } : p
       ),
     });
   };
@@ -2222,8 +2222,11 @@ function Apps({ cfg, set }) {
                       </div>
                     ))}
                     <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
-                      onClick={() => addToFolder(i)}
+                      onClick={() => addToFolder(i, "app")}
                       dangerouslySetInnerHTML={{ __html: icon("plus") }} />
+                    <button className="pin-kid pin-kid-add" title={t("m.addFolder")}
+                      onClick={() => addToFolder(i, "folder")}
+                      dangerouslySetInnerHTML={{ __html: icon("folder") }} />
                     <div className="pin-kids-hint">{t("apps.kidsHint2")}</div>
                   </div>
                 )}
@@ -2320,8 +2323,10 @@ function Apps({ cfg, set }) {
             });
             rows.push(
               <li key={item.id + ":add"} className="pin-item pin-child pin-add-row">
-                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i)}
+                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "app")}
                   dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
+                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}
+                  dangerouslySetInnerHTML={{ __html: icon("folder") + `<span>${t("m.addFolder")}</span>` }} />
               </li>
             );
           }
