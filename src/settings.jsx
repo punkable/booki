@@ -45,6 +45,7 @@ import {
   DeleteRegular,
   GridRegular,
   ListRegular,
+  MoreHorizontalRegular,
   ArrowUndo24Regular,
   Flash24Regular,
   Info24Regular,
@@ -111,6 +112,46 @@ function IconBtn({ name, title, onClick, danger, onPointerDown }) {
       onPointerDown={onPointerDown}
     >
       <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon(name) }} />
+    </button>
+  );
+}
+
+/** Click-to-rename label — calm read mode until the user asks to edit. */
+function PinName({ value, editing, onEdit, onChange, onDone, className = "", title }) {
+  if (editing) {
+    return (
+      <input
+        className={"pin-name-edit " + className}
+        value={value}
+        autoFocus
+        title={title || ""}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onDone}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            onDone();
+          }
+        }}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      className={"pin-name-btn " + className}
+      title={title || t("apps.renameHint")}
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit();
+      }}
+    >
+      {value}
     </button>
   );
 }
@@ -1695,6 +1736,15 @@ function Apps({ cfg, set }) {
   const [clearArm, setClearArm] = useState(false);
   // Two-step remove for groups so a stray click can't wipe several pins.
   const [removeArm, setRemoveArm] = useState(-1);
+  // Click-to-rename — keeps the list calm until the user edits a name.
+  const [renameKey, setRenameKey] = useState(null);
+  const [kidsHintDismissed, setKidsHintDismissed] = useState(() => {
+    try { return localStorage.getItem("booki.kidsHintDismissed") === "1"; } catch (_) { return false; }
+  });
+  const dismissKidsHint = () => {
+    setKidsHintDismissed(true);
+    try { localStorage.setItem("booki.kidsHintDismissed", "1"); } catch (_) {}
+  };
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
   const setStyle = (ref, value) =>
@@ -2161,30 +2211,29 @@ function Apps({ cfg, set }) {
             <MenuTrigger>
               <Button className="pin-more-btn" icon={<ChevronDownRegular />} iconPosition="after">{t("apps.more")}</Button>
             </MenuTrigger>
-            <MenuPopover>
+            <MenuPopover className="booki-menu-popover">
               <MenuList>
                 <MenuItem icon={<FolderAddRegular />} onClick={addFolder}>{t("apps.addFolder")}</MenuItem>
                 <MenuItem icon={<FolderRegular />} onClick={newFolder}>{t("apps.newFolder")}</MenuItem>
                 <MenuItem icon={<LineHorizontal3Regular />} onClick={addSep}>{t("apps.addSep")}</MenuItem>
                 <MenuItem icon={<DeleteRegular />} disabled={hasTrash} onClick={addTrash}>{t("apps.addTrash")}</MenuItem>
+                {cfg.pinned.length > 0 && (
+                  <MenuItem icon={<DeleteRegular />} onClick={() => setClearArm(true)}>{t("apps.clearAll")}</MenuItem>
+                )}
               </MenuList>
             </MenuPopover>
           </Menu>
-          {cfg.pinned.length > 0 && (clearArm ? (
+          {clearArm && (
             <div className="pin-clear-confirm">
               <span>{t("apps.clearConfirm")}</span>
               <Button appearance="primary" size="small" onClick={clearAll}>{t("apps.clearYes")}</Button>
               <Button size="small" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</Button>
             </div>
-          ) : (
-            <Button className="pin-clear" icon={<DeleteRegular />} onClick={() => setClearArm(true)}>
-              {t("apps.clearAll")}
-            </Button>
-          ))}
+          )}
         </div>
       </div>
       {cfg.pinned.length === 0 && (
-        <div className="s-tips">
+        <div className="s-tips pin-empty-tips">
           <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
           <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
           <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
@@ -2195,6 +2244,7 @@ function Apps({ cfg, set }) {
           {displayPinned.map((item, i) => {
             const isGroup = item.kind === "group";
             const open = isGroup && openIds[item.id];
+            const topKey = "top:" + item.id;
             return (
               <div key={item.id} data-idx={i}
                 className={"pin-card" + (isGroup ? " is-group" : "") + (item.kind === "separator" ? " is-sep" : "") +
@@ -2205,20 +2255,22 @@ function Apps({ cfg, set }) {
                   onClick={isGroup && !open ? () => toggleOpen(item.id) : undefined}
                   title={isGroup ? t("apps.editFolder") : item.path || ""}>
                   {item.kind !== "separator" && <PinThumb item={item} />}
-                  {isGroup && open ? (
-                    <input
-                      className="pin-name-edit pin-card-name-edit"
+                  {item.kind === "separator" ? (
+                    <span className="pin-card-name">{t("apps.sep")}</span>
+                  ) : isGroup ? (
+                    <PinName
+                      className="pin-card-name-edit"
                       value={item.name}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
+                      editing={renameKey === topKey}
+                      title={t("apps.renameHint")}
+                      onEdit={() => setRenameKey(topKey)}
+                      onDone={() => setRenameKey(null)}
+                      onChange={(name) =>
+                        set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name } : p)) })
                       }
                     />
                   ) : (
-                    <span className="pin-card-name">
-                      {item.kind === "separator" ? t("apps.sep") : item.name}
-                    </span>
+                    <span className="pin-card-name">{item.name}</span>
                   )}
                   {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
                   {missing[item.id] && (
@@ -2230,67 +2282,84 @@ function Apps({ cfg, set }) {
                   )}
                 </div>
                 <div className="pin-card-actions">
-                  {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                  {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", id: item.id, i })} />}
-                  {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
-                    <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
+                  {isGroup && (
+                    <IconBtn
+                      name={open ? "chevron-down" : "chevron-right"}
+                      title={t("apps.editFolder")}
+                      onClick={() => toggleOpen(item.id)}
+                    />
                   )}
-                  <IconBtn
-                    name="trash"
-                    danger
-                    title={removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
-                    onClick={() => remove(i)}
-                  />
+                  <Menu>
+                    <MenuTrigger disableButtonEnhancement>
+                      <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
+                        <MoreHorizontalRegular />
+                      </button>
+                    </MenuTrigger>
+                    <MenuPopover className="booki-menu-popover">
+                      <MenuList>
+                        {isGroup && <MenuItem onClick={() => setRenameKey(topKey)}>{t("apps.rename")}</MenuItem>}
+                        {isGroup && <MenuItem onClick={() => ungroup(i)}>{t("group.ungroup")}</MenuItem>}
+                        {item.kind === "widget" && (
+                          <MenuItem onClick={() => setStyleFor({ type: "top", id: item.id, i })}>{t("w.styleTitle")}</MenuItem>
+                        )}
+                        {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
+                          <MenuItem onClick={() => setIconFor(i)}>{t("apps.changeIcon")}</MenuItem>
+                        )}
+                        {(item.kind === "app" || item.kind === "folder") && (
+                          <MenuItem onClick={() => dockApi.openLocation(item.path)}>{t("apps.openLoc")}</MenuItem>
+                        )}
+                        {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
+                          <MenuItem onClick={() => reassign(i)}>{t("apps.reassign")}</MenuItem>
+                        )}
+                        <MenuItem onClick={() => remove(i)}>
+                          {removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
+                        </MenuItem>
+                      </MenuList>
+                    </MenuPopover>
+                  </Menu>
                 </div>
                 {open && (
                   <div className={"pin-card-kids" + (kidOut === i ? " taking-out" : "")}>
-                    {(item.children || []).map((c) => (
-                      <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
-                        onPointerDown={startKidDrag(i, c.id)}
-                        onContextMenu={(e) => openKidMenu(e, i, c.id)}>
-                        <PinThumb item={c} />
-                        <input
-                          className="pin-name-edit pin-kid-rename"
-                          value={c.name}
-                          title={c.path || ""}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => renameChild(i, c.id, e.target.value)}
-                        />
-                        <span className="pin-kid-acts" onPointerDown={(e) => e.stopPropagation()}>
-                          {c.kind === "widget" && (
+                    {(item.children || []).map((c) => {
+                      const childKey = "child:" + item.id + ":" + c.id;
+                      return (
+                        <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
+                          onPointerDown={startKidDrag(i, c.id)}
+                          onContextMenu={(e) => openKidMenu(e, i, c.id)}>
+                          <PinThumb item={c} />
+                          <PinName
+                            className="pin-kid-rename"
+                            value={c.name}
+                            editing={renameKey === childKey}
+                            title={c.path || t("apps.renameHint")}
+                            onEdit={() => setRenameKey(childKey)}
+                            onDone={() => setRenameKey(null)}
+                            onChange={(name) => renameChild(i, c.id, name)}
+                          />
+                          <span className="pin-kid-acts" onPointerDown={(e) => e.stopPropagation()}>
                             <button
                               type="button"
                               className="pin-kid-edit"
-                              title={t("w.styleTitle")}
-                              onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id }); }}
-                              dangerouslySetInnerHTML={{ __html: icon("sliders") }}
+                              title={t("group.takeOut")}
+                              onClick={(e) => { e.stopPropagation(); takeOutChild(i, c.id); }}
+                              dangerouslySetInnerHTML={{ __html: icon("take-out") }}
                             />
-                          )}
-                          <button
-                            type="button"
-                            className="pin-kid-edit"
-                            title={t("group.takeOut")}
-                            onClick={(e) => { e.stopPropagation(); takeOutChild(i, c.id); }}
-                            dangerouslySetInnerHTML={{ __html: icon("take-out") }}
-                          />
-                          <button
-                            type="button"
-                            className="pin-kid-edit danger"
-                            title={t("apps.remove")}
-                            onClick={(e) => { e.stopPropagation(); removeChild(i, c.id); }}
-                            dangerouslySetInnerHTML={{ __html: icon("trash") }}
-                          />
-                        </span>
-                      </div>
-                    ))}
+                          </span>
+                        </div>
+                      );
+                    })}
                     <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
                       onClick={() => addToFolder(i, "app")}
                       dangerouslySetInnerHTML={{ __html: icon("plus") }} />
                     <button className="pin-kid pin-kid-add" title={t("m.addFolder")}
                       onClick={() => addToFolder(i, "folder")}
                       dangerouslySetInnerHTML={{ __html: icon("folder") }} />
-                    <div className="pin-kids-hint">{t("apps.kidsHint2")}</div>
+                    {!kidsHintDismissed && (
+                      <div className="pin-kids-hint">
+                        <span>{t("apps.kidsHint")}</span>
+                        <button type="button" className="pin-kids-hint-x" onClick={dismissKidsHint} aria-label={t("apps.dismissHint")}>×</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2308,6 +2377,7 @@ function Apps({ cfg, set }) {
         {displayPinned.flatMap((item, i) => {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
+          const topKey = "top:" + item.id;
           const rows = [
             <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
               <span className="pin-left">
@@ -2318,18 +2388,19 @@ function Apps({ cfg, set }) {
                     onClick={() => toggleOpen(item.id)} />
                 )}
                 {item.kind !== "separator" && <PinThumb item={item} />}
-                {isGroup ? (
-                  <input
-                    className="pin-name-edit"
+                {item.kind === "separator" ? (
+                  <span className="pin-name">{t("apps.sep")}</span>
+                ) : (
+                  <PinName
                     value={item.name}
-                    onChange={(e) =>
-                      set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
+                    editing={renameKey === topKey}
+                    title={item.path || t("apps.renameHint")}
+                    onEdit={() => setRenameKey(topKey)}
+                    onDone={() => setRenameKey(null)}
+                    onChange={(name) =>
+                      set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name } : p)) })
                     }
                   />
-                ) : (
-                  <span className="pin-name" title={item.path}>
-                    {item.kind === "separator" ? t("apps.sep") : item.name}
-                  </span>
                 )}
                 {missing[item.id] && (
                   <span className="pin-missing" title={t("apps.missing")}>
@@ -2340,46 +2411,77 @@ function Apps({ cfg, set }) {
                 {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
               </span>
               <span className="pin-actions">
-                {isGroup && <IconBtn name="ungroup" title={t("group.ungroup")} onClick={() => ungroup(i)} />}
-                {item.kind === "widget" && <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "top", id: item.id, i })} />}
-                {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
-                  <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
-                )}
-                {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
-                  <IconBtn name="pencil" title={t("apps.reassign")} onClick={() => reassign(i)} />
-                )}
-                {(item.kind === "app" || item.kind === "folder") && (
-                  <IconBtn name="external" title={t("apps.openLoc")} onClick={() => dockApi.openLocation(item.path)} />
-                )}
-                <IconBtn
-                  name="trash"
-                  danger
-                  title={removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
-                  onClick={() => remove(i)}
-                />
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
+                      <MoreHorizontalRegular />
+                    </button>
+                  </MenuTrigger>
+                  <MenuPopover className="booki-menu-popover">
+                    <MenuList>
+                      {item.kind !== "separator" && (
+                        <MenuItem onClick={() => setRenameKey(topKey)}>{t("apps.rename")}</MenuItem>
+                      )}
+                      {isGroup && <MenuItem onClick={() => ungroup(i)}>{t("group.ungroup")}</MenuItem>}
+                      {item.kind === "widget" && (
+                        <MenuItem onClick={() => setStyleFor({ type: "top", id: item.id, i })}>{t("w.styleTitle")}</MenuItem>
+                      )}
+                      {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
+                        <MenuItem onClick={() => setIconFor(i)}>{t("apps.changeIcon")}</MenuItem>
+                      )}
+                      {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
+                        <MenuItem onClick={() => reassign(i)}>{t("apps.reassign")}</MenuItem>
+                      )}
+                      {(item.kind === "app" || item.kind === "folder") && (
+                        <MenuItem onClick={() => dockApi.openLocation(item.path)}>{t("apps.openLoc")}</MenuItem>
+                      )}
+                      <MenuItem onClick={() => remove(i)}>
+                        {removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
+                      </MenuItem>
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
               </span>
             </li>,
           ];
           if (open) {
             (item.children || []).forEach((c, ci) => {
+              const childKey = "child:" + item.id + ":" + c.id;
               rows.push(
                 <li key={item.id + ":" + c.id} className="pin-item pin-child pin-child-item" data-folder={i}>
                   <span className="pin-left">
                     <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
                       onPointerDown={startDragChild(i, ci)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
                     <PinThumb item={c} />
-                    <input
-                      className="pin-name-edit"
+                    <PinName
                       value={c.name}
-                      onChange={(e) => renameChild(i, c.id, e.target.value)}
+                      editing={renameKey === childKey}
+                      title={c.path || t("apps.renameHint")}
+                      onEdit={() => setRenameKey(childKey)}
+                      onDone={() => setRenameKey(null)}
+                      onChange={(name) => renameChild(i, c.id, name)}
                     />
                   </span>
                   <span className="pin-actions">
-                    {c.kind === "widget" && (
-                      <IconBtn name="palette" title={t("w.styleTitle")} onClick={() => setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id })} />
-                    )}
-                    <IconBtn name="take-out" title={t("group.takeOut")} onClick={() => takeOutChild(i, c.id)} />
-                    <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => removeChild(i, c.id)} />
+                    <Menu>
+                      <MenuTrigger disableButtonEnhancement>
+                        <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
+                          <MoreHorizontalRegular />
+                        </button>
+                      </MenuTrigger>
+                      <MenuPopover className="booki-menu-popover">
+                        <MenuList>
+                          <MenuItem onClick={() => setRenameKey(childKey)}>{t("apps.rename")}</MenuItem>
+                          {c.kind === "widget" && (
+                            <MenuItem onClick={() => setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id })}>
+                              {t("w.styleTitle")}
+                            </MenuItem>
+                          )}
+                          <MenuItem onClick={() => takeOutChild(i, c.id)}>{t("group.takeOut")}</MenuItem>
+                          <MenuItem onClick={() => removeChild(i, c.id)}>{t("apps.remove")}</MenuItem>
+                        </MenuList>
+                      </MenuPopover>
+                    </Menu>
                   </span>
                 </li>
               );
@@ -2390,7 +2492,12 @@ function Apps({ cfg, set }) {
                   dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
                 <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}
                   dangerouslySetInnerHTML={{ __html: icon("folder") + `<span>${t("m.addFolder")}</span>` }} />
-                <span className="pin-kids-hint muted">{t("apps.kidsHint2")}</span>
+                {!kidsHintDismissed && (
+                  <span className="pin-kids-hint muted">
+                    {t("apps.kidsHint")}
+                    <button type="button" className="pin-kids-hint-x" onClick={dismissKidsHint} aria-label={t("apps.dismissHint")}>×</button>
+                  </span>
+                )}
               </li>
             );
           }
@@ -2464,6 +2571,13 @@ function Apps({ cfg, set }) {
       {kidMenu && (
         <div ref={kidMenuRef} className="pin-kid-menu" role="menu" aria-label={t("apps.itemActions")} style={{ left: kidMenu.x, top: kidMenu.y }}
           onPointerDown={(e) => e.stopPropagation()}>
+          <button role="menuitem" onClick={() => {
+            const g = cfg.pinned[kidMenu.gi];
+            if (g) setRenameKey("child:" + g.id + ":" + kidMenu.id);
+            setKidMenu(null);
+          }}>
+            <span dangerouslySetInnerHTML={{ __html: icon("pencil") }} />{t("apps.rename")}
+          </button>
           <button role="menuitem" onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
             <span dangerouslySetInnerHTML={{ __html: icon("take-out") }} />{t("group.takeOut")}
           </button>
