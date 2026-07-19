@@ -3914,6 +3914,45 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-kid:active { cursor: grabbing; transform: scale(0.97); }
 .pin-kid .pin-thumb { width: 34px; height: 34px; font-size: var(--text-lg); }
 .pin-kid-name { font-size: var(--text-xs); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-kid-rename {
+  width: 100%;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+.pin-kid-rename:hover, .pin-kid-rename:focus {
+  background: var(--layer);
+  border-color: var(--stroke);
+  outline: none;
+}
+.pin-card-name-edit {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  text-align: center;
+  color: var(--ink);
+  background: var(--layer);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.pin-kid-acts {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  gap: 3px;
+  z-index: 2;
+}
+.pin-kid:hover .pin-kid-acts, .pin-kid:focus-within .pin-kid-acts { display: flex; }
 .pin-kid-x {
   position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
   border: 0; background: var(--danger); color: #fff; font-size: var(--text-md); line-height: 1; cursor: pointer;
@@ -3921,10 +3960,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-kid:hover .pin-kid-x { display: flex; }
 .pin-kid-edit {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  display: none;
+  display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
@@ -3933,10 +3969,12 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   border: 1px solid var(--stroke-light);
   border-radius: 7px;
   cursor: pointer;
+  padding: 0;
 }
-.pin-kid:hover .pin-kid-edit { display: grid; }
 .pin-kid-edit:hover { color: var(--ink); background: var(--hover); }
+.pin-kid-edit.danger:hover { color: var(--danger); }
 .pin-kid-edit svg { width: 13px; height: 13px; }
+.pin-add-row .pin-kids-hint { margin-left: 8px; }
 .pin-kid-add {
   color: var(--accent); border-style: dashed; cursor: pointer;
   align-items: center; justify-content: center;

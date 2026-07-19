@@ -2201,13 +2201,25 @@ function Apps({ cfg, set }) {
                   (mergeInto === i ? " merge-into" : "") + (open ? " open" : "")}>
                 <button className="pin-card-grip" title={t("apps.drag")} aria-label={t("apps.drag")}
                   onPointerDown={startDragGrid(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
-                <div className={"pin-card-body" + (isGroup ? " clickable" : "")}
-                  onClick={isGroup ? () => toggleOpen(item.id) : undefined}
+                <div className={"pin-card-body" + (isGroup && !open ? " clickable" : "")}
+                  onClick={isGroup && !open ? () => toggleOpen(item.id) : undefined}
                   title={isGroup ? t("apps.editFolder") : item.path || ""}>
                   {item.kind !== "separator" && <PinThumb item={item} />}
-                  <span className="pin-card-name">
-                    {item.kind === "separator" ? t("apps.sep") : item.name}
-                  </span>
+                  {isGroup && open ? (
+                    <input
+                      className="pin-name-edit pin-card-name-edit"
+                      value={item.name}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name: e.target.value } : p)) })
+                      }
+                    />
+                  ) : (
+                    <span className="pin-card-name">
+                      {item.kind === "separator" ? t("apps.sep") : item.name}
+                    </span>
+                  )}
                   {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
                   {missing[item.id] && (
                     <span
@@ -2237,17 +2249,39 @@ function Apps({ cfg, set }) {
                         onPointerDown={startKidDrag(i, c.id)}
                         onContextMenu={(e) => openKidMenu(e, i, c.id)}>
                         <PinThumb item={c} />
-                        <span className="pin-kid-name" title={c.path || ""}>{c.name}</span>
-                        {c.kind === "widget" && (
+                        <input
+                          className="pin-name-edit pin-kid-rename"
+                          value={c.name}
+                          title={c.path || ""}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => renameChild(i, c.id, e.target.value)}
+                        />
+                        <span className="pin-kid-acts" onPointerDown={(e) => e.stopPropagation()}>
+                          {c.kind === "widget" && (
+                            <button
+                              type="button"
+                              className="pin-kid-edit"
+                              title={t("w.styleTitle")}
+                              onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id }); }}
+                              dangerouslySetInnerHTML={{ __html: icon("sliders") }}
+                            />
+                          )}
                           <button
                             type="button"
                             className="pin-kid-edit"
-                            title={t("w.styleTitle")}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id }); }}
-                            dangerouslySetInnerHTML={{ __html: icon("sliders") }}
+                            title={t("group.takeOut")}
+                            onClick={(e) => { e.stopPropagation(); takeOutChild(i, c.id); }}
+                            dangerouslySetInnerHTML={{ __html: icon("take-out") }}
                           />
-                        )}
+                          <button
+                            type="button"
+                            className="pin-kid-edit danger"
+                            title={t("apps.remove")}
+                            onClick={(e) => { e.stopPropagation(); removeChild(i, c.id); }}
+                            dangerouslySetInnerHTML={{ __html: icon("trash") }}
+                          />
+                        </span>
                       </div>
                     ))}
                     <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
@@ -2356,6 +2390,7 @@ function Apps({ cfg, set }) {
                   dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
                 <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}
                   dangerouslySetInnerHTML={{ __html: icon("folder") + `<span>${t("m.addFolder")}</span>` }} />
+                <span className="pin-kids-hint muted">{t("apps.kidsHint2")}</span>
               </li>
             );
           }
