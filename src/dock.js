@@ -35,6 +35,7 @@ import {
   widgetDisplayName,
 } from "./widgets-meta.js";
 import { applySurfaceClass } from "./surface.js";
+import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -217,9 +218,11 @@ async function reloadConfig() {
   // toggles in Settings shouldn't make the whole dock flash.
   const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
-    await render(); // render() restarts polls when visible
+    // Stale flyout handlers hold old children — close rather than lie.
+    if (stackOpen) closeStack();
+    await render();
   } else {
-    fitDock(); // size/spacing may still have changed
+    fitDock();
   }
   reframe();
   // Re-arming auto-hide resets the shown/hidden state; only do it when the
@@ -314,11 +317,10 @@ function applyAll() {
 }
 
 async function persist() {
+  // Keep dissolve rules consistent with Settings (empty / 1-child groups).
+  cfg.pinned = normalizeGroups(cfg.pinned);
   await configApi.save(cfg);
-  maybeSyncCtxMenu(); // group added/renamed/removed on the dock → refresh Explorer menu
-  // Always notify the other windows (Settings especially) so its pinned-apps
-  // list can never drift out of sync with the dock — removing/adding/reordering
-  // straight on the bar now reflects in Settings immediately.
+  maybeSyncCtxMenu();
   await emitConfigChanged();
 }
 
@@ -539,6 +541,11 @@ function groupTile(item) {
     grid.appendChild(mini);
   }
   el.appendChild(grid);
+
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = item.name || t("group.new");
+  el.appendChild(label);
 
   const badge = document.createElement("span");
   badge.className = "badge";
@@ -1347,9 +1354,10 @@ function magnify(clientX, clientY) {
     const scale = item.noMag ? 1 : 1 + (maxScale - 1) * influence;
     // Lift toward the screen interior (translate BEFORE scale so it stays a
     // constant px amount). Neighbours also push along the bar — the wave.
-    const lift = Math.round(influence * 8);
+    // Rail-origin scale does most of the "lift"; keep translate modest.
+    const lift = Math.round(influence * 5);
     const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    const push = item.noMag ? 0 : Math.sign(delta || 1) * influence * base * 0.2;
+    const push = item.noMag ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
     const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
     item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
     item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
@@ -1363,6 +1371,49 @@ function magnify(clientX, clientY) {
     if (magFocus) magFocus.classList.remove("focus");
     if (focus) focus.classList.add("focus");
     magFocus = focus;
+  }
+  // Hit-rects must track the wave — style mutations are ignored while mag-live,
+  // so schedule from this rAF instead of waiting for the MutationObserver.
+  scheduleMagHitRects();
+}
+
+let magHitTimer = 0;
+function scheduleMagHitRects() {
+  if (magHitTimer) return;
+  magHitTimer = requestAnimationFrame(() => {
+    magHitTimer = 0;
+    if (!dockEl.classList.contains("mag-live")) return;
+    reportHitRectsLive();
+  });
+}
+
+/** Hit-test using transformed tile bounds while magnify is live. */
+function reportHitRectsLive() {
+  if (!dockApi.setHitRects) return;
+  try {
+    const tiles = [...dockEl.querySelectorAll(".tile")];
+    if (!tiles.length) return;
+    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
+    for (const el of tiles) {
+      const r = el.getBoundingClientRect();
+      minL = Math.min(minL, r.left);
+      minT = Math.min(minT, r.top);
+      maxR = Math.max(maxR, r.right);
+      maxB = Math.max(maxB, r.bottom);
+    }
+    const pad = 6;
+    const rect = [
+      Math.floor(minL - pad),
+      Math.floor(minT - pad),
+      Math.ceil(maxR - minL + pad * 2),
+      Math.ceil(maxB - minT + pad * 2),
+    ];
+    const sig = `mag:${rect.map(Math.round).join(",")}`;
+    if (sig === lastHitSig) return;
+    lastHitSig = sig;
+    dockApi.setHitRects([rect], false).catch(() => {});
+  } catch (_) {
+    /* best-effort */
   }
 }
 
@@ -1776,7 +1827,7 @@ function processMove(e) {
   // Hovering the CENTER of another tile → group (merge) intent. Apps and widgets
   // can both be grouped now (widgets go live only inside the group). Separators,
   // the trash tile and groups-into-groups never form a group.
-  const canMerge = press.item.kind === "app" || press.item.kind === "widget";
+  const canMerge = canMergeKind(press.item.kind);
   let centerTarget = null;
   if (canMerge) {
     for (const s of sibs) {
@@ -1925,28 +1976,11 @@ async function cancelDrag() {
 }
 window.addEventListener("pointercancel", cancelDrag);
 
-// Merge a dragged pin onto a target → create a folder/group (or add to one).
+// Merge a dragged pin onto a target → create a group (or add to one).
 async function createGroup(draggedId, targetId) {
-  const di = cfg.pinned.findIndex((a) => a.id === draggedId);
-  const ti = cfg.pinned.findIndex((a) => a.id === targetId);
-  if (di < 0 || ti < 0 || di === ti) return;
-  const dragged = cfg.pinned[di];
-  const target = cfg.pinned[ti];
-  if (target.kind === "group") {
-    target.children = target.children || [];
-    target.children.push(dragged);
-  } else {
-    cfg.pinned[ti] = {
-      id: uid(),
-      name: t("group.new"),
-      path: "",
-      args: [],
-      kind: "group",
-      icon: null,
-      children: [target, dragged],
-    };
-  }
-  cfg.pinned.splice(di, 1);
+  const next = mergePins(cfg.pinned, draggedId, targetId, t("group.new"));
+  if (next === cfg.pinned) return;
+  cfg.pinned = next;
   exitEdit();
   await persist();
   await render();
@@ -1955,12 +1989,30 @@ async function createGroup(draggedId, targetId) {
 
 // ─── Folder management: rename, ungroup, pull a child out ───
 let renameTimer = null;
-function renameGroup(group, name) {
+function renameGroup(group, name, { commit = false } = {}) {
   const gi = cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
-  cfg.pinned[gi].name = name;
+  const next = String(name || "").trim() || t("group.new");
+  cfg.pinned[gi].name = commit ? next : name;
+  const tile = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  if (tile) {
+    tile.title = commit ? next : (name || t("group.new"));
+    const lab = tile.querySelector(".label");
+    if (lab) lab.textContent = commit ? next : (name || t("group.new"));
+  }
   clearTimeout(renameTimer);
-  renameTimer = setTimeout(persist, 250);
+  if (commit) {
+    cfg.pinned[gi].name = next;
+    persist();
+  } else {
+    renameTimer = setTimeout(() => {
+      const i = cfg.pinned.findIndex((p) => p.id === group.id);
+      if (i >= 0) {
+        cfg.pinned[i].name = String(cfg.pinned[i].name || "").trim() || t("group.new");
+        persist();
+      }
+    }, 400);
+  }
 }
 
 // Dissolve a folder: spill its children back to the dock at its position.
@@ -1978,19 +2030,8 @@ async function ungroup(group) {
 // Take one item out of a folder → back to the dock (auto-dissolves a folder that
 // would be left with a single item). Re-opens the folder if it survives.
 async function takeOutChild(group, childId) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
-  if (gi < 0) return;
-  const grp = cfg.pinned[gi];
-  const ci = (grp.children || []).findIndex((c) => c.id === childId);
-  if (ci < 0) return;
-  const [child] = grp.children.splice(ci, 1);
-  cfg.pinned.splice(gi + 1, 0, child);
-  let reopenId = grp.id;
-  if ((grp.children || []).length < 2) {
-    const rest = grp.children || [];
-    cfg.pinned.splice(gi, 1, ...rest); // replace the folder with its leftover
-    reopenId = null;
-  }
+  const { pinned, reopenId } = takeOutOfGroup(cfg.pinned, group.id, childId);
+  cfg.pinned = pinned;
   await persist();
   closeStack();
   await render();
@@ -1998,12 +2039,11 @@ async function takeOutChild(group, childId) {
   if (reopenId) {
     const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
     const it = cfg.pinned.find((p) => p.id === reopenId);
-    if (tileEl && it) toggleStack(tileEl, it);
+    if (tileEl && it) openStack(tileEl, it);
   }
 }
 
-// Remove a child from a group entirely (unpin), dissolving the folder if it's
-// left with fewer than 2 items — matches the dock's own pull-out-to-remove.
+/** Unpin (delete) a child from a group — only via explicit trash, not drag-out. */
 async function removeChildFromGroup(group, childId) {
   const gi = cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
@@ -2011,7 +2051,7 @@ async function removeChildFromGroup(group, childId) {
   const kids = (grp.children || []).filter((c) => c.id !== childId);
   let reopenId = grp.id;
   if (kids.length < 2) {
-    cfg.pinned.splice(gi, 1, ...kids); // dissolve: leftover (if any) returns to the dock
+    cfg.pinned.splice(gi, 1, ...kids);
     reopenId = null;
   } else {
     grp.children = kids;
@@ -2023,7 +2063,7 @@ async function removeChildFromGroup(group, childId) {
   if (reopenId) {
     const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
     const it = cfg.pinned.find((p) => p.id === reopenId);
-    if (tileEl && it) toggleStack(tileEl, it);
+    if (tileEl && it) openStack(tileEl, it);
   }
 }
 
@@ -2035,6 +2075,9 @@ function wireStackDragOut(cell, group, child) {
   cell.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || closestSel(e.target, ".stack-rm")) return;
     st = { x: e.clientX, y: e.clientY, moved: false, pointerId: e.pointerId };
+    try {
+      cell.setPointerCapture(e.pointerId);
+    } catch (_) {}
   });
   cell.addEventListener("pointermove", (e) => {
     if (!st) return;
@@ -2076,7 +2119,9 @@ function wireStackDragOut(cell, group, child) {
         c.classList.add("poof");
         setTimeout(() => c.remove(), 280);
       }
-      await removeChildFromGroup(group, child.id);
+      // Drag out of the flyout = take out to the dock (same as Settings / ×).
+      // Unpinning is a separate destructive action, not a casual drag.
+      await takeOutChild(group, child.id);
     } else if (s.clone) {
       s.clone.remove();
     }
@@ -2161,8 +2206,9 @@ function openMenu(e, item) {
     const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
     add(openIcon, t("m.open"), () => {
       if (item.kind === "folder" || item.kind === "group") {
+        // Always open (never toggle-close) — right-click → Open should reveal.
         const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-        if (tileEl) toggleStack(tileEl, item);
+        if (tileEl) openStack(tileEl, item);
       } else if (item.kind === "trash") {
         dockApi.launch("shell:RecycleBinFolder", []);
       } else {
@@ -2202,12 +2248,52 @@ function openMenu(e, item) {
   add("folder-plus", t("m.addFolder"), onAddFolder);
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
   sep();
-  add("trash", t("m.remove"), () => removeItem(item.id), "danger");
+  add(
+    "trash",
+    t("m.remove"),
+    () => {
+      if (item.kind === "group" && (item.children || []).length > 0) confirmRemoveGroup(item);
+      else removeItem(item.id);
+    },
+    "danger"
+  );
   addMenuLabel(t("m.system"));
   add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
   if (recentsSlot) fillRecentFiles(recentsSlot, e, item);
+}
+
+/** Two-step confirm before deleting a whole group (children would go with it). */
+function confirmRemoveGroup(item) {
+  pinnedReveal = true;
+  const n = (item.children || []).length;
+  const pop = document.createElement("div");
+  pop.className = "trash-pop";
+  const name = esc(item.name || t("group.new"));
+  pop.innerHTML =
+    `${icon("trash")}<span class="tp-col"><span class="tp-text">${t("group.removeAsk").replace("{name}", name).replace("{n}", String(n))}</span>` +
+    `<span class="tp-sub">${t("group.removeSub")}</span></span>`;
+  const mkBtn = (cls, label, fn) => {
+    const b = document.createElement("button");
+    b.className = `tp-btn ${cls}`;
+    b.textContent = label;
+    b.addEventListener("click", fn);
+    pop.appendChild(b);
+  };
+  mkBtn("danger", t("apps.remove"), async () => {
+    closeTrashPop();
+    await removeItem(item.id);
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  mkBtn("", t("trash.cancel"), () => {
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  });
+  placePop(pop);
+  trashPop = pop;
 }
 
 // Recent files for THIS app only (matched by file association in the backend)
@@ -2381,6 +2467,7 @@ dockEl.addEventListener("contextmenu", openBackgroundMenu);
 window.addEventListener("click", closeMenu);
 window.addEventListener("blur", () => {
   closeMenu();
+  closeStack();
   // Focus moved to another app → release a pinned reveal so the dock can tuck
   // back into the notch instead of lingering on top of whatever the user opened.
   if (pinnedReveal) {
@@ -2390,6 +2477,11 @@ window.addEventListener("blur", () => {
 });
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    // Escape while renaming a group: revert handled on the input; don't close
+    // the whole flyout if the rename field still has focus.
+    if (document.activeElement && document.activeElement.classList.contains("stack-rename")) {
+      return;
+    }
     closeMenu();
     exitEdit();
     closeStack();
@@ -2625,7 +2717,7 @@ function setHidden(v) {
     document.body.classList.add("tucked");
     setTimeout(() => {
       if (hiddenState) dockApi.hideDock(cfg.edge);
-    }, 360); // let the minimize animation play before the window hides
+    }, 230); // match genie transition (~200ms) + one frame
   } else {
     // Show the dock window (and hide the notch), make sure it's sized to the full
     // bar, then slide the bar back in. Force the stage fully interactive during
@@ -2757,7 +2849,8 @@ function reportHitRects() {
   // clicks immediately.
   add(dockEl, DOCK_HIT_PAD);
   for (const tile of dockEl.querySelectorAll(".tile")) add(tile, TILE_HIT_PAD);
-  if (stackOpen) add(stackEl, PANEL_HIT_PAD);
+  // Inflate toward the dock so the pointer doesn't fall through the gap.
+  if (stackOpen) add(stackEl, Math.max(PANEL_HIT_PAD, 8));
   for (const el of document.querySelectorAll(
     ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
   ))
@@ -3445,20 +3538,37 @@ function startRunningPoll() {
     }
     try {
       const wins = await dockApi.listWindows();
-      dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
-        const app = cfg.pinned.find((a) => a.id === t.dataset.id);
-        if (!app || app.kind === "separator" || app.kind === "trash") return;
+      const matchWins = (pin) => {
+        if (!pin || pin.kind === "separator" || pin.kind === "trash" || pin.kind === "widget") return [];
+        if (pin.kind === "group") {
+          const seen = new Set();
+          const out = [];
+          for (const child of pin.children || []) {
+            for (const w of matchWins(child)) {
+              if (seen.has(w.hwnd)) continue;
+              seen.add(w.hwnd);
+              out.push(w);
+            }
+          }
+          return out;
+        }
         // Prefer matching by the owning process's executable (reliable, exact);
         // fall back to a title contains-name match for .lnk/shell pins.
-        const path = (app.path || "").toLowerCase();
+        const path = (pin.path || "").toLowerCase();
         const exeBase = path.endsWith(".exe") ? path.split(/[\\/]/).pop() : "";
-        const name = (app.name || "").toLowerCase();
+        const name = (pin.name || "").toLowerCase();
         let matches = exeBase
           ? wins.filter((w) => ((w.exe || "").split(/[\\/]/).pop() || "") === exeBase)
           : [];
         if (!matches.length && name) {
           matches = wins.filter((w) => w.title.toLowerCase().includes(name));
         }
+        return matches;
+      };
+      dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
+        const app = cfg.pinned.find((a) => a.id === t.dataset.id);
+        if (!app || app.kind === "separator" || app.kind === "trash") return;
+        const matches = matchWins(app);
         const badge = t.querySelector(".badge");
         if (matches.length) {
           t.dataset.running = "true";
@@ -3470,6 +3580,17 @@ function startRunningPoll() {
           if (badge) badge.textContent = "";
         }
       });
+      // Mirror running state onto open group flyout cells.
+      if (stackOpen && stackItemId) {
+        const grp = cfg.pinned.find((p) => p.id === stackItemId);
+        if (grp && grp.kind === "group") {
+          stackEl.querySelectorAll(".stack-item[data-child-id]").forEach((cell) => {
+            const child = (grp.children || []).find((c) => c.id === cell.dataset.childId);
+            const matches = matchWins(child);
+            cell.dataset.running = matches.length ? "true" : "false";
+          });
+        }
+      }
     } catch (_) {
       /* ignore */
     }
@@ -3525,13 +3646,24 @@ function wireFileDragOut(cell, it) {
   });
 }
 
+let stackItemId = null;
+
+/** Open a stack; switching to another group/folder replaces the current one. */
 async function toggleStack(tileEl, item) {
-  if (stackOpen) {
+  if (stackOpen && stackItemId === item.id) {
     closeStack();
     return;
   }
+  if (stackOpen) closeStack();
+  await openStack(tileEl, item);
+}
+
+async function openStack(tileEl, item) {
+  if (stackOpen && stackItemId === item.id) return;
+  if (stackOpen) closeStack();
   const isGroup = item.kind === "group";
   const seq = ++stackSeq;
+  stackItemId = item.id;
   stackEl.innerHTML = "";
   const head = document.createElement("div");
   head.className = "stack-head";
@@ -3540,11 +3672,26 @@ async function toggleStack(tileEl, item) {
   glyph.innerHTML = icon("folder");
   head.appendChild(glyph);
   if (isGroup) {
+    const prevName = item.name || t("group.new");
     const input = document.createElement("input");
     input.className = "stack-rename";
     input.value = item.name || "";
     input.placeholder = t("group.new");
     input.addEventListener("input", () => renameGroup(item, input.value));
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        renameGroup(item, input.value, { commit: true });
+        input.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        input.value = prevName;
+        renameGroup(item, prevName, { commit: true });
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", () => renameGroup(item, input.value, { commit: true }));
     head.appendChild(input);
   } else {
     const name = document.createElement("span");
@@ -3577,7 +3724,7 @@ async function toggleStack(tileEl, item) {
   const fillGrid = (items) => {
     grid.innerHTML = "";
     if (!items.length) {
-      grid.innerHTML = `<div class="stack-empty">${t("stack.empty")}</div>`;
+      grid.innerHTML = `<div class="stack-empty">${t(isGroup ? "stack.emptyGroup" : "stack.empty")}</div>`;
     }
     let cellIdx = 0;
     for (const it of items) {
@@ -3600,6 +3747,7 @@ async function toggleStack(tileEl, item) {
       }
       const cell = document.createElement("button");
       cell.className = "stack-item";
+      if (isGroup && it.id) cell.dataset.childId = it.id;
       cell.style.setProperty("--i", Math.min(cellIdx++, 6)); // staggered entry (capped)
       cell.title = it.name;
       const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
@@ -3763,7 +3911,12 @@ async function toggleStack(tileEl, item) {
   pendingReplace = placeStack; // re-place if the window DOES resize (screen change)
   requestAnimationFrame(() => {
     placeStack();
-    requestAnimationFrame(() => stackEl.classList.add("open"));
+    requestAnimationFrame(() => {
+      stackEl.classList.add("open", "just-opened");
+      clearTimeout(stackEl._justOpenedTimer);
+      stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
+    });
+
   });
 }
 
@@ -3772,7 +3925,8 @@ async function toggleStack(tileEl, item) {
 // Shared by the folder/group flyout and the clipboard-history flyout below.
 function placeStackNear(tileEl) {
   const dr = dockEl.getBoundingClientRect();
-  const gap = 10;
+  // Keep gap ≤ hit-pad bridge so the pointer path bar→flyout stays interactive.
+  const gap = 6;
   const r = tileEl.getBoundingClientRect();
   stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
   // Grow the flyout from the triggering tile's center so the open feels attached.
@@ -3809,17 +3963,16 @@ let stackCloseTimer = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
+  stackItemId = null;
   pendingReplace = null;
   document.body.classList.remove("stack-open");
-  stackEl.classList.remove("open"); // plays the close transition
-  // Any grouped widgets that were live are gone now — drop them from the poll
-  // (stops the timer if nothing on the bar still needs it).
+  stackEl.classList.remove("open", "just-opened");
   cacheWidgetEls();
   startPolls();
-  // Shrink the window only after the close animation has played, so it doesn't
-  // get cut off mid-fade.
   clearTimeout(stackCloseTimer);
-  stackCloseTimer = setTimeout(reframe, 240);
+  stackCloseTimer = setTimeout(reframe, 180);
+  // After closing, allow smart-hide to re-evaluate (flyout was blocking tuck).
+  scheduleHide();
 }
 
 // Clipboard-history flyout: the "clipboard" widget's click target. Reuses the
@@ -3898,7 +4051,11 @@ async function toggleClipboardStack(tileEl) {
   await renderClipboardList(grid, foot);
   requestAnimationFrame(() => {
     placeStack();
-    requestAnimationFrame(() => stackEl.classList.add("open"));
+    requestAnimationFrame(() => {
+      stackEl.classList.add("open", "just-opened");
+      clearTimeout(stackEl._justOpenedTimer);
+      stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
+    });
   });
 }
 
@@ -4026,16 +4183,17 @@ function startClipEdit(row, entry, grid, foot) {
   ta.focus();
 }
 
-// Add an app into a folder from its open flyout, then reopen it so you can keep
-// adding several in a row.
+// Add an app/folder into a group from its open flyout, then reopen it so you
+// can keep adding several in a row.
 async function addToFolderFromDock(group) {
   const path = await pickAppFile();
   if (!path) return;
   const gi = cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
+  const kind = await kindForPath(path, (p) => dockApi.isDir(p));
   cfg.pinned[gi].children = [
     ...(cfg.pinned[gi].children || []),
-    { id: uid(), name: baseName(path), path, args: [], kind: "app" },
+    { id: uid(), name: baseName(path), path, args: [], kind },
   ];
   await persist();
   closeStack();
@@ -4043,7 +4201,7 @@ async function addToFolderFromDock(group) {
   reframe();
   const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
   const it = cfg.pinned.find((p) => p.id === group.id);
-  if (el && it) toggleStack(el, it);
+  if (el && it) openStack(el, it);
 }
 window.addEventListener("pointerdown", (e) => {
   if (stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
