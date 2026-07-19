@@ -166,6 +166,9 @@ pub struct Config {
     /// Notch visual style: "island" | "liquid" | "mica" | "acrylic" | "windows".
     #[serde(default = "default_notch_style")]
     pub notch_style: String,
+    /// Notch size scale (0.7–1.5). 1.0 = default pill size.
+    #[serde(default = "default_notch_scale")]
+    pub notch_scale: f32,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
     /// Magnify animation style: "spring" | "smooth" | "off".
@@ -267,6 +270,10 @@ fn default_notch_trigger() -> String {
     "click".into()
 }
 
+fn default_notch_scale() -> f32 {
+    1.0
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -288,6 +295,7 @@ impl Default for Config {
             notch_peek: true,
             notch_edge: default_notch_edge(),
             notch_style: default_notch_style(),
+            notch_scale: default_notch_scale(),
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),

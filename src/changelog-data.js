@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.56.0",
+    date: "19 jul 2026",
+    headline: "Ajustes reordenados, tamaño del notch y limpieza técnica.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Ajustes más claros",
+        notes: [
+          "Apariencia: tema, dock look, y aspecto del notch (estilo, tamaño, peek).",
+          "Comportamiento: dock (posición, ocultar), notch (revelar, siempre visible), multi-notch e interacción (magnify, etiquetas).",
+          "Nuevo control: tamaño del notch del 70% al 150%.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Código más sano",
+        notes: [
+          "Metadata de widgets compartida; check:icons en CI; Fluent en chunk aparte.",
+          "Drag de Apps con RAF y guardado al soltar; acciones de flyout/clipboard visibles con focus.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.55.1",
     date: "18 jul 2026",
     headline: "Limpieza premium: glifos, rendimiento del magnify y menos ruido.",

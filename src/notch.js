@@ -43,6 +43,8 @@ async function applyLook() {
       "style-island", "style-liquid", "style-mica", "style-acrylic", "style-windows"
     );
     document.body.classList.add(`style-${cfg.notchStyle || "island"}`);
+    const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+    document.documentElement.style.setProperty("--notch-scale", String(scale));
   } catch (_) {
     /* keep defaults */
   }

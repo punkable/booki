@@ -1208,6 +1208,7 @@ body.edge-left .tile.widget.media .w-ctl svg, body.edge-right .tile.widget.media
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */
 body.notch-body {
+  --notch-scale: 1;
   margin: 0;
   background: transparent;
   overflow: hidden;
@@ -1215,7 +1216,7 @@ body.notch-body {
   align-items: flex-end;
   justify-content: center;
   height: 100vh;
-  padding: 4px;
+  padding: calc(4px * var(--notch-scale));
   /* The OS window is sized bigger than the visible pill on purpose (room for
      the hover-grow animation and the taskbar overlap in peek style) — but
      that means real empty space surrounds it. Without this, a click in that
@@ -1231,8 +1232,8 @@ body.notch-body.vertical { align-items: center; }
   --glass: color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.82));
   position: relative;
   flex: 0 0 auto;
-  width: 118px;
-  height: 13px;
+  width: calc(118px * var(--notch-scale));
+  height: calc(13px * var(--notch-scale));
   padding: 0;
   cursor: pointer;
   border-radius: 999px;
@@ -1283,7 +1284,12 @@ body.notch-body.vertical { align-items: center; }
 .notch-pill:hover:active { scale: var(--pill-gx) calc(var(--pill-gy) * 0.88); }
 body.notch-body.vertical .notch-pill:active { scale: 0.88 1; }
 body.notch-body.vertical .notch-pill:hover:active { scale: calc(var(--pill-gx) * 0.88) var(--pill-gy); }
-body.notch-body.vertical .notch-pill { width: 13px; height: 118px; --pill-gx: 1.38; --pill-gy: 1.24; }
+body.notch-body.vertical .notch-pill {
+  width: calc(13px * var(--notch-scale));
+  height: calc(118px * var(--notch-scale));
+  --pill-gx: 1.38;
+  --pill-gy: 1.24;
+}
 
 /* Peek style: a tab that emerges from behind the taskbar. The window slides a
    few px past the work area into the taskbar band (backend), and the pill sits
@@ -1296,9 +1302,9 @@ body.notch-body.peek.edge-right { justify-content: flex-end; }
 body.notch-body.peek .notch-pill {
   --pill-gx: 1.23;
   --pill-gy: 1.42;
-  width: 112px;
-  height: 12px;
-  border-radius: 11px 11px 0 0;
+  width: calc(112px * var(--notch-scale));
+  height: calc(12px * var(--notch-scale));
+  border-radius: calc(11px * var(--notch-scale)) calc(11px * var(--notch-scale)) 0 0;
   border-bottom: 0;
   transform-origin: center bottom;
   box-shadow:
@@ -1404,7 +1410,12 @@ body.notch-body.style-windows.peek .notch-pill {
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
-body.notch-body.peek.vertical .notch-pill { width: 12px; height: 112px; --pill-gx: 1.42; --pill-gy: 1.23; }
+body.notch-body.peek.vertical .notch-pill {
+  width: calc(12px * var(--notch-scale));
+  height: calc(112px * var(--notch-scale));
+  --pill-gx: 1.42;
+  --pill-gy: 1.23;
+}
 body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; transform-origin: left center; }
 body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; transform-origin: right center; }
 /* The concave corner fillets blend the tab into the *taskbar* — that only makes
@@ -1875,7 +1886,9 @@ body.edge-right .stack.open { transform: none; }
   padding: 0;
 }
 .stack-rm svg { width: 14px; height: 14px; stroke-width: 2.2; }
-.stack-item:hover .stack-rm { display: flex; }
+.stack-item:hover .stack-rm,
+.stack-item:focus-within .stack-rm,
+.stack-item:focus-visible .stack-rm { display: flex; }
 .stack-rm:hover { filter: brightness(1.06); }
 .stack-rm:active { transform: scale(0.92); }
 .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
@@ -1918,7 +1931,9 @@ body.edge-right .stack.open { transform: none; }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* Hover actions on a flyout file cell: copy path · Explorer · open with. */
 .stack-acts { position: absolute; top: 3px; left: 3px; display: none; gap: 3px; z-index: 2; }
-.stack-item:hover .stack-acts { display: flex; }
+.stack-item:hover .stack-acts,
+.stack-item:focus-within .stack-acts,
+.stack-item:focus-visible .stack-acts { display: flex; }
 .stack-act {
   width: 28px; height: 28px; display: grid; place-items: center; padding: 0;
   color: var(--ink-2); cursor: pointer;
@@ -2053,7 +2068,9 @@ body.edge-right .stack.open { transform: none; }
   display: none;
   gap: 3px;
 }
-.clip-row:hover .clip-acts, .clip-row.editing .clip-acts { display: flex; }
+.clip-row:hover .clip-acts,
+.clip-row:focus-within .clip-acts,
+.clip-row.editing .clip-acts { display: flex; }
 .clip-list.compact { gap: 2px; }
 .clip-list.compact .clip-row { padding-top: 5px; padding-bottom: 5px; }
 .clip-list.compact .clip-text { font-size: var(--text-sm); }
@@ -4362,8 +4379,8 @@ textarea {
 
 /* Dot mode: shrink the pill to a small reactive circle. */
 body.notch-dot .notch-pill {
-  width: 18px;
-  height: 18px;
+  width: calc(18px * var(--notch-scale));
+  height: calc(18px * var(--notch-scale));
   border-radius: 50%;
   --pill-gx: 1.35;
   --pill-gy: 1.35;
@@ -4371,12 +4388,12 @@ body.notch-dot .notch-pill {
 body.notch-dot .notch-pill::before,
 body.notch-dot .notch-pill::after { display: none; }
 body.notch-dot.vertical .notch-pill {
-  width: 18px;
-  height: 18px;
+  width: calc(18px * var(--notch-scale));
+  height: calc(18px * var(--notch-scale));
 }
 body.notch-dot.peek .notch-pill {
-  width: 16px;
-  height: 16px;
+  width: calc(16px * var(--notch-scale));
+  height: calc(16px * var(--notch-scale));
   border-radius: 50%;
 }
 

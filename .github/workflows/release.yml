@@ -50,6 +50,9 @@ jobs:
       - name: Check visible text encoding
         run: npm run check:text
 
+      - name: Check icons and emoji assets
+        run: npm run check:icons
+
       # Derive the release tag from package.json for manual runs. Normal
       # publishing is tag-based, so a version ships exactly once.
       - name: Resolve release tag

@@ -315,6 +315,10 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
         clip_apply_config(&config);
         apply_always_on_top(&app);
         apply_capture_policy(&app, config.capture_visible);
+        // Keep notch window geometry in sync (style / peek / scale).
+        if let Some(notch) = app.get_webview_window("notch") {
+            let _ = position_notch(&notch, &config.edge);
+        }
     }
     result
 }
@@ -1176,11 +1180,12 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     // perpendicular axis so the pill's soft glow/shadow has room to render
     // instead of being clipped at the window edge. The pill hugs the outward
     // edge (CSS align), so the extra depth is transparent space toward the screen.
+    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
     let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
-        (true, true) => (34.0, 156.0),
-        (true, false) => (156.0, 34.0),
-        (false, true) => (40.0, 168.0),
-        (false, false) => (168.0, 40.0),
+        (true, true) => (34.0 * scale, 156.0 * scale),
+        (true, false) => (156.0 * scale, 34.0 * scale),
+        (false, true) => (40.0 * scale, 168.0 * scale),
+        (false, false) => (168.0 * scale, 40.0 * scale),
     };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;

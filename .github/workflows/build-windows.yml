@@ -39,6 +39,9 @@ jobs:
       - name: Check visible text encoding
         run: npm run check:text
 
+      - name: Check icons and emoji assets
+        run: npm run check:icons
+
       - name: Build Tauri app (installers + exe)
         run: npm run tauri:build
         env:

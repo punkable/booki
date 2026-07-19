@@ -41,6 +41,15 @@ export default defineConfig({
         settings: resolve(process.cwd(), "src/settings.html"),
         notch: resolve(process.cwd(), "src/notch.html"),
       },
+      output: {
+        // Keep Fluent out of the dock/notch bundles and cache it separately.
+        manualChunks(id) {
+          if (id.includes("node_modules/@fluentui/")) return "fluent";
+          if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) {
+            return "react-vendor";
+          }
+        },
+      },
     },
   },
 });
