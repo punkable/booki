@@ -90,7 +90,11 @@ fn default_notch_edge() -> String {
     "auto".into()
 }
 fn default_notch_style() -> String {
-    "island".into()
+    "acrylic".into()
+}
+fn default_surface_style() -> String {
+    // Unified dock + notch finish. "acrylic" | "mica" | "tinted" | "solid".
+    "acrylic".into()
 }
 fn default_anim() -> String {
     "spring".into()
@@ -163,9 +167,12 @@ pub struct Config {
     /// Edge the notch lives on: "auto" (same as the dock) or a specific edge.
     #[serde(default = "default_notch_edge")]
     pub notch_edge: String,
-    /// Notch visual style: "island" | "liquid" | "mica" | "acrylic" | "windows".
+    /// Legacy notch-only finish. Kept for older configs; prefer `surface_style`.
     #[serde(default = "default_notch_style")]
     pub notch_style: String,
+    /// Unified dock + notch surface: "mica" | "acrylic" | "tinted" | "solid".
+    #[serde(default = "default_surface_style")]
+    pub surface_style: String,
     /// Notch size scale (0.7–1.5). 1.0 = default pill size.
     #[serde(default = "default_notch_scale")]
     pub notch_scale: f32,
@@ -295,6 +302,7 @@ impl Default for Config {
             notch_peek: true,
             notch_edge: default_notch_edge(),
             notch_style: default_notch_style(),
+            surface_style: default_surface_style(),
             notch_scale: default_notch_scale(),
             always_on_top: true,
             magnify_style: default_anim(),
@@ -400,6 +408,27 @@ pub fn load() -> Config {
     if cfg.settings_rev < 5 {
         cfg.notch_edge = "auto".into();
         cfg.settings_rev = 5;
+        let _ = save(&cfg);
+    }
+    // rev 6: one surface finish for dock + notch. Derive from the old notchStyle
+    // when the new key is still at its default and the legacy value differs.
+    if cfg.settings_rev < 6 {
+        let mapped = match cfg.notch_style.as_str() {
+            "mica" => "mica",
+            "liquid" => "tinted",
+            "windows" => "solid",
+            "acrylic" | "island" => "acrylic",
+            _ => "acrylic",
+        };
+        cfg.surface_style = mapped.into();
+        cfg.notch_style = match mapped {
+            "mica" => "mica",
+            "tinted" => "liquid",
+            "solid" => "windows",
+            _ => "acrylic",
+        }
+        .into();
+        cfg.settings_rev = 6;
         let _ = save(&cfg);
     }
     cfg

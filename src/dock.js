@@ -34,6 +34,7 @@ import {
   RING_DEFAULTS,
   widgetDisplayName,
 } from "./widgets-meta.js";
+import { applySurfaceClass } from "./surface.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -272,14 +273,11 @@ function applyAll() {
   ["slot-start", "slot-center", "slot-end"].forEach((c) => document.body.classList.remove(c));
   document.body.classList.add(`slot-${slot}`);
   const root = document.documentElement;
-  // The bar's frosted material is CSS-only now (no native vibrancy on the dock
-  // window — that caused the gray box). Map material strength 0–100 → a sensible
-  // alpha range so the bar always reads as a solid-ish frosted panel.
-  // CSS-only glass (no native vibrancy on the transparent dock window). Map the
-  // material strength to a visible translucency range so the bar reads as a
-  // tinted glass panel.
+  // CSS Fluent materials on a transparent window (native DWM vibrancy left a
+  // gray box). Strength 0–100 maps into a visible alpha band per surface.
   const mat = (cfg.materialStrength ?? 70) / 100;
-  root.style.setProperty("--material", String(Math.max(0.3, Math.min(0.92, 0.3 + mat * 0.6))));
+  root.style.setProperty("--material", String(Math.max(0.22, Math.min(0.94, 0.28 + mat * 0.62))));
+  applySurfaceClass(cfg);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }

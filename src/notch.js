@@ -5,7 +5,9 @@
 
 import { config as configApi, invoke, onActiveApp, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
 import { applyAccent } from "./util-color.js";
+import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
+import { applySurfaceClass } from "./surface.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -31,6 +33,7 @@ async function applyLook() {
     const label = t("notch.show");
     pill.title = label;
     pill.setAttribute("aria-label", label);
+    applyTheme(cfg);
     if (cfg.accent) applyAccent(root, cfg.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
@@ -39,11 +42,11 @@ async function applyLook() {
     document.body.classList.toggle("peek", cfg.notchPeek !== false);
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
-    document.body.classList.remove(
-      "style-island", "style-liquid", "style-mica", "style-acrylic", "style-windows"
-    );
-    document.body.classList.add(`style-${cfg.notchStyle || "island"}`);
+    applySurfaceClass(cfg);
+    // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
+    // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+    document.body.style.setProperty("--notch-scale", String(scale));
     document.documentElement.style.setProperty("--notch-scale", String(scale));
   } catch (_) {
     /* keep defaults */
