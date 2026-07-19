@@ -435,12 +435,13 @@ pub fn load() -> Config {
         cfg.settings_rev = 6;
         let _ = save(&cfg);
     }
-    // Heal empty / single-child groups left behind by older builds or partial edits.
-    cfg.pinned = normalize_pinned(cfg.pinned);
-    // Existing setups that lost the onboarded flag (Settings used to overwrite a
-    // stale copy) should not see first-run tips again once they already have pins
-    // or have seen a changelog.
-    if !cfg.onboarded && (!cfg.pinned.is_empty() || !cfg.seen_version.is_empty()) {
+    // Promote 1-child groups; keep empty groups (Settings uses them as staging
+    // for "+ New group"). The dock frontend dissolves empties on its own persist.
+    cfg.pinned = normalize_pinned(cfg.pinned, true);
+    // Existing setups that lost the onboarded flag should skip tips only when
+    // they already have pins — never key off seen_version alone (changelog
+    // stamps that on first boot and would skip onboarding).
+    if !cfg.onboarded && !cfg.pinned.is_empty() {
         cfg.onboarded = true;
         cfg.settings_intro_seen = true;
         let _ = save(&cfg);
@@ -448,8 +449,8 @@ pub fn load() -> Config {
     cfg
 }
 
-/// Dissolve groups with fewer than 2 children (empty → drop, one → promote).
-fn normalize_pinned(pinned: Vec<PinnedApp>) -> Vec<PinnedApp> {
+/// Normalize groups: promote a single leftover child; optionally keep empties.
+fn normalize_pinned(pinned: Vec<PinnedApp>, keep_empty: bool) -> Vec<PinnedApp> {
     let mut out = Vec::with_capacity(pinned.len());
     for p in pinned {
         if p.kind != "group" {
@@ -464,6 +465,11 @@ fn normalize_pinned(pinned: Vec<PinnedApp>) -> Vec<PinnedApp> {
             });
         } else if kids.len() == 1 {
             out.push(kids.remove(0));
+        } else if keep_empty {
+            out.push(PinnedApp {
+                children: Vec::new(),
+                ..p
+            });
         }
     }
     out

@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.58.2",
+    date: "19 jul 2026",
+    headline: "Fullscreen toast estable, onboarding real en instalaci\u00f3n nueva, FAQ al d\u00eda.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Menos carreras",
+        notes: [
+          "El toast de pantalla completa ya no vuelve a ocultar el dock si saliste antes.",
+          "Una sola ruta de blackout (dock); el notch solo pinta el mensaje.",
+          "Tips de primera vez antes del changelog; grupos vac\u00edos de Ajustes no se borran al recargar.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.58.1",
     date: "19 jul 2026",
     headline: "Onboarding que no se repite y toast de pantalla completa sin flash del notch.",
