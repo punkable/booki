@@ -2830,11 +2830,12 @@ function App() {
   const searchResults = useMemo(() => findSettings(query), [query]);
   const [activeSearchResult, setActiveSearchResult] = useState(0);
   const fluentTheme = useMemo(() => buildFluentTheme(cfg?.accent, cfg?.theme), [cfg?.accent, cfg?.theme]);
-  // One-time "start here" banner so a new user knows where to begin.
-  const [introSeen, setIntroSeen] = useState(() => {
-    try { return localStorage.getItem("booki.introSeen") === "1"; } catch (_) { return true; }
-  });
-  const dismissIntro = () => { setIntroSeen(true); try { localStorage.setItem("booki.introSeen", "1"); } catch (_) {} };
+  // One-time "start here" banner — persisted in config (not only localStorage),
+  // so a WebView data wipe / reinstall with kept AppData still remembers it.
+  const dismissIntro = () => {
+    try { localStorage.setItem("booki.introSeen", "1"); } catch (_) {}
+    set({ settingsIntroSeen: true });
+  };
   const saveTimer = useRef(null);
 
   useEffect(() => () => clearTimeout(saveTimer.current), []);
@@ -2867,8 +2868,16 @@ function App() {
   useEffect(() => {
     configApi.get().then(async (c) => {
       await ensureLang(c.language); // load pt/fr/de before first render
-      setCfg(c);
-      applyTheme(c);
+      // Migrate legacy localStorage intro flag into persisted config once.
+      let next = c;
+      try {
+        if (!c.settingsIntroSeen && localStorage.getItem("booki.introSeen") === "1") {
+          next = { ...c, settingsIntroSeen: true };
+          configApi.save(next).catch(() => {});
+        }
+      } catch (_) {}
+      setCfg(next);
+      applyTheme(next);
     });
     dockApi.appVersion().then(setVersion);
   }, []);
@@ -2969,14 +2978,23 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showChangelog]);
 
-  // Reflect changes made from the dock itself (e.g. drag-reorder or creating a
-  // folder) into the Apps list here. We only sync `pinned` so a slider being
-  // dragged in Settings isn't clobbered.
+  // Reflect dock-side changes without clobbering in-progress Settings edits.
+  // Always pull one-way progress flags (onboarding / changelog) so a later
+  // Settings save cannot rewrite them back to false/"".
   useEffect(() => {
     let un;
     onConfigChanged(() => {
       configApi.get().then((c) =>
-        setCfg((prev) => (prev ? { ...prev, pinned: c.pinned } : c))
+        setCfg((prev) => {
+          if (!prev) return c;
+          return {
+            ...prev,
+            pinned: c.pinned,
+            onboarded: prev.onboarded || c.onboarded,
+            settingsIntroSeen: prev.settingsIntroSeen || c.settingsIntroSeen,
+            seenVersion: c.seenVersion || prev.seenVersion,
+          };
+        })
       );
     }).then((u) => (un = u));
     return () => un && un();
@@ -3058,7 +3076,7 @@ function App() {
           </div>
         </aside>
         <main ref={contentRef} className="s-content">
-          {!introSeen && (
+          {!cfg.settingsIntroSeen && !(typeof localStorage !== "undefined" && localStorage.getItem("booki.introSeen") === "1") && (
             <div className="s-intro">
               <span className="s-intro-icon" dangerouslySetInnerHTML={{ __html: icon("info") }} />
               <div className="s-intro-body">

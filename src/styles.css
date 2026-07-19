@@ -1575,7 +1575,15 @@ body.notch-body.toast { padding: 4px; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-body.notch-body.toast .notch-pill { opacity: 0; pointer-events: none; }
+/* Toast replaces the notch entirely — never leave the pill/fillets visible. */
+body.notch-body.toast .notch-pill {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
+  transform: none !important;
+}
+body.notch-body.toast .notch-pill::before,
+body.notch-body.toast .notch-pill::after { display: none !important; }
 body.notch-body.toast .notch-toast {
   display: flex;
   opacity: 1;

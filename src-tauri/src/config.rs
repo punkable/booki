@@ -212,6 +212,9 @@ pub struct Config {
     /// Whether the three first-run tip bubbles were already shown.
     #[serde(default)]
     pub onboarded: bool,
+    /// Whether the Settings "start here" intro banner was dismissed.
+    #[serde(default)]
+    pub settings_intro_seen: bool,
     /// Name of the last dock profile applied/saved (shown with a check mark).
     #[serde(default)]
     pub last_profile: String,
@@ -316,6 +319,7 @@ impl Default for Config {
             settings_rev: 0,
             seen_version: String::new(),
             onboarded: false,
+            settings_intro_seen: false,
             last_profile: String::new(),
             notch_trigger: default_notch_trigger(),
             compact: false,
@@ -433,6 +437,14 @@ pub fn load() -> Config {
     }
     // Heal empty / single-child groups left behind by older builds or partial edits.
     cfg.pinned = normalize_pinned(cfg.pinned);
+    // Existing setups that lost the onboarded flag (Settings used to overwrite a
+    // stale copy) should not see first-run tips again once they already have pins
+    // or have seen a changelog.
+    if !cfg.onboarded && (!cfg.pinned.is_empty() || !cfg.seen_version.is_empty()) {
+        cfg.onboarded = true;
+        cfg.settings_intro_seen = true;
+        let _ = save(&cfg);
+    }
     cfg
 }
 
@@ -466,7 +478,22 @@ pub fn save(config: &Config) -> Result<(), String> {
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // Do not dissolve groups here — Settings may temporarily save an empty
     // staging group ("+ New group"). The dock + load() heal empty/1-child groups.
-    let text = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    //
+    // Preserve one-way progress flags: Settings often holds a stale snapshot and
+    // used to rewrite onboarded/seenVersion back to false/"" on every slider save.
+    let mut to_write = config.clone();
+    if let Some(existing) = read_config(&config_path()) {
+        if existing.onboarded {
+            to_write.onboarded = true;
+        }
+        if existing.settings_intro_seen {
+            to_write.settings_intro_seen = true;
+        }
+        if to_write.seen_version.is_empty() && !existing.seen_version.is_empty() {
+            to_write.seen_version = existing.seen_version;
+        }
+    }
+    let text = serde_json::to_string_pretty(&to_write).map_err(|e| e.to_string())?;
     let final_path = config_path();
     let tmp_path = dir.join("config.json.tmp");
     // Write the temp file and flush it all the way to disk before renaming, so a

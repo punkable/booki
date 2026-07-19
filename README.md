@@ -45,8 +45,9 @@
 ## What's new in 0.58
 
 - **Settings survive uninstall** — reinstalling Booki keeps `%APPDATA%\Booki` unless you check *Delete app data*.
+- **Onboarding stays dismissed** — first-run tips and the Settings intro are persisted; sliders no longer reset them.
+- **Fullscreen toast** — the hide message no longer flashes the bare notch pill underneath.
 - **Clearer groups** — open/switch flyouts, reorder inside the stack, add apps or folders, running dots on group children.
-- **One surface** — Mica / Acrylic / Tinted / Solid for dock and notch together; notch size slider works.
 
 Older notes live in Settings → What's new.
 
