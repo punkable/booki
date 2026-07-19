@@ -1,7 +1,7 @@
 {
   "name": "booki-dock",
   "private": true,
-  "version": "0.55.1",
+  "version": "0.56.0",
   "type": "module",
   "description": "Booki — a smart dock for Windows",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "dev": "vite",
     "build": "vite build",
     "check:text": "node scripts/check-text-encoding.mjs",
+    "check:icons": "node scripts/check-icons.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

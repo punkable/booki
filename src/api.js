@@ -45,6 +45,8 @@ const DEMO_CONFIG = {
   autoHideDelay: 650,
   notchPosition: "center",
   notchPeek: false,
+  notchStyle: "island",
+  notchScale: 1,
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
@@ -93,7 +95,7 @@ async function mockInvoke(cmd, args) {
     case "list_windows":
       return [];
     case "app_version":
-      return "0.55.1";
+      return "0.56.0";
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);

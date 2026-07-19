@@ -25,6 +25,15 @@ import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
+import {
+  WIDGET_ICONS,
+  WIDGET_VARIANTS,
+  STAT_WIDGETS,
+  RING_WIDGETS,
+  PREVIEW_WIDGETS,
+  RING_DEFAULTS,
+  widgetDisplayName,
+} from "./widgets-meta.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -604,38 +613,12 @@ const MEDIA_SVG = {
   play: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M5.1 2.32c-.87-.5-1.95.13-1.95 1.13v9.1c0 1 1.08 1.63 1.95 1.13l7.9-4.55c.87-.5.87-1.76 0-2.26L5.1 2.32Z"/></svg>',
   pause: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M4.1 2.5c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1H4.1Zm6.5 0c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1h-1.3Z"/></svg>',
 };
-// Fluent 3D emoji per widget (bundled — see emoji.js).
-const WIDGET_ICONS = {
-  clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna",
-  uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes",
-  volume: "speaker", clipboard: "clipboard",
-};
-const WIDGET_VARIANTS = ["glass", "solid", "gradient", "outline", "minimal"];
-const STAT_WIDGETS = ["cpu", "ram", "disk", "net", "uptime", "battery"];
-// Percent-based widgets get a circular progress ring instead of a linear bar —
-// reads as a proper gauge (à la Docky/Cooldock) at a glance, and the number
-// lives INSIDE the ring instead of stealing space in the label row.
-const RING_WIDGETS = ["cpu", "ram", "disk", "battery", "volume"];
 const RING_R = 15.5; // SVG viewBox 0 0 36 36
 const RING_C = 2 * Math.PI * RING_R;
-// Content-carrying widgets get a "preview card": a colored icon square, a bold
-// title and a live one-line preview of the actual content — reads like a
-// real Windows widget (notification/media card), not a bare label+number.
-const PREVIEW_WIDGETS = ["notes", "clipboard"];
-// Sensible default ring color per stat, so a freshly-pinned widget already
-// reads at a glance (à la Docky/Cooldock) instead of every ring sharing the
-// same accent — still fully overridable per-widget via its style modal.
-const RING_DEFAULTS = { cpu: "#fb8b24", ram: "#3a86ff", disk: "#8338ec", battery: "#2ecc71", volume: "#06b6d4" };
 const BATTERY_LOW = "#e5484d";
 
 function widgetLabel(type) {
-  return (
-    {
-      clock: t("w.clock"), cpu: "CPU", ram: "RAM", disk: t("w.disk"),
-      net: t("w.net"), uptime: t("w.uptime"), battery: t("w.battery"), notes: t("w.notes"),
-      media: t("w.media"), volume: t("w.volume"), clipboard: t("w.clipboard"),
-    }[type] || type
-  );
+  return widgetDisplayName(type, t);
 }
 
 function widgetTile(item, { inFlyout = false } = {}) {
@@ -3948,6 +3931,7 @@ async function renderClipboardList(grid, foot) {
   items.forEach((entry, i) => {
     const row = document.createElement("div");
     row.className = "clip-row" + (entry.favorite ? " favorite" : "") + (entry.private ? " private" : "");
+    row.tabIndex = 0;
     row.style.setProperty("--i", Math.min(i, 6));
     const text = document.createElement("div");
     text.className = "clip-text";

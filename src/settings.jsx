@@ -51,6 +51,12 @@ import {
   Search24Regular,
 } from "@fluentui/react-icons";
 import { buildFluentTheme } from "./fluent-theme.js";
+import {
+  WIDGET_ORDER,
+  WIDGET_META,
+  WIDGET_ICONS,
+  widgetDisplayName as widgetDisplayNameShared,
+} from "./widgets-meta.js";
 
 const CHANGELOG_ICONS = {
   search: Search24Regular,
@@ -218,9 +224,12 @@ const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
   ["ap.look", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
-  ["ap.translucency", "appearance"], ["ap.language", "general"], ["ap.backup", "general"],
+  ["ap.translucency", "appearance"],
+  ["be.notchStyle", "appearance"], ["ap.notchSize", "appearance"], ["be.notchPeek", "appearance"],
+  ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
-  ["be.notchPeek", "behavior"], ["be.reveal", "behavior"], ["prof.title", "behavior"],
+  ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
+  ["be.multiNotch", "behavior"],
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
@@ -304,37 +313,8 @@ const TABS = [
   ["about", "tab.about", "info"],
 ];
 
-const WIDGET_ORDER = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume", "clipboard"];
-const WIDGET_META = {
-  clock: { emoji: "clock", accent: "#dfaa75", desc: "widget.clockDesc", caps: ["widget.cap.live", "widget.cap.clean"] },
-  cpu: { emoji: "brain", accent: "#fb8b24", desc: "widget.cpuDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
-  ram: { emoji: "ice", accent: "#3a86ff", desc: "widget.ramDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
-  disk: { emoji: "floppy", accent: "#8338ec", desc: "widget.diskDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
-  net: { emoji: "antenna", accent: "#06b6d4", desc: "widget.netDesc", caps: ["widget.cap.live", "widget.cap.compact"] },
-  uptime: { emoji: "stopwatch", accent: "#2bb673", desc: "widget.uptimeDesc", caps: ["widget.cap.live", "widget.cap.clean"] },
-  battery: { emoji: "battery", accent: "#2ecc71", desc: "widget.batteryDesc", caps: ["widget.cap.live", "widget.cap.warning"] },
-  notes: { emoji: "memo", accent: "#ffbe0b", desc: "widget.notesDesc", caps: ["widget.cap.editable", "widget.cap.preview"] },
-  media: { emoji: "notes", accent: "#ff006e", desc: "widget.mediaDesc", caps: ["widget.cap.controls", "widget.cap.smart"] },
-  volume: { emoji: "speaker", accent: "#06b6d4", desc: "widget.volumeDesc", caps: ["widget.cap.scroll", "widget.cap.ring"] },
-  clipboard: { emoji: "clipboard", accent: "#7c3aed", desc: "widget.clipboardDesc", caps: ["widget.cap.private", "widget.cap.search"] },
-};
-
 function widgetDisplayName(widget) {
-  return (
-    {
-      clock: t("w.clock"),
-      cpu: "CPU",
-      ram: "RAM",
-      disk: t("w.disk"),
-      net: t("w.net"),
-      uptime: t("w.uptime"),
-      battery: t("w.battery"),
-      notes: t("w.notes"),
-      media: t("w.media"),
-      volume: t("w.volume"),
-      clipboard: t("w.clipboard"),
-    }[widget] || widget
-  );
+  return widgetDisplayNameShared(widget, t);
 }
 
 function widgetRefs(pinned, widget) {
@@ -1207,7 +1187,7 @@ function PinThumb({ item }) {
   );
 }
 
-const WIDGET_EMOJI = { clock: "clock", cpu: "brain", ram: "ice", disk: "floppy", net: "antenna", uptime: "stopwatch", battery: "battery", notes: "memo", media: "notes", volume: "speaker", clipboard: "clipboard" };
+const WIDGET_EMOJI = WIDGET_ICONS;
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -1243,120 +1223,138 @@ function HotkeyInput({ value, onChange }) {
 // ── Panels ──
 
 function Appearance({ cfg, set }) {
+  const notchScalePct = Math.round((Number(cfg.notchScale) || 1) * 100);
   return (
     <>
       <PageHeader icon="palette" title={t("ap.title")} />
       <MiniDockPreview cfg={cfg} />
 
       <SettingsSection title={t("gp.theme")} icon="palette">
-      <Row label={t("ap.theme")}>
-        <SegmentedControl
-          value={cfg.theme || "system"}
-          onChange={(v) => set({ theme: v })}
-          options={[
-            { value: "system", label: t("theme.system") },
-            { value: "light", label: t("theme.light"), icon: icon("sun") },
-            { value: "dark", label: t("theme.dark"), icon: icon("moon") },
-            { value: "auto", label: t("theme.auto"), icon: icon("clock") },
-          ]}
+        <Row label={t("ap.theme")}>
+          <SegmentedControl
+            value={cfg.theme || "system"}
+            onChange={(v) => set({ theme: v })}
+            options={[
+              { value: "system", label: t("theme.system") },
+              { value: "light", label: t("theme.light"), icon: icon("sun") },
+              { value: "dark", label: t("theme.dark"), icon: icon("moon") },
+              { value: "auto", label: t("theme.auto"), icon: icon("clock") },
+            ]}
+          />
+        </Row>
+        <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
+          <AccentPickerEnhanced value={cfg.accent} onChange={(v) => set({ accent: v })} />
+        </Row>
+        <Row label={t("ap.presets")} hint={t("ap.presetsHint")}>
+          <div className="preset-row">
+            {THEME_PRESETS.map((p) => {
+              const active =
+                (cfg.accent || "").toLowerCase() === p.accent.toLowerCase() &&
+                (cfg.theme || "system") === p.theme;
+              return (
+                <button
+                  key={p.name}
+                  type="button"
+                  className={"preset-chip" + (active ? " active" : "")}
+                  title={`${p.name} - ${t(`theme.${p.theme}`)}`}
+                  style={{ "--preset": p.accent }}
+                  onClick={() => set({ accent: p.accent, theme: p.theme })}
+                >
+                  <span className="preset-preview">
+                    <span className="preset-bar" />
+                    <span className="preset-tile" />
+                    <span className="preset-tile small" />
+                  </span>
+                  <span className="preset-copy">
+                    <strong>{p.name}</strong>
+                    <small>{t(`theme.${p.theme}`)}</small>
+                  </span>
+                  <span className="preset-dot" data-theme={p.theme} />
+                </button>
+              );
+            })}
+          </div>
+        </Row>
+        <Row label={t("ap.look")} hint={t("ap.lookHint")}>
+          <div className="preset-row look-presets">
+            {LOOK_PRESETS.map((p) => {
+              const active = lookPresetActive(cfg, p.patch);
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={"preset-chip look-chip" + (active ? " active" : "")}
+                  title={t(p.hintKey)}
+                  style={{ "--preset": cfg.accent || "#dfaa75" }}
+                  onClick={() => {
+                    set({ ...p.patch });
+                    if (typeof p.patch.materialStrength === "number") {
+                      dockApi.setMaterial(p.patch.materialStrength);
+                    }
+                  }}
+                >
+                  <span className="preset-preview">
+                    <span className="preset-bar" />
+                    <span className="preset-tile" />
+                    <span className="preset-tile small" />
+                  </span>
+                  <span className="preset-copy">
+                    <strong>{t(p.nameKey)}</strong>
+                    <small>{t(p.hintKey)}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Row>
+      </SettingsSection>
+
+      <SettingsSection title={t("gp.dockLook")} icon="app">
+        <Row label={t("ap.iconSize")}>
+          <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
+            onChange={(v) => set({ iconSize: v })} />
+        </Row>
+        <Row label={t("ap.spacing")}>
+          <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
+            onChange={(v) => set({ spacing: v })} />
+        </Row>
+        <Row label={t("ap.radius")} hint={t("ap.radiusHint")}>
+          <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
+            onChange={(v) => set({ cornerRadius: v })} />
+        </Row>
+        <Toggle label={t("ap.compact")} checked={!!cfg.compact}
+          onChange={(v) => set({ compact: v })} />
+        <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
+          <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
+            fmt={(v) => `${v}%`}
+            onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
+        </Row>
+      </SettingsSection>
+
+      <SettingsSection title={t("gp.notchLook")} icon="eye">
+        <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
+          <NotchStylePicker cfg={cfg} set={set} />
+        </Row>
+        <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
+          <Slider
+            value={notchScalePct}
+            min={70}
+            max={150}
+            step={5}
+            fmt={(v) => `${v}%`}
+            onChange={(v) => {
+              set({ notchScale: v / 100 });
+              dockApi.notchPreview();
+            }}
+          />
+        </Row>
+        <Toggle
+          label={t("be.notchPeek")}
+          hint={t("be.notchPeekHint")}
+          checked={cfg.notchPeek !== false}
+          onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }}
         />
-      </Row>
-      <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
-        <AccentPickerEnhanced value={cfg.accent} onChange={(v) => set({ accent: v })} />
-      </Row>
-      <Row label={t("ap.presets")} hint={t("ap.presetsHint")}>
-        <div className="preset-row">
-          {THEME_PRESETS.map((p) => {
-            const active =
-              (cfg.accent || "").toLowerCase() === p.accent.toLowerCase() &&
-              (cfg.theme || "system") === p.theme;
-            return (
-              <button
-                key={p.name}
-                type="button"
-                className={"preset-chip" + (active ? " active" : "")}
-                title={`${p.name} - ${t(`theme.${p.theme}`)}`}
-                style={{ "--preset": p.accent }}
-                onClick={() => set({ accent: p.accent, theme: p.theme })}
-              >
-                <span className="preset-preview">
-                  <span className="preset-bar" />
-                  <span className="preset-tile" />
-                  <span className="preset-tile small" />
-                </span>
-                <span className="preset-copy">
-                  <strong>{p.name}</strong>
-                  <small>{t(`theme.${p.theme}`)}</small>
-                </span>
-                <span className="preset-dot" data-theme={p.theme} />
-              </button>
-            );
-          })}
-        </div>
-      </Row>
-      <Row label={t("ap.look")} hint={t("ap.lookHint")}>
-        <div className="preset-row look-presets">
-          {LOOK_PRESETS.map((p) => {
-            const active = lookPresetActive(cfg, p.patch);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                className={"preset-chip look-chip" + (active ? " active" : "")}
-                title={t(p.hintKey)}
-                style={{ "--preset": cfg.accent || "#dfaa75" }}
-                onClick={() => {
-                  set({ ...p.patch });
-                  if (typeof p.patch.materialStrength === "number") {
-                    dockApi.setMaterial(p.patch.materialStrength);
-                  }
-                }}
-              >
-                <span className="preset-preview">
-                  <span className="preset-bar" />
-                  <span className="preset-tile" />
-                  <span className="preset-tile small" />
-                </span>
-                <span className="preset-copy">
-                  <strong>{t(p.nameKey)}</strong>
-                  <small>{t(p.hintKey)}</small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </Row>
       </SettingsSection>
-
-      <SettingsSection title={t("gp.icons")} icon="grid">
-      <Row label={t("ap.iconSize")}>
-        <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
-          onChange={(v) => set({ iconSize: v })} />
-      </Row>
-      <Row label={t("ap.spacing")}>
-        <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
-          onChange={(v) => set({ spacing: v })} />
-      </Row>
-      <Row label={t("ap.radius")} hint={t("ap.radiusHint")}>
-        <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
-          onChange={(v) => set({ cornerRadius: v })} />
-      </Row>
-      <Toggle label={t("ap.compact")} checked={!!cfg.compact}
-        onChange={(v) => set({ compact: v })} />
-      </SettingsSection>
-
-      <SettingsSection title={t("gp.material")} icon="sliders">
-      <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
-        <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
-          fmt={(v) => `${v}%`}
-          onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
-      </Row>
-
-      <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
-        <NotchStylePicker cfg={cfg} set={set} />
-      </Row>
-      </SettingsSection>
-
     </>
   );
 }
@@ -1371,88 +1369,91 @@ function Behavior({ cfg, set }) {
       <PageHeader icon="settings" title={t("be.title")} />
 
       <SettingsSection title={t("gp.dock")} icon="app">
-      <Row label={t("be.position")} hint={t("be.positionHint")}>
-        <PositionPicker cfg={cfg} set={set} />
-      </Row>
-      <Row label={t("be.monitor")}>
-        <MonitorPicker value={cfg.monitor} monitors={monitors}
-          onChange={(v) => set({ monitor: v })} />
-      </Row>
-      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-        <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
-          fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
-      </Row>
-      <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
-        checked={cfg.alwaysOnTop !== false}
-        onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
+        <Row label={t("be.position")} hint={t("be.positionHint")}>
+          <PositionPicker cfg={cfg} set={set} />
+        </Row>
+        <Row label={t("be.monitor")}>
+          <MonitorPicker value={cfg.monitor} monitors={monitors}
+            onChange={(v) => set({ monitor: v })} />
+        </Row>
+        <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+          <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
+            fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
+        </Row>
+        <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
+          checked={cfg.alwaysOnTop !== false}
+          onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
+        <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
+          <SegmentedControl
+            value={cfg.autoHideMode || "smart"}
+            onChange={(v) => set({ autoHideMode: v })}
+            options={[
+              { value: "off", label: t("hide.offShort") },
+              { value: "smart", label: t("hide.smartShort") },
+              { value: "edge", label: t("hide.edgeShort") },
+            ]}
+          />
+        </Row>
+        {cfg.autoHideMode !== "off" && (
+          <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
+            <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
+              fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`}
+              onChange={(v) => set({ autoHideDelay: v })} />
+          </Row>
+        )}
       </SettingsSection>
 
       <SettingsSection title={t("gp.notch")} icon="eye">
-      <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
-        <SegmentedControl
-          value={cfg.autoHideMode || "smart"}
-          onChange={(v) => set({ autoHideMode: v })}
-          options={[
-            { value: "off", label: t("hide.offShort") },
-            { value: "smart", label: t("hide.smartShort") },
-            { value: "edge", label: t("hide.edgeShort") },
-          ]}
-        />
-      </Row>
-      {cfg.autoHideMode !== "off" && (
-        <>
-          <Toggle label={t("be.notchPeek")} checked={cfg.notchPeek !== false}
-            onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }} />
-          <Toggle label={t("be.notchAlwaysVisible")} hint={t("be.notchAlwaysVisibleHint")}
-            checked={!!cfg.notchAlwaysVisible}
-            onChange={(v) => set({ notchAlwaysVisible: v })} />
-          <Row label={t("be.reveal")} hint={t("be.revealHint")}>
-            <SegmentedControl
-              value={cfg.notchTrigger || "click"}
-              onChange={(v) => set({ notchTrigger: v })}
-              options={[
-                { value: "click", label: t("be.revealClick") },
-                { value: "hover", label: t("be.revealHover") },
-              ]}
-            />
-          </Row>
-          <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
-            <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
-              fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`} onChange={(v) => set({ autoHideDelay: v })} />
-          </Row>
-        </>
-      )}
+        {cfg.autoHideMode !== "off" ? (
+          <>
+            <Row label={t("be.reveal")} hint={t("be.revealHint")}>
+              <SegmentedControl
+                value={cfg.notchTrigger || "click"}
+                onChange={(v) => set({ notchTrigger: v })}
+                options={[
+                  { value: "click", label: t("be.revealClick") },
+                  { value: "hover", label: t("be.revealHover") },
+                ]}
+              />
+            </Row>
+            <Toggle label={t("be.notchAlwaysVisible")} hint={t("be.notchAlwaysVisibleHint")}
+              checked={!!cfg.notchAlwaysVisible}
+              onChange={(v) => set({ notchAlwaysVisible: v })} />
+          </>
+        ) : (
+          <p className="muted">{t("be.notchNeedsHide")}</p>
+        )}
       </SettingsSection>
 
       <MultiNotchSection cfg={cfg} set={set} />
 
-      <SettingsSection title={t("gp.icons")} icon="grid">
-      <Row label={t("be.anim")}>
-        <SegmentedControl
-          value={cfg.magnifyStyle || "spring"}
-          onChange={(v) => set({ magnifyStyle: v })}
-          options={[
-            { value: "spring", label: t("anim.springShort") },
-            { value: "smooth", label: t("anim.smoothShort") },
-            { value: "off", label: t("anim.offShort") },
-          ]}
-        />
-      </Row>
-      <Toggle label={t("be.magnify")} checked={cfg.magnification}
-        onChange={(v) => set({ magnification: v })} />
-      {cfg.magnification && (
-        <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
-          <Slider value={Math.min(150, Math.max(110, Math.round((cfg.zoom || 1.25) * 100)))}
-            min={110} max={150} step={5}
-            fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
+      <SettingsSection title={t("gp.interaction")} icon="sparkles">
+        <Row label={t("be.anim")}>
+          <SegmentedControl
+            value={cfg.magnifyStyle || "spring"}
+            onChange={(v) => set({ magnifyStyle: v })}
+            options={[
+              { value: "spring", label: t("anim.springShort") },
+              { value: "smooth", label: t("anim.smoothShort") },
+              { value: "off", label: t("anim.offShort") },
+            ]}
+          />
         </Row>
-      )}
-      <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
-        onChange={(v) => set({ showLabels: v })} />
-      <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
-        onChange={(v) => set({ showIndicators: v })} />
-      <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
-        checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
+        <Toggle label={t("be.magnify")} checked={cfg.magnification}
+          onChange={(v) => set({ magnification: v })} />
+        {cfg.magnification && (
+          <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
+            <Slider value={Math.min(150, Math.max(110, Math.round((cfg.zoom || 1.25) * 100)))}
+              min={110} max={150} step={5}
+              fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
+          </Row>
+        )}
+        <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
+          onChange={(v) => set({ showLabels: v })} />
+        <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
+          onChange={(v) => set({ showIndicators: v })} />
+        <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
+          checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
       </SettingsSection>
 
       <ProfilesCard cfg={cfg} set={set} />
@@ -1768,12 +1769,37 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
   );
 }
 
+/** Coalesce pointer moves to one RAF tick; return detach(). */
+function bindRafMove(onFrame) {
+  let raf = 0;
+  let last = null;
+  const onMove = (ev) => {
+    last = ev;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (last) onFrame(last);
+    });
+  };
+  const detach = () => {
+    cancelAnimationFrame(raf);
+    raf = 0;
+    window.removeEventListener("pointermove", onMove);
+  };
+  window.addEventListener("pointermove", onMove);
+  return { onMove, detach };
+}
+
 function Apps({ cfg, set }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const kidMenuRef = useRef(null);
+  // During a drag we mutate a local draft and only persist on pointerup —
+  // avoids config saves / Settings reloads on every pointer frame.
+  const [draftPinned, setDraftPinned] = useState(null);
   const pinnedRef = useRef(cfg.pinned);
-  pinnedRef.current = cfg.pinned;
+  pinnedRef.current = draftPinned || cfg.pinned;
+  const displayPinned = draftPinned || cfg.pinned;
   const drag = useRef(null);
   const childDrag = useRef(null);
   const mergeRef = useRef(-1);
@@ -1839,11 +1865,11 @@ function Apps({ cfg, set }) {
     drag.current = { from: i };
     mergeRef.current = -1;
     setMergeInto(-1);
-    const onMove = (ev) => {
-      // Only top-level rows map 1:1 to cfg.pinned (folder children aren't draggable).
+    setDraftPinned([...pinnedRef.current]);
+    const { detach } = bindRafMove((ev) => {
+      if (!listRef.current || !drag.current) return;
       const lis = [...listRef.current.querySelectorAll(".pin-item:not(.pin-child)")];
       const from = drag.current.from;
-      // Dropping onto the CENTER of another app/group row → make a folder.
       let over = -1;
       for (let k = 0; k < lis.length; k++) {
         const r = lis[k].getBoundingClientRect();
@@ -1855,14 +1881,13 @@ function Apps({ cfg, set }) {
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
         const mergeable = (k) => k === "app" || k === "widget";
-        const canMerge = mergeable(dragged.kind) && (mergeable(target.kind) || target.kind === "group");
+        const canMerge = mergeable(dragged?.kind) && (mergeable(target?.kind) || target?.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
-          return; // aiming to merge → don't reorder
+          return;
         }
       }
       if (mergeRef.current !== -1) { mergeRef.current = -1; setMergeInto(-1); }
-      // Reorder.
       let to = lis.findIndex((li) => {
         const r = li.getBoundingClientRect();
         return ev.clientY < r.top + r.height / 2;
@@ -1873,26 +1898,45 @@ function Apps({ cfg, set }) {
         const [m] = p.splice(from, 1);
         p.splice(to, 0, m);
         drag.current.from = to;
-        set({ pinned: p });
+        setDraftPinned(p);
       }
-    };
+    });
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
+      detach();
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       const m = mergeRef.current;
-      if (m >= 0 && m !== drag.current.from) doMerge(drag.current.from, m);
+      const from = drag.current?.from;
+      let next = pinnedRef.current;
+      if (m >= 0 && from != null && m !== from) {
+        const arr = [...next];
+        const dragged = arr[from];
+        const target = arr[m];
+        if (dragged && target) {
+          const merged =
+            target.kind === "group"
+              ? { ...target, children: [...(target.children || []), dragged] }
+              : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
+          next = arr.map((p, k) => (k === m ? merged : p)).filter((_, k) => k !== from);
+        }
+      }
+      set({ pinned: next });
+      setDraftPinned(null);
       mergeRef.current = -1;
       setMergeInto(-1);
       drag.current = null;
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
   // Drag a folder's child up/down to reorder it within that folder.
   const startDragChild = (gi, ci) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     childDrag.current = { gi, from: ci };
-    const onMove = (ev) => {
+    setDraftPinned([...pinnedRef.current]);
+    const { detach } = bindRafMove((ev) => {
+      if (!listRef.current || !childDrag.current) return;
       const rows = [...listRef.current.querySelectorAll(`.pin-child-item[data-folder="${gi}"]`)];
       let to = rows.findIndex((r) => {
         const b = r.getBoundingClientRect();
@@ -1905,15 +1949,19 @@ function Apps({ cfg, set }) {
         const [m] = kids.splice(from, 1);
         kids.splice(to, 0, m);
         childDrag.current.from = to;
-        set({ pinned: pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: kids } : p)) });
+        setDraftPinned(pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: kids } : p)));
       }
-    };
+    });
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
+      detach();
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      set({ pinned: pinnedRef.current });
+      setDraftPinned(null);
       childDrag.current = null;
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
   // Grid version of the drag: same reorder + drop-onto-center-to-group logic,
   // but hit-tested in 2D (cards wrap onto multiple rows).
@@ -1922,7 +1970,9 @@ function Apps({ cfg, set }) {
     drag.current = { from: i };
     mergeRef.current = -1;
     setMergeInto(-1);
-    const onMove = (ev) => {
+    setDraftPinned([...pinnedRef.current]);
+    const { detach } = bindRafMove((ev) => {
+      if (!gridRef.current || !drag.current) return;
       const cards = [...gridRef.current.querySelectorAll(".pin-card")];
       const from = drag.current.from;
       let over = -1;
@@ -1938,7 +1988,7 @@ function Apps({ cfg, set }) {
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
         const mergeable = (k) => k === "app" || k === "widget";
-        const canMerge = mergeable(dragged.kind) && (mergeable(target.kind) || target.kind === "group");
+        const canMerge = mergeable(dragged?.kind) && (mergeable(target?.kind) || target?.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
           return;
@@ -1950,19 +2000,36 @@ function Apps({ cfg, set }) {
         const [m] = p.splice(from, 1);
         p.splice(over, 0, m);
         drag.current.from = over;
-        set({ pinned: p });
+        setDraftPinned(p);
       }
-    };
+    });
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
+      detach();
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       const m = mergeRef.current;
-      if (m >= 0 && m !== drag.current.from) doMerge(drag.current.from, m);
+      const from = drag.current?.from;
+      let next = pinnedRef.current;
+      if (m >= 0 && from != null && m !== from) {
+        const arr = [...next];
+        const dragged = arr[from];
+        const target = arr[m];
+        if (dragged && target) {
+          const merged =
+            target.kind === "group"
+              ? { ...target, children: [...(target.children || []), dragged] }
+              : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
+          next = arr.map((p, k) => (k === m ? merged : p)).filter((_, k) => k !== from);
+        }
+      }
+      set({ pinned: next });
+      setDraftPinned(null);
       mergeRef.current = -1;
       setMergeInto(-1);
       drag.current = null;
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
   const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
   const clearAll = () => { set({ pinned: [] }); setClearArm(false); };
@@ -2255,9 +2322,9 @@ function Apps({ cfg, set }) {
           <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
         </div>
       )}
-      {view === "grid" && cfg.pinned.length > 0 ? (
+      {view === "grid" && displayPinned.length > 0 ? (
         <div className="pin-grid" ref={gridRef}>
-          {cfg.pinned.map((item, i) => {
+          {displayPinned.map((item, i) => {
             const isGroup = item.kind === "group";
             const open = isGroup && openIds[item.id];
             return (
@@ -2322,13 +2389,13 @@ function Apps({ cfg, set }) {
         </div>
       ) : (
       <ul className="pin-list" ref={listRef}>
-        {cfg.pinned.length === 0 && (
+        {displayPinned.length === 0 && (
           <li className="pin-empty">
             <img className="empty-capy" src="/brand/svg/isotype.svg" alt="" />
             {t("apps.empty")}
           </li>
         )}
-        {cfg.pinned.flatMap((item, i) => {
+        {displayPinned.flatMap((item, i) => {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
           const rows = [
