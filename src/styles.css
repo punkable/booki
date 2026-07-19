@@ -119,10 +119,14 @@ input:focus-visible,
   --weight-semibold: 600;
   --weight-bold: 700;
 
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.4, 0.5, 1);
-  --motion-fast: 120ms;
+  /* Strong ease-out (Emil / Apple): instant feedback, soft settle. */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.25, 0.5, 1);
+  --motion-fast: 110ms;
   --motion-med: 180ms;
+  --motion-press: 100ms;
   --surface-raised: color-mix(in srgb, var(--layer-strong) 74%, transparent);
 }
 
@@ -224,6 +228,13 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
 
 .dock {
   --gap: 6px;
+  --surf-blur: 28px;
+  --surf-sat: 140%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
+  --surf-stroke: color-mix(in srgb, var(--stroke-light) 55%, transparent);
+  --surf-inset-top: rgba(255, 255, 255, 0.22);
+  --surf-inset-bot: rgba(0, 0, 0, 0.05);
+  --surf-sheen: 0.55;
   position: relative;
   display: flex;
   gap: var(--gap);
@@ -231,27 +242,27 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
   margin: 0;
   list-style: none;
   overflow: visible;
-  /* The dock surface is a custom CSS acrylic painted on a transparent window:
-     a backdrop blur + a tint whose opacity follows --material (the translucency
-     slider), with a fully tunable corner radius (--dock-r). No native Mica, so
-     the OUTER corner rounds exactly as the slider says — no fixed system corner. */
-  background: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(175%);
-  backdrop-filter: blur(24px) saturate(175%);
-  border: 1px solid color-mix(in srgb, var(--stroke-light) 70%, transparent);
+  /* Fluent-like materials via CSS (native DWM vibrancy on a transparent stage
+     window paints a gray box). body.surface-* overrides the tokens below. */
+  background: var(--surf-fill);
+  -webkit-backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
+  backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
+  border: 1px solid var(--surf-stroke);
   border-radius: var(--dock-r);
-  /* Shadow is cast AWAY from the anchored screen edge (--sh-x/--sh-y), so a
-     top/side dock throws its depth in the natural direction, not always down.
-     Kept small (offset 6 + blur 18 = 24px < the 36px shadow pad) so it never
-     gets clipped by the window's transparent margin. */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
-    var(--sh-x, 0) var(--sh-y, 6px) 18px color-mix(in srgb, #000 28%, transparent);
-  transition: transform 0.24s var(--ease), opacity 0.24s ease, background 0.18s ease;
+    inset 0 1px 0 var(--surf-inset-top),
+    inset 0 -1px 0 var(--surf-inset-bot),
+    var(--sh-x, 0) var(--sh-y, 5px) 16px color-mix(in srgb, #000 22%, transparent);
+  transition:
+    transform 0.22s var(--ease),
+    opacity 0.2s ease,
+    background 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    backdrop-filter 0.22s ease;
   isolation: isolate;
 }
-/* Soft shelf sheen — reads as glass catching light, not a fake reflection strip. */
+/* Soft top sheen — subdued so materials read as Windows glass, not neon. */
 .dock::before {
   content: "";
   position: absolute;
@@ -259,12 +270,69 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 42%),
-    radial-gradient(90% 140% at 50% 0%, rgba(255, 255, 255, 0.14), transparent 58%);
-  opacity: 0.7;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 48%);
+  opacity: var(--surf-sheen);
 }
 .dock > * { position: relative; z-index: 1; }
+
+/* ── Unified surface materials (dock + notch share these body classes) ── */
+body.surface-mica .dock {
+  --surf-blur: 20px;
+  --surf-sat: 110%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(72% + var(--material) * 22%), transparent);
+  --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
+  --surf-inset-top: rgba(255, 255, 255, 0.14);
+  --surf-inset-bot: rgba(0, 0, 0, 0.04);
+  --surf-sheen: 0.28;
+}
+body.surface-acrylic .dock {
+  --surf-blur: 36px;
+  --surf-sat: 165%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 88%), transparent);
+  --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
+  --surf-inset-top: rgba(255, 255, 255, 0.26);
+  --surf-sheen: 0.62;
+}
+body.surface-tinted .dock {
+  --surf-blur: 32px;
+  --surf-sat: 180%;
+  --surf-fill: color-mix(
+    in srgb,
+    var(--accent) calc(18% + var(--material) * 22%),
+    color-mix(in srgb, var(--surface-tint) calc(var(--material) * 70%), transparent)
+  );
+  --surf-stroke: color-mix(in srgb, var(--accent) 28%, var(--stroke-light));
+  --surf-inset-top: color-mix(in srgb, #fff 55%, var(--accent));
+  --surf-sheen: 0.48;
+}
+body.surface-solid .dock {
+  --surf-blur: 0px;
+  --surf-sat: 100%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
+  --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
+  --surf-inset-top: rgba(255, 255, 255, 0.1);
+  --surf-inset-bot: rgba(0, 0, 0, 0.08);
+  --surf-sheen: 0.12;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-theme="dark"] body.surface-mica .dock,
+html[data-theme="dark"] body.surface-solid .dock {
+  --surf-fill: color-mix(in srgb, #2b2b2f calc(78% + var(--material) * 16%), transparent);
+}
+html[data-theme="dark"] body.surface-acrylic .dock {
+  --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material) * 78%), transparent);
+}
+html[data-theme="dark"] body.surface-tinted .dock {
+  --surf-fill: color-mix(
+    in srgb,
+    var(--accent) calc(22% + var(--material) * 18%),
+    color-mix(in srgb, #1a1a1e calc(var(--material) * 72%), transparent)
+  );
+}
+html[data-theme="dark"] body.surface-solid .dock {
+  --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
+}
 body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
 body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
 body.edge-left .dock { --sh-x: -6px; --sh-y: 0; }
@@ -320,7 +388,8 @@ body.compact .w-card { padding: 4px 8px; gap: 6px; }
 body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
 /* Reveal is ease-out and quick: the dock appears instantly and decelerates
    into place — it shows dozens of times a day, so it must never crawl. */
-body.autohide .dock { transition: transform 0.22s var(--ease), opacity 0.22s ease, filter 0.22s ease; }
+/* Hide/show runs often — keep it crisp and under ~220ms (Emil frequency rule). */
+body.autohide .dock { transition: transform 0.2s var(--ease-out), opacity 0.18s var(--ease-out), filter 0.18s var(--ease-out); }
 body.autohide.tucked.genie-bottom .dock {
   transform-origin: var(--genie-ox, 50%) 100%;
   transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
@@ -1208,7 +1277,8 @@ body.edge-left .tile.widget.media .w-ctl svg, body.edge-right .tile.widget.media
 /* Its own tiny window shown when the dock is tucked away; clicking it brings the
    dock back. A real window → the click target and repaint are rock-solid. */
 body.notch-body {
-  --notch-scale: 1;
+  /* --notch-scale is set inline by notch.js (never hardcode it here — that
+     previously shadowed the Settings slider and made size changes invisible). */
   margin: 0;
   background: transparent;
   overflow: hidden;
@@ -1216,7 +1286,7 @@ body.notch-body {
   align-items: flex-end;
   justify-content: center;
   height: 100vh;
-  padding: calc(4px * var(--notch-scale));
+  padding: calc(4px * var(--notch-scale, 1));
   /* The OS window is sized bigger than the visible pill on purpose (room for
      the hover-grow animation and the taskbar overlap in peek style) — but
      that means real empty space surrounds it. Without this, a click in that
@@ -1229,43 +1299,46 @@ body.notch-body {
 body.notch-body.vertical { align-items: center; }
 .notch-pill { pointer-events: auto; }
 .notch-pill {
-  --glass: color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.82));
+  /* Tokens mirror the dock surface so collapsed ↔ expanded feel like one object. */
+  --glass: color-mix(in srgb, var(--surface-tint) 70%, rgba(20, 20, 24, 0.88));
+  --pill-stroke: rgba(255, 255, 255, 0.18);
+  --pill-inset: rgba(255, 255, 255, 0.2);
+  --pill-blur: 20px;
   position: relative;
   flex: 0 0 auto;
-  width: calc(118px * var(--notch-scale));
-  height: calc(13px * var(--notch-scale));
+  width: calc(118px * var(--notch-scale, 1));
+  height: calc(13px * var(--notch-scale, 1));
   padding: 0;
   cursor: pointer;
   border-radius: 999px;
-  /* Compact Mica/glass capsule: tint, hairline border and inner sheen. */
   background:
-    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 58%),
-    color-mix(in srgb, var(--accent) 16%, rgba(15, 15, 20, 0.80));
-  border: 1px solid rgba(255, 255, 255, 0.20);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 55%),
+    var(--glass);
+  -webkit-backdrop-filter: blur(var(--pill-blur)) saturate(140%);
+  backdrop-filter: blur(var(--pill-blur)) saturate(140%);
+  border: 1px solid var(--pill-stroke);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
-  /* Hover growth rides the compositor: `scale` instead of width/height, so
-     the constantly-hovered pill never re-layouts. Ratios per variant below. */
-  --pill-gx: 1.24;
-  --pill-gy: 1.38;
-  /* No pulsing animation — a steady pill (no blinking).
-     Width/height/border-radius animate fluidly for the multi-notch
-     wide ↔ dot transformation, while hover still uses cheap scale. */
+    inset 0 1px 0 var(--pill-inset),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.28);
+  /* Hover growth rides the compositor: `scale` instead of width/height. */
+  --pill-gx: 1.2;
+  --pill-gy: 1.32;
   transition:
-    width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-    height 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-    border-radius 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-    scale 0.2s var(--ease),
-    background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-  /* Enter animation when the notch window appears: scale up from the dock's
-     collapsed state so the hand-off from dock feels like a transformation. */
+    width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    scale 0.18s var(--ease),
+    background 0.22s ease,
+    box-shadow 0.22s ease,
+    opacity 0.2s ease,
+    border-color 0.22s ease;
 }
 .notch-pill.notch-enter {
-  animation: notch-enter 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: notch-enter 0.22s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
 }
 @keyframes notch-enter {
-  from { opacity: 0; transform: scale(0.50); }
+  /* Never scale(0) — real objects keep volume (Emil). */
+  from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1273,22 +1346,17 @@ body.notch-body.vertical { align-items: center; }
 }
 .notch-pill:hover {
   scale: var(--pill-gx) var(--pill-gy);
-  background:
-    radial-gradient(130% 200% at 50% -50%, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0) 58%),
-    color-mix(in srgb, var(--accent) 30%, rgba(15, 15, 20, 0.78));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+  filter: brightness(1.06);
 }
 .notch-pill:active { cursor: grabbing; scale: 1 0.88; }
 .notch-pill:hover:active { scale: var(--pill-gx) calc(var(--pill-gy) * 0.88); }
 body.notch-body.vertical .notch-pill:active { scale: 0.88 1; }
 body.notch-body.vertical .notch-pill:hover:active { scale: calc(var(--pill-gx) * 0.88) var(--pill-gy); }
 body.notch-body.vertical .notch-pill {
-  width: calc(13px * var(--notch-scale));
-  height: calc(118px * var(--notch-scale));
-  --pill-gx: 1.38;
-  --pill-gy: 1.24;
+  width: calc(13px * var(--notch-scale, 1));
+  height: calc(118px * var(--notch-scale, 1));
+  --pill-gx: 1.32;
+  --pill-gy: 1.2;
 }
 
 /* Peek style: a tab that emerges from behind the taskbar. The window slides a
@@ -1300,16 +1368,13 @@ body.notch-body.peek.edge-top { align-items: flex-start; }
 body.notch-body.peek.edge-left { justify-content: flex-start; }
 body.notch-body.peek.edge-right { justify-content: flex-end; }
 body.notch-body.peek .notch-pill {
-  --pill-gx: 1.23;
-  --pill-gy: 1.42;
-  width: calc(112px * var(--notch-scale));
-  height: calc(12px * var(--notch-scale));
-  border-radius: calc(11px * var(--notch-scale)) calc(11px * var(--notch-scale)) 0 0;
+  --pill-gx: 1.18;
+  --pill-gy: 1.36;
+  width: calc(112px * var(--notch-scale, 1));
+  height: calc(12px * var(--notch-scale, 1));
+  border-radius: calc(11px * var(--notch-scale, 1)) calc(11px * var(--notch-scale, 1)) 0 0;
   border-bottom: 0;
   transform-origin: center bottom;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.25);
 }
 
 /* iPhone-notch corner fillets: small concave curves that blend the tab into the
@@ -1359,62 +1424,51 @@ body.notch-body.peek.edge-right .notch-pill::after {
   background: radial-gradient(circle 10px at 0 100%, transparent 9px, var(--glass) 9.5px);
 }
 
-/* ───────────── Notch visual styles (island is the default look) ───────────── */
-/* Liquid glass: bright, saturated, watery highlight. */
-body.notch-body.style-liquid .notch-pill {
-  --glass: color-mix(in srgb, var(--accent) 30%, rgba(255, 255, 255, 0.30));
-  background:
-    radial-gradient(120% 220% at 30% -60%, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.05) 60%),
-    var(--glass);
-  border-color: rgba(255, 255, 255, 0.55);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.6),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.12);
+/* Unified surfaces on the notch — same finishes as the dock. */
+body.notch-body.surface-mica .notch-pill {
+  --glass: color-mix(in srgb, var(--surface-tint, #3a3a40) 88%, rgba(20, 20, 24, 0.95));
+  --pill-stroke: rgba(255, 255, 255, 0.12);
+  --pill-inset: rgba(255, 255, 255, 0.14);
+  --pill-blur: 12px;
 }
-/* Mica: calm, near-opaque neutral tint — no glow, no drama. */
-body.notch-body.style-mica .notch-pill {
-  --glass: color-mix(in srgb, var(--accent) 10%, rgba(58, 58, 64, 0.96));
-  background: var(--glass);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+body.notch-body.surface-acrylic .notch-pill {
+  --glass: color-mix(in srgb, var(--surface-tint, #c8c8d0) 42%, rgba(24, 24, 28, 0.55));
+  --pill-stroke: rgba(255, 255, 255, 0.28);
+  --pill-inset: rgba(255, 255, 255, 0.28);
+  --pill-blur: 24px;
 }
-/* Acrylic: milky translucency with a faint sheen. */
-body.notch-body.style-acrylic .notch-pill {
-  --glass: color-mix(in srgb, var(--accent) 12%, rgba(160, 160, 170, 0.45));
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08)),
-    var(--glass);
-  border-color: rgba(255, 255, 255, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+body.notch-body.surface-tinted .notch-pill {
+  --glass: color-mix(in srgb, var(--accent) 34%, rgba(22, 22, 28, 0.62));
+  --pill-stroke: color-mix(in srgb, var(--accent) 35%, rgba(255, 255, 255, 0.22));
+  --pill-inset: color-mix(in srgb, #fff 50%, var(--accent));
+  --pill-blur: 22px;
 }
-/* Windows: squared taskbar-style tab with an accent underline. */
-body.notch-body.style-windows .notch-pill,
-body.notch-body.style-windows.peek .notch-pill {
-  --glass: rgba(32, 32, 36, 0.9);
-  border-radius: 4px 4px 0 0;
-  background: var(--glass);
-  border-color: rgba(255, 255, 255, 0.14);
+body.notch-body.surface-solid .notch-pill {
+  --glass: color-mix(in srgb, #2c2c30 94%, var(--accent) 6%);
+  --pill-stroke: rgba(255, 255, 255, 0.12);
+  --pill-inset: rgba(255, 255, 255, 0.1);
+  --pill-blur: 0px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 6px;
+}
+body.notch-body.surface-solid.peek .notch-pill {
+  border-radius: 6px 6px 0 0;
   box-shadow: inset 0 2px 0 var(--accent);
 }
-body.notch-body.style-windows .notch-pill::before,
-body.notch-body.style-windows .notch-pill::after { display: none; }
-/* Peek lives in a deliberately tight window (small click hitbox). The per-style
-   drop-shadows above (e.g. liquid's 0 4px 18px) spill past that window and get
-   clipped — reading as the tab being "cut off with a margin". Cap the outer
-   shadow in peek so it always fits, whatever the style. The two selectors beat
-   both the 3-class style rules and the 4-class windows-peek rule by specificity
-   + source order. Insets stay (they're inside the pill, never clipped). */
-body.notch-body.peek .notch-pill,
-body.notch-body.style-windows.peek .notch-pill {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+body.notch-body.surface-solid .notch-pill::before,
+body.notch-body.surface-solid .notch-pill::after { display: none; }
+
+/* Peek: keep outer shadows tight so the small window never clips the tab. */
+body.notch-body.peek .notch-pill {
+  box-shadow: inset 0 1px 0 var(--pill-inset, rgba(255, 255, 255, 0.22));
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill {
-  width: calc(12px * var(--notch-scale));
-  height: calc(112px * var(--notch-scale));
-  --pill-gx: 1.42;
-  --pill-gy: 1.23;
+  width: calc(12px * var(--notch-scale, 1));
+  height: calc(112px * var(--notch-scale, 1));
+  --pill-gx: 1.36;
+  --pill-gy: 1.18;
 }
 body.notch-body.peek.edge-left .notch-pill { border-radius: 0 14px 14px 0; border-left: 0; transform-origin: left center; }
 body.notch-body.peek.edge-right .notch-pill { border-radius: 14px 0 0 14px; border-right: 0; transform-origin: right center; }
@@ -3184,6 +3238,88 @@ select {
 }
 
 /* Notch style chips: mini pill previews. */
+/* Unified surface picker — compact chips, press feedback (Emil). */
+.surface-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 420px);
+  justify-content: flex-end;
+}
+.surface-chip {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--surface-raised, var(--layer));
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-md);
+  transition:
+    transform var(--motion-press) var(--ease-out),
+    border-color var(--motion-fast) var(--ease-out),
+    background var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out);
+}
+.surface-chip:active { transform: scale(0.97); }
+.surface-chip.active {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--stroke));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.surface-swatch {
+  width: 36px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.surface-mica .surface-swatch {
+  background: color-mix(in srgb, var(--surface-tint, #3a3a40) 90%, #888);
+}
+.surface-acrylic .surface-swatch {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 60%),
+    color-mix(in srgb, var(--surface-tint, #bbb) 50%, transparent);
+  backdrop-filter: blur(6px);
+}
+.surface-tinted .surface-swatch {
+  background: color-mix(in srgb, var(--accent) 42%, rgba(40, 40, 48, 0.55));
+}
+.surface-solid .surface-swatch {
+  background: color-mix(in srgb, #2c2c30 94%, var(--accent) 6%);
+  border-radius: 4px;
+}
+.surface-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.surface-meta strong {
+  font: 650 12px/1.2 var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.surface-meta small {
+  font: 500 10.5px/1.25 var(--font);
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.preview-notch {
+  display: block;
+  margin: 8px auto 0;
+  background: color-mix(in srgb, var(--accent) 28%, var(--layer-strong));
+  border: 1px solid color-mix(in srgb, var(--stroke-light) 50%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  opacity: 0.92;
+}
+@media (max-width: 560px) {
+  .surface-row { grid-template-columns: 1fr; width: 100%; }
+}
+
 .nstyle-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .nstyle-chip {
   display: flex;
@@ -4020,7 +4156,12 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .s-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .s-btn { font: inherit; font-size: var(--text-lg); font-weight: 600; padding: 9px 16px; color: var(--accent-contrast); background: var(--accent); border: 0; border-radius: var(--r-sm); cursor: pointer; transition: filter 0.15s ease, transform 0.12s var(--ease), box-shadow 0.15s ease; box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px color-mix(in srgb, #000 14%, transparent); }
 .s-btn:hover { filter: brightness(1.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 2px 5px color-mix(in srgb, #000 18%, transparent); }
-.s-btn:active { transform: scale(0.98); }
+.s-btn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .surface-chip:hover {
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--stroke));
+  }
+}
 .s-btn-soft { background: var(--hover); color: var(--ink); box-shadow: inset 0 0 0 1px var(--stroke-light); }
 .s-btn-soft:hover { background: color-mix(in srgb, var(--hover) 92%, var(--accent)); }
 .s-btn-ghost { background: transparent; color: var(--danger); border: 1px solid var(--danger); box-shadow: none; }

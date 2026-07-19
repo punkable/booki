@@ -87,81 +87,12 @@ function ChangelogIcon({ name }) {
   );
 }
 
-// One-click theme presets (accent + light/dark).
-const THEME_PRESETS = [
-  { name: "Booki", accent: "#dfaa75", theme: "system" },
-  { name: "Océano", accent: "#3a86ff", theme: "dark" },
-  { name: "Bosque", accent: "#2bb673", theme: "dark" },
-  { name: "Atardecer", accent: "#fb5607", theme: "light" },
-  { name: "Uva", accent: "#8338ec", theme: "dark" },
-  { name: "Rosa", accent: "#ff006e", theme: "light" },
-];
-
-// Dock look presets — material, magnification and geometry in one click.
-const LOOK_PRESETS = [
-  {
-    id: "premium",
-    nameKey: "ap.look.premium",
-    hintKey: "ap.look.premiumHint",
-    patch: {
-      magnification: true,
-      zoom: 1.35,
-      materialStrength: 68,
-      cornerRadius: 20,
-      spacing: 6,
-      edgeGap: 28,
-      iconSize: 44,
-      compact: false,
-      notchStyle: "liquid",
-      magnifyStyle: "spring",
-    },
-  },
-  {
-    id: "classic",
-    nameKey: "ap.look.classic",
-    hintKey: "ap.look.classicHint",
-    patch: {
-      magnification: false,
-      zoom: 1.25,
-      materialStrength: 70,
-      cornerRadius: 12,
-      spacing: 6,
-      edgeGap: 48,
-      iconSize: 36,
-      compact: false,
-      notchStyle: "island",
-      magnifyStyle: "spring",
-    },
-  },
-  {
-    id: "compact",
-    nameKey: "ap.look.compact",
-    hintKey: "ap.look.compactHint",
-    patch: {
-      magnification: true,
-      zoom: 1.2,
-      materialStrength: 55,
-      cornerRadius: 10,
-      spacing: 2,
-      edgeGap: 16,
-      iconSize: 32,
-      compact: true,
-      notchStyle: "mica",
-      magnifyStyle: "spring",
-    },
-  },
-];
-
-function lookPresetActive(cfg, patch) {
-  const keys = Object.keys(patch);
-  return keys.every((k) => {
-    const a = cfg[k];
-    const b = patch[k];
-    if (typeof b === "number") return Math.abs(Number(a) - b) < 0.02;
-    return a === b;
-  });
-}
 import { applyTheme } from "./theme.js";
+import {
+  SURFACE_STYLES,
+  resolveSurfaceStyle,
+  legacyNotchFromSurface,
+} from "./surface.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -221,11 +152,10 @@ const LANG_OPTIONS = [
 
 // Searchable option index: i18n key → tab that hosts it (settings search).
 const SEARCH_INDEX = [
-  ["ap.theme", "appearance"], ["ap.accent", "appearance"], ["ap.presets", "appearance"],
-  ["ap.look", "appearance"],
+  ["ap.theme", "appearance"], ["ap.accent", "appearance"],
+  ["ap.surface", "appearance"], ["ap.translucency", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
-  ["ap.translucency", "appearance"],
-  ["be.notchStyle", "appearance"], ["ap.notchSize", "appearance"], ["be.notchPeek", "appearance"],
+  ["ap.notchSize", "appearance"], ["be.notchPeek", "appearance"], ["ap.compact", "appearance"],
   ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
@@ -698,22 +628,31 @@ function ProfilesCard({ cfg, set }) {
   );
 }
 
-// Notch style chips: little live previews of each finish.
-const NOTCH_STYLES = ["island", "liquid", "mica", "acrylic", "windows"];
-function NotchStylePicker({ cfg, set }) {
-  const cur = cfg.notchStyle || "island";
+/** Unified dock + notch surface picker — one finish for both windows. */
+function SurfaceStylePicker({ cfg, set }) {
+  const cur = resolveSurfaceStyle(cfg);
   return (
-    <div className="nstyle-row">
-      {NOTCH_STYLES.map((s) => (
-        <button key={s} type="button"
-          className={"nstyle-chip" + (cur === s ? " active" : "")}
+    <div className="surface-row" role="listbox" aria-label={t("ap.surface")}>
+      {SURFACE_STYLES.map((s) => (
+        <button
+          key={s}
+          type="button"
+          role="option"
+          aria-selected={cur === s}
+          className={"surface-chip surface-" + s + (cur === s ? " active" : "")}
           onClick={() => {
-            set({ notchStyle: s });
-            dockApi.notchPreview(); // show the real notch with the new finish
+            set(
+              { surfaceStyle: s, notchStyle: legacyNotchFromSurface(s) },
+              { flush: true, afterSave: () => dockApi.notchPreview() }
+            );
           }}
-          title={t(`nstyle.${s}`)}>
-          <span className={`nstyle-pill ns-${s}`} />
-          <span className="nstyle-name">{t(`nstyle.${s}`)}</span>
+          title={t(`surface.${s}Hint`)}
+        >
+          <span className="surface-swatch" aria-hidden="true" />
+          <span className="surface-meta">
+            <strong>{t(`surface.${s}`)}</strong>
+            <small>{t(`surface.${s}Hint`)}</small>
+          </span>
         </button>
       ))}
     </div>
@@ -799,19 +738,28 @@ function MiniDockPreview({ cfg }) {
   const gap = Math.round((cfg.spacing ?? 6) * scale + 2);
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const mat = (cfg.materialStrength ?? 70) / 100;
+  const surface = resolveSurfaceStyle(cfg);
   const alpha = Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66));
   const mid = Math.floor(count / 2);
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
+  const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+  const fills = {
+    mica: `color-mix(in srgb, var(--layer-strong) ${Math.min(96, 70 + alpha * 28)}%, transparent)`,
+    acrylic: `color-mix(in srgb, var(--layer-strong) ${alpha * 88}%, transparent)`,
+    tinted: `color-mix(in srgb, var(--accent) ${22 + alpha * 18}%, color-mix(in srgb, var(--layer-strong) ${alpha * 70}%, transparent))`,
+    solid: `color-mix(in srgb, var(--layer-strong) 94%, var(--accent) 6%)`,
+  };
   return (
-    <div className={"preview prev-" + (cfg.edge || "bottom")}>
+    <div className={"preview prev-" + (cfg.edge || "bottom") + " prev-surface-" + surface}>
       <div
         className="preview-bar"
         style={{
           flexDirection: vertical ? "column" : "row",
           gap,
-          borderRadius: radius + 5,
-          background: `color-mix(in srgb, var(--layer-strong) ${alpha * 100}%, transparent)`,
+          borderRadius: surface === "solid" ? Math.max(4, radius) : radius + 5,
+          background: fills[surface] || fills.acrylic,
+          backdropFilter: surface === "solid" ? "none" : `blur(${surface === "mica" ? 8 : 14}px)`,
         }}
       >
         {Array.from({ length: count }).map((_, i) => {
@@ -832,6 +780,15 @@ function MiniDockPreview({ cfg }) {
           );
         })}
       </div>
+      <span
+        className="preview-notch"
+        style={{
+          width: Math.round(42 * notchScale),
+          height: Math.max(4, Math.round(5 * notchScale)),
+          borderRadius: surface === "solid" ? 3 : 999,
+        }}
+        title={t("ap.notchSize")}
+      />
     </div>
   );
 }
@@ -878,68 +835,6 @@ function AccentPicker({ value, onChange }) {
         >
           <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
           <span className="accent-plus">{isPreset ? "+" : "✓"}</span>
-        </label>
-        <button
-          type="button"
-          className="accent-src"
-          title={t("ap.system")}
-          onClick={async () => {
-            const hex = await dockApi.systemAccent();
-            if (hex) onChange(hex);
-          }}
-        >
-          <span className="accent-src-dot" />
-          {t("ap.systemShort")}
-        </button>
-        <button
-          type="button"
-          className="accent-src"
-          title={t("ap.wallpaper")}
-          onClick={async () => {
-            const hex = await dockApi.wallpaperAccent().catch(() => null);
-            if (hex) onChange(hex);
-          }}
-        >
-          <img className="emo" src={emoSrc("picture")} alt="" width="15" height="15" />
-          {t("ap.wallpaperShort")}
-        </button>
-      </div>
-      <span className="accent-hex">{(value || "").toUpperCase()}</span>
-    </div>
-  );
-}
-
-function AccentPickerEnhanced({ value, onChange }) {
-  const v = (value || "").toLowerCase();
-  const isPreset = ACCENTS.some(([, val]) => val.toLowerCase() === v);
-  return (
-    <div className="accent-picker accent-picker-enhanced">
-      <div className="accent-swatches">
-        {ACCENTS.map(([name, val]) => (
-          <button
-            key={val}
-            type="button"
-            className={"accent-sw" + (v === val.toLowerCase() ? " active" : "")}
-            style={{ "--sw": val }}
-            title={name}
-            aria-label={name}
-            onClick={() => onChange(val)}
-          >
-            <span className="accent-dot" />
-            <span className="accent-name">{name}</span>
-            <span className="accent-check" dangerouslySetInnerHTML={{ __html: icon("check") }} />
-          </button>
-        ))}
-        <label
-          className={"accent-custom" + (!isPreset ? " active" : "")}
-          style={{ "--sw": value }}
-          title={t("ap.custom")}
-          aria-label={t("ap.custom")}
-        >
-          <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-          <span className="accent-dot" />
-          <span className="accent-name">{t("ap.custom")}</span>
-          <span className="accent-plus" dangerouslySetInnerHTML={{ __html: icon(isPreset ? "plus" : "check") }} />
         </label>
         <button
           type="button"
@@ -1224,6 +1119,8 @@ function HotkeyInput({ value, onChange }) {
 
 function Appearance({ cfg, set }) {
   const notchScalePct = Math.round((Number(cfg.notchScale) || 1) * 100);
+  const surface = resolveSurfaceStyle(cfg);
+  const solidSurface = surface === "solid";
   return (
     <>
       <PageHeader icon="palette" title={t("ap.title")} />
@@ -1243,73 +1140,52 @@ function Appearance({ cfg, set }) {
           />
         </Row>
         <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
-          <AccentPickerEnhanced value={cfg.accent} onChange={(v) => set({ accent: v })} />
-        </Row>
-        <Row label={t("ap.presets")} hint={t("ap.presetsHint")}>
-          <div className="preset-row">
-            {THEME_PRESETS.map((p) => {
-              const active =
-                (cfg.accent || "").toLowerCase() === p.accent.toLowerCase() &&
-                (cfg.theme || "system") === p.theme;
-              return (
-                <button
-                  key={p.name}
-                  type="button"
-                  className={"preset-chip" + (active ? " active" : "")}
-                  title={`${p.name} - ${t(`theme.${p.theme}`)}`}
-                  style={{ "--preset": p.accent }}
-                  onClick={() => set({ accent: p.accent, theme: p.theme })}
-                >
-                  <span className="preset-preview">
-                    <span className="preset-bar" />
-                    <span className="preset-tile" />
-                    <span className="preset-tile small" />
-                  </span>
-                  <span className="preset-copy">
-                    <strong>{p.name}</strong>
-                    <small>{t(`theme.${p.theme}`)}</small>
-                  </span>
-                  <span className="preset-dot" data-theme={p.theme} />
-                </button>
-              );
-            })}
-          </div>
-        </Row>
-        <Row label={t("ap.look")} hint={t("ap.lookHint")}>
-          <div className="preset-row look-presets">
-            {LOOK_PRESETS.map((p) => {
-              const active = lookPresetActive(cfg, p.patch);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={"preset-chip look-chip" + (active ? " active" : "")}
-                  title={t(p.hintKey)}
-                  style={{ "--preset": cfg.accent || "#dfaa75" }}
-                  onClick={() => {
-                    set({ ...p.patch });
-                    if (typeof p.patch.materialStrength === "number") {
-                      dockApi.setMaterial(p.patch.materialStrength);
-                    }
-                  }}
-                >
-                  <span className="preset-preview">
-                    <span className="preset-bar" />
-                    <span className="preset-tile" />
-                    <span className="preset-tile small" />
-                  </span>
-                  <span className="preset-copy">
-                    <strong>{t(p.nameKey)}</strong>
-                    <small>{t(p.hintKey)}</small>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
         </Row>
       </SettingsSection>
 
-      <SettingsSection title={t("gp.dockLook")} icon="app">
+      <SettingsSection title={t("gp.surface")} icon="sliders">
+        <Row label={t("ap.surface")} hint={t("ap.surfaceHint")}>
+          <SurfaceStylePicker cfg={cfg} set={set} />
+        </Row>
+        {!solidSurface && (
+          <Row label={t("ap.translucency")} hint={t("ap.translucencyHint")}>
+            <Slider
+              value={cfg.materialStrength ?? 70}
+              min={0}
+              max={100}
+              step={5}
+              fmt={(v) => `${v}%`}
+              onChange={(v) => set({ materialStrength: v })}
+            />
+          </Row>
+        )}
+        <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
+          <Slider
+            value={notchScalePct}
+            min={70}
+            max={150}
+            step={5}
+            fmt={(v) => `${v}%`}
+            onChange={(v) => {
+              set(
+                { notchScale: v / 100 },
+                { flush: true, afterSave: () => dockApi.notchPreview() }
+              );
+            }}
+          />
+        </Row>
+        <Toggle
+          label={t("be.notchPeek")}
+          hint={t("be.notchPeekHint")}
+          checked={cfg.notchPeek !== false}
+          onChange={(v) => {
+            set({ notchPeek: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
+          }}
+        />
+      </SettingsSection>
+
+      <SettingsSection title={t("gp.size")} icon="app">
         <Row label={t("ap.iconSize")}>
           <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
             onChange={(v) => set({ iconSize: v })} />
@@ -1322,38 +1198,9 @@ function Appearance({ cfg, set }) {
           <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
             onChange={(v) => set({ cornerRadius: v })} />
         </Row>
-        <Toggle label={t("ap.compact")} checked={!!cfg.compact}
+        <Toggle label={t("ap.compact")} hint={t("ap.compactHint")}
+          checked={!!cfg.compact}
           onChange={(v) => set({ compact: v })} />
-        <Row label={t("ap.translucency")} hint={t("be.materialHint")}>
-          <Slider value={cfg.materialStrength ?? 70} min={0} max={100} step={5}
-            fmt={(v) => `${v}%`}
-            onChange={(v) => { set({ materialStrength: v }); dockApi.setMaterial(v); }} />
-        </Row>
-      </SettingsSection>
-
-      <SettingsSection title={t("gp.notchLook")} icon="eye">
-        <Row label={t("be.notchStyle")} hint={t("be.notchStyleHint")}>
-          <NotchStylePicker cfg={cfg} set={set} />
-        </Row>
-        <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
-          <Slider
-            value={notchScalePct}
-            min={70}
-            max={150}
-            step={5}
-            fmt={(v) => `${v}%`}
-            onChange={(v) => {
-              set({ notchScale: v / 100 });
-              dockApi.notchPreview();
-            }}
-          />
-        </Row>
-        <Toggle
-          label={t("be.notchPeek")}
-          hint={t("be.notchPeekHint")}
-          checked={cfg.notchPeek !== false}
-          onChange={(v) => { set({ notchPeek: v }); dockApi.notchPreview(); }}
-        />
       </SettingsSection>
     </>
   );
@@ -3062,7 +2909,7 @@ function App() {
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
-  const set = (patch) => {
+  const set = (patch, opts = {}) => {
     setCfg((prev) => {
       const next = { ...prev, ...patch };
       // Switching language may need its dictionary → load then re-render.
@@ -3077,15 +2924,18 @@ function App() {
       applyTheme(next);
       setSaveState("saving");
       clearTimeout(saveTimer.current);
+      // flush:0 — notch size/surface must hit disk before notch_preview reads config.
+      const delay = opts.flush ? 0 : 120;
       saveTimer.current = setTimeout(async () => {
         try {
           await configApi.save(next);
           await emitConfigChanged();
           setSaveState("saved");
+          if (typeof opts.afterSave === "function") opts.afterSave(next);
         } catch (_) {
           setSaveState("error");
         }
-      }, 120);
+      }, delay);
       return next;
     });
   };

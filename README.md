@@ -42,12 +42,12 @@
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 
-## What's new in 0.56
+## What's new in 0.57
 
-- **Settings reorganized** — appearance (dock + notch look) separate from behavior (hide, reveal, magnify).
-- **Notch size control** — scale the notch from 70% to 150% in Appearance.
-- **Premium dock feel** — wave magnification, calmer glass, look presets (Premium / Classic / Compact).
-- **Cleaner icons and performance** — shared widget metadata, lighter magnify hit-testing, Fluent UI code-split in Settings.
+- **Unified surface** — Mica / Acrylic / Tinted / Solid apply to dock and notch together.
+- **Notch size fixed** — the 70%–150% slider actually scales the pill.
+- **Clearer Appearance** — compact theme + accent row, no redundant preset cards.
+- **Crisper motion** — stronger ease-out, natural enter scales, press feedback.
 
 Older notes live in Settings → What's new.
 

@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.57.0",
+    date: "19 jul 2026",
+    headline: "Superficie unificada dock+notch, materiales Windows y Apariencia más clara.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Un material para dock y notch",
+        notes: [
+          "Mica, Acrylic, Tintado y Sólido aplican al dock y al notch a la vez — misma pieza, distinta forma.",
+          "Corregido el tamaño del notch: el slider 70%–150% ya escala la pastilla de verdad.",
+          "Apariencia compacta: tema + acentos pequeños, sin tarjetas de presets redundantes.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Motion y detalle",
+        notes: [
+          "Entradas más naturales (sin scale desde cero), ease-out más crisp y feedback al pulsar.",
+          "Guardado inmediato al cambiar notch/superficie para que la vista previa no use config vieja.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.56.1",
     date: "19 jul 2026",
     headline: "Ajustes reordenados, tamaño del notch, limpieza técnica (release artifacts).",
