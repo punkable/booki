@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.58.1",
+    date: "19 jul 2026",
+    headline: "Onboarding que no se repite y toast de pantalla completa sin flash del notch.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Primera vez, una sola vez",
+        notes: [
+          "Ajustes ya no pisa onboarded/seenVersion con una copia vieja al guardar un slider.",
+          "El banner de Ajustes y los tips del dock quedan guardados en tu config.",
+          "Si ya tenías pines, no vuelven a salir los tips de bienvenida.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Toast a pantalla completa",
+        notes: [
+          "Al ocultarse por fullscreen, el pill del notch no se ve debajo ni al acabar el mensaje.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.58.0",
     date: "19 jul 2026",
     headline: "Tu configuraci\u00f3n sobrevive a desinstalar; grupos m\u00e1s \u00fatiles en el dock.",

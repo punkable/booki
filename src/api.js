@@ -58,6 +58,7 @@ const DEMO_CONFIG = {
   notchTrigger: "click",
   compact: false,
   onboarded: true,
+  settingsIntroSeen: true,
   lastProfile: "",
   edgeGap: 48,
   focusIfRunning: false,

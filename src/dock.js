@@ -1462,6 +1462,7 @@ async function maybeOnboard() {
           reframe();
         });
         cfg.onboarded = true;
+        cfg.settingsIntroSeen = true;
         await persist();
         pinnedReveal = false;
         scheduleHide();
@@ -2737,10 +2738,12 @@ function onFullscreenSignal(value) {
     hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
-    dockApi.notchToast(t("fs.hidden")); // hides the dock + shows the toast on the notch
+    // Toast on the notch window (pill stays hidden). Blackout BEFORE the toast
+    // UI clears so the bare notch never flashes after the message.
+    dockApi.notchToast(t("fs.hidden"));
     blackoutTimer = setTimeout(() => {
-      if (fullscreen) dockApi.hideAll(); // then hide the notch too (full blackout)
-    }, 2600);
+      if (fullscreen) dockApi.hideAll();
+    }, 2200);
   } else {
     // Back to normal: re-evaluate smart-hide and show the right window.
     document.body.classList.remove("tucked");
