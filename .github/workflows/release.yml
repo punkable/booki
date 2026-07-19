@@ -63,7 +63,7 @@ jobs:
       - name: Build and publish release
         id: tauri
         continue-on-error: true
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Auto-updater signing. Add these as repo secrets to enable signed
