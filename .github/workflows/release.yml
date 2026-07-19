@@ -104,8 +104,69 @@ jobs:
             src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi.sig
           if-no-files-found: error
 
+      # Fallback: if tauri-action built bundles but could not create the GitHub
+      # Release (common when GITHUB_TOKEN cannot publish tags cut off main),
+      # publish the local installers with gh.
+      # With continue-on-error, failed steps still report conclusion=success.
+      # Use outcome (pre-continue-on-error) to detect a real publish failure.
+      - name: Publish release from local bundles
+        if: steps.tauri.outcome == 'failure'
+        id: fallback
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          VER="${TAG#v}"
+          ROOT="src-tauri/target/release/bundle"
+          mapfile -t FILES < <(find "${ROOT}/nsis" "${ROOT}/msi" -type f \( -name 'Booki_*.exe' -o -name 'Booki_*.msi' -o -name 'Booki_*.sig' \) 2>/dev/null | sort)
+          if [[ "${#FILES[@]}" -eq 0 ]]; then
+            echo "No bundle files found; build likely failed earlier."
+            exit 1
+          fi
+          if ! gh release view "${TAG}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "${TAG}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Booki ${TAG}" \
+              --notes "Booki Dock for Windows.
+
+          Download the **Booki_*_x64-setup.exe** installer for the normal per-user installation.
+
+          WebView2 is downloaded automatically when it is missing.
+
+          **SmartScreen note:** Booki does not yet use a commercial code-signing certificate, so Windows may display a warning. Choose **More info** → **Run anyway**."
+          fi
+          gh release upload "${TAG}" "${FILES[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          EXE="$(printf '%s\n' "${FILES[@]}" | grep 'x64-setup\.exe$' | head -n1 || true)"
+          SIG="$(printf '%s\n' "${FILES[@]}" | grep 'x64-setup\.exe\.sig$' | head -n1 || true)"
+          if [[ -n "${EXE}" ]]; then
+            EXE_NAME="$(basename "${EXE}")"
+            SIG_B64=""
+            if [[ -n "${SIG}" && -f "${SIG}" ]]; then
+              SIG_B64="$(tr -d '\r\n' < "${SIG}")"
+            fi
+            URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${EXE_NAME}"
+            jq -n \
+              --arg version "${VER}" \
+              --arg url "${URL}" \
+              --arg signature "${SIG_B64}" \
+              --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                version: $version,
+                notes: "",
+                pub_date: $pub_date,
+                platforms: {
+                  "windows-x86_64": { signature: $signature, url: $url }
+                }
+              }' > latest.json
+            gh release upload "${TAG}" latest.json --repo "$GITHUB_REPOSITORY" --clobber
+          fi
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "Published fallback release assets for ${TAG}"
+
       - name: Verify published installers
-        if: steps.tauri.outcome == 'success'
+        if: always() && (steps.tauri.outcome == 'success' || steps.fallback.outcome == 'success')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -117,14 +178,19 @@ jobs:
           grep -Eq '\.msi$' <<< "$assets"
           grep -Eq 'latest\.json$' <<< "$assets"
 
-      # Keep only the just-published release downloadable: delete every older
-      # release (and its tag) so users always grab the latest beta.
+      # Only prune AFTER a successful publish. Never delete the previous release
+      # when the new one failed to create (that left the repo with zero releases).
       - name: Prune old releases
+        if: always() && (steps.tauri.outcome == 'success' || steps.fallback.outcome == 'success')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           keep="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          if ! gh release view "$keep" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to prune: release $keep does not exist"
+            exit 1
+          fi
           echo "Keeping latest release: $keep"
           gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
             if [ -n "$tag" ] && [ "$tag" != "$keep" ]; then
