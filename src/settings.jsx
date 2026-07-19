@@ -3015,8 +3015,63 @@ function App() {
     set({ settingsIntroSeen: true });
   };
   const saveTimer = useRef(null);
+  const cfgRef = useRef(null);
+  const dirtyKeys = useRef(new Set());
+  const afterSaveCb = useRef(null);
+  cfgRef.current = cfg;
 
-  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  // Merge only the keys Settings actually touched onto a fresh disk snapshot so
+  // a debounced slider save cannot wipe pins the dock wrote a moment earlier.
+  const flushSave = async () => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const keys = [...dirtyKeys.current];
+    dirtyKeys.current.clear();
+    const cb = afterSaveCb.current;
+    afterSaveCb.current = null;
+    if (!keys.length) return;
+    const snap = cfgRef.current;
+    if (!snap) return;
+    setSaveState("saving");
+    try {
+      const disk = (await configApi.get()) || {};
+      const toSave = { ...disk };
+      for (const k of keys) {
+        if (k in snap) toSave[k] = snap[k];
+      }
+      if (keys.includes("pinned")) {
+        toSave.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
+      }
+      // Sticky one-way progress flags (also enforced in Rust save).
+      toSave.onboarded = !!(snap.onboarded || disk.onboarded);
+      toSave.settingsIntroSeen = !!(snap.settingsIntroSeen || disk.settingsIntroSeen);
+      toSave.seenVersion = snap.seenVersion || disk.seenVersion || "";
+      await configApi.save(toSave);
+      await emitConfigChanged();
+      cfgRef.current = toSave;
+      setCfg((prev) => {
+        if (!prev) return toSave;
+        // Keep any edits typed while the save was in flight.
+        if (dirtyKeys.current.size) return prev;
+        return { ...prev, ...toSave };
+      });
+      setSaveState("saved");
+      if (typeof cb === "function") cb(toSave);
+    } catch (_) {
+      // Re-queue failed keys so the next edit (or close) retries.
+      for (const k of keys) dirtyKeys.current.add(k);
+      setSaveState("error");
+    }
+  };
+
+  // Flush pending edits on close — never drop a slider/toggle by clearing the timer.
+  useEffect(() => () => {
+    clearTimeout(saveTimer.current);
+    if (dirtyKeys.current.size) {
+      // Fire-and-forget sync path: window may be closing.
+      flushSave();
+    }
+  }, []);
 
   // Show "What's new" when the dock asks us to: either it was requested before
   // this window existed (pending flag, asked once on mount) or it arrives live
@@ -3108,6 +3163,8 @@ function App() {
       const next = { ...prev, ...patch };
       // Keep empty staging groups in Settings; dock persist dissolves them.
       if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
+      for (const k of Object.keys(patch)) dirtyKeys.current.add(k);
+      cfgRef.current = next;
       // Switching language may need its dictionary → load then re-render.
       if (prev && prev.language !== next.language) {
         ensureLang(next.language).then(() => {
@@ -3120,17 +3177,11 @@ function App() {
       applyTheme(next);
       setSaveState("saving");
       clearTimeout(saveTimer.current);
+      if (typeof opts.afterSave === "function") afterSaveCb.current = opts.afterSave;
       // flush:0 — notch size/surface must hit disk before notch_preview reads config.
       const delay = opts.flush ? 0 : 120;
-      saveTimer.current = setTimeout(async () => {
-        try {
-          await configApi.save(next);
-          await emitConfigChanged();
-          setSaveState("saved");
-          if (typeof opts.afterSave === "function") opts.afterSave(next);
-        } catch (_) {
-          setSaveState("error");
-        }
+      saveTimer.current = setTimeout(() => {
+        flushSave();
       }, delay);
       return next;
     });
@@ -3165,13 +3216,16 @@ function App() {
       configApi.get().then((c) =>
         setCfg((prev) => {
           if (!prev) return c;
-          return {
+          const next = {
             ...prev,
-            pinned: c.pinned,
             onboarded: prev.onboarded || c.onboarded,
             settingsIntroSeen: prev.settingsIntroSeen || c.settingsIntroSeen,
             seenVersion: c.seenVersion || prev.seenVersion,
           };
+          // Do not stomp pins the user is editing in Settings right now.
+          if (!dirtyKeys.current.has("pinned")) next.pinned = c.pinned;
+          cfgRef.current = next;
+          return next;
         })
       );
     }).then((u) => (un = u));

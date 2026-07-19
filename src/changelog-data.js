@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.60.1",
+    date: "19 jul 2026",
+    headline: "Ajustes que no pisan el dock; guardado al cerrar; menos trabajo en idle.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Config que se queda",
+        notes: [
+          "Al guardar un slider, Ajustes ya no puede borrar pines/grupos que el dock acababa de a\u00f1adir.",
+          "Si cierras Ajustes justo despu\u00e9s de un cambio, el guardado pendiente se escribe igual.",
+          "AppData sigue intacta al desinstalar (salvo que marques borrar datos).",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Energ\u00eda",
+        notes: [
+          "Sin memoria de portapapeles: el watcher duerme m\u00e1s y no lee config.json cada segundo.",
+          "El hilo de work-area relee config cada ~6 s, no en cada tick.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.60.0",
     date: "19 jul 2026",
     headline: "Apps ancladas m\u00e1s claras al estilo Windows 11; men\u00fas sin borde raro; grupos sin X permanente.",
