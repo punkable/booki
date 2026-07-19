@@ -38,7 +38,7 @@
 | **Live widgets** | CPU/RAM/disk/battery/volume rings, clock, network, uptime, notes, clipboard history and now-playing — compact cards that do not stretch the dock. |
 | **Smart hide + notch** | The dock tucks into a slim notch and comes back when you need it. Stays out of fullscreen games and videos. Notch size is adjustable in Settings. |
 | **Precise clicks** | Clicks outside the painted dock pass through to the app behind it. |
-| **Fits Windows** | Light/dark/system themes, wallpaper-aware accent, glass materials, size/spacing/radius, multi-monitor, six languages. |
+| **Fits Windows** | Light/dark/system themes, wallpaper-aware accent, glass materials, size/spacing/radius, multi-monitor, five languages. |
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 

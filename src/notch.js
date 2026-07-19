@@ -80,24 +80,26 @@ onActiveApp((payload) => applyDotMode(payload.dot));
 })();
 
 // Brief toast message (e.g. "Booki se ocultó · pantalla completa").
-// The pill must stay fully hidden for the whole toast — otherwise users see the
-// notch chrome under/after the message (especially at the end of the timer).
+// Dock owns hide_all timing — this window only paints the toast. Never call
+// hide_all here (a short fullscreen would otherwise re-blackout after restore).
 let toastTimer = null;
+function clearNotchToast() {
+  clearTimeout(toastTimer);
+  toastTimer = null;
+  document.body.classList.remove("toast");
+  if (textEl) textEl.textContent = "";
+}
 onNotchToast((text) => {
   document.body.classList.add("toast");
   if (textEl) textEl.textContent = text;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(async () => {
-    // Hide the notch window first, then drop the toast class (pill would
-    // otherwise reappear for a frame while the window is still on screen).
-    try {
-      await invoke("hide_all");
-    } catch (_) {
-      /* ignore */
-    }
-    document.body.classList.remove("toast");
-    if (textEl) textEl.textContent = "";
-  }, 2400);
+  // Safety clear if dock never blackouts (e.g. fullscreen ended early).
+  toastTimer = setTimeout(clearNotchToast, 2800);
+});
+// When the OS window is hidden (dock hide_all / hideDock), drop toast chrome
+// so a later show never flashes the old message + pill.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") clearNotchToast();
 });
 
 // Dragging a file NEAR the notch reveals the dock — otherwise there'd be

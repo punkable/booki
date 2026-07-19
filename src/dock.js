@@ -160,15 +160,17 @@ async function boot() {
       if (el) launch(el, item);
       else if (item.path) dockApi.launch(item.path, item.args || []);
     });
-    checkChangelog();
     // Keep the Explorer "Add to Booki" right-click menu in step with the
     // current groups + language (deferred: registry writes aren't urgent).
     setTimeout(maybeSyncCtxMenu, 2500);
     // Defer the update check (a network round-trip) a few seconds so it doesn't
     // compete with first paint / icon extraction during startup.
     setTimeout(checkUpdates, 4000);
-    // Give the first layout a beat to settle so the tips measure correctly.
-    setTimeout(maybeOnboard, 800);
+    // First-run tips first; changelog only after the user is past onboarding.
+    setTimeout(() => {
+      if (!cfg.onboarded) maybeOnboard();
+      else checkChangelog();
+    }, 800);
     logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
@@ -1420,6 +1422,8 @@ function reportHitRectsLive() {
 // Show the changelog the first time the app opens after an update.
 async function checkChangelog() {
   try {
+    // Don't open Settings "What's new" during first-run tips.
+    if (!cfg.onboarded) return;
     const v = await dockApi.appVersion();
     if (v && cfg.seenVersion !== v) {
       cfg.seenVersion = v;
@@ -1466,6 +1470,7 @@ async function maybeOnboard() {
         await persist();
         pinnedReveal = false;
         scheduleHide();
+        checkChangelog();
       }
     });
     pop.appendChild(btn);
@@ -2080,13 +2085,16 @@ async function reorderGroupChild(group, childId, beforeId) {
   if (to < 0) to = kids.length;
   kids.splice(to, 0, moved);
   cfg.pinned[gi].children = kids;
+  // Keep flyout open across persist so smart-hide can't tuck mid-reorder.
+  pinnedReveal = true;
   await persist();
   closeStack();
   await render();
   reframe();
   const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
   const it = cfg.pinned.find((p) => p.id === group.id);
-  if (el && it) openStack(el, it);
+  if (el && it) await openStack(el, it);
+  pinnedReveal = false;
 }
 
 // Let a flyout child be dragged to reorder inside the panel, or dragged out to
@@ -2738,14 +2746,15 @@ function onFullscreenSignal(value) {
     hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
-    // Toast on the notch window (pill stays hidden). Blackout BEFORE the toast
-    // UI clears so the bare notch never flashes after the message.
+    // Toast on the notch (pill hidden via CSS). Single blackout owner = dock.
     dockApi.notchToast(t("fs.hidden"));
     blackoutTimer = setTimeout(() => {
       if (fullscreen) dockApi.hideAll();
     }, 2200);
   } else {
-    // Back to normal: re-evaluate smart-hide and show the right window.
+    // Cancel pending blackout so a short fullscreen can't hide us after restore.
+    clearTimeout(blackoutTimer);
+    blackoutTimer = null;
     document.body.classList.remove("tucked");
     if (hiddenBeforeFullscreen && hideMode() === "smart" && (cfg.notchTrigger || "click") === "click") {
       hiddenState = true;

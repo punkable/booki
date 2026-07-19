@@ -14,7 +14,7 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.58.0` — groups UX polish,
+- Current public beta context at this writing: `0.58.2` — groups UX polish,
   unified dock/notch surfaces (mica/acrylic/tinted/solid), notch size control,
   and NSIS uninstall that **preserves** `%APPDATA%\Booki` unless the user checks
   Delete app data. Earlier waves covered Settings Appearance/Behavior split,
