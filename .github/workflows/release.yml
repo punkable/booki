@@ -61,6 +61,8 @@ jobs:
         run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Build and publish release
+        id: tauri
+        continue-on-error: true
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,7 +89,23 @@ jobs:
           # `releases/latest/download/latest.json` resolves. "Beta" is a label only.
           prerelease: false
 
+      # Always keep the built installers as Actions artifacts so a follow-up
+      # `gh release upload` can finish publishing if tauri-action cannot create
+      # the GitHub Release (e.g. restricted GITHUB_TOKEN on bot-pushed tags).
+      - name: Upload Windows installers as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: booki-windows-${{ steps.ver.outputs.tag }}
+          path: |
+            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe
+            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe.sig
+            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi
+            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi.sig
+          if-no-files-found: error
+
       - name: Verify published installers
+        if: steps.tauri.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,9 +3,9 @@
 
 export const CHANGELOG = [
   {
-    version: "0.56.0",
+    version: "0.56.1",
     date: "19 jul 2026",
-    headline: "Ajustes reordenados, tamaño del notch y limpieza técnica.",
+    headline: "Ajustes reordenados, tamaño del notch, limpieza técnica (release artifacts).",
     sections: [
       {
         icon: "undo",
