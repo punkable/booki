@@ -1298,6 +1298,9 @@ function resetMagnify() {
     t.classList.remove("focus");
   });
   magFocus = null;
+  // Resting hit-rects — don't leave the inflated mag union clickable.
+  lastHitSig = "";
+  scheduleHitReport();
 }
 
 // Cached tile geometry for magnify: measured ONCE per layout (transforms don't
@@ -1384,7 +1387,10 @@ function scheduleMagHitRects() {
   if (magHitTimer) return;
   magHitTimer = requestAnimationFrame(() => {
     magHitTimer = 0;
-    if (!dockEl.classList.contains("mag-live")) return;
+    if (!dockEl.classList.contains("mag-live")) {
+      reportHitRects();
+      return;
+    }
     reportHitRectsLive();
   });
 }
@@ -2605,9 +2611,17 @@ async function removeItem(id) {
 // watch the bar's real layout size and re-fit the window whenever it moves, so
 // nothing ever gets cut off at the window edge.
 if (typeof ResizeObserver !== "undefined") {
+  let lastRoW = 0;
+  let lastRoH = 0;
   new ResizeObserver(() => {
-    reframe();
     placeUpdatePill();
+    const w = dockEl.offsetWidth;
+    const h = dockEl.offsetHeight;
+    // Ignore 1–3px widget text jitter — only reframe when the bar really grew.
+    if (Math.abs(w - lastRoW) < 3 && Math.abs(h - lastRoH) < 3) return;
+    lastRoW = w;
+    lastRoH = h;
+    reframe();
   }).observe(dockEl);
 }
 
@@ -2637,6 +2651,9 @@ const SHADOW_PAD = 18;
 const PANEL_ROOM = 420;
 
 let lastFull = null;
+function edgePadCss() {
+  return Math.min(SHADOW_PAD, Math.max(4, Math.min(96, cfg.edgeGap ?? 48)));
+}
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
   // The STAGE: full length along the anchored edge; bar depth + panel headroom
@@ -2645,7 +2662,7 @@ function computeFrame() {
   // Use offsetWidth/Height (layout size) — NOT getBoundingClientRect — so a dock
   // that's currently scaled by the minimize animation doesn't size the window too
   // small (which left the bar looking cut off after revealing, esp. at the top).
-  const edgePad = Math.min(SHADOW_PAD, Math.max(4, Math.min(96, cfg.edgeGap ?? 48)));
+  const edgePad = edgePadCss();
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
@@ -2659,9 +2676,27 @@ function computeFrame() {
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
+/** Bar-only size for smart-hide occlusion (no PANEL_ROOM flyout headroom). */
+function computeHomeFrame() {
+  const dpr = window.devicePixelRatio || 1;
+  const edgePad = edgePadCss();
+  let wCss, hCss;
+  if (isVertical()) {
+    wCss = dockEl.offsetWidth + edgePad;
+    hCss = availH();
+  } else {
+    wCss = availW();
+    hCss = dockEl.offsetHeight + edgePad;
+  }
+  wCss = Math.min(wCss, availW());
+  hCss = Math.min(hCss, availH());
+  return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
+}
+
 let lastFrameEdge = null;
 function applyFrame() {
   const full = computeFrame();
+  const home = computeHomeFrame();
   // Skip the native resize when the change is small: the transparent SHADOW_PAD
   // absorbs minor bar-size jitter, so live widgets whose text
   // width wiggles (net rates, media title, rolling numbers) don't make the whole
@@ -2678,10 +2713,8 @@ function applyFrame() {
   }
   lastFull = full;
   lastFrameEdge = key;
-  // The dock window stays full-size at all times now; hiding is done by showing
-  // the separate notch window and hiding the dock window (no resize → no notch
-  // flap or repaint race). hidden=false keeps the home rect updated for occlusion.
-  dockApi.setDockFrame(cfg.edge, full.w, full.h, false);
+  // Stage stays large for flyouts; home rect is bar-sized for smart-hide.
+  dockApi.setDockFrame(cfg.edge, full.w, full.h, false, home.w, home.h);
 }
 
 // Reposition when the screen metrics change — resolution, DPI/scale, taskbar
@@ -2825,9 +2858,11 @@ function wantsHideNow() {
 }
 
 // Anything mid-use that a hide would yank out from under the user.
+// Note: pinnedReveal alone is NOT enough — occlusion must still be able to
+// tuck a notch-summoned dock once the user is working in another app.
 function interacting() {
   return (
-    pointerInside || dragging || draggingFile || pinnedReveal || stackOpen ||
+    pointerInside || dragging || draggingFile || stackOpen ||
     !!edgeMove || document.body.classList.contains("menu-open") ||
     !!document.querySelector(".trash-pop, .note-editor, .coach")
   );
@@ -3116,6 +3151,9 @@ function softOpen() {
   manualHide = false;
   clearTimeout(hideTimer);
   setHidden(false);
+  // Soft reveal is not a pin — if smart-hide still wants us gone, arm the grace
+  // hide so we don't sit over the app forever (occlusion won't re-fire if true).
+  if (wantsHideNow() && !pointerInside) scheduleHide();
 }
 onSoftReveal(softOpen);
 
