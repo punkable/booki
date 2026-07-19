@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.59.1` — Apps grid/list group
-  editor parity, smarter smart-hide for creative-app floaters, and bar-rect
-  hide from `0.59.0`. Earlier waves covered groups UX, unified surfaces,
-  NSIS keep-AppData uninstall, Settings Appearance/Behavior split, and
+- Current public beta context at this writing: `0.60.0` — Settings Apps redesign
+  (Win11-calm list, overflow actions, click-to-rename), quieter group take-out
+  (no permanent X), and cleaner dock/context-menu chrome. Earlier waves covered
+  smart-hide bar-rect + creative floaters, groups UX, NSIS keep-AppData, and
   clipboard opt-in memory.
 
 ## Important Files

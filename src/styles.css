@@ -1917,13 +1917,15 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   padding: 12px;
   /* Same material family as the dock — never a mismatched frost lid. */
   background: var(--panel-fill);
-  border: 1px solid var(--surf-stroke);
+  border: 1px solid color-mix(in srgb, var(--surf-stroke) 70%, transparent);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 5%, transparent),
+    var(--shadow);
   -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   contain: layout paint;
   transform-origin: bottom center;
   opacity: 0;
@@ -1997,19 +1999,28 @@ body.edge-right .stack.open { transform: none; }
 .stack-close:hover { color: var(--ink); background: var(--hover); }
 .stack-close:active { transform: scale(0.96); }
 .stack-item { position: relative; }
+/* Take-out only — never a permanent delete X. Hover-only so rename/focus
+   does not keep a red badge stuck on every cell. */
 .stack-rm {
-  position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; display: none;
-  align-items: center; justify-content: center; font-size: var(--text-md); line-height: 1; color: #fff;
-  background: var(--danger); border: 1px solid color-mix(in srgb, #fff 32%, transparent); border-radius: 50%; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.28);
-  transition: transform 0.12s var(--ease), filter 0.12s var(--ease);
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: none;
+  align-items: center; justify-content: center; line-height: 1; color: var(--ink-2);
+  background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  border-radius: 7px; cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, #000 16%, transparent);
+  transition: transform 0.12s var(--ease), color 0.12s var(--ease), background 0.12s var(--ease), border-color 0.12s var(--ease);
   padding: 0;
 }
-.stack-rm svg { width: 14px; height: 14px; stroke-width: 2.2; }
-.stack-item:hover .stack-rm,
-.stack-item:focus-within .stack-rm,
-.stack-item:focus-visible .stack-rm { display: flex; }
-.stack-rm:hover { filter: brightness(1.06); }
-.stack-rm:active { transform: scale(0.92); }
+.stack-rm svg { width: 13px; height: 13px; }
+@media (hover: hover) and (pointer: fine) {
+  .stack-item:hover .stack-rm { display: flex; }
+}
+.stack-rm:hover {
+  color: var(--ink);
+  background: var(--layer-strong);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--stroke));
+}
+.stack-rm:active { transform: scale(0.94); }
 .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
 .stack-empty { grid-column: 1 / -1; color: var(--ink-2); font-size: var(--text-md); padding: 14px; text-align: center; }
 .stack-item {
@@ -2042,7 +2053,6 @@ body.edge-right .stack.open { transform: none; }
 .stack-item:hover {
   background: var(--hover);
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .stack-item:active { transform: scale(0.96); }
 /* Staggered entry of the folder items when the flyout opens. */
@@ -2074,14 +2084,16 @@ body.edge-right .stack.open { transform: none; }
 .stack-item.stack-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 /* Hover actions on a flyout file cell: copy path · Explorer · open with. */
 .stack-acts { position: absolute; top: 3px; left: 3px; display: none; gap: 3px; z-index: 2; }
-.stack-item:hover .stack-acts,
-.stack-item:focus-within .stack-acts,
-.stack-item:focus-visible .stack-acts { display: flex; }
+@media (hover: hover) and (pointer: fine) {
+  .stack-item:hover .stack-acts { display: flex; }
+}
 .stack-act {
-  width: 28px; height: 28px; display: grid; place-items: center; padding: 0;
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
   color: var(--ink-2); cursor: pointer;
-  background: var(--layer-strong); border: 1px solid var(--stroke-light); border-radius: 7px;
-  box-shadow: 0 4px 12px color-mix(in srgb, #000 12%, transparent);
+  background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  border-radius: 7px;
+  box-shadow: 0 2px 8px color-mix(in srgb, #000 14%, transparent);
   transition: background 0.12s var(--ease), border-color 0.12s var(--ease), color 0.12s var(--ease), transform 0.12s var(--ease);
 }
 .stack-act:hover { color: var(--ink); background: var(--hover); border-color: color-mix(in srgb, var(--accent) 28%, var(--stroke-light)); }
@@ -2336,35 +2348,40 @@ body.edge-right .stack.open { transform: none; }
 .menu {
   position: fixed;
   z-index: 50;
-  min-width: 260px;
-  max-width: min(340px, calc(100vw - 16px));
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 16px));
   max-height: calc(100vh - 16px);
   overflow-y: auto;
-  padding: 5px;
+  padding: 4px;
   font-family: var(--font);
   font-size: var(--text-md);
   color: var(--ink);
   background: var(--panel-fill);
-  border: 1px solid var(--surf-stroke);
+  /* Win11 flyout: soft elevation, hairline stroke — no reserved scrollbar gutter
+     (that looked like a thick right edge on vertical-dock menus). */
+  border: 1px solid color-mix(in srgb, var(--surf-stroke) 70%, transparent);
   border-radius: 8px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 6%, transparent),
+    0 8px 24px color-mix(in srgb, #000 22%, transparent);
   -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   animation: menu-in 0.14s var(--ease-out);
 }
 body.surface-solid .menu {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  box-shadow: 0 8px 28px color-mix(in srgb, #000 28%, transparent);
 }
 .menu-head {
   display: grid;
   gap: 1px;
   min-width: 0;
-  margin: 0 0 4px;
-  padding: 8px 10px 7px;
-  border-bottom: 1px solid color-mix(in srgb, var(--stroke) 78%, transparent);
+  margin: 0 0 2px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--stroke) 45%, transparent);
 }
 .menu-head strong {
   min-width: 0;
@@ -2402,7 +2419,10 @@ body.surface-solid .menu {
 }
 .menu button:hover { background: var(--hover); }
 .menu button:active { transform: scale(0.98); }
-.menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.menu button:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 14%, var(--hover));
+}
 .menu button svg {
   flex: 0 0 auto;
   width: 17px;
@@ -2429,7 +2449,7 @@ body.surface-solid .menu {
   background: transparent;
   border-color: transparent;
 }
-.menu .sep { height: 1px; margin: 5px 8px; background: color-mix(in srgb, var(--stroke) 80%, transparent); }
+.menu .sep { height: 1px; margin: 4px 10px; background: color-mix(in srgb, var(--stroke) 55%, transparent); }
 .menu .menu-label {
   padding: 7px 10px 3px;
   font-size: var(--text-xs);
@@ -2674,15 +2694,18 @@ body.settings-body::before {
   display: flex;
   flex-direction: column;
   min-width: 212px;
-  padding: 6px;
-  border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
-  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
-  box-shadow: var(--shadow);
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--panel-fill, color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint)));
+  border: 1px solid color-mix(in srgb, var(--surf-stroke, var(--stroke)) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 6%, transparent),
+    0 8px 24px color-mix(in srgb, #000 22%, transparent);
   max-width: min(260px, calc(100vw - 16px));
   max-height: min(320px, calc(100vh - 16px));
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
   transform-origin: top right;
   animation: notch-toast-in 0.16s var(--ease);
 }
@@ -3649,41 +3672,61 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 42px;
-  padding: 6px 8px;
-  background: color-mix(in srgb, var(--layer-strong) 62%, transparent);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-md);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
-  transition: background var(--motion-med) var(--ease), border-color var(--motion-med) var(--ease), transform var(--motion-fast) var(--ease), box-shadow var(--motion-med) var(--ease);
+  min-height: 44px;
+  padding: 6px 8px 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: background var(--motion-med) var(--ease), border-color var(--motion-med) var(--ease);
 }
-.pin-item::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 9px;
-  bottom: 9px;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--accent);
-  opacity: 0;
-  transform: scaleY(0.45);
-  transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+.pin-item:hover,
+.pin-item:focus-within {
+  background: color-mix(in srgb, var(--layer-strong) 72%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 55%, transparent);
 }
-.pin-item:hover {
-  background: var(--layer-strong);
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--stroke));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+.pin-item.is-folder {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
-.pin-item:hover::before { opacity: 1; transform: scaleY(1); }
+.pin-item.is-folder:hover,
+.pin-item.is-folder:focus-within {
+  background: color-mix(in srgb, var(--accent) 9%, var(--layer-strong));
+}
 .pin-item.sep .pin-name { color: var(--ink-2); font-style: italic; }
 .pin-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .pin-thumb { flex: 0 0 auto; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: linear-gradient(150deg, var(--accent), var(--accent-deep)); color: #fff; font-size: var(--text-sm); font-weight: 700; overflow: hidden; }
 .pin-thumb img { width: 100%; height: 100%; object-fit: contain; }
-.pin-name { font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-name,
+.pin-name-btn {
+  font-size: var(--text-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.pin-name-btn {
+  display: inline-block;
+  margin: 0;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: text;
+}
+.pin-name-btn:hover {
+  background: color-mix(in srgb, var(--hover) 80%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
+}
 .pin-name-edit {
-  font: inherit; font-size: var(--text-lg); padding: 4px 8px; min-width: 0; width: 140px;
-  color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm);
+  font: inherit; font-size: var(--text-lg); font-weight: 600; padding: 4px 8px; min-width: 0; width: min(220px, 42vw);
+  color: var(--ink); background: var(--layer-strong); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--stroke));
+  border-radius: var(--r-sm); outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .pin-count {
   flex: 0 0 auto; font-size: var(--text-xs); font-weight: 700; color: var(--accent-contrast);
@@ -3819,13 +3862,13 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 0 0 8px;
-  padding: 6px;
+  margin: 0 0 10px;
+  padding: 4px;
   flex-wrap: wrap;
-  background: color-mix(in srgb, var(--layer-strong) 58%, transparent);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-md);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .pin-toolbar-main,
 .pin-toolbar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -3871,12 +3914,17 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 6px; margin: 6px 0 10px; }
 .pin-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 7px 7px; background: color-mix(in srgb, var(--layer-strong) 58%, transparent); border: 1px solid var(--stroke);
-  border-radius: var(--r-md, 12px); text-align: center; min-width: 0;
-  transition: box-shadow 0.18s var(--ease), background 0.18s var(--ease), transform 0.14s var(--ease);
+  padding: 10px 7px 7px;
+  background: color-mix(in srgb, var(--layer-strong) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
+  border-radius: 10px; text-align: center; min-width: 0;
+  transition: box-shadow 0.18s var(--ease), background 0.18s var(--ease), border-color 0.14s var(--ease);
 }
-.pin-card:hover { background: var(--layer-strong); }
-.pin-card.is-group { background: color-mix(in srgb, var(--accent) 6%, var(--layer)); }
+.pin-card:hover {
+  background: color-mix(in srgb, var(--layer-strong) 78%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 80%, transparent);
+}
+.pin-card.is-group { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .pin-card.is-sep { opacity: 0.7; }
 .pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
 .pin-card.open { grid-column: 1 / -1; align-items: stretch; }
@@ -3894,55 +3942,60 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-card .pin-missing { font-size: var(--text-xs); color: #e0a02a; }
 .pin-card-actions { display: flex; gap: 4px; justify-content: center; opacity: 0; transition: opacity 0.15s ease; }
 .pin-card:hover .pin-card-actions, .pin-card.open .pin-card-actions { opacity: 1; }
-/* A group opened in grid view: its children are draggable SQUARE tiles you can
-   reorder or drag out of the group — no per-item buttons except a hover ×. */
+/* Open group: children are calm tiles — take-out on hover, delete via context. */
 .pin-card-kids {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 8px; width: 100%; margin-top: 6px; padding-top: 10px;
-  border-top: 1px dashed var(--stroke);
+  border-top: 1px solid color-mix(in srgb, var(--stroke) 50%, transparent);
   border-radius: 10px; transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 /* When a child is dragged out past the edge, highlight that releasing removes it. */
 .pin-card-kids.taking-out { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .pin-kid {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 10px 6px 8px; background: var(--layer-strong, var(--layer)); border: 1px solid var(--stroke);
-  border-radius: 12px; cursor: grab; touch-action: none; min-width: 0;
-  transition: transform 0.12s var(--ease), background 0.14s ease, box-shadow 0.14s ease;
+  padding: 10px 6px 8px;
+  background: color-mix(in srgb, var(--layer-strong) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 45%, transparent);
+  border-radius: 10px; cursor: grab; touch-action: none; min-width: 0;
+  transition: transform 0.12s var(--ease), background 0.14s ease, border-color 0.14s ease;
 }
-.pin-kid:hover { background: var(--hover); transform: translateY(-2px); }
+.pin-kid:hover {
+  background: color-mix(in srgb, var(--layer-strong) 88%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 70%, transparent);
+}
 .pin-kid:active { cursor: grabbing; transform: scale(0.97); }
 .pin-kid .pin-thumb { width: 34px; height: 34px; font-size: var(--text-lg); }
-.pin-kid-name { font-size: var(--text-xs); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pin-kid-rename {
+.pin-kid-name,
+.pin-kid .pin-name-btn {
+  font-size: var(--text-xs);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+.pin-kid .pin-name-btn {
+  width: 100%;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 3px;
+}
+.pin-kid-rename.pin-name-edit,
+input.pin-kid-rename {
   width: 100%;
   font-size: var(--text-xs);
   font-weight: 600;
   text-align: center;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
   padding: 2px 4px;
   min-width: 0;
 }
-.pin-kid-rename:hover, .pin-kid-rename:focus {
-  background: var(--layer);
-  border-color: var(--stroke);
-  outline: none;
-}
-.pin-card-name-edit {
+.pin-card-name-edit.pin-name-edit,
+.pin-card .pin-name-btn.pin-card-name-edit {
   flex: 1;
   min-width: 0;
-  font: inherit;
   font-weight: 700;
   font-size: var(--text-sm);
   text-align: center;
-  color: var(--ink);
-  background: var(--layer);
-  border: 1px solid var(--stroke);
-  border-radius: 8px;
-  padding: 4px 8px;
 }
 .pin-kid-acts {
   position: absolute;
@@ -3952,27 +4005,22 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   gap: 3px;
   z-index: 2;
 }
-.pin-kid:hover .pin-kid-acts, .pin-kid:focus-within .pin-kid-acts { display: flex; }
-.pin-kid-x {
-  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
-  border: 0; background: var(--danger); color: #fff; font-size: var(--text-md); line-height: 1; cursor: pointer;
-  display: none; align-items: center; justify-content: center;
+@media (hover: hover) and (pointer: fine) {
+  .pin-kid:hover .pin-kid-acts { display: flex; }
 }
-.pin-kid:hover .pin-kid-x { display: flex; }
 .pin-kid-edit {
   display: grid;
   place-items: center;
   width: 22px;
   height: 22px;
   color: var(--ink-2);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
+  background: color-mix(in srgb, var(--layer-strong) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 65%, transparent);
   border-radius: 7px;
   cursor: pointer;
   padding: 0;
 }
 .pin-kid-edit:hover { color: var(--ink); background: var(--hover); }
-.pin-kid-edit.danger:hover { color: var(--danger); }
 .pin-kid-edit svg { width: 13px; height: 13px; }
 .pin-add-row .pin-kids-hint { margin-left: 8px; }
 .pin-kid-add {
@@ -3981,43 +4029,70 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-kid-add svg { width: 22px; height: 22px; }
 .pin-kid-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); transform: none; }
-.pin-kids-hint { grid-column: 1 / -1; font-size: var(--text-xs); color: var(--ink-2); text-align: center; padding-top: 2px; }
+.pin-kids-hint {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.pin-kids-hint-x {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  line-height: 1;
+  font-size: 14px;
+}
+.pin-kids-hint-x:hover { background: var(--hover); color: var(--ink); }
 .s-inline-link { color: var(--accent); text-decoration: none; }
 .s-inline-link:hover { text-decoration: underline; }
-/* Right-click menu on a group child square (take out / remove). */
+/* Right-click menu on a group child — same flat icon language as dock .menu. */
 .pin-kid-menu {
-  position: fixed; z-index: 60; min-width: 188px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; padding: 6px;
-  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
-  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
-  border-radius: var(--r-md); box-shadow: var(--shadow);
-  display: flex; flex-direction: column; gap: 2px;
+  position: fixed; z-index: 60; min-width: 188px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px);
+  overflow-y: auto; padding: 4px;
+  background: var(--panel-fill, color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint)));
+  border: 1px solid color-mix(in srgb, var(--surf-stroke, var(--stroke)) 70%, transparent);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 6%, transparent),
+    0 8px 24px color-mix(in srgb, #000 22%, transparent);
+  display: flex; flex-direction: column; gap: 1px;
   transform-origin: top left;
+  scrollbar-width: thin;
   animation: kidmenu-in 0.12s var(--ease);
 }
 @keyframes kidmenu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 .pin-kid-menu button {
-  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
-  min-height: 36px; padding: 7px 9px; border: 0; background: transparent; color: var(--ink);
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  min-height: 32px; padding: 6px 9px; border: 0; background: transparent; color: var(--ink);
   border-radius: var(--r-sm); font: var(--weight-medium) var(--text-md) var(--font); cursor: pointer;
 }
 .pin-kid-menu button span { display: grid; place-items: center; flex: 0 0 auto; }
 .pin-kid-menu button svg {
-  width: 27px; height: 27px; padding: 6px; border-radius: var(--r-sm);
+  width: 17px; height: 17px; padding: 0; border-radius: 0;
   color: color-mix(in srgb, var(--ink) 72%, var(--accent));
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+  background: transparent;
+  border: 0;
 }
-.pin-kid-menu button:hover { background: color-mix(in srgb, var(--accent) 10%, var(--hover)); }
+.pin-kid-menu button:hover { background: var(--hover); }
 .pin-kid-menu button.danger { color: color-mix(in srgb, var(--danger) 88%, var(--ink)); }
-.pin-kid-menu button.danger svg {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-  border-color: color-mix(in srgb, var(--danger) 26%, transparent);
+.pin-kid-menu button.danger svg { color: var(--danger); background: transparent; border: 0; }
+.pin-kid-menu button.danger:hover {
+  color: color-mix(in srgb, var(--danger) 92%, var(--ink));
+  background: color-mix(in srgb, var(--danger) 12%, var(--hover));
 }
-.pin-kid-menu button.danger:hover { background: #d92d2d; color: #fff; }
-.pin-kid-menu button.danger:hover svg {
-  color: #fff; background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.22);
-}
+.pin-kid-menu button.danger:hover svg { color: var(--danger); background: transparent; }
 
 /* Accent picker (more intuitive: big swatches + custom-color chip + hex) */
 .accent-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
@@ -4614,15 +4689,13 @@ textarea {
   border-radius: var(--r-md);
   background: color-mix(in srgb, var(--layer-strong) 92%, var(--bg));
   box-shadow:
-    0 0 0 1px var(--stroke),
-    0 2px 6px color-mix(in srgb, #000 8%, transparent),
-    0 8px 24px color-mix(in srgb, #000 4%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--stroke) 70%, transparent),
+    0 2px 8px color-mix(in srgb, #000 6%, transparent);
 }
 .settings-section.fui-Card:hover {
   box-shadow:
-    0 0 0 1px var(--stroke),
-    0 4px 10px color-mix(in srgb, #000 10%, transparent),
-    0 12px 32px color-mix(in srgb, #000 6%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--stroke) 80%, transparent),
+    0 4px 12px color-mix(in srgb, #000 8%, transparent);
 }
 .settings-section-headless.fui-Card {
   background: transparent;
@@ -4652,6 +4725,20 @@ textarea {
 /* Pinned-apps toolbar: Fluent Button sizing. */
 .pin-toolbar .fui-Button { min-width: auto; }
 .pin-clear-confirm .fui-Button { white-space: nowrap; }
+.pin-btn.ico .fui-Icon-root,
+.pin-btn.ico svg { width: 16px; height: 16px; display: block; }
+
+/* Fluent menus: match Booki flyout chrome (no double frame / thick edge). */
+.booki-menu-popover.fui-MenuPopover,
+.fui-MenuPopover.booki-menu-popover {
+  border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 5%, transparent),
+    0 8px 24px color-mix(in srgb, #000 18%, transparent) !important;
+  background: color-mix(in srgb, var(--layer-strong) 96%, var(--bg)) !important;
+  padding: 4px !important;
+}
 
 /* Responsive pinned-apps toolbar: collapse gracefully without overflow. */
 @media (max-width: 420px) {

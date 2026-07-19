@@ -3848,7 +3848,7 @@ async function openStack(tileEl, item) {
         wireStackDragOut(wCell, item, it);
         const out = document.createElement("span");
         out.className = "stack-rm";
-        out.innerHTML = icon("x");
+        out.innerHTML = icon("take-out");
         out.title = t("group.takeOut");
         out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
         wCell.appendChild(out);
@@ -3909,11 +3909,11 @@ async function openStack(tileEl, item) {
       });
       if (isGroup) {
         // Drag a child OUT of the flyout to unpin it (parity with the dock's
-        // pull-out-to-remove gesture); the × instead pops it back onto the dock.
+        // pull-out-to-remove gesture); hover control pops it back onto the dock.
         wireStackDragOut(cell, item, it);
         const out = document.createElement("span");
         out.className = "stack-rm";
-        out.innerHTML = icon("x");
+        out.innerHTML = icon("take-out");
         out.title = t("group.takeOut");
         out.addEventListener("click", (ev) => {
           ev.stopPropagation();

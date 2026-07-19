@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.60.0",
+    date: "19 jul 2026",
+    headline: "Apps ancladas m\u00e1s claras al estilo Windows 11; men\u00fas sin borde raro; grupos sin X permanente.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Ajustes \u00b7 Apps",
+        notes: [
+          "Lista m\u00e1s limpia: acciones secundarias en el men\u00fa \u22ef, renombrar al clic, menos botones a la vista.",
+          "En grupos, sacar al hover; quitar solo con clic derecho o el men\u00fa \u22ef — sin X roja siempre visible.",
+          "Consejo de grupos breve y descartable; barra de herramientas m\u00e1s ligera.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Men\u00fas y flyouts",
+        notes: [
+          "Men\u00fas contextuales del dock (sobre todo al borde derecho) sin franja/borde extra por el gutter del scroll.",
+          "Flyouts y men\u00fas de grupo con el mismo cromado plano Win11; sin chips con borde en los iconos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.59.1",
     date: "19 jul 2026",
     headline: "Grupos iguales en cuadr\u00edcula y lista; smart-hide ignora paletas flotantes.",
