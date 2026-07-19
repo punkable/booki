@@ -560,18 +560,40 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
         if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
             return false;
         }
-        // The user is working in a real app window → tuck the dock away. We don't
-        // require the window to overlap the dock: it should stay out of the way
-        // whenever you're in another window, not only when physically covered. It
-        // returns on the desktop, or when the notch is clicked.
+        // Floating tool palettes (Photoshop, Figma, Clip Studio…) are often
+        // WS_EX_TOOLWINDOW and only nick the dock edge — ignoring them keeps
+        // smart-hide quiet for creative apps with many floaters.
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_TOOLWINDOW.0 != 0 {
+            return false;
+        }
         if dr <= dl || db <= dt {
-            return true;
+            return false;
         }
         let mut wr = RECT::default();
         if GetWindowRect(hwnd, &mut wr).is_err() {
             return false;
         }
-        wr.left < dr && wr.right > dl && wr.top < db && wr.bottom > dt
+        let ol = wr.left.max(dl);
+        let ot = wr.top.max(dt);
+        let or = wr.right.min(dr);
+        let ob = wr.bottom.min(db);
+        let ow = or - ol;
+        let oh = ob - ot;
+        if ow <= 0 || oh <= 0 {
+            return false;
+        }
+        // Require meaningful coverage of the dock strip — a 2px graze from a
+        // floating inspector must not tuck the bar.
+        let dock_w = dr - dl;
+        let dock_h = db - dt;
+        if dock_w >= dock_h {
+            // Horizontal dock: need a chunk along the bar and most of its depth.
+            ow >= (dock_w / 5).max(48) && oh >= (dock_h / 2).max(10)
+        } else {
+            // Vertical dock: same idea, swapped axes.
+            oh >= (dock_h / 5).max(48) && ow >= (dock_w / 2).max(10)
+        }
     }
 }
 

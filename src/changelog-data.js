@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.59.1",
+    date: "19 jul 2026",
+    headline: "Grupos iguales en cuadr\u00edcula y lista; smart-hide ignora paletas flotantes.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Ajustes \u00b7 Apps",
+        notes: [
+          "En cuadr\u00edcula: renombrar el grupo al abrirlo, renombrar hijos, sacar o quitar sin men\u00fa contextual.",
+          "En lista: la misma pista de arrastre/a\u00f1adir que en cuadr\u00edcula.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Smart-hide",
+        notes: [
+          "Ventanas WS_EX_TOOLWINDOW (paletas de apps creativas) ya no esconden el dock.",
+          "Hace falta un solape real con la barra, no un roce de 2 px.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.59.0",
     date: "19 jul 2026",
     headline: "Smart-hide m\u00e1s fiel al dock real, notch completo en Comportamiento, preview que no miente.",
