@@ -42,12 +42,12 @@
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 
-## What's new in 0.58
+## What's new in 0.59
 
-- **Settings survive uninstall** — reinstalling Booki keeps `%APPDATA%\Booki` unless you check *Delete app data*.
-- **Onboarding stays dismissed** — first-run tips and the Settings intro are persisted; sliders no longer reset them.
-- **Fullscreen toast** — the hide message no longer flashes the bare notch pill underneath.
-- **Clearer groups** — open/switch flyouts, reorder inside the stack, add apps or folders, running dots on group children.
+- **Smarter smart-hide** — occlusion uses the painted dock rect (not the flyout stage), so unrelated windows stop tucking the bar.
+- **Notch controls together** — size, peek, reveal, and always-visible live under Behavior.
+- **Settings survive uninstall** — `%APPDATA%\Booki` is kept unless you check *Delete app data*.
+- **Clearer groups** — reorder in the flyout, add apps or folders, running dots on group children.
 
 Older notes live in Settings → What's new.
 

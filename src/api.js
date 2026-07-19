@@ -383,8 +383,15 @@ export const dock = {
   appIcon: (path) => invoke("app_icon", { path }),
   imageDataUri: (path) => invoke("image_data_uri", { path }),
   reposition: (edge) => invoke("reposition_dock", { edge }),
-  setDockFrame: (edge, width, height, hidden = false) =>
-    invoke("set_dock_frame", { edge, width, height, hidden }),
+  setDockFrame: (edge, width, height, hidden = false, homeWidth = null, homeHeight = null) =>
+    invoke("set_dock_frame", {
+      edge,
+      width,
+      height,
+      hidden,
+      homeWidth,
+      homeHeight,
+    }),
   // Interactive regions of the stage window (window-relative CSS px); `all`
   // keeps the whole window interactive during drags/overlays.
   setHitRects: (rects, all = false) => invoke("set_hit_rects", { rects, all }),

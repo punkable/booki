@@ -732,12 +732,13 @@ function MonitorPicker({ value, monitors, onChange }) {
 
 // Live miniature of the dock that reacts to every appearance/behavior change.
 function MiniDockPreview({ cfg }) {
-  const items = (cfg.pinned || []).filter((p) => p.kind !== "separator").slice(0, 7);
+  const items = (cfg.pinned || []).filter((p) => p.kind !== "separator" && p.kind !== "trash").slice(0, 7);
   const count = items.length || 5;
   const scale = 0.42;
-  const size = Math.round((cfg.iconSize || 48) * scale);
+  const size = Math.round((cfg.iconSize || 48) * scale * (cfg.compact ? 0.92 : 1));
   const gap = Math.round((cfg.spacing ?? 6) * scale + 2);
   const vertical = cfg.edge === "left" || cfg.edge === "right";
+  const edge = cfg.edge || "bottom";
   const mat = (cfg.materialStrength ?? 70) / 100;
   const surface = resolveSurfaceStyle(cfg);
   // Same material curve as dock/notch (--material = 0.28 + mat * 0.62).
@@ -746,14 +747,17 @@ function MiniDockPreview({ cfg }) {
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+  const peek = cfg.notchPeek !== false;
   const fills = {
     mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + material * 40)}%, transparent)`,
     acrylic: `color-mix(in srgb, var(--surface-tint) ${material * 88}%, transparent)`,
     tinted: `linear-gradient(180deg, color-mix(in srgb, var(--accent) ${18 + material * 22}%, transparent), color-mix(in srgb, var(--surface-tint) ${material * 70}%, transparent))`,
     solid: `color-mix(in srgb, var(--surface-tint) 92%, var(--accent) 8%)`,
   };
+  const notchAlong = Math.round(42 * notchScale);
+  const notchAcross = Math.max(4, Math.round((peek ? 6 : 5) * notchScale));
   return (
-    <div className={"preview prev-" + (cfg.edge || "bottom") + " prev-surface-" + surface}>
+    <div className={"preview prev-" + edge + " prev-surface-" + surface + (peek ? " prev-peek" : "")}>
       <div
         className="preview-bar"
         style={{
@@ -765,11 +769,12 @@ function MiniDockPreview({ cfg }) {
         }}
       >
         {Array.from({ length: count }).map((_, i) => {
+          const item = items[i];
           const s = i === mid ? Math.round(size * zoom) : size;
           return (
             <span
-              key={i}
-              className="preview-tile"
+              key={item?.id || i}
+              className={"preview-tile" + (item?.kind === "group" ? " is-group" : "")}
               style={{
                 width: s,
                 height: s,
@@ -777,7 +782,7 @@ function MiniDockPreview({ cfg }) {
                 transform: i === mid ? (vertical ? "translateX(-4px)" : "translateY(-4px)") : "none",
               }}
             >
-              <PreviewIcon item={items[i]} />
+              <PreviewIcon item={item} />
             </span>
           );
         })}
@@ -785,9 +790,9 @@ function MiniDockPreview({ cfg }) {
       <span
         className="preview-notch"
         style={{
-          width: Math.round(42 * notchScale),
-          height: Math.max(4, Math.round(5 * notchScale)),
-          borderRadius: surface === "solid" ? 3 : 999,
+          width: vertical ? notchAcross : notchAlong,
+          height: vertical ? notchAlong : notchAcross,
+          borderRadius: surface === "solid" ? 3 : peek ? (vertical ? "0 8px 8px 0" : "8px 8px 0 0") : 999,
         }}
         title={t("ap.notchSize")}
       />
@@ -799,13 +804,25 @@ function PreviewIcon({ item }) {
   const [src, setSrc] = useState(item && item.icon ? item.icon : null);
   useEffect(() => {
     let alive = true;
+    if (item && item.kind === "group") {
+      setSrc(null);
+      return () => { alive = false; };
+    }
     if (item && !item.icon && item.path) {
       dockApi.appIcon(item.path).then((u) => alive && setSrc(u)).catch(() => {});
+    } else {
+      setSrc(item && item.icon ? item.icon : null);
     }
     return () => {
       alive = false;
     };
-  }, [item && item.path]);
+  }, [item && item.path, item && item.kind, item && item.icon]);
+  if (item && item.kind === "group") {
+    return <span className="preview-glyph" title={item.name || t("group.new")} />;
+  }
+  if (item && item.kind === "folder") {
+    return <span className="preview-glyph" style={{ background: "color-mix(in srgb, var(--accent) 40%, #c9a227)" }} />;
+  }
   if (src) return <img src={src} alt="" />;
   return <span className="preview-glyph" />;
 }
@@ -1120,7 +1137,6 @@ function HotkeyInput({ value, onChange }) {
 // ── Panels ──
 
 function Appearance({ cfg, set }) {
-  const notchScalePct = Math.round((Number(cfg.notchScale) || 1) * 100);
   const surface = resolveSurfaceStyle(cfg);
   const solidSurface = surface === "solid";
   return (
@@ -1162,29 +1178,6 @@ function Appearance({ cfg, set }) {
             />
           </Row>
         )}
-        <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
-          <Slider
-            value={notchScalePct}
-            min={70}
-            max={150}
-            step={5}
-            fmt={(v) => `${v}%`}
-            onChange={(v) => {
-              set(
-                { notchScale: v / 100 },
-                { flush: true, afterSave: () => dockApi.notchPreview() }
-              );
-            }}
-          />
-        </Row>
-        <Toggle
-          label={t("be.notchPeek")}
-          hint={t("be.notchPeekHint")}
-          checked={cfg.notchPeek !== false}
-          onChange={(v) => {
-            set({ notchPeek: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
-          }}
-        />
       </SettingsSection>
 
       <SettingsSection title={t("gp.size")} icon="app">
@@ -1253,6 +1246,29 @@ function Behavior({ cfg, set }) {
       </SettingsSection>
 
       <SettingsSection title={t("gp.notch")} icon="eye">
+        <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
+          <Slider
+            value={Math.round((Number(cfg.notchScale) || 1) * 100)}
+            min={70}
+            max={150}
+            step={5}
+            fmt={(v) => `${v}%`}
+            onChange={(v) => {
+              set(
+                { notchScale: v / 100 },
+                { flush: true, afterSave: () => dockApi.notchPreview() }
+              );
+            }}
+          />
+        </Row>
+        <Toggle
+          label={t("be.notchPeek")}
+          hint={t("be.notchPeekHint")}
+          checked={cfg.notchPeek !== false}
+          onChange={(v) => {
+            set({ notchPeek: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
+          }}
+        />
         {cfg.autoHideMode !== "off" ? (
           <>
             <Row label={t("be.reveal")} hint={t("be.revealHint")}>
@@ -1265,9 +1281,14 @@ function Behavior({ cfg, set }) {
                 ]}
               />
             </Row>
-            <Toggle label={t("be.notchAlwaysVisible")} hint={t("be.notchAlwaysVisibleHint")}
+            <Toggle
+              label={t("be.notchAlwaysVisible")}
+              hint={t("be.notchAlwaysVisibleHint")}
               checked={!!cfg.notchAlwaysVisible}
-              onChange={(v) => set({ notchAlwaysVisible: v })} />
+              onChange={(v) => {
+                set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
+              }}
+            />
           </>
         ) : (
           <p className="muted">{t("be.notchNeedsHide")}</p>

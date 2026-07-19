@@ -1913,6 +1913,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   width: min(420px, calc(100vw - 16px));
   max-height: min(360px, calc(100vh - 16px));
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 12px;
   /* Same material family as the dock — never a mismatched frost lid. */
   background: var(--panel-fill);
@@ -1946,9 +1947,9 @@ body.surface-solid .stack {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-body.edge-top .stack { transform: translateY(-8px) scale(0.96); }
-body.edge-left .stack { transform: translateX(-8px) scale(0.96); }
-body.edge-right .stack { transform: translateX(8px) scale(0.96); }
+body.edge-top .stack { transform-origin: top center; transform: translateY(-8px) scale(0.96); }
+body.edge-left .stack { transform-origin: left center; transform: translateX(-8px) scale(0.96); }
+body.edge-right .stack { transform-origin: right center; transform: translateX(8px) scale(0.96); }
 body.edge-top .stack.open,
 body.edge-left .stack.open,
 body.edge-right .stack.open { transform: none; }
@@ -2014,9 +2015,11 @@ body.edge-right .stack.open { transform: none; }
 .stack-item {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 10px 6px; border: 0; background: transparent; border-radius: var(--r-md);
-  cursor: pointer; color: var(--ink); overflow: hidden;
+  /* visible so corner × / actions aren't clipped on small cells */
+  cursor: pointer; color: var(--ink); overflow: visible;
   transition: background 0.14s var(--ease), transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
 }
+.stack-item .stack-name { overflow: hidden; max-width: 100%; }
 .stack-item[data-running="true"]::after {
   content: "";
   position: absolute;
@@ -3429,7 +3432,7 @@ html[data-theme="dark"] .seg-thumb {
 }
 .preview-notch {
   display: block;
-  margin: 8px auto 0;
+  flex: 0 0 auto;
   background: color-mix(in srgb, var(--accent) 28%, var(--layer-strong));
   border: 1px solid color-mix(in srgb, var(--stroke-light) 50%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -3438,42 +3441,6 @@ html[data-theme="dark"] .seg-thumb {
 @media (max-width: 560px) {
   .surface-row { grid-template-columns: 1fr; width: 100%; }
 }
-
-.nstyle-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.nstyle-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 10px 6px;
-  background: var(--layer);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-.nstyle-chip:hover { background: var(--hover); }
-.nstyle-chip.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.nstyle-name { font: 600 10.5px var(--font); color: var(--ink-2); }
-.nstyle-chip.active .nstyle-name { color: var(--accent-deep, var(--accent)); }
-.nstyle-pill { width: 42px; height: 10px; border-radius: 999px; }
-.ns-island {
-  background: radial-gradient(130% 200% at 50% -50%, rgba(255,255,255,0.3), transparent 58%),
-    color-mix(in srgb, var(--accent) 16%, rgba(15,15,20,0.8));
-  border: 1px solid rgba(255,255,255,0.25);
-}
-.ns-liquid {
-  background: radial-gradient(120% 220% at 30% -60%, rgba(255,255,255,0.7), transparent 60%),
-    color-mix(in srgb, var(--accent) 30%, rgba(255,255,255,0.3));
-  border: 1px solid rgba(255,255,255,0.6);
-}
-.ns-mica { background: color-mix(in srgb, var(--accent) 10%, rgba(58,58,64,0.96)); border: 1px solid rgba(255,255,255,0.15); }
-.ns-acrylic {
-  background: linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.08)),
-    color-mix(in srgb, var(--accent) 12%, rgba(160,160,170,0.45));
-  border: 1px solid rgba(255,255,255,0.4);
-}
-.ns-windows { border-radius: 3px; background: rgba(32,32,36,0.9); box-shadow: inset 0 2px 0 var(--accent); }
 
 /* Modifier chips for the position hotkeys. */
 .mod-row { display: flex; gap: 6px; }
@@ -3613,7 +3580,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .monpick-box.primary { font-weight: 800; }
 
-/* Live mini-dock preview */
+/* Live mini-dock preview — one composition: bar + notch on the anchored edge. */
 .preview:not(.tile) {
   position: relative; height: 150px; margin: 0 0 14px; border-radius: var(--r-lg);
   border: 1px solid var(--stroke-light); overflow: hidden; display: flex;
@@ -3622,20 +3589,28 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
     linear-gradient(160deg, color-mix(in srgb, #223044 84%, var(--accent)), #171c29);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-.prev-bottom { align-items: flex-end; justify-content: center; }
-.prev-top { align-items: flex-start; justify-content: center; }
-.prev-left { align-items: center; justify-content: flex-start; }
-.prev-right { align-items: center; justify-content: flex-end; }
+.prev-bottom { flex-direction: column; align-items: center; justify-content: flex-end; gap: 0; }
+.prev-top { flex-direction: column-reverse; align-items: center; justify-content: flex-end; gap: 0; }
+.prev-left { flex-direction: row; align-items: center; justify-content: flex-start; gap: 0; }
+.prev-right { flex-direction: row-reverse; align-items: center; justify-content: flex-start; gap: 0; }
 .preview-bar {
-  display: flex; align-items: center; padding: 6px 8px; margin: 12px;
+  display: flex; align-items: center; padding: 6px 8px; margin: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 14px;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   transition: background 0.22s var(--ease), border-radius 0.22s var(--ease), transform 0.22s var(--ease);
 }
+.prev-bottom .preview-bar { margin-bottom: 6px; }
+.prev-top .preview-bar { margin-top: 6px; }
+.prev-left .preview-bar { margin-left: 6px; }
+.prev-right .preview-bar { margin-right: 6px; }
 .preview-tile {
   display: flex; align-items: center; justify-content: center; overflow: hidden;
   border-radius: 8px; transition: width 0.2s var(--ease), height 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.preview-tile.is-group {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .preview-tile img { width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)); }
 .preview-glyph {
@@ -3643,6 +3618,14 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   background: linear-gradient(150deg, var(--accent), var(--accent-deep));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
+.prev-bottom .preview-notch { margin: 0 0 4px; }
+.prev-top .preview-notch { margin: 4px 0 0; }
+.prev-left .preview-notch { margin: 0 0 0 2px; }
+.prev-right .preview-notch { margin: 0 2px 0 0; }
+.prev-peek.prev-bottom .preview-notch { border-radius: 8px 8px 0 0 !important; }
+.prev-peek.prev-top .preview-notch { border-radius: 0 0 8px 8px !important; }
+.prev-peek.prev-left .preview-notch { border-radius: 0 8px 8px 0 !important; }
+.prev-peek.prev-right .preview-notch { border-radius: 8px 0 0 8px !important; }
 
 .r-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; font-size: 13.8px; font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--stroke); }
 .r-toggle:last-child { border-bottom: 0; }

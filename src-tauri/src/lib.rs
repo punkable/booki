@@ -315,9 +315,19 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
         clip_apply_config(&config);
         apply_always_on_top(&app);
         apply_capture_policy(&app, config.capture_visible);
-        // Keep notch window geometry in sync (style / peek / scale).
+        // Keep notch window geometry + visibility in sync with settings.
         if let Some(notch) = app.get_webview_window("notch") {
             let _ = position_notch(&notch, &config.edge);
+            let dock_visible = app
+                .get_webview_window("dock")
+                .map(|d| d.is_visible().unwrap_or(true))
+                .unwrap_or(true);
+            if config.notch_always_visible {
+                let _ = notch.show();
+            } else if dock_visible {
+                // Dock is out → notch is off-duty unless always-visible.
+                let _ = notch.hide();
+            }
         }
     }
     result
@@ -363,13 +373,21 @@ fn set_dock_frame(
     width: u32,
     height: u32,
     hidden: Option<bool>,
+    home_width: Option<u32>,
+    home_height: Option<u32>,
 ) -> Result<(), String> {
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
     let h = height.max(8);
     let (x, y) = dock_xy(&window, &edge, w as i32, h as i32)?;
     if hidden != Some(true) {
-        *DOCK_HOME_RECT.lock().unwrap() = (x, y, x + w as i32, y + h as i32);
+        // Occlusion uses the painted bar rect when provided — not the tall
+        // stage that includes flyout PANEL_ROOM (that made smart-hide fire for
+        // windows that never touched the visible dock).
+        let hw = home_width.unwrap_or(w).max(8);
+        let hh = home_height.unwrap_or(h).max(8);
+        let (hx, hy) = dock_xy(&window, &edge, hw as i32, hh as i32).unwrap_or((x, y));
+        *DOCK_HOME_RECT.lock().unwrap() = (hx, hy, hx + hw as i32, hy + hh as i32);
     }
     // Resize + reposition in ONE SetWindowPos: the old set_size-then-set_position
     // pair painted an intermediate frame (resized but not yet moved), which read
@@ -1269,7 +1287,7 @@ fn notch_preview(app: AppHandle) {
             .get_webview_window("dock")
             .map(|d| d.is_visible().unwrap_or(true))
             .unwrap_or(true);
-        if dock_visible {
+        if dock_visible && !config::load().notch_always_visible {
             if let Some(notch) = app.get_webview_window("notch") {
                 let _ = notch.hide();
             }

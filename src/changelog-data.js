@@ -3,6 +3,30 @@
 
 export const CHANGELOG = [
   {
+    version: "0.59.0",
+    date: "19 jul 2026",
+    headline: "Smart-hide m\u00e1s fiel al dock real, notch completo en Comportamiento, preview que no miente.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Ocultar y magnify",
+        notes: [
+          "Smart-hide mide el rect del dock pintado (sin el hueco del flyout), as\u00ed no se esconde por ventanas que no lo tocan.",
+          "Hover del notch ya no deja el dock pegado; un summon se tuckea al trabajar en otra app.",
+          "Tras el magnify se restauran los hit-rects; ResizeObserver ignora jitter de 1\u20133 px.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Ajustes y flyouts",
+        notes: [
+          "Tama\u00f1o, peek, revelar y always-visible del notch viven juntos en Comportamiento.",
+          "Vista previa del dock respeta el borde y el notch; flyouts abren desde el borde correcto.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.58.2",
     date: "19 jul 2026",
     headline: "Fullscreen toast estable, onboarding real en instalaci\u00f3n nueva, FAQ al d\u00eda.",
