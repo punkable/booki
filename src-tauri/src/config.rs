@@ -431,7 +431,30 @@ pub fn load() -> Config {
         cfg.settings_rev = 6;
         let _ = save(&cfg);
     }
+    // Heal empty / single-child groups left behind by older builds or partial edits.
+    cfg.pinned = normalize_pinned(cfg.pinned);
     cfg
+}
+
+/// Dissolve groups with fewer than 2 children (empty → drop, one → promote).
+fn normalize_pinned(pinned: Vec<PinnedApp>) -> Vec<PinnedApp> {
+    let mut out = Vec::with_capacity(pinned.len());
+    for p in pinned {
+        if p.kind != "group" {
+            out.push(p);
+            continue;
+        }
+        let mut kids = p.children;
+        if kids.len() >= 2 {
+            out.push(PinnedApp {
+                children: kids,
+                ..p
+            });
+        } else if kids.len() == 1 {
+            out.push(kids.remove(0));
+        }
+    }
+    out
 }
 
 /// Persist config to disk, creating the directory if needed.
@@ -441,6 +464,8 @@ pub fn load() -> Config {
 pub fn save(config: &Config) -> Result<(), String> {
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // Do not dissolve groups here — Settings may temporarily save an empty
+    // staging group ("+ New group"). The dock + load() heal empty/1-child groups.
     let text = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     let final_path = config_path();
     let tmp_path = dir.join("config.json.tmp");

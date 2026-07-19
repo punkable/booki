@@ -3,6 +3,31 @@
 
 export const CHANGELOG = [
   {
+    version: "0.57.1",
+    date: "19 jul 2026",
+    headline: "Grupos del dock más claros: abrir, fusionar, indicadores y confirmación al quitar.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Grupos que se entienden",
+        notes: [
+          "Abrir desde el menú contextual siempre revela el grupo (no lo cierra si ya estaba abierto).",
+          "Cambiar de grupo con un clic; renombrar con Enter/Esc; sacar un hijo al dock sin borrarlo.",
+          "Indicador de apps en ejecución también en grupos y en el flyout; confirmación al quitar un grupo con contenido.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Misma lógica en dock, Ajustes y backend",
+        notes: [
+          "Helpers compartidos para fusionar/normalizar grupos; carpetas se anclan como folder (no como app).",
+          "Ajustes puede crear un grupo vacío y rellenarlo; el dock disuelve grupos de 0–1 hijos al guardar.",
+          "Notch y vista previa de Apariencia usan el mismo material que el dock.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.57.0",
     date: "19 jul 2026",
     headline: "Superficie unificada dock+notch, materiales Windows y Apariencia más clara.",

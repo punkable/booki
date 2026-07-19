@@ -43,6 +43,11 @@ async function applyLook() {
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     applySurfaceClass(cfg);
+    // Match dock material mapping so notch tint opacity tracks the same knob.
+    const mat = (cfg.materialStrength ?? 70) / 100;
+    const material = String(Math.max(0.22, Math.min(0.94, 0.28 + mat * 0.62)));
+    document.body.style.setProperty("--material", material);
+    document.documentElement.style.setProperty("--material", material);
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));

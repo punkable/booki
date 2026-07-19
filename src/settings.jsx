@@ -93,6 +93,7 @@ import {
   resolveSurfaceStyle,
   legacyNotchFromSurface,
 } from "./surface.js";
+import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
 import { checkForUpdate, installUpdate } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { icon } from "./icons.js";
@@ -739,16 +740,17 @@ function MiniDockPreview({ cfg }) {
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const mat = (cfg.materialStrength ?? 70) / 100;
   const surface = resolveSurfaceStyle(cfg);
-  const alpha = Math.max(0.28, Math.min(0.96, 0.3 + mat * 0.66));
+  // Same material curve as dock/notch (--material = 0.28 + mat * 0.62).
+  const material = Math.max(0.22, Math.min(0.94, 0.28 + mat * 0.62));
   const mid = Math.floor(count / 2);
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
   const fills = {
-    mica: `color-mix(in srgb, var(--layer-strong) ${Math.min(96, 70 + alpha * 28)}%, transparent)`,
-    acrylic: `color-mix(in srgb, var(--layer-strong) ${alpha * 88}%, transparent)`,
-    tinted: `color-mix(in srgb, var(--accent) ${22 + alpha * 18}%, color-mix(in srgb, var(--layer-strong) ${alpha * 70}%, transparent))`,
-    solid: `color-mix(in srgb, var(--layer-strong) 94%, var(--accent) 6%)`,
+    mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + material * 40)}%, transparent)`,
+    acrylic: `color-mix(in srgb, var(--surface-tint) ${material * 88}%, transparent)`,
+    tinted: `linear-gradient(180deg, color-mix(in srgb, var(--accent) ${18 + material * 22}%, transparent), color-mix(in srgb, var(--surface-tint) ${material * 70}%, transparent))`,
+    solid: `color-mix(in srgb, var(--surface-tint) 92%, var(--accent) 8%)`,
   };
   return (
     <div className={"preview prev-" + (cfg.edge || "bottom") + " prev-surface-" + surface}>
@@ -895,7 +897,7 @@ function Suggestions({ cfg, set }) {
   useEffect(() => {
     // Memoized across tab switches: scanning the Start Menu and extracting every
     // icon is slow, and this panel remounts each time you open the Apps tab.
-    installedAppsOnce().then((a) => setGroups(normalizeGroups(a)));
+    installedAppsOnce().then((a) => setGroups(normalizeSuggestGroups(a)));
     dockApi.knownFolders().then((v) => setKf(Array.isArray(v) ? v : [])).catch(() => {});
   }, []);
   if (!groups || groups.length === 0) return null;
@@ -955,7 +957,7 @@ function Suggestions({ cfg, set }) {
           onClick={async () => {
             setRefreshing(true);
             const fresh = await installedAppsOnce(true);
-            setGroups(normalizeGroups(fresh));
+            setGroups(normalizeSuggestGroups(fresh));
             setRefreshing(false);
           }}
         >
@@ -1023,7 +1025,7 @@ function Suggestions({ cfg, set }) {
 // Accept either the new grouped shape ([{name, items}]) or a legacy flat list.
 // Tiny groups (a single app) merge into the general "Apps" bucket, and groups
 // come out alphabetized with the general bucket first — tidier to scan.
-function normalizeGroups(a) {
+function normalizeSuggestGroups(a) {
   if (!Array.isArray(a)) return [];
   let groups =
     a.length && a[0] && Array.isArray(a[0].items)
@@ -1662,6 +1664,8 @@ function Apps({ cfg, set }) {
   const pickView = (v) => { setView(v); try { localStorage.setItem("booki.appsView", v); } catch (_) {} };
   // Two-step "remove everything" so a stray click can't wipe the dock.
   const [clearArm, setClearArm] = useState(false);
+  // Two-step remove for groups so a stray click can't wipe several pins.
+  const [removeArm, setRemoveArm] = useState(-1);
   const setIcon = (i, value) =>
     set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
   const setStyle = (ref, value) =>
@@ -1697,16 +1701,6 @@ function Apps({ cfg, set }) {
     set({ pinned: cfg.pinned.flatMap((p, k) => (k === i ? grp.children || [] : [p])) });
   };
 
-  const doMerge = (from, to) => {
-    const arr = pinnedRef.current;
-    const dragged = arr[from];
-    const target = arr[to];
-    const merged =
-      target.kind === "group"
-        ? { ...target, children: [...(target.children || []), dragged] }
-        : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
-    set({ pinned: arr.map((p, k) => (k === to ? merged : p)).filter((_, k) => k !== from) });
-  };
   const startDrag = (i) => (e) => {
     e.preventDefault();
     drag.current = { from: i };
@@ -1727,8 +1721,8 @@ function Apps({ cfg, set }) {
         const center = ev.clientY > r.top + r.height * 0.3 && ev.clientY < r.bottom - r.height * 0.3;
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
-        const mergeable = (k) => k === "app" || k === "widget";
-        const canMerge = mergeable(dragged?.kind) && (mergeable(target?.kind) || target?.kind === "group");
+        const canMerge =
+          canMergeKind(dragged?.kind) && (canMergeKind(target?.kind) || target?.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
           return;
@@ -1756,16 +1750,9 @@ function Apps({ cfg, set }) {
       const from = drag.current?.from;
       let next = pinnedRef.current;
       if (m >= 0 && from != null && m !== from) {
-        const arr = [...next];
-        const dragged = arr[from];
-        const target = arr[m];
-        if (dragged && target) {
-          const merged =
-            target.kind === "group"
-              ? { ...target, children: [...(target.children || []), dragged] }
-              : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
-          next = arr.map((p, k) => (k === m ? merged : p)).filter((_, k) => k !== from);
-        }
+        const dragged = next[from];
+        const target = next[m];
+        if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
       }
       set({ pinned: next });
       setDraftPinned(null);
@@ -1834,8 +1821,8 @@ function Apps({ cfg, set }) {
           ev.clientY > r.top + r.height * 0.28 && ev.clientY < r.bottom - r.height * 0.28;
         const dragged = pinnedRef.current[from];
         const target = pinnedRef.current[over];
-        const mergeable = (k) => k === "app" || k === "widget";
-        const canMerge = mergeable(dragged?.kind) && (mergeable(target?.kind) || target?.kind === "group");
+        const canMerge =
+          canMergeKind(dragged?.kind) && (canMergeKind(target?.kind) || target?.kind === "group");
         if (center && canMerge) {
           if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
           return;
@@ -1858,16 +1845,9 @@ function Apps({ cfg, set }) {
       const from = drag.current?.from;
       let next = pinnedRef.current;
       if (m >= 0 && from != null && m !== from) {
-        const arr = [...next];
-        const dragged = arr[from];
-        const target = arr[m];
-        if (dragged && target) {
-          const merged =
-            target.kind === "group"
-              ? { ...target, children: [...(target.children || []), dragged] }
-              : { id: uid(), name: t("group.new"), path: "", args: [], kind: "group", children: [target, dragged] };
-          next = arr.map((p, k) => (k === m ? merged : p)).filter((_, k) => k !== from);
-        }
+        const dragged = next[from];
+        const target = next[m];
+        if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
       }
       set({ pinned: next });
       setDraftPinned(null);
@@ -1878,8 +1858,16 @@ function Apps({ cfg, set }) {
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
   };
-  const remove = (i) => set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
-  const clearAll = () => { set({ pinned: [] }); setClearArm(false); };
+  const remove = (i) => {
+    const item = cfg.pinned[i];
+    if (item?.kind === "group" && (item.children || []).length > 0 && removeArm !== i) {
+      setRemoveArm(i);
+      return;
+    }
+    setRemoveArm(-1);
+    set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
+  };
+  const clearAll = () => { set({ pinned: [] }); setClearArm(false); setRemoveArm(-1); };
 
   // Grid view: drag a group's child SQUARE to reorder it within the group, or
   // drag it out of the group card to take it back onto the dock — no buttons.
@@ -2039,11 +2027,11 @@ function Apps({ cfg, set }) {
   };
   const addApp = async () => {
     const path = await pickAppFile();
-    if (path) set({ pinned: [...cfg.pinned, mkApp(path)] });
+    if (path) set({ pinned: [...cfg.pinned, mkPin(path, "app")] });
   };
   const addFolder = async () => {
     const path = await pickFolder();
-    if (path) set({ pinned: [...cfg.pinned, mkApp(path)] });
+    if (path) set({ pinned: [...cfg.pinned, mkPin(path, "folder")] });
   };
   const addSep = () =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
@@ -2075,7 +2063,11 @@ function Apps({ cfg, set }) {
   const addToFolder = async (gi) => {
     const path = await pickAppFile();
     if (!path) return;
-    set({ pinned: cfg.pinned.map((p, k) => (k === gi ? { ...p, children: [...(p.children || []), mkApp(path)] } : p)) });
+    set({
+      pinned: cfg.pinned.map((p, k) =>
+        k === gi ? { ...p, children: [...(p.children || []), mkPin(path, "app")] } : p
+      ),
+    });
   };
   const renameChild = (gi, childId, name) =>
     set({
@@ -2202,7 +2194,12 @@ function Apps({ cfg, set }) {
                   {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
                     <IconBtn name="palette" title={t("apps.changeIcon")} onClick={() => setIconFor(i)} />
                   )}
-                  <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => remove(i)} />
+                  <IconBtn
+                    name="trash"
+                    danger
+                    title={removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
+                    onClick={() => remove(i)}
+                  />
                 </div>
                 {open && (
                   <div className={"pin-card-kids" + (kidOut === i ? " taking-out" : "")}>
@@ -2288,7 +2285,12 @@ function Apps({ cfg, set }) {
                 {(item.kind === "app" || item.kind === "folder") && (
                   <IconBtn name="external" title={t("apps.openLoc")} onClick={() => dockApi.openLocation(item.path)} />
                 )}
-                <IconBtn name="trash" danger title={t("apps.remove")} onClick={() => remove(i)} />
+                <IconBtn
+                  name="trash"
+                  danger
+                  title={removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
+                  onClick={() => remove(i)}
+                />
               </span>
             </li>,
           ];
@@ -2912,6 +2914,8 @@ function App() {
   const set = (patch, opts = {}) => {
     setCfg((prev) => {
       const next = { ...prev, ...patch };
+      // Keep empty staging groups in Settings; dock persist dissolves them.
+      if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
       // Switching language may need its dictionary → load then re-render.
       if (prev && prev.language !== next.language) {
         ensureLang(next.language).then(() => {

@@ -153,9 +153,11 @@ input:focus-visible,
   --layer: rgba(255, 255, 255, 0.7);
   --layer-strong: rgba(255, 255, 255, 0.86);
   --stroke: rgba(0, 0, 0, 0.08);
+  --stroke-light: rgba(255, 255, 255, 0.7);
   --ink: #1b1b1b;
   --ink-2: #5a5a5a;
   --hover: rgba(0, 0, 0, 0.05);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.10);
   --track: rgba(0, 0, 0, 0.12);
   --acrylic: rgba(255, 255, 255, 0.6);
   --acrylic-soft: rgba(255, 255, 255, 0.45);
@@ -167,9 +169,11 @@ input:focus-visible,
   --layer: rgba(40, 40, 42, 0.6);
   --layer-strong: rgba(44, 44, 46, 0.9);
   --stroke: rgba(255, 255, 255, 0.09);
+  --stroke-light: rgba(255, 255, 255, 0.12);
   --ink: #f2f2f2;
   --ink-2: #a8a8a8;
   --hover: rgba(255, 255, 255, 0.07);
+  --shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
   --track: rgba(255, 255, 255, 0.16);
   --acrylic: rgba(38, 38, 42, 0.55);
   --acrylic-soft: rgba(34, 34, 38, 0.42);
@@ -179,11 +183,15 @@ input:focus-visible,
 * {
   box-sizing: border-box;
 }
+html {
+  font-optical-sizing: auto;
+}
 html,
 body {
   margin: 0;
   height: 100%;
   font-family: var(--font);
+  font-variation-settings: "opsz" 16;
   color: var(--ink);
   -webkit-user-select: none;
   user-select: none;
@@ -209,10 +217,12 @@ body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 18px); }
 body.dock-body.edge-top { padding-top: var(--edge-pad, 18px); }
 body.dock-body.edge-left { padding-left: var(--edge-pad, 18px); }
 body.dock-body.edge-right { padding-right: var(--edge-pad, 18px); }
-/* A tight gap has no room for the outward shadow — keep it subtle instead of
-   letting it clip against the window edge. */
+/* Tight to the taskbar: keep material insets, only shrink the outer cast. */
 body.tight-edge .dock {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset var(--lit-x, 0) var(--lit-y, 1px) 0 var(--surf-inset-lit),
+    inset var(--shade-x, 0) var(--shade-y, -1px) 0 var(--surf-inset-shade),
+    0 1px 3px color-mix(in srgb, #000 12%, transparent);
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
@@ -226,15 +236,101 @@ body.edge-bottom.slot-end, body.edge-top.slot-end { justify-content: flex-end; p
 body.edge-left.slot-start, body.edge-right.slot-start { align-items: flex-start; padding-top: 12%; }
 body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; padding-bottom: 12%; }
 
-.dock {
-  --gap: 6px;
+/* Surface tokens live on body so dock, notch, flyouts and menus share one finish. */
+body {
   --surf-blur: 28px;
   --surf-sat: 140%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 100%), transparent);
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 100%), transparent);
   --surf-stroke: color-mix(in srgb, var(--stroke-light) 55%, transparent);
-  --surf-inset-top: rgba(255, 255, 255, 0.22);
-  --surf-inset-bot: rgba(0, 0, 0, 0.05);
+  --surf-inset-lit: rgba(255, 255, 255, 0.22);
+  --surf-inset-shade: rgba(0, 0, 0, 0.05);
   --surf-sheen: 0.55;
+  --surf-sheen-dir: 180deg;
+  --panel-blur: calc(var(--surf-blur) * 0.85);
+  --panel-sat: var(--surf-sat);
+  --panel-fill: var(--layer-strong);
+  --lit-x: 0; --lit-y: 1px;
+  --shade-x: 0; --shade-y: -1px;
+}
+body.surface-mica {
+  --surf-blur: 20px;
+  --surf-sat: 110%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(72% + var(--material, 0.55) * 22%), transparent);
+  --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.14);
+  --surf-inset-shade: rgba(0, 0, 0, 0.04);
+  --surf-sheen: 0.28;
+  --panel-blur: 18px;
+  --panel-sat: 115%;
+  --panel-fill: color-mix(in srgb, var(--surface-tint) 82%, var(--layer-strong));
+}
+body.surface-acrylic {
+  --surf-blur: 36px;
+  --surf-sat: 165%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 88%), transparent);
+  --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.26);
+  --surf-sheen: 0.62;
+  --panel-blur: 30px;
+  --panel-sat: 170%;
+  --panel-fill: color-mix(in srgb, var(--layer-strong) 88%, transparent);
+}
+body.surface-tinted {
+  --surf-blur: 32px;
+  --surf-sat: 180%;
+  --surf-fill: color-mix(
+    in srgb,
+    var(--accent) calc(18% + var(--material, 0.55) * 22%),
+    color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 70%), transparent)
+  );
+  --surf-stroke: color-mix(in srgb, var(--accent) 28%, var(--stroke-light));
+  --surf-inset-lit: color-mix(in srgb, #fff 55%, var(--accent));
+  --surf-sheen: 0.48;
+  --panel-blur: 28px;
+  --panel-sat: 175%;
+  --panel-fill: color-mix(in srgb, var(--accent) 14%, var(--layer-strong));
+}
+body.surface-solid {
+  --surf-blur: 0px;
+  --surf-sat: 100%;
+  --surf-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
+  --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.1);
+  --surf-inset-shade: rgba(0, 0, 0, 0.08);
+  --surf-sheen: 0.12;
+  --panel-blur: 0px;
+  --panel-sat: 100%;
+  --panel-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
+}
+html[data-theme="dark"] body.surface-mica,
+html[data-theme="dark"] body.surface-solid {
+  --surf-fill: color-mix(in srgb, #2b2b2f calc(78% + var(--material, 0.55) * 16%), transparent);
+}
+html[data-theme="dark"] body.surface-acrylic {
+  --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material, 0.55) * 78%), transparent);
+}
+html[data-theme="dark"] body.surface-tinted {
+  --surf-fill: color-mix(
+    in srgb,
+    var(--accent) calc(22% + var(--material, 0.55) * 18%),
+    color-mix(in srgb, #1a1a1e calc(var(--material, 0.55) * 72%), transparent)
+  );
+}
+html[data-theme="dark"] body.surface-solid {
+  --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
+  --panel-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  body {
+    --surf-blur: 0px;
+    --panel-blur: 0px;
+    --surf-fill: color-mix(in srgb, var(--surface-tint) 92%, transparent);
+    --panel-fill: var(--layer-strong);
+  }
+}
+
+.dock {
+  --gap: 6px;
   position: relative;
   display: flex;
   gap: var(--gap);
@@ -242,27 +338,30 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
   margin: 0;
   list-style: none;
   overflow: visible;
-  /* Fluent-like materials via CSS (native DWM vibrancy on a transparent stage
-     window paints a gray box). body.surface-* overrides the tokens below. */
   background: var(--surf-fill);
   -webkit-backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
   backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
   border: 1px solid var(--surf-stroke);
   border-radius: var(--dock-r);
+  /* Inset light follows the free edge (--lit-*), cast shadow follows --sh-*. */
   box-shadow:
-    inset 0 1px 0 var(--surf-inset-top),
-    inset 0 -1px 0 var(--surf-inset-bot),
+    inset var(--lit-x, 0) var(--lit-y, 1px) 0 var(--surf-inset-lit),
+    inset var(--shade-x, 0) var(--shade-y, -1px) 0 var(--surf-inset-shade),
     var(--sh-x, 0) var(--sh-y, 5px) 16px color-mix(in srgb, #000 22%, transparent);
   transition:
-    transform 0.22s var(--ease),
-    opacity 0.2s ease,
-    background 0.22s ease,
-    border-color 0.22s ease,
-    box-shadow 0.22s ease,
-    backdrop-filter 0.22s ease;
+    transform 0.2s var(--ease-out),
+    opacity 0.18s var(--ease-out),
+    background 0.22s var(--ease-out),
+    border-color 0.22s var(--ease-out),
+    box-shadow 0.22s var(--ease-out),
+    backdrop-filter 0.22s var(--ease-out);
   isolation: isolate;
 }
-/* Soft top sheen — subdued so materials read as Windows glass, not neon. */
+body.surface-solid .dock {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* Sheen from the free (lit) edge — not always CSS top. */
 .dock::before {
   content: "";
   position: absolute;
@@ -270,73 +369,36 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 48%);
+  background: linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, 0.18), transparent 48%);
   opacity: var(--surf-sheen);
 }
 .dock > * { position: relative; z-index: 1; }
 
-/* ── Unified surface materials (dock + notch share these body classes) ── */
-body.surface-mica .dock {
-  --surf-blur: 20px;
-  --surf-sat: 110%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(72% + var(--material) * 22%), transparent);
-  --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
-  --surf-inset-top: rgba(255, 255, 255, 0.14);
-  --surf-inset-bot: rgba(0, 0, 0, 0.04);
-  --surf-sheen: 0.28;
+/* Light catches the edge facing the desktop interior. */
+body.edge-bottom .dock {
+  --sh-x: 0; --sh-y: 6px;
+  --lit-x: 0; --lit-y: 1px;
+  --shade-x: 0; --shade-y: -1px;
+  --surf-sheen-dir: 180deg;
 }
-body.surface-acrylic .dock {
-  --surf-blur: 36px;
-  --surf-sat: 165%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material) * 88%), transparent);
-  --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
-  --surf-inset-top: rgba(255, 255, 255, 0.26);
-  --surf-sheen: 0.62;
+body.edge-top .dock {
+  --sh-x: 0; --sh-y: -6px;
+  --lit-x: 0; --lit-y: -1px;
+  --shade-x: 0; --shade-y: 1px;
+  --surf-sheen-dir: 0deg;
 }
-body.surface-tinted .dock {
-  --surf-blur: 32px;
-  --surf-sat: 180%;
-  --surf-fill: color-mix(
-    in srgb,
-    var(--accent) calc(18% + var(--material) * 22%),
-    color-mix(in srgb, var(--surface-tint) calc(var(--material) * 70%), transparent)
-  );
-  --surf-stroke: color-mix(in srgb, var(--accent) 28%, var(--stroke-light));
-  --surf-inset-top: color-mix(in srgb, #fff 55%, var(--accent));
-  --surf-sheen: 0.48;
+body.edge-left .dock {
+  --sh-x: -6px; --sh-y: 0;
+  --lit-x: 1px; --lit-y: 0;
+  --shade-x: -1px; --shade-y: 0;
+  --surf-sheen-dir: 90deg;
 }
-body.surface-solid .dock {
-  --surf-blur: 0px;
-  --surf-sat: 100%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
-  --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
-  --surf-inset-top: rgba(255, 255, 255, 0.1);
-  --surf-inset-bot: rgba(0, 0, 0, 0.08);
-  --surf-sheen: 0.12;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+body.edge-right .dock {
+  --sh-x: 6px; --sh-y: 0;
+  --lit-x: -1px; --lit-y: 0;
+  --shade-x: 1px; --shade-y: 0;
+  --surf-sheen-dir: 270deg;
 }
-html[data-theme="dark"] body.surface-mica .dock,
-html[data-theme="dark"] body.surface-solid .dock {
-  --surf-fill: color-mix(in srgb, #2b2b2f calc(78% + var(--material) * 16%), transparent);
-}
-html[data-theme="dark"] body.surface-acrylic .dock {
-  --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material) * 78%), transparent);
-}
-html[data-theme="dark"] body.surface-tinted .dock {
-  --surf-fill: color-mix(
-    in srgb,
-    var(--accent) calc(22% + var(--material) * 18%),
-    color-mix(in srgb, #1a1a1e calc(var(--material) * 72%), transparent)
-  );
-}
-html[data-theme="dark"] body.surface-solid .dock {
-  --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
-}
-body.edge-bottom .dock { --sh-x: 0; --sh-y: 6px; }
-body.edge-top .dock { --sh-x: 0; --sh-y: -6px; }
-body.edge-left .dock { --sh-x: -6px; --sh-y: 0; }
-body.edge-right .dock { --sh-x: 6px; --sh-y: 0; }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: center; }
 /* Vertical: center every child (app icons AND widget cards) so the side bar
    reads as one tidy column. Thin cross-axis padding keeps its WIDTH close to
@@ -388,23 +450,34 @@ body.compact .w-card { padding: 4px 8px; gap: 6px; }
 body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
 /* Reveal is ease-out and quick: the dock appears instantly and decelerates
    into place — it shows dozens of times a day, so it must never crawl. */
-/* Hide/show runs often — keep it crisp and under ~220ms (Emil frequency rule). */
-body.autohide .dock { transition: transform 0.2s var(--ease-out), opacity 0.18s var(--ease-out), filter 0.18s var(--ease-out); }
+/* Genie: readable suck (not scale≈0), opacity trails transform so shape remains. */
+body.autohide .dock {
+  transition:
+    transform 0.2s var(--ease-out),
+    opacity 0.14s var(--ease-out) 0.06s,
+    filter 0.16s var(--ease-out);
+}
+body.autohide:not(.tucked) .dock {
+  transition:
+    transform 0.22s var(--ease-out),
+    opacity 0.18s var(--ease-out),
+    filter 0.18s var(--ease-out);
+}
 body.autohide.tucked.genie-bottom .dock {
   transform-origin: var(--genie-ox, 50%) 100%;
-  transform: translateY(60%) scale(0.12, 0.06) skewX(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+  transform: translateY(42%) scale(0.38, 0.16) skewX(calc((50 - var(--genie-oxn, 50)) * 0.12deg));
 }
 body.autohide.tucked.genie-top .dock {
   transform-origin: var(--genie-ox, 50%) 0%;
-  transform: translateY(-60%) scale(0.12, 0.06) skewX(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+  transform: translateY(-42%) scale(0.38, 0.16) skewX(calc((var(--genie-oxn, 50) - 50) * 0.12deg));
 }
 body.autohide.tucked.genie-left .dock {
   transform-origin: 0% var(--genie-ox, 50%);
-  transform: translateX(-60%) scale(0.06, 0.12) skewY(calc((var(--genie-oxn, 50) - 50) * 0.16deg));
+  transform: translateX(-42%) scale(0.16, 0.38) skewY(calc((var(--genie-oxn, 50) - 50) * 0.12deg));
 }
 body.autohide.tucked.genie-right .dock {
   transform-origin: 100% var(--genie-ox, 50%);
-  transform: translateX(60%) scale(0.06, 0.12) skewY(calc((50 - var(--genie-oxn, 50)) * 0.16deg));
+  transform: translateX(42%) scale(0.16, 0.38) skewY(calc((50 - var(--genie-oxn, 50)) * 0.12deg));
 }
 @media (prefers-reduced-motion: reduce) {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
@@ -763,10 +836,12 @@ body.edge-right .tile.widget:hover .w-card { transform: translateX(-2px) scale(1
 .tile.widget.no-ico .w-ico { display: none; }
 .w-main { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; }
 .w-label {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
-  /* Brighter than plain secondary ink so the tiny uppercase label stays legible
-     on the translucent glass card — especially in dark mode. */
-  text-transform: uppercase; color: color-mix(in srgb, var(--ink) 64%, var(--ink-2));
+  font-size: 9px;
+  font-weight: 650;
+  font-variation-settings: "opsz" 12;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 72%, var(--ink-2));
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Charging battery: accent cue without relying on emoji glyphs in textContent. */
@@ -1090,7 +1165,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 /* Overflowing titles scroll in a gentle loop (the text is doubled in .mq, so a
    -50% slide lands exactly on the seam). Built in dock.js only on overflow. */
 .tile.widget.media .w-value.scroll { text-overflow: clip; }
-.w-value .mq, .w-pv-sub .mq { display: inline-flex; white-space: nowrap; animation: w-mq var(--mq-duration, 9s) linear infinite; }
+.w-value .mq, .w-pv-sub .mq { display: inline-flex; white-space: nowrap; animation: w-mq var(--mq-duration, 24s) linear infinite; }
 .w-value .mq > span, .w-pv-sub .mq > span { padding-right: 26px; }
 /* Hold at rest for the first ~12% of EVERY cycle (not just the first, like an
    animation-delay would) so each loop starts with a readable pause. */
@@ -1299,11 +1374,8 @@ body.notch-body {
 body.notch-body.vertical { align-items: center; }
 .notch-pill { pointer-events: auto; }
 .notch-pill {
-  /* Tokens mirror the dock surface so collapsed ↔ expanded feel like one object. */
-  --glass: color-mix(in srgb, var(--surface-tint) 70%, rgba(20, 20, 24, 0.88));
-  --pill-stroke: rgba(255, 255, 255, 0.18);
-  --pill-inset: rgba(255, 255, 255, 0.2);
-  --pill-blur: 20px;
+  /* Same --surf-* tokens as the dock — one material, different shape. */
+  --glass: var(--surf-fill);
   position: relative;
   flex: 0 0 auto;
   width: calc(118px * var(--notch-scale, 1));
@@ -1312,26 +1384,25 @@ body.notch-body.vertical { align-items: center; }
   cursor: pointer;
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 55%),
-    var(--glass);
-  -webkit-backdrop-filter: blur(var(--pill-blur)) saturate(140%);
-  backdrop-filter: blur(var(--pill-blur)) saturate(140%);
-  border: 1px solid var(--pill-stroke);
+    linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, calc(var(--surf-sheen) * 0.28)), transparent 55%),
+    var(--surf-fill);
+  -webkit-backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
+  backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
+  border: 1px solid var(--surf-stroke);
   box-shadow:
-    inset 0 1px 0 var(--pill-inset),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.28);
-  /* Hover growth rides the compositor: `scale` instead of width/height. */
-  --pill-gx: 1.2;
-  --pill-gy: 1.32;
+    inset 0 1px 0 var(--surf-inset-lit),
+    inset 0 -1px 0 var(--surf-inset-shade);
+  --pill-gx: 1.18;
+  --pill-gy: 1.28;
   transition:
-    width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    height 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    border-radius 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    scale 0.18s var(--ease),
-    background 0.22s ease,
-    box-shadow 0.22s ease,
-    opacity 0.2s ease,
-    border-color 0.22s ease;
+    width 0.36s var(--ease-in-out),
+    height 0.36s var(--ease-in-out),
+    border-radius 0.36s var(--ease-in-out),
+    scale 0.16s var(--ease-out),
+    background 0.22s var(--ease-out),
+    box-shadow 0.22s var(--ease-out),
+    opacity 0.18s var(--ease-out),
+    border-color 0.22s var(--ease-out);
 }
 .notch-pill.notch-enter {
   animation: notch-enter 0.22s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
@@ -1344,9 +1415,13 @@ body.notch-body.vertical { align-items: center; }
 @media (prefers-reduced-motion: reduce) {
   .notch-pill.notch-enter { animation: none; }
 }
-.notch-pill:hover {
-  scale: var(--pill-gx) var(--pill-gy);
-  filter: brightness(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .notch-pill:hover {
+    scale: var(--pill-gx) var(--pill-gy);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--surf-inset-lit) 120%, #fff),
+      inset 0 -1px 0 var(--surf-inset-shade);
+  }
 }
 .notch-pill:active { cursor: grabbing; scale: 1 0.88; }
 .notch-pill:hover:active { scale: var(--pill-gx) calc(var(--pill-gy) * 0.88); }
@@ -1424,30 +1499,8 @@ body.notch-body.peek.edge-right .notch-pill::after {
   background: radial-gradient(circle 10px at 0 100%, transparent 9px, var(--glass) 9.5px);
 }
 
-/* Unified surfaces on the notch — same finishes as the dock. */
-body.notch-body.surface-mica .notch-pill {
-  --glass: color-mix(in srgb, var(--surface-tint, #3a3a40) 88%, rgba(20, 20, 24, 0.95));
-  --pill-stroke: rgba(255, 255, 255, 0.12);
-  --pill-inset: rgba(255, 255, 255, 0.14);
-  --pill-blur: 12px;
-}
-body.notch-body.surface-acrylic .notch-pill {
-  --glass: color-mix(in srgb, var(--surface-tint, #c8c8d0) 42%, rgba(24, 24, 28, 0.55));
-  --pill-stroke: rgba(255, 255, 255, 0.28);
-  --pill-inset: rgba(255, 255, 255, 0.28);
-  --pill-blur: 24px;
-}
-body.notch-body.surface-tinted .notch-pill {
-  --glass: color-mix(in srgb, var(--accent) 34%, rgba(22, 22, 28, 0.62));
-  --pill-stroke: color-mix(in srgb, var(--accent) 35%, rgba(255, 255, 255, 0.22));
-  --pill-inset: color-mix(in srgb, #fff 50%, var(--accent));
-  --pill-blur: 22px;
-}
+/* Solid notch: no blur, slight squaring — matches solid dock. */
 body.notch-body.surface-solid .notch-pill {
-  --glass: color-mix(in srgb, #2c2c30 94%, var(--accent) 6%);
-  --pill-stroke: rgba(255, 255, 255, 0.12);
-  --pill-inset: rgba(255, 255, 255, 0.1);
-  --pill-blur: 0px;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   border-radius: 6px;
@@ -1461,7 +1514,7 @@ body.notch-body.surface-solid .notch-pill::after { display: none; }
 
 /* Peek: keep outer shadows tight so the small window never clips the tab. */
 body.notch-body.peek .notch-pill {
-  box-shadow: inset 0 1px 0 var(--pill-inset, rgba(255, 255, 255, 0.22));
+  box-shadow: inset 0 1px 0 var(--surf-inset-lit);
 }
 body.notch-body.peek.edge-top .notch-pill { border-radius: 0 0 14px 14px; border-bottom: 1px solid rgba(255,255,255,0.20); border-top: 0; transform-origin: center top; }
 body.notch-body.peek.vertical .notch-pill {
@@ -1553,26 +1606,26 @@ body.notch-body.toast .notch-toast {
   background: transparent;
   cursor: pointer;
   border-radius: var(--tile-r);
+  /* Scale from the rail (macOS Dock), not geometric center. */
   transform-origin: bottom center;
   transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
     background 0.12s ease;
 }
-/* Center origin → the icon scales symmetrically and stays inside the bar's
-   padding (contained magnify, no clipping in the bar-sized window). */
-.tile { transform-origin: center center; }
-.tile:hover { background: color-mix(in srgb, var(--hover) 90%, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent); }
-.tile:active { background: color-mix(in srgb, var(--hover) 80%, var(--accent)); transform: scale(0.96); }
-/* In-page labels stay hidden unless "show names on hover" is on (then they
-   replace the floating custom tip). Native title remains the a11y fallback. */
+body.edge-top .tile { transform-origin: top center; }
+body.edge-left .tile { transform-origin: left center; }
+body.edge-right .tile { transform-origin: right center; }
+@media (hover: hover) and (pointer: fine) {
+  .tile:hover { background: color-mix(in srgb, var(--hover) 90%, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent); }
+}
+.tile:active { background: color-mix(in srgb, var(--hover) 80%, var(--accent)); transform: scale(0.97); }
 .tile .label { display: none; }
 body.show-labels .tile .label { display: block; }
 
-/* Focused tile — accent glow (the scale itself conveys the lift). */
+/* Focused tile — contact shadow only (no accent bloom / game-UI glow). */
 .tile.focus { z-index: 5; }
 .tile.focus img,
 .tile.focus .glyph {
-  filter: drop-shadow(0 6px 11px rgba(0, 0, 0, 0.28))
-    drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 45%, transparent));
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.34));
 }
 
 /* Window-count badge */
@@ -1848,31 +1901,30 @@ body.edge-left .sep-line, body.edge-right .sep-line {
 
 .stack {
   position: fixed;
-  /* vertical/edge offset is set inline from the bar's real size (dock.js) */
   z-index: 40;
   width: min(420px, calc(100vw - 16px));
   max-height: min(360px, calc(100vh - 16px));
   overflow-y: auto;
   padding: 12px;
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
+  /* Same material family as the dock — never a mismatched frost lid. */
+  background: var(--panel-fill);
+  border: 1px solid var(--surf-stroke);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
+  backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   contain: layout paint;
-  /* Open/close via transition (reliable in WebView2) — grows from the tile.
-     transform-origin is set per-open from placeStackNear(). */
   transform-origin: bottom center;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(8px) scale(0.96);
-  filter: blur(2px);
-  transition: opacity 0.16s var(--ease), transform 0.22s var(--ease), filter 0.2s ease,
-    visibility 0s linear 0.22s;
+  transform: translateY(8px) scale(0.97);
+  filter: blur(1px);
+  /* Exit snappier than enter. */
+  transition: opacity 0.12s var(--ease-out), transform 0.16s var(--ease-out), filter 0.14s var(--ease-out),
+    visibility 0s linear 0.16s;
 }
 .stack.open {
   opacity: 1;
@@ -1880,7 +1932,11 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   pointer-events: auto;
   transform: none;
   filter: none;
-  transition: opacity 0.16s var(--ease), transform 0.24s var(--ease), filter 0.18s ease;
+  transition: opacity 0.16s var(--ease-out), transform 0.22s var(--ease-out), filter 0.16s var(--ease-out);
+}
+body.surface-solid .stack {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 body.edge-top .stack { transform: translateY(-8px) scale(0.96); }
 body.edge-left .stack { transform: translateX(-8px) scale(0.96); }
@@ -1953,6 +2009,19 @@ body.edge-right .stack.open { transform: none; }
   cursor: pointer; color: var(--ink); overflow: hidden;
   transition: background 0.14s var(--ease), transform 0.14s var(--ease), box-shadow 0.14s var(--ease);
 }
+.stack-item[data-running="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel-fill, var(--layer)) 80%, transparent);
+  pointer-events: none;
+}
 .stack-item:hover {
   background: var(--hover);
   transform: translateY(-1px);
@@ -1961,13 +2030,16 @@ body.edge-right .stack.open { transform: none; }
 .stack-item:active { transform: scale(0.96); }
 /* Staggered entry of the folder items when the flyout opens. */
 @media (prefers-reduced-motion: no-preference) {
-  /* --i is capped in JS so large folders don't feel sluggish. */
-  .stack.open .stack-item {
-    animation: stack-cell-in 0.22s var(--ease) backwards;
-    animation-delay: calc(var(--i, 0) * 22ms);
+  /* Stagger only on the open that just happened — not on every re-render. */
+  .stack.open.just-opened .stack-item {
+    animation: stack-cell-in 0.2s var(--ease-out) backwards;
+    animation-delay: calc(var(--i, 0) * 28ms);
   }
 }
-@keyframes stack-cell-in { from { opacity: 0; transform: translateY(10px) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes stack-cell-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
 /* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
 .stack-item .stack-glyph {
@@ -2249,23 +2321,25 @@ body.edge-right .stack.open { transform: none; }
   z-index: 50;
   min-width: 260px;
   max-width: min(340px, calc(100vw - 16px));
-  /* Never taller than the window: long menus (recents…) scroll instead of
-     getting sliced at the window edge. */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   padding: 5px;
   font-family: var(--font);
   font-size: var(--text-md);
   color: var(--ink);
-  background: color-mix(in srgb, var(--layer-strong) 94%, var(--surface-tint));
-  border: 1px solid color-mix(in srgb, var(--stroke) 82%, var(--stroke-light));
+  background: var(--panel-fill);
+  border: 1px solid var(--surf-stroke);
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
+  backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  animation: menu-in 0.14s var(--ease);
+  animation: menu-in 0.14s var(--ease-out);
+}
+body.surface-solid .menu {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 .menu-head {
   display: grid;
@@ -3001,13 +3075,20 @@ body.settings-body::before {
 .r-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.2fr);
-  align-items: center;
+  align-items: start;
   gap: 14px;
   padding: 10px 0;
   border-bottom: 1px solid var(--stroke);
 }
 .r-row:last-child { border-bottom: 0; }
-.r-label { min-width: 0; font-size: 13.8px; font-weight: 600; display: flex; flex-direction: column; }
+.r-label {
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.55em; /* optical align with first control line */
+}
 .r-hint { font-size: var(--text-sm); color: var(--ink-2); font-weight: 400; margin-top: 3px; line-height: 1.35; }
 /* Controls never clip: they shrink, wrap their contents, and drop below the
    label on narrow windows instead of overflowing off-screen. */
@@ -3131,18 +3212,31 @@ select {
   position: absolute; top: 3px; bottom: 3px; left: 3px;
   width: calc((100% - 6px) / var(--n));
   transform: translateX(calc(var(--i) * 100%));
-  background: var(--layer-strong); border-radius: calc(var(--r-md) - 3px);
-  box-shadow: 0 2px 9px color-mix(in srgb, #000 16%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: transform 0.22s var(--ease);
+  background: var(--layer-strong);
+  border-radius: calc(var(--r-md) - 3px);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  box-shadow:
+    0 2px 8px color-mix(in srgb, #000 14%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: transform 0.22s var(--ease-out), box-shadow 0.18s var(--ease-out);
+}
+html[data-theme="dark"] .seg-thumb {
+  box-shadow:
+    0 2px 8px color-mix(in srgb, #000 28%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb { transition: none; }
 }
 .seg-item {
   position: relative; z-index: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 7px 8px; font: inherit; font-size: var(--text-md); color: var(--ink-2);
+  padding: 7px 8px; font: inherit; font-size: var(--text-md); font-weight: 600;
+  color: var(--ink-2);
   background: transparent; border: 0; cursor: pointer; border-radius: calc(var(--r-md) - 3px);
-  transition: color 0.14s var(--ease), transform 0.12s var(--ease); overflow: hidden;
+  transition: color 0.14s var(--ease-out), transform var(--motion-press) var(--ease-out); overflow: hidden;
 }
-.seg-item:active { transform: scale(0.98); }
-.seg-item.active { color: var(--ink); font-weight: 600; }
+.seg-item:active { transform: scale(0.97); }
+.seg-item.active { color: var(--ink); }
 .seg-ico { flex: 0 0 auto; font-size: var(--text-md); display: inline-flex; }
 .seg-ico svg { width: 14px; height: 14px; display: block; }
 .seg-lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3276,21 +3370,32 @@ select {
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  /* Checker under translucent fills so acrylic reads as glass, not a flat chip. */
+  background-image:
+    linear-gradient(45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.08) 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
 }
 .surface-mica .surface-swatch {
-  background: color-mix(in srgb, var(--surface-tint, #3a3a40) 90%, #888);
+  background-image: none;
+  background-color: color-mix(in srgb, var(--surface-tint) 92%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .surface-acrylic .surface-swatch {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 60%),
-    color-mix(in srgb, var(--surface-tint, #bbb) 50%, transparent);
-  backdrop-filter: blur(6px);
+  background-color: color-mix(in srgb, var(--surface-tint) 48%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 .surface-tinted .surface-swatch {
-  background: color-mix(in srgb, var(--accent) 42%, rgba(40, 40, 48, 0.55));
+  background-color: color-mix(in srgb, var(--accent) 40%, color-mix(in srgb, var(--surface-tint) 40%, transparent));
 }
 .surface-solid .surface-swatch {
-  background: color-mix(in srgb, #2c2c30 94%, var(--accent) 6%);
+  background-image: none;
+  background-color: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
   border-radius: 4px;
 }
 .surface-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -4404,7 +4509,6 @@ textarea {
 .widget-modal {
   font-family: var(--font);
 }
-.w-label,
 .w-sub,
 .w-pv-sub,
 .pin-kid-name,
@@ -4412,8 +4516,13 @@ textarea {
   font-size: var(--text-sm);
   line-height: 1.25;
 }
-.w-label {
-  font-weight: var(--weight-semibold);
+/* Keep dock micro-caps at 9px / opsz 12 — do not let the type normalize inflate them. */
+.tile.widget .w-label {
+  font-size: 9px;
+  font-weight: 650;
+  font-variation-settings: "opsz" 12;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
 }
 .w-value,
 .w-pv-title {
