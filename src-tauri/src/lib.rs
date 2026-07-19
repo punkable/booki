@@ -2368,12 +2368,22 @@ pub fn run() {
                 {
                     std::thread::spawn(move || {
                         let mut last: Option<String> = None;
+                        let mut active = clipboard_feature_active(&config::load());
+                        let mut since_cfg: u8 = 0;
                         loop {
-                            std::thread::sleep(std::time::Duration::from_millis(1000));
-                            // Do not read the OS clipboard when the feature is not
-                            // in use. The watcher wakes cheaply so enabling the
-                            // widget later takes effect without restarting Booki.
-                            if !clipboard_feature_active(&config::load()) {
+                            // When clipboard memory is off, sleep longer and only
+                            // re-read config every few ticks — avoids disk I/O every
+                            // second for users who never enable the feature.
+                            std::thread::sleep(std::time::Duration::from_millis(
+                                if active { 1000 } else { 2500 },
+                            ));
+                            since_cfg = since_cfg.saturating_add(1);
+                            let cfg_every = if active { 3 } else { 2 }; // ~3s on / ~5s off
+                            if since_cfg >= cfg_every {
+                                since_cfg = 0;
+                                active = clipboard_feature_active(&config::load());
+                            }
+                            if !active {
                                 last = None;
                                 continue;
                             }
@@ -2452,10 +2462,16 @@ pub fn run() {
                     let handle = app.handle().clone();
                     std::thread::spawn(move || {
                         let mut last_area: Option<(i32, i32, i32, i32)> = None;
+                        let mut cfg = config::load();
+                        let mut cfg_tick: u8 = 0;
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(1200));
                             let Some(dock) = handle.get_webview_window("dock") else { continue };
-                            let cfg = config::load();
+                            // Edge/position rarely changes with config; refresh every ~6s.
+                            cfg_tick = cfg_tick.wrapping_add(1);
+                            if cfg_tick % 5 == 0 {
+                                cfg = config::load();
+                            }
                             let Some(monitor) = pick_monitor(&dock) else { continue };
                             let mpos = monitor.position();
                             let msize = monitor.size();
