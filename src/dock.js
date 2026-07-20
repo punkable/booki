@@ -1999,32 +1999,98 @@ async function createGroup(draggedId, targetId) {
   reframe();
 }
 
-// ─── Folder management: rename, ungroup, pull a child out ───
+// ─── Pin rename / folder management ───
 let renameTimer = null;
-function renameGroup(group, name, { commit = false } = {}) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+function pinNameFallback(item) {
+  if (!item) return "App";
+  if (item.kind === "group") return t("group.new");
+  if (item.kind === "trash") return t("trash.name");
+  if (item.kind === "widget") return item.name || item.widget || "Widget";
+  if (item.kind === "folder") return item.name || baseName(item.path) || t("m.addFolder");
+  return item.name || baseName(item.path) || "App";
+}
+function renamePinnedItem(item, name, { commit = false } = {}) {
+  const gi = cfg.pinned.findIndex((p) => p.id === item.id);
   if (gi < 0) return;
-  const next = String(name || "").trim() || t("group.new");
+  const fallback = pinNameFallback(item);
+  const next = String(name || "").trim() || fallback;
   cfg.pinned[gi].name = commit ? next : name;
-  const tile = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  item.name = cfg.pinned[gi].name;
+  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (tile) {
-    tile.title = commit ? next : (name || t("group.new"));
+    tile.title = commit ? next : (name || fallback);
     const lab = tile.querySelector(".label");
-    if (lab) lab.textContent = commit ? next : (name || t("group.new"));
+    if (lab) lab.textContent = commit ? next : (name || fallback);
+  }
+  const stackInput = stackEl?.querySelector?.(".stack-rename");
+  if (stackInput && stackItemId === item.id && document.activeElement !== stackInput) {
+    stackInput.value = commit ? next : (name || "");
   }
   clearTimeout(renameTimer);
   if (commit) {
     cfg.pinned[gi].name = next;
+    item.name = next;
     persist();
   } else {
     renameTimer = setTimeout(() => {
-      const i = cfg.pinned.findIndex((p) => p.id === group.id);
+      const i = cfg.pinned.findIndex((p) => p.id === item.id);
       if (i >= 0) {
-        cfg.pinned[i].name = String(cfg.pinned[i].name || "").trim() || t("group.new");
+        cfg.pinned[i].name = String(cfg.pinned[i].name || "").trim() || fallback;
         persist();
       }
     }, 400);
   }
+}
+function renameGroup(group, name, opts) {
+  renamePinnedItem(group, name, opts);
+}
+/** Inline rename popover from the dock context menu (apps, folders, groups…). */
+function promptRename(item) {
+  if (!item || item.kind === "separator") return;
+  pinnedReveal = true;
+  closeMenu();
+  closeTrashPop();
+  const pop = document.createElement("div");
+  pop.className = "trash-pop rename-pop";
+  pop.innerHTML = `${icon("pencil")}<span class="tp-col"><span class="tp-text">${esc(t("apps.rename"))}</span></span>`;
+  const input = document.createElement("input");
+  input.className = "rename-pop-input";
+  input.type = "text";
+  input.value = item.name || "";
+  input.maxLength = 80;
+  input.setAttribute("aria-label", t("apps.rename"));
+  const finish = (commit) => {
+    if (commit) renamePinnedItem(item, input.value, { commit: true });
+    closeTrashPop();
+    pinnedReveal = false;
+    scheduleHide();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finish(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      finish(false);
+    }
+  });
+  const ok = document.createElement("button");
+  ok.className = "tp-btn";
+  ok.textContent = t("apps.rename");
+  ok.addEventListener("click", () => finish(true));
+  const cancel = document.createElement("button");
+  cancel.className = "tp-btn";
+  cancel.textContent = t("trash.cancel");
+  cancel.addEventListener("click", () => finish(false));
+  pop.appendChild(input);
+  pop.appendChild(ok);
+  pop.appendChild(cancel);
+  trashPop = pop;
+  placePop(pop);
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
 }
 
 // Dissolve a folder: spill its children back to the dock at its position.
@@ -2275,21 +2341,23 @@ function openMenu(e, item) {
   // The menu adapts to what you clicked: widgets have nothing to "open",
   // folders get a straight jump to Explorer, only apps get recents.
   let hasPrimaryActions = false;
-  if (item.kind !== "separator" && item.kind !== "widget") {
+  if (item.kind !== "separator") {
     addMenuLabel(t("m.actions"));
     hasPrimaryActions = true;
-    const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
-    add(openIcon, t("m.open"), () => {
-      if (item.kind === "folder" || item.kind === "group") {
-        // Always open (never toggle-close) — right-click → Open should reveal.
-        const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-        if (tileEl) openStack(tileEl, item);
-      } else if (item.kind === "trash") {
-        dockApi.launch("shell:RecycleBinFolder", []);
-      } else {
-        dockApi.launch(item.path, item.args || []);
-      }
-    });
+    if (item.kind !== "widget") {
+      const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
+      add(openIcon, t("m.open"), () => {
+        if (item.kind === "folder" || item.kind === "group") {
+          // Always open (never toggle-close) — right-click → Open should reveal.
+          const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
+          if (tileEl) openStack(tileEl, item);
+        } else if (item.kind === "trash") {
+          dockApi.launch("shell:RecycleBinFolder", []);
+        } else {
+          dockApi.launch(item.path, item.args || []);
+        }
+      });
+    }
     if (item.kind === "folder")
       add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
     // Recents (a lightweight jump list of files opened with this app via Booki).
@@ -2299,6 +2367,9 @@ function openMenu(e, item) {
       item.recents.slice(0, 6).forEach((rp) =>
         add("external", baseName(rp), () => dockApi.launch(item.path, [rp]))
       );
+    }
+    if (item.kind === "app" || item.kind === "folder" || item.kind === "group" || item.kind === "widget") {
+      add("pencil", t("apps.rename"), () => promptRename(item));
     }
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card) — so don't offer it for those.

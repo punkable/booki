@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.60.1` — reliable Settings saves
-  (merge-patch so dock pins are not overwritten; flush on close), quieter idle
-  clipboard/work-area polling, plus `0.60.0` Apps UX / menu chrome. Earlier:
-  smart-hide, groups, NSIS keep-AppData, clipboard opt-in.
+- Current public beta context at this writing: `0.61.0` — Windhawk-aligned tinted
+  glass (blur 18 / `#80000000`), dock context-menu rename, launch/favicon
+  hardening. Earlier: Settings merge-patch saves, Apps UX, smart-hide, NSIS
+  keep-AppData, clipboard opt-in.
 
 ## Important Files
 

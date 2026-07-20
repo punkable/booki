@@ -731,16 +731,37 @@ fn system_stats() -> SystemStats {
 #[tauri::command]
 async fn fetch_favicon(url: String) -> Option<String> {
     use base64::Engine;
-    let mut host = url
-        .trim()
-        .trim_start_matches("https://")
-        .trim_start_matches("http://")
+    let raw = url.trim();
+    // Only http(s) website pins — never arbitrary schemes or local paths.
+    let without_scheme = if let Some(rest) = raw.strip_prefix("https://") {
+        rest
+    } else if let Some(rest) = raw.strip_prefix("http://") {
+        rest
+    } else if !raw.contains("://") {
+        raw
+    } else {
+        return None;
+    };
+    let mut host = without_scheme
         .split('/')
+        .next()
+        .unwrap_or("")
+        .split('@')
+        .next_back()
+        .unwrap_or("")
+        .split(':')
         .next()
         .unwrap_or("")
         .trim_start_matches("www.")
         .to_ascii_lowercase();
-    if host.is_empty() {
+    if host.is_empty() || host.len() > 253 {
+        return None;
+    }
+    // Hostname labels only (no spaces / path injection into the Google URL).
+    if !host
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.')
+    {
         return None;
     }
     // Some brands live on a subdomain but are pinned by their short name; map those

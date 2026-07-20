@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.61.0",
+    date: "20 jul 2026",
+    headline: "Cristal tintado al estilo barra de tareas / Windhawk; renombrar desde el men\u00fa contextual.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Material",
+        notes: [
+          "Cristal tintado: blur 18 y tinta #80000000 como el tema TintedGlass de Windhawk; stroke #1AFFFFFF.",
+          "Dock, notch, flyouts y men\u00fas comparten el mismo cristal (radio 14, sin borde grueso).",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Dock y seguridad",
+        notes: [
+          "Clic derecho \u2192 Renombrar en apps, carpetas, grupos y widgets.",
+          "Launch bloquea esquemas peligrosos; favicons solo desde hosts http(s) v\u00e1lidos.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.60.1",
     date: "19 jul 2026",
     headline: "Ajustes que no pisan el dock; guardado al cerrar; menos trabajo en idle.",
