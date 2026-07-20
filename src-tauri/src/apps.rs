@@ -4,8 +4,34 @@
 use std::path::Path;
 use std::process::Command;
 
+/// Reject empty / NUL / clearly dangerous URI schemes before ShellExecute.
+fn validate_launch_target(path: &str) -> Result<&str, String> {
+    let path = path.trim();
+    if path.is_empty() || path.contains('\0') {
+        return Err("invalid launch path".into());
+    }
+    let lower = path.to_ascii_lowercase();
+    // Block script / remote-code schemes; allow http(s), file paths, shell:,
+    // ms-settings:, and other Windows protocol handlers users pin intentionally.
+    const BLOCKED: &[&str] = &[
+        "javascript:",
+        "vbscript:",
+        "data:",
+        "ms-msdt:",
+        "ms-search:",
+        "search-ms:",
+    ];
+    for prefix in BLOCKED {
+        if lower.starts_with(prefix) {
+            return Err(format!("blocked launch scheme: {prefix}"));
+        }
+    }
+    Ok(path)
+}
+
 /// Launch an app/file/shortcut by path with optional arguments.
 pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
+    let path = validate_launch_target(path)?;
     let p = Path::new(path);
 
     // Direct spawn works for plain executables.
@@ -17,7 +43,13 @@ pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
 
     if is_exe {
         let mut cmd = Command::new(path);
-        cmd.args(args);
+        // Cap args so a corrupt pin cannot flood CreateProcess.
+        for a in args.iter().take(32) {
+            if a.contains('\0') {
+                continue;
+            }
+            cmd.arg(a);
+        }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
@@ -70,7 +102,9 @@ fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
     let wpath = wide(path);
     let params = args
         .iter()
-        .map(|a| format!("\"{}\"", a.replace('"', "")))
+        .take(32)
+        .filter(|a| !a.contains('\0'))
+        .map(|a| format!("\"{}\"", a.replace('"', "").chars().take(1024).collect::<String>()))
         .collect::<Vec<_>>()
         .join(" ");
     let wparams = wide(&params);

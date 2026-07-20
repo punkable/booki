@@ -249,6 +249,7 @@ body {
   --panel-blur: calc(var(--surf-blur) * 0.85);
   --panel-sat: var(--surf-sat);
   --panel-fill: var(--layer-strong);
+  --panel-radius: 8px;
   --lit-x: 0; --lit-y: 1px;
   --shade-x: 0; --shade-y: -1px;
 }
@@ -275,20 +276,21 @@ body.surface-acrylic {
   --panel-sat: 170%;
   --panel-fill: color-mix(in srgb, var(--layer-strong) 88%, transparent);
 }
+/* Tinted glass — matched to Windhawk Taskbar "TintedGlass":
+   CommonBgBrush = WindhawkBlur BlurAmount=18 TintColor=#80000000
+   stroke/highlight ≈ TintColor=#1AFFFFFF, flyout CornerRadius=14 */
 body.surface-tinted {
-  --surf-blur: 32px;
-  --surf-sat: 180%;
-  --surf-fill: color-mix(
-    in srgb,
-    var(--accent) calc(18% + var(--material, 0.55) * 22%),
-    color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 70%), transparent)
-  );
-  --surf-stroke: color-mix(in srgb, var(--accent) 28%, var(--stroke-light));
-  --surf-inset-lit: color-mix(in srgb, #fff 55%, var(--accent));
-  --surf-sheen: 0.48;
-  --panel-blur: 28px;
-  --panel-sat: 175%;
-  --panel-fill: color-mix(in srgb, var(--accent) 14%, var(--layer-strong));
+  --surf-blur: 18px;
+  --surf-sat: 120%;
+  --surf-fill: rgba(0, 0, 0, calc(0.38 + var(--material, 0.55) * 0.22));
+  --surf-stroke: rgba(255, 255, 255, 0.102);
+  --surf-inset-lit: rgba(255, 255, 255, 0.10);
+  --surf-inset-shade: rgba(0, 0, 0, 0.16);
+  --surf-sheen: 0.10;
+  --panel-blur: 18px;
+  --panel-sat: 120%;
+  --panel-fill: rgba(0, 0, 0, 0.50);
+  --panel-radius: 14px;
 }
 body.surface-solid {
   --surf-blur: 0px;
@@ -310,11 +312,19 @@ html[data-theme="dark"] body.surface-acrylic {
   --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material, 0.55) * 78%), transparent);
 }
 html[data-theme="dark"] body.surface-tinted {
-  --surf-fill: color-mix(
-    in srgb,
-    var(--accent) calc(22% + var(--material, 0.55) * 18%),
-    color-mix(in srgb, #1a1a1e calc(var(--material, 0.55) * 72%), transparent)
-  );
+  /* Keep Windhawk black glass in dark mode (not accent-washed). */
+  --surf-fill: rgba(0, 0, 0, calc(0.40 + var(--material, 0.55) * 0.20));
+  --surf-stroke: rgba(255, 255, 255, 0.102);
+  --panel-fill: rgba(0, 0, 0, 0.50);
+}
+html[data-theme="light"] body.surface-tinted {
+  /* Light counterpart: same blur, pale glass so the wallpaper still shows. */
+  --surf-fill: rgba(255, 255, 255, calc(0.42 + var(--material, 0.55) * 0.28));
+  --surf-stroke: rgba(255, 255, 255, 0.28);
+  --surf-inset-lit: rgba(255, 255, 255, 0.42);
+  --surf-inset-shade: rgba(0, 0, 0, 0.06);
+  --surf-sheen: 0.22;
+  --panel-fill: rgba(255, 255, 255, 0.58);
 }
 html[data-theme="dark"] body.surface-solid {
   --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
@@ -1083,6 +1093,30 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
 .tp-btn:active { transform: scale(0.96); }
 .tp-btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 .tp-btn.danger:hover { background: var(--danger-strong); }
+.trash-pop.rename-pop {
+  gap: 8px;
+  white-space: normal;
+  max-width: min(360px, calc(100vw - 16px));
+}
+.trash-pop.rename-pop > svg { color: var(--accent); }
+.rename-pop-input {
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 220px;
+  margin: 0;
+  padding: 6px 10px;
+  font: 600 13px var(--font);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--layer-strong) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--stroke));
+  border-radius: 10px;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+body.surface-tinted .rename-pop-input {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.16);
+}
 
 /* ─────────────────── First-run coach bubbles ─────────────────── */
 .coach {
@@ -1918,7 +1952,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   /* Same material family as the dock — never a mismatched frost lid. */
   background: var(--panel-fill);
   border: 1px solid color-mix(in srgb, var(--surf-stroke) 70%, transparent);
-  border-radius: var(--r-lg);
+  border-radius: var(--panel-radius, var(--r-lg));
   box-shadow:
     0 0 0 1px color-mix(in srgb, #fff 5%, transparent),
     var(--shadow);
@@ -2357,10 +2391,9 @@ body.edge-right .stack.open { transform: none; }
   font-size: var(--text-md);
   color: var(--ink);
   background: var(--panel-fill);
-  /* Win11 flyout: soft elevation, hairline stroke — no reserved scrollbar gutter
-     (that looked like a thick right edge on vertical-dock menus). */
+  /* Win11 / Windhawk flyout: soft elevation — no reserved scrollbar gutter. */
   border: 1px solid color-mix(in srgb, var(--surf-stroke) 70%, transparent);
-  border-radius: 8px;
+  border-radius: var(--panel-radius, 8px);
   box-shadow:
     0 0 0 1px color-mix(in srgb, #fff 6%, transparent),
     0 8px 24px color-mix(in srgb, #000 22%, transparent);
@@ -2369,6 +2402,28 @@ body.edge-right .stack.open { transform: none; }
   overscroll-behavior: contain;
   scrollbar-width: thin;
   animation: menu-in 0.14s var(--ease-out);
+}
+/* Windhawk MenuFlyoutPresenter: BorderThickness=0, CornerRadius=14, soft glass. */
+body.surface-tinted .menu,
+body.surface-tinted .stack,
+body.surface-tinted .pin-kid-menu,
+body.surface-tinted .trash-pop,
+body.surface-tinted .coach {
+  border-width: 0;
+  border-radius: var(--panel-radius, 14px);
+  background: var(--panel-fill);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.10),
+    0 10px 28px rgba(0, 0, 0, 0.32);
+}
+html[data-theme="light"] body.surface-tinted .menu,
+html[data-theme="light"] body.surface-tinted .stack,
+html[data-theme="light"] body.surface-tinted .pin-kid-menu,
+html[data-theme="light"] body.surface-tinted .trash-pop,
+html[data-theme="light"] body.surface-tinted .coach {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 10px 28px rgba(0, 0, 0, 0.16);
 }
 body.surface-solid .menu {
   -webkit-backdrop-filter: none;
@@ -3431,7 +3486,14 @@ html[data-theme="dark"] .seg-thumb {
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 .surface-tinted .surface-swatch {
-  background-color: color-mix(in srgb, var(--accent) 40%, color-mix(in srgb, var(--surface-tint) 40%, transparent));
+  background-color: rgba(0, 0, 0, 0.50);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+html[data-theme="light"] .surface-tinted .surface-swatch {
+  background-color: rgba(255, 255, 255, 0.55);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 .surface-solid .surface-swatch {
   background-image: none;

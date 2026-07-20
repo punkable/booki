@@ -1,6 +1,9 @@
 /* Shared Windows-style surface materials for dock + notch.
    One finish drives both windows so the collapsed notch and expanded dock
-   read as the same object changing shape. */
+   read as the same object changing shape.
+
+   "tinted" follows Windhawk Taskbar TintedGlass:
+   WindhawkBlur BlurAmount=18, TintColor=#80000000, stroke ~#1AFFFFFF. */
 
 export const SURFACE_STYLES = ["mica", "acrylic", "tinted", "solid"];
 

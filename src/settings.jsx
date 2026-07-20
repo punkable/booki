@@ -800,9 +800,11 @@ function MiniDockPreview({ cfg }) {
   const fills = {
     mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + material * 40)}%, transparent)`,
     acrylic: `color-mix(in srgb, var(--surface-tint) ${material * 88}%, transparent)`,
-    tinted: `linear-gradient(180deg, color-mix(in srgb, var(--accent) ${18 + material * 22}%, transparent), color-mix(in srgb, var(--surface-tint) ${material * 70}%, transparent))`,
+    // Windhawk tinted glass: blur 18, black @ ~50% (light uses pale glass).
+    tinted: `rgba(0, 0, 0, ${0.38 + material * 0.22})`,
     solid: `color-mix(in srgb, var(--surface-tint) 92%, var(--accent) 8%)`,
   };
+  const blurPx = surface === "solid" ? 0 : surface === "tinted" ? 18 : surface === "mica" ? 12 : 16;
   const notchAlong = Math.round(42 * notchScale);
   const notchAcross = Math.max(4, Math.round((peek ? 6 : 5) * notchScale));
   return (
@@ -812,9 +814,10 @@ function MiniDockPreview({ cfg }) {
         style={{
           flexDirection: vertical ? "column" : "row",
           gap,
-          borderRadius: surface === "solid" ? Math.max(4, radius) : radius + 5,
+          borderRadius: surface === "solid" ? Math.max(4, radius) : surface === "tinted" ? 14 : radius + 5,
           background: fills[surface] || fills.acrylic,
-          backdropFilter: surface === "solid" ? "none" : `blur(${surface === "mica" ? 8 : 14}px)`,
+          border: surface === "tinted" ? "1px solid rgba(255,255,255,0.10)" : undefined,
+          backdropFilter: surface === "solid" ? "none" : `blur(${blurPx}px)`,
         }}
       >
         {Array.from({ length: count }).map((_, i) => {
@@ -2257,20 +2260,18 @@ function Apps({ cfg, set }) {
                   {item.kind !== "separator" && <PinThumb item={item} />}
                   {item.kind === "separator" ? (
                     <span className="pin-card-name">{t("apps.sep")}</span>
-                  ) : isGroup ? (
+                  ) : (
                     <PinName
-                      className="pin-card-name-edit"
+                      className={isGroup || renameKey === topKey ? "pin-card-name-edit" : "pin-card-name"}
                       value={item.name}
                       editing={renameKey === topKey}
-                      title={t("apps.renameHint")}
+                      title={item.path || t("apps.renameHint")}
                       onEdit={() => setRenameKey(topKey)}
                       onDone={() => setRenameKey(null)}
                       onChange={(name) =>
                         set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name } : p)) })
                       }
                     />
-                  ) : (
-                    <span className="pin-card-name">{item.name}</span>
                   )}
                   {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
                   {missing[item.id] && (
