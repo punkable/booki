@@ -223,7 +223,7 @@ const SEARCH_INDEX = [
 const SEARCH_ALIASES = {
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper",
-  "ap.surface": "mica acrylic acrilico tintado tinted solido solid material cristal glass",
+  "ap.surface": "mica acrylic acrilico tintado tinted solido solid material cristal glass windhawk taskbar barra",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
