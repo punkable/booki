@@ -253,28 +253,30 @@ body {
   --lit-x: 0; --lit-y: 1px;
   --shade-x: 0; --shade-y: -1px;
 }
+/* Glass fill uses --glass-tint when the user picks a color in Appearance;
+   otherwise falls back to the theme's --surface-tint (light/dark). */
 body.surface-mica {
   --surf-blur: 20px;
   --surf-sat: 110%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(72% + var(--material, 0.55) * 22%), transparent);
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(72% + var(--material, 0.55) * 22%), transparent);
   --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.14);
   --surf-inset-shade: rgba(0, 0, 0, 0.04);
   --surf-sheen: 0.28;
   --panel-blur: 18px;
   --panel-sat: 115%;
-  --panel-fill: color-mix(in srgb, var(--surface-tint) 82%, var(--layer-strong));
+  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 82%, var(--layer-strong));
 }
 body.surface-acrylic {
   --surf-blur: 36px;
   --surf-sat: 165%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 88%), transparent);
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--material, 0.55) * 88%), transparent);
   --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.26);
   --surf-sheen: 0.62;
   --panel-blur: 30px;
   --panel-sat: 170%;
-  --panel-fill: color-mix(in srgb, var(--layer-strong) 88%, transparent);
+  --panel-fill: color-mix(in srgb, var(--layer-strong) 72%, var(--glass-tint, var(--surface-tint)));
 }
 /* Tinted glass — taskbar / Windhawk style: blur 18, solid frosted tint.
    --glass-tint + --glass-alpha come from Settings (color + solidity). */
@@ -302,21 +304,14 @@ body.surface-tinted {
 body.surface-solid {
   --surf-blur: 0px;
   --surf-sat: 100%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
   --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.1);
   --surf-inset-shade: rgba(0, 0, 0, 0.08);
   --surf-sheen: 0.12;
   --panel-blur: 0px;
   --panel-sat: 100%;
-  --panel-fill: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
-}
-html[data-theme="dark"] body.surface-mica,
-html[data-theme="dark"] body.surface-solid {
-  --surf-fill: color-mix(in srgb, #2b2b2f calc(78% + var(--material, 0.55) * 16%), transparent);
-}
-html[data-theme="dark"] body.surface-acrylic {
-  --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material, 0.55) * 78%), transparent);
+  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
 }
 html[data-theme="dark"] body.surface-tinted,
 html[data-theme="light"] body.surface-tinted {
@@ -329,15 +324,11 @@ html[data-theme="light"] body.surface-tinted {
   --surf-inset-shade: rgba(0, 0, 0, 0.06);
   --surf-sheen: 0.14;
 }
-html[data-theme="dark"] body.surface-solid {
-  --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
-  --panel-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
-}
 @media (prefers-reduced-transparency: reduce) {
   body {
     --surf-blur: 0px;
     --panel-blur: 0px;
-    --surf-fill: color-mix(in srgb, var(--surface-tint) 92%, transparent);
+    --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 92%, transparent);
     --panel-fill: var(--layer-strong);
   }
 }
@@ -3501,11 +3492,11 @@ html[data-theme="dark"] .seg-thumb {
 }
 .surface-mica .surface-swatch {
   background-image: none;
-  background-color: color-mix(in srgb, var(--surface-tint) 92%, transparent);
+  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 92%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 .surface-acrylic .surface-swatch {
-  background-color: color-mix(in srgb, var(--surface-tint) 48%, transparent);
+  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 48%, transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
@@ -3517,7 +3508,7 @@ html[data-theme="dark"] .seg-thumb {
 }
 .surface-solid .surface-swatch {
   background-image: none;
-  background-color: color-mix(in srgb, var(--surface-tint) 94%, var(--accent) 6%);
+  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
   border-radius: 4px;
 }
 .surface-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }

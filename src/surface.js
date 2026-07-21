@@ -2,6 +2,10 @@
    One finish drives both windows so the collapsed notch and expanded dock
    read as the same object changing shape.
 
+   Glass fill color (`surfaceTint` → `--glass-tint`) applies to mica, acrylic,
+   and tinted in both light and dark themes. Empty tint falls back to the
+   theme's `--surface-tint` (except tinted, which defaults to black).
+
    "tinted" is taskbar / Windhawk-style frosted glass: blur 18, user tint color,
    solidity from materialStrength (higher = more opaque, less see-through). */
 
@@ -76,12 +80,19 @@ export function surfaceAlpha(cfg) {
   return Math.max(0.28, Math.min(0.92, 0.32 + mat * 0.58));
 }
 
-/** Resolve glass tint hex (empty config → black for tinted, theme tint otherwise). */
+/** Resolve glass tint hex.
+ * Custom `surfaceTint` always wins (mica / acrylic / tinted, any UI theme).
+ * Empty → black for tinted; otherwise leave unset so CSS uses theme --surface-tint. */
 export function resolveGlassTint(cfg) {
   const custom = String(cfg?.surfaceTint || "").trim();
   if (/^#[0-9a-fA-F]{6}$/.test(custom)) return custom.toLowerCase();
   if (resolveSurfaceStyle(cfg) === "tinted") return "#000000";
   return "";
+}
+
+/** CSS color for previews: custom/tinted hex, else theme surface token. */
+export function glassFillColor(cfg) {
+  return resolveGlassTint(cfg) || "var(--surface-tint)";
 }
 
 const SURFACE_CLASSES = SURFACE_STYLES.map((s) => `surface-${s}`);

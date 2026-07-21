@@ -96,6 +96,8 @@ import {
   legacyNotchFromSurface,
   surfaceAlpha,
   resolveGlassTint,
+  glassFillColor,
+  applySurfaceVars,
 } from "./surface.js";
 import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
 import { checkForUpdate, installUpdate } from "./update.js";
@@ -720,11 +722,13 @@ function SurfaceStylePicker({ cfg, set }) {
 }
 
 /** Color of the frosted glass fill (dock + notch), separate from accent. */
-function SurfaceTintPicker({ value, onChange, accent }) {
+function SurfaceTintPicker({ value, onChange, accent, autoBlack = false }) {
   const v = (value || "").toLowerCase();
-  const effective = (value || "#000000").toLowerCase();
+  // Empty = theme auto (mica/acrylic). Tinted treats empty as black.
+  const effective = (v || (autoBlack ? "#000000" : "#808080")).toLowerCase();
   const isPreset = SURFACE_TINT_PRESETS.some(([, hex]) => hex.toLowerCase() === v)
     || (accent && accent.toLowerCase() === v);
+  const blackActive = v === "#000000" || (!v && autoBlack);
   return (
     <div className="accent-picker surface-tint-picker">
       <div className="accent-swatches">
@@ -732,7 +736,7 @@ function SurfaceTintPicker({ value, onChange, accent }) {
           <button
             key={hex}
             type="button"
-            className={"accent-sw" + (v === hex.toLowerCase() || (!v && hex === "#000000") ? " active" : "")}
+            className={"accent-sw" + ((hex.toLowerCase() === "#000000" ? blackActive : v === hex.toLowerCase()) ? " active" : "")}
             style={{ "--sw": hex }}
             title={name}
             onClick={() => onChange(hex)}
@@ -764,7 +768,7 @@ function SurfaceTintPicker({ value, onChange, accent }) {
           <span className="accent-plus">{v && !isPreset ? "✓" : "+"}</span>
         </label>
       </div>
-      <span className="accent-hex">{effective.toUpperCase()}</span>
+      <span className="accent-hex">{v ? v.toUpperCase() : (autoBlack ? "#000000" : t("ap.surfaceTintAuto"))}</span>
     </div>
   );
 }
@@ -850,17 +854,17 @@ function MiniDockPreview({ cfg }) {
   const edge = cfg.edge || "bottom";
   const surface = resolveSurfaceStyle(cfg);
   const alpha = surfaceAlpha(cfg);
-  const glassTint = resolveGlassTint(cfg) || "#000000";
+  const fillTint = glassFillColor(cfg);
   const mid = Math.floor(count / 2);
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
   const peek = cfg.notchPeek !== false;
   const fills = {
-    mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + alpha * 40)}%, transparent)`,
-    acrylic: `color-mix(in srgb, var(--surface-tint) ${alpha * 88}%, transparent)`,
-    tinted: `color-mix(in srgb, ${glassTint} ${Math.round(alpha * 100)}%, transparent)`,
-    solid: `color-mix(in srgb, var(--surface-tint) 92%, var(--accent) 8%)`,
+    mica: `color-mix(in srgb, ${fillTint} ${Math.min(96, 55 + alpha * 40)}%, transparent)`,
+    acrylic: `color-mix(in srgb, ${fillTint} ${alpha * 88}%, transparent)`,
+    tinted: `color-mix(in srgb, ${fillTint} ${Math.round(alpha * 100)}%, transparent)`,
+    solid: `color-mix(in srgb, ${fillTint} 92%, var(--accent) 8%)`,
   };
   const blurPx = surface === "solid" ? 0 : surface === "tinted" ? 18 : surface === "mica" ? 12 : 16;
   const notchAlong = Math.round(42 * notchScale);
@@ -1279,8 +1283,9 @@ function Appearance({ cfg, set }) {
           <>
             <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")}>
               <SurfaceTintPicker
-                value={cfg.surfaceTint || resolveGlassTint(cfg)}
+                value={cfg.surfaceTint || ""}
                 accent={cfg.accent}
+                autoBlack={surface === "tinted"}
                 onChange={(v) => flushSurface({ surfaceTint: v })}
               />
             </Row>
@@ -3243,6 +3248,7 @@ function App() {
       } catch (_) {}
       setCfg(next);
       applyTheme(next);
+      applySurfaceVars(next);
     });
     dockApi.appVersion().then(setVersion);
   }, []);
@@ -3307,6 +3313,7 @@ function App() {
         setLang(next.language);
       }
       applyTheme(next);
+      applySurfaceVars(next);
       setSaveState("saving");
       clearTimeout(saveTimer.current);
       if (typeof opts.afterSave === "function") afterSaveCb.current = opts.afterSave;
@@ -3324,6 +3331,7 @@ function App() {
     if (fresh) {
       setCfg(fresh);
       applyTheme(fresh);
+      applySurfaceVars(fresh);
       await emitConfigChanged();
     }
   };
