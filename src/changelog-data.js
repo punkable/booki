@@ -3,6 +3,21 @@
 
 export const CHANGELOG = [
   {
+    version: "0.66.1",
+    date: "21 jul 2026",
+    headline: "Notch inteligente: c\u00edrculo completo sin recorte.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Notch inteligente",
+        notes: [
+          "El modo Inteligente ya no hereda el estilo flotante (c\u00e1psula), que recortaba el punto en la ventana cuadrada.",
+          "El c\u00edrculo se centra en su propia ventana, con espacio para hover y resplandor, y reglas CSS propias que no pierden ante pegado/flotante/solido.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.66.0",
     date: "21 jul 2026",
     headline: "Retraso al bajar con la taskbar; notch unificado (pegado / flotante / punto inteligente).",

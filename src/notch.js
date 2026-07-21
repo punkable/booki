@@ -46,10 +46,12 @@ async function applyLook() {
     const floating = mode === "floating";
     const smart = mode === "smart";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
+    // Modes are mutually exclusive. Smart must NOT also get `floating` —
+    // floating's capsule rules (128×16) are more specific than `.notch-dot`
+    // and would keep a long pill inside a square window (looks clipped).
     document.body.classList.toggle("peek", attached);
-    document.body.classList.toggle("floating", floating || smart);
+    document.body.classList.toggle("floating", floating);
     document.body.classList.toggle("smart", smart);
-    // Smart is always a circle — never gated on a per-app list.
     document.body.classList.toggle("notch-dot", smart);
     if (!smart) {
       document.body.classList.remove("smart-busy", "smart-focus");

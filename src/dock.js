@@ -295,7 +295,7 @@ function applyAll() {
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
     const mode = cfg.notchMode
       || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
-    const depth = Math.ceil(((mode === "floating" ? 44 : 34) * scale) + 12);
+    const depth = Math.ceil(((mode === "smart" ? 56 : mode === "floating" ? 48 : 34) * scale) + 12);
     edgeGap = Math.max(edgeGap, Math.min(96, depth));
   }
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
@@ -2735,7 +2735,7 @@ function edgePadCss() {
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
     const mode = cfg.notchMode
       || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
-    const depth = Math.ceil(((mode === "floating" ? 44 : 34) * scale) + 12);
+    const depth = Math.ceil(((mode === "smart" ? 56 : mode === "floating" ? 48 : 34) * scale) + 12);
     gap = Math.max(gap, Math.min(96, depth));
   }
   return Math.min(SHADOW_PAD, gap);
