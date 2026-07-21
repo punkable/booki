@@ -45,7 +45,6 @@ import {
   DeleteRegular,
   GridRegular,
   ListRegular,
-  MoreHorizontalRegular,
   ArrowUndo24Regular,
   Flash24Regular,
   Info24Regular,
@@ -2308,7 +2307,9 @@ function Apps({ cfg, set }) {
                 aria-label={t("apps.viewList")}
                 aria-selected={view === "list"}
                 onClick={() => pickView("list")}
-              />
+              >
+                {t("apps.viewList")}
+              </Button>
               <Button
                 appearance={view === "grid" ? "primary" : "subtle"}
                 icon={<GridRegular />}
@@ -2316,7 +2317,9 @@ function Apps({ cfg, set }) {
                 aria-label={t("apps.viewGrid")}
                 aria-selected={view === "grid"}
                 onClick={() => pickView("grid")}
-              />
+              >
+                {t("apps.viewGrid")}
+              </Button>
             </div>
           ) : (
             <div className="pin-list-summary">
@@ -2354,6 +2357,7 @@ function Apps({ cfg, set }) {
           )}
         </div>
       </div>
+      <p className="muted pin-howto">{cfg.pinned.length > 0 ? t("apps.howto") : t("apps.hint")}</p>
       {cfg.pinned.length === 0 && (
         <div className="s-tips pin-empty-tips">
           <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
@@ -2412,7 +2416,7 @@ function Apps({ cfg, set }) {
                   <Menu>
                     <MenuTrigger disableButtonEnhancement>
                       <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                        <MoreHorizontalRegular />
+                        <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
                       </button>
                     </MenuTrigger>
                     <MenuPopover className="booki-menu-popover">
@@ -2468,12 +2472,14 @@ function Apps({ cfg, set }) {
                         </div>
                       );
                     })}
-                    <button className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
-                      onClick={() => addToFolder(i, "app")}
-                      dangerouslySetInnerHTML={{ __html: icon("plus") }} />
-                    <button className="pin-kid pin-kid-add" title={t("m.addFolder")}
-                      onClick={() => addToFolder(i, "folder")}
-                      dangerouslySetInnerHTML={{ __html: icon("folder") }} />
+                    <button type="button" className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
+                      onClick={() => addToFolder(i, "app")}>
+                      <span dangerouslySetInnerHTML={{ __html: icon("plus") }} />
+                    </button>
+                    <button type="button" className="pin-kid pin-kid-add" title={t("m.addFolder")}
+                      onClick={() => addToFolder(i, "folder")}>
+                      <span dangerouslySetInnerHTML={{ __html: icon("folder") }} />
+                    </button>
                     {!kidsHintDismissed && (
                       <div className="pin-kids-hint">
                         <span>{t("apps.kidsHint")}</span>
@@ -2534,7 +2540,7 @@ function Apps({ cfg, set }) {
                 <Menu>
                   <MenuTrigger disableButtonEnhancement>
                     <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                      <MoreHorizontalRegular />
+                      <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
                     </button>
                   </MenuTrigger>
                   <MenuPopover className="booki-menu-popover">
@@ -2586,7 +2592,7 @@ function Apps({ cfg, set }) {
                     <Menu>
                       <MenuTrigger disableButtonEnhancement>
                         <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                          <MoreHorizontalRegular />
+                          <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
                         </button>
                       </MenuTrigger>
                       <MenuPopover className="booki-menu-popover">
@@ -2608,10 +2614,14 @@ function Apps({ cfg, set }) {
             });
             rows.push(
               <li key={item.id + ":add"} className="pin-item pin-child pin-add-row">
-                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "app")}
-                  dangerouslySetInnerHTML={{ __html: icon("folder-plus") + `<span>${t("apps.addToFolder")}</span>` }} />
-                <button className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}
-                  dangerouslySetInnerHTML={{ __html: icon("folder") + `<span>${t("m.addFolder")}</span>` }} />
+                <button type="button" className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "app")}>
+                  <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />
+                  <span>{t("apps.addToFolder")}</span>
+                </button>
+                <button type="button" className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}>
+                  <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("folder") }} />
+                  <span>{t("m.addFolder")}</span>
+                </button>
                 {!kidsHintDismissed && (
                   <span className="pin-kids-hint muted">
                     {t("apps.kidsHint")}

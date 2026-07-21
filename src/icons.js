@@ -73,6 +73,8 @@ export const iconZap = () =>
   S(`<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>`);
 export const iconAlert = () =>
   S(`<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>`);
+export const iconMore = () =>
+  S(`<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -112,6 +114,7 @@ const iconMap = {
   zap: iconZap,
   alert: iconAlert,
   "alert-triangle": iconAlert,
+  more: iconMore,
 };
 
 export function icon(name) {
