@@ -14,6 +14,7 @@ export const CHANGELOG = [
           "El modo Inteligente ya no hereda el estilo flotante (c\u00e1psula), que recortaba el punto en la ventana cuadrada.",
           "El c\u00edrculo se centra en su propia ventana, con espacio para hover y resplandor, y reglas CSS propias que no pierden ante pegado/flotante/solido.",
           "Distancia al borde: m\u00ednimo 0 (pegado). Ya no se infla en silencio con notch siempre visible ni con m\u00e1rgenes forzosos del flotante/inteligente.",
+          "El \u00e1rea clickable del notch coincide con la pastilla visible (pegado / flotante / inteligente): el margen transparente ya no bloquea apps debajo.",
         ],
       },
     ],
