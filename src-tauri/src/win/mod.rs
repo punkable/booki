@@ -27,8 +27,8 @@ pub use windows_impl::{
     foreground_occludes, foreground_window_handle, get_autostart, is_fullscreen, known_folders,
     list_windows, media_next, media_now_playing, media_prev, media_toggle, move_paths, move_window,
     protect_data, set_autostart, set_capture_visible, set_clipboard_text, shortcut_target,
-    sync_context_menu, trash_count, trash_is_empty, trash_paths, unprotect_data, volume_get,
-    volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
+    sync_context_menu, taskbar_autohide, trash_count, trash_is_empty, trash_paths, unprotect_data,
+    volume_get, volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
 
 #[cfg(not(windows))]
@@ -40,6 +40,6 @@ pub use stub::{
     foreground_occludes, foreground_window_handle, get_autostart, is_fullscreen, known_folders,
     list_windows, media_next, media_now_playing, media_prev, media_toggle, move_paths, move_window,
     protect_data, set_autostart, set_capture_visible, set_clipboard_text, shortcut_target,
-    sync_context_menu, trash_count, trash_is_empty, trash_paths, unprotect_data, volume_get,
-    volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
+    sync_context_menu, taskbar_autohide, trash_count, trash_is_empty, trash_paths, unprotect_data,
+    volume_get, volume_mute_toggle, volume_set, wallpaper_accent, work_area, MediaSnapshot,
 };
