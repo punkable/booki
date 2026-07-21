@@ -69,7 +69,12 @@ fn default_monitor() -> i32 {
     -1
 }
 fn default_material() -> u32 {
-    70
+    // Higher default so tinted/acrylic glass reads solid (taskbar-like), not clear.
+    80
+}
+fn default_surface_tint() -> String {
+    // Empty = auto (black for tinted). User can pick any hex in Appearance.
+    String::new()
 }
 fn default_language() -> String {
     "system".into()
@@ -93,8 +98,8 @@ fn default_notch_style() -> String {
     "acrylic".into()
 }
 fn default_surface_style() -> String {
-    // Unified dock + notch finish. "acrylic" | "mica" | "tinted" | "solid".
-    "acrylic".into()
+    // Unified dock + notch finish. Default tinted = taskbar / Windhawk glass.
+    "tinted".into()
 }
 fn default_anim() -> String {
     "spring".into()
@@ -187,9 +192,12 @@ pub struct Config {
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
-    /// Native material (Acrylic/Mica) strength, 0–100.
+    /// Glass solidity 0–100 (higher = more opaque fill; blur stays).
     #[serde(default = "default_material")]
     pub material_strength: u32,
+    /// Optional glass fill color (hex). Empty → auto per surface (black for tinted).
+    #[serde(default = "default_surface_tint")]
+    pub surface_tint: String,
     /// Start with Windows.
     #[serde(default)]
     pub autostart: bool,
@@ -312,6 +320,7 @@ impl Default for Config {
             hotkey: String::new(),
             monitor: default_monitor(),
             material_strength: default_material(),
+            surface_tint: default_surface_tint(),
             autostart: false,
             context_menu: true,
             edge_gap: 48,

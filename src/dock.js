@@ -34,7 +34,7 @@ import {
   RING_DEFAULTS,
   widgetDisplayName,
 } from "./widgets-meta.js";
-import { applySurfaceClass } from "./surface.js";
+import { applySurfaceVars } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
@@ -278,11 +278,9 @@ function applyAll() {
   ["slot-start", "slot-center", "slot-end"].forEach((c) => document.body.classList.remove(c));
   document.body.classList.add(`slot-${slot}`);
   const root = document.documentElement;
-  // CSS Fluent materials on a transparent window (native DWM vibrancy left a
-  // gray box). Strength 0–100 maps into a visible alpha band per surface.
-  const mat = (cfg.materialStrength ?? 70) / 100;
-  root.style.setProperty("--material", String(Math.max(0.22, Math.min(0.94, 0.28 + mat * 0.62))));
-  applySurfaceClass(cfg);
+  // CSS materials on a transparent window (native DWM vibrancy left a gray box).
+  // Solidity + optional glass tint drive dock/notch fill together.
+  applySurfaceVars(cfg);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }

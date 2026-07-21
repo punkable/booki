@@ -91,8 +91,11 @@ function ChangelogIcon({ name }) {
 import { applyTheme } from "./theme.js";
 import {
   SURFACE_STYLES,
+  SURFACE_TINT_PRESETS,
   resolveSurfaceStyle,
   legacyNotchFromSurface,
+  surfaceAlpha,
+  resolveGlassTint,
 } from "./surface.js";
 import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
 import { checkForUpdate, installUpdate } from "./update.js";
@@ -196,6 +199,7 @@ const LANG_OPTIONS = [
 const SEARCH_INDEX = [
   ["ap.theme", "appearance"], ["ap.accent", "appearance"],
   ["ap.surface", "appearance"], ["ap.translucency", "appearance"],
+  ["ap.solidity", "appearance"], ["ap.surfaceTint", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.compact", "appearance"],
   ["ap.language", "general"], ["ap.backup", "general"],
@@ -224,6 +228,8 @@ const SEARCH_ALIASES = {
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper",
   "ap.surface": "mica acrylic acrilico tintado tinted solido solid material cristal glass windhawk taskbar barra",
+  "ap.solidity": "solidez opacity opacidad translucidez translucency cristal",
+  "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
@@ -682,7 +688,7 @@ function ProfilesCard({ cfg, set }) {
 function SurfaceStylePicker({ cfg, set }) {
   const cur = resolveSurfaceStyle(cfg);
   return (
-    <div className="surface-row" role="listbox" aria-label={t("ap.surface")}>
+    <div className="surface-row surface-row-compact" role="listbox" aria-label={t("ap.surface")}>
       {SURFACE_STYLES.map((s) => (
         <button
           key={s}
@@ -699,12 +705,59 @@ function SurfaceStylePicker({ cfg, set }) {
           title={t(`surface.${s}Hint`)}
         >
           <span className="surface-swatch" aria-hidden="true" />
-          <span className="surface-meta">
-            <strong>{t(`surface.${s}`)}</strong>
-            <small>{t(`surface.${s}Hint`)}</small>
-          </span>
+          <strong>{t(`surface.${s}`)}</strong>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Color of the frosted glass fill (dock + notch), separate from accent. */
+function SurfaceTintPicker({ value, onChange, accent }) {
+  const v = (value || "").toLowerCase();
+  const effective = (value || "#000000").toLowerCase();
+  const isPreset = SURFACE_TINT_PRESETS.some(([, hex]) => hex.toLowerCase() === v)
+    || (accent && accent.toLowerCase() === v);
+  return (
+    <div className="accent-picker surface-tint-picker">
+      <div className="accent-swatches">
+        {SURFACE_TINT_PRESETS.map(([name, hex]) => (
+          <button
+            key={hex}
+            type="button"
+            className={"accent-sw" + (v === hex.toLowerCase() || (!v && hex === "#000000") ? " active" : "")}
+            style={{ "--sw": hex }}
+            title={name}
+            onClick={() => onChange(hex)}
+          >
+            <span className="accent-check">✓</span>
+          </button>
+        ))}
+        {accent && (
+          <button
+            type="button"
+            className={"accent-sw" + (v === accent.toLowerCase() ? " active" : "")}
+            style={{ "--sw": accent }}
+            title={t("ap.surfaceTintAccent")}
+            onClick={() => onChange(accent)}
+          >
+            <span className="accent-check">✓</span>
+          </button>
+        )}
+        <label
+          className={"accent-custom" + (v && !isPreset ? " active" : "")}
+          style={{ "--sw": effective }}
+          title={t("ap.custom")}
+        >
+          <input
+            type="color"
+            value={effective}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <span className="accent-plus">{v && !isPreset ? "✓" : "+"}</span>
+        </label>
+      </div>
+      <span className="accent-hex">{effective.toUpperCase()}</span>
     </div>
   );
 }
@@ -788,20 +841,18 @@ function MiniDockPreview({ cfg }) {
   const gap = Math.round((cfg.spacing ?? 6) * scale + 2);
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const edge = cfg.edge || "bottom";
-  const mat = (cfg.materialStrength ?? 70) / 100;
   const surface = resolveSurfaceStyle(cfg);
-  // Same material curve as dock/notch (--material = 0.28 + mat * 0.62).
-  const material = Math.max(0.22, Math.min(0.94, 0.28 + mat * 0.62));
+  const alpha = surfaceAlpha(cfg);
+  const glassTint = resolveGlassTint(cfg) || "#000000";
   const mid = Math.floor(count / 2);
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
   const peek = cfg.notchPeek !== false;
   const fills = {
-    mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + material * 40)}%, transparent)`,
-    acrylic: `color-mix(in srgb, var(--surface-tint) ${material * 88}%, transparent)`,
-    // Windhawk tinted glass: blur 18, black @ ~50% (light uses pale glass).
-    tinted: `rgba(0, 0, 0, ${0.38 + material * 0.22})`,
+    mica: `color-mix(in srgb, var(--surface-tint) ${Math.min(96, 55 + alpha * 40)}%, transparent)`,
+    acrylic: `color-mix(in srgb, var(--surface-tint) ${alpha * 88}%, transparent)`,
+    tinted: `color-mix(in srgb, ${glassTint} ${Math.round(alpha * 100)}%, transparent)`,
     solid: `color-mix(in srgb, var(--surface-tint) 92%, var(--accent) 8%)`,
   };
   const blurPx = surface === "solid" ? 0 : surface === "tinted" ? 18 : surface === "mica" ? 12 : 16;
@@ -1191,12 +1242,16 @@ function HotkeyInput({ value, onChange }) {
 function Appearance({ cfg, set }) {
   const surface = resolveSurfaceStyle(cfg);
   const solidSurface = surface === "solid";
+  const flushSurface = (patch) =>
+    set(patch, { flush: true, afterSave: () => dockApi.notchPreview() });
   return (
     <>
-      <PageHeader icon="palette" title={t("ap.title")} />
+      <PageHeader icon="palette" title={t("ap.title")}>
+        {t("ap.hint")}
+      </PageHeader>
       <MiniDockPreview cfg={cfg} />
 
-      <SettingsSection title={t("gp.theme")} icon="palette">
+      <SettingsSection title={t("gp.theme")} icon="palette" hint={t("gp.themeHint")}>
         <Row label={t("ap.theme")}>
           <SegmentedControl
             value={cfg.theme || "system"}
@@ -1209,30 +1264,43 @@ function Appearance({ cfg, set }) {
             ]}
           />
         </Row>
-        <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
-          <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
-        </Row>
       </SettingsSection>
 
-      <SettingsSection title={t("gp.surface")} icon="sliders">
-        <Row label={t("ap.surface")} hint={t("ap.surfaceHint")}>
-          <SurfaceStylePicker cfg={cfg} set={set} />
-        </Row>
+      <SettingsSection title={t("gp.surface")} icon="sliders" hint={t("ap.surfaceHint")}>
+        <SurfaceStylePicker cfg={cfg} set={set} />
         {!solidSurface && (
-          <Row label={t("ap.translucency")} hint={t("ap.translucencyHint")}>
-            <Slider
-              value={cfg.materialStrength ?? 70}
-              min={0}
-              max={100}
-              step={5}
-              fmt={(v) => `${v}%`}
-              onChange={(v) => set({ materialStrength: v })}
-            />
-          </Row>
+          <>
+            <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")}>
+              <SurfaceTintPicker
+                value={cfg.surfaceTint || resolveGlassTint(cfg)}
+                accent={cfg.accent}
+                onChange={(v) => flushSurface({ surfaceTint: v })}
+              />
+            </Row>
+            <Row label={t("ap.solidity")} hint={t("ap.solidityHint")}>
+              <Slider
+                value={cfg.materialStrength ?? 80}
+                min={40}
+                max={100}
+                step={5}
+                fmt={(v) => `${v}%`}
+                onChange={(v) => flushSurface({ materialStrength: v })}
+              />
+            </Row>
+          </>
         )}
       </SettingsSection>
 
-      <SettingsSection title={t("gp.size")} icon="app">
+      <SettingsSection title={t("ap.accent")} icon="palette" hint={t("ap.accentHint")}>
+        <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
+      </SettingsSection>
+
+      <CollapsibleSection
+        title={t("gp.size")}
+        icon="app"
+        hint={t("gp.sizeHint")}
+        defaultOpen={false}
+      >
         <Row label={t("ap.iconSize")}>
           <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
             onChange={(v) => set({ iconSize: v })} />
@@ -1248,7 +1316,7 @@ function Appearance({ cfg, set }) {
         <Toggle label={t("ap.compact")} hint={t("ap.compactHint")}
           checked={!!cfg.compact}
           onChange={(v) => set({ compact: v })} />
-      </SettingsSection>
+      </CollapsibleSection>
     </>
   );
 }
@@ -1349,7 +1417,7 @@ function Behavior({ cfg, set }) {
 
       <MultiNotchSection cfg={cfg} set={set} />
 
-      <SettingsSection title={t("gp.interaction")} icon="sparkles">
+      <CollapsibleSection title={t("gp.interaction")} icon="sparkles" defaultOpen={false}>
         <Row label={t("be.anim")}>
           <SegmentedControl
             value={cfg.magnifyStyle || "spring"}
@@ -1376,7 +1444,7 @@ function Behavior({ cfg, set }) {
           onChange={(v) => set({ showIndicators: v })} />
         <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
           checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
-      </SettingsSection>
+      </CollapsibleSection>
 
       <ProfilesCard cfg={cfg} set={set} />
     </>
@@ -1397,6 +1465,7 @@ const MULTI_NOTCH_SUGGESTIONS = {
 
 function MultiNotchSection({ cfg, set }) {
   const [custom, setCustom] = useState("");
+  const [suggestOpen, setSuggestOpen] = useState(false);
   const enabled = !!cfg.multiNotchEnabled;
   const apps = cfg.multiNotchApps || [];
   const add = (name) => {
@@ -1416,53 +1485,63 @@ function MultiNotchSection({ cfg, set }) {
           <Toggle label={t("be.multiNotchAutoSuggest")}
             checked={cfg.multiNotchAutoSuggest !== false}
             onChange={(v) => set({ multiNotchAutoSuggest: v })} />
-          <div className="s-card-inner">
-            <h3>{t("be.multiNotchSuggest")}</h3>
-            <p className="muted">{t("be.multiNotchSuggestHint")}</p>
-            {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
-              <div key={cat} className="mn-suggest-group">
-                <strong>{t(`mn.${cat}`)}</strong>
-                <div className="mn-chips">
-                  {list.map((app) => {
-                    const active = apps.some((a) => a.toLowerCase() === app);
-                    return (
-                      <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
-                        onClick={() => active ? remove(app) : add(app)} disabled={active}>
-                        {app}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="mn-add">
+            <input
+              className="r-hotkey-input"
+              value={custom}
+              placeholder={t("be.multiNotchPlaceholder")}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
+            />
+            <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
           </div>
-          <div className="s-card-inner">
-            <h3>{t("be.multiNotchApps")}</h3>
-            <div className="mn-add">
-              <input
-                className="r-hotkey-input"
-                value={custom}
-                placeholder="opencode"
-                onChange={(e) => setCustom(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
-              />
-              <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
+          {apps.length === 0 ? (
+            <p className="muted mn-empty">{t("be.multiNotchEmpty")}</p>
+          ) : (
+            <div className="mn-list">
+              {apps.map((app) => (
+                <span key={app} className="mn-tag">
+                  {app}
+                  <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
+                    <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
+                  </button>
+                </span>
+              ))}
             </div>
-            {apps.length === 0 ? (
-              <p className="muted">{t("be.multiNotchHint")}</p>
-            ) : (
-              <div className="mn-list">
-                {apps.map((app) => (
-                  <span key={app} className="mn-tag">
-                    {app}
-                    <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
-                      <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
+          <button
+            type="button"
+            className={"mn-suggest-toggle" + (suggestOpen ? " open" : "")}
+            onClick={() => setSuggestOpen((o) => !o)}
+            aria-expanded={suggestOpen}
+          >
+            <span>{t("be.multiNotchSuggest")}</span>
+            <span className="muted">{t("be.multiNotchSuggestCount").replace("{n}", String(
+              Object.values(MULTI_NOTCH_SUGGESTIONS).reduce((n, list) => n + list.length, 0)
+            ))}</span>
+            <span dangerouslySetInnerHTML={{ __html: icon(suggestOpen ? "chevron-down" : "chevron-right") }} />
+          </button>
+          {suggestOpen && (
+            <div className="mn-suggest-panel">
+              <p className="muted">{t("be.multiNotchSuggestHint")}</p>
+              {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
+                <details key={cat} className="mn-suggest-group">
+                  <summary>{t(`mn.${cat}`)} <span className="muted">{list.length}</span></summary>
+                  <div className="mn-chips">
+                    {list.map((app) => {
+                      const active = apps.some((a) => a.toLowerCase() === app);
+                      return (
+                        <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
+                          onClick={() => active ? remove(app) : add(app)} disabled={active}>
+                          {app}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </details>
+              ))}
+            </div>
+          )}
         </>
       )}
     </SettingsSection>

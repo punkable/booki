@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.61.0` — Windhawk-aligned tinted
-  glass (blur 18 / `#80000000`), dock context-menu rename, launch/favicon
-  hardening. Earlier: Settings merge-patch saves, Apps UX, smart-hide, NSIS
-  keep-AppData, clipboard opt-in.
+- Current public beta context at this writing: `0.62.0` — solid frosted glass with
+  configurable tint color + solidity, cleaner Appearance layout, compact
+  multi-notch suggestions. Earlier: Windhawk tinted glass, context rename,
+  Settings merge-patch saves, smart-hide, NSIS keep-AppData.
 
 ## Important Files
 
