@@ -296,14 +296,14 @@ pub struct Config {
     /// there's always a visible anchor on the screen edge.
     #[serde(default)]
     pub notch_always_visible: bool,
-    /// Multi-notch: shrink the notch to a dot when the active window belongs to
-    /// a productivity app (browser, editor, design tool, etc.).
+    /// Legacy multi-notch flag. Kept for config compatibility; smart mode is
+    /// always circular and no longer uses an app whitelist.
     #[serde(default)]
     pub multi_notch_enabled: bool,
-    /// Executable names (without .exe, lowercased) that trigger dot mode.
+    /// Legacy executable names for the old multi-notch whitelist (unused).
     #[serde(default)]
     pub multi_notch_apps: Vec<String>,
-    /// Suggest productivity apps for multi-notch automatically.
+    /// Legacy auto-suggest toggle for multi-notch (unused).
     #[serde(default = "default_true")]
     pub multi_notch_auto_suggest: bool,
 }
@@ -487,8 +487,27 @@ pub fn load() -> Config {
             "floating".into()
         };
         cfg.notch_peek = cfg.notch_mode != "floating";
-        cfg.multi_notch_enabled = cfg.notch_mode == "smart";
+        // Smart no longer keys off an app list — keep the legacy fields empty.
+        cfg.multi_notch_enabled = false;
+        cfg.multi_notch_apps.clear();
         cfg.settings_rev = 7;
+        let _ = save(&cfg);
+    }
+    // rev 8: smart is always circular (ambient behaviours only). Clear any leftover
+    // multi-notch app list so the old whitelist cannot resurrect in Settings.
+    if cfg.settings_rev < 8 {
+        let mode = cfg.notch_mode.trim().to_ascii_lowercase();
+        if mode != "attached" && mode != "floating" && mode != "smart" {
+            cfg.notch_mode = if cfg.notch_peek {
+                "attached".into()
+            } else {
+                "floating".into()
+            };
+        }
+        cfg.notch_peek = cfg.notch_mode != "floating";
+        cfg.multi_notch_enabled = false;
+        cfg.multi_notch_apps.clear();
+        cfg.settings_rev = 8;
         let _ = save(&cfg);
     }
     // Promote 1-child groups; keep empty groups (Settings uses them as staging

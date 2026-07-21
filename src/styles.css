@@ -4949,7 +4949,7 @@ textarea {
   .pin-clear > span:last-child { display: none; }
 }
 
-/* ─────────── Multi-notch: intelligent dot-mode notch ─────────── */
+/* ─────────── Smart notch: always-circular ambient dot ─────────── */
 
 /* Dot mode: shrink the pill to a small reactive circle. */
 body.notch-dot .notch-pill {
@@ -4971,97 +4971,33 @@ body.notch-dot.peek .notch-pill {
   border-radius: 50%;
 }
 
-/* Settings UI for multi-notch — compact list first; suggestions on demand. */
-.mn-empty { margin: 4px 0 8px; }
-.mn-suggest-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 10px;
-  padding: 8px 10px;
-  font: 600 12.5px var(--font);
-  color: var(--ink);
-  text-align: left;
-  background: color-mix(in srgb, var(--layer-strong) 70%, transparent);
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  cursor: pointer;
+/* Ambient behaviours for smart mode — independent of which app is focused. */
+body.notch-body.smart .notch-pill {
+  animation: smart-breathe 3.4s ease-in-out infinite;
 }
-.mn-suggest-toggle > span:first-child { flex: 1 1 auto; }
-.mn-suggest-toggle svg { width: 14px; height: 14px; color: var(--ink-2); }
-.mn-suggest-toggle:hover { background: var(--hover); }
-.mn-suggest-panel {
-  margin-top: 8px;
-  padding: 8px 10px 10px;
-  background: color-mix(in srgb, var(--layer) 80%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-  border-radius: 10px;
-  max-height: 240px;
-  overflow: auto;
+body.notch-body.smart.smart-focus .notch-pill {
+  animation: smart-focus-pulse 2.1s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #5b9fff) 35%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.28);
 }
-.mn-suggest-group { margin: 0 0 4px; }
-.mn-suggest-group summary {
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 2px;
-  font-size: var(--text-sm);
-  font-weight: 650;
-  color: var(--ink);
-  text-transform: capitalize;
+body.notch-body.smart.smart-busy .notch-pill {
+  opacity: 0.42;
+  animation: none;
+  transform: scale(0.88);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
-.mn-suggest-group summary::-webkit-details-marker { display: none; }
-.mn-suggest-group[open] summary { color: var(--accent); }
-.mn-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 0 8px; }
-.mn-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 11.5px;
-  color: var(--ink);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-pill);
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+@keyframes smart-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.88; }
+  50% { transform: scale(1.08); opacity: 1; }
 }
-.mn-chip:hover { background: var(--hover); border-color: var(--accent); }
-.mn-chip.active {
-  color: var(--accent-contrast);
-  background: var(--accent);
-  border-color: var(--accent);
-  cursor: default;
+@keyframes smart-focus-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
 }
-.mn-add { display: flex; gap: 8px; margin: 8px 0 6px; }
-.mn-add input { flex: 1 1 auto; min-width: 0; }
-.mn-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.mn-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 8px 4px 11px;
-  font-size: var(--text-sm);
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent) 10%, var(--layer-strong));
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--stroke));
-  border-radius: var(--r-pill);
+@media (prefers-reduced-motion: reduce) {
+  body.notch-body.smart .notch-pill,
+  body.notch-body.smart.smart-focus .notch-pill {
+    animation: none;
+  }
 }
-.mn-tag button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--layer);
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.mn-tag button:hover { color: var(--danger); background: var(--hover); }
-.mn-tag button svg { width: 10px; height: 10px; }
