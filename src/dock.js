@@ -288,7 +288,16 @@ function applyAll() {
   // How close the bar sits to its screen edge (user-tunable). The transparent
   // pad on the anchored side shrinks down to the requested gap; anything past
   // the stage pad is handled by the window's own margin (backend dock_xy).
-  const edgeGap = Math.max(4, Math.min(96, cfg.edgeGap ?? 48));
+  // When the notch stays painted with the dock, bump the gap so they don't
+  // stack — matches Rust `notch_clearance_css`.
+  let edgeGap = Math.max(4, Math.min(96, cfg.edgeGap ?? 48));
+  if (cfg.notchAlwaysVisible) {
+    const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+    const mode = cfg.notchMode
+      || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+    const depth = Math.ceil(((mode === "floating" ? 44 : 34) * scale) + 12);
+    edgeGap = Math.max(edgeGap, Math.min(96, depth));
+  }
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
   document.body.classList.toggle("tight-edge", edgeGap < 24);
@@ -2721,7 +2730,15 @@ const PANEL_ROOM = 420;
 
 let lastFull = null;
 function edgePadCss() {
-  return Math.min(SHADOW_PAD, Math.max(4, Math.min(96, cfg.edgeGap ?? 48)));
+  let gap = Math.max(4, Math.min(96, cfg.edgeGap ?? 48));
+  if (cfg.notchAlwaysVisible) {
+    const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
+    const mode = cfg.notchMode
+      || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+    const depth = Math.ceil(((mode === "floating" ? 44 : 34) * scale) + 12);
+    gap = Math.max(gap, Math.min(96, depth));
+  }
+  return Math.min(SHADOW_PAD, gap);
 }
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
