@@ -1394,12 +1394,10 @@ body.notch-body {
   height: 100vh;
   padding: calc(4px * var(--notch-scale, 1));
   /* The OS window is sized bigger than the visible pill on purpose (room for
-     the hover-grow animation and the taskbar overlap in peek style) — but
-     that means real empty space surrounds it. Without this, a click in that
-     margin still landed on <body> and could be mistaken for "the dock opened
-     on its own": nothing there had a click handler, yet the window still ate
-     the input. Only the pill itself is interactive; the margin now passes
-     clicks through instead of silently swallowing them. */
+     the hover-grow animation and soft shadow). CSS pointer-events alone cannot
+     pass clicks through on WebView2 — the backend notch hit watcher toggles
+     ignore_cursor_events from the pill rect reported by notch.js. Keep body
+     non-interactive as a belt-and-suspenders for in-page hits. */
   pointer-events: none;
 }
 body.notch-body.vertical { align-items: center; }
@@ -4958,7 +4956,8 @@ body.notch-body.notch-dot {
   /* Center the circle in the square OS window on every edge. */
   align-items: center;
   justify-content: center;
-  padding: calc(10px * var(--notch-scale, 1));
+  /* Pad matches Rust window (~36) vs pill (~20): keep glow room, not a dead zone. */
+  padding: calc(8px * var(--notch-scale, 1));
   /* Clip only at the OS window; keep body paint from eating soft glow. */
   overflow: hidden;
 }
@@ -4975,8 +4974,8 @@ body.notch-body.surface-solid.notch-dot .notch-pill {
   min-height: calc(20px * var(--notch-scale, 1));
   border-radius: 50%;
   transform-origin: center center;
-  --pill-gx: 1.28;
-  --pill-gy: 1.28;
+  --pill-gx: 1.18;
+  --pill-gy: 1.18;
   box-shadow:
     0 2px 8px color-mix(in srgb, #000 24%, transparent),
     inset 0 1px 0 var(--surf-inset-lit),
