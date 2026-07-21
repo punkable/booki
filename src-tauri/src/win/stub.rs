@@ -33,6 +33,11 @@ pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {
     None
 }
 
+/// Auto-hide taskbar state — always false off-Windows.
+pub fn taskbar_autohide() -> bool {
+    false
+}
+
 pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: isize) -> bool {
     false
 }
