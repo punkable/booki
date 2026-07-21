@@ -107,6 +107,11 @@ fn default_anim() -> String {
 fn default_edge_gap() -> u32 {
     48
 }
+fn default_taskbar_settle_ms() -> u32 {
+    // After an auto-hide taskbar tucks away, give the user a beat to hit the
+    // notch/dock before Booki drops back to the screen edge.
+    1000
+}
 fn default_clipboard_retention_days() -> u32 {
     7
 }
@@ -207,6 +212,20 @@ pub struct Config {
     /// Visual gap (CSS px) between the bar and its screen edge.
     #[serde(default = "default_edge_gap")]
     pub edge_gap: u32,
+    /// When Windows auto-hides the taskbar, rise with the revealed bar so the
+    /// dock/notch stay above it (Windhawk height mods included via tray HWND).
+    #[serde(default = "default_true")]
+    pub taskbar_follow: bool,
+    /// After the auto-hide taskbar hides again, wait this many ms before the
+    /// dock/notch drop back to the screen edge. Rising with a revealed bar is
+    /// still immediate so they never sit under it.
+    #[serde(default = "default_taskbar_settle_ms")]
+    pub taskbar_settle_ms: u32,
+    /// While the cursor is over the dock or notch, keep the raised position and
+    /// reset the settle timer — so you can actually use Booki after revealing
+    /// the taskbar.
+    #[serde(default = "default_true")]
+    pub taskbar_hold_while_hover: bool,
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
@@ -324,6 +343,9 @@ impl Default for Config {
             autostart: false,
             context_menu: true,
             edge_gap: 48,
+            taskbar_follow: true,
+            taskbar_settle_ms: default_taskbar_settle_ms(),
+            taskbar_hold_while_hover: true,
             language: default_language(),
             settings_rev: 0,
             seen_version: String::new(),

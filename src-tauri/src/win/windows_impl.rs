@@ -497,8 +497,15 @@ const TASKBAR_VISIBLE_MIN_PX: i32 = 8;
 /// full monitor even while the bar is temporarily revealed. We also inset by
 /// any *visible* `Shell_TrayWnd` / `Shell_SecondaryTrayWnd` overlapping this
 /// monitor so the dock and notch sit just above (or beside) the revealed bar
-/// and slide back to the edge when it hides again.
+/// and slide back to the edge when it hides again. Windhawk mods that change
+/// taskbar height are covered because we read the live tray HWND rect.
 pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
+    work_area_ex(x, y, true)
+}
+
+/// Like [`work_area`], but `follow_visible_tray` can disable the live tray
+/// inset (useful when the user prefers a fixed screen-edge anchor).
+pub fn work_area_ex(x: i32, y: i32, follow_visible_tray: bool) -> Option<(i32, i32, i32, i32)> {
     unsafe {
         let hmon = MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST);
         let mut mi = MONITORINFO {
@@ -509,7 +516,9 @@ pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
             return None;
         }
         let mut work = mi.rcWork;
-        inset_visible_taskbars(&mut work, &mi.rcMonitor, hmon);
+        if follow_visible_tray {
+            inset_visible_taskbars(&mut work, &mi.rcMonitor, hmon);
+        }
         Some((
             work.left,
             work.top,

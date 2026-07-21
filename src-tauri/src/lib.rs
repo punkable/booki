@@ -1203,13 +1203,14 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let mpos = monitor.position();
     let msize = monitor.size();
     let dpr = notch.scale_factor().unwrap_or(1.0);
-    let (ax, ay, aw, ah) = win::work_area(
+    let cfg = config::load();
+    let (ax, ay, aw, ah) = win::work_area_ex(
         mpos.x + msize.width as i32 / 2,
         mpos.y + msize.height as i32 / 2,
+        cfg.taskbar_follow,
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    let cfg = config::load();
     // The notch can live on its own edge ("auto" = follow the dock).
     let edge: &str = if cfg.notch_edge == "auto" {
         edge
@@ -1890,15 +1891,16 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     let msize = monitor.size();
 
     // Use the monitor's WORK AREA (excludes the taskbar — including a
-    // temporarily revealed auto-hide bar) so the dock never sits on top of it.
-    // Falls back to the full monitor off-Windows.
-    let (ax, ay, aw, ah) = win::work_area(
+    // temporarily revealed auto-hide bar when taskbar_follow is on) so the dock
+    // never sits on top of it. Falls back to the full monitor off-Windows.
+    let cfg = config::load();
+    let (ax, ay, aw, ah) = win::work_area_ex(
         mpos.x + msize.width as i32 / 2,
         mpos.y + msize.height as i32 / 2,
+        cfg.taskbar_follow,
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    let cfg = config::load();
     // The bar's distance to the screen edge is user-tunable (edge_gap = the
     // VISUAL gap in CSS px). The window itself carries a small transparent
     // padding on the anchored side (shrunk in CSS when the gap is small), so the
@@ -2482,49 +2484,182 @@ pub fn run() {
                 // edge — above a revealed taskbar, flush to the screen when it
                 // hides again. Purely position (never size), so it can't fight the
                 // stage window's fixed-size contract.
+                //
+                // Drop settle: rising with a revealed bar is immediate (so Booki
+                // never sits under it), but dropping back to the screen edge waits
+                // `taskbar_settle_ms` and holds while the cursor is over the dock
+                // or notch — otherwise the bar vanishes before you can use it.
                 #[cfg(windows)]
                 {
                     let handle = app.handle().clone();
                     std::thread::spawn(move || {
-                        let mut last_area: Option<(i32, i32, i32, i32)> = None;
+                        let mut last_seen: Option<(i32, i32, i32, i32)> = None;
+                        let mut last_applied: Option<(i32, i32, i32, i32)> = None;
+                        // When Some, waiting to apply a "drop" (taskbar hid again).
+                        let mut pending_drop: Option<(std::time::Instant, (i32, i32, i32, i32))> =
+                            None;
                         let mut cfg = config::load();
                         let mut cfg_tick: u8 = 0;
+
+                        /// True when `next` means the dock must move inward
+                        /// (taskbar revealed on this edge).
+                        fn is_rise(
+                            prev: (i32, i32, i32, i32),
+                            next: (i32, i32, i32, i32),
+                            edge: &str,
+                        ) -> bool {
+                            match edge {
+                                "top" => next.1 > prev.1,
+                                "left" => next.0 > prev.0,
+                                "right" => next.0 + next.2 < prev.0 + prev.2,
+                                _ => next.1 + next.3 < prev.1 + prev.3,
+                            }
+                        }
+
+                        fn cursor_over(win: &tauri::WebviewWindow) -> bool {
+                            let Ok(pos) = win.outer_position() else {
+                                return false;
+                            };
+                            let Ok(size) = win.outer_size() else {
+                                return false;
+                            };
+                            let mut p = windows::Win32::Foundation::POINT::default();
+                            if unsafe {
+                                windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut p)
+                            }
+                            .is_err()
+                            {
+                                return false;
+                            }
+                            let l = pos.x;
+                            let t = pos.y;
+                            let r = pos.x + size.width as i32;
+                            let b = pos.y + size.height as i32;
+                            p.x >= l && p.x < r && p.y >= t && p.y < b
+                        }
+
                         loop {
-                            // Auto-hide reveal/hide animates over ~200–300 ms and
-                            // never updates rcWork — poll snappily so the notch
-                            // rides with the bar. Always-visible taskbars only need
-                            // the slower rcWork heal.
                             let autohide = win::taskbar_autohide();
                             std::thread::sleep(std::time::Duration::from_millis(
-                                if autohide { 100 } else { 1200 },
+                                if autohide || pending_drop.is_some() {
+                                    80
+                                } else {
+                                    1200
+                                },
                             ));
-                            let Some(dock) = handle.get_webview_window("dock") else { continue };
-                            // Edge/position rarely changes with config; refresh every ~6s
-                            // (or ~1s while auto-hide is active and we tick faster).
+                            let Some(dock) = handle.get_webview_window("dock") else {
+                                continue;
+                            };
                             cfg_tick = cfg_tick.wrapping_add(1);
-                            let cfg_every = if autohide { 10 } else { 5 };
+                            let cfg_every = if autohide || pending_drop.is_some() {
+                                8
+                            } else {
+                                5
+                            };
                             if cfg_tick % cfg_every == 0 {
                                 cfg = config::load();
                             }
-                            let Some(monitor) = pick_monitor(&dock) else { continue };
+                            let Some(monitor) = pick_monitor(&dock) else {
+                                continue;
+                            };
                             let mpos = monitor.position();
                             let msize = monitor.size();
-                            let area = win::work_area(
+                            let area = win::work_area_ex(
                                 mpos.x + msize.width as i32 / 2,
                                 mpos.y + msize.height as i32 / 2,
+                                cfg.taskbar_follow,
                             )
-                            .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
-                            if last_area == Some(area) {
+                            .unwrap_or((
+                                mpos.x,
+                                mpos.y,
+                                msize.width as i32,
+                                msize.height as i32,
+                            ));
+
+                            let notch = handle.get_webview_window("notch");
+                            let apply = |dock: &tauri::WebviewWindow, edge: &str| {
+                                let _ = position_dock(dock, edge);
+                                if let Some(ref n) = notch {
+                                    let _ = position_notch(n, edge);
+                                }
+                            };
+
+                            // First observation: establish baseline, don't jump.
+                            if last_seen.is_none() {
+                                last_seen = Some(area);
+                                last_applied = Some(area);
                                 continue;
                             }
-                            let first_tick = last_area.is_none();
-                            last_area = Some(area);
-                            if first_tick {
-                                continue; // just establishing the baseline, nothing changed yet
+
+                            let edge = cfg.edge.as_str();
+                            let hovering = cfg.taskbar_hold_while_hover
+                                && (cursor_over(&dock)
+                                    || notch.as_ref().map(cursor_over).unwrap_or(false));
+
+                            if last_seen != Some(area) {
+                                let prev = last_seen.unwrap_or(area);
+                                last_seen = Some(area);
+
+                                if !cfg.taskbar_follow {
+                                    pending_drop = None;
+                                    if last_applied != Some(area) {
+                                        apply(&dock, edge);
+                                        last_applied = Some(area);
+                                    }
+                                    continue;
+                                }
+
+                                let rising = is_rise(prev, area, edge)
+                                    || last_applied
+                                        .map(|a| is_rise(a, area, edge))
+                                        .unwrap_or(false);
+                                if rising {
+                                    // Taskbar revealed → climb immediately.
+                                    pending_drop = None;
+                                    apply(&dock, edge);
+                                    last_applied = Some(area);
+                                    continue;
+                                }
+
+                                if last_applied != Some(area) {
+                                    // Taskbar tucked (or other shrink of inset):
+                                    // delay the drop so the notch stays reachable.
+                                    let settle = cfg.taskbar_settle_ms.clamp(0, 5000);
+                                    if settle == 0 {
+                                        pending_drop = None;
+                                        apply(&dock, edge);
+                                        last_applied = Some(area);
+                                    } else {
+                                        pending_drop = Some((
+                                            std::time::Instant::now()
+                                                + std::time::Duration::from_millis(settle as u64),
+                                            area,
+                                        ));
+                                    }
+                                }
                             }
-                            let _ = position_dock(&dock, &cfg.edge);
-                            if let Some(notch) = handle.get_webview_window("notch") {
-                                let _ = position_notch(&notch, &cfg.edge);
+
+                            // Hold while hovering Booki: keep the raised seat and
+                            // push the settle deadline out so the user can click.
+                            if hovering {
+                                if let Some((_, pending_area)) = pending_drop {
+                                    let settle = cfg.taskbar_settle_ms.clamp(0, 5000);
+                                    pending_drop = Some((
+                                        std::time::Instant::now()
+                                            + std::time::Duration::from_millis(settle as u64),
+                                        pending_area,
+                                    ));
+                                }
+                                continue;
+                            }
+
+                            if let Some((deadline, pending_area)) = pending_drop {
+                                if std::time::Instant::now() >= deadline {
+                                    apply(&dock, edge);
+                                    last_applied = Some(pending_area);
+                                    last_seen = Some(pending_area);
+                                    pending_drop = None;
+                                }
                             }
                         }
                     });

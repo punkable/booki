@@ -33,6 +33,10 @@ pub fn work_area(_x: i32, _y: i32) -> Option<(i32, i32, i32, i32)> {
     None
 }
 
+pub fn work_area_ex(_x: i32, _y: i32, _follow_visible_tray: bool) -> Option<(i32, i32, i32, i32)> {
+    None
+}
+
 /// Auto-hide taskbar state — always false off-Windows.
 pub fn taskbar_autohide() -> bool {
     false
