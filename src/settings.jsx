@@ -204,6 +204,7 @@ const SEARCH_INDEX = [
   ["ap.compact", "appearance"],
   ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
+  ["be.taskbarFollow", "behavior"], ["be.taskbarSettle", "behavior"], ["be.taskbarHoldHover", "behavior"],
   ["ap.notchSize", "behavior"], ["be.notchPeek", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
   ["apps.newFolder", "apps"], ["group.ungroup", "apps"], ["group.takeOut", "apps"],
@@ -232,6 +233,9 @@ const SEARCH_ALIASES = {
   "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
+  "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
+  "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
+  "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
   "ap.notchSize": "notch pastilla tamano size pill",
@@ -1383,6 +1387,36 @@ function Behavior({ cfg, set }) {
           checked={cfg.alwaysOnTop !== false}
           onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       </CollapsibleSection>
+
+      <SettingsSection title={t("gp.taskbar")} icon="app" hint={t("gp.taskbarHint")}>
+        <Toggle
+          label={t("be.taskbarFollow")}
+          hint={t("be.taskbarFollowHint")}
+          checked={cfg.taskbarFollow !== false}
+          onChange={(v) => set({ taskbarFollow: v })}
+        />
+        {cfg.taskbarFollow !== false && (
+          <>
+            <Row label={t("be.taskbarSettle")} hint={t("be.taskbarSettleHint")}>
+              <Slider
+                value={cfg.taskbarSettleMs ?? 1000}
+                min={0}
+                max={3000}
+                step={100}
+                fmt={(v) => (v === 0 ? t("be.taskbarSettleOff") : `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)} s`)}
+                onChange={(v) => set({ taskbarSettleMs: v })}
+              />
+            </Row>
+            <Toggle
+              label={t("be.taskbarHoldHover")}
+              hint={t("be.taskbarHoldHoverHint")}
+              checked={cfg.taskbarHoldWhileHover !== false}
+              onChange={(v) => set({ taskbarHoldWhileHover: v })}
+            />
+            <p className="muted" style={{ marginTop: 4 }}>{t("be.taskbarWindhawkTip")}</p>
+          </>
+        )}
+      </SettingsSection>
 
       <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
         <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
