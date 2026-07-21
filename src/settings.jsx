@@ -205,10 +205,9 @@ const SEARCH_INDEX = [
   ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
   ["be.taskbarFollow", "behavior"], ["be.taskbarSettle", "behavior"], ["be.taskbarHoldHover", "behavior"],
-  ["be.notchMode", "behavior"], ["ap.notchSize", "behavior"], ["be.notchPeek", "behavior"],
+  ["be.notchMode", "behavior"], ["ap.notchSize", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
   ["apps.newFolder", "apps"], ["group.ungroup", "apps"], ["group.takeOut", "apps"],
-  ["be.multiNotch", "behavior"],
   ["be.magnify", "behavior"],
   ["be.zoom", "behavior"], ["be.anim", "behavior"], ["be.monitor", "behavior"],
   ["be.showLabels", "behavior"], ["be.showIndicators", "behavior"],
@@ -240,7 +239,7 @@ const SEARCH_ALIASES = {
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
   "ap.notchSize": "notch pastilla tamano size pill",
-  "be.notchPeek": "notch peek asomar",
+  "be.notchPeek": "notch peek asomar pegado attached",
   "be.reveal": "revelar reveal hover click notch",
   "apps.title": "aplicaciones programas pinned apps ancladas grupo group carpeta folder",
   "apps.newFolder": "grupo group carpeta folder merge fusionar",
@@ -862,7 +861,10 @@ function MiniDockPreview({ cfg }) {
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
-  const peek = cfg.notchPeek !== false;
+  const notchMode = cfg.notchMode
+    || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+  const attached = notchMode === "attached";
+  const smart = notchMode === "smart";
   const fills = {
     mica: `color-mix(in srgb, ${fillTint} ${Math.min(96, 55 + alpha * 40)}%, transparent)`,
     acrylic: `color-mix(in srgb, ${fillTint} ${alpha * 88}%, transparent)`,
@@ -870,10 +872,12 @@ function MiniDockPreview({ cfg }) {
     solid: `color-mix(in srgb, ${fillTint} 92%, var(--accent) 8%)`,
   };
   const blurPx = surface === "solid" ? 0 : surface === "tinted" ? 18 : surface === "mica" ? 12 : 16;
-  const notchAlong = Math.round(42 * notchScale);
-  const notchAcross = Math.max(4, Math.round((peek ? 6 : 5) * notchScale));
+  const notchAlong = smart ? Math.round(14 * notchScale) : Math.round(42 * notchScale);
+  const notchAcross = smart
+    ? Math.round(14 * notchScale)
+    : Math.max(4, Math.round((attached ? 6 : 5) * notchScale));
   return (
-    <div className={"preview prev-" + edge + " prev-surface-" + surface + (peek ? " prev-peek" : "")}>
+    <div className={"preview prev-" + edge + " prev-surface-" + surface + (attached ? " prev-peek" : "") + (smart ? " prev-smart" : "")}>
       <div
         className="preview-bar"
         style={{
@@ -909,7 +913,7 @@ function MiniDockPreview({ cfg }) {
         style={{
           width: vertical ? notchAcross : notchAlong,
           height: vertical ? notchAlong : notchAcross,
-          borderRadius: surface === "solid" ? 3 : peek ? (vertical ? "0 8px 8px 0" : "8px 8px 0 0") : 999,
+          borderRadius: smart ? 999 : surface === "solid" ? 3 : attached ? (vertical ? "0 8px 8px 0" : "8px 8px 0 0") : 999,
         }}
         title={t("ap.notchSize")}
       />
@@ -1422,13 +1426,16 @@ function Behavior({ cfg, set }) {
       <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
         <Row label={t("be.notchMode")} hint={t("be.notchModeHint")}>
           <SegmentedControl
-            value={cfg.notchMode || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached")}
+            value={cfg.notchMode || (cfg.notchPeek === false ? "floating" : "attached")}
             onChange={(v) => {
               set(
                 {
                   notchMode: v,
-                  notchPeek: v !== "floating",
-                  multiNotchEnabled: v === "smart",
+                  // Keep legacy keys in sync so old fallbacks don't revive the
+                  // multi-notch app list or the peek toggle.
+                  notchPeek: v === "attached",
+                  multiNotchEnabled: false,
+                  multiNotchApps: [],
                 },
                 { flush: true, afterSave: () => dockApi.notchPreview() }
               );
@@ -1440,7 +1447,7 @@ function Behavior({ cfg, set }) {
             ]}
           />
         </Row>
-        <p className="muted" style={{ marginTop: -4, marginBottom: 8 }}>
+        <p className="muted notch-mode-hint">
           {(cfg.notchMode || "attached") === "floating"
             ? t("be.notchModeFloatingHint")
             : (cfg.notchMode || "attached") === "smart"
@@ -1463,46 +1470,33 @@ function Behavior({ cfg, set }) {
           />
         </Row>
         {hideOn ? (
-          <Row label={t("be.reveal")} hint={t("be.revealHint")}>
-            <SegmentedControl
-              value={cfg.notchTrigger || "click"}
-              onChange={(v) => set({ notchTrigger: v })}
-              options={[
-                { value: "click", label: t("be.revealClick") },
-                { value: "hover", label: t("be.revealHover") },
-              ]}
+          <>
+            <Row label={t("be.reveal")} hint={t("be.revealHint")}>
+              <SegmentedControl
+                value={cfg.notchTrigger || "click"}
+                onChange={(v) => set({ notchTrigger: v })}
+                options={[
+                  { value: "click", label: t("be.revealClick") },
+                  { value: "hover", label: t("be.revealHover") },
+                ]}
+              />
+            </Row>
+            <Toggle
+              label={t("be.notchAlwaysVisible")}
+              hint={t("be.notchAlwaysVisibleHint")}
+              checked={!!cfg.notchAlwaysVisible}
+              onChange={(v) => {
+                set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => {
+                  dockApi.reposition(cfg.edge || "bottom").catch(() => {});
+                  dockApi.notchPreview();
+                }});
+              }}
             />
-          </Row>
+          </>
         ) : (
           <p className="muted">{t("be.notchNeedsHide")}</p>
         )}
       </SettingsSection>
-
-      {hideOn && (
-        <CollapsibleSection
-          title={t("gp.advancedNotch")}
-          icon="eye"
-          hint={t("gp.advancedNotchHint")}
-          defaultOpen={false}
-        >
-          <Toggle
-            label={t("be.notchAlwaysVisible")}
-            hint={t("be.notchAlwaysVisibleHint")}
-            checked={!!cfg.notchAlwaysVisible}
-            onChange={(v) => {
-              set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => {
-                dockApi.reposition(cfg.edge || "bottom").catch(() => {});
-                dockApi.notchPreview();
-              }});
-            }}
-          />
-          <p className="muted" style={{ marginTop: 4 }}>{t("be.notchClearanceTip")}</p>
-        </CollapsibleSection>
-      )}
-
-      {(cfg.notchMode === "smart" || cfg.multiNotchEnabled) && (
-        <MultiNotchSection cfg={cfg} set={set} />
-      )}
 
       <CollapsibleSection
         title={t("gp.interaction")}
@@ -1540,103 +1534,6 @@ function Behavior({ cfg, set }) {
 
       <ProfilesCard cfg={cfg} set={set} />
     </>
-  );
-}
-
-const MULTI_NOTCH_SUGGESTIONS = {
-  browsers: ["chrome", "firefox", "edge", "brave", "opera", "vivaldi", "arc", "helium"],
-  design: ["photoshop", "illustrator", "figma", "gimp", "blender", "maya", "cinema4d"],
-  editors: ["premiere", "aftereffects", "davinciresolve", "capcut", "obs"],
-  code: [
-    "opencode", "cursor", "code", "vscodium", "sublime_text", "atom", "notepad++",
-    "idea64", "webstorm64", "pycharm64", "datagrip64", "goland64", "rustrover64", "rider64",
-    "clion64", "phpstorm64", "rubymine64", "rider64", "fleet", "zed",
-  ],
-  productivity: ["notion", "obsidian", "evernote", "onenote", "todoist", "ticktick", "slack", "teams", "discord", "telegram", "whatsapp"],
-};
-
-function MultiNotchSection({ cfg, set }) {
-  const [custom, setCustom] = useState("");
-  const [suggestOpen, setSuggestOpen] = useState(false);
-  const apps = cfg.multiNotchApps || [];
-  const add = (name) => {
-    const key = String(name).toLowerCase().trim().replace(/\.exe$/i, "");
-    if (!key || apps.some((a) => a.toLowerCase() === key)) return;
-    set({ multiNotchApps: [...apps, key] });
-  };
-  const remove = (key) => {
-    set({ multiNotchApps: apps.filter((a) => a.toLowerCase() !== key.toLowerCase()) });
-  };
-  return (
-    <CollapsibleSection
-      title={t("be.multiNotchApps")}
-      icon="eye"
-      hint={t("be.notchModeSmartHint")}
-      count={apps.length}
-      defaultOpen={true}
-    >
-      <Toggle label={t("be.multiNotchAutoSuggest")}
-        hint={t("be.multiNotchAutoSuggestHint")}
-        checked={cfg.multiNotchAutoSuggest !== false}
-        onChange={(v) => set({ multiNotchAutoSuggest: v })} />
-      <div className="mn-add">
-        <input
-          className="r-hotkey-input"
-          value={custom}
-          placeholder={t("be.multiNotchPlaceholder")}
-          onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
-        />
-        <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
-      </div>
-      {apps.length === 0 ? (
-        <p className="muted mn-empty">{t("be.multiNotchEmptySmart")}</p>
-      ) : (
-        <div className="mn-list">
-          {apps.map((app) => (
-            <span key={app} className="mn-tag">
-              {app}
-              <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
-                <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        className={"mn-suggest-toggle" + (suggestOpen ? " open" : "")}
-        onClick={() => setSuggestOpen((o) => !o)}
-        aria-expanded={suggestOpen}
-      >
-        <span>{t("be.multiNotchSuggest")}</span>
-        <span className="muted">{t("be.multiNotchSuggestCount").replace("{n}", String(
-          Object.values(MULTI_NOTCH_SUGGESTIONS).reduce((n, list) => n + list.length, 0)
-        ))}</span>
-        <span dangerouslySetInnerHTML={{ __html: icon(suggestOpen ? "chevron-down" : "chevron-right") }} />
-      </button>
-      {suggestOpen && (
-        <div className="mn-suggest-panel">
-          <p className="muted">{t("be.multiNotchSuggestHint")}</p>
-          {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
-            <details key={cat} className="mn-suggest-group">
-              <summary>{t(`mn.${cat}`)} <span className="muted">{list.length}</span></summary>
-              <div className="mn-chips">
-                {list.map((app) => {
-                  const active = apps.some((a) => a.toLowerCase() === app);
-                  return (
-                    <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
-                      onClick={() => active ? remove(app) : add(app)} disabled={active}>
-                      {app}
-                    </button>
-                  );
-                })}
-              </div>
-            </details>
-          ))}
-        </div>
-      )}
-    </CollapsibleSection>
   );
 }
 

@@ -5,7 +5,7 @@ export const CHANGELOG = [
   {
     version: "0.66.0",
     date: "21 jul 2026",
-    headline: "Retraso al bajar con la taskbar; estilos de notch (pegado / flotante / inteligente).",
+    headline: "Retraso al bajar con la taskbar; notch unificado (pegado / flotante / punto inteligente).",
     sections: [
       {
         icon: "undo",
@@ -21,8 +21,9 @@ export const CHANGELOG = [
         icon: "performance",
         title: "Notch",
         notes: [
-          "Tres estilos: Pegado (tipo iPhone), Flotante (c\u00e1psula separada) e Inteligente (isla \u2192 punto din\u00e1mico en apps de productividad).",
-          "El punto inteligente adapta el tama\u00f1o de la ventana y usa un cat\u00e1logo autom\u00e1tico (navegadores, IDEs, dise\u00f1o) m\u00e1s tu lista.",
+          "Un solo control de estilo: Pegado (tipo iPhone), Flotante (c\u00e1psula) e Inteligente (punto circular).",
+          "Inteligente es siempre circular en cualquier app — sin lista ni cat\u00e1logo de productividad. A\u00f1ade ambiente: respiraci\u00f3n suave, m\u00e1s presencia al trabajar y atenuaci\u00f3n en pantalla completa.",
+          "Se unific\u00f3 la secci\u00f3n Notch (sin opciones duplicadas de peek / multi-notch).",
           "Con notch siempre visible, la distancia al borde deja hueco para no solaparse con el dock en laterales/arriba.",
         ],
       },

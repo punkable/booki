@@ -3,7 +3,7 @@
    move the dock (and notch) there. It's its own small window (never resized
    mid-flight) so the click target and repaint stay rock-solid. */
 
-import { config as configApi, invoke, onActiveApp, onConfigChanged, onFileDrop, onNotchToast } from "./api.js";
+import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onOcclusion } from "./api.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
@@ -24,6 +24,7 @@ function availH() {
 }
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
+let notchMode = "attached";
 
 async function applyLook() {
   try {
@@ -39,12 +40,20 @@ async function applyLook() {
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
     const mode = cfg.notchMode
-      || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
-    const attached = mode === "attached" || mode === "smart";
+      || (cfg.notchPeek === false ? "floating" : "attached");
+    notchMode = mode;
+    const attached = mode === "attached";
+    const floating = mode === "floating";
+    const smart = mode === "smart";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
     document.body.classList.toggle("peek", attached);
-    document.body.classList.toggle("floating", mode === "floating");
-    document.body.classList.toggle("smart", mode === "smart");
+    document.body.classList.toggle("floating", floating || smart);
+    document.body.classList.toggle("smart", smart);
+    // Smart is always a circle — never gated on a per-app list.
+    document.body.classList.toggle("notch-dot", smart);
+    if (!smart) {
+      document.body.classList.remove("smart-busy", "smart-focus");
+    }
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     applySurfaceVars(cfg);
@@ -64,20 +73,14 @@ const textEl = document.getElementById("notch-text");
 applyLook();
 onConfigChanged(applyLook);
 
-// Multi-notch intelligence: shrink the notch to a dot when the active app is in
-// the user's productivity list (browsers, editors, design tools, etc.).
-let dotMode = false;
-function applyDotMode(active) {
-  dotMode = !!active;
-  document.body.classList.toggle("notch-dot", dotMode);
+// Smart ambient behaviours: stay circular always, but react to fullscreen /
+// occlusion so the dot feels alive — no app whitelist required.
+function setSmartState(name, on) {
+  if (notchMode !== "smart") return;
+  document.body.classList.toggle(name, !!on);
 }
-onActiveApp((payload) => applyDotMode(payload.dot));
-(async function initDotMode() {
-  try {
-    const payload = await invoke("current_foreground_app");
-    applyDotMode(payload.dot);
-  } catch (_) {}
-})();
+onFullscreen((v) => setSmartState("smart-busy", v));
+onOcclusion((v) => setSmartState("smart-focus", v));
 
 // Brief toast message (e.g. "Booki se ocultó · pantalla completa").
 // Dock owns hide_all timing — this window only paints the toast. Never call
