@@ -110,7 +110,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => invoke("reveal_dock"), 120);
+  hoverTimer = setTimeout(() => invoke("reveal_dock"), 90);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 
@@ -121,7 +121,7 @@ document.addEventListener("visibilitychange", () => {
   pill.classList.remove("notch-enter");
   void pill.offsetWidth; // force reflow
   pill.classList.add("notch-enter");
-  setTimeout(() => pill.classList.remove("notch-enter"), 400);
+  setTimeout(() => pill.classList.remove("notch-enter"), 280);
 });
 
 /** Current notch window size — vertical notches are tall, not 184×26. */

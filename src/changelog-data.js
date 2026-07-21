@@ -3,6 +3,38 @@
 
 export const CHANGELOG = [
   {
+    version: "0.64.0",
+    date: "21 jul 2026",
+    headline: "Apps en Ajustes m\u00e1s claras; notch\u2194dock m\u00e1s \u00e1gil; radio de widgets/grupos; backup e instalador.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Ajustes \u00b7 Apps",
+        notes: [
+          "Lista y cuadr\u00edcula redise\u00f1adas al estilo Windows 11: menos bordes, thumbs planos, contadores discretos.",
+          "Widgets del cat\u00e1logo m\u00e1s calmados, sin tarjetas que se elevan.",
+        ],
+      },
+      {
+        icon: "undo",
+        title: "Dock, notch y radio",
+        notes: [
+          "Transici\u00f3n notch\u2194dock m\u00e1s r\u00e1pida y coherente (genie + entrada del notch).",
+          "El redondeo de widgets y grupos sigue el radio que eliges en Apariencia.",
+        ],
+      },
+      {
+        icon: "sparkles",
+        title: "Backup e instalador",
+        notes: [
+          "Copia de seguridad con confirmaci\u00f3n y mensaje de \u00e9xito/error; al importar el dock se actualiza al momento.",
+          "Tus datos en %APPDATA%\\Booki se conservan al desinstalar salvo \u00abEliminar datos\u00bb.",
+          "Instalador NSIS/MSI con gr\u00e1ficos nuevos y selector de idioma.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.63.1",
     date: "21 jul 2026",
     headline: "El color del cristal ya funciona en Mica, Acrylic y en tema claro/oscuro.",

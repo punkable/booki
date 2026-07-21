@@ -292,8 +292,8 @@ function applyAll() {
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
   document.body.classList.toggle("tight-edge", edgeGap < 24);
-  // Tile/corner roundness (user-tunable). Drives tile, group and folder radii;
-  // the dock's own outer corner is a touch rounder so it frames the tiles.
+  // Tile/corner roundness (user-tunable). Drives tiles, widgets (.w-card),
+  // group grids/minis, and letter glyphs. Dock chrome is a touch rounder.
   const cr = cfg.cornerRadius ?? 12;
   root.style.setProperty("--tile-r", `${cr}px`);
   root.style.setProperty("--dock-r", `${cr + 8}px`);
@@ -2891,7 +2891,7 @@ function setHidden(v) {
     document.body.classList.add("tucked");
     setTimeout(() => {
       if (hiddenState) dockApi.hideDock(cfg.edge);
-    }, 230); // match genie transition (~200ms) + one frame
+    }, 190); // match genie (~170ms) + a frame
   } else {
     // Show the dock window (and hide the notch), make sure it's sized to the full
     // bar, then slide the bar back in. Force the stage fully interactive during
@@ -2901,11 +2901,11 @@ function setHidden(v) {
     applyFrame();
     setTimeout(() => {
       if (!hiddenState) document.body.classList.remove("tucked");
-    }, 60);
+    }, 40);
     setTimeout(() => {
       document.body.classList.remove("revealing");
       reportHitRects();
-    }, 500);
+    }, 380);
   }
 }
 

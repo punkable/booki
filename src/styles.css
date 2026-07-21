@@ -451,37 +451,38 @@ body.compact .w-card { padding: 4px 8px; gap: 6px; }
    suck-in, approximated with anchored scale + skew). --genie-ox points at where
    the notch sits along its edge, and the genie-* class (set in dock.js) at the
    EDGE the notch lives on — which may differ from the dock's own edge. */
-body.autohide.tucked .dock { opacity: 0; filter: blur(1.5px); }
+body.autohide.tucked .dock { opacity: 0; filter: blur(1.2px); }
 /* Reveal is ease-out and quick: the dock appears instantly and decelerates
    into place — it shows dozens of times a day, so it must never crawl. */
 /* Genie: readable suck (not scale≈0), opacity trails transform so shape remains. */
 body.autohide .dock {
   transition:
-    transform 0.2s var(--ease-out),
-    opacity 0.14s var(--ease-out) 0.06s,
-    filter 0.16s var(--ease-out);
+    transform 0.17s var(--ease-out),
+    opacity 0.12s var(--ease-out) 0.04s,
+    filter 0.14s var(--ease-out);
 }
-body.autohide:not(.tucked) .dock {
+body.autohide:not(.tucked) .dock,
+body.autohide.revealing:not(.tucked) .dock {
   transition:
-    transform 0.22s var(--ease-out),
-    opacity 0.18s var(--ease-out),
-    filter 0.18s var(--ease-out);
+    transform 0.2s var(--ease-out),
+    opacity 0.16s var(--ease-out),
+    filter 0.16s var(--ease-out);
 }
 body.autohide.tucked.genie-bottom .dock {
   transform-origin: var(--genie-ox, 50%) 100%;
-  transform: translateY(42%) scale(0.38, 0.16) skewX(calc((50 - var(--genie-oxn, 50)) * 0.12deg));
+  transform: translateY(38%) scale(0.42, 0.2) skewX(calc((50 - var(--genie-oxn, 50)) * 0.1deg));
 }
 body.autohide.tucked.genie-top .dock {
   transform-origin: var(--genie-ox, 50%) 0%;
-  transform: translateY(-42%) scale(0.38, 0.16) skewX(calc((var(--genie-oxn, 50) - 50) * 0.12deg));
+  transform: translateY(-38%) scale(0.42, 0.2) skewX(calc((var(--genie-oxn, 50) - 50) * 0.1deg));
 }
 body.autohide.tucked.genie-left .dock {
   transform-origin: 0% var(--genie-ox, 50%);
-  transform: translateX(-42%) scale(0.16, 0.38) skewY(calc((var(--genie-oxn, 50) - 50) * 0.12deg));
+  transform: translateX(-38%) scale(0.2, 0.42) skewY(calc((var(--genie-oxn, 50) - 50) * 0.1deg));
 }
 body.autohide.tucked.genie-right .dock {
   transform-origin: 100% var(--genie-ox, 50%);
-  transform: translateX(42%) scale(0.16, 0.38) skewY(calc((50 - var(--genie-oxn, 50)) * 0.12deg));
+  transform: translateX(38%) scale(0.2, 0.42) skewY(calc((50 - var(--genie-oxn, 50)) * 0.1deg));
 }
 @media (prefers-reduced-motion: reduce) {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
@@ -494,8 +495,10 @@ body.edge-swap .dock {
   transform: scale(0.92);
   transition: none !important;
 }
-body:not(.edge-swap):not(.tucked) .dock {
-  transition: transform 0.24s var(--ease), opacity 0.22s ease;
+/* Non-autohide dock motion (edge swap settle, etc.). Keep AFTER edge-swap so
+   autohide reveal timings above are not overridden. */
+body:not(.autohide):not(.edge-swap):not(.tucked) .dock {
+  transition: transform 0.2s var(--ease-out), opacity 0.18s var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   body.edge-swap .dock { transform: none; }
@@ -826,7 +829,7 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   text-align: left;
   overflow: hidden;
   transition: background 0.18s ease, border-color 0.18s ease, transform 0.22s var(--mag-ease),
-    box-shadow 0.22s var(--ease);
+    box-shadow 0.22s var(--ease), border-radius 0.18s var(--ease);
 }
 .tile.widget:hover .w-card {
   background: color-mix(in srgb, var(--ink) 12%, transparent);
@@ -1423,22 +1426,22 @@ body.notch-body.vertical { align-items: center; }
   --pill-gx: 1.18;
   --pill-gy: 1.28;
   transition:
-    width 0.36s var(--ease-in-out),
-    height 0.36s var(--ease-in-out),
-    border-radius 0.36s var(--ease-in-out),
-    scale 0.16s var(--ease-out),
-    background 0.22s var(--ease-out),
-    box-shadow 0.22s var(--ease-out),
-    opacity 0.18s var(--ease-out),
-    border-color 0.22s var(--ease-out);
+    width 0.28s var(--ease-out),
+    height 0.28s var(--ease-out),
+    border-radius 0.28s var(--ease-out),
+    scale 0.14s var(--ease-out),
+    background 0.18s var(--ease-out),
+    box-shadow 0.18s var(--ease-out),
+    opacity 0.14s var(--ease-out),
+    border-color 0.18s var(--ease-out);
 }
 .notch-pill.notch-enter {
-  animation: notch-enter 0.22s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
+  animation: notch-enter 0.2s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
 }
 @keyframes notch-enter {
-  /* Never scale(0) — real objects keep volume (Emil). */
-  from { opacity: 0; transform: scale(0.92); }
-  to { opacity: 1; transform: scale(1); }
+  /* Grow out of the dock's genie collapse — keep volume, arrive soft. */
+  from { opacity: 0; transform: scale(0.78); filter: blur(0.6px); }
+  to { opacity: 1; transform: scale(1); filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .notch-pill.notch-enter { animation: none; }
@@ -1645,7 +1648,8 @@ body.notch-body.toast .notch-toast {
   /* Scale from the rail (macOS Dock), not geometric center. */
   transform-origin: bottom center;
   transition: transform 0.18s var(--mag-ease, cubic-bezier(0.34, 1.5, 0.5, 1)),
-    background 0.12s ease;
+    background 0.12s ease,
+    border-radius 0.18s var(--ease);
 }
 body.edge-top .tile { transform-origin: top center; }
 body.edge-left .tile { transform-origin: left center; }
@@ -1758,16 +1762,16 @@ body.edit .dock { cursor: grab; }
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 22%;
-  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+  border-radius: max(2px, calc(var(--tile-r) * 0.55));
+  background: color-mix(in srgb, var(--accent) 82%, var(--accent-deep));
   color: #fff;
   font-weight: 650;
   font-size: calc(var(--size) * 0.34);
   filter: none;
+  transition: border-radius 0.18s var(--ease);
 }
 
-/* Folder / group tile — iOS-style mini grid of child icons. A centered flex
-   wrap so 1–4 icons always sit balanced in the middle (no top-left clumping). */
+/* Folder / group tile — mini grid tracks the dock's cornerRadius (--tile-r). */
 .tile.group .group-grid {
   width: 84%;
   height: 84%;
@@ -1777,16 +1781,19 @@ body.edit .dock { cursor: grab; }
   justify-content: center;
   gap: 3px;
   padding: 4px;
-  border-radius: 26%;
+  border-radius: max(4px, calc(var(--tile-r) * 0.85));
   background: color-mix(in srgb, var(--layer-strong) 60%, transparent);
   box-shadow: inset 0 0 0 1px var(--stroke-light);
+  transition: border-radius 0.18s var(--ease);
 }
 .tile.group .group-mini {
   flex: 0 0 auto;
   width: calc(50% - 4px);
   height: calc(50% - 4px);
   display: flex; align-items: center; justify-content: center; overflow: hidden;
-  border-radius: 22%; font-size: 8px; font-weight: 700; color: var(--ink-2);
+  border-radius: max(2px, calc(var(--tile-r) * 0.55));
+  font-size: 8px; font-weight: 700; color: var(--ink-2);
+  transition: border-radius 0.18s var(--ease);
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -3738,39 +3745,53 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .r-hotkey input { font: inherit; font-size: var(--text-md); padding: 7px 10px; min-width: 180px; text-align: center; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); }
 
 
-.pin-list { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.pin-list { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .pin-item {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 44px;
-  padding: 6px 8px 6px 10px;
+  min-height: 40px;
+  padding: 5px 6px 5px 6px;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  transition: background var(--motion-med) var(--ease), border-color var(--motion-med) var(--ease);
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .pin-item:hover,
 .pin-item:focus-within {
-  background: color-mix(in srgb, var(--layer-strong) 72%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 55%, transparent);
+  background: color-mix(in srgb, var(--hover) 88%, transparent);
+  border-color: transparent;
 }
 .pin-item.is-folder {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  background: transparent;
+  border-color: transparent;
 }
 .pin-item.is-folder:hover,
 .pin-item.is-folder:focus-within {
-  background: color-mix(in srgb, var(--accent) 9%, var(--layer-strong));
+  background: color-mix(in srgb, var(--hover) 88%, transparent);
 }
-.pin-item.sep .pin-name { color: var(--ink-2); font-style: italic; }
+.pin-item.sep .pin-name { color: var(--ink-2); font-style: italic; font-weight: 500; }
 .pin-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
-.pin-thumb { flex: 0 0 auto; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: linear-gradient(150deg, var(--accent), var(--accent-deep)); color: #fff; font-size: var(--text-sm); font-weight: 700; overflow: hidden; }
+.pin-thumb {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--hover) 90%, var(--accent) 10%);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  overflow: hidden;
+}
 .pin-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .pin-name,
 .pin-name-btn {
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3782,7 +3803,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   margin: 0;
   padding: 2px 4px;
   font: inherit;
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--ink);
   text-align: left;
@@ -3793,32 +3814,38 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-name-btn:hover {
   background: color-mix(in srgb, var(--hover) 80%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 40%, transparent);
 }
 .pin-name-edit {
-  font: inherit; font-size: var(--text-lg); font-weight: 600; padding: 4px 8px; min-width: 0; width: min(220px, 42vw);
+  font: inherit; font-size: var(--text-md); font-weight: 600; padding: 4px 8px; min-width: 0; width: min(220px, 42vw);
   color: var(--ink); background: var(--layer-strong); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--stroke));
   border-radius: var(--r-sm); outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .pin-count {
-  flex: 0 0 auto; font-size: var(--text-xs); font-weight: 700; color: var(--accent-contrast);
-  background: var(--accent); border-radius: var(--r-pill); padding: 1px 7px;
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  background: transparent;
+  border-radius: 0;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
 }
-.pin-actions { position: relative; display: flex; gap: 4px; flex: 0 0 auto; }
+.pin-actions { position: relative; display: flex; gap: 2px; flex: 0 0 auto; }
 .pin-btn {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   font-size: var(--text-sm);
   color: var(--ink);
-  background: color-mix(in srgb, var(--hover) 82%, transparent);
+  background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 7px;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.pin-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--hover)); border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.pin-btn:hover { background: var(--hover); border-color: transparent; }
 .pin-btn:active { transform: scale(0.96); }
 /* Icon buttons: center the 20×20 SVG and dim it a touch. */
 .pin-btn.ico { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
@@ -3828,65 +3855,53 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-btn svg { width: 16px; height: 16px; display: block; }
 .pin-actions .pin-btn::after,
 .pin-card-actions .pin-btn::after {
-  content: attr(data-action-label);
-  position: absolute;
-  right: 50%;
-  bottom: calc(100% + 7px);
-  z-index: 30;
-  max-width: 180px;
-  padding: 5px 8px;
-  color: var(--ink);
-  font: 600 11.5px var(--font);
-  line-height: 1.15;
-  white-space: nowrap;
-  pointer-events: none;
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
-  border-radius: var(--r-sm);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
-  opacity: 0;
-  transform: translate(50%, 4px) scale(0.98);
-  transition: opacity var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+  display: none;
 }
-.pin-actions .pin-btn:hover::after,
-.pin-actions .pin-btn:focus-visible::after,
-.pin-card-actions .pin-btn:hover::after,
-.pin-card-actions .pin-btn:focus-visible::after { opacity: 1; transform: translate(50%, 0) scale(1); }
 .pin-handle {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--ink-2);
+  color: color-mix(in srgb, var(--ink-2) 70%, transparent);
   cursor: grab;
   padding: 0;
   touch-action: none;
-  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.pin-handle svg { width: 16px; height: 16px; }
+.pin-handle svg { width: 15px; height: 15px; }
 .pin-handle:hover,
 .pin-handle:focus-visible {
   background: var(--hover);
-  border-color: var(--stroke-light);
   color: var(--ink);
 }
 .pin-handle:active { cursor: grabbing; transform: scale(0.96); }
 .pin-add-btn { display: inline-flex; align-items: center; gap: 6px; }
 .pin-add-btn svg { width: 16px; height: 16px; }
-.pin-item.is-folder { background: color-mix(in srgb, var(--accent) 7%, var(--layer)); border-color: color-mix(in srgb, var(--accent) 18%, var(--stroke)); }
-.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.pin-item.pin-child {
+  margin-left: 22px;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  min-height: 36px;
+}
+.pin-item.pin-child:hover,
+.pin-item.pin-child:focus-within {
+  background: color-mix(in srgb, var(--hover) 70%, transparent);
+}
+.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 14%, var(--hover)); color: var(--accent); }
 .pin-thumb.folder svg { width: 16px; height: 16px; }
 .pin-thumb.widget { background: var(--hover); font-size: 15px; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
 .pin-btn.del:hover { background: var(--danger); color: #fff; }
-.pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--text-md); padding: 20px 2px; text-align: center; }
+.pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--text-md); padding: 28px 8px; text-align: center; }
 /* Capybara mascot in empty states — friendly, not loud. */
-.empty-capy { width: 56px; height: 56px; opacity: 0.9; }
+.empty-capy { width: 48px; height: 48px; opacity: 0.85; }
 .empty-capy.sm { width: 34px; height: 34px; }
 
 /* ── Apps toolbar: list/grid switch + clear-all ─────────────────────────── */
@@ -3983,58 +3998,73 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-list-summary strong { color: var(--ink); font-size: var(--text-md); font-variant-numeric: tabular-nums; }
 
-/* ── Grid view: cards that wrap; a group card spans the row when opened ──── */
-.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 6px; margin: 6px 0 10px; }
+/* ── Grid view: calm icon tiles (Win11 Settings density, not marketplace cards) ─ */
+.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 4px; margin: 4px 0 8px; }
 .pin-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 7px 7px;
-  background: color-mix(in srgb, var(--layer-strong) 42%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
+  padding: 12px 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 10px; text-align: center; min-width: 0;
-  transition: box-shadow 0.18s var(--ease), background 0.18s var(--ease), border-color 0.14s var(--ease);
+  transition: background var(--motion-fast) var(--ease);
 }
 .pin-card:hover {
-  background: color-mix(in srgb, var(--layer-strong) 78%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 80%, transparent);
+  background: color-mix(in srgb, var(--hover) 90%, transparent);
+  border-color: transparent;
 }
-.pin-card.is-group { background: color-mix(in srgb, var(--accent) 5%, transparent); }
-.pin-card.is-sep { opacity: 0.7; }
-.pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--layer)); }
-.pin-card.open { grid-column: 1 / -1; align-items: stretch; }
-.pin-card-grip { position: absolute; top: 4px; left: 4px; display: inline-flex; border: 0; background: transparent; color: var(--ink-2); cursor: grab; padding: 2px; touch-action: none; opacity: 0; transition: opacity 0.15s ease; }
-.pin-card:hover .pin-card-grip { opacity: 1; }
+.pin-card.is-group { background: transparent; }
+.pin-card.is-group:hover { background: color-mix(in srgb, var(--hover) 90%, transparent); }
+.pin-card.is-sep { opacity: 0.65; }
+.pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pin-card.open {
+  grid-column: 1 / -1;
+  align-items: stretch;
+  padding: 10px 10px 12px;
+  background: color-mix(in srgb, var(--layer) 55%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
+}
+.pin-card-grip {
+  position: absolute; top: 4px; left: 4px; display: inline-flex; border: 0; background: transparent;
+  color: var(--ink-2); cursor: grab; padding: 2px; touch-action: none;
+  opacity: 0.35; transition: opacity var(--motion-fast) var(--ease);
+}
+.pin-card:hover .pin-card-grip,
+.pin-card.open .pin-card-grip { opacity: 1; }
 .pin-card-grip svg { width: 15px; height: 15px; }
 .pin-card-grip:active { cursor: grabbing; }
 .pin-card-body { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; width: 100%; }
-.pin-card.open .pin-card-body { flex-direction: row; justify-content: center; }
+.pin-card.open .pin-card-body { flex-direction: row; justify-content: flex-start; gap: 10px; }
 .pin-card-body.clickable { cursor: pointer; }
-.pin-card .pin-thumb { width: 40px; height: 40px; font-size: var(--text-xl); }
+.pin-card .pin-thumb { width: 40px; height: 40px; font-size: var(--text-xl); border-radius: 10px; }
 .pin-card .pin-thumb.folder svg { width: 22px; height: 22px; }
-.pin-card-name { font-size: var(--text-md); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pin-card .pin-count { position: absolute; top: 6px; right: 6px; }
+.pin-card-name { font-size: var(--text-sm); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pin-card .pin-count { position: absolute; top: 8px; right: 8px; }
 .pin-card .pin-missing { font-size: var(--text-xs); color: #e0a02a; }
-.pin-card-actions { display: flex; gap: 4px; justify-content: center; opacity: 0; transition: opacity 0.15s ease; }
+.pin-card-actions {
+  display: flex; gap: 2px; justify-content: center;
+  opacity: 0.45; transition: opacity var(--motion-fast) var(--ease);
+}
 .pin-card:hover .pin-card-actions, .pin-card.open .pin-card-actions { opacity: 1; }
 /* Open group: children are calm tiles — take-out on hover, delete via context. */
 .pin-card-kids {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-  gap: 8px; width: 100%; margin-top: 6px; padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--stroke) 50%, transparent);
-  border-radius: 10px; transition: box-shadow 0.15s ease, background 0.15s ease;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 4px; width: 100%; margin-top: 8px; padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--stroke) 45%, transparent);
+  border-radius: 0; transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 /* When a child is dragged out past the edge, highlight that releasing removes it. */
-.pin-card-kids.taking-out { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.pin-card-kids.taking-out { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .pin-kid {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 10px 6px 8px;
-  background: color-mix(in srgb, var(--layer-strong) 55%, transparent);
-  border: 1px solid color-mix(in srgb, var(--stroke) 45%, transparent);
-  border-radius: 10px; cursor: grab; touch-action: none; min-width: 0;
-  transition: transform 0.12s var(--ease), background 0.14s ease, border-color 0.14s ease;
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 4px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px; cursor: grab; touch-action: none; min-width: 0;
+  transition: transform var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
 }
 .pin-kid:hover {
-  background: color-mix(in srgb, var(--layer-strong) 88%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 70%, transparent);
+  background: color-mix(in srgb, var(--hover) 90%, transparent);
+  border-color: transparent;
 }
 .pin-kid:active { cursor: grabbing; transform: scale(0.97); }
 .pin-kid .pin-thumb { width: 34px; height: 34px; font-size: var(--text-lg); }
@@ -4458,71 +4488,80 @@ input.pin-kid-rename {
 
 .widget-store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
   margin: 0;
 }
 .widget-store-card {
   display: grid;
   grid-template-rows: 1fr auto auto;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px;
+  padding: 10px;
   border-radius: var(--r-md);
-  border: 1px solid var(--stroke);
-  background: color-mix(in srgb, var(--layer-strong) 62%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--widget-accent) 10%, transparent);
-  transition: border-color 0.14s var(--ease), background 0.14s var(--ease), box-shadow 0.14s var(--ease), transform 0.12s var(--ease);
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--hover) 55%, transparent);
+  box-shadow: none;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .widget-store-card:hover {
-  border-color: color-mix(in srgb, var(--widget-accent) 34%, var(--stroke));
-  background: color-mix(in srgb, var(--layer-strong) 72%, var(--hover));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--widget-accent) 18%, transparent);
-  transform: translateY(-1px);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--hover) 92%, transparent);
+  box-shadow: none;
+  transform: none;
 }
-.widget-store-card.pinned { border-color: color-mix(in srgb, var(--widget-accent) 30%, var(--stroke)); }
+.widget-store-card.pinned {
+  border-color: color-mix(in srgb, var(--widget-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--widget-accent) 6%, var(--hover));
+}
 .widget-store-top { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
 .widget-store-ico {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   background: color-mix(in srgb, var(--widget-accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--widget-accent) 18%, var(--stroke));
+  border: 1px solid color-mix(in srgb, var(--widget-accent) 16%, transparent);
 }
-.widget-store-ico img.emo { width: 26px; height: 26px; }
+.widget-store-ico img.emo { width: 24px; height: 24px; }
 .widget-store-badge {
   margin-left: auto;
   flex: 0 0 auto;
-  font: 650 10.5px var(--font);
+  font: 600 10.5px var(--font);
   color: var(--ink-2);
-  background: var(--hover);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-pill);
-  padding: 3px 7px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 2px 0;
 }
 .widget-store-body { flex: 1 1 auto; min-width: 0; }
-.widget-store-body strong { display: block; font-size: var(--text-lg); margin-bottom: 3px; }
+.widget-store-body strong { display: block; font-size: var(--text-md); margin-bottom: 2px; }
 .widget-store-body p {
   margin: 0;
   color: var(--ink-2);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.35;
 }
 .widget-store-caps {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 .widget-store-caps span {
-  font: 600 10.5px var(--font);
+  font: 550 10px var(--font);
   color: var(--ink-2);
   background: transparent;
-  border: 1px solid var(--stroke);
-  border-radius: 7px;
-  padding: 3px 7px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 4px 0 0;
+  opacity: 0.85;
+}
+.widget-store-caps span + span::before {
+  content: "·";
+  margin-right: 4px;
+  opacity: 0.5;
 }
 .widget-store-btn {
   display: inline-flex;

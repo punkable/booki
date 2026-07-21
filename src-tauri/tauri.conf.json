@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Booki",
-  "version": "0.63.1",
+  "version": "0.64.0",
   "identifier": "com.booki.dock",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -69,6 +69,7 @@
     "publisher": "Booki",
     "copyright": "© 2026 Booki contributors. MIT licensed.",
     "category": "Utility",
+    "homepage": "https://github.com/punkable/booki",
     "shortDescription": "A smart dock for Windows.",
     "longDescription": "Booki is a Tauri-based smart dock for Windows 10 and 11.",
     "licenseFile": "../LICENSE",
@@ -88,6 +89,7 @@
       "nsis": {
         "installMode": "currentUser",
         "compression": "lzma",
+        "displayLanguageSelector": true,
         "languages": [
           "English",
           "Spanish"
@@ -96,6 +98,11 @@
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp",
         "installerHooks": "installer/hooks.nsh"
+      },
+      "wix": {
+        "language": ["en-US", "es-ES"],
+        "bannerPath": "installer/wix-banner.bmp",
+        "dialogImagePath": "installer/wix-dialog.bmp"
       }
     }
   },
