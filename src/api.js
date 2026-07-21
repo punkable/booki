@@ -118,6 +118,7 @@ async function mockInvoke(cmd, args) {
     case "is_dir":
       return false;
     case "set_hit_rects":
+    case "set_notch_hit_rects":
     case "open_with":
       return null;
     case "file_thumbnail":
@@ -400,6 +401,9 @@ export const dock = {
   // Interactive regions of the stage window (window-relative CSS px); `all`
   // keeps the whole window interactive during drags/overlays.
   setHitRects: (rects, all = false) => invoke("set_hit_rects", { rects, all }),
+  // Same contract for the notch window — only the painted pill (or toast) is
+  // interactive; transparent padding stays click-through.
+  setNotchHitRects: (rects, all = false) => invoke("set_notch_hit_rects", { rects, all }),
   // Backend cursor watcher: fires when the OS cursor enters/leaves the dock's
   // live regions (DOM events can't see it once the window ignores the mouse).
   onCursorInside: (cb) => {

@@ -38,6 +38,13 @@ static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 #[allow(clippy::type_complexity)]
 static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), true));
 
+/// Same contract as HIT_RECTS, but for the notch window. The notch OS window is
+/// intentionally larger than the painted pill (hover/glow room); without this,
+/// transparent padding would block clicks on apps behind it.
+#[allow(clippy::type_complexity)]
+static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> =
+    Mutex::new((Vec::new(), false));
+
 static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 
 /// One clipboard-history entry (newest first). `text` is capped to keep the
@@ -419,6 +426,13 @@ fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
     *HIT_RECTS.lock().unwrap() = (rects, all);
 }
 
+/// Interactive regions of the notch window (window-relative CSS px). Same
+/// click-through contract as `set_hit_rects`, scoped to the notch.
+#[tauri::command]
+fn set_notch_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
+    *NOTCH_HIT_RECTS.lock().unwrap() = (rects, all);
+}
+
 /// Grow the dock window to cover the whole work area so it can host the
 /// edge-move overlay (the 4 anchor targets + ghost preview shown while the
 /// user drags the bar to another edge). Returns the CSS size of the work area
@@ -524,17 +538,6 @@ fn notch_mode_of(cfg: &Config) -> &str {
         _ if !cfg.notch_peek => "floating",
         _ => "attached",
     }
-}
-
-/// Inward CSS depth of the notch window (before DPR) — used to keep the dock
-/// bar clear when both are visible.
-fn notch_clearance_css(cfg: &Config) -> u32 {
-    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
-    let depth = match notch_mode_of(cfg) {
-        "floating" | "smart" => 44.0 * scale,
-        _ => 34.0 * scale,
-    };
-    (depth + 12.0).ceil() as u32
 }
 
 /// Current foreground app (kept for UI/debug; smart notch no longer keys off it).
@@ -1232,24 +1235,26 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let vertical = edge == "left" || edge == "right";
     let mode = notch_mode_of(&cfg);
     let attached = mode == "attached";
-    let floating = mode == "floating";
     let smart = mode == "smart";
     // Smart is always a circle (no per-app whitelist).
     let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
 
-    // Window is larger than the painted pill so hover/glow have room.
+    // Window sized just large enough for the painted pill + a small hover/glow
+    // pad. Transparent padding must stay click-through via NOTCH_HIT_RECTS —
+    // never rely on CSS pointer-events alone (WebView2 still eats OS hits).
     let (lw, lh): (f64, f64) = if smart {
-        let s = 40.0 * scale;
+        // Circle ~20px + modest pad for soft shadow / hover grow.
+        let s = 36.0 * scale;
         (s, s)
     } else if attached {
         match vertical {
-            true => (34.0 * scale, 156.0 * scale),
-            false => (156.0 * scale, 34.0 * scale),
+            true => (28.0 * scale, 140.0 * scale),
+            false => (140.0 * scale, 28.0 * scale),
         }
     } else {
         match vertical {
-            true => (48.0 * scale, 176.0 * scale),
-            false => (176.0 * scale, 48.0 * scale),
+            true => (40.0 * scale, 156.0 * scale),
+            false => (156.0 * scale, 40.0 * scale),
         }
     };
     let ww = (lw * dpr).round() as i32;
@@ -1257,25 +1262,13 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
     // Attached: flush to the work-area edge (iPhone tab).
-    // Floating / smart: sit inward with a calm gap so they never glue to the
-    // taskbar or stack on the dock bar when both are visible.
-    let mut margin: i32 = if floating || smart {
-        (10.0 * dpr).round() as i32
-    } else if attached {
+    // Floating / smart: inset by the user's edge gap (0 = glued to the edge).
+    // Do not force a hidden floor — the Settings slider is the source of truth.
+    let margin: i32 = if attached {
         0
     } else {
-        3
+        ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32
     };
-
-    let dock_visible = notch
-        .app_handle()
-        .get_webview_window("dock")
-        .and_then(|d| d.is_visible().ok())
-        .unwrap_or(false);
-    if (floating || smart) && (dock_visible || cfg.notch_always_visible) {
-        let gap = ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32;
-        margin = margin.max(gap + (6.0 * dpr).round() as i32);
-    }
 
     let along =
         |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
@@ -1939,14 +1932,11 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
     // The bar's distance to the screen edge is user-tunable (edge_gap = the
-    // VISUAL gap in CSS px). When the notch stays visible with the dock
-    // (always-visible), enforce enough gap so the painted bar never covers the
-    // notch — especially on left/right/top where a small gap used to stack them.
+    // VISUAL gap in CSS px). 0 = as flush as the stage pad allows. We no longer
+    // inflate this when the notch is always-visible — that made the slider's
+    // minimum feel useless. Users who keep both visible can raise the gap.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let mut gap = cfg.edge_gap.min(96);
-    if cfg.notch_always_visible {
-        gap = gap.max(notch_clearance_css(&cfg).min(96));
-    }
+    let gap = cfg.edge_gap.min(96);
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
@@ -2140,6 +2130,7 @@ pub fn run() {
             reposition_dock,
             set_dock_frame,
             set_hit_rects,
+            set_notch_hit_rects,
             file_thumbnail,
             copy_text,
             open_with,
@@ -2473,6 +2464,43 @@ pub fn run() {
                                     // Keep the interactive state snappy while the
                                     // cursor is over Booki, and use a lighter scan
                                     // cadence while the window is click-through.
+                                    std::thread::sleep(std::time::Duration::from_millis(
+                                        if inside { 30 } else { 80 },
+                                    ));
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Notch hit watcher: same click-through contract as the dock, so
+                // transparent padding around the pill never steals clicks from
+                // apps underneath (attached / floating / smart alike).
+                #[cfg(windows)]
+                if let Some(notch_watch) = app.get_webview_window("notch") {
+                    std::thread::spawn(move || {
+                        let hwnd = notch_watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                        if hwnd == 0 {
+                            return;
+                        }
+                        // Start click-through until the frontend reports a pill rect.
+                        let _ = notch_watch.set_ignore_cursor_events(true);
+                        let mut last: Option<bool> = None;
+                        loop {
+                            let (rects, all) = NOTCH_HIT_RECTS.lock().unwrap().clone();
+                            match win::cursor_in_rects(hwnd, &rects, all) {
+                                None => {
+                                    if last != Some(true) {
+                                        let _ = notch_watch.set_ignore_cursor_events(false);
+                                        last = Some(true);
+                                    }
+                                    std::thread::sleep(std::time::Duration::from_millis(180));
+                                }
+                                Some(inside) => {
+                                    if last != Some(inside) {
+                                        let _ = notch_watch.set_ignore_cursor_events(!inside);
+                                        last = Some(inside);
+                                    }
                                     std::thread::sleep(std::time::Duration::from_millis(
                                         if inside { 30 } else { 80 },
                                     ));
