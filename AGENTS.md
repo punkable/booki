@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.62.0` — solid frosted glass with
-  configurable tint color + solidity, cleaner Appearance layout, compact
-  multi-notch suggestions. Earlier: Windhawk tinted glass, context rename,
-  Settings merge-patch saves, smart-hide, NSIS keep-AppData.
+- Current public beta context at this writing: `0.65.0` — notch/dock track a
+  revealed auto-hide Windows taskbar; clearer Apps pinned board with quick-add.
+  Earlier: Apps UX polish (0.64), glass tint on Mica/Acrylic (0.63), solid
+  frosted glass + Appearance cleanup (0.62).
 
 ## Important Files
 
