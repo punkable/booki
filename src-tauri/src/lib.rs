@@ -531,7 +531,8 @@ fn notch_mode_of(cfg: &Config) -> &str {
 fn notch_clearance_css(cfg: &Config) -> u32 {
     let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
     let depth = match notch_mode_of(cfg) {
-        "floating" | "smart" => 44.0 * scale,
+        "smart" => 56.0 * scale,
+        "floating" => 48.0 * scale,
         _ => 34.0 * scale,
     };
     (depth + 12.0).ceil() as u32
@@ -1237,9 +1238,11 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     // Smart is always a circle (no per-app whitelist).
     let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
 
-    // Window is larger than the painted pill so hover/glow have room.
+    // Window is larger than the painted pill so hover/glow/shadow have room
+    // and WebView2's overflow:hidden body never clips the visible shape.
     let (lw, lh): (f64, f64) = if smart {
-        let s = 40.0 * scale;
+        // Square stage centered on a ~20px circle (+ hover grow + soft glow).
+        let s = 56.0 * scale;
         (s, s)
     } else if attached {
         match vertical {
