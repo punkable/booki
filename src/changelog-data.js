@@ -3,6 +3,23 @@
 
 export const CHANGELOG = [
   {
+    version: "0.63.0",
+    date: "21 jul 2026",
+    headline: "Ajustes reorganizados de punta a punta: lo habitual a la vista, lo avanzado plegado.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Todas las pesta\u00f1as",
+        notes: [
+          "Comportamiento: dock y notch al frente; pantalla/borde, multi-notch, interacci\u00f3n y perfiles plegados.",
+          "Apps: lista de pines primero; widgets, web y sugerencias en secciones colapsables.",
+          "General: idioma, inicio y actualizaciones visibles; atajos, capturas/men\u00fa y copia de seguridad plegados.",
+          "Acerca de y actualizaciones sin tarjetas anidadas que repet\u00edan el t\u00edtulo.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.62.0",
     date: "20 jul 2026",
     headline: "Cristal m\u00e1s s\u00f3lido con color y solidez; Ajustes m\u00e1s claros.",

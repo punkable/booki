@@ -626,7 +626,14 @@ function ProfilesCard({ cfg, set }) {
   }, []);
   const active = (cfg && cfg.lastProfile) || "";
   return (
-    <SettingsSection title={t("prof.title")} icon="copy" hint={t("prof.hint")} className="profiles-section">
+    <CollapsibleSection
+      title={t("prof.title")}
+      icon="copy"
+      hint={t("prof.hint")}
+      count={profiles.length || null}
+      defaultOpen={false}
+      className="profiles-section"
+    >
       {profiles.map((n) => (
         <div key={n} className={"prof-row" + (n === active ? " prof-active" : "")}>
           <span className="prof-name">
@@ -680,7 +687,7 @@ function ProfilesCard({ cfg, set }) {
           {t("prof.save")}
         </button>
       </div>
-    </SettingsSection>
+    </CollapsibleSection>
   );
 }
 
@@ -1326,25 +1333,15 @@ function Behavior({ cfg, set }) {
   useEffect(() => {
     dockApi.listMonitors().then((m) => setMonitors(m || []));
   }, []);
+  const hideOn = cfg.autoHideMode !== "off";
   return (
     <>
-      <PageHeader icon="settings" title={t("be.title")} />
+      <PageHeader icon="settings" title={t("be.title")}>{t("be.hint")}</PageHeader>
 
-      <SettingsSection title={t("gp.dock")} icon="app">
+      <SettingsSection title={t("gp.dock")} icon="app" hint={t("gp.dockHint")}>
         <Row label={t("be.position")} hint={t("be.positionHint")}>
           <PositionPicker cfg={cfg} set={set} />
         </Row>
-        <Row label={t("be.monitor")}>
-          <MonitorPicker value={cfg.monitor} monitors={monitors}
-            onChange={(v) => set({ monitor: v })} />
-        </Row>
-        <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-          <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
-            fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
-        </Row>
-        <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
-          checked={cfg.alwaysOnTop !== false}
-          onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
         <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
           <SegmentedControl
             value={cfg.autoHideMode || "smart"}
@@ -1356,7 +1353,7 @@ function Behavior({ cfg, set }) {
             ]}
           />
         </Row>
-        {cfg.autoHideMode !== "off" && (
+        {hideOn && (
           <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
             <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
               fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`}
@@ -1365,7 +1362,26 @@ function Behavior({ cfg, set }) {
         )}
       </SettingsSection>
 
-      <SettingsSection title={t("gp.notch")} icon="eye">
+      <CollapsibleSection
+        title={t("gp.advancedDock")}
+        icon="sliders"
+        hint={t("gp.advancedDockHint")}
+        defaultOpen={false}
+      >
+        <Row label={t("be.monitor")}>
+          <MonitorPicker value={cfg.monitor} monitors={monitors}
+            onChange={(v) => set({ monitor: v })} />
+        </Row>
+        <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+          <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
+            fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
+        </Row>
+        <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
+          checked={cfg.alwaysOnTop !== false}
+          onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
+      </CollapsibleSection>
+
+      <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
         <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
           <Slider
             value={Math.round((Number(cfg.notchScale) || 1) * 100)}
@@ -1389,35 +1405,48 @@ function Behavior({ cfg, set }) {
             set({ notchPeek: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
           }}
         />
-        {cfg.autoHideMode !== "off" ? (
-          <>
-            <Row label={t("be.reveal")} hint={t("be.revealHint")}>
-              <SegmentedControl
-                value={cfg.notchTrigger || "click"}
-                onChange={(v) => set({ notchTrigger: v })}
-                options={[
-                  { value: "click", label: t("be.revealClick") },
-                  { value: "hover", label: t("be.revealHover") },
-                ]}
-              />
-            </Row>
-            <Toggle
-              label={t("be.notchAlwaysVisible")}
-              hint={t("be.notchAlwaysVisibleHint")}
-              checked={!!cfg.notchAlwaysVisible}
-              onChange={(v) => {
-                set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
-              }}
+        {hideOn ? (
+          <Row label={t("be.reveal")} hint={t("be.revealHint")}>
+            <SegmentedControl
+              value={cfg.notchTrigger || "click"}
+              onChange={(v) => set({ notchTrigger: v })}
+              options={[
+                { value: "click", label: t("be.revealClick") },
+                { value: "hover", label: t("be.revealHover") },
+              ]}
             />
-          </>
+          </Row>
         ) : (
           <p className="muted">{t("be.notchNeedsHide")}</p>
         )}
       </SettingsSection>
 
+      {hideOn && (
+        <CollapsibleSection
+          title={t("gp.advancedNotch")}
+          icon="eye"
+          hint={t("gp.advancedNotchHint")}
+          defaultOpen={false}
+        >
+          <Toggle
+            label={t("be.notchAlwaysVisible")}
+            hint={t("be.notchAlwaysVisibleHint")}
+            checked={!!cfg.notchAlwaysVisible}
+            onChange={(v) => {
+              set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
+            }}
+          />
+        </CollapsibleSection>
+      )}
+
       <MultiNotchSection cfg={cfg} set={set} />
 
-      <CollapsibleSection title={t("gp.interaction")} icon="sparkles" defaultOpen={false}>
+      <CollapsibleSection
+        title={t("gp.interaction")}
+        icon="sparkles"
+        hint={t("gp.interactionHint")}
+        defaultOpen={false}
+      >
         <Row label={t("be.anim")}>
           <SegmentedControl
             value={cfg.magnifyStyle || "spring"}
@@ -1477,7 +1506,13 @@ function MultiNotchSection({ cfg, set }) {
     set({ multiNotchApps: apps.filter((a) => a.toLowerCase() !== key.toLowerCase()) });
   };
   return (
-    <SettingsSection title={t("be.multiNotch")} icon="eye" hint={t("be.multiNotchHint")}>
+    <CollapsibleSection
+      title={t("be.multiNotch")}
+      icon="eye"
+      hint={t("be.multiNotchHint")}
+      count={enabled ? apps.length : null}
+      defaultOpen={false}
+    >
       <Toggle label={t("be.multiNotch")} checked={enabled}
         onChange={(v) => set({ multiNotchEnabled: v })} />
       {enabled && (
@@ -1544,7 +1579,7 @@ function MultiNotchSection({ cfg, set }) {
           )}
         </>
       )}
-    </SettingsSection>
+    </CollapsibleSection>
   );
 }
 
@@ -2609,27 +2644,32 @@ function Apps({ cfg, set }) {
           })}
         </div>
       </CollapsibleSection>
-      <SettingsSection title={t("apps.web")} icon="external" hint={t("apps.webHint")}>
-      <div className="web-add">
-        <input
-          className="r-hotkey-input web-url"
-          type="text"
-          placeholder={t("apps.webPlaceholder")}
-          value={webUrl}
-          onChange={(e) => setWebUrl(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addWebsite()}
-        />
-        <input
-          className="r-hotkey-input web-name"
-          type="text"
-          placeholder={t("apps.webName")}
-          value={webName}
-          onChange={(e) => setWebName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addWebsite()}
-        />
-        <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
-      </div>
-      </SettingsSection>
+      <CollapsibleSection
+        title={t("apps.web")}
+        icon="external"
+        hint={t("apps.webHint")}
+        defaultOpen={false}
+      >
+        <div className="web-add">
+          <input
+            className="r-hotkey-input web-url"
+            type="text"
+            placeholder={t("apps.webPlaceholder")}
+            value={webUrl}
+            onChange={(e) => setWebUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addWebsite()}
+          />
+          <input
+            className="r-hotkey-input web-name"
+            type="text"
+            placeholder={t("apps.webName")}
+            value={webName}
+            onChange={(e) => setWebName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addWebsite()}
+          />
+          <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
+        </div>
+      </CollapsibleSection>
       <Suggestions cfg={cfg} set={set} />
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
@@ -2699,15 +2739,13 @@ function ShortcutsSection({ cfg, set }) {
           <ModifierPicker cfg={cfg} set={set} />
         </Row>
       )}
-      <div className="s-card-inner">
-        <h3>{t("sc.other")}</h3>
-        <ul className="muted-list">
-          <li>{t("sc.w1")}</li>
-          <li>{t("sc.w2")}</li>
-          <li>{t("sc.w3")}</li>
-          <li>{t("sc.w4")}</li>
-        </ul>
-      </div>
+      <p className="muted" style={{ marginTop: 10, marginBottom: 4 }}>{t("sc.other")}</p>
+      <ul className="muted-list">
+        <li>{t("sc.w1")}</li>
+        <li>{t("sc.w2")}</li>
+        <li>{t("sc.w3")}</li>
+        <li>{t("sc.w4")}</li>
+      </ul>
     </>
   );
 }
@@ -2744,8 +2782,7 @@ function DonateCard() {
     } catch (_) {}
   };
   return (
-    <div className="s-card-inner">
-      <h3>{t("ab.free")}</h3>
+    <>
       <p className="muted">{t("ab.freeText")}</p>
       <p className="muted">{t("ab.donateHint")}</p>
       <div className="donate">
@@ -2776,7 +2813,7 @@ function DonateCard() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -2790,8 +2827,7 @@ function ResetZone({ onReset }) {
     return () => clearTimeout(tm);
   }, [armed]);
   return (
-    <div className="s-card-inner">
-      <h3>{t("ab.danger")}</h3>
+    <>
       <p className="muted">{t("ab.resetHint")}</p>
       <button
         className={"s-btn " + (armed ? "s-btn-danger" : "s-btn-soft")}
@@ -2803,7 +2839,7 @@ function ResetZone({ onReset }) {
       >
         {armed ? t("ab.resetConfirm") : t("act.reset")}
       </button>
-    </div>
+    </>
   );
 }
 
@@ -2888,7 +2924,7 @@ function UpdatesCard({ onWhatsNew }) {
     }
   };
   return (
-    <div className="s-card-inner">
+    <>
       {status === "available" ? (
         <div className="upd-row">
           <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
@@ -2918,7 +2954,7 @@ function UpdatesCard({ onWhatsNew }) {
         <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
         <span>{t("ab.whatsNew")}</span>
       </button>
-    </div>
+    </>
   );
 }
 
@@ -2933,53 +2969,70 @@ function General({ cfg, set, onWhatsNew }) {
     <>
       <PageHeader icon="settings" title={t("gen.title")}>{t("gen.hint")}</PageHeader>
 
-      <SettingsSection title={t("gp.system")} icon="power">
-      <Row label={t("ap.language")} hint={t("gen.langHint")}>
-        <Dropdown
-          className="s-lang-dropdown"
-          value={LANG_OPTIONS.find((o) => o.value === (cfg.language || "system"))?.label || t("lang.system")}
-          selectedOptions={[cfg.language || "system"]}
-          onOptionSelect={(_e, data) => set({ language: data.optionValue })}
-        >
-          {LANG_OPTIONS.map((o) => (
-            <Option key={o.value} value={o.value}>{o.key ? t(o.key) : o.label}</Option>
-          ))}
-        </Dropdown>
-      </Row>
-      <Toggle label={t("be.autostart")} checked={autostart}
-        onChange={async (v) => {
-          setAutostart(v);
-          try {
-            await dockApi.setAutostart(v);
-          } catch (e) {
-            console.error("autostart:", e);
-          }
-          // Trust the registry, not our optimism: re-read and reflect reality.
-          const real = !!(await dockApi.getAutostart().catch(() => v));
-          setAutostart(real);
-          set({ autostart: real });
-        }} />
-      <div className="capture-row">
-        <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
-          checked={!!cfg.captureVisible}
-          onChange={(v) => set({ captureVisible: v })} />
-        <HelpTip text={t("gen.captureHelp")} />
-      </div>
-      <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
-        checked={cfg.contextMenu !== false}
-        onChange={(v) => set({ contextMenu: v })} />
+      <SettingsSection title={t("gp.system")} icon="power" hint={t("gp.systemHint")}>
+        <Row label={t("ap.language")} hint={t("gen.langHint")}>
+          <Dropdown
+            className="s-lang-dropdown"
+            value={LANG_OPTIONS.find((o) => o.value === (cfg.language || "system"))?.label || t("lang.system")}
+            selectedOptions={[cfg.language || "system"]}
+            onOptionSelect={(_e, data) => set({ language: data.optionValue })}
+          >
+            {LANG_OPTIONS.map((o) => (
+              <Option key={o.value} value={o.value}>{o.key ? t(o.key) : o.label}</Option>
+            ))}
+          </Dropdown>
+        </Row>
+        <Toggle label={t("be.autostart")} checked={autostart}
+          onChange={async (v) => {
+            setAutostart(v);
+            try {
+              await dockApi.setAutostart(v);
+            } catch (e) {
+              console.error("autostart:", e);
+            }
+            // Trust the registry, not our optimism: re-read and reflect reality.
+            const real = !!(await dockApi.getAutostart().catch(() => v));
+            setAutostart(real);
+            set({ autostart: real });
+          }} />
       </SettingsSection>
 
-      <SettingsSection title={t("sc.title")} icon="keyboard">
-      <ShortcutsSection cfg={cfg} set={set} />
+      <SettingsSection title={t("ab.updates")} icon="sparkles" hint={t("ab.updatesHint")}>
+        <UpdatesCard onWhatsNew={onWhatsNew} />
       </SettingsSection>
 
-      <SettingsSection title={t("ab.updates")} icon="sparkles">
-      <UpdatesCard onWhatsNew={onWhatsNew} />
-      </SettingsSection>
+      <CollapsibleSection
+        title={t("sc.title")}
+        icon="keyboard"
+        hint={t("sc.hint")}
+        defaultOpen={false}
+      >
+        <ShortcutsSection cfg={cfg} set={set} />
+      </CollapsibleSection>
 
-      <SettingsSection title={t("ap.backup")} icon="copy">
-      <Row label={t("ap.backup")} hint={t("ap.backupHint")}>
+      <CollapsibleSection
+        title={t("gen.more")}
+        icon="sliders"
+        hint={t("gen.moreHint")}
+        defaultOpen={false}
+      >
+        <div className="capture-row">
+          <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
+            checked={!!cfg.captureVisible}
+            onChange={(v) => set({ captureVisible: v })} />
+          <HelpTip text={t("gen.captureHelp")} />
+        </div>
+        <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
+          checked={cfg.contextMenu !== false}
+          onChange={(v) => set({ contextMenu: v })} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title={t("ap.backup")}
+        icon="copy"
+        hint={t("ap.backupHint")}
+        defaultOpen={false}
+      >
         <div className="s-actions" style={{ margin: 0 }}>
           <Button onClick={async () => {
             const p = await pickSavePath("booki-config.json");
@@ -2992,8 +3045,7 @@ function General({ cfg, set, onWhatsNew }) {
             if (fresh) set(fresh);
           }}>{t("ap.import")}</Button>
         </div>
-      </Row>
-      </SettingsSection>
+      </CollapsibleSection>
     </>
   );
 }
