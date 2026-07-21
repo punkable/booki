@@ -237,7 +237,8 @@ const DICT = {
     "apps.tips3": "Añade widgets (reloj, música, CPU…) y la papelera desde los botones de arriba.",
 
     "apps.title": "Apps ancladas",
-    "apps.hint": "Añade apps aquí o arrástralas al dock. Cambia lista/cuadrícula arriba; agrupa solapando iconos.",
+    "apps.hint": "Añade apps con el botón de arriba o arrástralas al dock.",
+    "apps.howto": "⋮ menú de cada elemento · arrastra el asa para reordenar · en un grupo, ábrelo para ver su contenido.",
     "apps.empty": "Aún no hay nada anclado.",
     "apps.suggest": "Sugerencias (instaladas)",
     "apps.suggestHint": "Apps detectadas en tu equipo, agrupadas como en el menú inicio. Haz clic para anclar.",
@@ -270,7 +271,7 @@ const DICT = {
     "kf.music": "M\u00fasica",
     "apps.view": "Vista",
     "apps.viewList": "Lista",
-    "apps.viewGrid": "Cuadros",
+    "apps.viewGrid": "Cuadrícula",
     "apps.dragKid": "Arrastra para mover o sacar del grupo",
     "apps.kidsHint": "Arrastra fuera del grupo para sacarlo · clic derecho para quitar",
     "apps.kidsHint2": "Arrastra fuera del grupo para sacarlo · clic derecho para quitar",
@@ -721,7 +722,8 @@ const DICT = {
     "apps.tips3": "Add widgets (clock, media, CPU…) and the Recycle Bin from the buttons above.",
 
     "apps.title": "Pinned apps",
-    "apps.hint": "Add apps here or drag them onto the dock. Switch list/grid above; stack icons to group.",
+    "apps.hint": "Add apps with the button above, or drag them onto the dock.",
+    "apps.howto": "⋮ opens each item's menu · drag the handle to reorder · open a group to see what's inside.",
     "apps.empty": "Nothing pinned yet.",
     "apps.suggest": "Suggestions (installed)",
     "apps.suggestHint": "Apps found on your PC, grouped like the Start menu. Click to pin.",

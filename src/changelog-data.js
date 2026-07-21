@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.64.1",
+    date: "21 jul 2026",
+    headline: "Apps ancladas otra vez claras: botones e iconos visibles, men\u00fa ⋮ legible.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Apps ancladas",
+        notes: [
+          "Lista/cuadr\u00edcula con controles visibles (asa, contador, men\u00fa ⋮) y etiquetas Lista/Cuadr\u00edcula.",
+          "Iconos del men\u00fa de cada pin arreglados (ya no usan el icono Fluent roto).",
+          "Texto de ayuda corto: c\u00f3mo reordenar, abrir grupos y usar el men\u00fa.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.64.0",
     date: "21 jul 2026",
     headline: "Apps en Ajustes m\u00e1s claras; notch\u2194dock m\u00e1s \u00e1gil; radio de widgets/grupos; backup e instalador.",

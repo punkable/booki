@@ -3745,49 +3745,51 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .r-hotkey input { font: inherit; font-size: var(--text-md); padding: 7px 10px; min-width: 180px; text-align: center; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); }
 
 
-.pin-list { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.pin-list { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .pin-item {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 40px;
-  padding: 5px 6px 5px 6px;
+  min-height: 44px;
+  padding: 6px 8px 6px 8px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .pin-item:hover,
 .pin-item:focus-within {
-  background: color-mix(in srgb, var(--hover) 88%, transparent);
-  border-color: transparent;
+  background: color-mix(in srgb, var(--layer-strong) 78%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
 }
 .pin-item.is-folder {
-  background: transparent;
-  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .pin-item.is-folder:hover,
 .pin-item.is-folder:focus-within {
-  background: color-mix(in srgb, var(--hover) 88%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--layer-strong));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--stroke));
 }
 .pin-item.sep .pin-name { color: var(--ink-2); font-style: italic; font-weight: 500; }
 .pin-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
 .pin-thumb {
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--hover) 90%, var(--accent) 10%);
-  color: var(--ink);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--hover));
+  color: var(--accent);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
   overflow: hidden;
 }
+.pin-thumb svg { width: 16px; height: 16px; display: block; }
 .pin-thumb img { width: 100%; height: 100%; object-fit: contain; }
 .pin-name,
 .pin-name-btn {
@@ -3814,7 +3816,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-name-btn:hover {
   background: color-mix(in srgb, var(--hover) 80%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 40%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 45%, transparent);
 }
 .pin-name-edit {
   font: inherit; font-size: var(--text-md); font-weight: 600; padding: 4px 8px; min-width: 0; width: min(220px, 42vw);
@@ -3825,84 +3827,92 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-count {
   flex: 0 0 auto;
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 650;
   color: var(--ink-2);
-  background: transparent;
-  border-radius: 0;
-  padding: 0 2px;
+  background: var(--hover);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
   font-variant-numeric: tabular-nums;
 }
-.pin-actions { position: relative; display: flex; gap: 2px; flex: 0 0 auto; }
+.pin-actions { position: relative; display: flex; gap: 4px; flex: 0 0 auto; align-items: center; }
 .pin-btn {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   font-size: var(--text-sm);
   color: var(--ink);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  background: color-mix(in srgb, var(--hover) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
+  border-radius: 8px;
   cursor: pointer;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.pin-btn:hover { background: var(--hover); border-color: transparent; }
+.pin-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--hover));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--stroke));
+  color: var(--ink);
+}
 .pin-btn:active { transform: scale(0.96); }
-/* Icon buttons: center the 20×20 SVG and dim it a touch. */
-.pin-btn.ico { display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.pin-btn.ico { display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
 .pin-btn.ico:hover { color: var(--ink); }
 .pin-btn.del.ico:hover { color: #fff; }
-.pin-btn-icon { display: grid; place-items: center; }
-.pin-btn svg { width: 16px; height: 16px; display: block; }
+.pin-btn-icon { display: grid; place-items: center; line-height: 0; }
+.pin-btn svg,
+.pin-btn-icon svg { width: 16px; height: 16px; display: block; }
 .pin-actions .pin-btn::after,
-.pin-card-actions .pin-btn::after {
-  display: none;
-}
+.pin-card-actions .pin-btn::after { display: none; }
 .pin-handle {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
-  color: color-mix(in srgb, var(--ink-2) 70%, transparent);
+  color: var(--ink-2);
   cursor: grab;
   padding: 0;
   touch-action: none;
-  transition: background var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease), transform var(--motion-fast) var(--ease);
 }
-.pin-handle svg { width: 15px; height: 15px; }
+.pin-handle svg { width: 16px; height: 16px; }
 .pin-handle:hover,
 .pin-handle:focus-visible {
   background: var(--hover);
+  border-color: var(--stroke-light);
   color: var(--ink);
 }
 .pin-handle:active { cursor: grabbing; transform: scale(0.96); }
 .pin-add-btn { display: inline-flex; align-items: center; gap: 6px; }
-.pin-add-btn svg { width: 16px; height: 16px; }
+.pin-add-btn svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .pin-item.pin-child {
-  margin-left: 22px;
-  padding-left: 8px;
-  border-left: 2px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-  border-radius: 0 8px 8px 0;
-  background: transparent;
-  min-height: 36px;
+  margin-left: 28px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, var(--stroke));
+  border-radius: 0 10px 10px 0;
+  min-height: 40px;
+  background: color-mix(in srgb, var(--layer) 40%, transparent);
 }
 .pin-item.pin-child:hover,
 .pin-item.pin-child:focus-within {
-  background: color-mix(in srgb, var(--hover) 70%, transparent);
+  background: color-mix(in srgb, var(--layer-strong) 70%, transparent);
 }
-.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 14%, var(--hover)); color: var(--accent); }
+.pin-thumb.folder { background: color-mix(in srgb, var(--accent) 18%, var(--hover)); color: var(--accent); }
 .pin-thumb.folder svg { width: 16px; height: 16px; }
-.pin-thumb.widget { background: var(--hover); font-size: 15px; }
+.pin-thumb.widget { background: var(--hover); color: var(--ink); font-size: 15px; }
 .pin-btn:disabled { opacity: 0.35; cursor: default; }
-.pin-btn.del:hover { background: var(--danger); color: #fff; }
-.pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--text-md); padding: 28px 8px; text-align: center; }
-/* Capybara mascot in empty states — friendly, not loud. */
-.empty-capy { width: 48px; height: 48px; opacity: 0.85; }
+.pin-btn.del:hover { background: var(--danger); color: #fff; border-color: transparent; }
+.pin-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--ink-2); font-size: var(--text-md); padding: 24px 8px; text-align: center; }
+.empty-capy { width: 52px; height: 52px; opacity: 0.88; }
 .empty-capy.sm { width: 34px; height: 34px; }
+.pin-howto {
+  margin: -2px 0 10px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
 
 /* ── Apps toolbar: list/grid switch + clear-all ─────────────────────────── */
 /* One-time "start here" banner at the top of Settings. */
@@ -3963,10 +3973,11 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .pin-toolbar-actions { justify-content: flex-end; margin-left: auto; }
 .pin-view-toggle { display: inline-flex; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 3px; gap: 2px; }
 .pin-view-toggle .fui-Button {
-  width: 34px;
-  height: 28px;
-  padding: 0;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
   justify-content: center;
+  gap: 6px;
 }
 .pin-view-toggle .fui-Button svg { width: 16px; height: 16px; display: block; }
 .s-btn-sm { padding: 4px 10px; font-size: var(--text-sm); }
@@ -3998,73 +4009,76 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 }
 .pin-list-summary strong { color: var(--ink); font-size: var(--text-md); font-variant-numeric: tabular-nums; }
 
-/* ── Grid view: calm icon tiles (Win11 Settings density, not marketplace cards) ─ */
-.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 4px; margin: 4px 0 8px; }
+/* ── Grid view: readable tiles with always-visible actions ─ */
+.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 10px; }
 .pin-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 12px 8px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 10px; text-align: center; min-width: 0;
-  transition: background var(--motion-fast) var(--ease);
+  background: color-mix(in srgb, var(--layer-strong) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 60%, transparent);
+  border-radius: 12px; text-align: center; min-width: 0;
+  transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease), box-shadow var(--motion-fast) var(--ease);
 }
 .pin-card:hover {
-  background: color-mix(in srgb, var(--hover) 90%, transparent);
-  border-color: transparent;
+  background: color-mix(in srgb, var(--layer-strong) 82%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 85%, transparent);
 }
-.pin-card.is-group { background: transparent; }
-.pin-card.is-group:hover { background: color-mix(in srgb, var(--hover) 90%, transparent); }
-.pin-card.is-sep { opacity: 0.65; }
-.pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pin-card.is-group {
+  background: color-mix(in srgb, var(--accent) 7%, var(--layer-strong));
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--stroke));
+}
+.pin-card.is-group:hover {
+  background: color-mix(in srgb, var(--accent) 11%, var(--layer-strong));
+}
+.pin-card.is-sep { opacity: 0.7; }
+.pin-card.merge-into { box-shadow: 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .pin-card.open {
   grid-column: 1 / -1;
   align-items: stretch;
-  padding: 10px 10px 12px;
-  background: color-mix(in srgb, var(--layer) 55%, transparent);
-  border-color: color-mix(in srgb, var(--stroke) 50%, transparent);
+  padding: 12px;
+  background: color-mix(in srgb, var(--layer-strong) 70%, transparent);
 }
 .pin-card-grip {
-  position: absolute; top: 4px; left: 4px; display: inline-flex; border: 0; background: transparent;
-  color: var(--ink-2); cursor: grab; padding: 2px; touch-action: none;
-  opacity: 0.35; transition: opacity var(--motion-fast) var(--ease);
+  position: absolute; top: 6px; left: 6px; display: inline-flex; border: 0; background: var(--hover);
+  color: var(--ink-2); cursor: grab; padding: 4px; border-radius: 6px; touch-action: none;
+  opacity: 1; transition: color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
 }
 .pin-card:hover .pin-card-grip,
-.pin-card.open .pin-card-grip { opacity: 1; }
-.pin-card-grip svg { width: 15px; height: 15px; }
+.pin-card.open .pin-card-grip { color: var(--ink); }
+.pin-card-grip svg { width: 14px; height: 14px; }
 .pin-card-grip:active { cursor: grabbing; }
 .pin-card-body { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; width: 100%; }
 .pin-card.open .pin-card-body { flex-direction: row; justify-content: flex-start; gap: 10px; }
 .pin-card-body.clickable { cursor: pointer; }
 .pin-card .pin-thumb { width: 40px; height: 40px; font-size: var(--text-xl); border-radius: 10px; }
-.pin-card .pin-thumb.folder svg { width: 22px; height: 22px; }
+.pin-card .pin-thumb.folder svg { width: 20px; height: 20px; }
 .pin-card-name { font-size: var(--text-sm); font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pin-card .pin-count { position: absolute; top: 8px; right: 8px; }
 .pin-card .pin-missing { font-size: var(--text-xs); color: #e0a02a; }
 .pin-card-actions {
-  display: flex; gap: 2px; justify-content: center;
-  opacity: 0.45; transition: opacity var(--motion-fast) var(--ease);
+  display: flex; gap: 4px; justify-content: center;
+  opacity: 1;
 }
 .pin-card:hover .pin-card-actions, .pin-card.open .pin-card-actions { opacity: 1; }
 /* Open group: children are calm tiles — take-out on hover, delete via context. */
 .pin-card-kids {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 4px; width: 100%; margin-top: 8px; padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--stroke) 45%, transparent);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px; width: 100%; margin-top: 10px; padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
   border-radius: 0; transition: box-shadow 0.15s ease, background 0.15s ease;
 }
-/* When a child is dragged out past the edge, highlight that releasing removes it. */
 .pin-card-kids.taking-out { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .pin-kid {
-  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 8px 4px 6px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px; cursor: grab; touch-action: none; min-width: 0;
-  transition: transform var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 6px 8px;
+  background: color-mix(in srgb, var(--layer) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 50%, transparent);
+  border-radius: 10px; cursor: grab; touch-action: none; min-width: 0;
+  transition: transform var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .pin-kid:hover {
-  background: color-mix(in srgb, var(--hover) 90%, transparent);
-  border-color: transparent;
+  background: color-mix(in srgb, var(--layer-strong) 88%, transparent);
+  border-color: color-mix(in srgb, var(--stroke) 75%, transparent);
 }
 .pin-kid:active { cursor: grabbing; transform: scale(0.97); }
 .pin-kid .pin-thumb { width: 34px; height: 34px; font-size: var(--text-lg); }
@@ -4129,8 +4143,10 @@ input.pin-kid-rename {
 .pin-kid-add {
   color: var(--accent); border-style: dashed; cursor: pointer;
   align-items: center; justify-content: center;
+  min-height: 72px;
 }
-.pin-kid-add svg { width: 22px; height: 22px; }
+.pin-kid-add > span { display: grid; place-items: center; line-height: 0; }
+.pin-kid-add svg { width: 20px; height: 20px; display: block; }
 .pin-kid-add:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); transform: none; }
 .pin-kids-hint {
   grid-column: 1 / -1;
@@ -4489,7 +4505,7 @@ input.pin-kid-rename {
 .widget-store-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 6px;
+  gap: 8px;
   margin: 0;
 }
 .widget-store-card {
@@ -4497,33 +4513,33 @@ input.pin-kid-rename {
   grid-template-rows: 1fr auto auto;
   gap: 8px;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   border-radius: var(--r-md);
-  border: 1px solid transparent;
-  background: color-mix(in srgb, var(--hover) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  background: color-mix(in srgb, var(--layer-strong) 58%, transparent);
   box-shadow: none;
   transition: background var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
 }
 .widget-store-card:hover {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--hover) 92%, transparent);
+  border-color: color-mix(in srgb, var(--widget-accent) 28%, var(--stroke));
+  background: color-mix(in srgb, var(--layer-strong) 78%, transparent);
   box-shadow: none;
   transform: none;
 }
 .widget-store-card.pinned {
-  border-color: color-mix(in srgb, var(--widget-accent) 22%, transparent);
-  background: color-mix(in srgb, var(--widget-accent) 6%, var(--hover));
+  border-color: color-mix(in srgb, var(--widget-accent) 28%, var(--stroke));
+  background: color-mix(in srgb, var(--widget-accent) 7%, var(--layer-strong));
 }
 .widget-store-top { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
 .widget-store-ico {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--widget-accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--widget-accent) 16%, transparent);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--widget-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--widget-accent) 18%, var(--stroke));
 }
 .widget-store-ico img.emo { width: 24px; height: 24px; }
 .widget-store-badge {
@@ -4531,10 +4547,10 @@ input.pin-kid-rename {
   flex: 0 0 auto;
   font: 600 10.5px var(--font);
   color: var(--ink-2);
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 2px 0;
+  background: var(--hover);
+  border: 1px solid var(--stroke);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
 }
 .widget-store-body { flex: 1 1 auto; min-width: 0; }
 .widget-store-body strong { display: block; font-size: var(--text-md); margin-bottom: 2px; }
@@ -4547,22 +4563,17 @@ input.pin-kid-rename {
 .widget-store-caps {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
 .widget-store-caps span {
-  font: 550 10px var(--font);
+  font: 600 10.5px var(--font);
   color: var(--ink-2);
   background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 0 4px 0 0;
-  opacity: 0.85;
+  border: 1px solid var(--stroke);
+  border-radius: 7px;
+  padding: 2px 7px;
 }
-.widget-store-caps span + span::before {
-  content: "·";
-  margin-right: 4px;
-  opacity: 0.5;
-}
+.widget-store-caps span + span::before { content: none; }
 .widget-store-btn {
   display: inline-flex;
   align-items: center;
