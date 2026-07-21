@@ -22,16 +22,17 @@ use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
-    MonitorFromPoint, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HDC,
-    HGDIOBJ, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    MonitorFromPoint, MonitorFromWindow, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    MONITOR_DEFAULTTONULL,
 };
 use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyIcon, EnumWindows, GetClassNameW, GetForegroundWindow, GetIconInfo, GetWindow,
-    GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-    IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GWL_EXSTYLE,
-    GW_OWNER, HICON, ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
+    DestroyIcon, EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow, GetIconInfo,
+    GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow,
+    GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -484,8 +485,19 @@ pub fn trash_count() -> Option<u64> {
     }
 }
 
+/// Minimum visible tray thickness (px) before we treat an auto-hide taskbar as
+/// "shown". Windows keeps a ~1–2 px peek when the bar is hidden; anything larger
+/// means the user has revealed it and the dock/notch must rise with it.
+const TASKBAR_VISIBLE_MIN_PX: i32 = 8;
+
 /// Work area (screen minus the taskbar) of the monitor containing a point,
 /// as (left, top, width, height). Used to keep the dock off the taskbar.
+///
+/// When the taskbar is set to auto-hide, Windows leaves `rcWork` equal to the
+/// full monitor even while the bar is temporarily revealed. We also inset by
+/// any *visible* `Shell_TrayWnd` / `Shell_SecondaryTrayWnd` overlapping this
+/// monitor so the dock and notch sit just above (or beside) the revealed bar
+/// and slide back to the edge when it hides again.
 pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
     unsafe {
         let hmon = MonitorFromPoint(POINT { x, y }, MONITOR_DEFAULTTONEAREST);
@@ -493,11 +505,126 @@ pub fn work_area(x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
             ..Default::default()
         };
-        if GetMonitorInfoW(hmon, &mut mi).as_bool() {
-            let r = mi.rcWork;
-            Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return None;
+        }
+        let mut work = mi.rcWork;
+        inset_visible_taskbars(&mut work, &mi.rcMonitor, hmon);
+        Some((
+            work.left,
+            work.top,
+            (work.right - work.left).max(0),
+            (work.bottom - work.top).max(0),
+        ))
+    }
+}
+
+/// True when the Windows taskbar is in auto-hide mode (any edge). Used to poll
+/// work-area changes faster while the bar can slide over the screen without
+/// changing `rcWork`.
+pub fn taskbar_autohide() -> bool {
+    use windows::Win32::UI::Shell::{ABM_GETSTATE, ABS_AUTOHIDE, APPBARDATA, SHAppBarMessage};
+    unsafe {
+        let mut data = APPBARDATA {
+            cbSize: std::mem::size_of::<APPBARDATA>() as u32,
+            ..Default::default()
+        };
+        let state = SHAppBarMessage(ABM_GETSTATE, &mut data) as u32;
+        (state & ABS_AUTOHIDE) != 0
+    }
+}
+
+/// Shrink `work` so it stays clear of any currently visible taskbar band on
+/// this monitor. Idempotent when the taskbar is always-visible (`rcWork`
+/// already excludes it) and a no-op while an auto-hide bar is fully tucked away.
+unsafe fn inset_visible_taskbars(work: &mut RECT, monitor: &RECT, hmon: HMONITOR) {
+    for tray in tray_hwnds() {
+        apply_tray_inset(work, monitor, hmon, tray);
+    }
+}
+
+unsafe fn tray_hwnds() -> Vec<HWND> {
+    let mut out = Vec::new();
+    // Primary taskbar.
+    let primary = wide("Shell_TrayWnd");
+    if let Ok(hwnd) = FindWindowW(PCWSTR(primary.as_ptr()), PCWSTR::null()) {
+        if !hwnd.0.is_null() {
+            out.push(hwnd);
+        }
+    }
+    // Secondary taskbars (multi-monitor). Enumerate by class — FindWindow only
+    // returns the first match.
+    let _ = EnumWindows(
+        Some(enum_secondary_tray_proc),
+        LPARAM(&mut out as *mut Vec<HWND> as isize),
+    );
+    out
+}
+
+unsafe extern "system" fn enum_secondary_tray_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let out = &mut *(lparam.0 as *mut Vec<HWND>);
+    let mut buf = [0u16; 64];
+    let n = GetClassNameW(hwnd, &mut buf);
+    if n <= 0 {
+        return TRUE;
+    }
+    let class = String::from_utf16_lossy(&buf[..n as usize]);
+    if class == "Shell_SecondaryTrayWnd" {
+        out.push(hwnd);
+    }
+    TRUE
+}
+
+unsafe fn apply_tray_inset(work: &mut RECT, monitor: &RECT, hmon: HMONITOR, tray: HWND) {
+    // Prefer the tray's assigned monitor; fall back to the center point if the
+    // shell reports null (rare during DPI/monitor transitions).
+    let mut on_monitor = MonitorFromWindow(tray, MONITOR_DEFAULTTONULL) == hmon;
+    let mut wr = RECT::default();
+    if GetWindowRect(tray, &mut wr).is_err() {
+        return;
+    }
+    if !on_monitor {
+        let cx = (wr.left + wr.right) / 2;
+        let cy = (wr.top + wr.bottom) / 2;
+        on_monitor = MonitorFromPoint(POINT { x: cx, y: cy }, MONITOR_DEFAULTTONULL) == hmon;
+    }
+    if !on_monitor {
+        return;
+    }
+
+    // Visible intersection of the tray with this monitor.
+    let ol = wr.left.max(monitor.left);
+    let ot = wr.top.max(monitor.top);
+    let or = wr.right.min(monitor.right);
+    let ob = wr.bottom.min(monitor.bottom);
+    if or <= ol || ob <= ot {
+        return;
+    }
+    let tw = or - ol;
+    let th = ob - ot;
+    let mw = (monitor.right - monitor.left).max(1);
+    let mh = (monitor.bottom - monitor.top).max(1);
+
+    // Horizontal taskbar (top or bottom): spans most of the monitor width.
+    if th >= TASKBAR_VISIBLE_MIN_PX && tw * 2 >= mw {
+        let from_bottom = monitor.bottom - ot;
+        let from_top = ob - monitor.top;
+        if from_bottom <= from_top {
+            work.bottom = work.bottom.min(ot);
         } else {
-            None
+            work.top = work.top.max(ob);
+        }
+        return;
+    }
+
+    // Vertical taskbar (left or right): spans most of the monitor height.
+    if tw >= TASKBAR_VISIBLE_MIN_PX && th * 2 >= mh {
+        let from_left = or - monitor.left;
+        let from_right = monitor.right - ol;
+        if from_left <= from_right {
+            work.left = work.left.max(or);
+        } else {
+            work.right = work.right.min(ol);
         }
     }
 }

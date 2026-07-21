@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.65.0",
+    date: "21 jul 2026",
+    headline: "Notch y dock siguen la barra de tareas (ocultar autom\u00e1tico); Apps ancladas m\u00e1s claras.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Barra de tareas de Windows",
+        notes: [
+          "Con \u00abocultar autom\u00e1ticamente la barra de tareas\u00bb, el notch y el dock suben cuando la barra se revela y vuelven al borde cuando se oculta.",
+          "El ancla usa el rect\u00e1ngulo visible de la taskbar (no solo rcWork), tambi\u00e9n en monitores secundarios.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Apps ancladas",
+        notes: [
+          "Acciones r\u00e1pidas a la vista (app, carpeta, grupo, separador, papelera) en lugar de un men\u00fa \u00abM\u00e1s\u00bb.",
+          "Tablero con lista/cuadr\u00edcula, estado vac\u00edo m\u00e1s claro y mejor comportamiento en ventanas estrechas.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.64.1",
     date: "21 jul 2026",
     headline: "Apps ancladas otra vez claras: botones e iconos visibles, men\u00fa ⋮ legible.",
