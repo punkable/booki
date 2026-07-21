@@ -3909,7 +3909,7 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
 .empty-capy { width: 52px; height: 52px; opacity: 0.88; }
 .empty-capy.sm { width: 34px; height: 34px; }
 .pin-howto {
-  margin: -2px 0 10px;
+  margin: 0 0 10px;
   font-size: var(--text-sm);
   line-height: 1.4;
 }
@@ -3955,13 +3955,24 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   .s-intro-x { grid-column: 3; grid-row: 1; }
 }
 
+.pin-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 0 4px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--layer) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 80%, transparent);
+  border-radius: 14px;
+  min-width: 0;
+}
 .pin-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin: 0 0 10px;
-  padding: 4px;
+  padding: 0;
   flex-wrap: wrap;
   background: transparent;
   border: 0;
@@ -3969,9 +3980,20 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   box-shadow: none;
 }
 .pin-toolbar-main,
-.pin-toolbar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pin-toolbar-actions { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .pin-toolbar-actions { justify-content: flex-end; margin-left: auto; }
-.pin-view-toggle { display: inline-flex; background: var(--layer); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 3px; gap: 2px; }
+.pin-quick-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pin-quick-add .fui-Button {
+  min-width: 0;
+  height: 32px;
+}
+.pin-view-toggle { display: inline-flex; background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-sm); padding: 3px; gap: 2px; }
 .pin-view-toggle .fui-Button {
   min-width: 0;
   height: 30px;
@@ -4008,9 +4030,38 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-emoji img
   font-size: var(--text-sm);
 }
 .pin-list-summary strong { color: var(--ink); font-size: var(--text-md); font-variant-numeric: tabular-nums; }
-
-/* ── Grid view: readable tiles with always-visible actions ─ */
-.pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 6px 0 10px; }
+.pin-empty-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 12px 18px;
+  text-align: center;
+  color: var(--ink-2);
+}
+.pin-empty-board strong {
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+.pin-empty-board .muted {
+  margin: 0;
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.pin-empty-board .pin-empty-tips {
+  width: min(100%, 420px);
+  margin: 6px 0 4px;
+  text-align: left;
+}
+.pin-list { margin: 0; }
+.pin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
 .pin-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 12px 8px 10px;
@@ -4350,8 +4401,12 @@ input.pin-kid-rename {
 }
 
 @media (max-width: 560px) {
+  .pin-board { padding: 10px; }
   .pin-toolbar { display: grid; grid-template-columns: 1fr; align-items: stretch; }
   .pin-toolbar-main { width: 100%; }
+  .pin-quick-add { width: 100%; }
+  .pin-quick-add .fui-Button { flex: 1 1 auto; }
+  .pin-quick-add .pin-add-main { flex: 1 1 100%; justify-content: center; }
   .pin-toolbar-actions {
     display: flex;
     flex-wrap: wrap;
@@ -4361,7 +4416,7 @@ input.pin-kid-rename {
   }
   .pin-add-main { flex: 1 1 auto; min-width: 0; justify-content: center; }
   .pin-more-btn { flex: 0 0 auto; }
-  .pin-clear { flex: 0 0 auto; margin-left: auto; }
+  .pin-clear { flex: 1 1 auto; margin-left: 0; justify-content: center; }
   .pin-view-toggle { width: 100%; justify-content: stretch; }
   .pin-view-toggle .fui-Button { flex: 1 1 0; }
   .pin-clear-confirm { flex: 1 1 100%; justify-content: space-between; }

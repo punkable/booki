@@ -1889,9 +1889,9 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     let mpos = monitor.position();
     let msize = monitor.size();
 
-    // Use the monitor's WORK AREA (excludes the taskbar) so the dock never
-    // sits on top of the taskbar, wherever it is. Falls back to the full
-    // monitor off-Windows.
+    // Use the monitor's WORK AREA (excludes the taskbar — including a
+    // temporarily revealed auto-hide bar) so the dock never sits on top of it.
+    // Falls back to the full monitor off-Windows.
     let (ax, ay, aw, ah) = win::work_area(
         mpos.x + msize.width as i32 / 2,
         mpos.y + msize.height as i32 / 2,
@@ -2475,13 +2475,13 @@ pub fn run() {
 
                 // Work-area self-heal: some setups change the usable screen space
                 // without any window-resize/monitor-change event reaching us — the
-                // big one being Windows' own "Automatically hide the taskbar"
-                // toggle, which grows/shrinks the work area live. Re-checking here
-                // (vs. only on config/monitor changes) means the dock and notch
-                // always sit at the CURRENT edge instead of leaving a stale gap —
-                // or, worse, sitting where a taskbar used to reserve space. This
-                // is purely position (never size), so it can't fight the stage
-                // window's own fixed-size contract from 0.41.
+                // big ones being Windows' "Automatically hide the taskbar" toggle
+                // (grows/shrinks rcWork) and the temporary reveal of an auto-hidden
+                // bar (rcWork stays full-screen; only the tray HWND moves). Re-
+                // checking here means the dock and notch always sit at the CURRENT
+                // edge — above a revealed taskbar, flush to the screen when it
+                // hides again. Purely position (never size), so it can't fight the
+                // stage window's fixed-size contract.
                 #[cfg(windows)]
                 {
                     let handle = app.handle().clone();
@@ -2490,11 +2490,20 @@ pub fn run() {
                         let mut cfg = config::load();
                         let mut cfg_tick: u8 = 0;
                         loop {
-                            std::thread::sleep(std::time::Duration::from_millis(1200));
+                            // Auto-hide reveal/hide animates over ~200–300 ms and
+                            // never updates rcWork — poll snappily so the notch
+                            // rides with the bar. Always-visible taskbars only need
+                            // the slower rcWork heal.
+                            let autohide = win::taskbar_autohide();
+                            std::thread::sleep(std::time::Duration::from_millis(
+                                if autohide { 100 } else { 1200 },
+                            ));
                             let Some(dock) = handle.get_webview_window("dock") else { continue };
-                            // Edge/position rarely changes with config; refresh every ~6s.
+                            // Edge/position rarely changes with config; refresh every ~6s
+                            // (or ~1s while auto-hide is active and we tick faster).
                             cfg_tick = cfg_tick.wrapping_add(1);
-                            if cfg_tick % 5 == 0 {
+                            let cfg_every = if autohide { 10 } else { 5 };
+                            if cfg_tick % cfg_every == 0 {
                                 cfg = config::load();
                             }
                             let Some(monitor) = pick_monitor(&dock) else { continue };

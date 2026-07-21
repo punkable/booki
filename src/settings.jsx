@@ -38,7 +38,6 @@ import {
 } from "@fluentui/react-components";
 import {
   AddRegular,
-  ChevronDownRegular,
   FolderRegular,
   FolderAddRegular,
   LineHorizontal3Regular,
@@ -2295,77 +2294,103 @@ function Apps({ cfg, set }) {
       >
         {t("apps.hint")}
       </PageHeader>
+
       <SettingsSection title={null} className="apps-primary-section">
-      <div className="pin-toolbar">
-        <div className="pin-toolbar-main">
-          {cfg.pinned.length > 0 ? (
-            <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
-              <Button
-                appearance={view === "list" ? "primary" : "subtle"}
-                icon={<ListRegular />}
-                title={t("apps.viewList")}
-                aria-label={t("apps.viewList")}
-                aria-selected={view === "list"}
-                onClick={() => pickView("list")}
-              >
-                {t("apps.viewList")}
-              </Button>
-              <Button
-                appearance={view === "grid" ? "primary" : "subtle"}
-                icon={<GridRegular />}
-                title={t("apps.viewGrid")}
-                aria-label={t("apps.viewGrid")}
-                aria-selected={view === "grid"}
-                onClick={() => pickView("grid")}
-              >
-                {t("apps.viewGrid")}
-              </Button>
+        <div className="pin-board">
+          <div className="pin-toolbar">
+            <div className="pin-toolbar-main">
+              <div className="pin-quick-add" role="group" aria-label={t("apps.quickAdd")}>
+                <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={addApp}>
+                  {t("apps.addApp")}
+                </Button>
+                <Button appearance="subtle" icon={<FolderAddRegular />} onClick={addFolder} title={t("apps.addFolder")}>
+                  {t("apps.addFolderShort")}
+                </Button>
+                <Button appearance="subtle" icon={<FolderRegular />} onClick={newFolder} title={t("apps.newFolder")}>
+                  {t("apps.newFolderShort")}
+                </Button>
+                <Button appearance="subtle" icon={<LineHorizontal3Regular />} onClick={addSep} title={t("apps.addSep")}>
+                  {t("apps.addSepShort")}
+                </Button>
+                <Button
+                  appearance="subtle"
+                  icon={<DeleteRegular />}
+                  disabled={hasTrash}
+                  onClick={addTrash}
+                  title={t("apps.addTrash")}
+                >
+                  {t("apps.addTrashShort")}
+                </Button>
+              </div>
             </div>
-          ) : (
-            <div className="pin-list-summary">
-              <strong>{cfg.pinned.length}</strong>
-              <span>{t("apps.title")}</span>
+            <div className="pin-toolbar-actions">
+              {cfg.pinned.length > 0 && (
+                <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
+                  <Button
+                    appearance={view === "list" ? "primary" : "subtle"}
+                    icon={<ListRegular />}
+                    title={t("apps.viewList")}
+                    aria-label={t("apps.viewList")}
+                    aria-selected={view === "list"}
+                    onClick={() => pickView("list")}
+                  >
+                    {t("apps.viewList")}
+                  </Button>
+                  <Button
+                    appearance={view === "grid" ? "primary" : "subtle"}
+                    icon={<GridRegular />}
+                    title={t("apps.viewGrid")}
+                    aria-label={t("apps.viewGrid")}
+                    aria-selected={view === "grid"}
+                    onClick={() => pickView("grid")}
+                  >
+                    {t("apps.viewGrid")}
+                  </Button>
+                </div>
+              )}
+              {cfg.pinned.length > 0 && (
+                clearArm ? (
+                  <div className="pin-clear-confirm">
+                    <span>{t("apps.clearConfirm")}</span>
+                    <Button appearance="primary" size="small" onClick={clearAll}>{t("apps.clearYes")}</Button>
+                    <Button size="small" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="pin-clear"
+                    appearance="subtle"
+                    icon={<DeleteRegular />}
+                    onClick={() => setClearArm(true)}
+                    title={t("apps.clearAll")}
+                  >
+                    {t("apps.clearAll")}
+                  </Button>
+                )
+              )}
+            </div>
+          </div>
+
+          {cfg.pinned.length > 0 && (
+            <p className="muted pin-howto">{t("apps.howto")}</p>
+          )}
+
+          {cfg.pinned.length === 0 && (
+            <div className="pin-empty-board">
+              <img className="empty-capy" src="/brand/svg/isotype.svg" alt="" />
+              <strong>{t("apps.empty")}</strong>
+              <p className="muted">{t("apps.emptyHint")}</p>
+              <div className="s-tips pin-empty-tips">
+                <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
+                <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
+                <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
+              </div>
+              <Button appearance="primary" icon={<AddRegular />} onClick={addApp}>
+                {t("apps.addApp")}
+              </Button>
             </div>
           )}
-        </div>
-        <div className="pin-toolbar-actions">
-          <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={addApp}>
-            {t("apps.addApp")}
-          </Button>
-          <Menu>
-            <MenuTrigger>
-              <Button className="pin-more-btn" icon={<ChevronDownRegular />} iconPosition="after">{t("apps.more")}</Button>
-            </MenuTrigger>
-            <MenuPopover className="booki-menu-popover">
-              <MenuList>
-                <MenuItem icon={<FolderAddRegular />} onClick={addFolder}>{t("apps.addFolder")}</MenuItem>
-                <MenuItem icon={<FolderRegular />} onClick={newFolder}>{t("apps.newFolder")}</MenuItem>
-                <MenuItem icon={<LineHorizontal3Regular />} onClick={addSep}>{t("apps.addSep")}</MenuItem>
-                <MenuItem icon={<DeleteRegular />} disabled={hasTrash} onClick={addTrash}>{t("apps.addTrash")}</MenuItem>
-                {cfg.pinned.length > 0 && (
-                  <MenuItem icon={<DeleteRegular />} onClick={() => setClearArm(true)}>{t("apps.clearAll")}</MenuItem>
-                )}
-              </MenuList>
-            </MenuPopover>
-          </Menu>
-          {clearArm && (
-            <div className="pin-clear-confirm">
-              <span>{t("apps.clearConfirm")}</span>
-              <Button appearance="primary" size="small" onClick={clearAll}>{t("apps.clearYes")}</Button>
-              <Button size="small" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</Button>
-            </div>
-          )}
-        </div>
-      </div>
-      <p className="muted pin-howto">{cfg.pinned.length > 0 ? t("apps.howto") : t("apps.hint")}</p>
-      {cfg.pinned.length === 0 && (
-        <div className="s-tips pin-empty-tips">
-          <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
-          <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
-          <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
-        </div>
-      )}
-      {view === "grid" && displayPinned.length > 0 ? (
+
+          {view === "grid" && displayPinned.length > 0 ? (
         <div className="pin-grid" ref={gridRef}>
           {displayPinned.map((item, i) => {
             const isGroup = item.kind === "group";
@@ -2492,14 +2517,8 @@ function Apps({ cfg, set }) {
             );
           })}
         </div>
-      ) : (
+          ) : displayPinned.length > 0 ? (
       <ul className="pin-list" ref={listRef}>
-        {displayPinned.length === 0 && (
-          <li className="pin-empty">
-            <img className="empty-capy" src="/brand/svg/isotype.svg" alt="" />
-            {t("apps.empty")}
-          </li>
-        )}
         {displayPinned.flatMap((item, i) => {
           const isGroup = item.kind === "group";
           const open = isGroup && openIds[item.id];
@@ -2634,7 +2653,8 @@ function Apps({ cfg, set }) {
           return rows;
         })}
       </ul>
-      )}
+          ) : null}
+        </div>
       </SettingsSection>
       <CollapsibleSection
         title={t("apps.widgets")}
