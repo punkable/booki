@@ -5,7 +5,7 @@ export const CHANGELOG = [
   {
     version: "0.66.0",
     date: "21 jul 2026",
-    headline: "Retraso al bajar con la taskbar; hold al pasar el cursor; mejor con Windhawk.",
+    headline: "Retraso al bajar con la taskbar; estilos de notch (pegado / flotante / inteligente).",
     sections: [
       {
         icon: "undo",
@@ -15,6 +15,15 @@ export const CHANGELOG = [
           "Opci\u00f3n de mantenerlos arriba mientras el cursor est\u00e1 sobre el notch o el dock (reinicia el retraso).",
           "Puedes desactivar \u00abSeguir la barra\u00bb si prefieres anclar solo al borde de la pantalla.",
           "Compatible con Windhawk: se lee el rect\u00e1ngulo real de la taskbar (altura/mods); tip en Ajustes y cristal tintado al estilo TintedGlass.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Notch",
+        notes: [
+          "Tres estilos: Pegado (tipo iPhone), Flotante (c\u00e1psula separada) e Inteligente (isla \u2192 punto din\u00e1mico en apps de productividad).",
+          "El punto inteligente adapta el tama\u00f1o de la ventana y usa un cat\u00e1logo autom\u00e1tico (navegadores, IDEs, dise\u00f1o) m\u00e1s tu lista.",
+          "Con notch siempre visible, la distancia al borde deja hueco para no solaparse con el dock en laterales/arriba.",
         ],
       },
     ],

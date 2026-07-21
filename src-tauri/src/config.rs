@@ -97,6 +97,10 @@ fn default_notch_edge() -> String {
 fn default_notch_style() -> String {
     "acrylic".into()
 }
+fn default_notch_mode() -> String {
+    // Attached = iPhone-style tab flush to the edge (former notchPeek default).
+    "attached".into()
+}
 fn default_surface_style() -> String {
     // Unified dock + notch finish. Default tinted = taskbar / Windhawk glass.
     "tinted".into()
@@ -172,8 +176,13 @@ pub struct Config {
     #[serde(default = "default_notch_position")]
     pub notch_position: String,
     /// Notch "peek" style — sits at the very edge like a tab, less intrusive.
+    /// Kept in sync with `notch_mode` for older frontends (`attached`/`smart` → true).
     #[serde(default = "default_true")]
     pub notch_peek: bool,
+    /// Notch silhouette / placement: "attached" (iPhone tab), "floating"
+    /// (inset capsule), "smart" (adaptive island ↔ intelligent dot).
+    #[serde(default = "default_notch_mode")]
+    pub notch_mode: String,
     /// Edge the notch lives on: "auto" (same as the dock) or a specific edge.
     #[serde(default = "default_notch_edge")]
     pub notch_edge: String,
@@ -330,6 +339,7 @@ impl Default for Config {
             auto_hide_delay: default_hide_delay(),
             notch_position: default_notch_position(),
             notch_peek: true,
+            notch_mode: default_notch_mode(),
             notch_edge: default_notch_edge(),
             notch_style: default_notch_style(),
             surface_style: default_surface_style(),
@@ -464,6 +474,21 @@ pub fn load() -> Config {
         }
         .into();
         cfg.settings_rev = 6;
+        let _ = save(&cfg);
+    }
+    // rev 7: explicit notch modes (attached / floating / smart). Derive from the
+    // older peek + multi-notch toggles so existing installs keep their look.
+    if cfg.settings_rev < 7 {
+        cfg.notch_mode = if cfg.multi_notch_enabled {
+            "smart".into()
+        } else if cfg.notch_peek {
+            "attached".into()
+        } else {
+            "floating".into()
+        };
+        cfg.notch_peek = cfg.notch_mode != "floating";
+        cfg.multi_notch_enabled = cfg.notch_mode == "smart";
+        cfg.settings_rev = 7;
         let _ = save(&cfg);
     }
     // Promote 1-child groups; keep empty groups (Settings uses them as staging

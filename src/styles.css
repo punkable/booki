@@ -1563,6 +1563,30 @@ body.notch-body.peek.edge-left .notch-pill::before,
 body.notch-body.peek.edge-left .notch-pill::after,
 body.notch-body.peek.edge-right .notch-pill::before,
 body.notch-body.peek.edge-right .notch-pill::after { display: none; }
+
+/* Floating notch: inset capsule with soft depth — not glued to the edge. */
+body.notch-body.floating {
+  padding: calc(6px * var(--notch-scale, 1));
+}
+body.notch-body.floating.edge-top { align-items: flex-start; }
+body.notch-body.floating.edge-left { justify-content: flex-start; }
+body.notch-body.floating.edge-right { justify-content: flex-end; }
+body.notch-body.floating .notch-pill {
+  width: calc(128px * var(--notch-scale, 1));
+  height: calc(16px * var(--notch-scale, 1));
+  border-radius: 999px;
+  box-shadow:
+    0 4px 14px color-mix(in srgb, #000 22%, transparent),
+    inset 0 1px 0 var(--surf-inset-lit),
+    inset 0 -1px 0 var(--surf-inset-shade);
+}
+body.notch-body.floating.vertical .notch-pill {
+  width: calc(16px * var(--notch-scale, 1));
+  height: calc(128px * var(--notch-scale, 1));
+}
+body.notch-body.floating .notch-pill::before,
+body.notch-body.floating .notch-pill::after { display: none; }
+
 /* The toast needs breathing room even in peek mode (its window is repositioned). */
 body.notch-body.toast { padding: 4px; }
 
