@@ -3,6 +3,21 @@
 
 export const CHANGELOG = [
   {
+    version: "0.63.1",
+    date: "21 jul 2026",
+    headline: "El color del cristal ya funciona en Mica, Acrylic y en tema claro/oscuro.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Material",
+        notes: [
+          "Color del cristal aplica a Mica y Acrylic (antes solo a Cristal tintado).",
+          "El tema oscuro ya no pisa tu tinta con un gris fijo: claro y oscuro respetan el color elegido.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.63.0",
     date: "21 jul 2026",
     headline: "Ajustes reorganizados de punta a punta: lo habitual a la vista, lo avanzado plegado.",
