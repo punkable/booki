@@ -3,6 +3,29 @@
 
 export const CHANGELOG = [
   {
+    version: "0.62.0",
+    date: "20 jul 2026",
+    headline: "Cristal m\u00e1s s\u00f3lido con color y solidez; Ajustes m\u00e1s claros.",
+    sections: [
+      {
+        icon: "undo",
+        title: "Dock y notch",
+        notes: [
+          "Cristal tintado mucho m\u00e1s opaco (estilo barra de tareas), con color y solidez ajustables.",
+          "El acento ya no ti\u00f1e el cristal: elige la tinta del fondo aparte.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Ajustes",
+        notes: [
+          "Apariencia reordenada: tema \u2192 material \u2192 color/solidez \u2192 acento; tama\u00f1o plegado.",
+          "Multi-notch: lista compacta; sugerencias ocultas hasta que las abras.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.61.0",
     date: "20 jul 2026",
     headline: "Cristal tintado al estilo barra de tareas / Windhawk; renombrar desde el men\u00fa contextual.",

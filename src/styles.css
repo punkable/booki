@@ -276,20 +276,27 @@ body.surface-acrylic {
   --panel-sat: 170%;
   --panel-fill: color-mix(in srgb, var(--layer-strong) 88%, transparent);
 }
-/* Tinted glass — matched to Windhawk Taskbar "TintedGlass":
-   CommonBgBrush = WindhawkBlur BlurAmount=18 TintColor=#80000000
-   stroke/highlight ≈ TintColor=#1AFFFFFF, flyout CornerRadius=14 */
+/* Tinted glass — taskbar / Windhawk style: blur 18, solid frosted tint.
+   --glass-tint + --glass-alpha come from Settings (color + solidity). */
 body.surface-tinted {
   --surf-blur: 18px;
-  --surf-sat: 120%;
-  --surf-fill: rgba(0, 0, 0, calc(0.38 + var(--material, 0.55) * 0.22));
-  --surf-stroke: rgba(255, 255, 255, 0.102);
-  --surf-inset-lit: rgba(255, 255, 255, 0.10);
-  --surf-inset-shade: rgba(0, 0, 0, 0.16);
-  --surf-sheen: 0.10;
+  --surf-sat: 115%;
+  --surf-fill: color-mix(
+    in srgb,
+    var(--glass-tint, #000000) calc(var(--glass-alpha, 0.88) * 100%),
+    transparent
+  );
+  --surf-stroke: rgba(255, 255, 255, 0.10);
+  --surf-inset-lit: rgba(255, 255, 255, 0.08);
+  --surf-inset-shade: rgba(0, 0, 0, 0.20);
+  --surf-sheen: 0.06;
   --panel-blur: 18px;
-  --panel-sat: 120%;
-  --panel-fill: rgba(0, 0, 0, 0.50);
+  --panel-sat: 115%;
+  --panel-fill: color-mix(
+    in srgb,
+    var(--glass-tint, #000000) calc(var(--glass-alpha, 0.88) * 100%),
+    transparent
+  );
   --panel-radius: 14px;
 }
 body.surface-solid {
@@ -311,20 +318,16 @@ html[data-theme="dark"] body.surface-solid {
 html[data-theme="dark"] body.surface-acrylic {
   --surf-fill: color-mix(in srgb, #1c1c1f calc(var(--material, 0.55) * 78%), transparent);
 }
-html[data-theme="dark"] body.surface-tinted {
-  /* Keep Windhawk black glass in dark mode (not accent-washed). */
-  --surf-fill: rgba(0, 0, 0, calc(0.40 + var(--material, 0.55) * 0.20));
-  --surf-stroke: rgba(255, 255, 255, 0.102);
-  --panel-fill: rgba(0, 0, 0, 0.50);
+html[data-theme="dark"] body.surface-tinted,
+html[data-theme="light"] body.surface-tinted {
+  /* Tint color is user-chosen; only stroke/sheen adapt lightly for contrast. */
+  --surf-stroke: color-mix(in srgb, #fff 12%, transparent);
 }
 html[data-theme="light"] body.surface-tinted {
-  /* Light counterpart: same blur, pale glass so the wallpaper still shows. */
-  --surf-fill: rgba(255, 255, 255, calc(0.42 + var(--material, 0.55) * 0.28));
-  --surf-stroke: rgba(255, 255, 255, 0.28);
-  --surf-inset-lit: rgba(255, 255, 255, 0.42);
+  --surf-stroke: color-mix(in srgb, #000 10%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.35);
   --surf-inset-shade: rgba(0, 0, 0, 0.06);
-  --surf-sheen: 0.22;
-  --panel-fill: rgba(255, 255, 255, 0.58);
+  --surf-sheen: 0.14;
 }
 html[data-theme="dark"] body.surface-solid {
   --surf-fill: color-mix(in srgb, #2a2a2e 96%, var(--accent) 4%);
@@ -3435,6 +3438,28 @@ html[data-theme="dark"] .seg-thumb {
   width: min(100%, 420px);
   justify-content: flex-end;
 }
+.surface-row-compact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.surface-row-compact .surface-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 64px;
+  padding: 10px 6px;
+  text-align: center;
+}
+.surface-row-compact .surface-chip strong {
+  font: 650 11.5px/1.2 var(--font);
+}
+@media (max-width: 560px) {
+  .surface-row-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .surface-chip {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
@@ -3486,14 +3511,9 @@ html[data-theme="dark"] .seg-thumb {
     inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 .surface-tinted .surface-swatch {
-  background-color: rgba(0, 0, 0, 0.50);
+  background-color: color-mix(in srgb, var(--glass-tint, #000) 88%, transparent);
   border-color: rgba(255, 255, 255, 0.10);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-}
-html[data-theme="light"] .surface-tinted .surface-swatch {
-  background-color: rgba(255, 255, 255, 0.55);
-  border-color: rgba(255, 255, 255, 0.28);
 }
 .surface-solid .surface-swatch {
   background-image: none;
@@ -4831,22 +4851,57 @@ body.notch-dot.peek .notch-pill {
   border-radius: 50%;
 }
 
-/* Settings UI for multi-notch app list and suggestions. */
-.mn-suggest-group { margin: 12px 0 8px; }
-.mn-suggest-group strong {
-  display: block;
-  margin-bottom: 6px;
+/* Settings UI for multi-notch — compact list first; suggestions on demand. */
+.mn-empty { margin: 4px 0 8px; }
+.mn-suggest-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  font: 600 12.5px var(--font);
+  color: var(--ink);
+  text-align: left;
+  background: color-mix(in srgb, var(--layer-strong) 70%, transparent);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.mn-suggest-toggle > span:first-child { flex: 1 1 auto; }
+.mn-suggest-toggle svg { width: 14px; height: 14px; color: var(--ink-2); }
+.mn-suggest-toggle:hover { background: var(--hover); }
+.mn-suggest-panel {
+  margin-top: 8px;
+  padding: 8px 10px 10px;
+  background: color-mix(in srgb, var(--layer) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
+  border-radius: 10px;
+  max-height: 240px;
+  overflow: auto;
+}
+.mn-suggest-group { margin: 0 0 4px; }
+.mn-suggest-group summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 2px;
   font-size: var(--text-sm);
-  color: var(--ink-2);
+  font-weight: 650;
+  color: var(--ink);
   text-transform: capitalize;
 }
-.mn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mn-suggest-group summary::-webkit-details-marker { display: none; }
+.mn-suggest-group[open] summary { color: var(--accent); }
+.mn-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 0 8px; }
 .mn-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  font-size: var(--text-sm);
+  padding: 3px 8px;
+  font-size: 11.5px;
   color: var(--ink);
   background: var(--layer-strong);
   border: 1px solid var(--stroke);
@@ -4861,9 +4916,9 @@ body.notch-dot.peek .notch-pill {
   border-color: var(--accent);
   cursor: default;
 }
-.mn-add { display: flex; gap: 8px; margin: 8px 0; }
+.mn-add { display: flex; gap: 8px; margin: 8px 0 6px; }
 .mn-add input { flex: 1 1 auto; min-width: 0; }
-.mn-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mn-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .mn-tag {
   display: inline-flex;
   align-items: center;
