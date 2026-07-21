@@ -526,18 +526,6 @@ fn notch_mode_of(cfg: &Config) -> &str {
     }
 }
 
-/// Inward CSS depth of the notch window (before DPR) — used to keep the dock
-/// bar clear when both are visible.
-fn notch_clearance_css(cfg: &Config) -> u32 {
-    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
-    let depth = match notch_mode_of(cfg) {
-        "smart" => 56.0 * scale,
-        "floating" => 48.0 * scale,
-        _ => 34.0 * scale,
-    };
-    (depth + 12.0).ceil() as u32
-}
-
 /// Current foreground app (kept for UI/debug; smart notch no longer keys off it).
 #[tauri::command]
 fn current_foreground_app() -> serde_json::Value {
@@ -1233,7 +1221,6 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let vertical = edge == "left" || edge == "right";
     let mode = notch_mode_of(&cfg);
     let attached = mode == "attached";
-    let floating = mode == "floating";
     let smart = mode == "smart";
     // Smart is always a circle (no per-app whitelist).
     let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
@@ -1260,25 +1247,13 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
     // Attached: flush to the work-area edge (iPhone tab).
-    // Floating / smart: sit inward with a calm gap so they never glue to the
-    // taskbar or stack on the dock bar when both are visible.
-    let mut margin: i32 = if floating || smart {
-        (10.0 * dpr).round() as i32
-    } else if attached {
+    // Floating / smart: inset by the user's edge gap (0 = glued to the edge).
+    // Do not force a hidden floor — the Settings slider is the source of truth.
+    let margin: i32 = if attached {
         0
     } else {
-        3
+        ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32
     };
-
-    let dock_visible = notch
-        .app_handle()
-        .get_webview_window("dock")
-        .and_then(|d| d.is_visible().ok())
-        .unwrap_or(false);
-    if (floating || smart) && (dock_visible || cfg.notch_always_visible) {
-        let gap = ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32;
-        margin = margin.max(gap + (6.0 * dpr).round() as i32);
-    }
 
     let along =
         |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
@@ -1942,14 +1917,11 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
     // The bar's distance to the screen edge is user-tunable (edge_gap = the
-    // VISUAL gap in CSS px). When the notch stays visible with the dock
-    // (always-visible), enforce enough gap so the painted bar never covers the
-    // notch — especially on left/right/top where a small gap used to stack them.
+    // VISUAL gap in CSS px). 0 = as flush as the stage pad allows. We no longer
+    // inflate this when the notch is always-visible — that made the slider's
+    // minimum feel useless. Users who keep both visible can raise the gap.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let mut gap = cfg.edge_gap.min(96);
-    if cfg.notch_always_visible {
-        gap = gap.max(notch_clearance_css(&cfg).min(96));
-    }
+    let gap = cfg.edge_gap.min(96);
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
