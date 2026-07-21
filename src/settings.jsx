@@ -1385,8 +1385,25 @@ function Behavior({ cfg, set }) {
             onChange={(v) => set({ monitor: v })} />
         </Row>
         <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-          <Slider value={cfg.edgeGap ?? 48} min={8} max={72} step={4}
-            fmt={(v) => `${v}px`} onChange={(v) => set({ edgeGap: v })} />
+          <Slider
+            value={cfg.edgeGap ?? 48}
+            min={0}
+            max={72}
+            step={2}
+            fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)}
+            onChange={(v) => {
+              set(
+                { edgeGap: v },
+                {
+                  flush: true,
+                  afterSave: () => {
+                    dockApi.reposition(cfg.edge || "bottom").catch(() => {});
+                    dockApi.notchPreview();
+                  },
+                }
+              );
+            }}
+          />
         </Row>
         <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
           checked={cfg.alwaysOnTop !== false}

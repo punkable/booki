@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.66.0` — configurable drop delay
-  when the auto-hide taskbar tucks away, hold-while-hover, Windhawk-friendly
-  taskbar follow. Earlier: `0.65` live tray tracking + Apps board; `0.64` Apps
-  UX; `0.63` glass tint; `0.62` frosted glass.
+- Current public beta context at this writing: `0.66.1` — smart notch is a true
+  centered circle (no floating-capsule clip). `0.66.0` added taskbar settle delay,
+  hold-while-hover, Windhawk-friendly follow, and unified notch styles.
+  Earlier: `0.65` live tray tracking + Apps board; `0.64` Apps UX.
 
 ## Important Files
 

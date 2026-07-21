@@ -1394,12 +1394,10 @@ body.notch-body {
   height: 100vh;
   padding: calc(4px * var(--notch-scale, 1));
   /* The OS window is sized bigger than the visible pill on purpose (room for
-     the hover-grow animation and the taskbar overlap in peek style) — but
-     that means real empty space surrounds it. Without this, a click in that
-     margin still landed on <body> and could be mistaken for "the dock opened
-     on its own": nothing there had a click handler, yet the window still ate
-     the input. Only the pill itself is interactive; the margin now passes
-     clicks through instead of silently swallowing them. */
+     the hover-grow animation and soft shadow). CSS pointer-events alone cannot
+     pass clicks through on WebView2 — the backend notch hit watcher toggles
+     ignore_cursor_events from the pill rect reported by notch.js. Keep body
+     non-interactive as a belt-and-suspenders for in-page hits. */
   pointer-events: none;
 }
 body.notch-body.vertical { align-items: center; }
@@ -4949,55 +4947,85 @@ textarea {
   .pin-clear > span:last-child { display: none; }
 }
 
-/* ─────────── Smart notch: always-circular ambient dot ─────────── */
+/* ─────────── Smart notch: always-circular ambient dot ───────────
+   Own layout (not floating/peek). Rules use body.notch-body.smart so they
+   beat floating/peek/surface-solid specificity and keep a true circle. */
 
-/* Dot mode: shrink the pill to a small reactive circle. */
-body.notch-dot .notch-pill {
-  width: calc(18px * var(--notch-scale));
-  height: calc(18px * var(--notch-scale));
-  border-radius: 50%;
-  --pill-gx: 1.35;
-  --pill-gy: 1.35;
-}
-body.notch-dot .notch-pill::before,
-body.notch-dot .notch-pill::after { display: none; }
-body.notch-dot.vertical .notch-pill {
-  width: calc(18px * var(--notch-scale));
-  height: calc(18px * var(--notch-scale));
-}
-body.notch-dot.peek .notch-pill {
-  width: calc(16px * var(--notch-scale));
-  height: calc(16px * var(--notch-scale));
-  border-radius: 50%;
+body.notch-body.smart,
+body.notch-body.notch-dot {
+  /* Center the circle in the square OS window on every edge. */
+  align-items: center;
+  justify-content: center;
+  /* Pad matches Rust window (~36) vs pill (~20): keep glow room, not a dead zone. */
+  padding: calc(8px * var(--notch-scale, 1));
+  /* Clip only at the OS window; keep body paint from eating soft glow. */
+  overflow: hidden;
 }
 
-/* Ambient behaviours for smart mode — independent of which app is focused. */
+body.notch-body.smart .notch-pill,
+body.notch-body.notch-dot .notch-pill,
+body.notch-body.smart.vertical .notch-pill,
+body.notch-body.notch-dot.vertical .notch-pill,
+body.notch-body.surface-solid.smart .notch-pill,
+body.notch-body.surface-solid.notch-dot .notch-pill {
+  width: calc(20px * var(--notch-scale, 1));
+  height: calc(20px * var(--notch-scale, 1));
+  min-width: calc(20px * var(--notch-scale, 1));
+  min-height: calc(20px * var(--notch-scale, 1));
+  border-radius: 50%;
+  transform-origin: center center;
+  --pill-gx: 1.18;
+  --pill-gy: 1.18;
+  box-shadow:
+    0 2px 8px color-mix(in srgb, #000 24%, transparent),
+    inset 0 1px 0 var(--surf-inset-lit),
+    inset 0 -1px 0 var(--surf-inset-shade);
+}
+body.notch-body.smart .notch-pill::before,
+body.notch-body.smart .notch-pill::after,
+body.notch-body.notch-dot .notch-pill::before,
+body.notch-body.notch-dot .notch-pill::after {
+  display: none !important;
+}
+
+/* Ambient behaviours — use the `scale` property (same as hover) so they
+   don't fight transform-based entrance animation, and stay inside the window. */
 body.notch-body.smart .notch-pill {
   animation: smart-breathe 3.4s ease-in-out infinite;
 }
 body.notch-body.smart.smart-focus .notch-pill {
   animation: smart-focus-pulse 2.1s ease-in-out infinite;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent, #5b9fff) 35%, transparent),
-    0 4px 14px rgba(0, 0, 0, 0.28);
+    0 0 0 1.5px color-mix(in srgb, var(--accent, #5b9fff) 45%, transparent),
+    0 2px 10px color-mix(in srgb, #000 26%, transparent),
+    inset 0 1px 0 var(--surf-inset-lit);
 }
 body.notch-body.smart.smart-busy .notch-pill {
-  opacity: 0.42;
+  opacity: 0.45;
   animation: none;
-  transform: scale(0.88);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  scale: 0.9;
+  box-shadow:
+    0 1px 4px color-mix(in srgb, #000 18%, transparent),
+    inset 0 1px 0 var(--surf-inset-lit);
 }
 @keyframes smart-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.88; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { scale: 1; opacity: 0.9; }
+  50% { scale: 1.06; opacity: 1; }
 }
 @keyframes smart-focus-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.14); }
+  0%, 100% { scale: 1; }
+  50% { scale: 1.12; }
 }
 @media (prefers-reduced-motion: reduce) {
   body.notch-body.smart .notch-pill,
   body.notch-body.smart.smart-focus .notch-pill {
     animation: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  body.notch-body.smart .notch-pill:hover,
+  body.notch-body.notch-dot .notch-pill:hover {
+    /* Pause ambient grow while the user aims — hover scale still applies. */
+    animation-play-state: paused;
   }
 }
