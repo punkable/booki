@@ -30,6 +30,10 @@ static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 /// "+" tile). Same read-and-clear pattern as PENDING_CHANGELOG.
 static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 
+/// Smart-notch dot mode (foreground productivity app). Read by `position_notch`
+/// so the OS window shrinks with the painted pill.
+static NOTCH_DOT_MODE: AtomicBool = AtomicBool::new(false);
+
 /// Interactive regions of the dock "stage" window, reported by the frontend
 /// (window-relative CSS px). The stage is a fixed-size transparent window that
 /// never resizes for flyouts/menus; a cursor watcher flips it click-through
@@ -517,18 +521,72 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// Built-in productivity catalog for smart-notch auto mode (mirrors Settings
+/// suggestions). Matched when `multi_notch_auto_suggest` is on.
+const SMART_NOTCH_APPS: &[&str] = &[
+    // browsers
+    "chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "arc", "helium", "browser",
+    // design
+    "photoshop", "illustrator", "figma", "gimp", "blender", "maya", "cinema4d",
+    // editors / media
+    "premiere", "afterfx", "resolve", "capcut", "obs64", "obs32", "obs",
+    // code / IDEs
+    "opencode", "cursor", "code", "code - insiders", "vscodium", "sublime_text",
+    "notepad++", "idea64", "webstorm64", "pycharm64", "datagrip64", "goland64",
+    "rustrover64", "rider64", "clion64", "phpstorm64", "rubymine64", "fleet", "zed",
+    "devenv", "windowsterminal", "windows terminal", "wt",
+    // productivity / chat
+    "notion", "obsidian", "onenote", "todoist", "ticktick", "slack", "teams",
+    "discord", "telegram", "whatsapp",
+];
+
+fn notch_mode_of(cfg: &Config) -> &str {
+    match cfg.notch_mode.as_str() {
+        "floating" | "smart" | "attached" => cfg.notch_mode.as_str(),
+        _ if !cfg.notch_peek => "floating",
+        _ if cfg.multi_notch_enabled => "smart",
+        _ => "attached",
+    }
+}
+
+fn notch_smart_enabled(cfg: &Config) -> bool {
+    notch_mode_of(cfg) == "smart" || cfg.multi_notch_enabled
+}
+
+fn notch_should_dot(cfg: &Config, app: &str) -> bool {
+    if !notch_smart_enabled(cfg) || app.is_empty() {
+        return false;
+    }
+    if cfg
+        .multi_notch_apps
+        .iter()
+        .any(|a| a.eq_ignore_ascii_case(app))
+    {
+        return true;
+    }
+    cfg.multi_notch_auto_suggest
+        && SMART_NOTCH_APPS
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case(app))
+}
+
+/// Inward CSS depth of the notch window (before DPR) — used to keep the dock
+/// bar clear when both are visible.
+fn notch_clearance_css(cfg: &Config) -> u32 {
+    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
+    let depth = match notch_mode_of(cfg) {
+        "floating" => 44.0 * scale,
+        _ => 34.0 * scale,
+    };
+    (depth + 12.0).ceil() as u32
+}
+
 /// Current foreground app + whether multi-notch would shrink the notch to a dot.
 #[tauri::command]
 fn current_foreground_app() -> serde_json::Value {
     let cfg = config::load();
     let app = win::foreground_app_name().unwrap_or_default();
-    let dot = if cfg.multi_notch_enabled {
-        cfg.multi_notch_apps
-            .iter()
-            .any(|a| a.eq_ignore_ascii_case(&app))
-    } else {
-        false
-    };
+    let dot = notch_should_dot(&cfg, &app);
     serde_json::json!({ "app": app, "dot": dot })
 }
 
@@ -1218,30 +1276,59 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         cfg.notch_edge.as_str()
     };
     let vertical = edge == "left" || edge == "right";
-    // Peek style → a thinner pill flush to the edge (a subtle "tab"); otherwise a
-    // slightly larger pill with a small margin. The window stays tight ALONG the
-    // edge (small click hitbox) but keeps a bit of INWARD headroom on the
-    // perpendicular axis so the pill's soft glow/shadow has room to render
-    // instead of being clipped at the window edge. The pill hugs the outward
-    // edge (CSS align), so the extra depth is transparent space toward the screen.
+    let mode = notch_mode_of(&cfg);
+    let attached = mode == "attached" || mode == "smart";
+    let floating = mode == "floating";
+    let dot = NOTCH_DOT_MODE.load(Ordering::Relaxed) && notch_smart_enabled(&cfg);
     let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
-    let (lw, lh): (f64, f64) = match (cfg.notch_peek, vertical) {
-        (true, true) => (34.0 * scale, 156.0 * scale),
-        (true, false) => (156.0 * scale, 34.0 * scale),
-        (false, true) => (40.0 * scale, 168.0 * scale),
-        (false, false) => (168.0 * scale, 40.0 * scale),
+
+    // Window is larger than the painted pill so hover/glow have room. Dot mode
+    // shrinks the OS window so the hitbox matches the circle.
+    let (lw, lh): (f64, f64) = if dot {
+        let s = 36.0 * scale;
+        (s, s)
+    } else if attached {
+        match vertical {
+            true => (34.0 * scale, 156.0 * scale),
+            false => (156.0 * scale, 34.0 * scale),
+        }
+    } else {
+        match vertical {
+            true => (48.0 * scale, 176.0 * scale),
+            false => (176.0 * scale, 48.0 * scale),
+        }
     };
     let ww = (lw * dpr).round() as i32;
     let wh = (lh * dpr).round() as i32;
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
-    // Peek style sits FLUSH against the work-area edge (touching the taskbar).
-    // Never overlap into the taskbar band: the notch is topmost, so any overlap
-    // would draw ON TOP of the bar. The flush pill with only its outward corners
-    // rounded (CSS) already reads as a tab attached to the bar.
-    let margin: i32 = if cfg.notch_peek { 0 } else { 3 };
-    // Offset along the anchored edge so it can dodge subtitles / chat boxes.
-    let along = |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
+    // Attached / smart island: flush to the work-area edge (iPhone tab).
+    // Floating: sit inward with a calm gap so it never glues to the taskbar
+    // or the dock bar when both are visible.
+    let mut margin: i32 = if floating {
+        (10.0 * dpr).round() as i32
+    } else if attached {
+        0
+    } else {
+        3
+    };
+
+    // When the dock is also showing (always-visible notch or live preview),
+    // keep the floating capsule clear of the dock's painted bar. Attached mode
+    // stays flush — dock_xy clamps edge_gap instead so the bar sits further in.
+    let dock_visible = notch
+        .app_handle()
+        .get_webview_window("dock")
+        .and_then(|d| d.is_visible().ok())
+        .unwrap_or(false);
+    if floating && (dock_visible || cfg.notch_always_visible) {
+        let gap = ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32;
+        // Sit just inward of the dock face (+ small air gap).
+        margin = margin.max(gap + (6.0 * dpr).round() as i32);
+    }
+
+    let along =
+        |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
     let (x, y) = match edge {
         "top" => (along(ax, aw, ww), ay + margin),
         "left" => (ax + margin, along(ay, ah, wh)),
@@ -1902,11 +1989,15 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
     // The bar's distance to the screen edge is user-tunable (edge_gap = the
-    // VISUAL gap in CSS px). The window itself carries a small transparent
-    // padding on the anchored side (shrunk in CSS when the gap is small), so the
-    // window margin only covers whatever the padding can't.
+    // VISUAL gap in CSS px). When the notch stays visible with the dock
+    // (always-visible), enforce enough gap so the painted bar never covers the
+    // notch — especially on left/right/top where a small gap used to stack them.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let margin: i32 = ((cfg.edge_gap.min(96).saturating_sub(18) as f64) * dpr).round() as i32;
+    let mut gap = cfg.edge_gap.min(96);
+    if cfg.notch_always_visible {
+        gap = gap.max(notch_clearance_css(&cfg).min(96));
+    }
+    let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
     // if the notch sits at the top-left, the dock reveals at the left too (not
@@ -2340,31 +2431,42 @@ pub fn run() {
                             if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }
-                            // Multi-notch: when enabled, tell the notch whether the active
-                            // app should shrink it to a dot (productivity / focus apps).
-                            if cfg_cache.multi_notch_enabled {
+                            // Smart notch: shrink to an intelligent dot for
+                            // productivity apps (user list + built-in catalog).
+                            if notch_smart_enabled(&cfg_cache) {
                                 let fg = win::foreground_window_handle();
                                 let hwnd_changed = last_fg_hwnd != Some(fg);
                                 if hwnd_changed || cfg_just_reloaded || last_dot.is_none() {
                                     last_fg_hwnd = Some(fg);
                                     cfg_just_reloaded = false;
                                     if let Some(app) = win::foreground_app_name() {
-                                        if last_active_app.as_ref() != Some(&app) {
+                                        if last_active_app.as_ref() != Some(&app) || last_dot.is_none()
+                                        {
                                             last_active_app = Some(app.clone());
-                                            let dot = cfg_cache
-                                                .multi_notch_apps
-                                                .iter()
-                                                .any(|a| a.eq_ignore_ascii_case(&app));
+                                            let dot = notch_should_dot(&cfg_cache, &app);
                                             if last_dot != Some(dot) {
                                                 last_dot = Some(dot);
+                                                NOTCH_DOT_MODE.store(dot, Ordering::Relaxed);
                                                 let _ = handle.emit(
                                                     "booki://active-app",
                                                     serde_json::json!({ "app": app, "dot": dot }),
                                                 );
+                                                if let Some(notch) =
+                                                    handle.get_webview_window("notch")
+                                                {
+                                                    let _ = position_notch(&notch, &cfg_cache.edge);
+                                                }
                                             }
                                         }
                                     }
                                 }
+                            } else if last_dot != Some(false) {
+                                last_dot = Some(false);
+                                NOTCH_DOT_MODE.store(false, Ordering::Relaxed);
+                                let _ = handle.emit(
+                                    "booki://active-app",
+                                    serde_json::json!({ "app": "", "dot": false }),
+                                );
                             }
                             // Cursor pressed against the dock's edge → reveal signal.
                             if cfg_cache.notch_trigger == "hover" {

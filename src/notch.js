@@ -38,8 +38,13 @@ async function applyLook() {
     hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
+    const mode = cfg.notchMode
+      || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+    const attached = mode === "attached" || mode === "smart";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
-    document.body.classList.toggle("peek", cfg.notchPeek !== false);
+    document.body.classList.toggle("peek", attached);
+    document.body.classList.toggle("floating", mode === "floating");
+    document.body.classList.toggle("smart", mode === "smart");
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     applySurfaceVars(cfg);

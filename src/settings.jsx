@@ -205,7 +205,7 @@ const SEARCH_INDEX = [
   ["ap.language", "general"], ["ap.backup", "general"],
   ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
   ["be.taskbarFollow", "behavior"], ["be.taskbarSettle", "behavior"], ["be.taskbarHoldHover", "behavior"],
-  ["ap.notchSize", "behavior"], ["be.notchPeek", "behavior"],
+  ["be.notchMode", "behavior"], ["ap.notchSize", "behavior"], ["be.notchPeek", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
   ["apps.newFolder", "apps"], ["group.ungroup", "apps"], ["group.takeOut", "apps"],
   ["be.multiNotch", "behavior"],
@@ -236,6 +236,7 @@ const SEARCH_ALIASES = {
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
+  "be.notchMode": "notch estilo pegado flotante inteligente iphone attached floating smart punto dot",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
   "ap.notchSize": "notch pastilla tamano size pill",
@@ -1419,6 +1420,33 @@ function Behavior({ cfg, set }) {
       </SettingsSection>
 
       <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
+        <Row label={t("be.notchMode")} hint={t("be.notchModeHint")}>
+          <SegmentedControl
+            value={cfg.notchMode || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached")}
+            onChange={(v) => {
+              set(
+                {
+                  notchMode: v,
+                  notchPeek: v !== "floating",
+                  multiNotchEnabled: v === "smart",
+                },
+                { flush: true, afterSave: () => dockApi.notchPreview() }
+              );
+            }}
+            options={[
+              { value: "attached", label: t("be.notchModeAttached") },
+              { value: "floating", label: t("be.notchModeFloating") },
+              { value: "smart", label: t("be.notchModeSmart") },
+            ]}
+          />
+        </Row>
+        <p className="muted" style={{ marginTop: -4, marginBottom: 8 }}>
+          {(cfg.notchMode || "attached") === "floating"
+            ? t("be.notchModeFloatingHint")
+            : (cfg.notchMode || "attached") === "smart"
+              ? t("be.notchModeSmartHint")
+              : t("be.notchModeAttachedHint")}
+        </p>
         <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
           <Slider
             value={Math.round((Number(cfg.notchScale) || 1) * 100)}
@@ -1434,14 +1462,6 @@ function Behavior({ cfg, set }) {
             }}
           />
         </Row>
-        <Toggle
-          label={t("be.notchPeek")}
-          hint={t("be.notchPeekHint")}
-          checked={cfg.notchPeek !== false}
-          onChange={(v) => {
-            set({ notchPeek: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
-          }}
-        />
         {hideOn ? (
           <Row label={t("be.reveal")} hint={t("be.revealHint")}>
             <SegmentedControl
@@ -1470,13 +1490,19 @@ function Behavior({ cfg, set }) {
             hint={t("be.notchAlwaysVisibleHint")}
             checked={!!cfg.notchAlwaysVisible}
             onChange={(v) => {
-              set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => dockApi.notchPreview() });
+              set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => {
+                dockApi.reposition(cfg.edge || "bottom").catch(() => {});
+                dockApi.notchPreview();
+              }});
             }}
           />
+          <p className="muted" style={{ marginTop: 4 }}>{t("be.notchClearanceTip")}</p>
         </CollapsibleSection>
       )}
 
-      <MultiNotchSection cfg={cfg} set={set} />
+      {(cfg.notchMode === "smart" || cfg.multiNotchEnabled) && (
+        <MultiNotchSection cfg={cfg} set={set} />
+      )}
 
       <CollapsibleSection
         title={t("gp.interaction")}
@@ -1532,7 +1558,6 @@ const MULTI_NOTCH_SUGGESTIONS = {
 function MultiNotchSection({ cfg, set }) {
   const [custom, setCustom] = useState("");
   const [suggestOpen, setSuggestOpen] = useState(false);
-  const enabled = !!cfg.multiNotchEnabled;
   const apps = cfg.multiNotchApps || [];
   const add = (name) => {
     const key = String(name).toLowerCase().trim().replace(/\.exe$/i, "");
@@ -1544,77 +1569,72 @@ function MultiNotchSection({ cfg, set }) {
   };
   return (
     <CollapsibleSection
-      title={t("be.multiNotch")}
+      title={t("be.multiNotchApps")}
       icon="eye"
-      hint={t("be.multiNotchHint")}
-      count={enabled ? apps.length : null}
-      defaultOpen={false}
+      hint={t("be.notchModeSmartHint")}
+      count={apps.length}
+      defaultOpen={true}
     >
-      <Toggle label={t("be.multiNotch")} checked={enabled}
-        onChange={(v) => set({ multiNotchEnabled: v })} />
-      {enabled && (
-        <>
-          <Toggle label={t("be.multiNotchAutoSuggest")}
-            checked={cfg.multiNotchAutoSuggest !== false}
-            onChange={(v) => set({ multiNotchAutoSuggest: v })} />
-          <div className="mn-add">
-            <input
-              className="r-hotkey-input"
-              value={custom}
-              placeholder={t("be.multiNotchPlaceholder")}
-              onChange={(e) => setCustom(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
-            />
-            <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
-          </div>
-          {apps.length === 0 ? (
-            <p className="muted mn-empty">{t("be.multiNotchEmpty")}</p>
-          ) : (
-            <div className="mn-list">
-              {apps.map((app) => (
-                <span key={app} className="mn-tag">
-                  {app}
-                  <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
-                    <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <button
-            type="button"
-            className={"mn-suggest-toggle" + (suggestOpen ? " open" : "")}
-            onClick={() => setSuggestOpen((o) => !o)}
-            aria-expanded={suggestOpen}
-          >
-            <span>{t("be.multiNotchSuggest")}</span>
-            <span className="muted">{t("be.multiNotchSuggestCount").replace("{n}", String(
-              Object.values(MULTI_NOTCH_SUGGESTIONS).reduce((n, list) => n + list.length, 0)
-            ))}</span>
-            <span dangerouslySetInnerHTML={{ __html: icon(suggestOpen ? "chevron-down" : "chevron-right") }} />
-          </button>
-          {suggestOpen && (
-            <div className="mn-suggest-panel">
-              <p className="muted">{t("be.multiNotchSuggestHint")}</p>
-              {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
-                <details key={cat} className="mn-suggest-group">
-                  <summary>{t(`mn.${cat}`)} <span className="muted">{list.length}</span></summary>
-                  <div className="mn-chips">
-                    {list.map((app) => {
-                      const active = apps.some((a) => a.toLowerCase() === app);
-                      return (
-                        <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
-                          onClick={() => active ? remove(app) : add(app)} disabled={active}>
-                          {app}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </details>
-              ))}
-            </div>
-          )}
-        </>
+      <Toggle label={t("be.multiNotchAutoSuggest")}
+        hint={t("be.multiNotchAutoSuggestHint")}
+        checked={cfg.multiNotchAutoSuggest !== false}
+        onChange={(v) => set({ multiNotchAutoSuggest: v })} />
+      <div className="mn-add">
+        <input
+          className="r-hotkey-input"
+          value={custom}
+          placeholder={t("be.multiNotchPlaceholder")}
+          onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (add(custom), setCustom(""))}
+        />
+        <Button onClick={() => { add(custom); setCustom(""); }}>{t("be.multiNotchAdd")}</Button>
+      </div>
+      {apps.length === 0 ? (
+        <p className="muted mn-empty">{t("be.multiNotchEmptySmart")}</p>
+      ) : (
+        <div className="mn-list">
+          {apps.map((app) => (
+            <span key={app} className="mn-tag">
+              {app}
+              <button type="button" onClick={() => remove(app)} aria-label={t("apps.remove")}>
+                <span dangerouslySetInnerHTML={{ __html: icon("x") }} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        className={"mn-suggest-toggle" + (suggestOpen ? " open" : "")}
+        onClick={() => setSuggestOpen((o) => !o)}
+        aria-expanded={suggestOpen}
+      >
+        <span>{t("be.multiNotchSuggest")}</span>
+        <span className="muted">{t("be.multiNotchSuggestCount").replace("{n}", String(
+          Object.values(MULTI_NOTCH_SUGGESTIONS).reduce((n, list) => n + list.length, 0)
+        ))}</span>
+        <span dangerouslySetInnerHTML={{ __html: icon(suggestOpen ? "chevron-down" : "chevron-right") }} />
+      </button>
+      {suggestOpen && (
+        <div className="mn-suggest-panel">
+          <p className="muted">{t("be.multiNotchSuggestHint")}</p>
+          {Object.entries(MULTI_NOTCH_SUGGESTIONS).map(([cat, list]) => (
+            <details key={cat} className="mn-suggest-group">
+              <summary>{t(`mn.${cat}`)} <span className="muted">{list.length}</span></summary>
+              <div className="mn-chips">
+                {list.map((app) => {
+                  const active = apps.some((a) => a.toLowerCase() === app);
+                  return (
+                    <button key={app} type="button" className={"mn-chip" + (active ? " active" : "")}
+                      onClick={() => active ? remove(app) : add(app)} disabled={active}>
+                      {app}
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
+          ))}
+        </div>
       )}
     </CollapsibleSection>
   );
