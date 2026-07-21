@@ -2967,9 +2967,15 @@ function UpdatesCard({ onWhatsNew }) {
 // and backup — anything that isn't about how the dock looks or moves.
 function General({ cfg, set, onWhatsNew }) {
   const [autostart, setAutostart] = useState(!!cfg.autostart);
+  const [backupMsg, setBackupMsg] = useState("");
   useEffect(() => {
     dockApi.getAutostart().then((v) => setAutostart(!!v));
   }, []);
+  const flashBackup = (msg) => {
+    setBackupMsg(msg);
+    clearTimeout(flashBackup._t);
+    flashBackup._t = setTimeout(() => setBackupMsg(""), 3200);
+  };
   return (
     <>
       <PageHeader icon="settings" title={t("gen.title")}>{t("gen.hint")}</PageHeader>
@@ -3038,18 +3044,36 @@ function General({ cfg, set, onWhatsNew }) {
         hint={t("ap.backupHint")}
         defaultOpen={false}
       >
+        <p className="muted" style={{ margin: "0 0 10px" }}>{t("ap.backupKeep")}</p>
         <div className="s-actions" style={{ margin: 0 }}>
           <Button onClick={async () => {
-            const p = await pickSavePath("booki-config.json");
-            if (p) await dockApi.exportConfig(p);
+            try {
+              const p = await pickSavePath("booki-config.json");
+              if (!p) return;
+              await dockApi.exportConfig(p);
+              flashBackup(t("ap.backupExported"));
+            } catch (_) {
+              flashBackup(t("ap.backupError"));
+            }
           }}>{t("ap.export")}</Button>
           <Button appearance="secondary" onClick={async () => {
-            const p = await pickJsonFile();
-            if (!p) return;
-            const fresh = await dockApi.importConfig(p);
-            if (fresh) set(fresh);
+            try {
+              const p = await pickJsonFile();
+              if (!p) return;
+              if (!window.confirm(t("ap.backupImportConfirm"))) return;
+              const fresh = await dockApi.importConfig(p);
+              if (fresh) {
+                set(fresh);
+                flashBackup(t("ap.backupImported"));
+              } else {
+                flashBackup(t("ap.backupError"));
+              }
+            } catch (_) {
+              flashBackup(t("ap.backupError"));
+            }
           }}>{t("ap.import")}</Button>
         </div>
+        {backupMsg ? <p className="muted" style={{ marginTop: 8 }}>{backupMsg}</p> : null}
       </CollapsibleSection>
     </>
   );

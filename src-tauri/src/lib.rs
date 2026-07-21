@@ -1047,7 +1047,7 @@ fn export_config(path: String) -> Result<(), String> {
 
 /// Import config from a JSON file, replacing the current one. Returns the new config.
 #[tauri::command]
-fn import_config(path: String) -> Result<Config, String> {
+fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
     let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     // Machine-specific bits don't travel: the monitor layout of the exporting
@@ -1055,6 +1055,10 @@ fn import_config(path: String) -> Result<Config, String> {
     // that don't exist here and offers to reassign them).
     cfg.monitor = -1;
     config::save(&cfg)?;
+    clip_apply_config(&cfg);
+    apply_always_on_top(&app);
+    apply_capture_policy(&app, cfg.capture_visible);
+    let _ = app.emit("booki://config-changed", ());
     Ok(cfg)
 }
 
