@@ -97,6 +97,10 @@ fn default_notch_edge() -> String {
 fn default_notch_style() -> String {
     "acrylic".into()
 }
+fn default_notch_mode() -> String {
+    // Attached = iPhone-style tab flush to the edge (former notchPeek default).
+    "attached".into()
+}
 fn default_surface_style() -> String {
     // Unified dock + notch finish. Default tinted = taskbar / Windhawk glass.
     "tinted".into()
@@ -106,6 +110,11 @@ fn default_anim() -> String {
 }
 fn default_edge_gap() -> u32 {
     48
+}
+fn default_taskbar_settle_ms() -> u32 {
+    // After an auto-hide taskbar tucks away, give the user a beat to hit the
+    // notch/dock before Booki drops back to the screen edge.
+    1000
 }
 fn default_clipboard_retention_days() -> u32 {
     7
@@ -167,8 +176,13 @@ pub struct Config {
     #[serde(default = "default_notch_position")]
     pub notch_position: String,
     /// Notch "peek" style — sits at the very edge like a tab, less intrusive.
+    /// Kept in sync with `notch_mode` for older frontends (`attached`/`smart` → true).
     #[serde(default = "default_true")]
     pub notch_peek: bool,
+    /// Notch silhouette / placement: "attached" (iPhone tab), "floating"
+    /// (inset capsule), "smart" (adaptive island ↔ intelligent dot).
+    #[serde(default = "default_notch_mode")]
+    pub notch_mode: String,
     /// Edge the notch lives on: "auto" (same as the dock) or a specific edge.
     #[serde(default = "default_notch_edge")]
     pub notch_edge: String,
@@ -207,6 +221,20 @@ pub struct Config {
     /// Visual gap (CSS px) between the bar and its screen edge.
     #[serde(default = "default_edge_gap")]
     pub edge_gap: u32,
+    /// When Windows auto-hides the taskbar, rise with the revealed bar so the
+    /// dock/notch stay above it (Windhawk height mods included via tray HWND).
+    #[serde(default = "default_true")]
+    pub taskbar_follow: bool,
+    /// After the auto-hide taskbar hides again, wait this many ms before the
+    /// dock/notch drop back to the screen edge. Rising with a revealed bar is
+    /// still immediate so they never sit under it.
+    #[serde(default = "default_taskbar_settle_ms")]
+    pub taskbar_settle_ms: u32,
+    /// While the cursor is over the dock or notch, keep the raised position and
+    /// reset the settle timer — so you can actually use Booki after revealing
+    /// the taskbar.
+    #[serde(default = "default_true")]
+    pub taskbar_hold_while_hover: bool,
     /// UI language: "system" | "es" | "en".
     #[serde(default = "default_language")]
     pub language: String,
@@ -268,14 +296,14 @@ pub struct Config {
     /// there's always a visible anchor on the screen edge.
     #[serde(default)]
     pub notch_always_visible: bool,
-    /// Multi-notch: shrink the notch to a dot when the active window belongs to
-    /// a productivity app (browser, editor, design tool, etc.).
+    /// Legacy multi-notch flag. Kept for config compatibility; smart mode is
+    /// always circular and no longer uses an app whitelist.
     #[serde(default)]
     pub multi_notch_enabled: bool,
-    /// Executable names (without .exe, lowercased) that trigger dot mode.
+    /// Legacy executable names for the old multi-notch whitelist (unused).
     #[serde(default)]
     pub multi_notch_apps: Vec<String>,
-    /// Suggest productivity apps for multi-notch automatically.
+    /// Legacy auto-suggest toggle for multi-notch (unused).
     #[serde(default = "default_true")]
     pub multi_notch_auto_suggest: bool,
 }
@@ -311,6 +339,7 @@ impl Default for Config {
             auto_hide_delay: default_hide_delay(),
             notch_position: default_notch_position(),
             notch_peek: true,
+            notch_mode: default_notch_mode(),
             notch_edge: default_notch_edge(),
             notch_style: default_notch_style(),
             surface_style: default_surface_style(),
@@ -324,6 +353,9 @@ impl Default for Config {
             autostart: false,
             context_menu: true,
             edge_gap: 48,
+            taskbar_follow: true,
+            taskbar_settle_ms: default_taskbar_settle_ms(),
+            taskbar_hold_while_hover: true,
             language: default_language(),
             settings_rev: 0,
             seen_version: String::new(),
@@ -442,6 +474,40 @@ pub fn load() -> Config {
         }
         .into();
         cfg.settings_rev = 6;
+        let _ = save(&cfg);
+    }
+    // rev 7: explicit notch modes (attached / floating / smart). Derive from the
+    // older peek + multi-notch toggles so existing installs keep their look.
+    if cfg.settings_rev < 7 {
+        cfg.notch_mode = if cfg.multi_notch_enabled {
+            "smart".into()
+        } else if cfg.notch_peek {
+            "attached".into()
+        } else {
+            "floating".into()
+        };
+        cfg.notch_peek = cfg.notch_mode != "floating";
+        // Smart no longer keys off an app list — keep the legacy fields empty.
+        cfg.multi_notch_enabled = false;
+        cfg.multi_notch_apps.clear();
+        cfg.settings_rev = 7;
+        let _ = save(&cfg);
+    }
+    // rev 8: smart is always circular (ambient behaviours only). Clear any leftover
+    // multi-notch app list so the old whitelist cannot resurrect in Settings.
+    if cfg.settings_rev < 8 {
+        let mode = cfg.notch_mode.trim().to_ascii_lowercase();
+        if mode != "attached" && mode != "floating" && mode != "smart" {
+            cfg.notch_mode = if cfg.notch_peek {
+                "attached".into()
+            } else {
+                "floating".into()
+            };
+        }
+        cfg.notch_peek = cfg.notch_mode != "floating";
+        cfg.multi_notch_enabled = false;
+        cfg.multi_notch_apps.clear();
+        cfg.settings_rev = 8;
         let _ = save(&cfg);
     }
     // Promote 1-child groups; keep empty groups (Settings uses them as staging

@@ -3,6 +3,33 @@
 
 export const CHANGELOG = [
   {
+    version: "0.66.0",
+    date: "21 jul 2026",
+    headline: "Retraso al bajar con la taskbar; notch unificado (pegado / flotante / punto inteligente).",
+    sections: [
+      {
+        icon: "undo",
+        title: "Barra de tareas de Windows",
+        notes: [
+          "Nuevo retraso configurable antes de que el notch/dock bajen cuando la barra se oculta (por defecto 1 s). Subir sigue siendo inmediato.",
+          "Opci\u00f3n de mantenerlos arriba mientras el cursor est\u00e1 sobre el notch o el dock (reinicia el retraso).",
+          "Puedes desactivar \u00abSeguir la barra\u00bb si prefieres anclar solo al borde de la pantalla.",
+          "Compatible con Windhawk: se lee el rect\u00e1ngulo real de la taskbar (altura/mods); tip en Ajustes y cristal tintado al estilo TintedGlass.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Notch",
+        notes: [
+          "Un solo control de estilo: Pegado (tipo iPhone), Flotante (c\u00e1psula) e Inteligente (punto circular).",
+          "Inteligente es siempre circular en cualquier app — sin lista ni cat\u00e1logo de productividad. A\u00f1ade ambiente: respiraci\u00f3n suave, m\u00e1s presencia al trabajar y atenuaci\u00f3n en pantalla completa.",
+          "Se unific\u00f3 la secci\u00f3n Notch (sin opciones duplicadas de peek / multi-notch).",
+          "Con notch siempre visible, la distancia al borde deja hueco para no solaparse con el dock en laterales/arriba.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.65.0",
     date: "21 jul 2026",
     headline: "Notch y dock siguen la barra de tareas (ocultar autom\u00e1tico); Apps ancladas m\u00e1s claras.",
