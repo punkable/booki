@@ -572,6 +572,23 @@ pub fn save(config: &Config) -> Result<(), String> {
     // Preserve one-way progress flags: Settings often holds a stale snapshot and
     // used to rewrite onboarded/seenVersion back to false/"" on every slider save.
     let mut to_write = config.clone();
+    // Keep legacy peek aligned with the canonical mode on every write.
+    let mode = to_write.notch_mode.trim().to_ascii_lowercase();
+    if mode == "attached" || mode == "floating" || mode == "smart" {
+        to_write.notch_mode = mode.clone();
+        to_write.notch_peek = mode != "floating";
+    } else if to_write.multi_notch_enabled {
+        to_write.notch_mode = "smart".into();
+        to_write.notch_peek = true;
+    } else {
+        to_write.notch_mode = if to_write.notch_peek {
+            "attached".into()
+        } else {
+            "floating".into()
+        };
+        to_write.notch_peek = to_write.notch_mode != "floating";
+    }
+    to_write.multi_notch_enabled = false;
     if let Some(existing) = read_config(&config_path()) {
         if existing.onboarded {
             to_write.onboarded = true;

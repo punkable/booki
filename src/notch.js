@@ -13,6 +13,7 @@ import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
+import { resolveNotchMode } from "./notch-mode.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -26,16 +27,6 @@ function availW() {
 function availH() {
   const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
   return inTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
-}
-
-/** Normalize notch mode from config (including legacy peek / multi-notch keys). */
-function resolveNotchMode(cfg) {
-  if (cfg.notchMode === "attached" || cfg.notchMode === "floating" || cfg.notchMode === "smart") {
-    return cfg.notchMode;
-  }
-  if (cfg.notchPeek === false) return "floating";
-  if (cfg.multiNotchEnabled) return "smart";
-  return "attached";
 }
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered

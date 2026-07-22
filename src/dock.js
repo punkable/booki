@@ -13,12 +13,14 @@ import {
   onReveal,
   onSoftReveal,
   onFullscreen,
+  onToggleDock,
   onLaunchIndex,
   onHotEdge,
   emitConfigChanged as emitConfigChangedRaw,
   logMessage,
   isTauri,
 } from "./api.js";
+import { resolveNotchMode } from "./notch-mode.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
@@ -151,6 +153,13 @@ async function boot() {
     onConfigChanged(() => { if (Date.now() < selfChangeUntil) return; reloadConfig(); });
     onOcclusion(onOcclusionSignal);
     onFullscreen(onFullscreenSignal);
+    // Tray / global hotkey: tuck or summon through the same hide/reveal path
+    // the notch uses so JS hiddenState stays in sync with the native windows.
+    onToggleDock(() => {
+      if (fullscreen) return;
+      if (hiddenState) pinOpen();
+      else setHidden(true);
+    });
     // Position hotkeys (modifier+1…9): launch the Nth item on the bar.
     onLaunchIndex((i) => {
       const items = cfg.pinned.filter((p) => p.kind !== "separator");
@@ -2728,8 +2737,7 @@ const SHADOW_PAD = 18;
 /** Painted notch depth + air gap (CSS px) — keep in sync with Rust `notch_stack_depth_css`. */
 function notchStackDepthCss(c) {
   const scale = Math.min(1.5, Math.max(0.7, Number(c.notchScale) || 1));
-  const mode = c.notchMode
-    || (c.notchPeek === false ? "floating" : c.multiNotchEnabled ? "smart" : "attached");
+  const mode = resolveNotchMode(c);
   const painted = mode === "smart" ? 28 : mode === "floating" ? 26 : 14;
   return Math.ceil(painted * scale + 8);
 }
@@ -2857,7 +2865,7 @@ let hideTimer = null;
 let occluded = false; // last occlusion signal from the backend (smart mode)
 let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
-let fullscreen = false; // a fullscreen game/movie is running → blackout everything
+let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
 let draggingFile = false; // an OS file drag is over the dock → keep it open
 let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
@@ -2874,13 +2882,23 @@ function hideInFullscreenEnabled() {
   return cfg.hideInFullscreen !== false;
 }
 
-function onFullscreenSignal(value) {
-  fullscreen = value;
+function clearFsTimers() {
   clearTimeout(blackoutTimer);
   blackoutTimer = null;
+  clearTimeout(occRevealTimer);
+  occRevealTimer = null;
+  clearTimeout(hideTimer);
+  hideTimer = null;
+}
+
+function onFullscreenSignal(value) {
+  clearFsTimers();
   if (value) {
-    // Opt-out: stay visible in fullscreen (honest with auto-hide "Never").
+    // Already blacked out — ignore repeat signals.
+    if (fullscreen) return;
+    // Opt-out: stay visible. Do NOT set `fullscreen` or pinOpen/tryTuck break.
     if (!hideInFullscreenEnabled()) return;
+    fullscreen = true;
     hiddenBeforeFullscreen = hiddenState;
     pinnedReveal = false;
     manualReveal = false;
@@ -2904,34 +2922,35 @@ function onFullscreenSignal(value) {
       }, FS_TOAST_FADE_MS);
     }, FS_TOAST_HOLD_MS);
   } else {
-    // Cancel pending blackout so a short fullscreen can't hide us after restore.
-    clearTimeout(blackoutTimer);
-    blackoutTimer = null;
-    document.body.classList.remove("tucked");
-    if (!hideInFullscreenEnabled() && !hiddenBeforeFullscreen) {
-      // We never blacked out — leave current dock state alone.
-      hiddenBeforeFullscreen = false;
-      return;
-    }
-    if (hiddenBeforeFullscreen && hideMode() === "smart" && (cfg.notchTrigger || "click") === "click") {
-      // Stay on the notch: smart + click is intentionally quiet on the desktop.
-      hiddenState = true;
-      stopPolls();
-      document.body.classList.add("tucked");
-      dockApi.hideDock(cfg.edge);
-    } else if (hideMode() === "off") {
-      // Always-visible mode: come straight back without resetting other state.
-      hiddenState = false;
-      startPolls();
-      document.body.classList.add("revealing");
-      dockApi.revealDock();
-      applyFrame();
-      setTimeout(() => document.body.classList.remove("revealing"), 380);
-    } else {
-      hiddenState = false;
-      setupAutoHide();
-    }
+    // Never entered a blackout (hide was off) — nothing to restore.
+    if (!fullscreen) return;
+    fullscreen = false;
+    const wasTucked = hiddenBeforeFullscreen;
     hiddenBeforeFullscreen = false;
+    document.body.classList.remove("tucked");
+    // clear_fullscreen_blackout must finish before hide/reveal or Rust no-ops.
+    void (async () => {
+      await dockApi.clearFullscreenBlackout().catch(() => {});
+      await dockApi.notchToastDismiss().catch(() => {});
+      // Restore the pre-FS visibility for every hide mode, not only smart+click.
+      // setupAutoHide() starts edge visible — that would pop a tucked dock open.
+      if (wasTucked) {
+        hiddenState = true;
+        stopPolls();
+        document.body.classList.add("tucked");
+        await dockApi.hideDock(cfg.edge).catch(() => {});
+      } else if (hideMode() === "off") {
+        hiddenState = false;
+        startPolls();
+        document.body.classList.add("revealing");
+        await dockApi.revealDock().catch(() => {});
+        applyFrame();
+        setTimeout(() => document.body.classList.remove("revealing"), 380);
+      } else {
+        hiddenState = false;
+        setupAutoHide();
+      }
+    })();
   }
 }
 
@@ -3155,6 +3174,9 @@ if (dockApi.onCursorInside)
   });
 
 function setupAutoHide() {
+  // Fullscreen blackout owns visibility — don't reveal/hide underneath it
+  // (config reload / preview end during a game would flash Booki over it).
+  if (fullscreen) return;
   clearTimeout(hideTimer);
   manualReveal = false;
   pinnedReveal = false;

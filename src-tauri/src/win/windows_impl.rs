@@ -638,11 +638,6 @@ unsafe fn apply_tray_inset(work: &mut RECT, monitor: &RECT, hmon: HMONITOR, tray
     }
 }
 
-/// Native handle of the currently foreground window.
-pub fn foreground_window_handle() -> isize {
-    unsafe { GetForegroundWindow().0 as isize }
-}
-
 /// Lowercased executable name (without .exe) of the currently foreground window.
 pub fn foreground_app_name() -> Option<String> {
     unsafe {

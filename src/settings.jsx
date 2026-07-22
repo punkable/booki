@@ -19,6 +19,7 @@ import {
   closeSelf,
   logMessage,
 } from "./api.js";
+import { resolveNotchMode } from "./notch-mode.js";
 import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
 import {
@@ -862,8 +863,7 @@ function MiniDockPreview({ cfg }) {
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
-  const notchMode = cfg.notchMode
-    || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+  const notchMode = resolveNotchMode(cfg);
   const attached = notchMode === "attached";
   const smart = notchMode === "smart";
   const fills = {
@@ -1358,7 +1358,12 @@ function Behavior({ cfg, set }) {
         <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
           <SegmentedControl
             value={cfg.autoHideMode || "smart"}
-            onChange={(v) => set({ autoHideMode: v })}
+            onChange={(v) => {
+              // Auto-hide "Never" hides notch controls — also clear always-visible
+              // so the dock doesn't keep stacking clearance for an orphaned notch.
+              if (v === "off") set({ autoHideMode: v, notchAlwaysVisible: false });
+              else set({ autoHideMode: v });
+            }}
             options={[
               { value: "off", label: t("hide.offShort") },
               { value: "smart", label: t("hide.smartShort") },
@@ -1450,14 +1455,15 @@ function Behavior({ cfg, set }) {
       <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
         <Row label={t("be.notchMode")} hint={t("be.notchModeHint")}>
           <SegmentedControl
-            value={cfg.notchMode || (cfg.notchPeek === false ? "floating" : "attached")}
+            value={resolveNotchMode(cfg)}
             onChange={(v) => {
               set(
                 {
                   notchMode: v,
                   // Keep legacy keys in sync so old fallbacks don't revive the
-                  // multi-notch app list or the peek toggle.
-                  notchPeek: v === "attached",
+                  // multi-notch app list or the peek toggle. Smart + attached
+                  // both peek; only floating is the lifted capsule.
+                  notchPeek: v !== "floating",
                   multiNotchEnabled: false,
                   multiNotchApps: [],
                 },
@@ -1478,9 +1484,9 @@ function Behavior({ cfg, set }) {
           />
         </Row>
         <p className="muted notch-mode-hint">
-          {(cfg.notchMode || "attached") === "floating"
+          {resolveNotchMode(cfg) === "floating"
             ? t("be.notchModeFloatingHint")
-            : (cfg.notchMode || "attached") === "smart"
+            : resolveNotchMode(cfg) === "smart"
               ? t("be.notchModeSmartHint")
               : t("be.notchModeAttachedHint")}
         </p>
