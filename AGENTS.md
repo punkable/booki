@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.66.2` — notch + dock stack
-  without overlap when the notch stays visible (edge → notch → dock). `0.66.1`
-  fixed smart circle clipping, edge gap to 0, and pill-only hit testing.
-  Earlier: `0.66.0` taskbar settle; `0.65` tray tracking.
+- Current public beta context at this writing: `0.67.0` — calmer fullscreen hide
+  chip, optional stay-visible toggle, stricter detection (no QUNS_BUSY false
+  positives). `0.66.2` stacked always-visible notch above the dock; `0.66.1`
+  fixed smart circle, edge gap to 0, and pill-only hits.
 
 ## Important Files
 

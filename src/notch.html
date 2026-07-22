@@ -8,9 +8,12 @@
   </head>
   <body class="notch-body">
     <button class="notch-pill notch-enter" id="notch-pill" title="Show Booki" aria-label="Show Booki"></button>
-    <div class="notch-toast" id="notch-toast">
-      <span class="notch-emoji"><img src="/emoji/beaver.png" alt="" width="18" height="18" /></span>
-      <span class="notch-text" id="notch-text"></span>
+    <div class="notch-toast" id="notch-toast" role="status" aria-live="polite">
+      <img class="notch-toast-mark" src="/brand/svg/isotype.svg" alt="" width="16" height="16" draggable="false" />
+      <span class="notch-toast-copy">
+        <span class="notch-toast-title" id="notch-toast-title"></span>
+        <span class="notch-toast-sub" id="notch-toast-sub"></span>
+      </span>
     </div>
     <script type="module" src="./notch.js"></script>
   </body>

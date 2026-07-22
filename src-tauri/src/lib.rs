@@ -1300,9 +1300,10 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Briefly show a message on the notch window (used for "Booki se ocultó …").
+/// Briefly show a calm status chip on the notch (fullscreen hide notice).
+/// `detail` is optional secondary line; empty keeps a single-line toast.
 #[tauri::command]
-fn notch_toast(app: AppHandle, text: String) {
+fn notch_toast(app: AppHandle, title: String, detail: Option<String>) {
     // The toast replaces the bar — hide the dock window while it shows.
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
@@ -1318,10 +1319,13 @@ fn notch_toast(app: AppHandle, text: String) {
             )
             .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
             let m = (14.0 * dpr).round() as i32;
-            let desired_w = ((text.chars().count() as f64 * 7.4) + 88.0).clamp(320.0, 560.0);
-            let max_w = ((aw - m * 2).max(260) as f64 / dpr).max(260.0);
+            let detail_len = detail.as_ref().map(|s| s.chars().count()).unwrap_or(0);
+            let chars = title.chars().count().max(detail_len);
+            let desired_w = ((chars as f64 * 7.2) + 72.0).clamp(280.0, 420.0);
+            let max_w = ((aw - m * 2).max(240) as f64 / dpr).max(240.0);
             let ww = (desired_w.min(max_w) * dpr).round() as i32;
-            let wh = (52.0 * dpr).round() as i32;
+            let two_line = detail.as_ref().map(|s| !s.is_empty()).unwrap_or(false);
+            let wh = ((if two_line { 56.0 } else { 44.0 }) * dpr).round() as i32;
             let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
             // Show the toast on the dock's anchored edge — a side-docked bar
             // must not flash a pill at the bottom of the screen.
@@ -1334,8 +1338,21 @@ fn notch_toast(app: AppHandle, text: String) {
             let _ = notch.set_position(PhysicalPosition::new(x, y));
         }
         let _ = notch.show();
-        let _ = app.emit("booki://notch-toast", text);
+        let _ = notch.set_ignore_cursor_events(false);
+        let _ = app.emit(
+            "booki://notch-toast",
+            serde_json::json!({
+                "title": title,
+                "detail": detail.unwrap_or_default(),
+            }),
+        );
     }
+}
+
+/// Ask the notch toast to fade out before the dock blackout hides the window.
+#[tauri::command]
+fn notch_toast_dismiss(app: AppHandle) {
+    let _ = app.emit("booki://notch-toast-out", ());
 }
 
 /// Briefly show the notch while the user is tweaking its style/position in
@@ -2165,6 +2182,7 @@ pub fn run() {
             reveal_dock,
             notch_reveal,
             notch_toast,
+            notch_toast_dismiss,
             notch_preview,
             hide_all,
             profile_list,

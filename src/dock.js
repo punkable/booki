@@ -2867,31 +2867,66 @@ const SMART_REVEAL_DELAY = 1100;
 
 // Fullscreen game/movie/presentation → get completely out of the way: flash a
 // brief toast, then hide BOTH the bar and the notch. Restore when it ends.
+const FS_TOAST_HOLD_MS = 1500;
+const FS_TOAST_FADE_MS = 260;
+
+function hideInFullscreenEnabled() {
+  return cfg.hideInFullscreen !== false;
+}
+
 function onFullscreenSignal(value) {
   fullscreen = value;
   clearTimeout(blackoutTimer);
+  blackoutTimer = null;
   if (value) {
+    // Opt-out: stay visible in fullscreen (honest with auto-hide "Never").
+    if (!hideInFullscreenEnabled()) return;
     hiddenBeforeFullscreen = hiddenState;
     pinnedReveal = false;
     manualReveal = false;
     hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
-    // Toast on the notch (pill hidden via CSS). Single blackout owner = dock.
-    dockApi.notchToast(t("fs.hidden"));
+    // Already tucked into the notch → skip the toast chip; blackout quietly.
+    if (hiddenBeforeFullscreen) {
+      blackoutTimer = setTimeout(() => {
+        if (fullscreen) dockApi.hideAll();
+      }, 320);
+      return;
+    }
+    // Calm two-line status on the notch, then fade into full blackout.
+    dockApi.notchToast(t("fs.hiddenTitle"), t("fs.hiddenSub"));
     blackoutTimer = setTimeout(() => {
-      if (fullscreen) dockApi.hideAll();
-    }, 2200);
+      if (!fullscreen) return;
+      dockApi.notchToastDismiss().catch(() => {});
+      blackoutTimer = setTimeout(() => {
+        if (fullscreen) dockApi.hideAll();
+      }, FS_TOAST_FADE_MS);
+    }, FS_TOAST_HOLD_MS);
   } else {
     // Cancel pending blackout so a short fullscreen can't hide us after restore.
     clearTimeout(blackoutTimer);
     blackoutTimer = null;
     document.body.classList.remove("tucked");
+    if (!hideInFullscreenEnabled() && !hiddenBeforeFullscreen) {
+      // We never blacked out — leave current dock state alone.
+      hiddenBeforeFullscreen = false;
+      return;
+    }
     if (hiddenBeforeFullscreen && hideMode() === "smart" && (cfg.notchTrigger || "click") === "click") {
+      // Stay on the notch: smart + click is intentionally quiet on the desktop.
       hiddenState = true;
       stopPolls();
       document.body.classList.add("tucked");
       dockApi.hideDock(cfg.edge);
+    } else if (hideMode() === "off") {
+      // Always-visible mode: come straight back without resetting other state.
+      hiddenState = false;
+      startPolls();
+      document.body.classList.add("revealing");
+      dockApi.revealDock();
+      applyFrame();
+      setTimeout(() => document.body.classList.remove("revealing"), 380);
     } else {
       hiddenState = false;
       setupAutoHide();
