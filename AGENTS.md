@@ -14,10 +14,10 @@ details, or screenshots from a private desktop.
 - Stack: Tauri 2, Rust backend, React 19, Vite, Windows WebView2.
 - Privacy posture: local-first, no accounts, no telemetry, no cloud sync.
   Clipboard memory must remain opt-in and clearly explained.
-- Current public beta context at this writing: `0.66.1` — smart notch is a true
-  centered circle (no floating-capsule clip). `0.66.0` added taskbar settle delay,
-  hold-while-hover, Windhawk-friendly follow, and unified notch styles.
-  Earlier: `0.65` live tray tracking + Apps board; `0.64` Apps UX.
+- Current public beta context at this writing: `0.66.2` — notch + dock stack
+  without overlap when the notch stays visible (edge → notch → dock). `0.66.1`
+  fixed smart circle clipping, edge gap to 0, and pill-only hit testing.
+  Earlier: `0.66.0` taskbar settle; `0.65` tray tracking.
 
 ## Important Files
 

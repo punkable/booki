@@ -1454,7 +1454,13 @@ function Behavior({ cfg, set }) {
                   multiNotchEnabled: false,
                   multiNotchApps: [],
                 },
-                { flush: true, afterSave: () => dockApi.notchPreview() }
+                {
+                  flush: true,
+                  afterSave: () => {
+                    dockApi.reposition(cfg.edge || "bottom").catch(() => {});
+                    dockApi.notchPreview();
+                  },
+                }
               );
             }}
             options={[
@@ -1509,6 +1515,9 @@ function Behavior({ cfg, set }) {
                 }});
               }}
             />
+            {!!cfg.notchAlwaysVisible && (
+              <p className="muted notch-mode-hint">{t("be.notchClearanceTip")}</p>
+            )}
           </>
         ) : (
           <p className="muted">{t("be.notchNeedsHide")}</p>
