@@ -203,7 +203,7 @@ const SEARCH_INDEX = [
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.compact", "appearance"],
   ["ap.language", "general"], ["ap.backup", "general"],
-  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
+  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.hideInFullscreen", "behavior"], ["be.edgeGap", "behavior"],
   ["be.taskbarFollow", "behavior"], ["be.taskbarSettle", "behavior"], ["be.taskbarHoldHover", "behavior"],
   ["be.notchMode", "behavior"], ["ap.notchSize", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
@@ -232,6 +232,7 @@ const SEARCH_ALIASES = {
   "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
+  "be.hideInFullscreen": "pantalla completa fullscreen juego pelicula movie presentation ocultar",
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
@@ -1372,6 +1373,12 @@ function Behavior({ cfg, set }) {
               onChange={(v) => set({ autoHideDelay: v })} />
           </Row>
         )}
+        <Toggle
+          label={t("be.hideInFullscreen")}
+          hint={t("be.hideInFullscreenHint")}
+          checked={cfg.hideInFullscreen !== false}
+          onChange={(v) => set({ hideInFullscreen: v })}
+        />
       </SettingsSection>
 
       <CollapsibleSection

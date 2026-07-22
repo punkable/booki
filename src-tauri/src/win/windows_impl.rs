@@ -741,16 +741,17 @@ pub fn is_fullscreen() -> bool {
         // presentation mode, or a busy/fullscreen app (movies). This is exactly
         // what Windows uses to suppress its own notifications.
         use windows::Win32::UI::Shell::{
-            SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+            SHQueryUserNotificationState, QUNS_PRESENTATION_MODE,
             QUNS_RUNNING_D3D_FULL_SCREEN,
         };
         if let Ok(state) = SHQueryUserNotificationState() {
-            if state == QUNS_RUNNING_D3D_FULL_SCREEN
+            || state == QUNS_RUNNING_D3D_FULL_SCREEN
                 || state == QUNS_PRESENTATION_MODE
-                || state == QUNS_BUSY
             {
                 return true;
             }
+            // Intentionally ignore QUNS_BUSY — Windows uses it for many
+            // non-fullscreen "quiet" moments and it caused false Booki blackouts.
         }
         // 2) Fallback: the foreground window covers the WHOLE monitor (borderless
         // fullscreen video like YouTube/VLC). Ignore the desktop and the shell.
