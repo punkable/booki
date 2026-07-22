@@ -540,6 +540,22 @@ fn notch_mode_of(cfg: &Config) -> &str {
     }
 }
 
+/// Across-edge CSS depth the painted notch occupies from its outer margin
+/// (pill + inner pad), plus a small air gap — used to stack the dock inward
+/// when the notch stays visible with the bar.
+fn notch_stack_depth_css(cfg: &Config) -> u32 {
+    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
+    let painted = match notch_mode_of(cfg) {
+        // Smart circle ~20 + centering pad inside the ~36 window.
+        "smart" => 28.0 * scale,
+        // Floating capsule ~16 + soft pad.
+        "floating" => 26.0 * scale,
+        // Attached peek tab.
+        _ => 14.0 * scale,
+    };
+    (painted + 8.0).ceil() as u32
+}
+
 /// Current foreground app (kept for UI/debug; smart notch no longer keys off it).
 #[tauri::command]
 fn current_foreground_app() -> serde_json::Value {
@@ -1262,8 +1278,9 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
 
     // Attached: flush to the work-area edge (iPhone tab).
-    // Floating / smart: inset by the user's edge gap (0 = glued to the edge).
-    // Do not force a hidden floor — the Settings slider is the source of truth.
+    // Floating / smart: sit at the user's edge gap (0 = glued). When the dock
+    // is also visible (always-visible notch), the dock stacks inward via
+    // notch_stack_depth_css — the notch keeps the outer slot so they don't collide.
     let margin: i32 = if attached {
         0
     } else {
@@ -1931,12 +1948,19 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    // The bar's distance to the screen edge is user-tunable (edge_gap = the
-    // VISUAL gap in CSS px). 0 = as flush as the stage pad allows. We no longer
-    // inflate this when the notch is always-visible — that made the slider's
-    // minimum feel useless. Users who keep both visible can raise the gap.
+    // edge_gap = visual distance from the screen edge to the OUTERMOST Booki
+    // chrome (CSS px). 0 = as flush as the stage pad allows.
+    // When the notch stays painted with the dock, keep that outer gap for the
+    // notch and push the dock inward by the notch's painted depth + air — so
+    // they stack (edge → notch → dock) instead of colliding. The slider still
+    // goes to 0; clearance is additive, not a silent floor replacing the value.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let gap = cfg.edge_gap.min(96);
+    let mut gap = cfg.edge_gap.min(96);
+    if cfg.notch_always_visible {
+        gap = gap
+            .saturating_add(notch_stack_depth_css(&cfg))
+            .min(140);
+    }
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
