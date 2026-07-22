@@ -745,13 +745,11 @@ pub fn is_fullscreen() -> bool {
             QUNS_RUNNING_D3D_FULL_SCREEN,
         };
         if let Ok(state) = SHQueryUserNotificationState() {
-            || state == QUNS_RUNNING_D3D_FULL_SCREEN
-                || state == QUNS_PRESENTATION_MODE
-            {
-                return true;
-            }
             // Intentionally ignore QUNS_BUSY — Windows uses it for many
             // non-fullscreen "quiet" moments and it caused false Booki blackouts.
+            if state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE {
+                return true;
+            }
         }
         // 2) Fallback: the foreground window covers the WHOLE monitor (borderless
         // fullscreen video like YouTube/VLC). Ignore the desktop and the shell.
