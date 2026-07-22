@@ -16,6 +16,7 @@ export const CHANGELOG = [
           "Si ya estabas en el notch, el blackout es silencioso (sin chip repetido).",
           "Detecci\u00f3n m\u00e1s estricta: ya no usa el estado gen\u00e9rico QUNS_BUSY de Windows, que disparaba ocultaciones falsas.",
           "Textos de ocultar autom\u00e1tico y de c\u00f3mo vuelve el dock m\u00e1s claros (clic vs cursor).",
+          "Correcciones: el opt-out ya no bloquea el dock; al salir se restaura el estado previo (incluido el notch); la bandeja/atajo sincroniza el frontend; el toast no deja el notch mal dimensionado.",
         ],
       },
     ],

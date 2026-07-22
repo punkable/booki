@@ -44,7 +44,9 @@ Persisted at `%APPDATA%\Booki\config.json` (camelCase via serde). Important keys
 - `pinned[]` — apps, folders, groups (`children`), widgets, separators, trash
 - `surfaceStyle` — `mica` | `acrylic` | `tinted` | `solid` (dock + notch)
 - `autoHideMode` — `off` | `smart` | `edge`
-- `notchScale`, `notchPeek`, `notchTrigger`, `notchAlwaysVisible`
+- `hideInFullscreen` — black out dock + notch during fullscreen apps (default true)
+- `notchMode` — `attached` | `floating` | `smart` (legacy `notchPeek` kept in sync)
+- `notchScale`, `notchTrigger`, `notchAlwaysVisible`
 - `onboarded`, `settingsIntroSeen`, `seenVersion`
 
 Uninstall keeps this folder by default; only the NSIS *Delete app data* checkbox wipes it.

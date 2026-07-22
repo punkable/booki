@@ -45,7 +45,7 @@ const DEMO_CONFIG = {
   hideInFullscreen: true,
   autoHideDelay: 650,
   notchPosition: "center",
-  notchPeek: false,
+  notchPeek: true,
   notchStyle: "acrylic",
   surfaceStyle: "tinted",
   surfaceTint: "",
@@ -58,6 +58,7 @@ const DEMO_CONFIG = {
   autostart: false,
   language: "system",
   notchTrigger: "click",
+  notchAlwaysVisible: false,
   compact: false,
   onboarded: true,
   settingsIntroSeen: true,
@@ -455,6 +456,7 @@ export const dock = {
   notchToast: (title, detail = "") => invoke("notch_toast", { title, detail }),
   notchToastDismiss: () => invoke("notch_toast_dismiss"),
   hideAll: () => invoke("hide_all"),
+  clearFullscreenBlackout: () => invoke("clear_fullscreen_blackout"),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -545,6 +547,12 @@ export async function onSoftReveal(cb) {
 export async function onShowChangelog(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://show-changelog", () => cb());
+}
+
+/** Listen for tray / hotkey show-hide toggle. */
+export async function onToggleDock(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://toggle-dock", () => cb());
 }
 
 /** Listen for fullscreen on/off (a game/movie/presentation is running). */

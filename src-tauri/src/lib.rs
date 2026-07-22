@@ -26,6 +26,11 @@ use std::sync::Mutex;
 /// URL (a hash in the app URL made the window come up blank on Windows).
 static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 
+/// True while hide_all has blacked out dock + notch for a fullscreen app.
+/// Reveal / tray / save_config must not resurface Booki until the frontend
+/// clears this after fullscreen ends.
+static FULLSCREEN_BLACKOUT: AtomicBool = AtomicBool::new(false);
+
 /// Tab the settings window should open on (e.g. "apps" from the empty dock's
 /// "+" tile). Same read-and-clear pattern as PENDING_CHANGELOG.
 static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
@@ -330,7 +335,10 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
                 .map(|d| d.is_visible().unwrap_or(true))
                 .unwrap_or(true);
             if config.notch_always_visible {
-                let _ = notch.show();
+                // Don't resurrect the notch over a fullscreen blackout.
+                if !FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+                    let _ = notch.show();
+                }
             } else if dock_visible {
                 // Dock is out → notch is off-duty unless always-visible.
                 let _ = notch.hide();
@@ -535,6 +543,7 @@ fn app_version(app: AppHandle) -> String {
 fn notch_mode_of(cfg: &Config) -> &str {
     match cfg.notch_mode.as_str() {
         "floating" | "smart" | "attached" => cfg.notch_mode.as_str(),
+        _ if cfg.multi_notch_enabled => "smart",
         _ if !cfg.notch_peek => "floating",
         _ => "attached",
     }
@@ -831,6 +840,9 @@ async fn fetch_favicon(url: String) -> Option<String> {
 /// so there's no WebView2 repaint race or erratic shrink.
 #[tauri::command]
 fn hide_dock(app: AppHandle, edge: String) {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
+    }
     if let Some(notch) = app.get_webview_window("notch") {
         // Re-assert topmost every time the notch surfaces so it never slides
         // behind a swarm of newly-opened windows.
@@ -849,9 +861,16 @@ fn hide_dock(app: AppHandle, edge: String) {
 /// its hidden state without pinning the dock open (unlike notch click).
 #[tauri::command]
 fn reveal_dock(app: AppHandle) {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
+    }
     let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        if !cfg.notch_always_visible {
+        if cfg.notch_always_visible {
+            // Toast / preview may have resized the window — restore geometry.
+            let _ = position_notch(&notch, &cfg.edge);
+            let _ = notch.show();
+        } else {
             let _ = notch.hide();
         }
     }
@@ -882,9 +901,15 @@ fn lift_dock_window(dock: &tauri::WebviewWindow) {
 /// reveal+pin itself (the dock owns the hide/show state and calls reveal_dock).
 #[tauri::command]
 fn notch_reveal(app: AppHandle) {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
+    }
     let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        if !cfg.notch_always_visible {
+        if cfg.notch_always_visible {
+            let _ = position_notch(&notch, &cfg.edge);
+            let _ = notch.show();
+        } else {
             let _ = notch.hide();
         }
     }
@@ -1090,7 +1115,8 @@ fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
     apply_always_on_top(&app);
     apply_capture_policy(&app, cfg.capture_visible);
     let _ = app.emit("booki://config-changed", ());
-    Ok(cfg)
+    // Return the migrated/healed config — raw import JSON skips load() revs.
+    Ok(config::load())
 }
 
 // ─────────────────────────── Dock profiles ───────────────────────────
@@ -1163,7 +1189,8 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         let _ = position_notch(&notch, &cfg.edge);
     }
     let _ = app.emit("booki://config-changed", ());
-    Ok(cfg)
+    // Same as import: always hand Settings a load()-migrated snapshot.
+    Ok(config::load())
 }
 
 #[tauri::command]
@@ -1304,6 +1331,9 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
 /// `detail` is optional secondary line; empty keeps a single-line toast.
 #[tauri::command]
 fn notch_toast(app: AppHandle, title: String, detail: Option<String>) {
+    // Treat toast as the start of a fullscreen blackout so tray/hover cannot
+    // resurrect the dock over the game while the chip is still showing.
+    FULLSCREEN_BLACKOUT.store(true, Ordering::Relaxed);
     // The toast replaces the bar — hide the dock window while it shows.
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
@@ -1388,12 +1418,20 @@ fn notch_preview(app: AppHandle) {
 /// Hide both windows (full blackout, e.g. while a fullscreen app is running).
 #[tauri::command]
 fn hide_all(app: AppHandle) {
+    FULLSCREEN_BLACKOUT.store(true, Ordering::Relaxed);
     if let Some(notch) = app.get_webview_window("notch") {
         let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
     }
+}
+
+/// Clear the fullscreen blackout latch so reveal/hide can run again. The
+/// frontend decides whether to call reveal_dock or hide_dock afterwards.
+#[tauri::command]
+fn clear_fullscreen_blackout() {
+    FULLSCREEN_BLACKOUT.store(false, Ordering::Relaxed);
 }
 
 #[tauri::command]
@@ -2051,14 +2089,12 @@ fn open_settings_url(app: &AppHandle, url: &str) {
 }
 
 fn toggle_dock(app: &AppHandle) {
-    if let Some(dock) = app.get_webview_window("dock") {
-        if dock.is_visible().unwrap_or(false) {
-            let _ = dock.hide();
-        } else {
-            let _ = dock.show();
-            let _ = dock.set_focus();
-        }
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
     }
+    // Let the dock frontend tuck/summon so hiddenState, polls, and the notch
+    // stay in sync — bare show/hide left JS thinking the opposite of reality.
+    let _ = app.emit("booki://toggle-dock", ());
 }
 
 // ──────────────────────────────── Entry ─────────────────────────────────
@@ -2185,6 +2221,7 @@ pub fn run() {
             notch_toast_dismiss,
             notch_preview,
             hide_all,
+            clear_fullscreen_blackout,
             profile_list,
             profile_save,
             profile_apply,
