@@ -3,6 +3,22 @@
 
 export const CHANGELOG = [
   {
+    version: "0.66.2",
+    date: "22 jul 2026",
+    headline: "Notch y dock ya no se solapan; apilado inteligente al borde.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Notch + dock",
+        notes: [
+          "Con notch siempre visible, el dock se apila hacia dentro (borde \u2192 notch \u2192 dock) seg\u00fan el estilo (pegado / flotante / inteligente).",
+          "La distancia al borde sigue llegando a 0: el hueco extra es aditivo, no sustituye tu valor.",
+          "Cambiar estilo o tama\u00f1o del notch recoloca el dock al instante para mantener el hueco.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.66.1",
     date: "21 jul 2026",
     headline: "Notch inteligente: c\u00edrculo completo sin recorte.",
