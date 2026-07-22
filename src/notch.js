@@ -8,11 +8,12 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onOcclusion } from "./api.js";
+import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
+import { resolveNotchMode } from "./notch-mode.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -28,24 +29,15 @@ function availH() {
   return inTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
 }
 
-/** Normalize notch mode from config (including legacy peek / multi-notch keys). */
-function resolveNotchMode(cfg) {
-  if (cfg.notchMode === "attached" || cfg.notchMode === "floating" || cfg.notchMode === "smart") {
-    return cfg.notchMode;
-  }
-  if (cfg.notchPeek === false) return "floating";
-  if (cfg.multiNotchEnabled) return "smart";
-  return "attached";
-}
-
 let hoverTrigger = false; // reveal the dock when the pill is hovered
 let notchMode = "attached";
 let draggingNotch = false;
 let lastHitSig = "";
 
 const pill = document.getElementById("notch-pill");
-const textEl = document.getElementById("notch-text");
 const toastEl = document.getElementById("notch-toast");
+const toastTitleEl = document.getElementById("notch-toast-title");
+const toastSubEl = document.getElementById("notch-toast-sub");
 
 async function applyLook() {
   try {
@@ -155,24 +147,42 @@ new MutationObserver(scheduleHitReport).observe(document.body, {
   subtree: true,
 });
 
-// Brief toast message (e.g. "Booki se ocultó · pantalla completa").
-// Dock owns hide_all timing — this window only paints the toast. Never call
-// hide_all here (a short fullscreen would otherwise re-blackout after restore).
+// Brief status chip (e.g. fullscreen hide). Dock owns hide_all timing — this
+// window only paints. Never call hide_all here (a short fullscreen would
+// otherwise re-blackout after restore).
 let toastTimer = null;
 function clearNotchToast() {
   clearTimeout(toastTimer);
   toastTimer = null;
-  document.body.classList.remove("toast");
-  if (textEl) textEl.textContent = "";
+  document.body.classList.remove("toast", "toast-out");
+  if (toastTitleEl) toastTitleEl.textContent = "";
+  if (toastSubEl) {
+    toastSubEl.textContent = "";
+    toastSubEl.hidden = true;
+  }
   scheduleHitReport();
 }
-onNotchToast((text) => {
+function showNotchToast(payload) {
+  const title = (payload && payload.title) || "";
+  const detail = (payload && payload.detail) || "";
+  document.body.classList.remove("toast-out");
   document.body.classList.add("toast");
-  if (textEl) textEl.textContent = text;
+  if (toastTitleEl) toastTitleEl.textContent = title;
+  if (toastSubEl) {
+    toastSubEl.textContent = detail;
+    toastSubEl.hidden = !detail;
+  }
   clearTimeout(toastTimer);
   // Safety clear if dock never blackouts (e.g. fullscreen ended early).
-  toastTimer = setTimeout(clearNotchToast, 2800);
+  toastTimer = setTimeout(clearNotchToast, 3200);
   scheduleHitReport();
+}
+onNotchToast(showNotchToast);
+onNotchToastOut(() => {
+  if (!document.body.classList.contains("toast")) return;
+  document.body.classList.add("toast-out");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(clearNotchToast, 300);
 });
 // When the OS window is hidden (dock hide_all / hideDock), drop toast chrome
 // so a later show never flashes the old message + pill.

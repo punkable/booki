@@ -130,6 +130,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_hide_in_fullscreen() -> bool {
+    true
+}
+
 /// Full dock configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,6 +176,10 @@ pub struct Config {
     /// Auto-hide delay before sliding away, in ms.
     #[serde(default = "default_hide_delay")]
     pub auto_hide_delay: u32,
+    /// Hide Booki entirely during true fullscreen (games / movie / presentation).
+    /// Off = stay visible even then (respects "Never" auto-hide honesty).
+    #[serde(default = "default_hide_in_fullscreen")]
+    pub hide_in_fullscreen: bool,
     /// Notch placement along the anchored edge: "center" | "start" | "end".
     #[serde(default = "default_notch_position")]
     pub notch_position: String,
@@ -337,6 +345,7 @@ impl Default for Config {
             auto_hide: false,
             auto_hide_mode: default_auto_hide_mode(),
             auto_hide_delay: default_hide_delay(),
+            hide_in_fullscreen: true,
             notch_position: default_notch_position(),
             notch_peek: true,
             notch_mode: default_notch_mode(),
@@ -563,6 +572,23 @@ pub fn save(config: &Config) -> Result<(), String> {
     // Preserve one-way progress flags: Settings often holds a stale snapshot and
     // used to rewrite onboarded/seenVersion back to false/"" on every slider save.
     let mut to_write = config.clone();
+    // Keep legacy peek aligned with the canonical mode on every write.
+    let mode = to_write.notch_mode.trim().to_ascii_lowercase();
+    if mode == "attached" || mode == "floating" || mode == "smart" {
+        to_write.notch_mode = mode.clone();
+        to_write.notch_peek = mode != "floating";
+    } else if to_write.multi_notch_enabled {
+        to_write.notch_mode = "smart".into();
+        to_write.notch_peek = true;
+    } else {
+        to_write.notch_mode = if to_write.notch_peek {
+            "attached".into()
+        } else {
+            "floating".into()
+        };
+        to_write.notch_peek = to_write.notch_mode != "floating";
+    }
+    to_write.multi_notch_enabled = false;
     if let Some(existing) = read_config(&config_path()) {
         if existing.onboarded {
             to_write.onboarded = true;

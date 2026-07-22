@@ -3,6 +3,25 @@
 
 export const CHANGELOG = [
   {
+    version: "0.67.0",
+    date: "22 jul 2026",
+    headline: "Pantalla completa m\u00e1s clara: aviso calmado, opci\u00f3n de no ocultar, menos falsos positivos.",
+    sections: [
+      {
+        icon: "performance",
+        title: "Ocultar en pantalla completa",
+        notes: [
+          "Aviso en dos l\u00edneas con el isotipo de Booki (sin emoji), entrada/salida suaves y blackout sincronizado.",
+          "Nueva opci\u00f3n en Comportamiento: puedes dejar Booki visible en fullscreen (por defecto sigue ocult\u00e1ndose).",
+          "Si ya estabas en el notch, el blackout es silencioso (sin chip repetido).",
+          "Detecci\u00f3n m\u00e1s estricta: ya no usa el estado gen\u00e9rico QUNS_BUSY de Windows, que disparaba ocultaciones falsas.",
+          "Textos de ocultar autom\u00e1tico y de c\u00f3mo vuelve el dock m\u00e1s claros (clic vs cursor).",
+          "Correcciones: el opt-out ya no bloquea el dock; al salir se restaura el estado previo (incluido el notch); la bandeja/atajo sincroniza el frontend; el toast no deja el notch mal dimensionado.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.66.2",
     date: "22 jul 2026",
     headline: "Notch y dock ya no se solapan; apilado inteligente al borde.",
