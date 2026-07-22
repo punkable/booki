@@ -638,11 +638,6 @@ unsafe fn apply_tray_inset(work: &mut RECT, monitor: &RECT, hmon: HMONITOR, tray
     }
 }
 
-/// Native handle of the currently foreground window.
-pub fn foreground_window_handle() -> isize {
-    unsafe { GetForegroundWindow().0 as isize }
-}
-
 /// Lowercased executable name (without .exe) of the currently foreground window.
 pub fn foreground_app_name() -> Option<String> {
     unsafe {
@@ -741,14 +736,13 @@ pub fn is_fullscreen() -> bool {
         // presentation mode, or a busy/fullscreen app (movies). This is exactly
         // what Windows uses to suppress its own notifications.
         use windows::Win32::UI::Shell::{
-            SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+            SHQueryUserNotificationState, QUNS_PRESENTATION_MODE,
             QUNS_RUNNING_D3D_FULL_SCREEN,
         };
         if let Ok(state) = SHQueryUserNotificationState() {
-            if state == QUNS_RUNNING_D3D_FULL_SCREEN
-                || state == QUNS_PRESENTATION_MODE
-                || state == QUNS_BUSY
-            {
+            // Intentionally ignore QUNS_BUSY — Windows uses it for many
+            // non-fullscreen "quiet" moments and it caused false Booki blackouts.
+            if state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE {
                 return true;
             }
         }

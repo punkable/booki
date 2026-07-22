@@ -50,10 +50,6 @@ pub fn foreground_app_name() -> Option<String> {
     None
 }
 
-pub fn foreground_window_handle() -> isize {
-    0
-}
-
 pub fn is_fullscreen() -> bool {
     false
 }

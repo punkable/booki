@@ -19,6 +19,7 @@ import {
   closeSelf,
   logMessage,
 } from "./api.js";
+import { resolveNotchMode } from "./notch-mode.js";
 import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
 import {
@@ -203,7 +204,7 @@ const SEARCH_INDEX = [
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.compact", "appearance"],
   ["ap.language", "general"], ["ap.backup", "general"],
-  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.edgeGap", "behavior"],
+  ["be.position", "behavior"], ["be.autoHide", "behavior"], ["be.hideDelay", "behavior"], ["be.hideInFullscreen", "behavior"], ["be.edgeGap", "behavior"],
   ["be.taskbarFollow", "behavior"], ["be.taskbarSettle", "behavior"], ["be.taskbarHoldHover", "behavior"],
   ["be.notchMode", "behavior"], ["ap.notchSize", "behavior"],
   ["be.reveal", "behavior"], ["be.notchAlwaysVisible", "behavior"], ["prof.title", "behavior"],
@@ -232,6 +233,7 @@ const SEARCH_ALIASES = {
   "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
+  "be.hideInFullscreen": "pantalla completa fullscreen juego pelicula movie presentation ocultar",
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
@@ -861,8 +863,7 @@ function MiniDockPreview({ cfg }) {
   const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
   const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
   const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
-  const notchMode = cfg.notchMode
-    || (cfg.notchPeek === false ? "floating" : cfg.multiNotchEnabled ? "smart" : "attached");
+  const notchMode = resolveNotchMode(cfg);
   const attached = notchMode === "attached";
   const smart = notchMode === "smart";
   const fills = {
@@ -1357,7 +1358,12 @@ function Behavior({ cfg, set }) {
         <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
           <SegmentedControl
             value={cfg.autoHideMode || "smart"}
-            onChange={(v) => set({ autoHideMode: v })}
+            onChange={(v) => {
+              // Auto-hide "Never" hides notch controls — also clear always-visible
+              // so the dock doesn't keep stacking clearance for an orphaned notch.
+              if (v === "off") set({ autoHideMode: v, notchAlwaysVisible: false });
+              else set({ autoHideMode: v });
+            }}
             options={[
               { value: "off", label: t("hide.offShort") },
               { value: "smart", label: t("hide.smartShort") },
@@ -1372,6 +1378,12 @@ function Behavior({ cfg, set }) {
               onChange={(v) => set({ autoHideDelay: v })} />
           </Row>
         )}
+        <Toggle
+          label={t("be.hideInFullscreen")}
+          hint={t("be.hideInFullscreenHint")}
+          checked={cfg.hideInFullscreen !== false}
+          onChange={(v) => set({ hideInFullscreen: v })}
+        />
       </SettingsSection>
 
       <CollapsibleSection
@@ -1443,14 +1455,15 @@ function Behavior({ cfg, set }) {
       <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
         <Row label={t("be.notchMode")} hint={t("be.notchModeHint")}>
           <SegmentedControl
-            value={cfg.notchMode || (cfg.notchPeek === false ? "floating" : "attached")}
+            value={resolveNotchMode(cfg)}
             onChange={(v) => {
               set(
                 {
                   notchMode: v,
                   // Keep legacy keys in sync so old fallbacks don't revive the
-                  // multi-notch app list or the peek toggle.
-                  notchPeek: v === "attached",
+                  // multi-notch app list or the peek toggle. Smart + attached
+                  // both peek; only floating is the lifted capsule.
+                  notchPeek: v !== "floating",
                   multiNotchEnabled: false,
                   multiNotchApps: [],
                 },
@@ -1471,9 +1484,9 @@ function Behavior({ cfg, set }) {
           />
         </Row>
         <p className="muted notch-mode-hint">
-          {(cfg.notchMode || "attached") === "floating"
+          {resolveNotchMode(cfg) === "floating"
             ? t("be.notchModeFloatingHint")
-            : (cfg.notchMode || "attached") === "smart"
+            : resolveNotchMode(cfg) === "smart"
               ? t("be.notchModeSmartHint")
               : t("be.notchModeAttachedHint")}
         </p>

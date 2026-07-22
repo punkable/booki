@@ -42,9 +42,10 @@ const DEMO_CONFIG = {
   showIndicators: true,
   autoHide: false,
   autoHideMode: "smart",
+  hideInFullscreen: true,
   autoHideDelay: 650,
   notchPosition: "center",
-  notchPeek: false,
+  notchPeek: true,
   notchStyle: "acrylic",
   surfaceStyle: "tinted",
   surfaceTint: "",
@@ -57,6 +58,7 @@ const DEMO_CONFIG = {
   autostart: false,
   language: "system",
   notchTrigger: "click",
+  notchAlwaysVisible: false,
   compact: false,
   onboarded: true,
   settingsIntroSeen: true,
@@ -119,6 +121,8 @@ async function mockInvoke(cmd, args) {
       return false;
     case "set_hit_rects":
     case "set_notch_hit_rects":
+    case "notch_toast":
+    case "notch_toast_dismiss":
     case "open_with":
       return null;
     case "file_thumbnail":
@@ -449,8 +453,10 @@ export const dock = {
     invoke("sync_context_menu", { enabled, labelPin, labelGroup }),
   hideDock: (edge) => invoke("hide_dock", { edge }),
   revealDock: () => invoke("reveal_dock"),
-  notchToast: (text) => invoke("notch_toast", { text }),
+  notchToast: (title, detail = "") => invoke("notch_toast", { title, detail }),
+  notchToastDismiss: () => invoke("notch_toast_dismiss"),
   hideAll: () => invoke("hide_all"),
+  clearFullscreenBlackout: () => invoke("clear_fullscreen_blackout"),
   setAlwaysOnTop: (value) => invoke("set_always_on_top", { value }),
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
@@ -543,6 +549,12 @@ export async function onShowChangelog(cb) {
   return T.event.listen("booki://show-changelog", () => cb());
 }
 
+/** Listen for tray / hotkey show-hide toggle. */
+export async function onToggleDock(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://toggle-dock", () => cb());
+}
+
 /** Listen for fullscreen on/off (a game/movie/presentation is running). */
 export async function onFullscreen(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
@@ -552,7 +564,17 @@ export async function onFullscreen(cb) {
 /** Listen for a toast message to render on the notch window. */
 export async function onNotchToast(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
-  return T.event.listen("booki://notch-toast", (e) => cb(e.payload || ""));
+  return T.event.listen("booki://notch-toast", (e) => {
+    const p = e.payload;
+    if (p && typeof p === "object") cb(p);
+    else cb({ title: String(p || ""), detail: "" });
+  });
+}
+
+/** Fade the notch toast out before blackout. */
+export async function onNotchToastOut(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
 /** Listen for the active foreground app changing (multi-notch intelligence). */
