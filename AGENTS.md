@@ -24,7 +24,9 @@ details, or screenshots from a private desktop.
 - `src/dock.js`: dock runtime, widgets, hover behavior, update checks.
 - `src/settings.jsx`: Settings UI, app/widget management, widget editor dialogs.
 - `src/styles.css`: dock, settings, modal, widget, notch, and responsive styles.
-- `src/i18n.js` and `src/i18n-extra.js`: visible copy in English/Spanish.
+- `src/i18n.js` and `src/i18n-extra.js`: visible copy in five languages
+  (Spanish and English inline; Portuguese, French and German loaded on demand).
+  All five must define the same keys — `npm run check:i18n` enforces it.
 - `src/changelog-data.js`: in-app "What's new" content.
 - `src/api.js`: frontend bridge to Tauri commands.
 - `src-tauri/src/lib.rs`: Tauri commands and window coordination.

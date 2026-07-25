@@ -343,7 +343,7 @@ dependencies = [
 
 [[package]]
 name = "booki-dock"
-version = "0.67.0"
+version = "0.68.0"
 dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
@@ -363,7 +363,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "ureq",
- "window-vibrancy",
  "windows 0.58.0",
  "windows-dpapi",
 ]

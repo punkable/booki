@@ -1,6 +1,10 @@
-/* Minimal i18n (ES/EN). t(key) returns the active-language string. */
+/* Minimal i18n. t(key) returns the active-language string.
+   es/en ship inline here; pt/fr/de are lazy-loaded from i18n-extra.js.
+   DICT is exported so tooling (scripts/check-i18n.mjs) can verify that every
+   language defines the same keys and that no t("…") call references a key that
+   does not exist. */
 
-const DICT = {
+export const DICT = {
   es: {
     "tab.appearance": "Apariencia",
     "tab.behavior": "Comportamiento",
@@ -414,6 +418,15 @@ const DICT = {
     "m.remove": "Quitar del dock",
     "m.settings": "Ajustes…",
     "dock.update": "● Actualización disponible",
+    "ac.tan": "Tan (Booki)",
+    "ac.amber": "Ámbar",
+    "ac.orange": "Naranja",
+    "ac.pink": "Rosa",
+    "ac.violet": "Violeta",
+    "ac.blue": "Azul",
+    "ac.green": "Verde",
+    "dock.dropPin": "Suelta para anclar a Booki",
+    "dock.updateTip": "Hay una actualización disponible",
     "fs.hiddenTitle": "Booki se ocult\u00f3",
     "fs.hiddenSub": "Pantalla completa",
     "stack.empty": "Carpeta vacía",
@@ -930,6 +943,15 @@ const DICT = {
     "m.remove": "Remove from dock",
     "m.settings": "Settings…",
     "dock.update": "● Update available",
+    "ac.tan": "Tan (Booki)",
+    "ac.amber": "Amber",
+    "ac.orange": "Orange",
+    "ac.pink": "Pink",
+    "ac.violet": "Violet",
+    "ac.blue": "Blue",
+    "ac.green": "Green",
+    "dock.dropPin": "Drop to pin to Booki",
+    "dock.updateTip": "An update is available",
     "fs.hiddenTitle": "Booki hid",
     "fs.hiddenSub": "Fullscreen",
     "stack.empty": "Empty folder",
@@ -1058,11 +1080,21 @@ export async function ensureLang(value) {
       extraLoaded = true;
     } catch (_) { /* fall back to English */ }
   }
-  lang = l;
+  setLang(l);
 }
 
 export function setLang(value) {
   lang = resolveLang(value);
+  // Tell the document what language it is actually in. The three pages ship
+  // with a hard-coded lang attribute (two said "es", one said "en") that was
+  // never updated, so a screen reader announced every string in the wrong
+  // language for four of the five locales — and for Spanish users on the notch.
+  //
+  // ensureLang() routes through here rather than assigning `lang` itself, so
+  // there is one place that decides the language and one place that records
+  // it. Settings only ever calls ensureLang on mount, which is exactly how the
+  // attribute stayed wrong there.
+  if (typeof document !== "undefined") document.documentElement.lang = lang;
 }
 
 export function t(key) {

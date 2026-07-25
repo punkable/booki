@@ -21,6 +21,7 @@ import {
   isTauri,
 } from "./api.js";
 import { resolveNotchMode } from "./notch-mode.js";
+import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
@@ -28,14 +29,33 @@ import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
 import {
+  WIDGET_ORDER,
   WIDGET_ICONS,
   WIDGET_VARIANTS,
   STAT_WIDGETS,
-  RING_WIDGETS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   widgetDisplayName,
 } from "./widgets-meta.js";
+import { reduceMotion } from "./dock/motion.js";
+import { availW, availH, rectFromElement, pointInRect, hitSignature } from "./dock/geometry.js";
+import { placeBesideBar, transformOrigin } from "./dock/placement.js";
+import {
+  MEDIA_SVG,
+  BATTERY_LOW,
+  fmtRate,
+  fmtUptime,
+  dockPreviewSnippet,
+  clockParts,
+  volumeStep,
+  widgetCardHTML,
+  setMetric,
+  setText,
+  setMediaText,
+  setPreviewSubText,
+  refreshPreviewMarquees,
+  LIVE_WIDGETS,
+} from "./dock/widget-view.js";
 import { applySurfaceVars } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 
@@ -49,16 +69,6 @@ const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 const undoToast = document.getElementById("undo-toast");
-
-function availW() {
-  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
-  return isTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
-}
-
-function availH() {
-  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
-  return isTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
-}
 
 // Safe .closest() — pointer/keyboard targets can be non-Element (document/window),
 // which would throw "closest is not a function".
@@ -289,6 +299,16 @@ function positionPreview() {
 
 function applyAll() {
   setLang(cfg.language);
+  // The two strings baked into index.html were Spanish, which no language
+  // setting could reach — a German user dragging a file onto the bar was told
+  // "Suelta para anclar a Booki". They live in the dictionary now and are
+  // written here, so they follow the language like everything else.
+  dropOverlay.querySelector("#drop-pill").textContent = t("dock.dropPin");
+  const pill = document.getElementById("update-pill");
+  if (pill) {
+    pill.textContent = t("dock.update");
+    pill.title = t("dock.updateTip");
+  }
   applyTheme(cfg);
   applyEdge(cfg);
   // The stage window spans the whole edge; the BAR aligns to the notch's
@@ -356,6 +376,10 @@ async function persist() {
 let widgetEls = {};
 function cacheWidgetEls() {
   widgetEls = {};
+  // The widget elements are about to be replaced, so any "already painted this
+  // minute" shortcut is stale — a fresh clock card would otherwise sit on its
+  // placeholder until the minute rolled over.
+  lastClockKey = "";
   // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
@@ -430,7 +454,7 @@ const MIN_TILE = 30;
 function fitDock() {
   setAllSizes(baseSize());
   const vertical = isVertical();
-  const span = vertical ? availH() : availW();
+  const span = vertical ? availH(isTauri) : availW(isTauri);
   // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
   // usable, or a full bar would overflow past the far screen edge.
   const slotPad = cfg && cfg.notchPosition && cfg.notchPosition !== "center" ? span * 0.12 : 0;
@@ -635,18 +659,6 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume", "clipboard"];
-// Transport glyphs for the media card — filled, rounded, Fluent-like SVGs.
-const MEDIA_SVG = {
-  prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
-  next: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12.8 2.8c0-.44-.36-.8-.8-.8s-.8.36-.8.8v4.1l-7-4.63c-.8-.53-1.87.04-1.87 1v9.46c0 .96 1.07 1.53 1.87 1l7-4.63v4.1c0 .44.36.8.8.8s.8-.36.8-.8V2.8Z"/></svg>',
-  play: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M5.1 2.32c-.87-.5-1.95.13-1.95 1.13v9.1c0 1 1.08 1.63 1.95 1.13l7.9-4.55c.87-.5.87-1.76 0-2.26L5.1 2.32Z"/></svg>',
-  pause: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M4.1 2.5c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1H4.1Zm6.5 0c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1h-1.3Z"/></svg>',
-};
-const RING_R = 15.5; // SVG viewBox 0 0 36 36
-const RING_C = 2 * Math.PI * RING_R;
-const BATTERY_LOW = "#e5484d";
-
 function widgetLabel(type) {
   return widgetDisplayName(type, t);
 }
@@ -669,26 +681,12 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (st.icon === false) el.classList.add("no-ico");
   el.style.setProperty("--size", `${baseSize()}px`);
   el.title = widgetLabel(type);
+  if (LIVE_WIDGETS.includes(type)) el.setAttribute("aria-live", "polite");
 
   const card = document.createElement("span");
   card.className = "w-card";
-  const isRing = RING_WIDGETS.includes(type);
-  const isPreview = PREVIEW_WIDGETS.includes(type);
-  if (isPreview) el.classList.add("preview");
-  card.innerHTML = isPreview
-    ? `<span class="w-pv-ico">${emo(WIDGET_ICONS[type] || "puzzle", 22)}<span class="w-pv-count"></span></span>` +
-      `<span class="w-pv-main"><span class="w-pv-title"></span><span class="w-pv-sub"></span></span>` +
-      `<span class="w-pv-badge">${icon(type === "notes" ? "pencil" : "chevron-right")}</span>`
-    : (isRing
-      ? `<span class="w-ring">` +
-        `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
-        `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>` +
-        `<span class="w-ring-num"></span></span>`
-      : `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>`) +
-      `<span class="w-main">` +
-      `<span class="w-label"></span>` +
-      (isRing ? "" : `<span class="w-value">…</span><span class="w-bar"><i></i></span>`) +
-      `</span>`;
+  if (PREVIEW_WIDGETS.includes(type)) el.classList.add("preview");
+  card.innerHTML = widgetCardHTML(type);
   el.appendChild(card);
 
   // On the bar the widget is a full dock tile (removable, draggable, right-click
@@ -754,159 +752,23 @@ function widgetTile(item, { inFlyout = false } = {}) {
   return el;
 }
 
-const fmtRate = (kbps) =>
-  kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
-
-function fmtUptime(s) {
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-const REDUCE_MOTION =
-  typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// Animate an integer from its previous value to the next over ~320ms (easeOut),
-// so CPU/RAM/volume tick up smoothly instead of snapping. Cheap: one rAF chain
-// per metric, and it no-ops when the value is unchanged or motion is reduced.
-function tweenNumber(el, to, fmt) {
-  const from = Number(el.dataset.v);
-  el.dataset.v = String(to);
-  if (REDUCE_MOTION || !Number.isFinite(from) || from === to) {
-    el.textContent = fmt(to);
-    return;
-  }
-  const t0 = performance.now();
-  const dur = 320;
-  const step = (now) => {
-    const p = Math.min(1, (now - t0) / dur);
-    const e = 1 - Math.pow(1 - p, 3);
-    el.textContent = fmt(Math.round(from + (to - from) * e));
-    if (p < 1 && el.dataset.v === String(to)) requestAnimationFrame(step);
-    else el.textContent = fmt(to);
-  };
-  requestAnimationFrame(step);
-}
-
-// Set a percentage metric (CPU/RAM/disk): label + value% + bar. Extra detail
-// goes in the tooltip so nothing overflows the compact card.
-function setMetric(el, label, val, title) {
-  el.querySelector(".w-label").textContent = label;
-  const pct = Math.min(100, Math.max(0, val));
-  const ring = el.querySelector(".w-ring-fill");
-  if (ring) {
-    // Ring widget: the number lives INSIDE the ring, not the label row.
-    tweenNumber(el.querySelector(".w-ring-num"), val, (n) => `${n}`);
-    ring.style.strokeDashoffset = `${(RING_C * (1 - pct / 100)).toFixed(2)}`;
-  } else {
-    tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
-    const bar = el.querySelector(".w-bar");
-    bar.style.display = "";
-    bar.querySelector("i").style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
-  }
-  if (title) el.title = title;
-}
-
-function setText(el, label, value, title) {
-  el.querySelector(".w-label").textContent = label;
-  el.querySelector(".w-value").textContent = value;
-  el.querySelector(".w-bar").style.display = "none";
-  if (title) el.title = title;
-}
-
-// Media card text: artist as label, song as value. A title that doesn't fit its
-// box scrolls gently in a loop (marquee) instead of being chopped by ellipsis —
-// essential on the compact vertical card. Rebuilt only when the song changes so
-// the animation never restarts mid-scroll on every poll.
-function setMediaText(el, artist, title) {
-  el.querySelector(".w-label").textContent = artist;
-  el.querySelector(".w-bar").style.display = "none";
-  if (el.dataset.mqTitle === title) return;
-  el.dataset.mqTitle = title;
-  const v = el.querySelector(".w-value");
-  v.classList.remove("scroll");
-  v.textContent = title;
-  // Reduced motion: keep the plain single line (ellipsized by CSS) — never
-  // build the doubled-span marquee that would sit clipped and frozen.
-  if (REDUCE_MOTION) return;
-  if (v.scrollWidth > v.clientWidth + 2) {
-    const safe = esc(title);
-    v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
-    const mq = v.querySelector(".mq");
-    const distance = mq ? mq.scrollWidth / 2 : v.scrollWidth;
-    v.style.setProperty("--mq-duration", `${marqueeDuration(distance).toFixed(2)}s`);
-    v.classList.add("scroll");
-  }
-}
-
-function marqueeDuration(distance) {
-  // Slow, distance-aware marquee. The old media fallback used 9s for every
-  // title, which made long tracks rush across the card. The keyframes hold at
-  // rest for the first 12% of each cycle (a readable pause every loop), so the
-  // duration is stretched to keep the actual scroll speed unchanged.
-  return Math.max(18, Math.min(48, distance / 14)) / 0.88;
-}
-
-function setMarqueeText(el, text, keyName, force = false) {
-  if (!el) return;
-  if (!force && el.dataset[keyName] === text) return;
-  el.dataset[keyName] = text;
-  el.classList.remove("scroll");
-  el.style.removeProperty("--mq-duration");
-  el.textContent = text;
-  if (REDUCE_MOTION) return; // plain ellipsized line instead of a frozen marquee
-  if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
-  const safe = esc(text);
-  el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
-  const mq = el.querySelector(".mq");
-  const distance = mq ? mq.scrollWidth / 2 : el.scrollWidth;
-  const duration = marqueeDuration(distance);
-  el.style.setProperty("--mq-duration", `${duration.toFixed(2)}s`);
-  el.classList.add("scroll");
-}
-
-function setPreviewSubText(el, text, empty = false, force = false) {
-  const sub = el.querySelector(".w-pv-sub");
-  if (!sub) return;
-  sub.classList.toggle("empty", empty);
-  setMarqueeText(sub, text, "mqPreview", force);
-}
-
-function dockPreviewSnippet(text, max = 180) {
-  const s = String(text || "").replace(/\s+/g, " ").trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 3).trimEnd()}...`;
-}
-
-function refreshPreviewMarquees() {
-  document.querySelectorAll(".tile.widget.preview").forEach((el) => {
-    const sub = el.querySelector(".w-pv-sub");
-    if (!sub) return;
-    const text =
-      sub.dataset.mqPreview ||
-      sub.querySelector(".mq > span")?.textContent ||
-      sub.textContent ||
-      "";
-    setPreviewSubText(el, text, sub.classList.contains("empty"), true);
-  });
-}
-
 // Run fn over every cached element of a widget type (no per-tick DOM query).
 function eachWidget(type, fn) {
   const list = widgetEls[type];
   if (list) list.forEach(fn);
 }
 
+// The poll loop ticks every second so the clock rolls over promptly, but the
+// card only shows hours and minutes: 59 of every 60 ticks used to reformat the
+// same two strings with Intl and write them straight back into the DOM. Keep
+// the 1s cadence (it is what makes the rollover feel immediate) and skip the
+// work when the displayed minute has not changed.
+let lastClockKey = "";
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
-  const now = new Date();
-  const loc =
-    { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "de-DE" }[curLang()] || "en-US";
-  const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
-  const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
+  const { key, time, date } = clockParts(new Date(), curLang());
+  if (key === lastClockKey) return;
+  lastClockKey = key;
   eachWidget("clock", (el) => setText(el, date, time));
 }
 
@@ -1027,7 +889,7 @@ function adjustVolumeFromWheel(deltaY, sourceTile) {
       .catch(() => { volumeInfoPending = false; });
     return;
   }
-  const step = Math.abs(deltaY) > 80 ? 5 : 3;
+  const step = volumeStep(deltaY);
   queueVolumeSet(cur + (deltaY > 0 ? -step : step));
 }
 
@@ -1039,7 +901,7 @@ function renderClipboardSummary(count, preview) {
     const shown = preview ? dockPreviewSnippet(preview) : t("clip.empty");
     setPreviewSubText(el, shown, !preview);
     const badge = el.querySelector(".w-pv-count");
-    badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
+    if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
     // The tooltip carries the preview snippet too: in a vertical dock the card
     // collapses to icon+badge, so el.title is the only glanceable content.
     el.title = preview
@@ -1175,17 +1037,16 @@ function editNote(item) {
   pinnedReveal = true; // keep the dock open while writing
   applyFrame(); // grow the window so the editor isn't clipped
   const place = () => {
-    const r = tile.getBoundingClientRect();
-    const gap = 10;
-    const w = ta.offsetWidth, h = ta.offsetHeight;
-    let x = r.left + r.width / 2 - w / 2;
-    let y = cfg.edge === "top" ? r.bottom + gap : r.top - h - gap;
-    if (isVertical()) {
-      y = r.top + r.height / 2 - h / 2;
-      x = cfg.edge === "left" ? r.right + gap : r.left - w - gap;
-    }
-    ta.style.left = `${Math.max(6, Math.min(x, window.innerWidth - w - 6))}px`;
-    ta.style.top = `${Math.max(6, Math.min(y, window.innerHeight - h - 6))}px`;
+    // Anchored to the note's own tile, not the whole bar.
+    const { left, top } = placeBesideBar({
+      bar: tile.getBoundingClientRect(),
+      box: { width: ta.offsetWidth, height: ta.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      pad: 6,
+    });
+    ta.style.left = `${left}px`;
+    ta.style.top = `${top}px`;
   };
   place();
   setTimeout(() => { place(); ta.focus(); ta.select(); }, 80);
@@ -1364,10 +1225,22 @@ function magnify(clientX, clientY) {
   if (!magCache) buildMagCache();
   // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
   // you leave still eases. This is what makes it feel crisp at high refresh.
-  dockEl.classList.add("mag-live");
+  // Guarded: re-adding a class that is already there still queues a mutation
+  // record, and this runs every frame — that single write was waking the
+  // observer below once per frame, which scheduled a full hit-rect report that
+  // raced the one magnify schedules itself.
+  if (!dockEl.classList.contains("mag-live")) dockEl.classList.add("mag-live");
   const base = baseSize();
-  const maxScale = Math.max(1, cfg.zoom || 1.25);
-  const spread = base * 2.0;
+  // Reduced motion reaches magnify here, not through CSS: the wave is written
+  // as an inline transform every frame, which the global override cannot touch,
+  // so the setting used to do nothing at all to the dock's largest animation.
+  // What goes is the decoration — neighbours rippling outward, tiles lifting
+  // off the bar. What stays is a small scale on the tile under the pointer,
+  // because that is not ornament: it is how you know what you are about to
+  // click, and removing it would make the dock harder to use, not calmer.
+  const calm = reduceMotion();
+  const maxScale = calm ? Math.min(1.12, Math.max(1, cfg.zoom || 1.25)) : Math.max(1, cfg.zoom || 1.25);
+  const spread = calm ? base * 0.6 : base * 2.0;
   const vertical = isVertical();
   const mainAxis = vertical ? "Y" : "X";
   const liftAxis = vertical ? "X" : "Y";
@@ -1383,9 +1256,9 @@ function magnify(clientX, clientY) {
     // Lift toward the screen interior (translate BEFORE scale so it stays a
     // constant px amount). Neighbours also push along the bar — the wave.
     // Rail-origin scale does most of the "lift"; keep translate modest.
-    const lift = Math.round(influence * 5);
+    const lift = calm ? 0 : Math.round(influence * 5);
     const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    const push = item.noMag ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
+    const push = item.noMag || calm ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
     const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
     item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
     item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
@@ -1422,22 +1295,29 @@ function scheduleMagHitRects() {
 function reportHitRectsLive() {
   if (!dockApi.setHitRects) return;
   try {
-    const tiles = [...dockEl.querySelectorAll(".tile")];
-    if (!tiles.length) return;
-    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
-    for (const el of tiles) {
-      const r = el.getBoundingClientRect();
-      minL = Math.min(minL, r.left);
-      minT = Math.min(minT, r.top);
-      maxR = Math.max(maxR, r.right);
-      maxB = Math.max(maxB, r.bottom);
-    }
-    const pad = 6;
+    // Derive the region from the bar's RESTING rect plus the most the wave can
+    // ever add, instead of measuring every tile.
+    //
+    // This used to walk all the tiles and getBoundingClientRect() each one,
+    // from inside the magnify rAF — a forced layout right after writing their
+    // transforms, then an IPC call, every frame. On a 144Hz screen with a full
+    // bar that is ~2200 rect reads and 144 backend calls a second for as long
+    // as the cursor rests on the dock.
+    //
+    // The bound is exact: magnify scales a tile by at most `zoom` about the
+    // rail, lifts it 5px perpendicular and pushes neighbours base*0.22 along
+    // the bar. A pad covering all three is a superset of the real union — and,
+    // unlike the union, it does not change as the wave travels, so the
+    // signature check below collapses the whole gesture into one call.
+    const dr = magDockRect || dockEl.getBoundingClientRect();
+    const base = baseSize();
+    const grow = Math.max(0, (Math.max(1, cfg.zoom || 1.25) - 1) * base);
+    const pad = Math.ceil(grow + base * 0.22 + 6);
     const rect = [
-      Math.floor(minL - pad),
-      Math.floor(minT - pad),
-      Math.ceil(maxR - minL + pad * 2),
-      Math.ceil(maxB - minT + pad * 2),
+      Math.floor(dr.left - pad),
+      Math.floor(dr.top - pad),
+      Math.ceil(dr.width + pad * 2),
+      Math.ceil(dr.height + pad * 2),
     ];
     const sig = `mag:${rect.map(Math.round).join(",")}`;
     if (sig === lastHitSig) return;
@@ -2011,6 +1891,40 @@ async function cancelDrag() {
 }
 window.addEventListener("pointercancel", cancelDrag);
 
+/* Keyboard activation.
+ *
+ * Every tile is a real <button>, so it takes focus and Tab walks the bar
+ * correctly — but launching was wired only to pointerdown/pointerup. Enter and
+ * Space synthesise a click with no pointer events behind it, so nothing
+ * happened: you could tab through the entire dock without being able to open a
+ * single thing. Handled here rather than on each tile so it covers whatever
+ * render() built, including tiles inside an open group.
+ */
+dockEl.addEventListener("keydown", (e) => {
+  const tile = closestSel(e.target, ".tile");
+  if (!tile || !tile.dataset.id) return;
+  const item = findPinnedById(tile.dataset.id);
+  if (!item || item.kind === "separator") return;
+
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault(); // Space would otherwise scroll the bar
+    if (editMode) exitEdit();
+    else launch(tile, item);
+    return;
+  }
+  // The menu key and Shift+F10 are what a keyboard user presses for a context
+  // menu; without them the right-click actions (rename, remove, change icon)
+  // are unreachable without a mouse.
+  if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+    e.preventDefault();
+    const r = tile.getBoundingClientRect();
+    openMenu(
+      { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, preventDefault() {}, stopPropagation() {} },
+      item
+    );
+  }
+});
+
 // Merge a dragged pin onto a target → create a group (or add to one).
 async function createGroup(draggedId, targetId) {
   const next = mergePins(cfg.pinned, draggedId, targetId, t("group.new"));
@@ -2133,30 +2047,6 @@ async function ungroup(group) {
 async function takeOutChild(group, childId) {
   const { pinned, reopenId } = takeOutOfGroup(cfg.pinned, group.id, childId);
   cfg.pinned = pinned;
-  await persist();
-  closeStack();
-  await render();
-  reframe();
-  if (reopenId) {
-    const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
-    const it = cfg.pinned.find((p) => p.id === reopenId);
-    if (tileEl && it) openStack(tileEl, it);
-  }
-}
-
-/** Unpin (delete) a child from a group — only via explicit trash, not drag-out. */
-async function removeChildFromGroup(group, childId) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
-  if (gi < 0) return;
-  const grp = cfg.pinned[gi];
-  const kids = (grp.children || []).filter((c) => c.id !== childId);
-  let reopenId = grp.id;
-  if (kids.length < 2) {
-    cfg.pinned.splice(gi, 1, ...kids);
-    reopenId = null;
-  } else {
-    grp.children = kids;
-  }
   await persist();
   closeStack();
   await render();
@@ -2346,6 +2236,9 @@ function openMenu(e, item) {
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
+    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
+    // ARIA, and a screen reader announces "button" with no sense of the list.
+    b.setAttribute("role", "menuitem");
     if (tone) b.classList.add(tone);
     b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
@@ -2503,6 +2396,9 @@ async function openBackgroundMenu(e) {
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
+    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
+    // ARIA, and a screen reader announces "button" with no sense of the list.
+    b.setAttribute("role", "menuitem");
     if (tone) b.classList.add(tone);
     b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
@@ -2524,7 +2420,7 @@ async function openBackgroundMenu(e) {
   // make the menu taller than the screen's worth of attention.
   // Only offer widgets you don't already have — no point adding a second CPU
   // meter or clock. When they're all added, the whole section disappears.
-  const availableWidgets = WIDGETS.filter((type) => !widgetPresent(type));
+  const availableWidgets = WIDGET_ORDER.filter((type) => !widgetPresent(type));
   if (availableWidgets.length) {
     sep();
     addMenuLabel(t("m.widgets"));
@@ -2575,38 +2471,24 @@ function placeMenu(e) {
   const cy = e.clientY;
   // Measure invisibly, grow the window FIRST, then reveal in its final spot —
   // one paint, no flicker from the window resizing under an already-visible menu.
-  ctxMenu.style.visibility = "hidden";
+  ctxMenu.classList.add("measuring");
   ctxMenu.classList.remove("hidden");
   document.body.classList.add("menu-open");
   applyFrame();
   const put = () => {
-    const dr = dockEl.getBoundingClientRect();
-    const pad = 8;
-    const gap = 10;
-    const mw = ctxMenu.offsetWidth;
-    const mh = ctxMenu.offsetHeight;
-    // Clamp BOTH axes into the window — a long menu near a corner used to get
-    // sliced at the window edge (worst on vertical docks).
-    const maxTop = Math.max(pad, window.innerHeight - mh - pad);
-    const maxLeft = Math.max(pad, window.innerWidth - mw - pad);
-    if (isVertical()) {
-      const top = Math.min(Math.max(pad, cy - mh / 2), maxTop);
-      ctxMenu.style.top = `${top}px`;
-      let left = cfg.edge === "left" ? dr.right + gap : dr.left - mw - gap;
-      left = Math.min(Math.max(pad, left), maxLeft);
-      ctxMenu.style.left = `${left}px`;
-    } else {
-      const left = Math.min(Math.max(pad, cx - mw / 2), maxLeft);
-      ctxMenu.style.left = `${left}px`;
-      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - mh - gap;
-      top = Math.min(Math.max(pad, top), maxTop);
-      ctxMenu.style.top = `${top}px`;
-    }
+    const { left, top } = placeBesideBar({
+      bar: dockEl.getBoundingClientRect(),
+      box: { width: ctxMenu.offsetWidth, height: ctxMenu.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      along: isVertical() ? cy : cx,
+    });
+    ctxMenu.style.left = `${left}px`;
+    ctxMenu.style.top = `${top}px`;
     // Scale the menu out from the point that opened it (the cursor/tile), not
     // its own center — keeps the spatial link between trigger and content.
-    const r = ctxMenu.getBoundingClientRect();
-    ctxMenu.style.transformOrigin =
-      `${Math.min(Math.max(0, cx - r.left), r.width)}px ${Math.min(Math.max(0, cy - r.top), r.height)}px`;
+    const o = transformOrigin(ctxMenu.getBoundingClientRect(), cx, cy);
+    ctxMenu.style.transformOrigin = `${o.x}px ${o.y}px`;
   };
   put();
   // The window resizes asynchronously after applyFrame(); reposition again the
@@ -2616,7 +2498,7 @@ function placeMenu(e) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       put();
-      ctxMenu.style.visibility = "";
+      ctxMenu.classList.remove("measuring");
     });
   });
 }
@@ -2688,7 +2570,7 @@ async function removeItem(id) {
   if (!removed) return;
   // Play a quick fade+scale-out on the tile before the re-render swaps it away.
   const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
-  if (el && !REDUCE_MOTION) {
+  if (el && !reduceMotion()) {
     el.classList.add("tile-out");
     await new Promise((r) => setTimeout(r, 170));
   }
@@ -2772,13 +2654,13 @@ function computeFrame() {
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
-    hCss = availH();
+    hCss = availH(isTauri);
   } else {
-    wCss = availW();
+    wCss = availW(isTauri);
     hCss = dockEl.offsetHeight + edgePad + PANEL_ROOM;
   }
-  wCss = Math.min(wCss, availW());
-  hCss = Math.min(hCss, availH());
+  wCss = Math.min(wCss, availW(isTauri));
+  hCss = Math.min(hCss, availH(isTauri));
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -2789,13 +2671,13 @@ function computeHomeFrame() {
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad;
-    hCss = availH();
+    hCss = availH(isTauri);
   } else {
-    wCss = availW();
+    wCss = availW(isTauri);
     hCss = dockEl.offsetHeight + edgePad;
   }
-  wCss = Math.min(wCss, availW());
-  hCss = Math.min(hCss, availH());
+  wCss = Math.min(wCss, availW(isTauri));
+  hCss = Math.min(hCss, availH(isTauri));
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -2863,7 +2745,6 @@ window.addEventListener("resize", () => {
 let hiddenState = false;
 let hideTimer = null;
 let occluded = false; // last occlusion signal from the backend (smart mode)
-let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
 let draggingFile = false; // an OS file drag is over the dock → keep it open
@@ -2901,7 +2782,6 @@ function onFullscreenSignal(value) {
     fullscreen = true;
     hiddenBeforeFullscreen = hiddenState;
     pinnedReveal = false;
-    manualReveal = false;
     hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
@@ -3001,12 +2881,29 @@ function setHidden(v) {
 // countdown while you're on the dock.
 let pointerInside = false;
 
+// Snapshot of everything the visibility policy needs. Built in ONE place so
+// every caller below decides from the same inputs — the old code had each of
+// reveal(), tryTuck() and onOcclusionSignal() testing a different subset of the
+// flags in a different order, which is how a fix for one case kept breaking
+// another.
+function visibilityState() {
+  return {
+    mode: hideMode(),
+    trigger: cfg.notchTrigger || "click",
+    fullscreen,
+    previewing,
+    occluded,
+    manualHide,
+    summoned: pinnedReveal,
+    draggingFile,
+    pointerInside,
+  };
+}
+
 // Would the current mode want the dock hidden right now (ignoring the user's
-// ongoing interaction)? edge = whenever you're not on it; smart = only while
-// another window covers its spot.
+// ongoing interaction)?
 function wantsHideNow() {
-  const m = hideMode();
-  return m === "edge" || (m === "smart" && occluded);
+  return wantsHidden(visibilityState());
 }
 
 // Anything mid-use that a hide would yank out from under the user.
@@ -3025,7 +2922,6 @@ function interacting() {
 function tryTuck() {
   if (fullscreen || previewing || !wantsHideNow()) return;
   if (interacting()) return; // deferred: pointer-out / gesture-end re-checks
-  manualReveal = false;
   setHidden(true);
 }
 
@@ -3061,17 +2957,6 @@ let lastHitSig = "";
 const DOCK_HIT_PAD = 0;
 const TILE_HIT_PAD = 2;
 const PANEL_HIT_PAD = 4;
-
-function rectFromElement(el, inflate = 0) {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
-  return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
-}
-
-function pointInRect(x, y, rect) {
-  return !!rect && x >= rect[0] && x < rect[0] + rect[2] && y >= rect[1] && y < rect[1] + rect[3];
-}
 
 function pointInLiveHitArea(x, y) {
   if (edgeMove || dragging || draggingFile) return true;
@@ -3114,7 +2999,7 @@ function reportHitRects() {
     ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
   ))
     add(el, PANEL_HIT_PAD);
-  const sig = all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
+  const sig = hitSignature(rects, all);
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   dockApi.setHitRects(rects, all).catch(() => {});
@@ -3135,12 +3020,17 @@ new MutationObserver((mutations) => {
   if (dockEl.classList.contains("mag-live")) {
     const meaningful = mutations.some((m) => {
       if (m.type === "childList") return true;
-      if (m.attributeName === "class") return true;
-      if (m.attributeName === "style") {
-        const t = m.target;
-        if (t && t.classList && t.classList.contains("tile")) return false;
-        return true;
-      }
+      const t = m.target;
+      const onTile = !!(t && t.classList && t.classList.contains("tile"));
+      // A tile's own class/style churn during the wave is the magnify effect
+      // itself — the transform, the z-index, and the .focus ring hopping from
+      // tile to tile. Reporting on it made this observer race the magnify rAF:
+      // each recomputed a different region, so neither one's dedupe held and
+      // the dock emitted hit rects twice per frame. magnify() already schedules
+      // its own report. Anything NOT on a tile (body edit mode, an opening
+      // flyout) still counts.
+      if (onTile && (m.attributeName === "class" || m.attributeName === "style")) return false;
+      if (m.attributeName === "class" || m.attributeName === "style") return true;
       return false;
     });
     if (!meaningful) return;
@@ -3178,7 +3068,6 @@ function setupAutoHide() {
   // (config reload / preview end during a game would flash Booki over it).
   if (fullscreen) return;
   clearTimeout(hideTimer);
-  manualReveal = false;
   pinnedReveal = false;
   // smart starts hidden only if we're currently in an app (occluded), so a
   // config reload while working doesn't flash the dock open. edge now starts
@@ -3200,16 +3089,13 @@ function setupAutoHide() {
 // Pointer entered the dock area while HIDDEN → reveal (hover trigger only; in
 // click mode a hidden dock comes back exclusively from the notch).
 function reveal() {
-  if (fullscreen) return; // stay out of the way during fullscreen
-  if (manualHide) return; // user swiped the dock away — only the notch brings it back
-  if ((cfg.notchTrigger || "click") === "click") return;
-  const mode = hideMode();
-  if (mode === "off") return;
-  // In smart mode, while you're working in another app, DON'T reveal on hover —
-  // the dock returns only on the desktop or when you click the notch.
-  if (mode === "smart" && occluded && !pinnedReveal) return;
+  if ((cfg.notchTrigger || "click") === "click") return; // hover trigger only
+  // "The pointer just arrived — with that, does the policy want the bar out?"
+  // The chain of early-outs this replaced (fullscreen, manual swipe, mode off,
+  // occluded-and-not-summoned) is now one lookup that cannot drift from the
+  // other two decision points.
+  if (decideVisible({ ...visibilityState(), pointerInside: true }) !== true) return;
   clearTimeout(hideTimer);
-  manualReveal = true;
   setHidden(false);
 }
 
@@ -3229,41 +3115,34 @@ function onOcclusionSignal(value) {
   // Going back to work in an app releases a manual swipe-hide: next time the
   // desktop is clear, normal smart behavior resumes.
   if (value) manualHide = false;
-  if (previewing) return; // a live position preview owns visibility for now
-  if (fullscreen) return; // blackout owns the visibility while fullscreen
-  if (draggingFile) return; // never tuck away mid file-drag (the drop needs us)
-  if (manualHide) return; // stay hidden until the user asks for the dock again
+  // These own visibility while they last; occlusion doesn't get a vote.
+  if (previewing || fullscreen || draggingFile) return;
   if (hideMode() !== "smart") return;
-  if (!value) {
-    if ((cfg.notchTrigger || "click") === "click") {
-      clearTimeout(occRevealTimer);
-      return;
-    }
-    // Back on the desktop → bring the dock out automatically, but only after
-    // the desktop has stayed clear for a beat. Switching/moving windows opens
-    // transient gaps over the dock's spot, and revealing on those made the dock
-    // pop out "by itself" mid alt-tab / drag (reported bug).
+
+  const want = decideVisible(visibilityState());
+  if (want === null) {
+    // Click trigger: the desktop cleared, but a tucked dock waits to be asked.
+    clearTimeout(occRevealTimer);
+    return;
+  }
+  if (want) {
+    // Back on the desktop → come out, but only once it has STAYED clear for a
+    // beat. Switching or moving windows opens transient gaps over the dock's
+    // spot, and revealing on those made it pop out "by itself" mid alt-tab.
     clearTimeout(occRevealTimer);
     occRevealTimer = setTimeout(() => {
-      if (occluded || fullscreen || manualHide || hideMode() !== "smart") return;
+      if (decideVisible(visibilityState()) !== true) return;
       pinnedReveal = false;
-      manualReveal = false;
       setHidden(false);
     }, SMART_REVEAL_DELAY);
-  } else if (pointerInside || interacting()) {
-    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
-    // Another window covers the dock's spot, but the user is ON the dock right
-    // now (it's topmost) — hiding it under the cursor was the "it hides while
-    // I'm using it!" bug. It tucks the moment they leave instead (pointer-out).
     return;
-  } else {
-    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
-    // Working in another window → tuck away. Even a dock pinned open from the
-    // notch hides once you switch to another app.
-    pinnedReveal = false;
-    manualReveal = false;
-    setHidden(true);
   }
+  clearTimeout(occRevealTimer); // covered again → drop any pending reveal
+  // The policy says hide, but the gate still applies: never yank the bar out
+  // from under someone using it. The pointer-out handler re-checks.
+  if (pointerInside || interacting()) return;
+  pinnedReveal = false;
+  setHidden(true);
 }
 
 document.body.addEventListener("pointerenter", reveal);
@@ -3330,12 +3209,6 @@ window.addEventListener("pointerdown", (e) => {
 
 // ─────────────────── Desktop file drop ───────────────────
 
-function tileFromPoint(position) {
-  if (!position) return null;
-  const dpr = window.devicePixelRatio || 1;
-  const el = document.elementFromPoint(position.x / dpr, position.y / dpr);
-  return el ? el.closest(".tile[data-id]") : null;
-}
 // Where would a dropped file land? Aiming at the CENTER of a tile that accepts
 // drops (app = open-with, folder = move, group = pin inside, trash = delete)
 // targets that tile; anywhere else is an INSERTION between tiles — the bar
@@ -3514,7 +3387,7 @@ function dismissPop(pop, done) {
     if (done) done();
     return;
   }
-  if (REDUCE_MOTION) return finish();
+  if (reduceMotion()) return finish();
   pop.classList.add("closing");
   setTimeout(finish, 180);
 }
@@ -3533,49 +3406,44 @@ function closeTrashPop() {
 // Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never
 // on top of it — and grow the window so nothing gets clipped.
 function placePop(pop) {
-  pop.style.visibility = "hidden";
+  pop.classList.add("measuring");
   document.body.appendChild(pop);
   document.body.classList.add("pop-open");
   applyFrame(); // grow the window before anything is visible
   const put = () => {
-    // Center on the BAR (not the window: a slot-aligned dock sits off-center)
-    // and clamp both axes into the viewport, like placeMenu does.
-    const dr = dockEl.getBoundingClientRect();
-    const gap = 12;
-    const pad = 8;
-    const pw = pop.offsetWidth;
-    const ph = pop.offsetHeight;
+    // Centre on the BAR, not the window: a slot-aligned dock sits off-centre.
     pop.style.left = pop.style.right = pop.style.top = pop.style.bottom = "";
     pop.style.transform = "";
-    if (isVertical()) {
-      const top = Math.min(Math.max(pad, dr.top + dr.height / 2 - ph / 2), window.innerHeight - ph - pad);
-      pop.style.top = `${top}px`;
-      let left = cfg.edge === "left" ? dr.right + gap : dr.left - pw - gap;
-      left = Math.min(Math.max(pad, left), window.innerWidth - pw - pad);
-      pop.style.left = `${left}px`;
-    } else {
-      const left = Math.min(Math.max(pad, dr.left + dr.width / 2 - pw / 2), window.innerWidth - pw - pad);
-      pop.style.left = `${left}px`;
-      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - ph - gap;
-      top = Math.min(Math.max(pad, top), window.innerHeight - ph - pad);
-      pop.style.top = `${top}px`;
-    }
+    const { left, top } = placeBesideBar({
+      bar: dockEl.getBoundingClientRect(),
+      box: { width: pop.offsetWidth, height: pop.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      gap: 12,
+    });
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
   };
   put();
   // Reveal only after the window has grown and the popover sits in place.
   setTimeout(() => {
     requestAnimationFrame(() => {
       put();
-      pop.style.visibility = "";
+      pop.classList.remove("measuring");
     });
   }, 70);
   // The coach swaps its content per step WITHOUT re-calling placePop; since the
   // popover is now hard-positioned (no translate centering), re-run put() on
   // any size change so every step stays centered on the bar and in-viewport.
   if (typeof ResizeObserver !== "undefined") {
-    new ResizeObserver(() => {
+    // Disconnect once the popover leaves the document. An observer left
+    // watching a detached node keeps it (and its whole subtree) alive, and the
+    // dock opens one of these for every trash prompt and coach step.
+    const ro = new ResizeObserver(() => {
       if (pop.isConnected) put();
-    }).observe(pop);
+      else ro.disconnect();
+    });
+    ro.observe(pop);
   }
 }
 
@@ -3613,7 +3481,7 @@ function confirmTrash(paths, emptyBin = false) {
     } catch (err) {
       // Deletion was blocked (usually Defender's Controlled Folder Access) —
       // explain honestly instead of failing in silence.
-      logMessage(`trash: ${err}`);
+      logMessage("error", `trash: ${err}`);
       trashBlockedInfo();
       return;
     }
@@ -3680,7 +3548,7 @@ function confirmMove(paths, item) {
     try {
       await dockApi.movePaths(paths, item.path);
     } catch (err) {
-      logMessage(`move: ${err}`);
+      logMessage("error", `move: ${err}`);
     }
     pinnedReveal = false;
     scheduleHide();
@@ -3895,6 +3763,10 @@ function wireFileDragOut(cell, it) {
     const cleanup = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", cleanup);
+      // Without pointercancel (touch, capture loss, the window hiding under the
+      // cursor) this listener stayed attached to window forever, one per
+      // cancelled drag. wireStackDragOut already handles it.
+      window.removeEventListener("pointercancel", cleanup);
     };
     const move = (ev) => {
       if (started) return;
@@ -3908,6 +3780,7 @@ function wireFileDragOut(cell, it) {
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", cleanup);
+    window.addEventListener("pointercancel", cleanup);
   });
 }
 
@@ -3930,6 +3803,7 @@ async function openStack(tileEl, item) {
   const seq = ++stackSeq;
   stackItemId = item.id;
   stackEl.innerHTML = "";
+  stackEl.setAttribute("aria-label", item.name || t("group.new"));
   const head = document.createElement("div");
   head.className = "stack-head";
   const glyph = document.createElement("span");
@@ -4258,6 +4132,7 @@ async function toggleClipboardStack(tileEl) {
     return;
   }
   stackEl.innerHTML = "";
+  stackEl.setAttribute("aria-label", t("w.clipboard"));
   const head = document.createElement("div");
   head.className = "stack-head";
   const glyph = document.createElement("span");
@@ -4487,36 +4362,16 @@ window.addEventListener("pointerdown", (e) => {
 function placeUpdatePill() {
   const pill = document.getElementById("update-pill");
   if (!pill || pill.classList.contains("hidden")) return;
-  const r = dockEl.getBoundingClientRect();
-  const pad = 8;
-  const gap = 8;
-  pill.style.left = "";
-  pill.style.right = "";
-  pill.style.top = "";
-  pill.style.bottom = "";
-  if (isVertical()) {
-    const top = Math.min(
-      Math.max(pad, r.top + r.height / 2 - pill.offsetHeight / 2),
-      Math.max(pad, window.innerHeight - pill.offsetHeight - pad)
-    );
-    const left =
-      (cfg.edge || "bottom") === "left"
-        ? Math.min(r.right + gap, window.innerWidth - pill.offsetWidth - pad)
-        : Math.max(pad, r.left - pill.offsetWidth - gap);
-    pill.style.top = `${top}px`;
-    pill.style.left = `${left}px`;
-  } else {
-    const left = Math.min(
-      Math.max(pad, r.left + r.width / 2 - pill.offsetWidth / 2),
-      Math.max(pad, window.innerWidth - pill.offsetWidth - pad)
-    );
-    const top =
-      (cfg.edge || "bottom") === "top"
-        ? Math.min(r.bottom + gap, window.innerHeight - pill.offsetHeight - pad)
-        : Math.max(pad, r.top - pill.offsetHeight - gap);
-    pill.style.left = `${left}px`;
-    pill.style.top = `${top}px`;
-  }
+  pill.style.left = pill.style.right = pill.style.top = pill.style.bottom = "";
+  const { left, top } = placeBesideBar({
+    bar: dockEl.getBoundingClientRect(),
+    box: { width: pill.offsetWidth, height: pill.offsetHeight },
+    edge: cfg.edge || "bottom",
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    gap: 8,
+  });
+  pill.style.left = `${left}px`;
+  pill.style.top = `${top}px`;
 }
 
 async function checkUpdates() {
