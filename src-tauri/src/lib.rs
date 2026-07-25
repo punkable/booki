@@ -135,6 +135,13 @@ fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
     hist.len() != before
 }
 
+/// Encrypt (DPAPI) and persist the history.
+///
+/// Callers must NOT hold the CLIP_HISTORY guard while calling this. It was
+/// previously invoked from inside the lock at all nine call sites, and
+/// save_config — a synchronous command, so it runs on the UI thread — takes the
+/// same lock, which meant a slow disk could freeze the whole dock. Mutate under
+/// the guard, clone a snapshot, drop the guard, then call this.
 fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
@@ -176,9 +183,12 @@ fn clip_parse_disk(bytes: &[u8]) -> Option<Vec<ClipEntry>> {
 }
 
 fn clip_apply_config(cfg: &Config) {
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    clip_prune_locked(&mut hist, cfg);
-    clip_write_disk(&hist, cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        clip_prune_locked(&mut hist, cfg);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, cfg);
 }
 
 fn clip_load_from_disk() {
@@ -205,18 +215,24 @@ fn clip_load_from_disk() {
         .unwrap_or(0)
         .saturating_add(1);
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
-    let mut current = CLIP_HISTORY.lock().unwrap();
-    *current = hist;
+    let snapshot = {
+        let mut current = CLIP_HISTORY.lock().unwrap();
+        *current = hist;
+        current.clone()
+    };
     if loaded_legacy || cfg.clipboard_persist {
-        clip_write_disk(&current, &cfg);
+        clip_write_disk(&snapshot, &cfg);
     }
 }
 
 fn clip_enforce_current_policy() {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if clip_prune_locked(&mut hist, &cfg) || !cfg.clipboard_persist {
-        clip_write_disk(&hist, &cfg);
+    let (changed, snapshot) = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        (clip_prune_locked(&mut hist, &cfg), hist.clone())
+    };
+    if changed || !cfg.clipboard_persist {
+        clip_write_disk(&snapshot, &cfg);
     }
 }
 
@@ -281,32 +297,36 @@ fn clip_remember(text: &str) {
     if cfg.clipboard_sensitive_guard && clip_looks_sensitive(&text) {
         return;
     }
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    let pruned = clip_prune_locked(&mut hist, &cfg);
-    if hist.first().map(|e| e.text == text).unwrap_or(false) {
-        if pruned || !cfg.clipboard_persist {
-            clip_write_disk(&hist, &cfg);
+    let (should_write, snapshot) = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        let pruned = clip_prune_locked(&mut hist, &cfg);
+        if hist.first().map(|e| e.text == text).unwrap_or(false) {
+            // Already the most recent entry — nothing changed.
+            (pruned || !cfg.clipboard_persist, hist.clone())
+        } else {
+            let (favorite, private) = hist
+                .iter()
+                .find(|entry| entry.text == text)
+                .map(|entry| (entry.favorite, entry.private))
+                .unwrap_or((false, false));
+            hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
+            hist.insert(
+                0,
+                ClipEntry {
+                    id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
+                    text,
+                    ts: clip_now_ms(),
+                    favorite,
+                    private,
+                },
+            );
+            clip_prune_locked(&mut hist, &cfg);
+            (true, hist.clone())
         }
-        return; // already the most recent entry — nothing changed
+    };
+    if should_write {
+        clip_write_disk(&snapshot, &cfg);
     }
-    let (favorite, private) = hist
-        .iter()
-        .find(|entry| entry.text == text)
-        .map(|entry| (entry.favorite, entry.private))
-        .unwrap_or((false, false));
-    hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
-    hist.insert(
-        0,
-        ClipEntry {
-            id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            text,
-            ts: clip_now_ms(),
-            favorite,
-            private,
-        },
-    );
-    clip_prune_locked(&mut hist, &cfg);
-    clip_write_disk(&hist, &cfg);
 }
 
 /// Is anything actually consuming clipboard history right now? Only the
@@ -1637,38 +1657,50 @@ fn clipboard_copy(text: String) -> bool {
 #[tauri::command]
 fn clipboard_delete(id: u64) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    hist.retain(|e| e.id != id);
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        hist.retain(|e| e.id != id);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_favorite(id: u64, favorite: bool) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
-        entry.favorite = favorite;
-    }
-    clip_prune_locked(&mut hist, &cfg);
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+            entry.favorite = favorite;
+        }
+        clip_prune_locked(&mut hist, &cfg);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_private(id: u64, private: bool) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
-        entry.private = private;
-    }
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+            entry.private = private;
+        }
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_clear() {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    hist.clear();
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        hist.clear();
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 /// Recent files RELEVANT to one pinned app: keeps only entries whose default
