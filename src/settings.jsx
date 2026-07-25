@@ -20,7 +20,6 @@ import {
   logMessage,
 } from "./api.js";
 import { resolveNotchMode } from "./notch-mode.js";
-import { CHANGELOG } from "./changelog-data.js";
 import { emoSrc } from "./emoji.js";
 import {
   FluentProvider,
@@ -3546,6 +3545,21 @@ function SettingsSkeleton() {
 // "What's new" shown as a modal inside Settings (no fragile extra window).
 function ChangelogModal({ onClose }) {
   useModalControls(onClose);
+  // changelog-data.js is ~107KB of prose covering 97 releases, and this modal
+  // renders five of them. Importing it statically shipped the whole history in
+  // the Settings bundle for every user, every launch; loading it when the modal
+  // actually opens keeps it out of the critical path.
+  const [entries, setEntries] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import("./changelog-data.js")
+      .then((m) => alive && setEntries(m.CHANGELOG))
+      .catch(() => alive && setEntries([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const log = entries || [];
   return createPortal((
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>
@@ -3558,7 +3572,8 @@ function ChangelogModal({ onClose }) {
             <span className="cl-beta-badge">{t("cl.betaBadge")}</span>
             <p className="cl-beta-body">{t("cl.betaBody")}</p>
           </div>
-          {CHANGELOG.slice(0, 1).map((entry, idx) => (
+          {entries === null && <p className="cl-headline">{t("cl.title")}…</p>}
+          {log.slice(0, 1).map((entry, idx) => (
             <section key={entry.version} className={"cl-entry" + (idx === 0 ? " latest" : "")}>
               <div className="cl-entry-head">
                 <span className="cl-ver">v{entry.version}</span>
@@ -3576,11 +3591,11 @@ function ChangelogModal({ onClose }) {
               ))}
             </section>
           ))}
-          {CHANGELOG.length > 1 && (
+          {log.length > 1 && (
             <div className="cl-recent">
               <h4 className="cl-recent-title">{t("cl.recentTitle")}</h4>
               <ul className="cl-recent-list">
-                {CHANGELOG.slice(1, 5).map((entry) => (
+                {log.slice(1, 5).map((entry) => (
                   <li key={entry.version}>
                     <span className="cl-recent-ver">v{entry.version}</span>
                     <span className="cl-recent-headline">{entry.headline}</span>
