@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="es">
+<!-- lang is a placeholder: i18n.js sets it from the resolved language on boot. -->
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,16 +11,16 @@
     <nav class="dock" id="dock" aria-label="Booki dock"></nav>
 
     <div class="drop-overlay" id="drop-overlay">
-      <div class="pill" id="drop-pill">Suelta para anclar a Booki</div>
+      <div class="pill" id="drop-pill"></div>
     </div>
 
-    <button class="update-pill hidden" id="update-pill" title="Hay una actualización disponible">
-      ● Actualización disponible
-    </button>
+    <button class="update-pill hidden" id="update-pill"></button>
 
     <div class="undo-toast hidden" id="undo-toast" role="status" aria-live="polite"></div>
 
-    <div class="stack" id="stack" role="menu"></div>
+    <!-- Not role="menu": this panel has a heading and a rename field, and a menu
+         may not contain a textbox. It is a labelled group of launchers. -->
+    <div class="stack" id="stack" role="group"></div>
 
     <div class="menu hidden" id="ctx-menu" role="menu"></div>
 

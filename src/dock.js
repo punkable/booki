@@ -54,6 +54,7 @@ import {
   setMediaText,
   setPreviewSubText,
   refreshPreviewMarquees,
+  LIVE_WIDGETS,
 } from "./dock/widget-view.js";
 import { applySurfaceVars } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
@@ -298,6 +299,16 @@ function positionPreview() {
 
 function applyAll() {
   setLang(cfg.language);
+  // The two strings baked into index.html were Spanish, which no language
+  // setting could reach — a German user dragging a file onto the bar was told
+  // "Suelta para anclar a Booki". They live in the dictionary now and are
+  // written here, so they follow the language like everything else.
+  dropOverlay.querySelector("#drop-pill").textContent = t("dock.dropPin");
+  const pill = document.getElementById("update-pill");
+  if (pill) {
+    pill.textContent = t("dock.update");
+    pill.title = t("dock.updateTip");
+  }
   applyTheme(cfg);
   applyEdge(cfg);
   // The stage window spans the whole edge; the BAR aligns to the notch's
@@ -670,6 +681,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (st.icon === false) el.classList.add("no-ico");
   el.style.setProperty("--size", `${baseSize()}px`);
   el.title = widgetLabel(type);
+  if (LIVE_WIDGETS.includes(type)) el.setAttribute("aria-live", "polite");
 
   const card = document.createElement("span");
   card.className = "w-card";
@@ -1879,6 +1891,40 @@ async function cancelDrag() {
 }
 window.addEventListener("pointercancel", cancelDrag);
 
+/* Keyboard activation.
+ *
+ * Every tile is a real <button>, so it takes focus and Tab walks the bar
+ * correctly — but launching was wired only to pointerdown/pointerup. Enter and
+ * Space synthesise a click with no pointer events behind it, so nothing
+ * happened: you could tab through the entire dock without being able to open a
+ * single thing. Handled here rather than on each tile so it covers whatever
+ * render() built, including tiles inside an open group.
+ */
+dockEl.addEventListener("keydown", (e) => {
+  const tile = closestSel(e.target, ".tile");
+  if (!tile || !tile.dataset.id) return;
+  const item = findPinnedById(tile.dataset.id);
+  if (!item || item.kind === "separator") return;
+
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault(); // Space would otherwise scroll the bar
+    if (editMode) exitEdit();
+    else launch(tile, item);
+    return;
+  }
+  // The menu key and Shift+F10 are what a keyboard user presses for a context
+  // menu; without them the right-click actions (rename, remove, change icon)
+  // are unreachable without a mouse.
+  if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+    e.preventDefault();
+    const r = tile.getBoundingClientRect();
+    openMenu(
+      { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, preventDefault() {}, stopPropagation() {} },
+      item
+    );
+  }
+});
+
 // Merge a dragged pin onto a target → create a group (or add to one).
 async function createGroup(draggedId, targetId) {
   const next = mergePins(cfg.pinned, draggedId, targetId, t("group.new"));
@@ -2190,6 +2236,9 @@ function openMenu(e, item) {
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
+    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
+    // ARIA, and a screen reader announces "button" with no sense of the list.
+    b.setAttribute("role", "menuitem");
     if (tone) b.classList.add(tone);
     b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
@@ -2347,6 +2396,9 @@ async function openBackgroundMenu(e) {
   ctxMenu.innerHTML = "";
   const add = (iconName, text, fn, tone = "") => {
     const b = document.createElement("button");
+    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
+    // ARIA, and a screen reader announces "button" with no sense of the list.
+    b.setAttribute("role", "menuitem");
     if (tone) b.classList.add(tone);
     b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
     b.addEventListener("click", async () => {
@@ -3751,6 +3803,7 @@ async function openStack(tileEl, item) {
   const seq = ++stackSeq;
   stackItemId = item.id;
   stackEl.innerHTML = "";
+  stackEl.setAttribute("aria-label", item.name || t("group.new"));
   const head = document.createElement("div");
   head.className = "stack-head";
   const glyph = document.createElement("span");
@@ -4079,6 +4132,7 @@ async function toggleClipboardStack(tileEl) {
     return;
   }
   stackEl.innerHTML = "";
+  stackEl.setAttribute("aria-label", t("w.clipboard"));
   const head = document.createElement("div");
   head.className = "stack-head";
   const glyph = document.createElement("span");
