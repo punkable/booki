@@ -21,6 +21,7 @@ import {
   isTauri,
 } from "./api.js";
 import { resolveNotchMode } from "./notch-mode.js";
+import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon } from "./icon-library.js";
@@ -3014,12 +3015,29 @@ function setHidden(v) {
 // countdown while you're on the dock.
 let pointerInside = false;
 
+// Snapshot of everything the visibility policy needs. Built in ONE place so
+// every caller below decides from the same inputs — the old code had each of
+// reveal(), tryTuck() and onOcclusionSignal() testing a different subset of the
+// flags in a different order, which is how a fix for one case kept breaking
+// another.
+function visibilityState() {
+  return {
+    mode: hideMode(),
+    trigger: cfg.notchTrigger || "click",
+    fullscreen,
+    previewing,
+    occluded,
+    manualHide,
+    summoned: pinnedReveal,
+    draggingFile,
+    pointerInside,
+  };
+}
+
 // Would the current mode want the dock hidden right now (ignoring the user's
-// ongoing interaction)? edge = whenever you're not on it; smart = only while
-// another window covers its spot.
+// ongoing interaction)?
 function wantsHideNow() {
-  const m = hideMode();
-  return m === "edge" || (m === "smart" && occluded);
+  return wantsHidden(visibilityState());
 }
 
 // Anything mid-use that a hide would yank out from under the user.
@@ -3216,14 +3234,12 @@ function setupAutoHide() {
 // Pointer entered the dock area while HIDDEN → reveal (hover trigger only; in
 // click mode a hidden dock comes back exclusively from the notch).
 function reveal() {
-  if (fullscreen) return; // stay out of the way during fullscreen
-  if (manualHide) return; // user swiped the dock away — only the notch brings it back
-  if ((cfg.notchTrigger || "click") === "click") return;
-  const mode = hideMode();
-  if (mode === "off") return;
-  // In smart mode, while you're working in another app, DON'T reveal on hover —
-  // the dock returns only on the desktop or when you click the notch.
-  if (mode === "smart" && occluded && !pinnedReveal) return;
+  if ((cfg.notchTrigger || "click") === "click") return; // hover trigger only
+  // "The pointer just arrived — with that, does the policy want the bar out?"
+  // The chain of early-outs this replaced (fullscreen, manual swipe, mode off,
+  // occluded-and-not-summoned) is now one lookup that cannot drift from the
+  // other two decision points.
+  if (decideVisible({ ...visibilityState(), pointerInside: true }) !== true) return;
   clearTimeout(hideTimer);
   setHidden(false);
 }
@@ -3244,39 +3260,34 @@ function onOcclusionSignal(value) {
   // Going back to work in an app releases a manual swipe-hide: next time the
   // desktop is clear, normal smart behavior resumes.
   if (value) manualHide = false;
-  if (previewing) return; // a live position preview owns visibility for now
-  if (fullscreen) return; // blackout owns the visibility while fullscreen
-  if (draggingFile) return; // never tuck away mid file-drag (the drop needs us)
-  if (manualHide) return; // stay hidden until the user asks for the dock again
+  // These own visibility while they last; occlusion doesn't get a vote.
+  if (previewing || fullscreen || draggingFile) return;
   if (hideMode() !== "smart") return;
-  if (!value) {
-    if ((cfg.notchTrigger || "click") === "click") {
-      clearTimeout(occRevealTimer);
-      return;
-    }
-    // Back on the desktop → bring the dock out automatically, but only after
-    // the desktop has stayed clear for a beat. Switching/moving windows opens
-    // transient gaps over the dock's spot, and revealing on those made the dock
-    // pop out "by itself" mid alt-tab / drag (reported bug).
+
+  const want = decideVisible(visibilityState());
+  if (want === null) {
+    // Click trigger: the desktop cleared, but a tucked dock waits to be asked.
+    clearTimeout(occRevealTimer);
+    return;
+  }
+  if (want) {
+    // Back on the desktop → come out, but only once it has STAYED clear for a
+    // beat. Switching or moving windows opens transient gaps over the dock's
+    // spot, and revealing on those made it pop out "by itself" mid alt-tab.
     clearTimeout(occRevealTimer);
     occRevealTimer = setTimeout(() => {
-      if (occluded || fullscreen || manualHide || hideMode() !== "smart") return;
+      if (decideVisible(visibilityState()) !== true) return;
       pinnedReveal = false;
       setHidden(false);
     }, SMART_REVEAL_DELAY);
-  } else if (pointerInside || interacting()) {
-    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
-    // Another window covers the dock's spot, but the user is ON the dock right
-    // now (it's topmost) — hiding it under the cursor was the "it hides while
-    // I'm using it!" bug. It tucks the moment they leave instead (pointer-out).
     return;
-  } else {
-    clearTimeout(occRevealTimer); // covered again → drop any pending reveal
-    // Working in another window → tuck away. Even a dock pinned open from the
-    // notch hides once you switch to another app.
-    pinnedReveal = false;
-    setHidden(true);
   }
+  clearTimeout(occRevealTimer); // covered again → drop any pending reveal
+  // The policy says hide, but the gate still applies: never yank the bar out
+  // from under someone using it. The pointer-out handler re-checks.
+  if (pointerInside || interacting()) return;
+  pinnedReveal = false;
+  setHidden(true);
 }
 
 document.body.addEventListener("pointerenter", reveal);
