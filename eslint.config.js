@@ -62,11 +62,23 @@ export default [
 
   {
     // Node tooling: different globals, and console output is the point.
-    files: ["scripts/**/*.mjs", "*.config.js", "tests/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "*.config.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
       globals: { ...globals.node },
+    },
+  },
+
+  {
+    // Tests run in Node, but the bodies of `page.evaluate(...)` are serialized
+    // and executed in the browser, so `document` and friends are genuinely in
+    // scope there. Both global sets apply.
+    files: ["tests/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...globals.node, ...globals.browser },
     },
   },
 ];

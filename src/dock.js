@@ -810,10 +810,24 @@ function setMetric(el, label, val, title) {
   if (title) el.title = title;
 }
 
+// Plain label + value. Ring widgets have no `.w-value`/`.w-bar` at all (see
+// widgetTile), so this has to place the text inside the ring instead — a
+// batteryless desktop reports battery < 0 and lands here on every poll, which
+// used to throw ~1500 times an hour and freeze the card on its placeholder.
 function setText(el, label, value, title) {
   el.querySelector(".w-label").textContent = label;
-  el.querySelector(".w-value").textContent = value;
-  el.querySelector(".w-bar").style.display = "none";
+  const ringNum = el.querySelector(".w-ring-num");
+  if (ringNum) {
+    delete ringNum.dataset.v; // no numeric value to tween from next time
+    ringNum.textContent = value;
+    const ring = el.querySelector(".w-ring-fill");
+    if (ring) ring.style.strokeDashoffset = `${RING_C.toFixed(2)}`; // empty gauge
+  } else {
+    const val = el.querySelector(".w-value");
+    if (val) val.textContent = value;
+    const bar = el.querySelector(".w-bar");
+    if (bar) bar.style.display = "none";
+  }
   if (title) el.title = title;
 }
 
@@ -1039,7 +1053,7 @@ function renderClipboardSummary(count, preview) {
     const shown = preview ? dockPreviewSnippet(preview) : t("clip.empty");
     setPreviewSubText(el, shown, !preview);
     const badge = el.querySelector(".w-pv-count");
-    badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
+    if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
     // The tooltip carries the preview snippet too: in a vertical dock the card
     // collapses to icon+badge, so el.title is the only glanceable content.
     el.title = preview
@@ -3576,7 +3590,7 @@ function confirmTrash(paths, emptyBin = false) {
     } catch (err) {
       // Deletion was blocked (usually Defender's Controlled Folder Access) —
       // explain honestly instead of failing in silence.
-      logMessage(`trash: ${err}`);
+      logMessage("error", `trash: ${err}`);
       trashBlockedInfo();
       return;
     }
@@ -3643,7 +3657,7 @@ function confirmMove(paths, item) {
     try {
       await dockApi.movePaths(paths, item.path);
     } catch (err) {
-      logMessage(`move: ${err}`);
+      logMessage("error", `move: ${err}`);
     }
     pinnedReveal = false;
     scheduleHide();
@@ -3858,6 +3872,10 @@ function wireFileDragOut(cell, it) {
     const cleanup = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", cleanup);
+      // Without pointercancel (touch, capture loss, the window hiding under the
+      // cursor) this listener stayed attached to window forever, one per
+      // cancelled drag. wireStackDragOut already handles it.
+      window.removeEventListener("pointercancel", cleanup);
     };
     const move = (ev) => {
       if (started) return;
@@ -3871,6 +3889,7 @@ function wireFileDragOut(cell, it) {
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", cleanup);
+    window.addEventListener("pointercancel", cleanup);
   });
 }
 
