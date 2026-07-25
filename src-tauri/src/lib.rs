@@ -757,7 +757,7 @@ fn system_stats() -> SystemStats {
     let secs = entry.1.elapsed().as_secs_f64().max(0.001);
     entry.1 = std::time::Instant::now();
     let (mut down, mut up) = (0u64, 0u64);
-    for (_name, data) in entry.0.iter() {
+    for data in entry.0.values() {
         down += data.received();
         up += data.transmitted();
     }
@@ -1603,7 +1603,7 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
             },
         ));
     }
-    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.sort_by_key(|item| std::cmp::Reverse(item.0)); // newest first
     items.into_iter().take(cap).map(|(_, f)| f).collect()
 }
 
