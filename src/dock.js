@@ -29,14 +29,30 @@ import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
 import {
+  WIDGET_ORDER,
   WIDGET_ICONS,
   WIDGET_VARIANTS,
   STAT_WIDGETS,
-  RING_WIDGETS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   widgetDisplayName,
 } from "./widgets-meta.js";
+import { reduceMotion } from "./dock/motion.js";
+import {
+  MEDIA_SVG,
+  BATTERY_LOW,
+  fmtRate,
+  fmtUptime,
+  dockPreviewSnippet,
+  clockParts,
+  volumeStep,
+  widgetCardHTML,
+  setMetric,
+  setText,
+  setMediaText,
+  setPreviewSubText,
+  refreshPreviewMarquees,
+} from "./dock/widget-view.js";
 import { applySurfaceVars } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 
@@ -640,18 +656,6 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-const WIDGETS = ["clock", "cpu", "ram", "disk", "net", "uptime", "battery", "notes", "media", "volume", "clipboard"];
-// Transport glyphs for the media card — filled, rounded, Fluent-like SVGs.
-const MEDIA_SVG = {
-  prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
-  next: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M12.8 2.8c0-.44-.36-.8-.8-.8s-.8.36-.8.8v4.1l-7-4.63c-.8-.53-1.87.04-1.87 1v9.46c0 .96 1.07 1.53 1.87 1l7-4.63v4.1c0 .44.36.8.8.8s.8-.36.8-.8V2.8Z"/></svg>',
-  play: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M5.1 2.32c-.87-.5-1.95.13-1.95 1.13v9.1c0 1 1.08 1.63 1.95 1.13l7.9-4.55c.87-.5.87-1.76 0-2.26L5.1 2.32Z"/></svg>',
-  pause: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M4.1 2.5c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1H4.1Zm6.5 0c-.61 0-1.1.49-1.1 1.1v8.8c0 .61.49 1.1 1.1 1.1h1.3c.61 0 1.1-.49 1.1-1.1V3.6c0-.61-.49-1.1-1.1-1.1h-1.3Z"/></svg>',
-};
-const RING_R = 15.5; // SVG viewBox 0 0 36 36
-const RING_C = 2 * Math.PI * RING_R;
-const BATTERY_LOW = "#e5484d";
-
 function widgetLabel(type) {
   return widgetDisplayName(type, t);
 }
@@ -677,23 +681,8 @@ function widgetTile(item, { inFlyout = false } = {}) {
 
   const card = document.createElement("span");
   card.className = "w-card";
-  const isRing = RING_WIDGETS.includes(type);
-  const isPreview = PREVIEW_WIDGETS.includes(type);
-  if (isPreview) el.classList.add("preview");
-  card.innerHTML = isPreview
-    ? `<span class="w-pv-ico">${emo(WIDGET_ICONS[type] || "puzzle", 22)}<span class="w-pv-count"></span></span>` +
-      `<span class="w-pv-main"><span class="w-pv-title"></span><span class="w-pv-sub"></span></span>` +
-      `<span class="w-pv-badge">${icon(type === "notes" ? "pencil" : "chevron-right")}</span>`
-    : (isRing
-      ? `<span class="w-ring">` +
-        `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
-        `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>` +
-        `<span class="w-ring-num"></span></span>`
-      : `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>`) +
-      `<span class="w-main">` +
-      `<span class="w-label"></span>` +
-      (isRing ? "" : `<span class="w-value">…</span><span class="w-bar"><i></i></span>`) +
-      `</span>`;
+  if (PREVIEW_WIDGETS.includes(type)) el.classList.add("preview");
+  card.innerHTML = widgetCardHTML(type);
   el.appendChild(card);
 
   // On the bar the widget is a full dock tile (removable, draggable, right-click
@@ -759,160 +748,6 @@ function widgetTile(item, { inFlyout = false } = {}) {
   return el;
 }
 
-const fmtRate = (kbps) =>
-  kbps >= 1024 ? `${(kbps / 1024).toFixed(1)} MB/s` : `${kbps} KB/s`;
-
-function fmtUptime(s) {
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-const REDUCE_MOTION =
-  typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-// Animate an integer from its previous value to the next over ~320ms (easeOut),
-// so CPU/RAM/volume tick up smoothly instead of snapping. Cheap: one rAF chain
-// per metric, and it no-ops when the value is unchanged or motion is reduced.
-function tweenNumber(el, to, fmt) {
-  const from = Number(el.dataset.v);
-  el.dataset.v = String(to);
-  if (REDUCE_MOTION || !Number.isFinite(from) || from === to) {
-    el.textContent = fmt(to);
-    return;
-  }
-  const t0 = performance.now();
-  const dur = 320;
-  const step = (now) => {
-    const p = Math.min(1, (now - t0) / dur);
-    const e = 1 - Math.pow(1 - p, 3);
-    el.textContent = fmt(Math.round(from + (to - from) * e));
-    if (p < 1 && el.dataset.v === String(to)) requestAnimationFrame(step);
-    else el.textContent = fmt(to);
-  };
-  requestAnimationFrame(step);
-}
-
-// Set a percentage metric (CPU/RAM/disk): label + value% + bar. Extra detail
-// goes in the tooltip so nothing overflows the compact card.
-function setMetric(el, label, val, title) {
-  el.querySelector(".w-label").textContent = label;
-  const pct = Math.min(100, Math.max(0, val));
-  const ring = el.querySelector(".w-ring-fill");
-  if (ring) {
-    // Ring widget: the number lives INSIDE the ring, not the label row.
-    tweenNumber(el.querySelector(".w-ring-num"), val, (n) => `${n}`);
-    ring.style.strokeDashoffset = `${(RING_C * (1 - pct / 100)).toFixed(2)}`;
-  } else {
-    tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);
-    const bar = el.querySelector(".w-bar");
-    bar.style.display = "";
-    bar.querySelector("i").style.transform = `scaleX(${(pct / 100).toFixed(3)})`;
-  }
-  if (title) el.title = title;
-}
-
-// Plain label + value. Ring widgets have no `.w-value`/`.w-bar` at all (see
-// widgetTile), so this has to place the text inside the ring instead — a
-// batteryless desktop reports battery < 0 and lands here on every poll, which
-// used to throw ~1500 times an hour and freeze the card on its placeholder.
-function setText(el, label, value, title) {
-  el.querySelector(".w-label").textContent = label;
-  const ringNum = el.querySelector(".w-ring-num");
-  if (ringNum) {
-    delete ringNum.dataset.v; // no numeric value to tween from next time
-    ringNum.textContent = value;
-    const ring = el.querySelector(".w-ring-fill");
-    if (ring) ring.style.strokeDashoffset = `${RING_C.toFixed(2)}`; // empty gauge
-  } else {
-    const val = el.querySelector(".w-value");
-    if (val) val.textContent = value;
-    const bar = el.querySelector(".w-bar");
-    if (bar) bar.style.display = "none";
-  }
-  if (title) el.title = title;
-}
-
-// Media card text: artist as label, song as value. A title that doesn't fit its
-// box scrolls gently in a loop (marquee) instead of being chopped by ellipsis —
-// essential on the compact vertical card. Rebuilt only when the song changes so
-// the animation never restarts mid-scroll on every poll.
-function setMediaText(el, artist, title) {
-  el.querySelector(".w-label").textContent = artist;
-  el.querySelector(".w-bar").style.display = "none";
-  if (el.dataset.mqTitle === title) return;
-  el.dataset.mqTitle = title;
-  const v = el.querySelector(".w-value");
-  v.classList.remove("scroll");
-  v.textContent = title;
-  // Reduced motion: keep the plain single line (ellipsized by CSS) — never
-  // build the doubled-span marquee that would sit clipped and frozen.
-  if (REDUCE_MOTION) return;
-  if (v.scrollWidth > v.clientWidth + 2) {
-    const safe = esc(title);
-    v.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
-    const mq = v.querySelector(".mq");
-    const distance = mq ? mq.scrollWidth / 2 : v.scrollWidth;
-    v.style.setProperty("--mq-duration", `${marqueeDuration(distance).toFixed(2)}s`);
-    v.classList.add("scroll");
-  }
-}
-
-function marqueeDuration(distance) {
-  // Slow, distance-aware marquee. The old media fallback used 9s for every
-  // title, which made long tracks rush across the card. The keyframes hold at
-  // rest for the first 12% of each cycle (a readable pause every loop), so the
-  // duration is stretched to keep the actual scroll speed unchanged.
-  return Math.max(18, Math.min(48, distance / 14)) / 0.88;
-}
-
-function setMarqueeText(el, text, keyName, force = false) {
-  if (!el) return;
-  if (!force && el.dataset[keyName] === text) return;
-  el.dataset[keyName] = text;
-  el.classList.remove("scroll");
-  el.style.removeProperty("--mq-duration");
-  el.textContent = text;
-  if (REDUCE_MOTION) return; // plain ellipsized line instead of a frozen marquee
-  if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
-  const safe = esc(text);
-  el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
-  const mq = el.querySelector(".mq");
-  const distance = mq ? mq.scrollWidth / 2 : el.scrollWidth;
-  const duration = marqueeDuration(distance);
-  el.style.setProperty("--mq-duration", `${duration.toFixed(2)}s`);
-  el.classList.add("scroll");
-}
-
-function setPreviewSubText(el, text, empty = false, force = false) {
-  const sub = el.querySelector(".w-pv-sub");
-  if (!sub) return;
-  sub.classList.toggle("empty", empty);
-  setMarqueeText(sub, text, "mqPreview", force);
-}
-
-function dockPreviewSnippet(text, max = 180) {
-  const s = String(text || "").replace(/\s+/g, " ").trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 3).trimEnd()}...`;
-}
-
-function refreshPreviewMarquees() {
-  document.querySelectorAll(".tile.widget.preview").forEach((el) => {
-    const sub = el.querySelector(".w-pv-sub");
-    if (!sub) return;
-    const text =
-      sub.dataset.mqPreview ||
-      sub.querySelector(".mq > span")?.textContent ||
-      sub.textContent ||
-      "";
-    setPreviewSubText(el, text, sub.classList.contains("empty"), true);
-  });
-}
-
 // Run fn over every cached element of a widget type (no per-tick DOM query).
 function eachWidget(type, fn) {
   const list = widgetEls[type];
@@ -927,15 +762,9 @@ function eachWidget(type, fn) {
 let lastClockKey = "";
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
-  const now = new Date();
-  const lang = curLang();
-  const key = `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}`;
+  const { key, time, date } = clockParts(new Date(), curLang());
   if (key === lastClockKey) return;
   lastClockKey = key;
-  const loc =
-    { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "de-DE" }[lang] || "en-US";
-  const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
-  const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
   eachWidget("clock", (el) => setText(el, date, time));
 }
 
@@ -1056,7 +885,7 @@ function adjustVolumeFromWheel(deltaY, sourceTile) {
       .catch(() => { volumeInfoPending = false; });
     return;
   }
-  const step = Math.abs(deltaY) > 80 ? 5 : 3;
+  const step = volumeStep(deltaY);
   queueVolumeSet(cur + (deltaY > 0 ? -step : step));
 }
 
@@ -2540,7 +2369,7 @@ async function openBackgroundMenu(e) {
   // make the menu taller than the screen's worth of attention.
   // Only offer widgets you don't already have — no point adding a second CPU
   // meter or clock. When they're all added, the whole section disappears.
-  const availableWidgets = WIDGETS.filter((type) => !widgetPresent(type));
+  const availableWidgets = WIDGET_ORDER.filter((type) => !widgetPresent(type));
   if (availableWidgets.length) {
     sep();
     addMenuLabel(t("m.widgets"));
@@ -2704,7 +2533,7 @@ async function removeItem(id) {
   if (!removed) return;
   // Play a quick fade+scale-out on the tile before the re-render swaps it away.
   const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
-  if (el && !REDUCE_MOTION) {
+  if (el && !reduceMotion()) {
     el.classList.add("tile-out");
     await new Promise((r) => setTimeout(r, 170));
   }
@@ -3532,7 +3361,7 @@ function dismissPop(pop, done) {
     if (done) done();
     return;
   }
-  if (REDUCE_MOTION) return finish();
+  if (reduceMotion()) return finish();
   pop.classList.add("closing");
   setTimeout(finish, 180);
 }
