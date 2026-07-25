@@ -1378,7 +1378,11 @@ function magnify(clientX, clientY) {
   if (!magCache) buildMagCache();
   // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
   // you leave still eases. This is what makes it feel crisp at high refresh.
-  dockEl.classList.add("mag-live");
+  // Guarded: re-adding a class that is already there still queues a mutation
+  // record, and this runs every frame — that single write was waking the
+  // observer below once per frame, which scheduled a full hit-rect report that
+  // raced the one magnify schedules itself.
+  if (!dockEl.classList.contains("mag-live")) dockEl.classList.add("mag-live");
   const base = baseSize();
   const maxScale = Math.max(1, cfg.zoom || 1.25);
   const spread = base * 2.0;
@@ -1436,22 +1440,29 @@ function scheduleMagHitRects() {
 function reportHitRectsLive() {
   if (!dockApi.setHitRects) return;
   try {
-    const tiles = [...dockEl.querySelectorAll(".tile")];
-    if (!tiles.length) return;
-    let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
-    for (const el of tiles) {
-      const r = el.getBoundingClientRect();
-      minL = Math.min(minL, r.left);
-      minT = Math.min(minT, r.top);
-      maxR = Math.max(maxR, r.right);
-      maxB = Math.max(maxB, r.bottom);
-    }
-    const pad = 6;
+    // Derive the region from the bar's RESTING rect plus the most the wave can
+    // ever add, instead of measuring every tile.
+    //
+    // This used to walk all the tiles and getBoundingClientRect() each one,
+    // from inside the magnify rAF — a forced layout right after writing their
+    // transforms, then an IPC call, every frame. On a 144Hz screen with a full
+    // bar that is ~2200 rect reads and 144 backend calls a second for as long
+    // as the cursor rests on the dock.
+    //
+    // The bound is exact: magnify scales a tile by at most `zoom` about the
+    // rail, lifts it 5px perpendicular and pushes neighbours base*0.22 along
+    // the bar. A pad covering all three is a superset of the real union — and,
+    // unlike the union, it does not change as the wave travels, so the
+    // signature check below collapses the whole gesture into one call.
+    const dr = magDockRect || dockEl.getBoundingClientRect();
+    const base = baseSize();
+    const grow = Math.max(0, (Math.max(1, cfg.zoom || 1.25) - 1) * base);
+    const pad = Math.ceil(grow + base * 0.22 + 6);
     const rect = [
-      Math.floor(minL - pad),
-      Math.floor(minT - pad),
-      Math.ceil(maxR - minL + pad * 2),
-      Math.ceil(maxB - minT + pad * 2),
+      Math.floor(dr.left - pad),
+      Math.floor(dr.top - pad),
+      Math.ceil(dr.width + pad * 2),
+      Math.ceil(dr.height + pad * 2),
     ];
     const sig = `mag:${rect.map(Math.round).join(",")}`;
     if (sig === lastHitSig) return;
@@ -3122,12 +3133,17 @@ new MutationObserver((mutations) => {
   if (dockEl.classList.contains("mag-live")) {
     const meaningful = mutations.some((m) => {
       if (m.type === "childList") return true;
-      if (m.attributeName === "class") return true;
-      if (m.attributeName === "style") {
-        const t = m.target;
-        if (t && t.classList && t.classList.contains("tile")) return false;
-        return true;
-      }
+      const t = m.target;
+      const onTile = !!(t && t.classList && t.classList.contains("tile"));
+      // A tile's own class/style churn during the wave is the magnify effect
+      // itself — the transform, the z-index, and the .focus ring hopping from
+      // tile to tile. Reporting on it made this observer race the magnify rAF:
+      // each recomputed a different region, so neither one's dedupe held and
+      // the dock emitted hit rects twice per frame. magnify() already schedules
+      // its own report. Anything NOT on a tile (body edit mode, an opening
+      // flyout) still counts.
+      if (onTile && (m.attributeName === "class" || m.attributeName === "style")) return false;
+      if (m.attributeName === "class" || m.attributeName === "style") return true;
       return false;
     });
     if (!meaningful) return;
