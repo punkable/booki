@@ -42,12 +42,14 @@
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 
-## What's new in 0.59
+## What's new in 0.68
 
-- **Smarter smart-hide** — occlusion uses the painted dock rect (not the flyout stage), so unrelated windows stop tucking the bar.
-- **Notch controls together** — size, peek, reveal, and always-visible live under Behavior.
-- **Settings survive uninstall** — `%APPDATA%\Booki` is kept unless you check *Delete app data*.
-- **Clearer groups** — reorder in the flyout, add apps or folders, running dots on group children.
+- **Fixed a crash on desktop PCs** — a pinned battery widget threw on every poll on any machine without a battery, froze on a placeholder, and filled the log.
+- **Widgets line up** — ring gauges and card artwork are sized from the space the card actually has, so nothing is clipped, and a vertical dock keeps one width for every widget.
+- **Lighter at rest** — settings are cached instead of read from disk twelve times a second, two duplicate cursor watchers became one, and the clock stopped reformatting itself sixty times a minute.
+- **All five languages complete** — Portuguese, French and German were each missing ninety strings and silently fell back to English.
+- **Usable from the keyboard** — Enter and Space launch a focused tile, the menu key opens its actions, and live widgets announce their updates.
+- **Reduced motion is respected everywhere** — including the two largest movements, which are drawn in JS and were never covered by the CSS setting.
 
 Older notes live in Settings → What's new.
 

@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.67.0"
+version = "0.68.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -8,7 +8,10 @@ rust-version = "1.77"
 
 [lib]
 name = "booki_dock_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop-only app: the binary links this as a normal Rust library. The
+# staticlib and cdylib artifacts come from Tauri's mobile template and are
+# built, and thrown away, on every release.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -34,10 +37,6 @@ log = "0.4"
 sysinfo = "0.32"
 # Tiny HTTP client to fetch a website's favicon when pinning it as a widget.
 ureq = "2"
-
-# Native window material (Acrylic/Mica on Windows; no-op elsewhere).
-[target.'cfg(windows)'.dependencies.window-vibrancy]
-version = "0.6"
 
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]
