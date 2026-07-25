@@ -1148,6 +1148,10 @@ fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
     apply_capture_policy(&app, cfg.capture_visible);
     let _ = app.emit("booki://config-changed", ());
     // Return the migrated/healed config — raw import JSON skips load() revs.
+    // save() leaves its own value cached, and that value has NOT been through
+    // load()'s migrations or group normalization, so the cache has to be dropped
+    // for this read or the import would come back unhealed.
+    config::invalidate_cache();
     Ok(config::load())
 }
 
@@ -1221,7 +1225,9 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         let _ = position_notch(&notch, &cfg.edge);
     }
     let _ = app.emit("booki://config-changed", ());
-    // Same as import: always hand Settings a load()-migrated snapshot.
+    // Same as import: always hand Settings a load()-migrated snapshot, so the
+    // cache save() just populated has to be dropped first (see import_config).
+    config::invalidate_cache();
     Ok(config::load())
 }
 
@@ -2489,9 +2495,16 @@ pub fn run() {
                                     let _ = watch.set_always_on_top(false);
                                     let _ = watch.set_always_on_top(true);
                                 }
+                                // Only while it is actually on screen. This used
+                                // to run unconditionally, so a hidden notch —
+                                // which is most of the time — still cost four
+                                // SetWindowPos calls every three seconds, waking
+                                // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
-                                    let _ = notch.set_always_on_top(false);
-                                    let _ = notch.set_always_on_top(true);
+                                    if notch.is_visible().unwrap_or(false) {
+                                        let _ = notch.set_always_on_top(false);
+                                        let _ = notch.set_always_on_top(true);
+                                    }
                                 }
                             }
                             // foreground_occludes = "the user is in an app". Smart
@@ -2572,92 +2585,104 @@ pub fn run() {
                     });
                 }
 
-                // Cursor watcher for the stage window: at ~30 ms it flips the
-                // dock between interactive and click-through against the hit
-                // rects reported by the frontend, and tells the frontend when
-                // the cursor enters/leaves the dock's live regions (DOM
-                // enter/leave events can't see that once the window is
-                // ignoring the mouse). GetCursorPos + a few rect tests — the
-                // per-tick cost is nanoseconds.
+                // Cursor watcher for the stage windows: it flips the dock and
+                // the notch between interactive and click-through against the hit
+                // rects the frontend reports, and tells the frontend when the
+                // cursor enters/leaves the dock's live regions (DOM enter/leave
+                // events cannot see that once a window ignores the mouse).
+                //
+                // The dock and the notch used to run this as two byte-identical
+                // threads, differing only in which window and which rect list
+                // they read. That doubled the timer wakeups — and the two are
+                // complementary anyway, since the notch is visible exactly when
+                // the dock is not. One thread now serves both: the loop sleeps
+                // for whichever window wants the shortest interval, so the total
+                // wakeup rate is halved without either window feeling slower.
                 #[cfg(windows)]
                 {
-                    let watch = dock.clone();
-                    let handle = app.handle().clone();
-                    std::thread::spawn(move || {
-                        let hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                        if hwnd == 0 {
-                            return;
-                        }
-                        let mut last: Option<bool> = None;
-                        loop {
-                            let (rects, all) = HIT_RECTS.lock().unwrap().clone();
-                            match win::cursor_in_rects(hwnd, &rects, all) {
-                                None => {
-                                    // Window hidden → leave it interactive so the
-                                    // next reveal is immediately usable; idle slower.
-                                    if last != Some(true) {
-                                        let _ = watch.set_ignore_cursor_events(false);
-                                        last = Some(true);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(180));
-                                }
-                                Some(inside) => {
-                                    if last != Some(inside) {
-                                        // Tauri's own path: applies the style with the
-                                        // proper frame refresh on the window's thread —
-                                        // a raw SetWindowLongPtr left the window in a
-                                        // half-applied state that could stop painting.
-                                        let _ = watch.set_ignore_cursor_events(!inside);
-                                        last = Some(inside);
-                                        let _ = handle.emit("booki://cursor-inside", inside);
-                                    }
-                                    // Keep the interactive state snappy while the
-                                    // cursor is over Booki, and use a lighter scan
-                                    // cadence while the window is click-through.
-                                    std::thread::sleep(std::time::Duration::from_millis(
-                                        if inside { 30 } else { 80 },
-                                    ));
-                                }
-                            }
-                        }
-                    });
-                }
+                    struct CursorTarget {
+                        window: tauri::WebviewWindow,
+                        hwnd: isize,
+                        rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                        /// Only the dock reports enter/leave to the frontend.
+                        emits_inside: bool,
+                        last: Option<bool>,
+                    }
 
-                // Notch hit watcher: same click-through contract as the dock, so
-                // transparent padding around the pill never steals clicks from
-                // apps underneath (attached / floating / smart alike).
-                #[cfg(windows)]
-                if let Some(notch_watch) = app.get_webview_window("notch") {
-                    std::thread::spawn(move || {
-                        let hwnd = notch_watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                    let handle = app.handle().clone();
+                    let mut targets: Vec<CursorTarget> = Vec::new();
+                    let mut add = |window: tauri::WebviewWindow,
+                                   rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                                   emits_inside: bool,
+                                   start_click_through: bool| {
+                        let hwnd = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
                         if hwnd == 0 {
                             return;
                         }
-                        // Start click-through until the frontend reports a pill rect.
-                        let _ = notch_watch.set_ignore_cursor_events(true);
-                        let mut last: Option<bool> = None;
-                        loop {
-                            let (rects, all) = NOTCH_HIT_RECTS.lock().unwrap().clone();
-                            match win::cursor_in_rects(hwnd, &rects, all) {
-                                None => {
-                                    if last != Some(true) {
-                                        let _ = notch_watch.set_ignore_cursor_events(false);
-                                        last = Some(true);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(180));
-                                }
-                                Some(inside) => {
-                                    if last != Some(inside) {
-                                        let _ = notch_watch.set_ignore_cursor_events(!inside);
-                                        last = Some(inside);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(
-                                        if inside { 30 } else { 80 },
-                                    ));
-                                }
-                            }
+                        if start_click_through {
+                            // The notch stays click-through until the frontend
+                            // reports a pill rect, so its transparent padding
+                            // never steals a click from the app underneath.
+                            let _ = window.set_ignore_cursor_events(true);
                         }
-                    });
+                        targets.push(CursorTarget {
+                            window,
+                            hwnd,
+                            rects,
+                            emits_inside,
+                            last: None,
+                        });
+                    };
+                    add(dock.clone(), &HIT_RECTS, true, false);
+                    if let Some(notch_watch) = app.get_webview_window("notch") {
+                        add(notch_watch, &NOTCH_HIT_RECTS, false, true);
+                    }
+                    drop(add);
+
+                    if !targets.is_empty() {
+                        std::thread::spawn(move || {
+                            loop {
+                                // Shortest interval any target asks for this tick.
+                                let mut next_ms = 180u64;
+                                for t in targets.iter_mut() {
+                                    let (rects, all) = match t.rects.lock() {
+                                        Ok(g) => g.clone(),
+                                        Err(_) => continue,
+                                    };
+                                    match win::cursor_in_rects(t.hwnd, &rects, all) {
+                                        None => {
+                                            // Window hidden -> leave it interactive so
+                                            // the next reveal is usable straight away,
+                                            // and let this one idle slowly.
+                                            if t.last != Some(true) {
+                                                let _ = t.window.set_ignore_cursor_events(false);
+                                                t.last = Some(true);
+                                            }
+                                        }
+                                        Some(inside) => {
+                                            if t.last != Some(inside) {
+                                                // Tauri's own path applies the style with
+                                                // the proper frame refresh on the window's
+                                                // thread; a raw SetWindowLongPtr left the
+                                                // window half-applied and it could stop
+                                                // painting.
+                                                let _ = t.window.set_ignore_cursor_events(!inside);
+                                                t.last = Some(inside);
+                                                if t.emits_inside {
+                                                    let _ = handle
+                                                        .emit("booki://cursor-inside", inside);
+                                                }
+                                            }
+                                            // Snappy while the cursor is over Booki,
+                                            // lighter while the window is click-through.
+                                            next_ms = next_ms.min(if inside { 30 } else { 80 });
+                                        }
+                                    }
+                                }
+                                std::thread::sleep(std::time::Duration::from_millis(next_ms));
+                            }
+                        });
+                    }
                 }
 
                 // Work-area self-heal: some setups change the usable screen space
@@ -2724,9 +2749,20 @@ pub fn run() {
                         }
 
                         loop {
-                            let autohide = win::taskbar_autohide();
+                            // The 80ms cadence exists to catch an auto-hiding
+                            // taskbar sliding in and out without rcWork ever
+                            // changing. That only matters when the user actually
+                            // asked the dock to follow it: with taskbar_follow
+                            // off there is nothing to react to quickly, yet this
+                            // still woke up 12.5 times a second forever. Checking
+                            // the setting first drops those users to the 1200ms
+                            // idle cadence — and while blacked out for a
+                            // fullscreen app, nothing needs repositioning at all.
+                            let blackout = FULLSCREEN_BLACKOUT.load(Ordering::Relaxed);
+                            let watching_taskbar =
+                                !blackout && cfg.taskbar_follow && win::taskbar_autohide();
                             std::thread::sleep(std::time::Duration::from_millis(
-                                if autohide || pending_drop.is_some() {
+                                if watching_taskbar || pending_drop.is_some() {
                                     80
                                 } else {
                                     1200
@@ -2736,13 +2772,19 @@ pub fn run() {
                                 continue;
                             };
                             cfg_tick = cfg_tick.wrapping_add(1);
-                            let cfg_every = if autohide || pending_drop.is_some() {
+                            let cfg_every = if watching_taskbar || pending_drop.is_some() {
                                 8
                             } else {
                                 5
                             };
                             if cfg_tick % cfg_every == 0 {
                                 cfg = config::load();
+                            }
+                            if blackout {
+                                // A fullscreen game/video owns the screen; both
+                                // windows are hidden, so skip the monitor and
+                                // work-area queries entirely this tick.
+                                continue;
                             }
                             let Some(monitor) = pick_monitor(&dock) else {
                                 continue;
