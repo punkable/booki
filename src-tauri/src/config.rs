@@ -4,6 +4,22 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::RwLock;
+
+/// In-memory copy of what is on disk.
+///
+/// `load()` used to read and parse `config.json` on every single call, and it is
+/// called from 39 places — including watcher loops that tick every 80ms and
+/// 300ms, and four times per `set_dock_frame` (which the dock issues on every
+/// reframe). With an auto-hide taskbar that worked out to roughly twelve full
+/// read+parse cycles per second, forever.
+///
+/// This is safe to cache because `save()` below is the only writer of
+/// `config.json`: import and profile-apply write elsewhere and then call it, so
+/// there is exactly one place to keep in sync. The trade-off is that editing
+/// `config.json` by hand while Booki is running no longer takes effect until
+/// restart — it never really did, since the app rewrites the file constantly.
+static CACHE: RwLock<Option<Config>> = RwLock::new(None);
 
 fn default_kind() -> String {
     "app".into()
@@ -416,9 +432,41 @@ fn read_config(path: &PathBuf) -> Option<Config> {
 /// pins, and stash the bad file for inspection. Falls back to defaults only when
 /// neither file is usable (e.g. a genuine first run).
 pub fn load() -> Config {
+    // Fast path: hand back the cached copy. The read guard is dropped before
+    // anything else runs — load_from_disk() applies migrations, which call
+    // save(), which takes the write lock. Holding a guard across that would
+    // deadlock.
+    if let Some(cfg) = CACHE.read().ok().and_then(|g| g.clone()) {
+        return cfg;
+    }
+    let cfg = load_from_disk();
+    if let Ok(mut w) = CACHE.write() {
+        *w = Some(cfg.clone());
+    }
+    cfg
+}
+
+/// Invalidate the cache so the next `load()` re-reads the file. For paths that
+/// replace `config.json` behind `save()`'s back (import, restore).
+pub fn invalidate_cache() {
+    if let Ok(mut w) = CACHE.write() {
+        *w = None;
+    }
+}
+
+fn load_from_disk() -> Config {
     let path = config_path();
-    // Clean any leftover temp file from an interrupted atomic save (no junk).
-    let _ = fs::remove_file(config_dir().join("config.json.tmp"));
+    // Sweep leftover temp files from an interrupted atomic save. The name
+    // carries a pid (see save), so a crashed run leaves one behind.
+    if let Ok(entries) = fs::read_dir(config_dir()) {
+        for e in entries.flatten() {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("config.json.") && name.ends_with(".tmp") {
+                let _ = fs::remove_file(e.path());
+            }
+        }
+    }
     let mut cfg = if let Some(c) = read_config(&path) {
         c
     } else if path.exists() {
@@ -589,7 +637,13 @@ pub fn save(config: &Config) -> Result<(), String> {
         to_write.notch_peek = to_write.notch_mode != "floating";
     }
     to_write.multi_notch_enabled = false;
-    if let Some(existing) = read_config(&config_path()) {
+    // The cache mirrors what is on disk, so it answers this without a read.
+    let existing = CACHE
+        .read()
+        .ok()
+        .and_then(|g| g.clone())
+        .or_else(|| read_config(&config_path()));
+    if let Some(existing) = existing {
         if existing.onboarded {
             to_write.onboarded = true;
         }
@@ -602,7 +656,13 @@ pub fn save(config: &Config) -> Result<(), String> {
     }
     let text = serde_json::to_string_pretty(&to_write).map_err(|e| e.to_string())?;
     let final_path = config_path();
-    let tmp_path = dir.join("config.json.tmp");
+    // The temp name carries the pid. It used to be a single shared
+    // "config.json.tmp", which defeated the atomicity the rest of this function
+    // is built for: the dock window, the Settings window and the backend all
+    // call save(), and two concurrent writers would truncate each other's temp
+    // file — one could then rename the other's half-written bytes over the real
+    // config.
+    let tmp_path = dir.join(format!("config.json.{}.tmp", std::process::id()));
     // Write the temp file and flush it all the way to disk before renaming, so a
     // power loss right after the rename can't leave an empty/zero-length config.
     {
@@ -612,6 +672,13 @@ pub fn save(config: &Config) -> Result<(), String> {
         f.sync_all().map_err(|e| e.to_string())?;
     }
     fs::rename(&tmp_path, &final_path).map_err(|e| e.to_string())?;
+    // Cache what was actually persisted, not the caller's value: the two differ
+    // (notch_mode is normalized, multi_notch_enabled forced off, and the
+    // one-way progress flags above are restored from disk). Caching the input
+    // would let the cache drift from the file.
+    if let Ok(mut w) = CACHE.write() {
+        *w = Some(to_write);
+    }
     // Keep a redundant last-good copy so a later corruption of config.json can be
     // healed on the next load without losing the user's setup. Best-effort.
     let _ = fs::copy(&final_path, backup_path());
