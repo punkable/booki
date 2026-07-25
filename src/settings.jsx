@@ -35,7 +35,6 @@ import {
   Dropdown,
   Option,
   Card,
-  CardHeader,
 } from "@fluentui/react-components";
 import {
   AddRegular,
@@ -94,7 +93,6 @@ import {
   resolveSurfaceStyle,
   legacyNotchFromSurface,
   surfaceAlpha,
-  resolveGlassTint,
   glassFillColor,
   applySurfaceVars,
 } from "./surface.js";

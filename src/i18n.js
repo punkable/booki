@@ -1,6 +1,10 @@
-/* Minimal i18n (ES/EN). t(key) returns the active-language string. */
+/* Minimal i18n. t(key) returns the active-language string.
+   es/en ship inline here; pt/fr/de are lazy-loaded from i18n-extra.js.
+   DICT is exported so tooling (scripts/check-i18n.mjs) can verify that every
+   language defines the same keys and that no t("…") call references a key that
+   does not exist. */
 
-const DICT = {
+export const DICT = {
   es: {
     "tab.appearance": "Apariencia",
     "tab.behavior": "Comportamiento",
