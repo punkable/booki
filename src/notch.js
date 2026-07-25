@@ -133,7 +133,15 @@ function scheduleHitReport() {
   });
 }
 
-// Keep hit rects fresh while visible (smart breathe/focus animates scale).
+// Keep hit rects fresh while the pill is animating (smart breathe/focus scales
+// it, and the rect has to follow or clicks land in the wrong place).
+//
+// KNOWN COST: this runs at 4Hz for the life of the app. The visibilityState
+// guard does not help, because a window the backend hid with ShowWindow still
+// reports "visible" here. Gating it properly needs a shown/hidden event from
+// Rust that does not exist yet — deliberately not half-wired: reportNotchHitRects
+// already dedupes by signature, so the waste is one getBoundingClientRect per
+// tick, not IPC.
 setInterval(() => {
   if (document.visibilityState === "visible") reportNotchHitRects();
 }, 250);

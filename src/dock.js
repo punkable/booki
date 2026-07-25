@@ -356,6 +356,10 @@ async function persist() {
 let widgetEls = {};
 function cacheWidgetEls() {
   widgetEls = {};
+  // The widget elements are about to be replaced, so any "already painted this
+  // minute" shortcut is stale — a fresh clock card would otherwise sit on its
+  // placeholder until the minute rolled over.
+  lastClockKey = "";
   // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
@@ -914,11 +918,21 @@ function eachWidget(type, fn) {
   if (list) list.forEach(fn);
 }
 
+// The poll loop ticks every second so the clock rolls over promptly, but the
+// card only shows hours and minutes: 59 of every 60 ticks used to reformat the
+// same two strings with Intl and write them straight back into the DOM. Keep
+// the 1s cadence (it is what makes the rollover feel immediate) and skip the
+// work when the displayed minute has not changed.
+let lastClockKey = "";
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
   const now = new Date();
+  const lang = curLang();
+  const key = `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}`;
+  if (key === lastClockKey) return;
+  lastClockKey = key;
   const loc =
-    { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "de-DE" }[curLang()] || "en-US";
+    { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "de-DE" }[lang] || "en-US";
   const time = now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
   const date = now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" });
   eachWidget("clock", (el) => setText(el, date, time));
