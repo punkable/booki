@@ -14,9 +14,10 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.1.0)"
-        required: true
-        default: "v0.1.0"
+        # No default on purpose: a stray manual run must not be able to publish
+        # a placeholder tag and then prune every real release behind it.
+        description: "Release tag (e.g. v0.68.0). Leave empty to use package.json."
+        required: false
 
 permissions:
   contents: write
@@ -53,12 +54,33 @@ jobs:
       - name: Check icons and emoji assets
         run: npm run check:icons
 
-      # Derive the release tag from package.json for manual runs. Normal
-      # publishing is tag-based, so a version ships exactly once.
+      # Resolve the release tag ONCE, here, and use steps.ver.outputs.tag
+      # everywhere below. This used to be a three-way expression repeated in
+      # five places, which could drift (the artifact name and the release could
+      # end up carrying different versions).
+      # Precedence: manual input > pushed tag > package.json version.
       - name: Resolve release tag
         id: ver
         shell: bash
-        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_TAG}" ]]; then
+            tag="${INPUT_TAG}"
+          elif [[ "${REF}" == refs/tags/* ]]; then
+            tag="${REF_NAME}"
+          else
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Refusing to release: '${tag}' is not a vMAJOR.MINOR.PATCH tag."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Release tag: ${tag}"
 
       - name: Build and publish release
         id: tauri
@@ -72,8 +94,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}
-          releaseName: "Booki ${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          tagName: ${{ steps.ver.outputs.tag }}
+          releaseName: "Booki ${{ steps.ver.outputs.tag }}"
           releaseBody: |
             **Booki** is a Tauri-based smart dock for Windows 10 and Windows 11.
 
@@ -89,26 +111,17 @@ jobs:
           # `releases/latest/download/latest.json` resolves. "Beta" is a label only.
           prerelease: false
 
-      # Always keep the built installers as Actions artifacts so a follow-up
-      # `gh release upload` can finish publishing if tauri-action cannot create
-      # the GitHub Release (e.g. restricted GITHUB_TOKEN on bot-pushed tags).
-      - name: Upload Windows installers as artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: booki-windows-${{ steps.ver.outputs.tag }}
-          path: |
-            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe
-            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe.sig
-            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi
-            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi.sig
-          if-no-files-found: error
-
       # Fallback: if tauri-action built bundles but could not create the GitHub
       # Release (common when GITHUB_TOKEN cannot publish tags cut off main),
       # publish the local installers with gh.
       # With continue-on-error, failed steps still report conclusion=success.
       # Use outcome (pre-continue-on-error) to detect a real publish failure.
+      #
+      # This runs BEFORE the artifact upload on purpose. The upload used to sit
+      # here with `if-no-files-found: error`, so when tauri-action died early
+      # (npm/cargo failure, no bundles on disk) the upload failed the job and
+      # the fallback — the whole reason continue-on-error exists — never got its
+      # turn. Publishing now comes first; archiving is best-effort after it.
       - name: Publish release from local bundles
         if: steps.tauri.outcome == 'failure'
         id: fallback
@@ -117,7 +130,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          TAG="${{ steps.ver.outputs.tag }}"
           VER="${TAG#v}"
           ROOT="src-tauri/target/release/bundle"
           mapfile -t FILES < <(find "${ROOT}/nsis" "${ROOT}/msi" -type f \( -name 'Booki_*.exe' -o -name 'Booki_*.msi' -o -name 'Booki_*.sig' \) 2>/dev/null | sort)
@@ -142,9 +155,20 @@ jobs:
           SIG="$(printf '%s\n' "${FILES[@]}" | grep 'x64-setup\.exe\.sig$' | head -n1 || true)"
           if [[ -n "${EXE}" ]]; then
             EXE_NAME="$(basename "${EXE}")"
-            SIG_B64=""
-            if [[ -n "${SIG}" && -f "${SIG}" ]]; then
-              SIG_B64="$(tr -d '\r\n' < "${SIG}")"
+            # An empty signature produces a latest.json that LOOKS published and
+            # passes an "is the file there?" check, but every installed client
+            # rejects it — the updater dies silently for everyone. Fail loudly
+            # instead of shipping one.
+            if [[ -z "${SIG}" || ! -f "${SIG}" ]]; then
+              echo "Refusing to publish latest.json: no .sig for ${EXE_NAME}."
+              echo "The updater would reject an unsigned manifest. Check the"
+              echo "TAURI_SIGNING_PRIVATE_KEY secrets."
+              exit 1
+            fi
+            SIG_B64="$(tr -d '\r\n' < "${SIG}")"
+            if [[ -z "${SIG_B64}" ]]; then
+              echo "Refusing to publish latest.json: ${SIG} is empty."
+              exit 1
             fi
             URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/${EXE_NAME}"
             jq -n \
@@ -165,28 +189,70 @@ jobs:
           echo "published=true" >> "$GITHUB_OUTPUT"
           echo "Published fallback release assets for ${TAG}"
 
+      # Keep the built installers as Actions artifacts too, so a human can
+      # finish publishing by hand if both the action and the fallback failed.
+      - name: Upload Windows installers as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: booki-windows-${{ steps.ver.outputs.tag }}
+          path: |
+            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe
+            src-tauri/target/release/bundle/nsis/Booki_*_x64-setup.exe.sig
+            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi
+            src-tauri/target/release/bundle/msi/Booki_*_x64_en-US.msi.sig
+          # `warn`, not `error`: a missing bundle here is already reported by the
+          # publish steps, and failing the job at this point would skip Verify
+          # and leave the release unchecked.
+          if-no-files-found: warn
+
       - name: Verify published installers
+        id: verify
         if: always() && (steps.tauri.outcome == 'success' || steps.fallback.outcome == 'success')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          set -euo pipefail
+          tag="${{ steps.ver.outputs.tag }}"
           assets="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
           echo "$assets"
           grep -Eq 'x64-setup\.exe$' <<< "$assets"
           grep -Eq '\.msi$' <<< "$assets"
           grep -Eq 'latest\.json$' <<< "$assets"
+          # Presence is not enough: a latest.json with an empty signature passes
+          # a filename check but is rejected by every installed client, which
+          # silently kills the auto-updater. Verify the manifest is usable.
+          tmp="$(mktemp -d)"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'latest.json' --dir "$tmp" --clobber
+          sig="$(jq -r '.platforms["windows-x86_64"].signature // ""' "$tmp/latest.json")"
+          url="$(jq -r '.platforms["windows-x86_64"].url // ""' "$tmp/latest.json")"
+          ver="$(jq -r '.version // ""' "$tmp/latest.json")"
+          if [[ -z "$sig" || -z "$url" || -z "$ver" ]]; then
+            echo "latest.json is unusable (version='$ver' url='$url' signature empty=$([[ -z "$sig" ]] && echo yes || echo no))"
+            exit 1
+          fi
+          if [[ "v$ver" != "$tag" ]]; then
+            echo "latest.json version 'v$ver' does not match release tag '$tag'"
+            exit 1
+          fi
+          echo "latest.json verified for $tag"
 
-      # Only prune AFTER a successful publish. Never delete the previous release
-      # when the new one failed to create (that left the repo with zero releases).
+      # Prune ONLY after Verify actually passed.
+      #
+      # This used to carry the same condition as Verify rather than depending on
+      # it, so a release that published but failed verification (e.g. an
+      # unusable latest.json) would still delete every previous release — and
+      # `--cleanup-tag` deletes the tags too, so there was no way back. That left
+      # a single broken release and a dead updater for every installed user.
       - name: Prune old releases
-        if: always() && (steps.tauri.outcome == 'success' || steps.fallback.outcome == 'success')
+        if: steps.verify.outcome == 'success'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          keep="${{ github.event.inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || steps.ver.outputs.tag }}"
+          keep="${{ steps.ver.outputs.tag }}"
           if ! gh release view "$keep" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Refusing to prune: release $keep does not exist"
             exit 1
@@ -195,6 +261,10 @@ jobs:
           gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | while read -r tag; do
             if [ -n "$tag" ] && [ "$tag" != "$keep" ]; then
               echo "Deleting old release $tag"
-              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+              # A failed delete must not fail the job — the new release is
+              # already published and verified — but it should be visible in the
+              # log rather than swallowed.
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag \
+                || echo "::warning::Could not delete old release $tag"
             fi
           done
