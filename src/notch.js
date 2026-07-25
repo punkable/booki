@@ -14,20 +14,11 @@ import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
+import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
 const inTauri = !!winApi;
-
-function availW() {
-  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
-  return inTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
-}
-
-function availH() {
-  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
-  return inTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
-}
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
 let notchMode = "attached";
@@ -97,13 +88,6 @@ onOcclusion((v) => setSmartState("smart-focus", v));
 
 // ─── Hit-testing: only the painted pill (or toast) is clickable ───────────
 // Window-relative CSS px [x, y, w, h], matching the dock's set_hit_rects.
-function rectFromElement(el, inflate = 0) {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
-  return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
-}
-
 function reportNotchHitRects() {
   const toasting = document.body.classList.contains("toast");
   // During drag or toast, keep the whole notch window interactive so gestures
@@ -118,7 +102,7 @@ function reportNotchHitRects() {
     const pillRect = rectFromElement(pill, 1);
     if (pillRect) rects.push(pillRect);
   }
-  const sig = all ? "all" : rects.map((r) => r.map((n) => Math.round(n)).join(",")).join(";");
+  const sig = hitSignature(rects, all);
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   invoke("set_notch_hit_rects", { rects, all }).catch(() => {});
@@ -290,8 +274,8 @@ pill.addEventListener("pointerup", (e) => {
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.
-  const sw = availW();
-  const sh = availH();
+  const sw = availW(inTauri);
+  const sh = availH(inTauri);
   const dist = { left: e.screenX, right: sw - e.screenX, top: e.screenY, bottom: sh - e.screenY };
   let edge = "bottom";
   let best = Infinity;

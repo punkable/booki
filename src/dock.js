@@ -38,6 +38,7 @@ import {
   widgetDisplayName,
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
+import { availW, availH, rectFromElement, pointInRect, hitSignature } from "./dock/geometry.js";
 import {
   MEDIA_SVG,
   BATTERY_LOW,
@@ -66,16 +67,6 @@ const dockEl = document.getElementById("dock");
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 const undoToast = document.getElementById("undo-toast");
-
-function availW() {
-  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
-  return isTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
-}
-
-function availH() {
-  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
-  return isTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
-}
 
 // Safe .closest() — pointer/keyboard targets can be non-Element (document/window),
 // which would throw "closest is not a function".
@@ -451,7 +442,7 @@ const MIN_TILE = 30;
 function fitDock() {
   setAllSizes(baseSize());
   const vertical = isVertical();
-  const span = vertical ? availH() : availW();
+  const span = vertical ? availH(isTauri) : availW(isTauri);
   // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
   // usable, or a full bar would overflow past the far screen edge.
   const slotPad = cfg && cfg.notchPosition && cfg.notchPosition !== "center" ? span * 0.12 : 0;
@@ -2617,13 +2608,13 @@ function computeFrame() {
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
-    hCss = availH();
+    hCss = availH(isTauri);
   } else {
-    wCss = availW();
+    wCss = availW(isTauri);
     hCss = dockEl.offsetHeight + edgePad + PANEL_ROOM;
   }
-  wCss = Math.min(wCss, availW());
-  hCss = Math.min(hCss, availH());
+  wCss = Math.min(wCss, availW(isTauri));
+  hCss = Math.min(hCss, availH(isTauri));
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -2634,13 +2625,13 @@ function computeHomeFrame() {
   let wCss, hCss;
   if (isVertical()) {
     wCss = dockEl.offsetWidth + edgePad;
-    hCss = availH();
+    hCss = availH(isTauri);
   } else {
-    wCss = availW();
+    wCss = availW(isTauri);
     hCss = dockEl.offsetHeight + edgePad;
   }
-  wCss = Math.min(wCss, availW());
-  hCss = Math.min(hCss, availH());
+  wCss = Math.min(wCss, availW(isTauri));
+  hCss = Math.min(hCss, availH(isTauri));
   return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
 }
 
@@ -2921,17 +2912,6 @@ const DOCK_HIT_PAD = 0;
 const TILE_HIT_PAD = 2;
 const PANEL_HIT_PAD = 4;
 
-function rectFromElement(el, inflate = 0) {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
-  return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
-}
-
-function pointInRect(x, y, rect) {
-  return !!rect && x >= rect[0] && x < rect[0] + rect[2] && y >= rect[1] && y < rect[1] + rect[3];
-}
-
 function pointInLiveHitArea(x, y) {
   if (edgeMove || dragging || draggingFile) return true;
   const rects = [
@@ -2973,7 +2953,7 @@ function reportHitRects() {
     ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
   ))
     add(el, PANEL_HIT_PAD);
-  const sig = all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
+  const sig = hitSignature(rects, all);
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   dockApi.setHitRects(rects, all).catch(() => {});
