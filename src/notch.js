@@ -15,6 +15,7 @@ import { t, setLang, ensureLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
+import { reduceMotion } from "./dock/motion.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -306,6 +307,16 @@ function tweenNotch(from, to, ms, done) {
     return;
   }
   const w = winApi.getCurrentWindow();
+  // The notch travelling across the screen is one of the larger movements
+  // Booki makes, and it is driven by setPosition, not CSS — so the global
+  // reduced-motion override never reached it. Jump straight to the new edge.
+  if (reduceMotion()) {
+    try {
+      w.setPosition(new winApi.LogicalPosition(Math.round(to.x), Math.round(to.y)));
+    } catch (_) {}
+    done && done();
+    return;
+  }
   const t0 = performance.now();
   const ease = (p) => 1 - Math.pow(1 - p, 3);
   const frame = (now) => {
