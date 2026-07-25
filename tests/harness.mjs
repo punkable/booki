@@ -8,12 +8,12 @@
    Run `npm run build` first; these tests read `dist/`. */
 import http from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { extname, join, dirname } from "node:path";
+import { extname, join, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-export const DIST = join(HERE, "..", "dist");
+export const DIST = resolve(HERE, "..", "dist");
 
 const MIME = {
   ".html": "text/html",
@@ -32,9 +32,23 @@ export function assertBuilt() {
 
 export async function serveDist() {
   const srv = http.createServer((req, res) => {
-    const rel = req.url.split("?")[0];
-    const p = join(DIST, rel === "/" ? "index.html" : rel);
-    if (!existsSync(p) || !p.startsWith(DIST)) {
+    // Resolve the request inside dist/ and prove it stayed there.
+    //
+    // The old guard was `p.startsWith(DIST)`, which is a prefix test on a
+    // string rather than on a path: `../../etc/passwd` was caught, but a
+    // sibling directory named `dist-anything` passed it cleanly, because its
+    // path really does start with those letters. Comparing against
+    // `DIST + sep` is the difference between "inside dist" and "spelled like
+    // dist". Containment is also checked before touching the filesystem, so a
+    // rejected path is never stat'd.
+    //
+    // This server only ever listens on localhost during `npm test` and serves
+    // a build directory, so nothing here was reachable by an attacker — but a
+    // containment check that does not check containment is worth fixing where
+    // it is written, not where it happens to be harmless.
+    const rel = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
+    const p = resolve(DIST, `.${rel === "/" ? "/index.html" : rel}`);
+    if ((p !== DIST && !p.startsWith(DIST + sep)) || !existsSync(p)) {
       res.writeHead(404);
       res.end();
       return;
