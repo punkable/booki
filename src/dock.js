@@ -2144,30 +2144,6 @@ async function takeOutChild(group, childId) {
   }
 }
 
-/** Unpin (delete) a child from a group — only via explicit trash, not drag-out. */
-async function removeChildFromGroup(group, childId) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
-  if (gi < 0) return;
-  const grp = cfg.pinned[gi];
-  const kids = (grp.children || []).filter((c) => c.id !== childId);
-  let reopenId = grp.id;
-  if (kids.length < 2) {
-    cfg.pinned.splice(gi, 1, ...kids);
-    reopenId = null;
-  } else {
-    grp.children = kids;
-  }
-  await persist();
-  closeStack();
-  await render();
-  reframe();
-  if (reopenId) {
-    const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
-    const it = cfg.pinned.find((p) => p.id === reopenId);
-    if (tileEl && it) openStack(tileEl, it);
-  }
-}
-
 /** Reorder a child inside its group and reopen the flyout. */
 async function reorderGroupChild(group, childId, beforeId) {
   const gi = cfg.pinned.findIndex((p) => p.id === group.id);
@@ -2863,7 +2839,6 @@ window.addEventListener("resize", () => {
 let hiddenState = false;
 let hideTimer = null;
 let occluded = false; // last occlusion signal from the backend (smart mode)
-let manualReveal = false; // user hovered/clicked the notch → keep shown for now
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
 let draggingFile = false; // an OS file drag is over the dock → keep it open
@@ -2901,7 +2876,6 @@ function onFullscreenSignal(value) {
     fullscreen = true;
     hiddenBeforeFullscreen = hiddenState;
     pinnedReveal = false;
-    manualReveal = false;
     hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
@@ -3025,7 +2999,6 @@ function interacting() {
 function tryTuck() {
   if (fullscreen || previewing || !wantsHideNow()) return;
   if (interacting()) return; // deferred: pointer-out / gesture-end re-checks
-  manualReveal = false;
   setHidden(true);
 }
 
@@ -3178,7 +3151,6 @@ function setupAutoHide() {
   // (config reload / preview end during a game would flash Booki over it).
   if (fullscreen) return;
   clearTimeout(hideTimer);
-  manualReveal = false;
   pinnedReveal = false;
   // smart starts hidden only if we're currently in an app (occluded), so a
   // config reload while working doesn't flash the dock open. edge now starts
@@ -3209,7 +3181,6 @@ function reveal() {
   // the dock returns only on the desktop or when you click the notch.
   if (mode === "smart" && occluded && !pinnedReveal) return;
   clearTimeout(hideTimer);
-  manualReveal = true;
   setHidden(false);
 }
 
@@ -3247,7 +3218,6 @@ function onOcclusionSignal(value) {
     occRevealTimer = setTimeout(() => {
       if (occluded || fullscreen || manualHide || hideMode() !== "smart") return;
       pinnedReveal = false;
-      manualReveal = false;
       setHidden(false);
     }, SMART_REVEAL_DELAY);
   } else if (pointerInside || interacting()) {
@@ -3261,7 +3231,6 @@ function onOcclusionSignal(value) {
     // Working in another window → tuck away. Even a dock pinned open from the
     // notch hides once you switch to another app.
     pinnedReveal = false;
-    manualReveal = false;
     setHidden(true);
   }
 }
@@ -3330,12 +3299,6 @@ window.addEventListener("pointerdown", (e) => {
 
 // ─────────────────── Desktop file drop ───────────────────
 
-function tileFromPoint(position) {
-  if (!position) return null;
-  const dpr = window.devicePixelRatio || 1;
-  const el = document.elementFromPoint(position.x / dpr, position.y / dpr);
-  return el ? el.closest(".tile[data-id]") : null;
-}
 // Where would a dropped file land? Aiming at the CENTER of a tile that accepts
 // drops (app = open-with, folder = move, group = pin inside, trash = delete)
 // targets that tile; anywhere else is an INSERTION between tiles — the bar
