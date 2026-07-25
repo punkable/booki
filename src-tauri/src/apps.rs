@@ -81,7 +81,11 @@ pub fn reveal(path: &str) -> Result<(), String> {
             .parent()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| ".".into());
-        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        let opener = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
         Command::new(opener)
             .arg(parent)
             .spawn()
@@ -98,13 +102,22 @@ fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
     use windows::core::PCWSTR;
     use windows::Win32::UI::Shell::ShellExecuteW;
     use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let wide = |s: &str| {
+        s.encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<u16>>()
+    };
     let wpath = wide(path);
     let params = args
         .iter()
         .take(32)
         .filter(|a| !a.contains('\0'))
-        .map(|a| format!("\"{}\"", a.replace('"', "").chars().take(1024).collect::<String>()))
+        .map(|a| {
+            format!(
+                "\"{}\"",
+                a.replace('"', "").chars().take(1024).collect::<String>()
+            )
+        })
         .collect::<Vec<_>>()
         .join(" ");
     let wparams = wide(&params);
