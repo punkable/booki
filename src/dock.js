@@ -39,6 +39,7 @@ import {
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
 import { availW, availH, rectFromElement, pointInRect, hitSignature } from "./dock/geometry.js";
+import { placeBesideBar, transformOrigin } from "./dock/placement.js";
 import {
   MEDIA_SVG,
   BATTERY_LOW,
@@ -1024,17 +1025,16 @@ function editNote(item) {
   pinnedReveal = true; // keep the dock open while writing
   applyFrame(); // grow the window so the editor isn't clipped
   const place = () => {
-    const r = tile.getBoundingClientRect();
-    const gap = 10;
-    const w = ta.offsetWidth, h = ta.offsetHeight;
-    let x = r.left + r.width / 2 - w / 2;
-    let y = cfg.edge === "top" ? r.bottom + gap : r.top - h - gap;
-    if (isVertical()) {
-      y = r.top + r.height / 2 - h / 2;
-      x = cfg.edge === "left" ? r.right + gap : r.left - w - gap;
-    }
-    ta.style.left = `${Math.max(6, Math.min(x, window.innerWidth - w - 6))}px`;
-    ta.style.top = `${Math.max(6, Math.min(y, window.innerHeight - h - 6))}px`;
+    // Anchored to the note's own tile, not the whole bar.
+    const { left, top } = placeBesideBar({
+      bar: tile.getBoundingClientRect(),
+      box: { width: ta.offsetWidth, height: ta.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      pad: 6,
+    });
+    ta.style.left = `${left}px`;
+    ta.style.top = `${top}px`;
   };
   place();
   setTimeout(() => { place(); ta.focus(); ta.select(); }, 80);
@@ -2416,33 +2416,19 @@ function placeMenu(e) {
   document.body.classList.add("menu-open");
   applyFrame();
   const put = () => {
-    const dr = dockEl.getBoundingClientRect();
-    const pad = 8;
-    const gap = 10;
-    const mw = ctxMenu.offsetWidth;
-    const mh = ctxMenu.offsetHeight;
-    // Clamp BOTH axes into the window — a long menu near a corner used to get
-    // sliced at the window edge (worst on vertical docks).
-    const maxTop = Math.max(pad, window.innerHeight - mh - pad);
-    const maxLeft = Math.max(pad, window.innerWidth - mw - pad);
-    if (isVertical()) {
-      const top = Math.min(Math.max(pad, cy - mh / 2), maxTop);
-      ctxMenu.style.top = `${top}px`;
-      let left = cfg.edge === "left" ? dr.right + gap : dr.left - mw - gap;
-      left = Math.min(Math.max(pad, left), maxLeft);
-      ctxMenu.style.left = `${left}px`;
-    } else {
-      const left = Math.min(Math.max(pad, cx - mw / 2), maxLeft);
-      ctxMenu.style.left = `${left}px`;
-      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - mh - gap;
-      top = Math.min(Math.max(pad, top), maxTop);
-      ctxMenu.style.top = `${top}px`;
-    }
+    const { left, top } = placeBesideBar({
+      bar: dockEl.getBoundingClientRect(),
+      box: { width: ctxMenu.offsetWidth, height: ctxMenu.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      along: isVertical() ? cy : cx,
+    });
+    ctxMenu.style.left = `${left}px`;
+    ctxMenu.style.top = `${top}px`;
     // Scale the menu out from the point that opened it (the cursor/tile), not
     // its own center — keeps the spatial link between trigger and content.
-    const r = ctxMenu.getBoundingClientRect();
-    ctxMenu.style.transformOrigin =
-      `${Math.min(Math.max(0, cx - r.left), r.width)}px ${Math.min(Math.max(0, cy - r.top), r.height)}px`;
+    const o = transformOrigin(ctxMenu.getBoundingClientRect(), cx, cy);
+    ctxMenu.style.transformOrigin = `${o.x}px ${o.y}px`;
   };
   put();
   // The window resizes asynchronously after applyFrame(); reposition again the
@@ -3365,28 +3351,18 @@ function placePop(pop) {
   document.body.classList.add("pop-open");
   applyFrame(); // grow the window before anything is visible
   const put = () => {
-    // Center on the BAR (not the window: a slot-aligned dock sits off-center)
-    // and clamp both axes into the viewport, like placeMenu does.
-    const dr = dockEl.getBoundingClientRect();
-    const gap = 12;
-    const pad = 8;
-    const pw = pop.offsetWidth;
-    const ph = pop.offsetHeight;
+    // Centre on the BAR, not the window: a slot-aligned dock sits off-centre.
     pop.style.left = pop.style.right = pop.style.top = pop.style.bottom = "";
     pop.style.transform = "";
-    if (isVertical()) {
-      const top = Math.min(Math.max(pad, dr.top + dr.height / 2 - ph / 2), window.innerHeight - ph - pad);
-      pop.style.top = `${top}px`;
-      let left = cfg.edge === "left" ? dr.right + gap : dr.left - pw - gap;
-      left = Math.min(Math.max(pad, left), window.innerWidth - pw - pad);
-      pop.style.left = `${left}px`;
-    } else {
-      const left = Math.min(Math.max(pad, dr.left + dr.width / 2 - pw / 2), window.innerWidth - pw - pad);
-      pop.style.left = `${left}px`;
-      let top = cfg.edge === "top" ? dr.bottom + gap : dr.top - ph - gap;
-      top = Math.min(Math.max(pad, top), window.innerHeight - ph - pad);
-      pop.style.top = `${top}px`;
-    }
+    const { left, top } = placeBesideBar({
+      bar: dockEl.getBoundingClientRect(),
+      box: { width: pop.offsetWidth, height: pop.offsetHeight },
+      edge: cfg.edge,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      gap: 12,
+    });
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
   };
   put();
   // Reveal only after the window has grown and the popover sits in place.
@@ -3400,9 +3376,14 @@ function placePop(pop) {
   // popover is now hard-positioned (no translate centering), re-run put() on
   // any size change so every step stays centered on the bar and in-viewport.
   if (typeof ResizeObserver !== "undefined") {
-    new ResizeObserver(() => {
+    // Disconnect once the popover leaves the document. An observer left
+    // watching a detached node keeps it (and its whole subtree) alive, and the
+    // dock opens one of these for every trash prompt and coach step.
+    const ro = new ResizeObserver(() => {
       if (pop.isConnected) put();
-    }).observe(pop);
+      else ro.disconnect();
+    });
+    ro.observe(pop);
   }
 }
 
@@ -4319,36 +4300,16 @@ window.addEventListener("pointerdown", (e) => {
 function placeUpdatePill() {
   const pill = document.getElementById("update-pill");
   if (!pill || pill.classList.contains("hidden")) return;
-  const r = dockEl.getBoundingClientRect();
-  const pad = 8;
-  const gap = 8;
-  pill.style.left = "";
-  pill.style.right = "";
-  pill.style.top = "";
-  pill.style.bottom = "";
-  if (isVertical()) {
-    const top = Math.min(
-      Math.max(pad, r.top + r.height / 2 - pill.offsetHeight / 2),
-      Math.max(pad, window.innerHeight - pill.offsetHeight - pad)
-    );
-    const left =
-      (cfg.edge || "bottom") === "left"
-        ? Math.min(r.right + gap, window.innerWidth - pill.offsetWidth - pad)
-        : Math.max(pad, r.left - pill.offsetWidth - gap);
-    pill.style.top = `${top}px`;
-    pill.style.left = `${left}px`;
-  } else {
-    const left = Math.min(
-      Math.max(pad, r.left + r.width / 2 - pill.offsetWidth / 2),
-      Math.max(pad, window.innerWidth - pill.offsetWidth - pad)
-    );
-    const top =
-      (cfg.edge || "bottom") === "top"
-        ? Math.min(r.bottom + gap, window.innerHeight - pill.offsetHeight - pad)
-        : Math.max(pad, r.top - pill.offsetHeight - gap);
-    pill.style.left = `${left}px`;
-    pill.style.top = `${top}px`;
-  }
+  pill.style.left = pill.style.right = pill.style.top = pill.style.bottom = "";
+  const { left, top } = placeBesideBar({
+    bar: dockEl.getBoundingClientRect(),
+    box: { width: pill.offsetWidth, height: pill.offsetHeight },
+    edge: cfg.edge || "bottom",
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    gap: 8,
+  });
+  pill.style.left = `${left}px`;
+  pill.style.top = `${top}px`;
 }
 
 async function checkUpdates() {
