@@ -1219,8 +1219,16 @@ function magnify(clientX, clientY) {
   // raced the one magnify schedules itself.
   if (!dockEl.classList.contains("mag-live")) dockEl.classList.add("mag-live");
   const base = baseSize();
-  const maxScale = Math.max(1, cfg.zoom || 1.25);
-  const spread = base * 2.0;
+  // Reduced motion reaches magnify here, not through CSS: the wave is written
+  // as an inline transform every frame, which the global override cannot touch,
+  // so the setting used to do nothing at all to the dock's largest animation.
+  // What goes is the decoration — neighbours rippling outward, tiles lifting
+  // off the bar. What stays is a small scale on the tile under the pointer,
+  // because that is not ornament: it is how you know what you are about to
+  // click, and removing it would make the dock harder to use, not calmer.
+  const calm = reduceMotion();
+  const maxScale = calm ? Math.min(1.12, Math.max(1, cfg.zoom || 1.25)) : Math.max(1, cfg.zoom || 1.25);
+  const spread = calm ? base * 0.6 : base * 2.0;
   const vertical = isVertical();
   const mainAxis = vertical ? "Y" : "X";
   const liftAxis = vertical ? "X" : "Y";
@@ -1236,9 +1244,9 @@ function magnify(clientX, clientY) {
     // Lift toward the screen interior (translate BEFORE scale so it stays a
     // constant px amount). Neighbours also push along the bar — the wave.
     // Rail-origin scale does most of the "lift"; keep translate modest.
-    const lift = Math.round(influence * 5);
+    const lift = calm ? 0 : Math.round(influence * 5);
     const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    const push = item.noMag ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
+    const push = item.noMag || calm ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
     const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
     item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
     item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
@@ -2411,7 +2419,7 @@ function placeMenu(e) {
   const cy = e.clientY;
   // Measure invisibly, grow the window FIRST, then reveal in its final spot —
   // one paint, no flicker from the window resizing under an already-visible menu.
-  ctxMenu.style.visibility = "hidden";
+  ctxMenu.classList.add("measuring");
   ctxMenu.classList.remove("hidden");
   document.body.classList.add("menu-open");
   applyFrame();
@@ -2438,7 +2446,7 @@ function placeMenu(e) {
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       put();
-      ctxMenu.style.visibility = "";
+      ctxMenu.classList.remove("measuring");
     });
   });
 }
@@ -3346,7 +3354,7 @@ function closeTrashPop() {
 // Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never
 // on top of it — and grow the window so nothing gets clipped.
 function placePop(pop) {
-  pop.style.visibility = "hidden";
+  pop.classList.add("measuring");
   document.body.appendChild(pop);
   document.body.classList.add("pop-open");
   applyFrame(); // grow the window before anything is visible
@@ -3369,7 +3377,7 @@ function placePop(pop) {
   setTimeout(() => {
     requestAnimationFrame(() => {
       put();
-      pop.style.visibility = "";
+      pop.classList.remove("measuring");
     });
   }, 70);
   // The coach swaps its content per step WITHOUT re-calling placePop; since the
