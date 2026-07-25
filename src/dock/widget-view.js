@@ -79,6 +79,13 @@ export function clockParts(now, lang) {
 
 // ── markup ────────────────────────────────────────────────────────────────
 
+/* Widgets whose text changes on its own while you are looking at the bar. A
+   screen reader has no way to know a value updated unless the region says so,
+   and "polite" means it waits for a pause rather than interrupting. The clock
+   is deliberately not on this list: announcing the time every minute, forever,
+   is noise, not information. */
+export const LIVE_WIDGETS = ["cpu", "ram", "disk", "net", "battery", "media", "volume", "clipboard"];
+
 /** Inner markup of `.w-card` for a widget type. Ring, preview or plain. */
 export function widgetCardHTML(type) {
   if (PREVIEW_WIDGETS.includes(type)) {

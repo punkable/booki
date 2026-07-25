@@ -176,14 +176,17 @@ window.addEventListener("unhandledrejection", (e) =>
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+// Accent swatches. The names are the swatches' only label — they are the
+// tooltip and the accessible name — and they used to be written in Spanish
+// here, so four of the five languages showed "Ámbar" and "Naranja".
 const ACCENTS = [
-  ["Tan (Booki)", "#dfaa75"],
-  ["Ámbar", "#ffbe0b"],
-  ["Naranja", "#fb5607"],
-  ["Rosa", "#ff006e"],
-  ["Violeta", "#8338ec"],
-  ["Azul", "#3a86ff"],
-  ["Verde", "#2ecc71"],
+  ["ac.tan", "#dfaa75"],
+  ["ac.amber", "#ffbe0b"],
+  ["ac.orange", "#fb5607"],
+  ["ac.pink", "#ff006e"],
+  ["ac.violet", "#8338ec"],
+  ["ac.blue", "#3a86ff"],
+  ["ac.green", "#2ecc71"],
 ];
 
 const LANG_OPTIONS = [
@@ -824,13 +827,14 @@ function AccentPicker({ value, onChange }) {
   return (
     <div className="accent-picker">
       <div className="accent-swatches">
-        {ACCENTS.map(([name, val]) => (
+        {ACCENTS.map(([nameKey, val]) => (
           <button
             key={val}
             type="button"
             className={"accent-sw" + (v === val.toLowerCase() ? " active" : "")}
             style={{ "--sw": val }}
-            title={name}
+            title={t(nameKey)}
+            aria-label={t(nameKey)}
             onClick={() => onChange(val)}
           >
             <span className="accent-check">✓</span>
