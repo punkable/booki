@@ -1,5 +1,11 @@
 //! Non-Windows fallbacks. These let the crate compile and the frontend run in a
 //! browser during development; native dock behavior is Windows-only.
+//!
+//! Every function here exists to mirror the `windows_impl` surface one-for-one,
+//! so `win::foo` resolves on both platforms. Most are therefore never called in
+//! a Linux build — that is the point, not an oversight, and `cargo clippy
+//! -D warnings` on Linux would otherwise fail on all of them.
+#![allow(dead_code)]
 
 use super::WindowInfo;
 

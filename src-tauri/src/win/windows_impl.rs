@@ -7,8 +7,18 @@ use std::path::Path;
 
 use base64::Engine;
 use windows::core::{Interface, PCWSTR, PWSTR};
+use windows::Win32::Foundation::POINT;
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
+use windows::Win32::Graphics::Gdi::{
+    CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
+    MonitorFromPoint, MonitorFromWindow, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
+    DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    MONITOR_DEFAULTTONULL,
+};
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator};
+use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
+use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_ALL, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED, STGM_READ,
@@ -17,16 +27,6 @@ use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
-use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
-use windows::Win32::Foundation::POINT;
-use windows::Win32::Graphics::Gdi::{
-    CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
-    MonitorFromPoint, MonitorFromWindow, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
-    DIB_RGB_COLORS, HBITMAP, HDC, HGDIOBJ, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
-    MONITOR_DEFAULTTONULL,
-};
-use windows::Win32::Storage::FileSystem::FILE_FLAGS_AND_ATTRIBUTES;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow, GetIconInfo,
@@ -532,7 +532,7 @@ pub fn work_area_ex(x: i32, y: i32, follow_visible_tray: bool) -> Option<(i32, i
 /// work-area changes faster while the bar can slide over the screen without
 /// changing `rcWork`.
 pub fn taskbar_autohide() -> bool {
-    use windows::Win32::UI::Shell::{ABM_GETSTATE, ABS_AUTOHIDE, APPBARDATA, SHAppBarMessage};
+    use windows::Win32::UI::Shell::{SHAppBarMessage, ABM_GETSTATE, ABS_AUTOHIDE, APPBARDATA};
     unsafe {
         let mut data = APPBARDATA {
             cbSize: std::mem::size_of::<APPBARDATA>() as u32,
@@ -653,8 +653,13 @@ pub fn foreground_app_name() -> Option<String> {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buf = [0u16; 512];
         let mut size = buf.len() as u32;
-        QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut size)
-            .ok()?;
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buf.as_mut_ptr()),
+            &mut size,
+        )
+        .ok()?;
         let path = String::from_utf16_lossy(&buf[..size as usize]);
         Path::new(&path)
             .file_stem()
@@ -736,8 +741,7 @@ pub fn is_fullscreen() -> bool {
         // presentation mode, or a busy/fullscreen app (movies). This is exactly
         // what Windows uses to suppress its own notifications.
         use windows::Win32::UI::Shell::{
-            SHQueryUserNotificationState, QUNS_PRESENTATION_MODE,
-            QUNS_RUNNING_D3D_FULL_SCREEN,
+            SHQueryUserNotificationState, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
         };
         if let Ok(state) = SHQueryUserNotificationState() {
             // Intentionally ignore QUNS_BUSY — Windows uses it for many
@@ -805,7 +809,11 @@ pub fn set_capture_visible(hwnd: isize, visible: bool) {
         SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
     };
     let handle = HWND(hwnd as *mut c_void);
-    let affinity = if visible { WDA_NONE } else { WDA_EXCLUDEFROMCAPTURE };
+    let affinity = if visible {
+        WDA_NONE
+    } else {
+        WDA_EXCLUDEFROMCAPTURE
+    };
     unsafe {
         let _ = SetWindowDisplayAffinity(handle, affinity);
     }
@@ -873,8 +881,7 @@ pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
         let result = if enabled {
             // Quote the path so spaces in the install dir can't break the command.
             let cmd = wide(&format!("\"{exe}\""));
-            let bytes =
-                std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
+            let bytes = std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
             let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_SZ, Some(bytes));
             if r.is_err() {
                 Err(format!("could not write the Run registry value ({r:?})"))
@@ -901,8 +908,8 @@ pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
 pub fn known_folders() -> Vec<(String, String)> {
     use windows::Win32::System::Com::CoTaskMemFree;
     use windows::Win32::UI::Shell::{
-        SHGetKnownFolderPath, FOLDERID_Desktop, FOLDERID_Documents, FOLDERID_Downloads,
-        FOLDERID_Music, FOLDERID_Pictures, FOLDERID_Videos, KF_FLAG_DEFAULT,
+        FOLDERID_Desktop, FOLDERID_Documents, FOLDERID_Downloads, FOLDERID_Music,
+        FOLDERID_Pictures, FOLDERID_Videos, SHGetKnownFolderPath, KF_FLAG_DEFAULT,
     };
     let ids = [
         ("desktop", &FOLDERID_Desktop),
@@ -931,9 +938,7 @@ pub fn known_folders() -> Vec<(String, String)> {
 /// resized-but-not-yet-moved frame — that intermediate paint was the dock's
 /// "blink" whenever a flyout or menu grew/shrank the window).
 pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER,
-    };
+    use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
     let handle = HWND(hwnd as *mut c_void);
     unsafe {
         let _ = SetWindowPos(handle, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
@@ -1006,7 +1011,11 @@ pub fn sync_context_menu(
         let wval = wide(value);
         let bytes = std::slice::from_raw_parts(wval.as_ptr() as *const u8, wval.len() * 2);
         let r = unsafe { RegSetValueExW(key, name_ptr, 0, REG_SZ, Some(bytes)) };
-        if r.is_err() { Err(format!("reg set failed ({r:?})")) } else { Ok(()) }
+        if r.is_err() {
+            Err(format!("reg set failed ({r:?})"))
+        } else {
+            Ok(())
+        }
     }
     unsafe fn create(path: &str) -> Result<HKEY, String> {
         let wpath = wide(path);
@@ -1024,7 +1033,11 @@ pub fn sync_context_menu(
                 None,
             )
         };
-        if r.is_err() { Err(format!("reg create {path} failed ({r:?})")) } else { Ok(key) }
+        if r.is_err() {
+            Err(format!("reg create {path} failed ({r:?})"))
+        } else {
+            Ok(key)
+        }
     }
 
     unsafe {
@@ -1090,8 +1103,8 @@ pub fn get_autostart() -> bool {
 /// Confirmation happens in Booki's own UI, so the shell dialog is suppressed.
 pub fn trash_paths(paths: &[String]) -> Result<(), String> {
     use windows::Win32::UI::Shell::{
-        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT,
-        FO_DELETE, SHFILEOPSTRUCTW,
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+        SHFILEOPSTRUCTW,
     };
     if paths.is_empty() {
         return Ok(());
@@ -1135,9 +1148,7 @@ pub fn trash_is_empty() -> bool {
 /// Empty the Recycle Bin (Booki's UI asks for confirmation first).
 pub fn empty_trash() -> Result<(), String> {
     use windows::Win32::Foundation::HWND;
-    use windows::Win32::UI::Shell::{
-        SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI,
-    };
+    use windows::Win32::UI::Shell::{SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI};
     unsafe {
         SHEmptyRecycleBinW(
             HWND::default(),
@@ -1205,8 +1216,7 @@ pub struct MediaSnapshot {
     pub thumb: Option<String>,
 }
 
-fn media_session(
-) -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
+fn media_session() -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
     use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
     let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
         .ok()?
@@ -1247,13 +1257,22 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         }
         let mut bytes = vec![0u8; got];
         reader.ReadBytes(&mut bytes).ok()?;
-        let mime = if bytes.starts_with(&[0x89, b'P']) { "png" } else { "jpeg" };
+        let mime = if bytes.starts_with(&[0x89, b'P']) {
+            "png"
+        } else {
+            "jpeg"
+        };
         Some(format!(
             "data:image/{mime};base64,{}",
             base64::engine::general_purpose::STANDARD.encode(bytes)
         ))
     })();
-    Some(MediaSnapshot { title, artist, playing, thumb })
+    Some(MediaSnapshot {
+        title,
+        artist,
+        playing,
+        thumb,
+    })
 }
 
 /// Toggle play/pause on the current system media session.
@@ -1337,7 +1356,9 @@ fn endpoint_volume() -> Result<IAudioEndpointVolume, String> {
 pub fn volume_get() -> Result<(u32, bool), String> {
     unsafe {
         let vol = endpoint_volume()?;
-        let level = vol.GetMasterVolumeLevelScalar().map_err(|e| e.to_string())?;
+        let level = vol
+            .GetMasterVolumeLevelScalar()
+            .map_err(|e| e.to_string())?;
         let muted = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
         Ok(((level * 100.0).round() as u32, muted))
     }

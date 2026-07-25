@@ -47,8 +47,7 @@ static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::ne
 /// intentionally larger than the painted pill (hover/glow room); without this,
 /// transparent padding would block clicks on apps behind it.
 #[allow(clippy::type_complexity)]
-static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> =
-    Mutex::new((Vec::new(), false));
+static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), false));
 
 static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 
@@ -146,7 +145,11 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     if let Some(dir) = path.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    let persistable: Vec<ClipEntry> = hist.iter().filter(|entry| !entry.private).cloned().collect();
+    let persistable: Vec<ClipEntry> = hist
+        .iter()
+        .filter(|entry| !entry.private)
+        .cloned()
+        .collect();
     if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
         let payload = if let Some(protected) = win::protect_data(&text) {
             [CLIP_DPAPI_MAGIC, protected.as_slice()].concat()
@@ -232,7 +235,15 @@ fn clip_looks_sensitive(text: &str) -> bool {
     if lower.matches('.').count() == 2 && lower.starts_with("eyj") && trimmed.len() > 80 {
         return true;
     }
-    for prefix in ["sk-", "ghp_", "gho_", "github_pat_", "xoxb-", "xoxp-", "akia"] {
+    for prefix in [
+        "sk-",
+        "ghp_",
+        "gho_",
+        "github_pat_",
+        "xoxb-",
+        "xoxp-",
+        "akia",
+    ] {
         if lower.starts_with(prefix) && trimmed.len() >= 20 {
             return true;
         }
@@ -298,15 +309,17 @@ fn clip_remember(text: &str) {
     clip_write_disk(&hist, &cfg);
 }
 
+/// Is anything actually consuming clipboard history right now? Only the
+/// Windows-only watcher thread asks, so the whole helper is cfg'd with it.
+#[cfg(windows)]
 fn clipboard_feature_active(cfg: &config::Config) -> bool {
     fn has_pin(items: &[config::PinnedApp]) -> bool {
-        items.iter().any(|item| {
-            item.widget.as_deref() == Some("clipboard") || has_pin(&item.children)
-        })
+        items
+            .iter()
+            .any(|item| item.widget.as_deref() == Some("clipboard") || has_pin(&item.children))
     }
     cfg.clipboard_persist || has_pin(&cfg.pinned)
 }
-
 
 /// Generation counter for the notch preview: each preview bumps it, and only the
 /// timer holding the LATEST generation hides the notch again (rapid style
@@ -575,9 +588,11 @@ fn current_foreground_app() -> serde_json::Value {
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
 fn reset_config(app: AppHandle) -> Result<Config, String> {
-    let mut c = Config::default();
-    c.pinned = config::load().pinned;
-    c.always_on_top = true;
+    let c = Config {
+        pinned: config::load().pinned,
+        always_on_top: true,
+        ..Default::default()
+    };
     config::save(&c)?;
     apply_always_on_top(&app);
     apply_capture_policy(&app, c.capture_visible);
@@ -629,7 +644,10 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
                 .enumerate()
                 .map(|(i, m)| MonitorInfo {
                     index: i as i32,
-                    name: m.name().cloned().unwrap_or_else(|| format!("Monitor {}", i + 1)),
+                    name: m
+                        .name()
+                        .cloned()
+                        .unwrap_or_else(|| format!("Monitor {}", i + 1)),
                     x: m.position().x,
                     y: m.position().y,
                     w: m.size().width,
@@ -710,7 +728,10 @@ fn system_stats() -> SystemStats {
 
     let mut nguard = NETS.lock().unwrap();
     let entry = nguard.get_or_insert_with(|| {
-        (sysinfo::Networks::new_with_refreshed_list(), std::time::Instant::now())
+        (
+            sysinfo::Networks::new_with_refreshed_list(),
+            std::time::Instant::now(),
+        )
     });
     entry.0.refresh();
     let secs = entry.1.elapsed().as_secs_f64().max(0.001);
@@ -732,7 +753,11 @@ fn system_stats() -> SystemStats {
         davail += d.available_space();
     }
     let dused = dtotal.saturating_sub(davail);
-    let disk = if dtotal > 0 { (dused as f64 / dtotal as f64 * 100.0) as f32 } else { 0.0 };
+    let disk = if dtotal > 0 {
+        (dused as f64 / dtotal as f64 * 100.0) as f32
+    } else {
+        0.0
+    };
     let gb = 1024 * 1024 * 1024;
 
     // Battery (Windows only). -1 = no battery (e.g. a desktop).
@@ -740,7 +765,10 @@ fn system_stats() -> SystemStats {
     let (battery, charging) = unsafe {
         use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
         let mut s = SYSTEM_POWER_STATUS::default();
-        if GetSystemPowerStatus(&mut s).is_ok() && s.BatteryFlag & 128 == 0 && s.BatteryLifePercent != 255 {
+        if GetSystemPowerStatus(&mut s).is_ok()
+            && s.BatteryFlag & 128 == 0
+            && s.BatteryLifePercent != 255
+        {
             (s.BatteryLifePercent as i32, s.ACLineStatus == 1)
         } else {
             (-1, false)
@@ -1024,7 +1052,11 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
         recents: vec![],
     };
     let mut cfg = config::load();
-    match group.and_then(|gid| cfg.pinned.iter_mut().find(|g| g.kind == "group" && g.id == gid)) {
+    match group.and_then(|gid| {
+        cfg.pinned
+            .iter_mut()
+            .find(|g| g.kind == "group" && g.id == gid)
+    }) {
         Some(g) => g.children.push(item),
         None => cfg.pinned.push(item),
     }
@@ -1314,8 +1346,9 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32
     };
 
-    let along =
-        |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
+    let along = |start: i32, span: i32, win: i32| {
+        along_offset(start, span, win, cfg.notch_position.as_str())
+    };
     let (x, y) = match edge {
         "top" => (along(ax, aw, ww), ay + margin),
         "left" => (ax + margin, along(ay, ah, wh)),
@@ -1516,12 +1549,18 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
     for entry in entries.flatten() {
         let path = entry.path();
         // Only the flat .lnk shortcuts (skip the AutomaticDestinations subfolders).
-        if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk"))
+        if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("lnk"))
             != Some(true)
         {
             continue;
         }
-        let modified = entry.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
         let name = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -1656,19 +1695,19 @@ async fn recent_files_for(app_path: String, limit: Option<usize>) -> Vec<RecentF
         };
         let Some(ext) = std::path::Path::new(&target)
             .extension()
-        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+            .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
         else {
             continue;
         };
         let hit = *assoc_cache.entry(ext.clone()).or_insert_with(|| {
             win::assoc_executable(&ext)
-            .and_then(|e| {
-                std::path::Path::new(&e)
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_lowercase())
-            })
-            .map(|n| n == exe_name)
-            .unwrap_or(false)
+                .and_then(|e| {
+                    std::path::Path::new(&e)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_lowercase())
+                })
+                .map(|n| n == exe_name)
+                .unwrap_or(false)
         });
         // exists() on a dead network share can block for seconds — skip UNC.
         if target.starts_with("\\\\") {
@@ -1799,8 +1838,7 @@ fn list_installed_apps() -> Vec<AppGroup> {
         let mut roots: Vec<std::path::PathBuf> = Vec::new();
         if let Ok(appdata) = std::env::var("APPDATA") {
             roots.push(
-                std::path::PathBuf::from(appdata)
-                    .join("Microsoft\\Windows\\Start Menu\\Programs"),
+                std::path::PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu\\Programs"),
             );
         }
         if let Ok(pd) = std::env::var("ProgramData") {
@@ -1829,7 +1867,10 @@ fn list_installed_apps() -> Vec<AppGroup> {
         groups.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         general.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         if !general.is_empty() {
-            groups.push(AppGroup { name: String::new(), items: general });
+            groups.push(AppGroup {
+                name: String::new(),
+                items: general,
+            });
         }
         groups
     }
@@ -1897,12 +1938,38 @@ fn scan_lnks(
         // website links, changelogs, license/EULA, "report a bug", etc. — so the
         // suggestions are real, useful apps, not junk.
         const JUNK: &[&str] = &[
-            "uninstall", "readme", "read me", "help", "manual", "documentation",
-            "docs", "license", "licence", "eula", "changelog", "release notes",
-            "what's new", "whats new", "website", "web site", "home page",
-            "homepage", "visit ", "report", "feedback", "support", "faq",
-            "register", "activate", "modify", "repair", "update", "updater",
-            "command prompt", "powershell", "terminal here",
+            "uninstall",
+            "readme",
+            "read me",
+            "help",
+            "manual",
+            "documentation",
+            "docs",
+            "license",
+            "licence",
+            "eula",
+            "changelog",
+            "release notes",
+            "what's new",
+            "whats new",
+            "website",
+            "web site",
+            "home page",
+            "homepage",
+            "visit ",
+            "report",
+            "feedback",
+            "support",
+            "faq",
+            "register",
+            "activate",
+            "modify",
+            "repair",
+            "update",
+            "updater",
+            "command prompt",
+            "powershell",
+            "terminal here",
         ];
         if JUNK.iter().any(|j| lower.contains(j)) {
             continue;
@@ -1922,7 +1989,12 @@ fn scan_lnks(
 #[tauri::command]
 fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let cfg = config::load();
-    hotkeys_apply(&app, &accelerator, cfg.position_hotkeys, &cfg.hotkey_modifier)
+    hotkeys_apply(
+        &app,
+        &accelerator,
+        cfg.position_hotkeys,
+        &cfg.hotkey_modifier,
+    )
 }
 
 /// Re-register ALL global shortcuts: the toggle hotkey plus (when enabled) the
@@ -2012,9 +2084,7 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     let dpr = window.scale_factor().unwrap_or(1.0);
     let mut gap = cfg.edge_gap.min(96);
     if cfg.notch_always_visible {
-        gap = gap
-            .saturating_add(notch_stack_depth_css(&cfg))
-            .min(140);
+        gap = gap.saturating_add(notch_stack_depth_css(&cfg)).min(140);
     }
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
@@ -2035,12 +2105,7 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
 fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
     let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
-    *DOCK_HOME_RECT.lock().unwrap() = (
-        x,
-        y,
-        x + wsize.width as i32,
-        y + wsize.height as i32,
-    );
+    *DOCK_HOME_RECT.lock().unwrap() = (x, y, x + wsize.width as i32, y + wsize.height as i32);
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
@@ -2123,7 +2188,9 @@ fn install_panic_hook() {
         let _ = std::fs::create_dir_all(&dir);
         let crash_path = dir.join("crash.log");
         // Start fresh if a crash-loop ever bloated the file — never grow unbounded.
-        let too_big = std::fs::metadata(&crash_path).map(|m| m.len() > 128 * 1024).unwrap_or(false);
+        let too_big = std::fs::metadata(&crash_path)
+            .map(|m| m.len() > 128 * 1024)
+            .unwrap_or(false);
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(!too_big)
@@ -2300,7 +2367,8 @@ pub fn run() {
                 }
             }
             // System tray.
-            let toggle = MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
+            let toggle =
+                MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Ajustes…", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Salir de Booki", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &settings, &quit_item])?;
@@ -2432,9 +2500,10 @@ pub fn run() {
                                 || cfg_cache.notch_mode.eq_ignore_ascii_case("smart")
                             {
                                 let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
-                                if let Some(v) =
-                                    debounce(&mut occ, win::foreground_occludes(dl, dt, dr, db, self_hwnd))
-                                {
+                                if let Some(v) = debounce(
+                                    &mut occ,
+                                    win::foreground_occludes(dl, dt, dr, db, self_hwnd),
+                                ) {
                                     let _ = handle.emit("booki://occlusion", v);
                                 }
                             }
@@ -2478,9 +2547,11 @@ pub fn run() {
                             // When clipboard memory is off, sleep longer and only
                             // re-read config every few ticks — avoids disk I/O every
                             // second for users who never enable the feature.
-                            std::thread::sleep(std::time::Duration::from_millis(
-                                if active { 1000 } else { 2500 },
-                            ));
+                            std::thread::sleep(std::time::Duration::from_millis(if active {
+                                1000
+                            } else {
+                                2500
+                            }));
                             since_cfg = since_cfg.saturating_add(1);
                             let cfg_every = if active { 3 } else { 2 }; // ~3s on / ~5s off
                             if since_cfg >= cfg_every {
