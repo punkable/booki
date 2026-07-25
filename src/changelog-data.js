@@ -3,6 +3,54 @@
 
 export const CHANGELOG = [
   {
+    version: "0.68.0",
+    date: "25 jul 2026",
+    headline: "Revisión a fondo: un crash menos, widgets alineados, mucho menos consumo en reposo y los cinco idiomas completos.",
+    sections: [
+      {
+        icon: "\u{1FA79}",
+        title: "Correcciones",
+        notes: [
+          "Arreglado un fallo en equipos sin batería: el widget de batería lanzaba un error en cada sondeo, se quedaba congelado en “…” y llenaba el registro.",
+          "Los widgets ya no se recortan: el anillo y el arte de las tarjetas se calculan desde el hueco real de la tarjeta, no desde una proporción fija.",
+          "En dock vertical todos los widgets miden lo mismo, así que anclar uno nuevo ya no cambia el grosor de la barra.",
+          "Un menú largo abierto cerca de una esquina ya no se corta contra el borde de la ventana.",
+          "El aviso de “deshacer” ya no da un salto al terminar de aparecer.",
+        ],
+      },
+      {
+        icon: "performance",
+        title: "Consumo",
+        notes: [
+          "La configuración se cachea en memoria: se leía del disco hasta doce veces por segundo con la barra de tareas en autoocultar.",
+          "Los dos vigilantes del cursor eran código idéntico duplicado; ahora es uno solo que atiende las dos ventanas.",
+          "El reloj deja de reformatearse sesenta veces por minuto para mostrar el mismo minuto.",
+          "El portapapeles ya no bloquea la interfaz mientras cifra y guarda en disco.",
+        ],
+      },
+      {
+        icon: "\u{1F310}",
+        title: "Idiomas y accesibilidad",
+        notes: [
+          "Portugués, francés y alemán tenían noventa textos sin traducir cada uno y caían a inglés en silencio. Los cinco idiomas están completos.",
+          "Tres textos estaban escritos en español dentro del código y ningún idioma podía cambiarlos: el aviso al soltar un archivo, el de actualización y los nombres de los colores de acento.",
+          "El dock se puede usar con el teclado: Enter y Espacio abren el elemento enfocado, y la tecla de menú da acceso a sus acciones.",
+          "Los widgets en vivo anuncian sus cambios a los lectores de pantalla, y cada ventana declara por fin el idioma en el que está.",
+          "“Reducir movimiento” ya afecta también a la lupa y al viaje del notch, que se dibujan desde JavaScript y se lo saltaban.",
+        ],
+      },
+      {
+        icon: "\u{1F9F0}",
+        title: "Por dentro",
+        notes: [
+          "Ocultar y mostrar la barra tenía nueve banderas repartidas por todo el archivo; ahora hay una sola decisión, con su tabla de pruebas.",
+          "El proyecto pasa de cero pruebas a sesenta y cinco, más linter y verificación de idiomas en cada cambio.",
+          "El flujo de publicación ya no puede borrar todas las versiones anteriores cuando la comprobación de firma falla.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.67.0",
     date: "22 jul 2026",
     headline: "Pantalla completa m\u00e1s clara: aviso calmado, opci\u00f3n de no ocultar, menos falsos positivos.",
@@ -142,7 +190,7 @@ export const CHANGELOG = [
         ],
       },
       {
-        icon: "sparkles",
+        icon: "\u2728",
         title: "Backup e instalador",
         notes: [
           "Copia de seguridad con confirmaci\u00f3n y mensaje de \u00e9xito/error; al importar el dock se actualiza al momento.",

@@ -14,20 +14,12 @@ import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
+import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
+import { reduceMotion } from "./dock/motion.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
 const inTauri = !!winApi;
-
-function availW() {
-  const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
-  return inTauri ? screenW : Math.min(screenW, window.innerWidth || screenW);
-}
-
-function availH() {
-  const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
-  return inTauri ? screenH : Math.min(screenH, window.innerHeight || screenH);
-}
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
 let notchMode = "attached";
@@ -97,13 +89,6 @@ onOcclusion((v) => setSmartState("smart-focus", v));
 
 // ─── Hit-testing: only the painted pill (or toast) is clickable ───────────
 // Window-relative CSS px [x, y, w, h], matching the dock's set_hit_rects.
-function rectFromElement(el, inflate = 0) {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (!r.width || !r.height) return null;
-  return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
-}
-
 function reportNotchHitRects() {
   const toasting = document.body.classList.contains("toast");
   // During drag or toast, keep the whole notch window interactive so gestures
@@ -118,7 +103,7 @@ function reportNotchHitRects() {
     const pillRect = rectFromElement(pill, 1);
     if (pillRect) rects.push(pillRect);
   }
-  const sig = all ? "all" : rects.map((r) => r.map((n) => Math.round(n)).join(",")).join(";");
+  const sig = hitSignature(rects, all);
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   invoke("set_notch_hit_rects", { rects, all }).catch(() => {});
@@ -133,7 +118,15 @@ function scheduleHitReport() {
   });
 }
 
-// Keep hit rects fresh while visible (smart breathe/focus animates scale).
+// Keep hit rects fresh while the pill is animating (smart breathe/focus scales
+// it, and the rect has to follow or clicks land in the wrong place).
+//
+// KNOWN COST: this runs at 4Hz for the life of the app. The visibilityState
+// guard does not help, because a window the backend hid with ShowWindow still
+// reports "visible" here. Gating it properly needs a shown/hidden event from
+// Rust that does not exist yet — deliberately not half-wired: reportNotchHitRects
+// already dedupes by signature, so the waste is one getBoundingClientRect per
+// tick, not IPC.
 setInterval(() => {
   if (document.visibilityState === "visible") reportNotchHitRects();
 }, 250);
@@ -282,8 +275,8 @@ pill.addEventListener("pointerup", (e) => {
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.
-  const sw = availW();
-  const sh = availH();
+  const sw = availW(inTauri);
+  const sh = availH(inTauri);
   const dist = { left: e.screenX, right: sw - e.screenX, top: e.screenY, bottom: sh - e.screenY };
   let edge = "bottom";
   let best = Infinity;
@@ -314,6 +307,16 @@ function tweenNotch(from, to, ms, done) {
     return;
   }
   const w = winApi.getCurrentWindow();
+  // The notch travelling across the screen is one of the larger movements
+  // Booki makes, and it is driven by setPosition, not CSS — so the global
+  // reduced-motion override never reached it. Jump straight to the new edge.
+  if (reduceMotion()) {
+    try {
+      w.setPosition(new winApi.LogicalPosition(Math.round(to.x), Math.round(to.y)));
+    } catch (_) {}
+    done && done();
+    return;
+  }
   const t0 = performance.now();
   const ease = (p) => 1 - Math.pow(1 - p, 3);
   const frame = (now) => {

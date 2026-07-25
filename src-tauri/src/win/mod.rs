@@ -33,7 +33,10 @@ pub use windows_impl::{
 
 #[cfg(not(windows))]
 mod stub;
+// The Linux build only calls a handful of these — the rest are re-exported so
+// `win::foo` type-checks in code that is itself cfg'd to Windows.
 #[cfg(not(windows))]
+#[allow(unused_imports)]
 pub use stub::{
     app_icon_data_uri, assoc_executable, clipboard_get_text, cursor_at_edge, cursor_in_rects,
     empty_trash, exclude_from_capture, file_thumbnail, focus_window, foreground_app_name,

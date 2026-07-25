@@ -47,8 +47,7 @@ static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::ne
 /// intentionally larger than the painted pill (hover/glow room); without this,
 /// transparent padding would block clicks on apps behind it.
 #[allow(clippy::type_complexity)]
-static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> =
-    Mutex::new((Vec::new(), false));
+static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), false));
 
 static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 
@@ -136,6 +135,13 @@ fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
     hist.len() != before
 }
 
+/// Encrypt (DPAPI) and persist the history.
+///
+/// Callers must NOT hold the CLIP_HISTORY guard while calling this. It was
+/// previously invoked from inside the lock at all nine call sites, and
+/// save_config — a synchronous command, so it runs on the UI thread — takes the
+/// same lock, which meant a slow disk could freeze the whole dock. Mutate under
+/// the guard, clone a snapshot, drop the guard, then call this.
 fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
@@ -146,7 +152,11 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     if let Some(dir) = path.parent() {
         let _ = fs::create_dir_all(dir);
     }
-    let persistable: Vec<ClipEntry> = hist.iter().filter(|entry| !entry.private).cloned().collect();
+    let persistable: Vec<ClipEntry> = hist
+        .iter()
+        .filter(|entry| !entry.private)
+        .cloned()
+        .collect();
     if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
         let payload = if let Some(protected) = win::protect_data(&text) {
             [CLIP_DPAPI_MAGIC, protected.as_slice()].concat()
@@ -173,9 +183,12 @@ fn clip_parse_disk(bytes: &[u8]) -> Option<Vec<ClipEntry>> {
 }
 
 fn clip_apply_config(cfg: &Config) {
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    clip_prune_locked(&mut hist, cfg);
-    clip_write_disk(&hist, cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        clip_prune_locked(&mut hist, cfg);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, cfg);
 }
 
 fn clip_load_from_disk() {
@@ -202,18 +215,24 @@ fn clip_load_from_disk() {
         .unwrap_or(0)
         .saturating_add(1);
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
-    let mut current = CLIP_HISTORY.lock().unwrap();
-    *current = hist;
+    let snapshot = {
+        let mut current = CLIP_HISTORY.lock().unwrap();
+        *current = hist;
+        current.clone()
+    };
     if loaded_legacy || cfg.clipboard_persist {
-        clip_write_disk(&current, &cfg);
+        clip_write_disk(&snapshot, &cfg);
     }
 }
 
 fn clip_enforce_current_policy() {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if clip_prune_locked(&mut hist, &cfg) || !cfg.clipboard_persist {
-        clip_write_disk(&hist, &cfg);
+    let (changed, snapshot) = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        (clip_prune_locked(&mut hist, &cfg), hist.clone())
+    };
+    if changed || !cfg.clipboard_persist {
+        clip_write_disk(&snapshot, &cfg);
     }
 }
 
@@ -232,7 +251,15 @@ fn clip_looks_sensitive(text: &str) -> bool {
     if lower.matches('.').count() == 2 && lower.starts_with("eyj") && trimmed.len() > 80 {
         return true;
     }
-    for prefix in ["sk-", "ghp_", "gho_", "github_pat_", "xoxb-", "xoxp-", "akia"] {
+    for prefix in [
+        "sk-",
+        "ghp_",
+        "gho_",
+        "github_pat_",
+        "xoxb-",
+        "xoxp-",
+        "akia",
+    ] {
         if lower.starts_with(prefix) && trimmed.len() >= 20 {
             return true;
         }
@@ -270,43 +297,49 @@ fn clip_remember(text: &str) {
     if cfg.clipboard_sensitive_guard && clip_looks_sensitive(&text) {
         return;
     }
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    let pruned = clip_prune_locked(&mut hist, &cfg);
-    if hist.first().map(|e| e.text == text).unwrap_or(false) {
-        if pruned || !cfg.clipboard_persist {
-            clip_write_disk(&hist, &cfg);
+    let (should_write, snapshot) = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        let pruned = clip_prune_locked(&mut hist, &cfg);
+        if hist.first().map(|e| e.text == text).unwrap_or(false) {
+            // Already the most recent entry — nothing changed.
+            (pruned || !cfg.clipboard_persist, hist.clone())
+        } else {
+            let (favorite, private) = hist
+                .iter()
+                .find(|entry| entry.text == text)
+                .map(|entry| (entry.favorite, entry.private))
+                .unwrap_or((false, false));
+            hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
+            hist.insert(
+                0,
+                ClipEntry {
+                    id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
+                    text,
+                    ts: clip_now_ms(),
+                    favorite,
+                    private,
+                },
+            );
+            clip_prune_locked(&mut hist, &cfg);
+            (true, hist.clone())
         }
-        return; // already the most recent entry — nothing changed
+    };
+    if should_write {
+        clip_write_disk(&snapshot, &cfg);
     }
-    let (favorite, private) = hist
-        .iter()
-        .find(|entry| entry.text == text)
-        .map(|entry| (entry.favorite, entry.private))
-        .unwrap_or((false, false));
-    hist.retain(|e| e.text != text); // de-dupe: re-copying an older entry moves it up
-    hist.insert(
-        0,
-        ClipEntry {
-            id: CLIP_NEXT_ID.fetch_add(1, Ordering::Relaxed),
-            text,
-            ts: clip_now_ms(),
-            favorite,
-            private,
-        },
-    );
-    clip_prune_locked(&mut hist, &cfg);
-    clip_write_disk(&hist, &cfg);
 }
 
+/// Is anything actually consuming clipboard history right now? Only the
+/// Windows-only watcher thread asks, so the whole helper is cfg'd with it.
+#[cfg(windows)]
 fn clipboard_feature_active(cfg: &config::Config) -> bool {
     fn has_pin(items: &[config::PinnedApp]) -> bool {
-        items.iter().any(|item| {
-            item.widget.as_deref() == Some("clipboard") || has_pin(&item.children)
-        })
+        items
+            .iter()
+            .any(|item| item.widget.as_deref() == Some("clipboard") || has_pin(&item.children))
     }
     cfg.clipboard_persist || has_pin(&cfg.pinned)
 }
-
 
 /// Generation counter for the notch preview: each preview bumps it, and only the
 /// timer holding the LATEST generation hides the notch again (rapid style
@@ -575,9 +608,11 @@ fn current_foreground_app() -> serde_json::Value {
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
 fn reset_config(app: AppHandle) -> Result<Config, String> {
-    let mut c = Config::default();
-    c.pinned = config::load().pinned;
-    c.always_on_top = true;
+    let c = Config {
+        pinned: config::load().pinned,
+        always_on_top: true,
+        ..Default::default()
+    };
     config::save(&c)?;
     apply_always_on_top(&app);
     apply_capture_policy(&app, c.capture_visible);
@@ -629,7 +664,10 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
                 .enumerate()
                 .map(|(i, m)| MonitorInfo {
                     index: i as i32,
-                    name: m.name().cloned().unwrap_or_else(|| format!("Monitor {}", i + 1)),
+                    name: m
+                        .name()
+                        .cloned()
+                        .unwrap_or_else(|| format!("Monitor {}", i + 1)),
                     x: m.position().x,
                     y: m.position().y,
                     w: m.size().width,
@@ -710,13 +748,16 @@ fn system_stats() -> SystemStats {
 
     let mut nguard = NETS.lock().unwrap();
     let entry = nguard.get_or_insert_with(|| {
-        (sysinfo::Networks::new_with_refreshed_list(), std::time::Instant::now())
+        (
+            sysinfo::Networks::new_with_refreshed_list(),
+            std::time::Instant::now(),
+        )
     });
     entry.0.refresh();
     let secs = entry.1.elapsed().as_secs_f64().max(0.001);
     entry.1 = std::time::Instant::now();
     let (mut down, mut up) = (0u64, 0u64);
-    for (_name, data) in entry.0.iter() {
+    for data in entry.0.values() {
         down += data.received();
         up += data.transmitted();
     }
@@ -732,7 +773,11 @@ fn system_stats() -> SystemStats {
         davail += d.available_space();
     }
     let dused = dtotal.saturating_sub(davail);
-    let disk = if dtotal > 0 { (dused as f64 / dtotal as f64 * 100.0) as f32 } else { 0.0 };
+    let disk = if dtotal > 0 {
+        (dused as f64 / dtotal as f64 * 100.0) as f32
+    } else {
+        0.0
+    };
     let gb = 1024 * 1024 * 1024;
 
     // Battery (Windows only). -1 = no battery (e.g. a desktop).
@@ -740,7 +785,10 @@ fn system_stats() -> SystemStats {
     let (battery, charging) = unsafe {
         use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
         let mut s = SYSTEM_POWER_STATUS::default();
-        if GetSystemPowerStatus(&mut s).is_ok() && s.BatteryFlag & 128 == 0 && s.BatteryLifePercent != 255 {
+        if GetSystemPowerStatus(&mut s).is_ok()
+            && s.BatteryFlag & 128 == 0
+            && s.BatteryLifePercent != 255
+        {
             (s.BatteryLifePercent as i32, s.ACLineStatus == 1)
         } else {
             (-1, false)
@@ -1024,7 +1072,11 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
         recents: vec![],
     };
     let mut cfg = config::load();
-    match group.and_then(|gid| cfg.pinned.iter_mut().find(|g| g.kind == "group" && g.id == gid)) {
+    match group.and_then(|gid| {
+        cfg.pinned
+            .iter_mut()
+            .find(|g| g.kind == "group" && g.id == gid)
+    }) {
         Some(g) => g.children.push(item),
         None => cfg.pinned.push(item),
     }
@@ -1116,6 +1168,10 @@ fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
     apply_capture_policy(&app, cfg.capture_visible);
     let _ = app.emit("booki://config-changed", ());
     // Return the migrated/healed config — raw import JSON skips load() revs.
+    // save() leaves its own value cached, and that value has NOT been through
+    // load()'s migrations or group normalization, so the cache has to be dropped
+    // for this read or the import would come back unhealed.
+    config::invalidate_cache();
     Ok(config::load())
 }
 
@@ -1189,7 +1245,9 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         let _ = position_notch(&notch, &cfg.edge);
     }
     let _ = app.emit("booki://config-changed", ());
-    // Same as import: always hand Settings a load()-migrated snapshot.
+    // Same as import: always hand Settings a load()-migrated snapshot, so the
+    // cache save() just populated has to be dropped first (see import_config).
+    config::invalidate_cache();
     Ok(config::load())
 }
 
@@ -1314,8 +1372,9 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32
     };
 
-    let along =
-        |start: i32, span: i32, win: i32| along_offset(start, span, win, cfg.notch_position.as_str());
+    let along = |start: i32, span: i32, win: i32| {
+        along_offset(start, span, win, cfg.notch_position.as_str())
+    };
     let (x, y) = match edge {
         "top" => (along(ax, aw, ww), ay + margin),
         "left" => (ax + margin, along(ay, ah, wh)),
@@ -1516,12 +1575,18 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
     for entry in entries.flatten() {
         let path = entry.path();
         // Only the flat .lnk shortcuts (skip the AutomaticDestinations subfolders).
-        if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk"))
+        if path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("lnk"))
             != Some(true)
         {
             continue;
         }
-        let modified = entry.metadata().and_then(|m| m.modified()).unwrap_or(std::time::UNIX_EPOCH);
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
         let name = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -1538,7 +1603,7 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
             },
         ));
     }
-    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.sort_by_key(|item| std::cmp::Reverse(item.0)); // newest first
     items.into_iter().take(cap).map(|(_, f)| f).collect()
 }
 
@@ -1592,38 +1657,50 @@ fn clipboard_copy(text: String) -> bool {
 #[tauri::command]
 fn clipboard_delete(id: u64) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    hist.retain(|e| e.id != id);
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        hist.retain(|e| e.id != id);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_favorite(id: u64, favorite: bool) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
-        entry.favorite = favorite;
-    }
-    clip_prune_locked(&mut hist, &cfg);
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+            entry.favorite = favorite;
+        }
+        clip_prune_locked(&mut hist, &cfg);
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_private(id: u64, private: bool) {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
-        entry.private = private;
-    }
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
+            entry.private = private;
+        }
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 #[tauri::command]
 fn clipboard_clear() {
     let cfg = config::load();
-    let mut hist = CLIP_HISTORY.lock().unwrap();
-    hist.clear();
-    clip_write_disk(&hist, &cfg);
+    let snapshot = {
+        let mut hist = CLIP_HISTORY.lock().unwrap();
+        hist.clear();
+        hist.clone()
+    };
+    clip_write_disk(&snapshot, &cfg);
 }
 
 /// Recent files RELEVANT to one pinned app: keeps only entries whose default
@@ -1656,19 +1733,19 @@ async fn recent_files_for(app_path: String, limit: Option<usize>) -> Vec<RecentF
         };
         let Some(ext) = std::path::Path::new(&target)
             .extension()
-        .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
+            .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))
         else {
             continue;
         };
         let hit = *assoc_cache.entry(ext.clone()).or_insert_with(|| {
             win::assoc_executable(&ext)
-            .and_then(|e| {
-                std::path::Path::new(&e)
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_lowercase())
-            })
-            .map(|n| n == exe_name)
-            .unwrap_or(false)
+                .and_then(|e| {
+                    std::path::Path::new(&e)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_lowercase())
+                })
+                .map(|n| n == exe_name)
+                .unwrap_or(false)
         });
         // exists() on a dead network share can block for seconds — skip UNC.
         if target.starts_with("\\\\") {
@@ -1799,8 +1876,7 @@ fn list_installed_apps() -> Vec<AppGroup> {
         let mut roots: Vec<std::path::PathBuf> = Vec::new();
         if let Ok(appdata) = std::env::var("APPDATA") {
             roots.push(
-                std::path::PathBuf::from(appdata)
-                    .join("Microsoft\\Windows\\Start Menu\\Programs"),
+                std::path::PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu\\Programs"),
             );
         }
         if let Ok(pd) = std::env::var("ProgramData") {
@@ -1829,7 +1905,10 @@ fn list_installed_apps() -> Vec<AppGroup> {
         groups.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         general.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         if !general.is_empty() {
-            groups.push(AppGroup { name: String::new(), items: general });
+            groups.push(AppGroup {
+                name: String::new(),
+                items: general,
+            });
         }
         groups
     }
@@ -1897,12 +1976,38 @@ fn scan_lnks(
         // website links, changelogs, license/EULA, "report a bug", etc. — so the
         // suggestions are real, useful apps, not junk.
         const JUNK: &[&str] = &[
-            "uninstall", "readme", "read me", "help", "manual", "documentation",
-            "docs", "license", "licence", "eula", "changelog", "release notes",
-            "what's new", "whats new", "website", "web site", "home page",
-            "homepage", "visit ", "report", "feedback", "support", "faq",
-            "register", "activate", "modify", "repair", "update", "updater",
-            "command prompt", "powershell", "terminal here",
+            "uninstall",
+            "readme",
+            "read me",
+            "help",
+            "manual",
+            "documentation",
+            "docs",
+            "license",
+            "licence",
+            "eula",
+            "changelog",
+            "release notes",
+            "what's new",
+            "whats new",
+            "website",
+            "web site",
+            "home page",
+            "homepage",
+            "visit ",
+            "report",
+            "feedback",
+            "support",
+            "faq",
+            "register",
+            "activate",
+            "modify",
+            "repair",
+            "update",
+            "updater",
+            "command prompt",
+            "powershell",
+            "terminal here",
         ];
         if JUNK.iter().any(|j| lower.contains(j)) {
             continue;
@@ -1922,7 +2027,12 @@ fn scan_lnks(
 #[tauri::command]
 fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let cfg = config::load();
-    hotkeys_apply(&app, &accelerator, cfg.position_hotkeys, &cfg.hotkey_modifier)
+    hotkeys_apply(
+        &app,
+        &accelerator,
+        cfg.position_hotkeys,
+        &cfg.hotkey_modifier,
+    )
 }
 
 /// Re-register ALL global shortcuts: the toggle hotkey plus (when enabled) the
@@ -2012,9 +2122,7 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     let dpr = window.scale_factor().unwrap_or(1.0);
     let mut gap = cfg.edge_gap.min(96);
     if cfg.notch_always_visible {
-        gap = gap
-            .saturating_add(notch_stack_depth_css(&cfg))
-            .min(140);
+        gap = gap.saturating_add(notch_stack_depth_css(&cfg)).min(140);
     }
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
@@ -2035,12 +2143,7 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
 fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
     let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
-    *DOCK_HOME_RECT.lock().unwrap() = (
-        x,
-        y,
-        x + wsize.width as i32,
-        y + wsize.height as i32,
-    );
+    *DOCK_HOME_RECT.lock().unwrap() = (x, y, x + wsize.width as i32, y + wsize.height as i32);
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
@@ -2123,7 +2226,9 @@ fn install_panic_hook() {
         let _ = std::fs::create_dir_all(&dir);
         let crash_path = dir.join("crash.log");
         // Start fresh if a crash-loop ever bloated the file — never grow unbounded.
-        let too_big = std::fs::metadata(&crash_path).map(|m| m.len() > 128 * 1024).unwrap_or(false);
+        let too_big = std::fs::metadata(&crash_path)
+            .map(|m| m.len() > 128 * 1024)
+            .unwrap_or(false);
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(!too_big)
@@ -2300,7 +2405,8 @@ pub fn run() {
                 }
             }
             // System tray.
-            let toggle = MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
+            let toggle =
+                MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Ajustes…", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Salir de Booki", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &settings, &quit_item])?;
@@ -2421,9 +2527,16 @@ pub fn run() {
                                     let _ = watch.set_always_on_top(false);
                                     let _ = watch.set_always_on_top(true);
                                 }
+                                // Only while it is actually on screen. This used
+                                // to run unconditionally, so a hidden notch —
+                                // which is most of the time — still cost four
+                                // SetWindowPos calls every three seconds, waking
+                                // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
-                                    let _ = notch.set_always_on_top(false);
-                                    let _ = notch.set_always_on_top(true);
+                                    if notch.is_visible().unwrap_or(false) {
+                                        let _ = notch.set_always_on_top(false);
+                                        let _ = notch.set_always_on_top(true);
+                                    }
                                 }
                             }
                             // foreground_occludes = "the user is in an app". Smart
@@ -2432,9 +2545,10 @@ pub fn run() {
                                 || cfg_cache.notch_mode.eq_ignore_ascii_case("smart")
                             {
                                 let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
-                                if let Some(v) =
-                                    debounce(&mut occ, win::foreground_occludes(dl, dt, dr, db, self_hwnd))
-                                {
+                                if let Some(v) = debounce(
+                                    &mut occ,
+                                    win::foreground_occludes(dl, dt, dr, db, self_hwnd),
+                                ) {
                                     let _ = handle.emit("booki://occlusion", v);
                                 }
                             }
@@ -2478,9 +2592,11 @@ pub fn run() {
                             // When clipboard memory is off, sleep longer and only
                             // re-read config every few ticks — avoids disk I/O every
                             // second for users who never enable the feature.
-                            std::thread::sleep(std::time::Duration::from_millis(
-                                if active { 1000 } else { 2500 },
-                            ));
+                            std::thread::sleep(std::time::Duration::from_millis(if active {
+                                1000
+                            } else {
+                                2500
+                            }));
                             since_cfg = since_cfg.saturating_add(1);
                             let cfg_every = if active { 3 } else { 2 }; // ~3s on / ~5s off
                             if since_cfg >= cfg_every {
@@ -2501,92 +2617,104 @@ pub fn run() {
                     });
                 }
 
-                // Cursor watcher for the stage window: at ~30 ms it flips the
-                // dock between interactive and click-through against the hit
-                // rects reported by the frontend, and tells the frontend when
-                // the cursor enters/leaves the dock's live regions (DOM
-                // enter/leave events can't see that once the window is
-                // ignoring the mouse). GetCursorPos + a few rect tests — the
-                // per-tick cost is nanoseconds.
+                // Cursor watcher for the stage windows: it flips the dock and
+                // the notch between interactive and click-through against the hit
+                // rects the frontend reports, and tells the frontend when the
+                // cursor enters/leaves the dock's live regions (DOM enter/leave
+                // events cannot see that once a window ignores the mouse).
+                //
+                // The dock and the notch used to run this as two byte-identical
+                // threads, differing only in which window and which rect list
+                // they read. That doubled the timer wakeups — and the two are
+                // complementary anyway, since the notch is visible exactly when
+                // the dock is not. One thread now serves both: the loop sleeps
+                // for whichever window wants the shortest interval, so the total
+                // wakeup rate is halved without either window feeling slower.
                 #[cfg(windows)]
                 {
-                    let watch = dock.clone();
-                    let handle = app.handle().clone();
-                    std::thread::spawn(move || {
-                        let hwnd = watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                        if hwnd == 0 {
-                            return;
-                        }
-                        let mut last: Option<bool> = None;
-                        loop {
-                            let (rects, all) = HIT_RECTS.lock().unwrap().clone();
-                            match win::cursor_in_rects(hwnd, &rects, all) {
-                                None => {
-                                    // Window hidden → leave it interactive so the
-                                    // next reveal is immediately usable; idle slower.
-                                    if last != Some(true) {
-                                        let _ = watch.set_ignore_cursor_events(false);
-                                        last = Some(true);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(180));
-                                }
-                                Some(inside) => {
-                                    if last != Some(inside) {
-                                        // Tauri's own path: applies the style with the
-                                        // proper frame refresh on the window's thread —
-                                        // a raw SetWindowLongPtr left the window in a
-                                        // half-applied state that could stop painting.
-                                        let _ = watch.set_ignore_cursor_events(!inside);
-                                        last = Some(inside);
-                                        let _ = handle.emit("booki://cursor-inside", inside);
-                                    }
-                                    // Keep the interactive state snappy while the
-                                    // cursor is over Booki, and use a lighter scan
-                                    // cadence while the window is click-through.
-                                    std::thread::sleep(std::time::Duration::from_millis(
-                                        if inside { 30 } else { 80 },
-                                    ));
-                                }
-                            }
-                        }
-                    });
-                }
+                    struct CursorTarget {
+                        window: tauri::WebviewWindow,
+                        hwnd: isize,
+                        rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                        /// Only the dock reports enter/leave to the frontend.
+                        emits_inside: bool,
+                        last: Option<bool>,
+                    }
 
-                // Notch hit watcher: same click-through contract as the dock, so
-                // transparent padding around the pill never steals clicks from
-                // apps underneath (attached / floating / smart alike).
-                #[cfg(windows)]
-                if let Some(notch_watch) = app.get_webview_window("notch") {
-                    std::thread::spawn(move || {
-                        let hwnd = notch_watch.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                    let handle = app.handle().clone();
+                    let mut targets: Vec<CursorTarget> = Vec::new();
+                    let mut add = |window: tauri::WebviewWindow,
+                                   rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                                   emits_inside: bool,
+                                   start_click_through: bool| {
+                        let hwnd = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
                         if hwnd == 0 {
                             return;
                         }
-                        // Start click-through until the frontend reports a pill rect.
-                        let _ = notch_watch.set_ignore_cursor_events(true);
-                        let mut last: Option<bool> = None;
-                        loop {
-                            let (rects, all) = NOTCH_HIT_RECTS.lock().unwrap().clone();
-                            match win::cursor_in_rects(hwnd, &rects, all) {
-                                None => {
-                                    if last != Some(true) {
-                                        let _ = notch_watch.set_ignore_cursor_events(false);
-                                        last = Some(true);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(180));
-                                }
-                                Some(inside) => {
-                                    if last != Some(inside) {
-                                        let _ = notch_watch.set_ignore_cursor_events(!inside);
-                                        last = Some(inside);
-                                    }
-                                    std::thread::sleep(std::time::Duration::from_millis(
-                                        if inside { 30 } else { 80 },
-                                    ));
-                                }
-                            }
+                        if start_click_through {
+                            // The notch stays click-through until the frontend
+                            // reports a pill rect, so its transparent padding
+                            // never steals a click from the app underneath.
+                            let _ = window.set_ignore_cursor_events(true);
                         }
-                    });
+                        targets.push(CursorTarget {
+                            window,
+                            hwnd,
+                            rects,
+                            emits_inside,
+                            last: None,
+                        });
+                    };
+                    add(dock.clone(), &HIT_RECTS, true, false);
+                    if let Some(notch_watch) = app.get_webview_window("notch") {
+                        add(notch_watch, &NOTCH_HIT_RECTS, false, true);
+                    }
+                    drop(add);
+
+                    if !targets.is_empty() {
+                        std::thread::spawn(move || {
+                            loop {
+                                // Shortest interval any target asks for this tick.
+                                let mut next_ms = 180u64;
+                                for t in targets.iter_mut() {
+                                    let (rects, all) = match t.rects.lock() {
+                                        Ok(g) => g.clone(),
+                                        Err(_) => continue,
+                                    };
+                                    match win::cursor_in_rects(t.hwnd, &rects, all) {
+                                        None => {
+                                            // Window hidden -> leave it interactive so
+                                            // the next reveal is usable straight away,
+                                            // and let this one idle slowly.
+                                            if t.last != Some(true) {
+                                                let _ = t.window.set_ignore_cursor_events(false);
+                                                t.last = Some(true);
+                                            }
+                                        }
+                                        Some(inside) => {
+                                            if t.last != Some(inside) {
+                                                // Tauri's own path applies the style with
+                                                // the proper frame refresh on the window's
+                                                // thread; a raw SetWindowLongPtr left the
+                                                // window half-applied and it could stop
+                                                // painting.
+                                                let _ = t.window.set_ignore_cursor_events(!inside);
+                                                t.last = Some(inside);
+                                                if t.emits_inside {
+                                                    let _ = handle
+                                                        .emit("booki://cursor-inside", inside);
+                                                }
+                                            }
+                                            // Snappy while the cursor is over Booki,
+                                            // lighter while the window is click-through.
+                                            next_ms = next_ms.min(if inside { 30 } else { 80 });
+                                        }
+                                    }
+                                }
+                                std::thread::sleep(std::time::Duration::from_millis(next_ms));
+                            }
+                        });
+                    }
                 }
 
                 // Work-area self-heal: some setups change the usable screen space
@@ -2653,9 +2781,20 @@ pub fn run() {
                         }
 
                         loop {
-                            let autohide = win::taskbar_autohide();
+                            // The 80ms cadence exists to catch an auto-hiding
+                            // taskbar sliding in and out without rcWork ever
+                            // changing. That only matters when the user actually
+                            // asked the dock to follow it: with taskbar_follow
+                            // off there is nothing to react to quickly, yet this
+                            // still woke up 12.5 times a second forever. Checking
+                            // the setting first drops those users to the 1200ms
+                            // idle cadence — and while blacked out for a
+                            // fullscreen app, nothing needs repositioning at all.
+                            let blackout = FULLSCREEN_BLACKOUT.load(Ordering::Relaxed);
+                            let watching_taskbar =
+                                !blackout && cfg.taskbar_follow && win::taskbar_autohide();
                             std::thread::sleep(std::time::Duration::from_millis(
-                                if autohide || pending_drop.is_some() {
+                                if watching_taskbar || pending_drop.is_some() {
                                     80
                                 } else {
                                     1200
@@ -2665,13 +2804,19 @@ pub fn run() {
                                 continue;
                             };
                             cfg_tick = cfg_tick.wrapping_add(1);
-                            let cfg_every = if autohide || pending_drop.is_some() {
+                            let cfg_every = if watching_taskbar || pending_drop.is_some() {
                                 8
                             } else {
                                 5
                             };
                             if cfg_tick % cfg_every == 0 {
                                 cfg = config::load();
+                            }
+                            if blackout {
+                                // A fullscreen game/video owns the screen; both
+                                // windows are hidden, so skip the monitor and
+                                // work-area queries entirely this tick.
+                                continue;
                             }
                             let Some(monitor) = pick_monitor(&dock) else {
                                 continue;
