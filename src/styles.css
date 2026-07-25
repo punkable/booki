@@ -445,7 +445,8 @@ body.dock-overflow .dock { scrollbar-width: none; }
    configured size; only the surrounding padding/gaps shrink. */
 body.compact .dock { padding: 4px 6px; gap: calc(var(--gap) * 0.6); }
 body.compact.edge-left .dock, body.compact.edge-right .dock { padding: 6px 4px; }
-body.compact .w-card { padding: 4px 8px; gap: 6px; }
+/* Keep --w-chrome in step with the padding, or the artwork overflows again. */
+body.compact .w-card { --w-chrome: 10px; padding: 4px 8px; gap: 6px; }
 
 /* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
    suck-in, approximated with anchored scale + skew). --genie-ox points at where
@@ -815,7 +816,16 @@ body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
   background: transparent;
 }
 .tile.widget:hover { background: transparent; }
+/* --w-chrome is the vertical space the card itself eats (padding + border), so
+   --w-art is exactly what is left for the ring gauge or the icon square.
+   Deriving the artwork from the available box instead of guessing a fraction of
+   --size is what keeps it from being clipped: the old `0.78 * --size` ring only
+   fitted when --size was 64px or more, so at the default 48 — and much worse at
+   the 30px floor fitDock() can reach — it was silently sliced by the
+   overflow:hidden below. Compact mode overrides --w-chrome to match. */
 .w-card {
+  --w-chrome: 14px; /* 6+6 padding + 1+1 border */
+  --w-art: calc(var(--size) - var(--w-chrome));
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -884,8 +894,8 @@ body.edge-right .tile.widget:hover .w-card { transform: translateX(-2px) scale(1
 .w-pv-ico {
   position: relative;
   flex: 0 0 auto;
-  width: calc(var(--size) * 0.74);
-  height: calc(var(--size) * 0.74);
+  width: var(--w-art);
+  height: var(--w-art);
   display: grid;
   place-items: center;
   border-radius: calc(var(--tile-r) * 0.7);
@@ -1212,24 +1222,43 @@ body.surface-tinted .rename-pop-input {
   .tile.widget.media .w-value.scroll, .w-pv-sub.scroll { text-overflow: ellipsis; }
 }
 
-/* Vertical dock → EVERY widget card turns into a compact column (icon or art
-   on top, label/value/bar below) with one shared width, so the side bar stays
-   even and narrow instead of being stretched by horizontal strips. */
+/* Vertical dock → every widget card becomes a compact column: artwork on top,
+   one value line below.
+
+   Two rules matter here and both used to be wrong:
+
+   1. ONE SHARED HEIGHT. This was `height: auto`, so each widget ended up as
+      tall as its own content — 48.5px for a preview card, 60.25px for the
+      clock, 62.2px for a ring, 77px for media. A column of five different
+      heights is what "the dock grows and the widgets are misaligned" looked
+      like. Every widget is now exactly --size tall, the same as an app icon, so
+      the rail is even no matter which widgets are pinned.
+   2. WIDTH TRACKS --size. The card had `width: max(var(--size), 46px)`, a floor
+      that app icons do not share; once fitDock() shrank --size below 46 the
+      widgets stuck out of the column and kept the whole bar 46px wide.
+
+   The text lines are hidden rather than shrunk, which makes the rail
+   ICON-FIRST. The rail is only as wide as an icon — it drops to 39px once
+   fitDock() starts shrinking — and the strings simply do not fit: "04:49 AM"
+   needs 64px of the 33px available, "↑ 1 KB/s" needs 57px. No font size closes
+   that gap, so the old layout just rendered "04:…", "UPTI…", "BATT…": height
+   spent on nothing readable. Ring widgets keep their number, because it lives
+   inside the ring and two digits do fit. Everything else shows its icon, with
+   the full reading in the tile's native tooltip. Horizontal docks are
+   unaffected and still show label + value. */
 body.edge-left .tile.widget, body.edge-right .tile.widget {
   width: auto;
   min-width: 0;
   max-width: none;
-  height: auto;
+  height: var(--size); /* exactly an app tile — one even column */
 }
 body.edge-left .tile.widget .w-card, body.edge-right .tile.widget .w-card {
+  --w-chrome: 8px; /* 3+3 padding + 1+1 border */
   flex-direction: column;
-  gap: 3px;
-  padding: 5px 2px 4px;
-  /* ONE shared width for every widget card, kept as THIN as the horizontal bar
-     is tall: it tracks the icon size but never dips below what the media
-     transport row needs (~46px). So the side bar reads as a slim column, not a
-     fat panel. */
-  width: max(var(--size), 46px);
+  justify-content: center;
+  gap: 0;
+  padding: 3px;
+  width: var(--size);
 }
 body.edge-left .tile.widget .w-main, body.edge-right .tile.widget .w-main {
   max-width: 100%;
@@ -1238,14 +1267,22 @@ body.edge-left .tile.widget .w-main, body.edge-right .tile.widget .w-main {
   text-align: center;
 }
 body.edge-left .tile.widget .w-label, body.edge-right .tile.widget .w-label,
-body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value {
-  max-width: 100%;
-}
-body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value {
-  font-size: var(--text-sm);
-}
+body.edge-left .tile.widget .w-value, body.edge-right .tile.widget .w-value,
 body.edge-left .tile.widget .w-bar, body.edge-right .tile.widget .w-bar {
-  width: 100%;
+  display: none;
+}
+/* With the text gone the icon can take the whole card instead of the 20px it
+   is pinned to in the horizontal strip. */
+body.edge-left .tile.widget .w-ico, body.edge-right .tile.widget .w-ico {
+  display: grid;
+  place-items: center;
+  width: var(--w-art);
+  height: var(--w-art);
+}
+body.edge-left .tile.widget .w-ico img.emo,
+body.edge-right .tile.widget .w-ico img.emo {
+  width: 78% !important;
+  height: 78% !important;
 }
 /* Preview cards collapse to just the icon (+ unread badge) — the narrow rail
    has no room for a title/subtitle line, and centering long text like
@@ -1262,8 +1299,8 @@ body.edge-left .tile.widget.preview .w-pv-badge, body.edge-right .tile.widget.pr
   display: none;
 }
 body.edge-left .tile.widget.media .w-art, body.edge-right .tile.widget.media .w-art {
-  width: calc(var(--size) * 0.78);
-  height: calc(var(--size) * 0.78);
+  width: var(--w-art);
+  height: var(--w-art);
   border-radius: 8px;
 }
 /* Hover controls: prev · play/pause · next as a floating glass strip. */
@@ -1346,8 +1383,8 @@ body.edge-left .tile.widget.media .w-ctl svg, body.edge-right .tile.widget.media
 .w-ring {
   position: relative;
   flex: 0 0 auto;
-  width: calc(var(--size) * 0.78);
-  height: calc(var(--size) * 0.78);
+  width: var(--w-art);
+  height: var(--w-art);
   display: grid;
   place-items: center;
 }
