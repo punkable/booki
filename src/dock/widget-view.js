@@ -188,11 +188,22 @@ export function setMarqueeText(el, text, keyName, force = false) {
   el.textContent = text;
   if (reduceMotion()) return; // plain ellipsized line instead of a frozen marquee
   if (!el.clientWidth || el.scrollWidth <= el.clientWidth + 2) return;
-  const safe = escapeHTML(text);
-  el.innerHTML = `<span class="mq"><span>${safe}</span><span>${safe}</span></span>`;
-  const mq = el.querySelector(".mq");
-  const distance = mq ? mq.scrollWidth / 2 : el.scrollWidth;
-  el.style.setProperty("--mq-duration", `${marqueeDuration(distance).toFixed(2)}s`);
+  // Built as nodes, not as an HTML string. The text here is a song title or a
+  // clipboard entry — content Booki did not author — and the loop needs two
+  // copies of it, so the old version escaped it by hand and interpolated it
+  // into innerHTML. Setting textContent on real elements means the value is
+  // never parsed as markup at all, so there is nothing left to escape and
+  // nothing to get wrong later.
+  el.textContent = "";
+  const mq = document.createElement("span");
+  mq.className = "mq";
+  for (let i = 0; i < 2; i++) {
+    const copy = document.createElement("span");
+    copy.textContent = text;
+    mq.appendChild(copy);
+  }
+  el.appendChild(mq);
+  el.style.setProperty("--mq-duration", `${marqueeDuration(mq.scrollWidth / 2).toFixed(2)}s`);
   el.classList.add("scroll");
 }
 
@@ -226,14 +237,4 @@ export function refreshPreviewMarquees() {
       "";
     setPreviewSubText(el, text, sub.classList.contains("empty"), true);
   });
-}
-
-/* Escape user-controlled text (song titles, clipboard contents) before it goes
-   into innerHTML — a track literally named "<img onerror=…>" must render as
-   text, not run. */
-function escapeHTML(s) {
-  return String(s ?? "").replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
-  );
 }
