@@ -135,6 +135,7 @@ function bridgeSource(cfg, { stats = {} } = {}) {
   };
   return `
     window.__bookiErrors = [];
+    window.__listeners = {};
     window.__TAURI__ = {
       core: {
         invoke: (cmd) => {
@@ -164,7 +165,12 @@ function bridgeSource(cfg, { stats = {} } = {}) {
         },
       },
       event: {
-        listen: () => Promise.resolve(() => {}),
+        // Keep the handlers so a test can push a backend event (occlusion,
+        // fullscreen, notch click) through the real listener path.
+        listen: (name, cb) => {
+          (window.__listeners[name] ||= []).push(cb);
+          return Promise.resolve(() => {});
+        },
         emit: () => Promise.resolve(),
       },
       window: {
