@@ -310,7 +310,14 @@ pub fn clipboard_get_text() -> Option<String> {
             let hglobal = HGLOBAL(h.0);
             let size = GlobalSize(hglobal);
             let p = GlobalLock(hglobal) as *const u16;
-            if p.is_null() || size == 0 {
+            if p.is_null() {
+                return None; // lock failed, nothing to release
+            }
+            if size == 0 {
+                // The lock DID succeed here, so it has to be released — the
+                // combined `p.is_null() || size == 0` guard used to bail out
+                // leaving the block locked.
+                let _ = GlobalUnlock(hglobal);
                 return None;
             }
             // GlobalSize is in bytes; CF_UNICODETEXT is UTF-16 + a NUL terminator.
@@ -650,16 +657,22 @@ pub fn foreground_app_name() -> Option<String> {
         if pid == 0 {
             return None;
         }
+        use windows::Win32::Foundation::CloseHandle;
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buf = [0u16; 512];
         let mut size = buf.len() as u32;
-        QueryFullProcessImageNameW(
+        // Close the handle on EVERY path. The `?` on QueryFullProcessImageNameW
+        // used to return early and leak it, once per call — and this runs from
+        // the foreground watcher, so the process slowly bled handles.
+        // process_image_path below already does it this way.
+        let queried = QueryFullProcessImageNameW(
             handle,
             PROCESS_NAME_WIN32,
             PWSTR(buf.as_mut_ptr()),
             &mut size,
-        )
-        .ok()?;
+        );
+        let _ = CloseHandle(handle);
+        queried.ok()?;
         let path = String::from_utf16_lossy(&buf[..size as usize]);
         Path::new(&path)
             .file_stem()
