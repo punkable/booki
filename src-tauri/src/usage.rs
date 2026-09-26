@@ -9,6 +9,9 @@
 //!
 //! Parsing is pure and tested; only `frequent_apps()` touches the registry.
 
+// The parsers only run on Windows (and in tests); elsewhere they are unused.
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
