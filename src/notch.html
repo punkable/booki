@@ -7,7 +7,23 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body class="notch-body">
-    <button class="notch-pill notch-enter" id="notch-pill" title="Show Booki" aria-label="Show Booki"></button>
+    <!-- One element that morphs: a slim tab at rest, a live activity while
+         something plays, a small card on hover. Not a <button>, because the
+         card holds its own play/pause button. -->
+    <div class="notch-pill notch-enter" id="notch-pill" role="button" tabindex="0" title="Show Booki" aria-label="Show Booki">
+      <div class="nl" aria-hidden="true">
+        <span class="nl-art"><img id="nl-art-img" alt="" draggable="false" /></span>
+        <span class="nl-eq"><i></i><i></i><i></i></span>
+      </div>
+      <div class="nc" id="notch-card">
+        <span class="nc-art"><img id="nc-art-img" alt="" draggable="false" /></span>
+        <span class="nc-copy">
+          <span class="nc-title" id="nc-title"></span>
+          <span class="nc-sub" id="nc-sub"></span>
+        </span>
+        <button class="nc-play" id="nc-play" type="button" hidden></button>
+      </div>
+    </div>
     <div class="notch-toast" id="notch-toast" role="status" aria-live="polite">
       <img class="notch-toast-mark" src="/brand/svg/isotype.svg" alt="" width="16" height="16" draggable="false" />
       <span class="notch-toast-copy">

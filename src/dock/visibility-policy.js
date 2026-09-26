@@ -23,16 +23,19 @@
  */
 
 /**
- * @param {object} s
- * @param {"off"|"smart"|"edge"} s.mode      auto-hide mode
- * @param {"click"|"hover"}      s.trigger   how a tucked dock comes back
- * @param {boolean} s.fullscreen   a fullscreen app owns the screen
- * @param {boolean} s.previewing   Settings is driving position live
- * @param {boolean} s.occluded     another window covers the dock's home rect
- * @param {boolean} s.manualHide   the user swiped the bar away
- * @param {boolean} s.summoned     the user asked for it (notch click / hot edge)
- * @param {boolean} s.draggingFile an OS file drag is over the dock
- * @param {boolean} s.pointerInside the pointer is within the dock's live area
+ * @typedef {object} VisibilityState
+ * @property {"off"|"smart"|"edge"} mode      auto-hide mode
+ * @property {"click"|"hover"} trigger   how a tucked dock comes back
+ * @property {boolean} fullscreen   a fullscreen app owns the screen
+ * @property {boolean} previewing   Settings is driving position live
+ * @property {boolean} occluded     another window covers the dock's home rect
+ * @property {boolean} manualHide   the user swiped the bar away
+ * @property {boolean} summoned     the user asked for it (notch click / hot edge)
+ * @property {boolean} draggingFile an OS file drag is over the dock
+ * @property {boolean} pointerInside the pointer is within the dock's live area
+ */
+/**
+ * @param {VisibilityState} s
  * @returns {boolean|null} true = show, false = hide, null = no opinion (leave
  *   it as it is). `null` is a real answer, not a fallback: in click mode a
  *   tucked dock must NOT pop back out on its own when the desktop clears — only
@@ -78,6 +81,7 @@ export function decideVisible(s) {
  * is mid-gesture? Kept as its own export because the caller needs it to decide
  * whether to even start the auto-hide grace period.
  */
+/** @param {VisibilityState} s */
 export function wantsHidden(s) {
   return decideVisible(s) === false;
 }

@@ -75,6 +75,26 @@ export const iconAlert = () =>
   S(`<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>`);
 export const iconMore = () =>
   S(`<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>`);
+export const iconActivity = () =>
+  S(`<path d="M22 12h-4l-3 8L9 4l-3 8H2"/>`);
+export const iconTimer = () =>
+  S(`<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/>`);
+export const iconMusic = () =>
+  S(`<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`);
+export const iconClipboard = () =>
+  S(`<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>`);
+export const iconCpu = () =>
+  S(`<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>`);
+export const iconMemory = () =>
+  S(`<rect x="2" y="7" width="20" height="10" rx="2"/><path d="M6 11v2M10 11v2M14 11v2M18 11v2M6 17v3M18 17v3"/>`);
+export const iconDisk = () =>
+  S(`<path d="M22 12H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/><path d="M6 16h.01M10 16h.01"/>`);
+export const iconBattery = () =>
+  S(`<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 11v2"/>`);
+export const iconVolume = () =>
+  S(`<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>`);
+export const iconNote = () =>
+  S(`<path d="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v6h6M7 13h8M7 17h5"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -115,6 +135,16 @@ const iconMap = {
   alert: iconAlert,
   "alert-triangle": iconAlert,
   more: iconMore,
+  activity: iconActivity,
+  timer: iconTimer,
+  music: iconMusic,
+  clipboard: iconClipboard,
+  note: iconNote,
+  cpu: iconCpu,
+  memory: iconMemory,
+  disk: iconDisk,
+  battery: iconBattery,
+  volume: iconVolume,
 };
 
 export function icon(name) {

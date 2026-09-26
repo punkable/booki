@@ -21,7 +21,9 @@ pub fn focus_window(_hwnd: isize) -> bool {
     false
 }
 
-pub fn exclude_from_capture(_hwnd: isize) {}
+pub fn close_window(_hwnd: isize) -> bool {
+    false
+}
 
 pub fn set_capture_visible(_hwnd: isize, _visible: bool) {}
 

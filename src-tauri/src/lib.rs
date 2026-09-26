@@ -5,6 +5,7 @@
 
 mod apps;
 mod config;
+mod usage;
 mod util;
 mod win;
 
@@ -41,13 +42,15 @@ static PENDING_TAB: Mutex<Option<String>> = Mutex::new(None);
 /// whenever the cursor isn't over one of these rects. `bool` = the whole
 /// window is interactive (edge-move overlay, internal drags).
 #[allow(clippy::type_complexity)]
-static HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), true));
+/// Clickable regions a window reported, plus whether the whole window is live.
+type HitRegions = Mutex<(Vec<(f64, f64, f64, f64)>, bool)>;
+static HIT_RECTS: HitRegions = Mutex::new((Vec::new(), true));
 
 /// Same contract as HIT_RECTS, but for the notch window. The notch OS window is
 /// intentionally larger than the painted pill (hover/glow room); without this,
 /// transparent padding would block clicks on apps behind it.
 #[allow(clippy::type_complexity)]
-static NOTCH_HIT_RECTS: Mutex<(Vec<(f64, f64, f64, f64)>, bool)> = Mutex::new((Vec::new(), false));
+static NOTCH_HIT_RECTS: HitRegions = Mutex::new((Vec::new(), false));
 
 static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 
@@ -402,6 +405,17 @@ fn focus_window(hwnd: i64) -> bool {
     win::focus_window(hwnd as isize)
 }
 
+#[tauri::command]
+fn close_window(hwnd: i64) -> bool {
+    win::close_window(hwnd as isize)
+}
+
+/// The apps this user runs most, from Windows' local usage record.
+#[tauri::command]
+async fn frequent_apps(limit: Option<usize>) -> Vec<usage::UsedApp> {
+    usage::frequent_apps(limit.unwrap_or(12).min(50))
+}
+
 /// Re-anchor the dock window to the given screen edge.
 #[tauri::command]
 fn reposition_dock(window: WebviewWindow, edge: String) -> Result<(), String> {
@@ -465,6 +479,45 @@ fn set_dock_frame(
 #[tauri::command]
 fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
     *HIT_RECTS.lock().unwrap() = (rects, all);
+}
+
+/// Native blurred material behind the calling window, clipped to `shapes`
+/// (`[x, y, w, h, radius]`, window-relative CSS px). `tint` is `#RRGGBBAA`.
+/// Returns false where there is no native material (the page keeps its CSS
+/// fallback then). An empty list hides it.
+#[tauri::command]
+fn set_material(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    shapes: Vec<(f64, f64, f64, f64, f64)>,
+    tint: String,
+) -> bool {
+    #[cfg(windows)]
+    {
+        let owner = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+        if owner == 0 {
+            return false;
+        }
+        let hex = tint.trim_start_matches('#');
+        let rgba = u32::from_str_radix(hex, 16).unwrap_or(0x1c1c1ea0);
+        let argb = if hex.len() == 8 {
+            // RRGGBBAA -> AARRGGBB
+            rgba.rotate_right(8)
+        } else {
+            0xff00_0000 | rgba
+        };
+        let key = window.label().to_string();
+        let dpr = window.scale_factor().unwrap_or(1.0);
+        let _ = app.run_on_main_thread(move || {
+            win::material::apply(owner, &key, &shapes, dpr, argb);
+        });
+        true
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, window, shapes, tint);
+        false
+    }
 }
 
 /// Interactive regions of the notch window (window-relative CSS px). Same
@@ -677,15 +730,6 @@ fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-/// Kept for IPC compatibility; the dock's translucency is now CSS-only.
-#[tauri::command]
-fn set_material(_app: AppHandle, _strength: u32) -> Result<(), String> {
-    // No-op: the dock's translucency is now a pure-CSS acrylic driven by the
-    // `--material` variable in the frontend (see styles.css / dock.js). Kept so
-    // the existing IPC call from settings stays valid.
-    Ok(())
 }
 
 /// The Windows accent/colorization color as a `#rrggbb` hex string, so the user
@@ -1347,15 +1391,19 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
         // Circle ~20px + modest pad for soft shadow / hover grow.
         let s = 36.0 * scale;
         (s, s)
-    } else if attached {
-        match vertical {
-            true => (28.0 * scale, 140.0 * scale),
-            false => (140.0 * scale, 28.0 * scale),
+    } else if vertical {
+        if attached {
+            (28.0 * scale, 140.0 * scale)
+        } else {
+            (40.0 * scale, 156.0 * scale)
         }
     } else {
-        match vertical {
-            true => (40.0 * scale, 156.0 * scale),
-            false => (156.0 * scale, 40.0 * scale),
+        // Horizontal tabs open into a live card on hover (notch.js), so the
+        // window holds the card's size. Only the painted pill takes clicks.
+        if attached {
+            (320.0 * scale, 60.0 * scale)
+        } else {
+            (320.0 * scale, 68.0 * scale)
         }
     };
     let ww = (lw * dpr).round() as i32;
@@ -1898,12 +1946,12 @@ fn list_installed_apps() -> Vec<AppGroup> {
             if items.len() <= 1 {
                 general.append(&mut items);
             } else {
-                items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                items.sort_by_key(|a| a.name.to_lowercase());
                 groups.push(AppGroup { name, items });
             }
         }
-        groups.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        general.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        groups.sort_by_key(|a| a.name.to_lowercase());
+        general.sort_by_key(|a| a.name.to_lowercase());
         if !general.is_empty() {
             groups.push(AppGroup {
                 name: String::new(),
@@ -2349,6 +2397,8 @@ pub fn run() {
             reset_config,
             open_settings,
             open_location,
+            close_window,
+            frequent_apps,
             set_hotkey,
             apply_hotkeys,
             move_paths,
@@ -2635,7 +2685,7 @@ pub fn run() {
                     struct CursorTarget {
                         window: tauri::WebviewWindow,
                         hwnd: isize,
-                        rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                        rects: &'static HitRegions,
                         /// Only the dock reports enter/leave to the frontend.
                         emits_inside: bool,
                         last: Option<bool>,
@@ -2644,7 +2694,7 @@ pub fn run() {
                     let handle = app.handle().clone();
                     let mut targets: Vec<CursorTarget> = Vec::new();
                     let mut add = |window: tauri::WebviewWindow,
-                                   rects: &'static Mutex<(Vec<(f64, f64, f64, f64)>, bool)>,
+                                   rects: &'static HitRegions,
                                    emits_inside: bool,
                                    start_click_through: bool| {
                         let hwnd = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
@@ -2669,11 +2719,13 @@ pub fn run() {
                     if let Some(notch_watch) = app.get_webview_window("notch") {
                         add(notch_watch, &NOTCH_HIT_RECTS, false, true);
                     }
-                    drop(add);
 
                     if !targets.is_empty() {
                         std::thread::spawn(move || {
                             loop {
+                                // A hidden dock or notch must never leave its
+                                // material behind, whichever path hid it.
+                                win::material::sync();
                                 // Shortest interval any target asks for this tick.
                                 let mut next_ms = 180u64;
                                 for t in targets.iter_mut() {

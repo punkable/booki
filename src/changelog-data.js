@@ -3,6 +3,40 @@
 
 export const CHANGELOG = [
   {
+    version: "0.69.0",
+    date: "26 sept 2026",
+    headline: "Booki renovado: vidrio real de Windows, widgets tipo tile, notch vivo, menús nuevos y Ajustes rehechos.",
+    sections: [
+      {
+        icon: "\u{2728}",
+        title: "Diseño",
+        notes: [
+          "La barra, los flyouts, los menús y el notch usan el material acrílico de Windows: el escritorio se ve desenfocado de verdad detrás. Se puede apagar en Ajustes → Apariencia.",
+          "Widgets rehechos como tiles: anillos gruesos de colores con número grande, gráfica de red en vivo y botón de música siempre a mano.",
+          "Iconos de línea en el dock en lugar de emoji, y el dock arranca más cerca de la barra de tareas.",
+        ],
+      },
+      {
+        icon: "\u{1F4A1}",
+        title: "Más fácil de usar",
+        notes: [
+          "Panel «Añadir apps y widgets»: busca, muestra primero las apps que más usas y las que tienes abiertas, y reúne la galería de widgets.",
+          "El notch se abre al pasar el mouse con la canción que suena y play/pausa, o con la hora.",
+          "Menú contextual nuevo: las ventanas abiertas de la app, nueva ventana, cerrar ventanas y mostrar en el Explorador.",
+          "Al arrastrar, una etiqueta dice qué pasará: abrir con, mover a, añadir a un grupo, fijar o quitar del dock.",
+        ],
+      },
+      {
+        icon: "\u{2699}\u{FE0F}",
+        title: "Ajustes",
+        notes: [
+          "Ajustes rehechos al estilo de Configuración de macOS, con secciones propias para Dock, Ocultar, Notch, Widgets, Portapapeles, Atajos y Perfiles.",
+          "Más ligeros: ya no dependen de una librería de componentes externa.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.68.0",
     date: "25 jul 2026",
     headline: "Revisión a fondo: un crash menos, widgets alineados, mucho menos consumo en reposo y los cinco idiomas completos.",

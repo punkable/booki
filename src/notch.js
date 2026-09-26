@@ -11,11 +11,13 @@
 import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
-import { t, setLang, ensureLang } from "./i18n.js";
+import { t, setLang, ensureLang, curLang } from "./i18n.js";
 import { applySurfaceVars } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
+import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
+import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled } from "./material.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -23,6 +25,9 @@ const inTauri = !!winApi;
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
 let notchMode = "attached";
+// The live card only exists on a horizontal tab: a vertical one has no room
+// for a line of text, and the smart dot is deliberately a dot.
+let canPeek = false;
 let draggingNotch = false;
 let lastHitSig = "";
 
@@ -62,7 +67,14 @@ async function applyLook() {
     }
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
+    // Stacked under a visible dock the card would grow over the bar.
+    canPeek = !smart && !hoverTrigger && !cfg.notchAlwaysVisible && (edge === "top" || edge === "bottom");
+    document.body.classList.toggle("peekable", canPeek);
+    if (!canPeek) closeCard();
+    pollMedia();
     applySurfaceVars(cfg);
+    setMaterialTint(materialTint(cfg));
+    setMaterialEnabled(cfg.nativeMaterial);
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
@@ -91,6 +103,7 @@ onOcclusion((v) => setSmartState("smart-focus", v));
 // Window-relative CSS px [x, y, w, h], matching the dock's set_hit_rects.
 function reportNotchHitRects() {
   const toasting = document.body.classList.contains("toast");
+  reportMaterial(document.visibilityState === "hidden" ? [] : [shapeOf(toasting ? toastEl : pill)]);
   // During drag or toast, keep the whole notch window interactive so gestures
   // and the message aren't yanked out from under the cursor.
   const all = !!(draggingNotch || toasting);
@@ -183,6 +196,133 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") clearNotchToast();
 });
 
+// ─── Live activity + hover card ───────────────────────────────────────────
+// The tab is one element that morphs: slim at rest, a little wider with art
+// and a level meter while something plays, and a small card under the
+// pointer. Clicking the card still brings the dock back, so the notch never
+// stops being the dock's handle — the card only adds a glance and play/pause.
+const lArt = document.getElementById("nl-art-img");
+const cArt = document.getElementById("nc-art-img");
+const cTitle = document.getElementById("nc-title");
+const cSub = document.getElementById("nc-sub");
+const cPlay = document.getElementById("nc-play");
+let media = null; // { title, artist, playing, thumb } or null
+let mediaTimer = null;
+let cardTimer = null;
+let cardOpen = false;
+
+function paintMedia() {
+  const live = !!(media && media.playing && canPeek);
+  document.body.classList.toggle("live", live);
+  const art = (media && media.thumb) || "";
+  for (const img of [lArt, cArt]) {
+    if (img.getAttribute("src") !== art) {
+      if (art) img.src = art;
+      else img.removeAttribute("src");
+    }
+  }
+  document.body.classList.toggle("has-art", !!art);
+  paintCard();
+}
+
+function paintCard() {
+  if (media && (media.title || media.artist)) {
+    cTitle.textContent = media.title || media.artist;
+    cSub.textContent = media.title ? media.artist : "";
+    cPlay.hidden = false;
+    cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+    cPlay.setAttribute("aria-label", t("w.playPause"));
+    cPlay.title = t("w.playPause");
+    document.body.classList.remove("card-clock");
+  } else {
+    // Nothing playing: the card is a clock, which is the other thing you
+    // glance at the edge of the screen for.
+    const { time, date } = clockParts(new Date(), curLang());
+    cTitle.textContent = time;
+    cSub.textContent = date;
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+  }
+}
+
+// Media is polled only while it can be shown, and slower when nothing plays:
+// the WinRT session query is cheap but not free.
+async function pollMedia() {
+  clearTimeout(mediaTimer);
+  if (!canPeek || !inTauri) {
+    media = null;
+    paintMedia();
+    return;
+  }
+  try {
+    media = await invoke("media_info");
+  } catch (_) {
+    media = null;
+  }
+  paintMedia();
+  mediaTimer = setTimeout(pollMedia, media && media.playing ? 2500 : 6000);
+}
+
+// Hit rects must follow the morph while its width/height transition runs.
+function followMorph(ms = 420) {
+  const end = performance.now() + ms;
+  const step = () => {
+    reportNotchHitRects();
+    if (performance.now() < end) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function openCard() {
+  if (!canPeek || cardOpen || drag) return;
+  paintCard();
+  cardOpen = true;
+  document.body.classList.add("card");
+  followMorph();
+}
+function closeCard() {
+  clearTimeout(cardTimer);
+  if (!cardOpen) return;
+  cardOpen = false;
+  document.body.classList.remove("card");
+  followMorph();
+}
+
+// Intent delay in, a short grace out: brushing past the edge does nothing,
+// and leaving by a pixel does not snap it shut.
+pill.addEventListener("pointerenter", () => {
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(openCard, 140);
+});
+pill.addEventListener("pointerleave", () => {
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(closeCard, 220);
+});
+
+cPlay.addEventListener("pointerdown", (e) => e.stopPropagation());
+cPlay.addEventListener("click", async (e) => {
+  e.stopPropagation();
+  try {
+    await invoke("media_toggle");
+  } catch (_) {}
+  if (media) media.playing = !media.playing;
+  paintMedia();
+  setTimeout(pollMedia, 400);
+});
+
+pill.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    invoke("notch_reveal");
+  }
+});
+
+// A hidden notch has nothing to show; drop the card so the next reveal starts
+// from the tab.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") closeCard();
+});
+
 // Dragging a file NEAR the notch reveals the dock — otherwise there'd be
 // nowhere to drop while the dock is tucked away (its window is hidden).
 onFileDrop({ onEnter: () => invoke("notch_reveal") });
@@ -243,6 +383,7 @@ pill.addEventListener("pointermove", (e) => {
   if (!drag.moved && Math.hypot(e.screenX - drag.sx, e.screenY - drag.sy) < 6) return;
   drag.moved = true;
   draggingNotch = true;
+  closeCard();
   scheduleHitReport();
   // Coalesce to one window move per frame — moving the OS window is an IPC, so
   // firing it on every raw pointer event would flood it at high refresh rates.

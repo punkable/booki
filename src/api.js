@@ -63,7 +63,7 @@ const DEMO_CONFIG = {
   onboarded: true,
   settingsIntroSeen: true,
   lastProfile: "",
-  edgeGap: 48,
+  edgeGap: 12,
   taskbarFollow: true,
   taskbarSettleMs: 1000,
   taskbarHoldWhileHover: true,
@@ -161,6 +161,8 @@ async function mockInvoke(cmd, args) {
         { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
         { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
       ];
+    case "frequent_apps":
+      return [];
     case "list_installed_apps":
       return [
         {
@@ -462,6 +464,7 @@ export const dock = {
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
+  closeWindow: (hwnd) => invoke("close_window", { hwnd }),
   trashCount: () => invoke("trash_count"),
   recentFiles: (limit) => invoke("recent_files", { limit }),
   openDataDir: () => invoke("open_data_dir"),
@@ -473,7 +476,7 @@ export const dock = {
     invoke("apply_hotkeys", { toggle, positions, modifier }),
   movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
-  setMaterial: (strength) => invoke("set_material", { strength }),
+  setMaterial: (shapes, tint) => invoke("set_material", { shapes, tint }),
   systemAccent: () => invoke("system_accent"),
   systemStats: () => invoke("system_stats"),
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
@@ -505,6 +508,7 @@ export const dock = {
   listDir: (path) => invoke("list_dir", { path }),
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: () => invoke("list_installed_apps"),
+  frequentApps: (limit = 12) => invoke("frequent_apps", { limit }),
 };
 
 /** Listen for "switch to a pending settings tab" (settings re-asks the backend). */

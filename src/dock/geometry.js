@@ -14,17 +14,22 @@
  * (the test harness, the demo) there is no backend placing anything, and
  * screen.availWidth reports the whole desktop while the page only gets the
  * viewport — clamping keeps the layout inside what is actually visible. */
+/** @param {boolean} hasBackend */
 export function availW(hasBackend) {
   const screenW = window.screen.availWidth || window.screen.width || window.innerWidth || 1280;
   return hasBackend ? screenW : Math.min(screenW, window.innerWidth || screenW);
 }
 
+/** @param {boolean} hasBackend */
 export function availH(hasBackend) {
   const screenH = window.screen.availHeight || window.screen.height || window.innerHeight || 720;
   return hasBackend ? screenH : Math.min(screenH, window.innerHeight || screenH);
 }
 
-/** Window-relative [x, y, w, h] for an element, or null if it isn't painted. */
+/** Window-relative [x, y, w, h] for an element, or null if it isn't painted.
+ * @param {Element|null} el
+ * @param {number} [inflate]
+ */
 export function rectFromElement(el, inflate = 0) {
   if (!el) return null;
   const r = el.getBoundingClientRect();
@@ -32,6 +37,7 @@ export function rectFromElement(el, inflate = 0) {
   return [r.left - inflate, r.top - inflate, r.width + inflate * 2, r.height + inflate * 2];
 }
 
+/** @param {number} x @param {number} y @param {number[]|null} rect */
 export function pointInRect(x, y, rect) {
   return !!rect && x >= rect[0] && x < rect[0] + rect[2] && y >= rect[1] && y < rect[1] + rect[3];
 }
@@ -40,6 +46,7 @@ export function pointInRect(x, y, rect) {
  * Rounded to whole pixels: a fractional drift of a tenth of a px is not a
  * change anyone can click on, and both windows re-measure every frame while
  * something animates. */
+/** @param {number[][]} rects @param {boolean} all */
 export function hitSignature(rects, all) {
   return all ? "all" : rects.map((r) => r.map(Math.round).join(",")).join(";");
 }

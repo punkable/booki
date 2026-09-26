@@ -14,20 +14,22 @@
  * a browser.
  */
 
+/** @param {string} edge */
 export const isVerticalEdge = (edge) => edge === "left" || edge === "right";
 
+/** @param {number} v @param {number} lo @param {number} hi */
 const clamp = (v, lo, hi) => Math.min(Math.max(lo, v), Math.max(lo, hi));
 
 /**
  * Position a box beside the bar.
  *
  * @param {object}  o
- * @param {object}  o.bar      Anchor rect {left, top, width, height} — the dock,
+ * @param {{left:number, top:number, width:number, height:number}} o.bar Anchor rect — the dock,
  *                             or a single tile when the box belongs to one.
- * @param {object}  o.box      {width, height} of the thing being placed.
+ * @param {{width:number, height:number}} o.box Size of the thing being placed.
  * @param {string}  o.edge     Which screen edge the dock is anchored to.
- * @param {object}  o.viewport {width, height} of the window.
- * @param {number} [o.along]   Point along the bar's long axis to centre on
+ * @param {{width:number, height:number}} o.viewport Window size.
+ * @param {number|null} [o.along] Point along the bar's long axis to centre on
  *                             (a cursor position, say). Defaults to the bar's
  *                             own centre.
  * @param {number} [o.gap]     Space between bar and box.
@@ -65,6 +67,8 @@ export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 1
    opened it — the cursor, the tile — keeps the link between trigger and
    content; scaling it out of its own centre reads as a box that arrived from
    nowhere. Clamped to the box so an origin outside it can't shear the animation. */
+/** @param {{left:number, top:number, width:number, height:number}} box
+ * @param {number} anchorX @param {number} anchorY */
 export function transformOrigin(box, anchorX, anchorY) {
   return {
     x: clamp(anchorX - box.left, 0, box.width),

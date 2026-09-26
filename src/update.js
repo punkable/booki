@@ -1,12 +1,12 @@
-/* Auto-update via the Tauri updater. Checks the GitHub release manifest,
-   downloads + installs the signed update, and relaunches — the user's config
-   in %APPDATA%\Booki is never touched (only the app install is replaced).
+/* Auto-update via the Tauri updater. Checks the GitHub release manifest and
+   installs only signed installers. Updating the app does not replace its
+   saved configuration.
    Dynamic imports so the browser preview (no Tauri) doesn't choke. */
 
 import { isTauri, logMessage } from "./api.js";
 
 /** Check for an available update. Returns the update object or null. */
-export async function checkForUpdate() {
+export async function checkForUpdate(onError) {
   if (!isTauri) return null;
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
@@ -14,6 +14,7 @@ export async function checkForUpdate() {
     return update && update.available ? update : null;
   } catch (e) {
     logMessage("warn", `update check failed: ${e}`);
+    onError?.(e);
     return null;
   }
 }

@@ -125,7 +125,9 @@ fn default_anim() -> String {
     "spring".into()
 }
 fn default_edge_gap() -> u32 {
-    48
+    // Close to the taskbar, like a second dock beside it; 48 read as floating
+    // in the middle of the screen.
+    12
 }
 fn default_taskbar_settle_ms() -> u32 {
     // After an auto-hide taskbar tucks away, give the user a beat to hit the
@@ -216,6 +218,10 @@ pub struct Config {
     /// Unified dock + notch surface: "mica" | "acrylic" | "tinted" | "solid".
     #[serde(default = "default_surface_style")]
     pub surface_style: String,
+    /// Real blurred material behind the dock and notch (win/material.rs).
+    /// A switch so it can be turned off if a system renders it badly.
+    #[serde(default = "default_true")]
+    pub native_material: bool,
     /// Notch size scale (0.7–1.5). 1.0 = default pill size.
     #[serde(default = "default_notch_scale")]
     pub notch_scale: f32,
@@ -368,6 +374,7 @@ impl Default for Config {
             notch_edge: default_notch_edge(),
             notch_style: default_notch_style(),
             surface_style: default_surface_style(),
+            native_material: true,
             notch_scale: default_notch_scale(),
             always_on_top: true,
             magnify_style: default_anim(),
@@ -377,7 +384,7 @@ impl Default for Config {
             surface_tint: default_surface_tint(),
             autostart: false,
             context_menu: true,
-            edge_gap: 48,
+            edge_gap: default_edge_gap(),
             taskbar_follow: true,
             taskbar_settle_ms: default_taskbar_settle_ms(),
             taskbar_hold_while_hover: true,

@@ -8,7 +8,7 @@ use std::path::Path;
 use base64::Engine;
 use windows::core::{Interface, PCWSTR, PWSTR};
 use windows::Win32::Foundation::POINT;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
     MonitorFromPoint, MonitorFromWindow, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
@@ -31,8 +31,8 @@ use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_L
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow, GetIconInfo,
     GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow,
-    GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE, WS_EX_TOOLWINDOW,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, PostMessageW, SetForegroundWindow,
+    ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE, WM_CLOSE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -139,7 +139,7 @@ unsafe fn hicon_to_png(hicon: HICON) -> Option<Vec<u8>> {
             biHeight: -height, // negative => top-down rows
             biPlanes: 1,
             biBitCount: 32,
-            biCompression: BI_RGB.0 as u32,
+            biCompression: BI_RGB.0,
             ..Default::default()
         },
         ..Default::default()
@@ -244,7 +244,7 @@ unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
             biHeight: -height, // negative => top-down rows
             biPlanes: 1,
             biBitCount: 32,
-            biCompression: BI_RGB.0 as u32,
+            biCompression: BI_RGB.0,
             ..Default::default()
         },
         ..Default::default()
@@ -283,8 +283,8 @@ unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
         for px in buf.chunks_exact_mut(4) {
             let a = px[3] as u32;
             if a > 0 && a < 255 {
-                for c in 0..3 {
-                    px[c] = ((px[c] as u32 * 255 + a / 2) / a).min(255) as u8;
+                for channel in px.iter_mut().take(3) {
+                    *channel = ((*channel as u32 * 255 + a / 2) / a).min(255) as u8;
                 }
             }
         }
@@ -832,16 +832,18 @@ pub fn set_capture_visible(hwnd: isize, visible: bool) {
     }
 }
 
-pub fn exclude_from_capture(hwnd: isize) {
-    set_capture_visible(hwnd, false);
-}
-
 pub fn protect_data(data: &[u8]) -> Option<Vec<u8>> {
     windows_dpapi::encrypt_data(data, windows_dpapi::Scope::User, None).ok()
 }
 
 pub fn unprotect_data(data: &[u8]) -> Option<Vec<u8>> {
     windows_dpapi::decrypt_data(data, windows_dpapi::Scope::User, None).ok()
+}
+
+/// Ask a window to close, exactly like its title-bar X: the app can still
+/// prompt to save. Posted, so a busy app never blocks the dock.
+pub fn close_window(hwnd: isize) -> bool {
+    unsafe { PostMessageW(HWND(hwnd as *mut c_void), WM_CLOSE, WPARAM(0), LPARAM(0)).is_ok() }
 }
 
 /// Bring a window to the foreground, restoring it if minimized.
@@ -1055,7 +1057,7 @@ pub fn sync_context_menu(
 
     unsafe {
         for base in ["*", "Directory"] {
-            let root = format!("Software\\Classes\\{base}\\shell\\Booki");
+            let root = format!("Software\\Classes\\{base}\\shell\\{RUN_VALUE}");
             // Always start clean (also removes the menu when disabling).
             let wroot = wide(&root);
             let _ = RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr()));
@@ -1063,7 +1065,7 @@ pub fn sync_context_menu(
                 continue;
             }
             let key = create(&root)?;
-            set_str(key, Some("MUIVerb"), "Booki")?;
+            set_str(key, Some("MUIVerb"), RUN_VALUE)?;
             set_str(key, Some("Icon"), &format!("\"{exe}\""))?;
             // An empty SubCommands + subkeys under shell\ = a cascading menu.
             set_str(key, Some("SubCommands"), "")?;

@@ -15,6 +15,9 @@ import {
   volumeStep,
   clockParts,
   RING_C,
+  sparkPaths,
+  SPARK_W,
+  SPARK_H,
 } from "../src/dock/widget-view.js";
 
 test("network rate switches unit at a megabyte", () => {
@@ -93,4 +96,19 @@ test("the ring's circumference matches its radius", () => {
   // The gauge is drawn by offsetting a dash the length of the whole circle;
   // if these drift apart the ring reads full when it should read empty.
   assert.ok(Math.abs(RING_C - 2 * Math.PI * 15.5) < 1e-9);
+});
+
+test("sparkline stays inside its box and leaves headroom over the peak", () => {
+  const { line, fill } = sparkPaths([0, 5, 10, 5, 0]);
+  const ys = [...line.matchAll(/[ML][\d.]+ ([\d.]+)/g)].map((m) => Number(m[1]));
+  assert.equal(ys.length, 5);
+  for (const y of ys) assert.ok(y >= 0 && y <= SPARK_H, `y=${y} out of box`);
+  // The peak is not glued to the top edge: a steady rate reads as a line.
+  assert.ok(Math.min(...ys) > SPARK_H * 0.3);
+  assert.ok(fill.endsWith(`L${SPARK_W} ${SPARK_H} L0 ${SPARK_H} Z`));
+});
+
+test("sparkline with no history draws a flat baseline", () => {
+  const { line } = sparkPaths([]);
+  assert.match(line, /^M0\.0 \d+\.\d L\d+\.\d \d+\.\d$/);
 });

@@ -3,6 +3,7 @@
 
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+
 import { createPortal } from "react-dom";
 import {
   config as configApi,
@@ -25,8 +26,6 @@ import { widgetRefs, itemForWidgetRef, updateWidgetStyleForRef } from "./setting
 import { emoSrc } from "./emoji.js";
 import {
   FluentProvider,
-  Switch,
-  Slider as FluentSlider,
   Button,
   Menu,
   MenuTrigger,
@@ -35,9 +34,15 @@ import {
   MenuPopover,
   Dropdown,
   Option,
-  Card,
-} from "@fluentui/react-components";
-import {
+  Row,
+  Toggle,
+  Slider,
+  SegmentedControl,
+  PageHeader,
+  SettingsSection,
+  CollapsibleSection,
+  SectionTitle,
+  useModalControls,
   AddRegular,
   FolderRegular,
   FolderAddRegular,
@@ -49,12 +54,12 @@ import {
   Flash24Regular,
   Info24Regular,
   Search24Regular,
-} from "@fluentui/react-icons";
-import { buildFluentTheme } from "./fluent-theme.js";
+} from "./settings/ui.jsx";
 import {
   WIDGET_ORDER,
   WIDGET_META,
   WIDGET_ICONS,
+  WIDGET_GLYPHS,
   widgetDisplayName as widgetDisplayNameShared,
 } from "./widgets-meta.js";
 
@@ -198,14 +203,25 @@ const LANG_OPTIONS = [
   { value: "de", label: "Deutsch" },
 ];
 
+// Sidebar sections: [id, label key, icon, tile colour]. Blank entries are
+// visual gaps between groups of sections.
 const TABS = [
-  ["general", "tab.general", "sliders"],
-  ["appearance", "tab.appearance", "palette"],
-  ["behavior", "tab.behavior", "settings"],
-  ["apps", "tab.apps", "grid"],
-  ["faq", "tab.faq", "help"],
-  ["about", "tab.about", "info"],
+  ["general", "tab.general", "settings", "#8e8e93"],
+  ["appearance", "tab.appearance", "palette", "#0a84ff"],
+  ["dock", "tab.dock", "app", "#5e5ce6"],
+  ["autohide", "tab.autohide", "eye-off", "#30b0c7"],
+  ["notch", "tab.notch", "sparkles", "#bf5af2"],
+  null,
+  ["apps", "tab.apps", "grid", "#ff9f0a"],
+  ["widgets", "tab.widgets", "zap", "#ff375f"],
+  ["clipboard", "tab.clipboard", "clipboard", "#30d158"],
+  ["shortcuts", "tab.shortcuts", "keyboard", "#64d2ff"],
+  null,
+  ["profiles", "tab.profiles", "copy", "#ac8e68"],
+  ["faq", "tab.faq", "help", "#8e8e93"],
+  ["about", "tab.about", "info", "#636366"],
 ];
+const TAB_IDS = TABS.filter(Boolean).map(([id]) => id);
 
 function widgetDisplayName(widget) {
   return widgetDisplayNameShared(widget, t);
@@ -222,200 +238,6 @@ function installedAppsOnce(force = false) {
     });
   }
   return _installedApps;
-}
-
-// ── Reusable controls ──
-
-function Row({ label, children, hint }) {
-  return (
-    <div className="r-row">
-      <div className="r-label">
-        {label}
-        {hint && <span className="r-hint">{hint}</span>}
-      </div>
-      <div className="r-control">{children}</div>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange, label, hint }) {
-  return (
-    <label className="r-toggle fui-toggle">
-      <span className="r-toggle-text">
-        {label}
-        {hint ? <small className="r-toggle-hint">{hint}</small> : null}
-      </span>
-      <Switch
-        checked={!!checked}
-        onChange={(_e, data) => onChange(data.checked)}
-      />
-    </label>
-  );
-}
-
-function PageHeader({ icon: iconName, title, children, meta }) {
-  return (
-    <header className="settings-page-head">
-      <div className="settings-page-title">
-        <span className="settings-page-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
-        <div>
-          <h1>{title}</h1>
-          {children ? <p className="settings-page-copy">{children}</p> : null}
-        </div>
-      </div>
-      {meta ? <div className="settings-page-meta">{meta}</div> : null}
-    </header>
-  );
-}
-
-function SettingsSection({ title, icon: iconName = "settings", hint, children, className = "" }) {
-  return (
-    <Card className={"settings-section " + (!title ? "settings-section-headless " : "") + className}>
-      {title ? (
-        <div className="settings-section-head">
-          <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
-          <div>
-            <h2>{title}</h2>
-            {hint ? <p>{hint}</p> : null}
-          </div>
-        </div>
-      ) : null}
-      <div className="settings-section-body">{children}</div>
-    </Card>
-  );
-}
-
-function CollapsibleSection({ title, icon: iconName = "settings", hint, count, defaultOpen = false, children, className = "" }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={"settings-section settings-collapsible " + className + (open ? " open" : "")}>
-      <button
-        type="button"
-        className="settings-collapse-head"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        <span className="settings-section-icon" dangerouslySetInnerHTML={{ __html: icon(iconName) }} />
-        <span className="settings-collapse-copy">
-          <strong>{title}</strong>
-          {hint ? <small>{hint}</small> : null}
-        </span>
-        {count != null ? <span className="settings-count">{count}</span> : null}
-        <span className="settings-collapse-chev" dangerouslySetInnerHTML={{ __html: icon(open ? "chevron-down" : "chevron-right") }} />
-      </button>
-      {open ? <div className="settings-section-body settings-collapse-body">{children}</div> : null}
-    </section>
-  );
-}
-
-function HelpTip({ text }) {
-  return (
-    <button type="button" className="help-dot" title={text} aria-label={text}>
-      <span dangerouslySetInnerHTML={{ __html: icon("help") }} />
-    </button>
-  );
-}
-
-function useModalControls(onClose) {
-  useEffect(() => {
-    const body = document.body;
-    const prev = body.style.overflow;
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.overflow = prev;
-    };
-  }, []);
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-      onClose();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
-  // Keyboard focus: move it INTO the dialog on open, keep Tab cycling inside
-  // (aria-modal alone doesn't trap anything), and give it back on close.
-  useEffect(() => {
-    const prevFocus = document.activeElement;
-    const modals = document.querySelectorAll(".modal");
-    const modal = modals[modals.length - 1]; // this hook's dialog is the topmost
-    if (!modal) return;
-    modal.tabIndex = -1;
-    const sel = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-    const focusables = () =>
-      Array.from(modal.querySelectorAll(sel)).filter((el) => !el.disabled && el.offsetParent !== null);
-    (focusables()[0] || modal).focus();
-    const onKey = (e) => {
-      if (e.key !== "Tab") return;
-      const all = document.querySelectorAll(".modal");
-      if (all[all.length - 1] !== modal) return; // a newer dialog is on top
-      const list = focusables();
-      if (!list.length) { e.preventDefault(); modal.focus(); return; }
-      const first = list[0];
-      const last = list[list.length - 1];
-      if (!modal.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
-      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-      if (prevFocus && typeof prevFocus.focus === "function") prevFocus.focus();
-    };
-  }, []);
-}
-
-function SectionTitle({ children, name = "settings" }) {
-  return (
-    <h2 className="s-subhead">
-      <span className="s-subhead-icon" dangerouslySetInnerHTML={{ __html: icon(name) }} />
-      <span>{children}</span>
-    </h2>
-  );
-}
-
-function Slider({ value, min, max, step, onChange, fmt }) {
-  return (
-    <div className="r-slider fui-slider">
-      <FluentSlider
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(_e, data) => onChange(data.value)}
-      />
-      <span className="slider-bubble">{fmt ? fmt(value) : value}</span>
-    </div>
-  );
-}
-
-// Sliding segmented control (replaces small dropdowns). options: [{value,label,icon}]
-function SegmentedControl({ value, options, onChange }) {
-  const idx = Math.max(0, options.findIndex((o) => o.value === value));
-  return (
-    <div className="seg" style={{ "--n": options.length, "--i": idx }}>
-      <span className="seg-thumb" />
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          className={"seg-item" + (o.value === value ? " active" : "")}
-          onClick={() => onChange(o.value)}
-          title={o.label}
-        >
-          {o.icon && (
-            typeof o.icon === "string" && o.icon.includes("<svg")
-              ? <span className="seg-ico" dangerouslySetInnerHTML={{ __html: o.icon }} />
-              : <span className="seg-ico">{o.icon}</span>
-          )}
-          <span className="seg-lbl">{o.label}</span>
-        </button>
-      ))}
-    </div>
-  );
 }
 
 // ONE control for position. The dock and its notch always live on the SAME
@@ -903,12 +725,14 @@ function Suggestions({ cfg, set }) {
   const [refreshing, setRefreshing] = useState(false);
   const [openGroups, setOpenGroups] = useState({}); // collapsed by default
   const [kf, setKf] = useState([]); // the user's important shell folders
+  const [freq, setFreq] = useState([]); // most used apps (Windows' local usage record)
   const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
   useEffect(() => {
     // Memoized across tab switches: scanning the Start Menu and extracting every
     // icon is slow, and this panel remounts each time you open the Apps tab.
     installedAppsOnce().then((a) => setGroups(normalizeSuggestGroups(a)));
     dockApi.knownFolders().then((v) => setKf(Array.isArray(v) ? v : [])).catch(() => {});
+    dockApi.frequentApps(12).then((v) => setFreq(Array.isArray(v) ? v : [])).catch(() => {});
   }, []);
   if (!groups || groups.length === 0) return null;
   const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
@@ -955,7 +779,7 @@ function Suggestions({ cfg, set }) {
       icon="search"
       hint={t("apps.suggestHint")}
       count={groups.reduce((n, g) => n + g.items.length, 0)}
-      defaultOpen={false}
+      defaultOpen
       className="suggestions-section"
     >
       <div className="suggestions-panel">
@@ -987,6 +811,12 @@ function Suggestions({ cfg, set }) {
           />
         )}
       </div>
+      {!ql && freq.length > 0 && (
+        <>
+          <div className="kf-head">{t("add.frequent")}</div>
+          <div className="sugg-grid">{freq.map((a) => Tile({ name: a.name, path: a.path }))}</div>
+        </>
+      )}
       {kfView.length > 0 && (
         <>
           <div className="kf-head">{t("apps.userFolders")}</div>
@@ -1132,32 +962,40 @@ function HotkeyInput({ value, onChange }) {
 function Appearance({ cfg, set }) {
   const surface = resolveSurfaceStyle(cfg);
   const solidSurface = surface === "solid";
-  const flushSurface = (patch) =>
-    set(patch, { flush: true, afterSave: () => dockApi.notchPreview() });
+  const flushSurface = (patch) => set(patch, { flush: true, afterSave: () => dockApi.notchPreview() });
   return (
     <>
-      <PageHeader icon="palette" title={t("ap.title")}>
-        {t("ap.hint")}
-      </PageHeader>
+      <PageHeader title={t("ap.title")}>{t("ap.hint")}</PageHeader>
       <MiniDockPreview cfg={cfg} />
 
-      <SettingsSection title={t("gp.theme")} icon="palette" hint={t("gp.themeHint")}>
+      <SettingsSection>
         <Row label={t("ap.theme")}>
           <SegmentedControl
             value={cfg.theme || "system"}
             onChange={(v) => set({ theme: v })}
             options={[
               { value: "system", label: t("theme.system") },
-              { value: "light", label: t("theme.light"), icon: icon("sun") },
-              { value: "dark", label: t("theme.dark"), icon: icon("moon") },
-              { value: "auto", label: t("theme.auto"), icon: icon("clock") },
+              { value: "light", label: t("theme.light") },
+              { value: "dark", label: t("theme.dark") },
+              { value: "auto", label: t("theme.auto") },
             ]}
           />
         </Row>
+        <Row label={t("ap.accent")} hint={t("ap.accentHint")}>
+          <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
+        </Row>
       </SettingsSection>
 
-      <SettingsSection title={t("gp.surface")} icon="sliders" hint={t("ap.surfaceHint")}>
-        <SurfaceStylePicker cfg={cfg} set={set} />
+      <SettingsSection title={t("gp.surface")} hint={t("ap.surfaceHint")}>
+        <div className="ui-row ui-row-stack">
+          <SurfaceStylePicker cfg={cfg} set={set} />
+        </div>
+        <Toggle
+          checked={cfg.nativeMaterial !== false}
+          onChange={(v) => set({ nativeMaterial: v })}
+          label={t("ap.nativeMaterial")}
+          hint={t("ap.nativeMaterialHint")}
+        />
         {!solidSurface && (
           <>
             <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")}>
@@ -1182,56 +1020,130 @@ function Appearance({ cfg, set }) {
         )}
       </SettingsSection>
 
-      <SettingsSection title={t("ap.accent")} icon="palette" hint={t("ap.accentHint")}>
-        <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />
-      </SettingsSection>
-
-      <CollapsibleSection
-        title={t("gp.size")}
-        icon="app"
-        hint={t("gp.sizeHint")}
-        defaultOpen={false}
-      >
+      <SettingsSection title={t("gp.size")} hint={t("gp.sizeHint")}>
         <Row label={t("ap.iconSize")}>
-          <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`}
-            onChange={(v) => set({ iconSize: v })} />
+          <Slider value={cfg.iconSize} min={28} max={80} step={4} fmt={(v) => `${v}px`} onChange={(v) => set({ iconSize: v })} />
         </Row>
         <Row label={t("ap.spacing")}>
-          <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`}
-            onChange={(v) => set({ spacing: v })} />
+          <Slider value={cfg.spacing} min={0} max={20} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ spacing: v })} />
         </Row>
         <Row label={t("ap.radius")} hint={t("ap.radiusHint")}>
-          <Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`}
-            onChange={(v) => set({ cornerRadius: v })} />
+          <Slider
+            value={cfg.cornerRadius ?? 12}
+            min={0}
+            max={24}
+            step={1}
+            fmt={(v) => `${v}px`}
+            onChange={(v) => set({ cornerRadius: v })}
+          />
         </Row>
-        <Toggle label={t("ap.compact")} hint={t("ap.compactHint")}
-          checked={!!cfg.compact}
-          onChange={(v) => set({ compact: v })} />
-      </CollapsibleSection>
+        <Toggle label={t("ap.compact")} hint={t("ap.compactHint")} checked={!!cfg.compact} onChange={(v) => set({ compact: v })} />
+      </SettingsSection>
     </>
   );
 }
 
-function Behavior({ cfg, set }) {
+// Re-apply the dock's placement once the saved value is on disk.
+const afterPlacement = (cfg) => ({
+  flush: true,
+  afterSave: () => {
+    dockApi.reposition(cfg.edge || "bottom").catch(() => {});
+    dockApi.notchPreview();
+  },
+});
+
+function DockPage({ cfg, set }) {
   const [monitors, setMonitors] = useState([]);
   useEffect(() => {
     dockApi.listMonitors().then((m) => setMonitors(m || []));
   }, []);
+  return (
+    <>
+      <PageHeader title={t("tab.dock")}>{t("gp.dockHint")}</PageHeader>
+
+      <SettingsSection title={t("be.position")} hint={t("be.positionHint")}>
+        <div className="ui-row ui-row-stack">
+          <PositionPicker cfg={cfg} set={set} />
+        </div>
+        {monitors.length > 1 && (
+          <Row label={t("be.monitor")}>
+            <MonitorPicker value={cfg.monitor} monitors={monitors} onChange={(v) => set({ monitor: v })} />
+          </Row>
+        )}
+        <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+          <Slider
+            value={cfg.edgeGap ?? 12}
+            min={0}
+            max={72}
+            step={2}
+            fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)}
+            onChange={(v) => set({ edgeGap: v }, afterPlacement(cfg))}
+          />
+        </Row>
+      </SettingsSection>
+
+      <SettingsSection title={t("gp.interaction")}>
+        <Toggle label={t("be.magnify")} checked={cfg.magnification} onChange={(v) => set({ magnification: v })} />
+        {cfg.magnification && (
+          <>
+            <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
+              <Slider
+                value={Math.min(150, Math.max(110, Math.round((cfg.zoom || 1.25) * 100)))}
+                min={110}
+                max={150}
+                step={5}
+                fmt={(v) => `${v}%`}
+                onChange={(v) => set({ zoom: v / 100 })}
+              />
+            </Row>
+            <Row label={t("be.anim")}>
+              <SegmentedControl
+                value={cfg.magnifyStyle || "spring"}
+                onChange={(v) => set({ magnifyStyle: v })}
+                options={[
+                  { value: "spring", label: t("anim.springShort") },
+                  { value: "smooth", label: t("anim.smoothShort") },
+                  { value: "off", label: t("anim.offShort") },
+                ]}
+              />
+            </Row>
+          </>
+        )}
+        <Toggle label={t("be.showLabels")} checked={cfg.showLabels} onChange={(v) => set({ showLabels: v })} />
+        <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators} onChange={(v) => set({ showIndicators: v })} />
+        <Toggle
+          label={t("be.focusRunning")}
+          hint={t("be.focusRunningHint")}
+          checked={!!cfg.focusIfRunning}
+          onChange={(v) => set({ focusIfRunning: v })}
+        />
+        <Toggle
+          label={t("be.alwaysOnTop")}
+          hint={t("be.alwaysOnTopHint")}
+          checked={cfg.alwaysOnTop !== false}
+          onChange={(v) => {
+            set({ alwaysOnTop: v });
+            dockApi.setAlwaysOnTop(v);
+          }}
+        />
+      </SettingsSection>
+    </>
+  );
+}
+
+function AutoHidePage({ cfg, set }) {
   const hideOn = cfg.autoHideMode !== "off";
   return (
     <>
-      <PageHeader icon="settings" title={t("be.title")}>{t("be.hint")}</PageHeader>
+      <PageHeader title={t("tab.autohide")}>{t("be.autoHideHint")}</PageHeader>
 
-      <SettingsSection title={t("gp.dock")} icon="app" hint={t("gp.dockHint")}>
-        <Row label={t("be.position")} hint={t("be.positionHint")}>
-          <PositionPicker cfg={cfg} set={set} />
-        </Row>
-        <Row label={t("be.autoHide")} hint={t("be.autoHideHint")}>
+      <SettingsSection>
+        <Row label={t("be.autoHide")}>
           <SegmentedControl
             value={cfg.autoHideMode || "smart"}
             onChange={(v) => {
-              // Auto-hide "Never" hides notch controls — also clear always-visible
-              // so the dock doesn't keep stacking clearance for an orphaned notch.
+              // "Never" has no notch — also clear always-visible so the dock
+              // doesn't keep stacking clearance for an orphaned notch.
               if (v === "off") set({ autoHideMode: v, notchAlwaysVisible: false });
               else set({ autoHideMode: v });
             }}
@@ -1244,9 +1156,14 @@ function Behavior({ cfg, set }) {
         </Row>
         {hideOn && (
           <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
-            <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50}
+            <Slider
+              value={cfg.autoHideDelay ?? 650}
+              min={0}
+              max={2500}
+              step={50}
               fmt={(v) => `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 2)} s`}
-              onChange={(v) => set({ autoHideDelay: v })} />
+              onChange={(v) => set({ autoHideDelay: v })}
+            />
           </Row>
         )}
         <Toggle
@@ -1257,43 +1174,7 @@ function Behavior({ cfg, set }) {
         />
       </SettingsSection>
 
-      <CollapsibleSection
-        title={t("gp.advancedDock")}
-        icon="sliders"
-        hint={t("gp.advancedDockHint")}
-        defaultOpen={false}
-      >
-        <Row label={t("be.monitor")}>
-          <MonitorPicker value={cfg.monitor} monitors={monitors}
-            onChange={(v) => set({ monitor: v })} />
-        </Row>
-        <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-          <Slider
-            value={cfg.edgeGap ?? 48}
-            min={0}
-            max={72}
-            step={2}
-            fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)}
-            onChange={(v) => {
-              set(
-                { edgeGap: v },
-                {
-                  flush: true,
-                  afterSave: () => {
-                    dockApi.reposition(cfg.edge || "bottom").catch(() => {});
-                    dockApi.notchPreview();
-                  },
-                }
-              );
-            }}
-          />
-        </Row>
-        <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")}
-          checked={cfg.alwaysOnTop !== false}
-          onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
-      </CollapsibleSection>
-
-      <SettingsSection title={t("gp.taskbar")} icon="app" hint={t("gp.taskbarHint")}>
+      <SettingsSection title={t("gp.taskbar")} hint={cfg.taskbarFollow !== false ? t("be.taskbarWindhawkTip") : null}>
         <Toggle
           label={t("be.taskbarFollow")}
           hint={t("be.taskbarFollowHint")}
@@ -1318,35 +1199,39 @@ function Behavior({ cfg, set }) {
               checked={cfg.taskbarHoldWhileHover !== false}
               onChange={(v) => set({ taskbarHoldWhileHover: v })}
             />
-            <p className="muted" style={{ marginTop: 4 }}>{t("be.taskbarWindhawkTip")}</p>
           </>
         )}
       </SettingsSection>
+    </>
+  );
+}
 
-      <SettingsSection title={t("gp.notch")} icon="eye" hint={t("gp.notchHint")}>
-        <Row label={t("be.notchMode")} hint={t("be.notchModeHint")}>
+function NotchPage({ cfg, set }) {
+  const hideOn = cfg.autoHideMode !== "off";
+  const mode = resolveNotchMode(cfg);
+  return (
+    <>
+      <PageHeader title={t("tab.notch")}>{t("gp.notchHint")}</PageHeader>
+
+      <SettingsSection
+        hint={mode === "floating" ? t("be.notchModeFloatingHint") : mode === "smart" ? t("be.notchModeSmartHint") : t("be.notchModeAttachedHint")}
+      >
+        <Row label={t("be.notchMode")}>
           <SegmentedControl
-            value={resolveNotchMode(cfg)}
-            onChange={(v) => {
+            value={mode}
+            onChange={(v) =>
               set(
                 {
                   notchMode: v,
                   // Keep legacy keys in sync so old fallbacks don't revive the
-                  // multi-notch app list or the peek toggle. Smart + attached
-                  // both peek; only floating is the lifted capsule.
+                  // multi-notch app list or the peek toggle.
                   notchPeek: v !== "floating",
                   multiNotchEnabled: false,
                   multiNotchApps: [],
                 },
-                {
-                  flush: true,
-                  afterSave: () => {
-                    dockApi.reposition(cfg.edge || "bottom").catch(() => {});
-                    dockApi.notchPreview();
-                  },
-                }
-              );
-            }}
+                afterPlacement(cfg)
+              )
+            }
             options={[
               { value: "attached", label: t("be.notchModeAttached") },
               { value: "floating", label: t("be.notchModeFloating") },
@@ -1354,13 +1239,6 @@ function Behavior({ cfg, set }) {
             ]}
           />
         </Row>
-        <p className="muted notch-mode-hint">
-          {resolveNotchMode(cfg) === "floating"
-            ? t("be.notchModeFloatingHint")
-            : resolveNotchMode(cfg) === "smart"
-              ? t("be.notchModeSmartHint")
-              : t("be.notchModeAttachedHint")}
-        </p>
         <Row label={t("ap.notchSize")} hint={t("ap.notchSizeHint")}>
           <Slider
             value={Math.round((Number(cfg.notchScale) || 1) * 100)}
@@ -1368,15 +1246,13 @@ function Behavior({ cfg, set }) {
             max={150}
             step={5}
             fmt={(v) => `${v}%`}
-            onChange={(v) => {
-              set(
-                { notchScale: v / 100 },
-                { flush: true, afterSave: () => dockApi.notchPreview() }
-              );
-            }}
+            onChange={(v) => set({ notchScale: v / 100 }, { flush: true, afterSave: () => dockApi.notchPreview() })}
           />
         </Row>
-        {hideOn ? (
+      </SettingsSection>
+
+      <SettingsSection hint={!hideOn ? t("be.notchNeedsHide") : cfg.notchAlwaysVisible ? t("be.notchClearanceTip") : null}>
+        {hideOn && (
           <>
             <Row label={t("be.reveal")} hint={t("be.revealHint")}>
               <SegmentedControl
@@ -1392,57 +1268,88 @@ function Behavior({ cfg, set }) {
               label={t("be.notchAlwaysVisible")}
               hint={t("be.notchAlwaysVisibleHint")}
               checked={!!cfg.notchAlwaysVisible}
-              onChange={(v) => {
-                set({ notchAlwaysVisible: v }, { flush: true, afterSave: () => {
-                  dockApi.reposition(cfg.edge || "bottom").catch(() => {});
-                  dockApi.notchPreview();
-                }});
-              }}
+              onChange={(v) => set({ notchAlwaysVisible: v }, afterPlacement(cfg))}
             />
-            {!!cfg.notchAlwaysVisible && (
-              <p className="muted notch-mode-hint">{t("be.notchClearanceTip")}</p>
-            )}
           </>
-        ) : (
-          <p className="muted">{t("be.notchNeedsHide")}</p>
         )}
       </SettingsSection>
+    </>
+  );
+}
 
-      <CollapsibleSection
-        title={t("gp.interaction")}
-        icon="sparkles"
-        hint={t("gp.interactionHint")}
-        defaultOpen={false}
-      >
-        <Row label={t("be.anim")}>
-          <SegmentedControl
-            value={cfg.magnifyStyle || "spring"}
-            onChange={(v) => set({ magnifyStyle: v })}
-            options={[
-              { value: "spring", label: t("anim.springShort") },
-              { value: "smooth", label: t("anim.smoothShort") },
-              { value: "off", label: t("anim.offShort") },
-            ]}
-          />
-        </Row>
-        <Toggle label={t("be.magnify")} checked={cfg.magnification}
-          onChange={(v) => set({ magnification: v })} />
-        {cfg.magnification && (
-          <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
-            <Slider value={Math.min(150, Math.max(110, Math.round((cfg.zoom || 1.25) * 100)))}
-              min={110} max={150} step={5}
-              fmt={(v) => `${v}%`} onChange={(v) => set({ zoom: v / 100 })} />
-          </Row>
-        )}
-        <Toggle label={t("be.showLabels")} checked={cfg.showLabels}
-          onChange={(v) => set({ showLabels: v })} />
-        <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators}
-          onChange={(v) => set({ showIndicators: v })} />
-        <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")}
-          checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
-      </CollapsibleSection>
+function ClipboardPage({ cfg, set }) {
+  return (
+    <>
+      <PageHeader title={t("tab.clipboard")}>{t("clip.howPrivate")}</PageHeader>
+      <SettingsSection>
+        <ClipboardSettingsPanel cfg={cfg} set={set} />
+      </SettingsSection>
+    </>
+  );
+}
 
+function ShortcutsPage({ cfg, set }) {
+  return (
+    <>
+      <PageHeader title={t("tab.shortcuts")}>{t("sc.hint")}</PageHeader>
+      <SettingsSection>
+        <ShortcutsSection cfg={cfg} set={set} />
+      </SettingsSection>
+    </>
+  );
+}
+
+function ProfilesPage({ cfg, set }) {
+  const [backupMsg, setBackupMsg] = useState("");
+  const flash = (msg) => {
+    setBackupMsg(msg);
+    clearTimeout(flash._t);
+    flash._t = setTimeout(() => setBackupMsg(""), 3200);
+  };
+  return (
+    <>
+      <PageHeader title={t("tab.profiles")}>{t("ap.backupHint")}</PageHeader>
       <ProfilesCard cfg={cfg} set={set} />
+      <SettingsSection title={t("ap.backup")} hint={backupMsg || t("ap.backupKeep")}>
+        <Row label={t("ap.export")}>
+          <Button
+            onClick={async () => {
+              try {
+                const p = await pickSavePath("booki-config.json");
+                if (!p) return;
+                await dockApi.exportConfig(p);
+                flash(t("ap.backupExported"));
+              } catch (_) {
+                flash(t("ap.backupError"));
+              }
+            }}
+          >
+            {t("ap.export")}
+          </Button>
+        </Row>
+        <Row label={t("ap.import")}>
+          <Button
+            onClick={async () => {
+              try {
+                const p = await pickJsonFile();
+                if (!p) return;
+                if (!window.confirm(t("ap.backupImportConfirm"))) return;
+                const fresh = await dockApi.importConfig(p);
+                if (fresh) {
+                  set(fresh);
+                  flash(t("ap.backupImported"));
+                } else {
+                  flash(t("ap.backupError"));
+                }
+              } catch (_) {
+                flash(t("ap.backupError"));
+              }
+            }}
+          >
+            {t("ap.import")}
+          </Button>
+        </Row>
+      </SettingsSection>
     </>
   );
 }
@@ -1645,9 +1552,7 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
   return (
     <article className={"widget-store-card" + (pinned ? " pinned" : "")} style={{ "--widget-accent": meta.accent }}>
       <div className="widget-store-top">
-        <span className="widget-store-ico">
-          <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
-        </span>
+        <span className="widget-store-ico" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
         <div className="widget-store-body">
           <strong>{label}</strong>
           <p>{t(meta.desc)}</p>
@@ -1690,7 +1595,7 @@ function bindRafMove(onFrame) {
   return { onMove, detach };
 }
 
-function Apps({ cfg, set }) {
+function Apps({ cfg, set, section = "apps" }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const kidMenuRef = useRef(null);
@@ -2144,8 +2049,7 @@ function Apps({ cfg, set }) {
   return (
     <>
       <PageHeader
-        icon="grid"
-        title={t("apps.title")}
+        title={section === "widgets" ? t("tab.widgets") : t("apps.title")}
         meta={(
           <>
             <span>{cfg.pinned.length}</span>
@@ -2153,9 +2057,10 @@ function Apps({ cfg, set }) {
           </>
         )}
       >
-        {t("apps.hint")}
+        {section === "widgets" ? t("apps.widgetsHint") : t("apps.hint")}
       </PageHeader>
 
+      {section === "apps" && (
       <SettingsSection title={null} className="apps-primary-section">
         <div className="pin-board">
           <div className="pin-toolbar">
@@ -2517,13 +2422,8 @@ function Apps({ cfg, set }) {
           ) : null}
         </div>
       </SettingsSection>
-      <CollapsibleSection
-        title={t("apps.widgets")}
-        icon="sliders"
-        hint={t("apps.widgetsHint")}
-        count={WIDGET_ORDER.length}
-        defaultOpen={false}
-      >
+      )}
+      {section === "widgets" && (
         <div className="widget-store-grid">
           {WIDGET_ORDER.map((w) => {
             const refs = widgetRefs(cfg.pinned, w);
@@ -2539,7 +2439,8 @@ function Apps({ cfg, set }) {
             );
           })}
         </div>
-      </CollapsibleSection>
+      )}
+      {section === "apps" && (
       <CollapsibleSection
         title={t("apps.web")}
         icon="external"
@@ -2566,7 +2467,8 @@ function Apps({ cfg, set }) {
           <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
         </div>
       </CollapsibleSection>
-      <Suggestions cfg={cfg} set={set} />
+      )}
+      {section === "apps" && <Suggestions cfg={cfg} set={set} />}
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
           item={cfg.pinned[iconFor]}
@@ -2801,8 +2703,10 @@ function UpdatesCard({ onWhatsNew }) {
   const [pct, setPct] = useState(0);
   const check = async () => {
     setStatus("checking");
-    const u = await checkForUpdate();
-    if (u) { setUpdate(u); setStatus("available"); } else { setStatus("none"); }
+    let failed = false;
+    const u = await checkForUpdate(() => { failed = true; });
+    if (u) { setUpdate(u); setStatus("available"); }
+    else setStatus(failed ? "error" : "none");
   };
   // Check on arrival: the pill lands on this tab, so the install button must be
   // waiting — not another "check for updates" click.
@@ -2822,34 +2726,26 @@ function UpdatesCard({ onWhatsNew }) {
   return (
     <>
       {status === "available" ? (
-        <div className="upd-row">
-          <span>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</span>
-          <button className="s-btn" onClick={install}>{t("ab.install")}</button>
-        </div>
-      ) : status === "downloading" ? (
-        <div className="upd-row">
-          <span>{t("ab.downloading")} {Math.round(pct * 100)}%</span>
-          <div className="upd-bar"><i style={{ transform: `scaleX(${pct.toFixed(3)})` }} /></div>
-        </div>
-      ) : status === "installing" ? (
-        <div className="upd-row">
-          <span><img className="emo" src={emoSrc("sparkles")} alt="" width="16" height="16" /> <strong>{t("ab.installing")}</strong></span>
-          <div className="upd-bar"><i style={{ transform: "scaleX(1)" }} /></div>
-        </div>
+        <Row label={<>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</>} hint={t("ab.keeps")}>
+          <Button appearance="primary" onClick={install}>{t("ab.install")}</Button>
+        </Row>
+      ) : status === "downloading" || status === "installing" ? (
+        <Row label={status === "installing" ? t("ab.installing") : `${t("ab.downloading")} ${Math.round(pct * 100)}%`}>
+          <div className="upd-bar"><i style={{ transform: `scaleX(${status === "installing" ? 1 : pct.toFixed(3)})` }} /></div>
+        </Row>
       ) : (
-        <div className="upd-row">
-          <button className="s-btn s-btn-soft" onClick={check} disabled={status === "checking"}>
+        <Row
+          label={status === "none" ? t("ab.upToDate") : status === "error" ? t("ab.error") : t("ab.check")}
+          hint={t("ab.keeps")}
+        >
+          <Button onClick={check} disabled={status === "checking"}>
             {status === "checking" ? t("ab.checking") : t("ab.check")}
-          </button>
-          {status === "none" && <span className="muted">{t("ab.upToDate")}</span>}
-          {status === "error" && <span className="muted">{t("ab.error")}</span>}
-        </div>
+          </Button>
+        </Row>
       )}
-      <p className="muted" style={{ marginTop: 8 }}>{t("ab.keeps")}</p>
-      <button className="s-btn s-btn-soft s-btn-ico" style={{ marginTop: 8 }} onClick={onWhatsNew}>
-        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
-        <span>{t("ab.whatsNew")}</span>
-      </button>
+      <Row label={t("ab.whatsNew")}>
+        <Button onClick={onWhatsNew}>{t("ab.whatsNew")}</Button>
+      </Row>
     </>
   );
 }
@@ -2858,24 +2754,16 @@ function UpdatesCard({ onWhatsNew }) {
 // and backup — anything that isn't about how the dock looks or moves.
 function General({ cfg, set, onWhatsNew }) {
   const [autostart, setAutostart] = useState(!!cfg.autostart);
-  const [backupMsg, setBackupMsg] = useState("");
   useEffect(() => {
     dockApi.getAutostart().then((v) => setAutostart(!!v));
   }, []);
-  const flashBackup = (msg) => {
-    setBackupMsg(msg);
-    clearTimeout(flashBackup._t);
-    flashBackup._t = setTimeout(() => setBackupMsg(""), 3200);
-  };
   return (
     <>
-      <PageHeader icon="settings" title={t("gen.title")}>{t("gen.hint")}</PageHeader>
+      <PageHeader title={t("gen.title")}>{t("gen.hint")}</PageHeader>
 
-      <SettingsSection title={t("gp.system")} icon="power" hint={t("gp.systemHint")}>
+      <SettingsSection>
         <Row label={t("ap.language")} hint={t("gen.langHint")}>
           <Dropdown
-            className="s-lang-dropdown"
-            value={LANG_OPTIONS.find((o) => o.value === (cfg.language || "system"))?.label || t("lang.system")}
             selectedOptions={[cfg.language || "system"]}
             onOptionSelect={(_e, data) => set({ language: data.optionValue })}
           >
@@ -2884,7 +2772,9 @@ function General({ cfg, set, onWhatsNew }) {
             ))}
           </Dropdown>
         </Row>
-        <Toggle label={t("be.autostart")} checked={autostart}
+        <Toggle
+          label={t("be.autostart")}
+          checked={autostart}
           onChange={async (v) => {
             setAutostart(v);
             try {
@@ -2896,76 +2786,28 @@ function General({ cfg, set, onWhatsNew }) {
             const real = !!(await dockApi.getAutostart().catch(() => v));
             setAutostart(real);
             set({ autostart: real });
-          }} />
+          }}
+        />
       </SettingsSection>
 
-      <SettingsSection title={t("ab.updates")} icon="sparkles" hint={t("ab.updatesHint")}>
+      <SettingsSection title={t("ab.updates")} hint={t("ab.updatesHint")}>
         <UpdatesCard onWhatsNew={onWhatsNew} />
       </SettingsSection>
 
-      <CollapsibleSection
-        title={t("sc.title")}
-        icon="keyboard"
-        hint={t("sc.hint")}
-        defaultOpen={false}
-      >
-        <ShortcutsSection cfg={cfg} set={set} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={t("gen.more")}
-        icon="sliders"
-        hint={t("gen.moreHint")}
-        defaultOpen={false}
-      >
-        <div className="capture-row">
-          <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")}
-            checked={!!cfg.captureVisible}
-            onChange={(v) => set({ captureVisible: v })} />
-          <HelpTip text={t("gen.captureHelp")} />
-        </div>
-        <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")}
+      <SettingsSection title={t("gen.more")}>
+        <Toggle
+          label={t("gen.captureVisible")}
+          hint={t("gen.captureVisibleHint")}
+          checked={!!cfg.captureVisible}
+          onChange={(v) => set({ captureVisible: v })}
+        />
+        <Toggle
+          label={t("gen.ctxMenu")}
+          hint={t("gen.ctxMenuHint")}
           checked={cfg.contextMenu !== false}
-          onChange={(v) => set({ contextMenu: v })} />
-      </CollapsibleSection>
-
-      <CollapsibleSection
-        title={t("ap.backup")}
-        icon="copy"
-        hint={t("ap.backupHint")}
-        defaultOpen={false}
-      >
-        <p className="muted" style={{ margin: "0 0 10px" }}>{t("ap.backupKeep")}</p>
-        <div className="s-actions" style={{ margin: 0 }}>
-          <Button onClick={async () => {
-            try {
-              const p = await pickSavePath("booki-config.json");
-              if (!p) return;
-              await dockApi.exportConfig(p);
-              flashBackup(t("ap.backupExported"));
-            } catch (_) {
-              flashBackup(t("ap.backupError"));
-            }
-          }}>{t("ap.export")}</Button>
-          <Button appearance="secondary" onClick={async () => {
-            try {
-              const p = await pickJsonFile();
-              if (!p) return;
-              if (!window.confirm(t("ap.backupImportConfirm"))) return;
-              const fresh = await dockApi.importConfig(p);
-              if (fresh) {
-                set(fresh);
-                flashBackup(t("ap.backupImported"));
-              } else {
-                flashBackup(t("ap.backupError"));
-              }
-            } catch (_) {
-              flashBackup(t("ap.backupError"));
-            }
-          }}>{t("ap.import")}</Button>
-        </div>
-        {backupMsg ? <p className="muted" style={{ marginTop: 8 }}>{backupMsg}</p> : null}
-      </CollapsibleSection>
+          onChange={(v) => set({ contextMenu: v })}
+        />
+      </SettingsSection>
     </>
   );
 }
@@ -3044,7 +2886,12 @@ function App() {
   const searchRef = useRef(null);
   // Reopen on the last tab the user was looking at.
   const [tab, setTabRaw] = useState(() => {
-    try { return localStorage.getItem("booki.lastTab") || "general"; } catch (_) { return "general"; }
+    try {
+      const saved = localStorage.getItem("booki.lastTab");
+      return TAB_IDS.includes(saved) ? saved : "general";
+    } catch (_) {
+      return "general";
+    }
   });
   const setTab = (t) => {
     setTabRaw(t);
@@ -3059,7 +2906,6 @@ function App() {
   const [query, setQuery] = useState("");
   const searchResults = useMemo(() => findSettings(query), [query]);
   const [activeSearchResult, setActiveSearchResult] = useState(0);
-  const fluentTheme = useMemo(() => buildFluentTheme(cfg?.accent, cfg?.theme), [cfg?.accent, cfg?.theme]);
   // One-time "start here" banner — persisted in config (not only localStorage),
   // so a WebView data wipe / reinstall with kept AppData still remembers it.
   const dismissIntro = () => {
@@ -3289,14 +3135,14 @@ function App() {
 
   if (!cfg) {
     return (
-      <FluentProvider theme={buildFluentTheme(null, "system")}>
+      <FluentProvider>
         <SettingsSkeleton />
       </FluentProvider>
     );
   }
 
   return (
-    <FluentProvider theme={fluentTheme}>
+    <FluentProvider>
       <div className="s-shell">
         <aside className="s-sidebar">
           <div className="s-brand">
@@ -3343,20 +3189,23 @@ function App() {
               </div>
             )}
           </div>
-          <nav style={{ "--active": Math.max(0, TABS.findIndex(([id]) => id === tab)) }}>
-            <span className="s-nav-indicator" aria-hidden="true" />
-            {TABS.map(([id, label, ico]) => (
-              <button
-                key={id}
-                className={"s-navitem" + (tab === id ? " active" : "")}
-                aria-current={tab === id ? "page" : undefined}
-                type="button"
-                onClick={() => setTab(id)}
-              >
-                <span className="s-navicon" dangerouslySetInnerHTML={{ __html: icon(ico) }} />
-                <span>{t(label)}</span>
-              </button>
-            ))}
+          <nav className="s-nav">
+            {TABS.map((entry, i) =>
+              entry ? (
+                <button
+                  key={entry[0]}
+                  className={"s-navitem" + (tab === entry[0] ? " active" : "")}
+                  aria-current={tab === entry[0] ? "page" : undefined}
+                  type="button"
+                  onClick={() => setTab(entry[0])}
+                >
+                  <span className="s-navicon" style={{ background: entry[3] }} dangerouslySetInnerHTML={{ __html: icon(entry[2]) }} />
+                  <span>{t(entry[1])}</span>
+                </button>
+              ) : (
+                <span key={"gap" + i} className="s-nav-gap" aria-hidden="true" />
+              )
+            )}
           </nav>
           <div className="s-sidebar-foot">
             <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
@@ -3386,8 +3235,14 @@ function App() {
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
-            {tab === "behavior" && <Behavior cfg={cfg} set={set} />}
-            {tab === "apps" && <Apps cfg={cfg} set={set} />}
+            {tab === "dock" && <DockPage cfg={cfg} set={set} />}
+            {tab === "autohide" && <AutoHidePage cfg={cfg} set={set} />}
+            {tab === "notch" && <NotchPage cfg={cfg} set={set} />}
+            {tab === "apps" && <Apps cfg={cfg} set={set} section="apps" />}
+            {tab === "widgets" && <Apps cfg={cfg} set={set} section="widgets" />}
+            {tab === "clipboard" && <ClipboardPage cfg={cfg} set={set} />}
+            {tab === "shortcuts" && <ShortcutsPage cfg={cfg} set={set} />}
+            {tab === "profiles" && <ProfilesPage cfg={cfg} set={set} />}
             {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
             {tab === "faq" && <Faq version={version || "..."} />}
             {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}

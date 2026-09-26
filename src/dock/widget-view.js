@@ -15,7 +15,7 @@
  */
 import { icon } from "../icons.js";
 import { emo } from "../emoji.js";
-import { WIDGET_ICONS, RING_WIDGETS, PREVIEW_WIDGETS } from "../widgets-meta.js";
+import { WIDGET_ICONS, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS } from "../widgets-meta.js";
 import { reduceMotion } from "./motion.js";
 
 export const RING_R = 15.5; // SVG viewBox 0 0 36 36
@@ -86,11 +86,18 @@ export function clockParts(now, lang) {
    is noise, not information. */
 export const LIVE_WIDGETS = ["cpu", "ram", "disk", "net", "battery", "media", "volume", "clipboard"];
 
+/** A cell's icon: a quiet line glyph, falling back to the Fluent emoji for any
+    widget that has no glyph yet. */
+function widgetGlyph(type, size) {
+  const glyph = WIDGET_GLYPHS[type];
+  return glyph ? icon(glyph) : emo(WIDGET_ICONS[type] || "puzzle", size);
+}
+
 /** Inner markup of `.w-card` for a widget type. Ring, preview or plain. */
 export function widgetCardHTML(type) {
   if (PREVIEW_WIDGETS.includes(type)) {
     return (
-      `<span class="w-pv-ico">${emo(WIDGET_ICONS[type] || "puzzle", 22)}<span class="w-pv-count"></span></span>` +
+      `<span class="w-pv-ico">${widgetGlyph(type, 22)}<span class="w-pv-count"></span></span>` +
       `<span class="w-pv-main"><span class="w-pv-title"></span><span class="w-pv-sub"></span></span>` +
       `<span class="w-pv-badge">${icon(type === "notes" ? "pencil" : "chevron-right")}</span>`
     );
@@ -100,15 +107,41 @@ export function widgetCardHTML(type) {
     ? `<span class="w-ring">` +
       `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
       `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>` +
+      `<span class="w-ring-ico">${widgetGlyph(type, 14)}</span>` +
       `<span class="w-ring-num"></span></span>`
-    : `<span class="w-ico">${emo(WIDGET_ICONS[type] || "puzzle", 20)}</span>`;
+    : `<span class="w-ico">${widgetGlyph(type, 20)}</span>`;
+  // Network gets a live throughput graph under its reading.
+  const spark =
+    type === "net"
+      ? `<svg class="w-spark" viewBox="0 0 ${SPARK_W} ${SPARK_H}" preserveAspectRatio="none" aria-hidden="true">` +
+        `<path class="w-spark-fill"/><path class="w-spark-line"/></svg>`
+      : "";
   return (
     art +
     `<span class="w-main">` +
     `<span class="w-label"></span>` +
     (isRing ? "" : `<span class="w-value">…</span><span class="w-bar"><i></i></span>`) +
-    `</span>`
+    `</span>` +
+    spark
   );
+}
+
+export const SPARK_W = 100;
+export const SPARK_H = 28;
+
+/**
+ * Line and area paths for a sparkline of `values` (oldest first), scaled to
+ * the largest value so the shape reads at any throughput. Flat zero when
+ * there is nothing to show.
+ */
+export function sparkPaths(values, w = SPARK_W, h = SPARK_H) {
+  const pts = values.length > 1 ? values : [0, 0];
+  // Headroom above the peak keeps a steady rate a line, not a solid block.
+  const max = Math.max(1, ...pts) * 1.6;
+  const step = w / (pts.length - 1);
+  const xy = pts.map((v, i) => [i * step, h - 1 - (Math.max(0, v) / max) * (h - 3)]);
+  const line = xy.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  return { line, fill: `${line} L${w} ${h} L0 ${h} Z` };
 }
 
 // ── painting ──────────────────────────────────────────────────────────────

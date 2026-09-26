@@ -29,12 +29,13 @@ import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
 import {
-  WIDGET_ORDER,
   WIDGET_ICONS,
+  WIDGET_GLYPHS,
   WIDGET_VARIANTS,
   STAT_WIDGETS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
+  WIDGET_META,
   widgetDisplayName,
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
@@ -55,9 +56,12 @@ import {
   setPreviewSubText,
   refreshPreviewMarquees,
   LIVE_WIDGETS,
+  sparkPaths,
 } from "./dock/widget-view.js";
 import { applySurfaceVars } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
+import { buildAddPanel } from "./dock/add-panel.js";
+import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -320,6 +324,8 @@ function applyAll() {
   // CSS materials on a transparent window (native DWM vibrancy left a gray box).
   // Solidity + optional glass tint drive dock/notch fill together.
   applySurfaceVars(cfg);
+  setMaterialTint(materialTint(cfg));
+  setMaterialEnabled(cfg.nativeMaterial);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -330,7 +336,7 @@ function applyAll() {
   // When the notch stays painted with the dock, add the notch's painted depth
   // so the bar stacks inward (edge → notch → dock) — mirrors Rust
   // notch_stack_depth_css. The Settings value itself still goes to 0.
-  let userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 48));
+  let userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
   let edgeGap = cfg.notchAlwaysVisible
     ? Math.min(140, userGap + notchStackDepthCss(cfg))
     : userGap;
@@ -429,7 +435,7 @@ async function render() {
       `<span class="label">${t("dock.emptyAdd")}</span>` +
       `<span class="hint-capy"><img src="/brand/svg/isotype.svg" alt="" draggable="false" />` +
       `<span class="hint-plus-badge">${icon("plus")}</span></span>`;
-    hint.addEventListener("click", () => dockApi.openSettingsTab("apps"));
+    hint.addEventListener("click", () => openAddPanel(hint));
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
   }
@@ -575,7 +581,7 @@ function groupTile(item) {
     mini.className = "group-mini";
     if (child.kind === "widget") {
       // A grouped widget previews as its emoji (it only goes live inside the group).
-      mini.innerHTML = emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
+      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
     } else {
       const now = syncIcon(child);
       if (now) {
@@ -676,6 +682,8 @@ function widgetTile(item, { inFlyout = false } = {}) {
   else if (RING_DEFAULTS[type]) {
     el.style.setProperty("--w-accent", RING_DEFAULTS[type]);
     el.dataset.autoAccent = "1"; // no custom color set → the battery ring may still shift to red when low
+  } else if (WIDGET_META[type]) {
+    el.style.setProperty("--w-accent", WIDGET_META[type].accent);
   }
   if (st.animated) el.classList.add("animated");
   if (st.icon === false) el.classList.add("no-ico");
@@ -772,6 +780,10 @@ function tickClocks() {
   eachWidget("clock", (el) => setText(el, date, time));
 }
 
+// Recent total throughput for the network sparkline (one sample per poll).
+const NET_HISTORY = 30;
+const netHistory = [];
+
 // System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
 // every stat card on the bar (from the cached element map).
 async function pollStats() {
@@ -787,8 +799,14 @@ async function pollStats() {
     setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`));
   eachWidget("disk", (el) =>
     setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`));
-  eachWidget("net", (el) =>
-    setText(el, `↓ ${fmtRate(s.net_down_kbps)}`, `↑ ${fmtRate(s.net_up_kbps)}`, t("w.net")));
+  netHistory.push((s.net_down_kbps || 0) + (s.net_up_kbps || 0));
+  if (netHistory.length > NET_HISTORY) netHistory.shift();
+  const { line, fill } = sparkPaths(netHistory);
+  eachWidget("net", (el) => {
+    setText(el, `↑ ${fmtRate(s.net_up_kbps)}`, `↓ ${fmtRate(s.net_down_kbps)}`, t("w.net"));
+    el.querySelector(".w-spark-line")?.setAttribute("d", line);
+    el.querySelector(".w-spark-fill")?.setAttribute("d", fill);
+  });
   eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
   eachWidget("battery", (el) => {
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
@@ -1293,6 +1311,7 @@ function scheduleMagHitRects() {
 
 /** Hit-test using transformed tile bounds while magnify is live. */
 function reportHitRectsLive() {
+  reportDockMaterial();
   if (!dockApi.setHitRects) return;
   try {
     // Derive the region from the bar's RESTING rect plus the most the wave can
@@ -1668,6 +1687,7 @@ function killClone() {
   if (dragClone) dragClone.remove();
   dragClone = null;
   willUnpin = false;
+  placeHint(null);
 }
 
 // Distance from the pointer to the bar, measured AWAY from the anchored edge.
@@ -1734,6 +1754,7 @@ function processMove(e) {
   }
   if (willUnpin) {
     clearMerge();
+    placeHint(t("m.remove"), press.el);
     return; // no reordering/merging while aiming outside the bar
   }
 
@@ -1769,11 +1790,19 @@ function processMove(e) {
     }
     // Hold on the centre a moment longer before arming the merge — a quick pass
     // over a tile while reordering should never fold things into a folder.
-    if (Date.now() - mergeArm > 260) centerTarget.classList.add("merge-target");
+    if (Date.now() - mergeArm > 260) {
+      centerTarget.classList.add("merge-target");
+      const into = cfg.pinned.find((p) => p.id === centerTarget.dataset.id);
+      placeHint(
+        into?.kind === "group" ? t("drop.addTo").replace("{name}", menuPinTitle(into)) : t("drag.makeGroup"),
+        centerTarget
+      );
+    }
     return; // aiming at the bullseye → hold for a merge, don't reorder
   }
 
   clearMerge();
+  placeHint(null);
   // Reorder: place the dragged tile before the sibling under the pointer.
   const vertical = isVertical();
   const pointer = vertical ? e.clientY : e.clientX;
@@ -2254,60 +2283,65 @@ function openMenu(e, item) {
   };
   addMenuHead(menuPinTitle(item), menuKindLabel(item));
 
-  // The menu adapts to what you clicked: widgets have nothing to "open",
-  // folders get a straight jump to Explorer, only apps get recents.
-  let hasPrimaryActions = false;
-  if (item.kind !== "separator") {
-    addMenuLabel(t("m.actions"));
-    hasPrimaryActions = true;
-    if (item.kind !== "widget") {
-      const openIcon = item.kind === "folder" || item.kind === "group" ? "folder" : item.kind === "trash" ? "trash" : "app";
-      add(openIcon, t("m.open"), () => {
-        if (item.kind === "folder" || item.kind === "group") {
-          // Always open (never toggle-close) — right-click → Open should reveal.
-          const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-          if (tileEl) openStack(tileEl, item);
-        } else if (item.kind === "trash") {
-          dockApi.launch("shell:RecycleBinFolder", []);
-        } else {
-          dockApi.launch(item.path, item.args || []);
-        }
-      });
+  // Like the macOS dock: an app's open windows come first (the likeliest
+  // reason to right-click a running app is to pick one of them), then what
+  // you can do with it, then how it sits on the dock, then removal. Sections
+  // are separated, not titled.
+  const wins = item.kind === "app" || item.kind === "group" ? windowsFor(item) : [];
+  if (wins.length) {
+    for (const w of wins.slice(0, 6)) {
+      add("app", w.title || menuPinTitle(item), () => dockApi.focusWindow(Number(w.hwnd)));
     }
-    if (item.kind === "folder")
-      add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
-    // Recents (a lightweight jump list of files opened with this app via Booki).
-    if (item.kind === "app" && (item.recents || []).length) {
+    sep();
+  }
+
+  if (item.kind === "app") {
+    if (wins.length) add("plus", t("m.newWindow"), () => dockApi.launch(item.path, item.args || []));
+    else add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
+  } else if (item.kind === "folder" || item.kind === "group") {
+    add("folder", t("m.open"), () => {
+      // Always open (never toggle-close) — right-click → Open should reveal.
+      const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
+      if (tileEl) openStack(tileEl, item);
+    });
+  } else if (item.kind === "trash") {
+    add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
+    add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
+  }
+  if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
+  if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
+  if (wins.length) {
+    add("x", t(wins.length > 1 ? "m.closeAll" : "m.closeWindow"), async () => {
+      for (const w of wins) await dockApi.closeWindow(Number(w.hwnd)).catch(() => {});
+    });
+  }
+
+  // Files this app opened through Booki, then the system's recent files
+  // (filled asynchronously so opening the menu stays instant).
+  let recentsSlot = null;
+  if (item.kind === "app") {
+    if ((item.recents || []).length) {
       sep();
-      addMenuLabel(t("m.recent"));
-      item.recents.slice(0, 6).forEach((rp) =>
-        add("external", baseName(rp), () => dockApi.launch(item.path, [rp]))
-      );
+      item.recents.slice(0, 6).forEach((rp) => add("external", baseName(rp), () => dockApi.launch(item.path, [rp])));
     }
-    if (item.kind === "app" || item.kind === "folder" || item.kind === "group" || item.kind === "widget") {
-      add("pencil", t("apps.rename"), () => promptRename(item));
-    }
+    recentsSlot = document.createElement("div");
+    recentsSlot.className = "ctx-recents";
+    ctxMenu.appendChild(recentsSlot);
+  }
+
+  if (item.kind !== "separator" && item.kind !== "trash") {
+    sep();
+    add("pencil", t("apps.rename"), () => promptRename(item));
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
-    // widgets show their card) — so don't offer it for those.
+    // widgets show their card).
     if (item.kind === "app" || item.kind === "folder") {
       add("palette", t("m.changeIcon"), () => changeIcon(item));
       if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
-    if (item.kind === "trash") add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
-  // Slot for the system's recent files (filled asynchronously for app pins so
-  // opening the menu stays instant).
-  let recentsSlot = null;
-  if (item.kind === "app") {
-    recentsSlot = document.createElement("div");
-    recentsSlot.className = "ctx-recents";
-    ctxMenu.appendChild(recentsSlot);
-  }
-  if (hasPrimaryActions) sep();
-  addMenuLabel(t("m.add"));
-  add("plus", t("m.addApp"), onAddApp);
-  add("folder-plus", t("m.addFolder"), onAddFolder);
+  sep();
+  add("plus", t("add.open"), () => openAddPanel(dockEl));
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
   sep();
   add(
@@ -2319,8 +2353,6 @@ function openMenu(e, item) {
     },
     "danger"
   );
-  addMenuLabel(t("m.system"));
-  add("settings", t("m.settings"), () => dockApi.openSettings());
 
   placeMenu(e);
   if (recentsSlot) fillRecentFiles(recentsSlot, e, item);
@@ -2414,31 +2446,8 @@ async function openBackgroundMenu(e) {
   };
   addMenuHead("Booki", t("m.dockMenu"));
   addMenuLabel(t("m.add"));
-  add("plus", t("m.addApp"), onAddApp);
-  add("folder-plus", t("m.addFolder"), onAddFolder);
-  // Widgets as a compact chip grid (emoji + tooltip) — ten text rows would
-  // make the menu taller than the screen's worth of attention.
-  // Only offer widgets you don't already have — no point adding a second CPU
-  // meter or clock. When they're all added, the whole section disappears.
-  const availableWidgets = WIDGET_ORDER.filter((type) => !widgetPresent(type));
-  if (availableWidgets.length) {
-    sep();
-    addMenuLabel(t("m.widgets"));
-    const grid = document.createElement("div");
-    grid.className = "menu-grid";
-    for (const type of availableWidgets) {
-      const chip = document.createElement("button");
-      chip.className = "menu-chip";
-      chip.title = widgetLabel(type);
-      chip.innerHTML = `${emo(WIDGET_ICONS[type] || "puzzle", 18)}<span>${esc(widgetLabel(type))}</span>`;
-      chip.addEventListener("click", async () => {
-        closeMenu();
-        await addWidget(type);
-      });
-      grid.appendChild(chip);
-    }
-    ctxMenu.appendChild(grid);
-  }
+  // Apps, folders, files and widgets all live in the add panel now.
+  add("plus", t("add.open"), () => openAddPanel(dockEl));
   // Saved profiles → one-click switch, right from the dock. The active one
   // (last applied/saved) is marked with a check.
   const profiles = await dockApi.profileList().catch(() => []);
@@ -2636,7 +2645,7 @@ const PANEL_ROOM = 420;
 
 let lastFull = null;
 function edgePadCss() {
-  const userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 48));
+  const userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
   const gap = cfg.notchAlwaysVisible
     ? Math.min(140, userGap + notchStackDepthCss(cfg))
     : userGap;
@@ -2957,6 +2966,10 @@ let lastHitSig = "";
 const DOCK_HIT_PAD = 0;
 const TILE_HIT_PAD = 2;
 const PANEL_HIT_PAD = 4;
+// Open panels that must stay clickable. Tooltips are not listed: they never
+// take input, and counting them blocked clicks on whatever sat under them.
+const HIT_PANELS =
+  ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
 
 function pointInLiveHitArea(x, y) {
   if (edgeMove || dragging || draggingFile) return true;
@@ -2965,12 +2978,40 @@ function pointInLiveHitArea(x, y) {
     ...[...dockEl.querySelectorAll(".tile")].map((el) => rectFromElement(el, TILE_HIT_PAD)),
     stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
     ...[...document.querySelectorAll(
-      ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
+      HIT_PANELS
     )].map((el) => rectFromElement(el, PANEL_HIT_PAD)),
   ];
   return rects.some((rect) => pointInRect(x, y, rect));
 }
+// Real blur behind the bar and whatever panel is open over the desktop.
+const MATERIAL_PANELS = "#ctx-menu:not(.hidden), .trash-pop, .coach, .update-pill:not(.hidden)";
+function reportDockMaterial() {
+  const body = document.body.classList;
+  if (hiddenState || body.contains("tucked") || body.contains("edge-swap") || body.contains("booting")) {
+    reportMaterial([]);
+    return;
+  }
+  reportMaterial([
+    shapeOf(dockEl),
+    stackOpen ? shapeOf(stackEl) : null,
+    ...[...document.querySelectorAll(MATERIAL_PANELS)].map((el) => shapeOf(el)),
+  ]);
+}
+// Surfaces move under CSS transitions (reveal, tuck, a flyout opening) that
+// fire no mutations mid-flight; follow them frame by frame for their length.
+new MutationObserver(() => followFrames(reportDockMaterial)).observe(document.body, {
+  attributes: true,
+  attributeFilter: ["class"],
+});
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (!cfg) return;
+  setMaterialTint(materialTint(cfg));
+  reportDockMaterial();
+});
+
 function reportHitRects() {
+  reportDockMaterial();
   if (!dockApi.setHitRects) return;
   // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
   // drag over the dock) → the whole stage stays interactive; never yank the
@@ -2983,6 +3024,13 @@ function reportHitRects() {
     document.body.classList.contains("revealing") ||
     document.querySelector(".drag-clone, .stack-drag-clone")
   );
+  // While the wave is live the region is the fixed magnify envelope. Measuring
+  // transformed tiles here instead produced a different signature than the
+  // envelope, so any unrelated mutation made the two ping-pong IPC calls.
+  if (!all && !stackOpen && dockEl.classList.contains("mag-live") && !document.querySelector(HIT_PANELS)) {
+    reportHitRectsLive();
+    return;
+  }
   const rects = [];
   const add = (el, inflate = 0) => {
     const rect = rectFromElement(el, inflate);
@@ -2996,7 +3044,7 @@ function reportHitRects() {
   // Inflate toward the dock so the pointer doesn't fall through the gap.
   if (stackOpen) add(stackEl, Math.max(PANEL_HIT_PAD, 8));
   for (const el of document.querySelectorAll(
-    ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .dock-tip.show, .update-pill:not(.hidden)"
+    HIT_PANELS
   ))
     add(el, PANEL_HIT_PAD);
   const sig = hitSignature(rects, all);
@@ -3260,6 +3308,57 @@ function setDropGap(index) {
     el.classList.add(cls);
     dropGap = { el, cls };
   }
+}
+
+// While files are dragged over the dock, a small label says what letting go
+// will do — open with, move to, add to, trash, or pin — so a drop is never a
+// guess.
+const dropHintEl = document.createElement("div");
+dropHintEl.className = "drop-hint";
+dropHintEl.setAttribute("role", "status");
+document.body.appendChild(dropHintEl);
+function dropHintText(spot) {
+  const item = spot.target && cfg.pinned.find((p) => p.id === spot.target.dataset.id);
+  const name = item ? menuPinTitle(item) : "";
+  if (item?.kind === "app") return t("drop.openWith").replace("{name}", name);
+  if (item?.kind === "folder") return t("drop.moveTo").replace("{name}", name);
+  if (item?.kind === "group") return t("drop.addTo").replace("{name}", name);
+  if (item?.kind === "trash") return t("drop.trash");
+  return t("drop.pin");
+}
+function showDropHint(spot) {
+  if (!spot) {
+    placeHint(null);
+    return;
+  }
+  // Anchor on the target tile, or on the tile the gap opens beside.
+  const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
+  placeHint(dropHintText(spot), spot.target || tiles[Math.min(spot.index ?? tiles.length, tiles.length - 1)] || dockEl);
+}
+/** Show `text` in the hint pill beside the bar, lined up with `anchor`; null hides it. */
+function placeHint(text, anchor) {
+  if (!text) {
+    dropHintEl.classList.remove("show");
+    return;
+  }
+  if (dropHintEl.textContent !== text) dropHintEl.textContent = text;
+  const a = anchor.getBoundingClientRect();
+  const bar = dockEl.getBoundingClientRect();
+  const w = dropHintEl.offsetWidth;
+  const h = dropHintEl.offsetHeight;
+  const gap = 10;
+  let left;
+  let top;
+  if (isVertical()) {
+    top = a.top + a.height / 2 - h / 2;
+    left = cfg.edge === "left" ? bar.right + gap : bar.left - w - gap;
+  } else {
+    left = a.left + a.width / 2 - w / 2;
+    top = cfg.edge === "top" ? bar.bottom + gap : bar.top - h - gap;
+  }
+  dropHintEl.style.left = `${Math.max(6, Math.min(left, window.innerWidth - w - 6))}px`;
+  dropHintEl.style.top = `${Math.max(6, Math.min(top, window.innerHeight - h - 6))}px`;
+  dropHintEl.classList.add("show");
 }
 
 let dropTargetEl = null;
@@ -3589,6 +3688,7 @@ function setupFileDrop() {
       const spot = dropSpot(position);
       setDropTarget(spot.target);
       setDropGap(spot.target ? null : spot.index);
+      showDropHint(spot);
     },
     onLeave: () => {
       draggingFile = false;
@@ -3596,6 +3696,7 @@ function setupFileDrop() {
       dropOverlay.classList.remove("active");
       setDropTarget(null);
       setDropGap(null);
+      showDropHint(null);
       scheduleHide();
     },
     onDrop: async (paths, position) => {
@@ -3606,6 +3707,7 @@ function setupFileDrop() {
       const target = spot.target;
       setDropTarget(null);
       setDropGap(null);
+      showDropHint(null);
       if (!paths || !paths.length) return;
       // Dropped onto an app icon → open the files with that app.
       const item = target && cfg.pinned.find((p) => p.id === target.dataset.id);
@@ -3648,6 +3750,35 @@ function setupFileDrop() {
 
 // ─────────────────── Running-app indicators ───────────────────
 
+// Windows from the last poll, so a context menu can list an app's windows
+// without waiting on another enumeration.
+let lastWindows = [];
+
+/** The open windows that belong to a pin (a group collects its children's). */
+function windowsFor(pin, wins = lastWindows) {
+  if (!pin || pin.kind === "separator" || pin.kind === "trash" || pin.kind === "widget") return [];
+  if (pin.kind === "group") {
+    const seen = new Set();
+    const out = [];
+    for (const child of pin.children || []) {
+      for (const w of windowsFor(child, wins)) {
+        if (seen.has(w.hwnd)) continue;
+        seen.add(w.hwnd);
+        out.push(w);
+      }
+    }
+    return out;
+  }
+  // Prefer matching by the owning process's executable (reliable, exact);
+  // fall back to a title contains-name match for .lnk/shell pins.
+  const path = (pin.path || "").toLowerCase();
+  const exeBase = path.endsWith(".exe") ? path.split(/[\\/]/).pop() : "";
+  const name = (pin.name || "").toLowerCase();
+  let matches = exeBase ? wins.filter((w) => ((w.exe || "").split(/[\\/]/).pop() || "") === exeBase) : [];
+  if (!matches.length && name) matches = wins.filter((w) => w.title.toLowerCase().includes(name));
+  return matches;
+}
+
 let pollTimer = null;
 function startRunningPoll() {
   if (!isTauri) return;
@@ -3671,33 +3802,8 @@ function startRunningPoll() {
     }
     try {
       const wins = await dockApi.listWindows();
-      const matchWins = (pin) => {
-        if (!pin || pin.kind === "separator" || pin.kind === "trash" || pin.kind === "widget") return [];
-        if (pin.kind === "group") {
-          const seen = new Set();
-          const out = [];
-          for (const child of pin.children || []) {
-            for (const w of matchWins(child)) {
-              if (seen.has(w.hwnd)) continue;
-              seen.add(w.hwnd);
-              out.push(w);
-            }
-          }
-          return out;
-        }
-        // Prefer matching by the owning process's executable (reliable, exact);
-        // fall back to a title contains-name match for .lnk/shell pins.
-        const path = (pin.path || "").toLowerCase();
-        const exeBase = path.endsWith(".exe") ? path.split(/[\\/]/).pop() : "";
-        const name = (pin.name || "").toLowerCase();
-        let matches = exeBase
-          ? wins.filter((w) => ((w.exe || "").split(/[\\/]/).pop() || "") === exeBase)
-          : [];
-        if (!matches.length && name) {
-          matches = wins.filter((w) => w.title.toLowerCase().includes(name));
-        }
-        return matches;
-      };
+      lastWindows = wins;
+      const matchWins = (pin) => windowsFor(pin, wins);
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash") return;
@@ -4103,6 +4209,49 @@ function placeStackNear(tileEl) {
   }
 }
 
+// The add panel shares the flyout with folders and the clipboard, so it gets
+// the same placement, hit regions and open/close motion.
+function flattenPinned(items) {
+  return (items || []).flatMap((it) => [it, ...flattenPinned(it.children)]);
+}
+function openAddPanel(anchorEl = dockEl, tab = "apps") {
+  if (stackOpen) closeStack();
+  stackItemId = "__add";
+  stackEl.classList.add("add-mode");
+  stackEl.setAttribute("aria-label", t("add.title"));
+  const place = () => placeStackNear(anchorEl);
+  const panel = buildAddPanel(stackEl, {
+    t,
+    tab,
+    pinned: () => flattenPinned(cfg.pinned),
+    listWindows: () => dockApi.listWindows(),
+    listInstalled: () => dockApi.listInstalledApps(),
+    listFrequent: () => dockApi.frequentApps(12),
+    appIcon: (path) => dockApi.appIcon(path),
+    widgetLabel,
+    widgetPresent,
+    addPath: (path) => addPaths([path]),
+    addWidget,
+    browseFile: () => { closeStack(); onAddApp(); },
+    browseFolder: () => { closeStack(); onAddFolder(); },
+    close: closeStack,
+    relayout: () => requestAnimationFrame(place),
+  });
+  stackOpen = true;
+  document.body.classList.add("stack-open");
+  applyFrame();
+  pendingReplace = place;
+  requestAnimationFrame(() => {
+    place();
+    requestAnimationFrame(() => {
+      stackEl.classList.add("open", "just-opened");
+      clearTimeout(stackEl._justOpenedTimer);
+      stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
+      panel.focus();
+    });
+  });
+}
+
 let stackCloseTimer = null;
 function closeStack() {
   if (!stackOpen) return;
@@ -4110,7 +4259,7 @@ function closeStack() {
   stackItemId = null;
   pendingReplace = null;
   document.body.classList.remove("stack-open");
-  stackEl.classList.remove("open", "just-opened");
+  stackEl.classList.remove("open", "just-opened", "add-mode");
   cacheWidgetEls();
   startPolls();
   clearTimeout(stackCloseTimer);
@@ -4137,7 +4286,7 @@ async function toggleClipboardStack(tileEl) {
   head.className = "stack-head";
   const glyph = document.createElement("span");
   glyph.className = "stack-head-icon";
-  glyph.innerHTML = emo("clipboard", 15);
+  glyph.innerHTML = icon("clipboard");
   head.appendChild(glyph);
   const title = document.createElement("span");
   title.className = "stack-title";
