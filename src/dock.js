@@ -2886,7 +2886,7 @@ function onFullscreenSignal(value) {
       await dockApi.notchToastDismiss().catch(() => {});
       // Restore the pre-FS visibility for every hide mode, not only smart+click.
       // setupAutoHide() starts edge visible — that would pop a tucked dock open.
-      if (wasTucked) {
+      if (wasTucked && !(hideMode() === "smart" && desktopActive && !manualHide)) {
         hiddenState = true;
         stopPolls();
         document.body.classList.add("tucked");
@@ -3225,6 +3225,10 @@ function scheduleHide() {
 function onDesktopSignal(value) {
   desktopActive = value;
   if (value) occluded = false;
+  // Win+D can hide a native window without changing our JS visibility.
+  if (value && !hiddenState && decideVisible(visibilityState()) === true) {
+    dockApi.revealDock().catch(() => {});
+  }
   onOcclusionSignal(occluded);
 }
 
@@ -4208,7 +4212,8 @@ async function openStack(tileEl, item) {
     pager.className = "stack-pager";
     const loadPage = async (nextPage) => {
       const current = ++request;
-      pager.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.disabled]);
+      buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
         const rows = await dockApi.listDir(item.path, nextPage * pageSize, pageSize + 1);
         if (seq !== stackSeq || !stackOpen || current !== request) return;
@@ -4235,7 +4240,8 @@ async function openStack(tileEl, item) {
         if (pendingReplace) requestAnimationFrame(pendingReplace);
       } catch (_) {
         if (seq !== stackSeq || !stackOpen || current !== request) return;
-        pager.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+        buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
+        if (!pager.isConnected) { fillGrid([]); applyFrame(); }
       }
     };
     loadPage(0);

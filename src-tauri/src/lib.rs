@@ -1956,12 +1956,7 @@ async fn list_dir(path: String, offset: Option<usize>, limit: Option<usize>) -> 
                 });
             }
         }
-        out.sort_by(|a, b| {
-            b.is_dir
-                .cmp(&a.is_dir)
-                .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-                .then(a.name.cmp(&b.name))
-        });
+        out.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase(), item.name.clone()));
         out.into_iter()
             .skip(offset.unwrap_or(0))
             .take(limit.unwrap_or(80).clamp(1, 81))

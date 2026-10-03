@@ -36,7 +36,7 @@ test("shortcut launches as a shortcut and transfer failure leaves the pin intact
       return old(cmd, args);
     };
   });
-  const tile = page.locator('.tile[data-id="link"]');
+  const tile = page.locator('#dock > .tile[data-id="link"]');
   await tile.click();
   assert.equal(await page.evaluate(() => window.__calls.find(c => c.cmd === "launch_app").args.path), shortcut.path);
   await tile.click({ button: "right" });
@@ -124,15 +124,28 @@ test("cancelling a group drag leaves the child inside its group", async () => {
 
 test("dragging a shortcut out offers an explicit desktop action and cancel keeps the pin", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [shortcut] }) });
-  const rect = await page.locator('.tile[data-id="link"]').boundingBox();
+  const rect = await page.locator('#dock > .tile[data-id="link"]').boundingBox();
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.down();
   await page.mouse.move(rect.x + rect.width / 2, Math.max(0, rect.y - 110), { steps: 10 });
   await page.mouse.up();
   await page.getByRole("button", { name: "Return shortcut to desktop", exact: true }).waitFor();
-  assert.equal(await page.locator('.tile[data-id="link"]').count(), 1);
+  assert.equal(await page.locator('#dock > .tile[data-id="link"]').count(), 1);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  assert.equal(await page.locator('.tile[data-id="link"]').count(), 1);
+  assert.equal(await page.locator('#dock > .tile[data-id="link"]').count(), 1);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("returning to the desktop from fullscreen restores a previously tucked dock", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ autoHideMode: "smart", pinned: [shortcut] }) });
+  await event(page, "booki://occlusion", true);
+  await page.waitForTimeout(250);
+  await event(page, "booki://fullscreen", true);
+  await event(page, "booki://desktop", true);
+  await event(page, "booki://fullscreen", false);
+  await page.waitForTimeout(400);
+  assert.equal(await page.evaluate(() => document.body.classList.contains("tucked")), false);
   assert.deepEqual(errors, []);
   await page.close();
 });
