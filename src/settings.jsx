@@ -18,14 +18,18 @@ import {
   onShowChangelog,
   onShowTab,
   closeSelf,
+  onCloseRequest,
   logMessage,
 } from "./api.js";
+import { currentRelease } from "./release-notes.js";
+import { AppLibrary } from "./settings/app-library.jsx";
+import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
+import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
 import { resolveNotchMode } from "./notch-mode.js";
 import { findSettings } from "./settings/search.js";
 import { widgetRefs, itemForWidgetRef, updateWidgetStyleForRef } from "./settings/pin-model.js";
 import { emoSrc } from "./emoji.js";
 import {
-  FluentProvider,
   Button,
   Menu,
   MenuTrigger,
@@ -98,8 +102,6 @@ import {
   SURFACE_TINT_PRESETS,
   resolveSurfaceStyle,
   legacyNotchFromSurface,
-  surfaceAlpha,
-  glassFillColor,
   applySurfaceVars,
 } from "./surface.js";
 import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
@@ -206,21 +208,19 @@ const LANG_OPTIONS = [
 // Sidebar sections: [id, label key, icon, tile colour]. Blank entries are
 // visual gaps between groups of sections.
 const TABS = [
-  ["general", "tab.general", "settings", "#8e8e93"],
-  ["appearance", "tab.appearance", "palette", "#0a84ff"],
+  ["home", "overhaul.home", "grid", "#dfaa75"],
   ["dock", "tab.dock", "app", "#5e5ce6"],
-  ["autohide", "tab.autohide", "eye-off", "#30b0c7"],
-  ["notch", "tab.notch", "sparkles", "#bf5af2"],
-  null,
-  ["apps", "tab.apps", "grid", "#ff9f0a"],
+  ["appearance", "tab.appearance", "palette", "#0a84ff"],
   ["widgets", "tab.widgets", "zap", "#ff375f"],
-  ["clipboard", "tab.clipboard", "clipboard", "#30d158"],
-  ["shortcuts", "tab.shortcuts", "keyboard", "#64d2ff"],
-  null,
+  ["apps", "overhaul.appsFolders", "folder", "#ff9f0a"],
   ["profiles", "tab.profiles", "copy", "#ac8e68"],
+  null,
+  ["general", "overhaul.system", "settings", "#8e8e93"],
   ["faq", "tab.faq", "help", "#8e8e93"],
   ["about", "tab.about", "info", "#636366"],
 ];
+const LEGACY_TABS = ["autohide", "notch", "shortcuts", "clipboard"];
+const NAV_PARENT = { autohide: "dock", notch: "dock", shortcuts: "general", clipboard: "widgets" };
 const TAB_IDS = TABS.filter(Boolean).map(([id]) => id);
 
 function widgetDisplayName(widget) {
@@ -540,109 +540,8 @@ function MonitorPicker({ value, monitors, onChange }) {
 }
 
 // Live miniature of the dock that reacts to every appearance/behavior change.
-function MiniDockPreview({ cfg }) {
-  const items = (cfg.pinned || []).filter((p) => p.kind !== "separator" && p.kind !== "trash").slice(0, 7);
-  const count = items.length || 5;
-  const scale = 0.42;
-  const size = Math.round((cfg.iconSize || 48) * scale * (cfg.compact ? 0.92 : 1));
-  const gap = Math.round((cfg.spacing ?? 6) * scale + 2);
-  const vertical = cfg.edge === "left" || cfg.edge === "right";
-  const edge = cfg.edge || "bottom";
-  const surface = resolveSurfaceStyle(cfg);
-  const alpha = surfaceAlpha(cfg);
-  const fillTint = glassFillColor(cfg);
-  const mid = Math.floor(count / 2);
-  const zoom = cfg.magnification ? cfg.zoom || 1.35 : 1;
-  const radius = Math.round((cfg.cornerRadius ?? 12) * scale);
-  const notchScale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
-  const notchMode = resolveNotchMode(cfg);
-  const attached = notchMode === "attached";
-  const smart = notchMode === "smart";
-  const fills = {
-    mica: `color-mix(in srgb, ${fillTint} ${Math.min(96, 55 + alpha * 40)}%, transparent)`,
-    acrylic: `color-mix(in srgb, ${fillTint} ${alpha * 88}%, transparent)`,
-    tinted: `color-mix(in srgb, ${fillTint} ${Math.round(alpha * 100)}%, transparent)`,
-    solid: `color-mix(in srgb, ${fillTint} 92%, var(--accent) 8%)`,
-  };
-  const blurPx = surface === "solid" ? 0 : surface === "tinted" ? 18 : surface === "mica" ? 12 : 16;
-  const notchAlong = smart ? Math.round(14 * notchScale) : Math.round(42 * notchScale);
-  const notchAcross = smart
-    ? Math.round(14 * notchScale)
-    : Math.max(4, Math.round((attached ? 6 : 5) * notchScale));
-  return (
-    <div className={"preview prev-" + edge + " prev-surface-" + surface + (attached ? " prev-peek" : "") + (smart ? " prev-smart" : "")}>
-      <div
-        className="preview-bar"
-        style={{
-          flexDirection: vertical ? "column" : "row",
-          gap,
-          borderRadius: surface === "solid" ? Math.max(4, radius) : surface === "tinted" ? 14 : radius + 5,
-          background: fills[surface] || fills.acrylic,
-          border: surface === "tinted" ? "1px solid rgba(255,255,255,0.10)" : undefined,
-          backdropFilter: surface === "solid" ? "none" : `blur(${blurPx}px)`,
-        }}
-      >
-        {Array.from({ length: count }).map((_, i) => {
-          const item = items[i];
-          const s = i === mid ? Math.round(size * zoom) : size;
-          return (
-            <span
-              key={item?.id || i}
-              className={"preview-tile" + (item?.kind === "group" ? " is-group" : "")}
-              style={{
-                width: s,
-                height: s,
-                borderRadius: radius,
-                transform: i === mid ? (vertical ? "translateX(-4px)" : "translateY(-4px)") : "none",
-              }}
-            >
-              <PreviewIcon item={item} />
-            </span>
-          );
-        })}
-      </div>
-      <span
-        className="preview-notch"
-        style={{
-          width: vertical ? notchAcross : notchAlong,
-          height: vertical ? notchAlong : notchAcross,
-          borderRadius: smart ? 999 : surface === "solid" ? 3 : attached ? (vertical ? "0 8px 8px 0" : "8px 8px 0 0") : 999,
-        }}
-        title={t("ap.notchSize")}
-      />
-    </div>
-  );
-}
+function MiniDockPreview({ cfg }) { return <DockPreview cfg={cfg} />; }
 
-function PreviewIcon({ item }) {
-  const [src, setSrc] = useState(item && item.icon ? item.icon : null);
-  useEffect(() => {
-    let alive = true;
-    if (item && item.kind === "group") {
-      setSrc(null);
-      return () => { alive = false; };
-    }
-    if (item && !item.icon && item.path) {
-      dockApi.appIcon(item.path).then((u) => alive && setSrc(u)).catch(() => {});
-    } else {
-      setSrc(item && item.icon ? item.icon : null);
-    }
-    return () => {
-      alive = false;
-    };
-  }, [item && item.path, item && item.kind, item && item.icon]);
-  if (item && item.kind === "group") {
-    return <span className="preview-glyph" title={item.name || t("group.new")} />;
-  }
-  if (item && item.kind === "folder") {
-    return <span className="preview-glyph" style={{ background: "color-mix(in srgb, var(--accent) 40%, #c9a227)" }} />;
-  }
-  if (src) return <img src={src} alt="" />;
-  return <span className="preview-glyph" />;
-}
-
-// A more intuitive accent picker: large tappable swatches with a check on the
-// active one, plus a custom-color chip that shows the live value + hex.
 function AccentPicker({ value, onChange }) {
   const v = (value || "").toLowerCase();
   const isPreset = ACCENTS.some(([, val]) => val.toLowerCase() === v);
@@ -701,189 +600,6 @@ function AccentPicker({ value, onChange }) {
 }
 
 // One installed-app suggestion icon (native icon, falls back to a letter).
-function SuggIcon({ path, name }) {
-  const [src, setSrc] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    dockApi.appIcon(path).then((u) => alive && setSrc(u)).catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [path]);
-  return (
-    <span className="sugg-thumb">
-      {src ? <img src={src} alt="" /> : (name || "?").trim().charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
-// Suggests apps installed on the PC (scanned from the Start Menu) so the user
-// can pin them with one click instead of browsing the filesystem.
-function Suggestions({ cfg, set }) {
-  const [groups, setGroups] = useState(null);
-  const [q, setQ] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
-  const [openGroups, setOpenGroups] = useState({}); // collapsed by default
-  const [kf, setKf] = useState([]); // the user's important shell folders
-  const [freq, setFreq] = useState([]); // most used apps (Windows' local usage record)
-  const toggleGroup = (name) => setOpenGroups((o) => ({ ...o, [name]: !o[name] }));
-  useEffect(() => {
-    // Memoized across tab switches: scanning the Start Menu and extracting every
-    // icon is slow, and this panel remounts each time you open the Apps tab.
-    installedAppsOnce().then((a) => setGroups(normalizeSuggestGroups(a)));
-    dockApi.knownFolders().then((v) => setKf(Array.isArray(v) ? v : [])).catch(() => {});
-    dockApi.frequentApps(12).then((v) => setFreq(Array.isArray(v) ? v : [])).catch(() => {});
-  }, []);
-  if (!groups || groups.length === 0) return null;
-  const pinned = new Set(cfg.pinned.map((p) => (p.path || "").toLowerCase()));
-  const add = (a) => {
-    if (pinned.has((a.path || "").toLowerCase())) return;
-    set({ pinned: [...cfg.pinned, mkApp(a.path)] });
-  };
-  const addGroup = (g) => {
-    const fresh = g.items.filter((a) => !pinned.has((a.path || "").toLowerCase()));
-    if (!fresh.length) return;
-    set({
-      pinned: [
-        ...cfg.pinned,
-        { id: uid(), name: g.name || t("apps.suggestGeneral"), path: "", args: [], kind: "group", children: fresh.map(mkApp) },
-      ],
-    });
-  };
-  const ql = q.trim().toLowerCase();
-  // While searching, show a flat list of matches across every group.
-  const view = ql
-    ? [{ name: "", items: groups.flatMap((g) => g.items).filter((a) => a.name.toLowerCase().includes(ql)).slice(0, 60) }]
-    : groups;
-  // User folders also answer the search (by their localized name).
-  const kfView = ql ? kf.filter(([k]) => t("kf." + k).toLowerCase().includes(ql)) : kf;
-  const addKf = (k, p) => {
-    if (pinned.has((p || "").toLowerCase())) return;
-    set({ pinned: [...cfg.pinned, { id: uid(), name: t("kf." + k), path: p, args: [], kind: "folder" }] });
-  };
-
-  const Tile = (a) => {
-    const isPinned = pinned.has((a.path || "").toLowerCase());
-    return (
-      <button key={a.path} type="button" className={"sugg-item" + (isPinned ? " pinned" : "")}
-        title={a.name} onClick={() => add(a)} disabled={isPinned}>
-        <SuggIcon path={a.path} name={a.name} />
-        <span className="sugg-name">{a.name}</span>
-      </button>
-    );
-  };
-
-  return (
-    <CollapsibleSection
-      title={t("apps.suggest")}
-      icon="search"
-      hint={t("apps.suggestHint")}
-      count={groups.reduce((n, g) => n + g.items.length, 0)}
-      defaultOpen
-      className="suggestions-section"
-    >
-      <div className="suggestions-panel">
-      <div className="suggestions-tools">
-        <button
-          type="button"
-          className="s-btn s-btn-soft s-btn-sm"
-          disabled={refreshing}
-          onClick={async () => {
-            setRefreshing(true);
-            const fresh = await installedAppsOnce(true);
-            setGroups(normalizeSuggestGroups(fresh));
-            setRefreshing(false);
-          }}
-        >
-          {refreshing ? "..." : t("apps.refresh")}
-        </button>
-      </div>
-      <div className="sugg-searchwrap">
-        <span className="sugg-search-ico" dangerouslySetInnerHTML={{ __html: icon("search") }} />
-        <input className="sugg-search" placeholder={t("apps.search")} value={q}
-          onChange={(e) => setQ(e.target.value)} />
-        {q && (
-          <button
-            className="sugg-clear"
-            title={t("apps.clearNo")}
-            onClick={() => setQ("")}
-            dangerouslySetInnerHTML={{ __html: icon("x") }}
-          />
-        )}
-      </div>
-      {!ql && freq.length > 0 && (
-        <>
-          <div className="kf-head">{t("add.frequent")}</div>
-          <div className="sugg-grid">{freq.map((a) => Tile({ name: a.name, path: a.path }))}</div>
-        </>
-      )}
-      {kfView.length > 0 && (
-        <>
-          <div className="kf-head">{t("apps.userFolders")}</div>
-          <div className="kf-row">
-            {kfView.map(([k, p]) => {
-              const isP = pinned.has((p || "").toLowerCase());
-              return (
-                <button key={k} type="button" className={"kf-chip" + (isP ? " pinned" : "")}
-                  disabled={isP} title={p} onClick={() => addKf(k, p)}>
-                  <span className="kf-ico" dangerouslySetInnerHTML={{ __html: icon("folder") }} />
-                  <span>{t("kf." + k)}</span>
-                  {!isP && <span className="kf-plus">+</span>}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-      {view.map((g, gi) => {
-        const key = g.name || "general-" + gi;
-        const open = ql || !!openGroups[key];
-        return (
-          <div key={key} className="sugg-group">
-            {!ql && (
-              <div className="sugg-group-head clickable" onClick={() => toggleGroup(key)}>
-                <span className="sugg-chevron" dangerouslySetInnerHTML={{ __html: icon(open ? "chevron-down" : "chevron-right") }} />
-                <span className="sugg-group-name">{g.name || t("apps.suggestGeneral")}</span>
-                <span className="sugg-count">{g.items.length}</span>
-                {g.name && g.items.length > 1 && (
-                  <button className="sugg-group-add"
-                    onClick={(e) => { e.stopPropagation(); addGroup(g); }}>
-                    {t("apps.pinFolder")}
-                  </button>
-                )}
-              </div>
-            )}
-            {open && <div className="sugg-grid">{g.items.map(Tile)}</div>}
-          </div>
-        );
-      })}
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-// Accept either the new grouped shape ([{name, items}]) or a legacy flat list.
-// Tiny groups (a single app) merge into the general "Apps" bucket, and groups
-// come out alphabetized with the general bucket first — tidier to scan.
-function normalizeSuggestGroups(a) {
-  if (!Array.isArray(a)) return [];
-  let groups =
-    a.length && a[0] && Array.isArray(a[0].items)
-      ? a.filter((g) => g.items && g.items.length)
-      : a.length
-        ? [{ name: "", items: a }]
-        : [];
-  const general = { name: "", items: [] };
-  const real = [];
-  for (const g of groups) {
-    if (!g.name || g.items.length < 2) general.items.push(...g.items);
-    else real.push(g);
-  }
-  real.sort((x, y) => x.name.localeCompare(y.name));
-  general.items.sort((x, y) => x.name.localeCompare(y.name));
-  return general.items.length ? [general, ...real] : real;
-}
-
 function PinThumb({ item }) {
   const [src, setSrc] = useState(isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
   useEffect(() => {
@@ -967,6 +683,7 @@ function Appearance({ cfg, set }) {
     <>
       <PageHeader title={t("ap.title")}>{t("ap.hint")}</PageHeader>
       <MiniDockPreview cfg={cfg} />
+      <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v })} />
 
       <SettingsSection>
         <Row label={t("ap.theme")}>
@@ -1060,6 +777,7 @@ function DockPage({ cfg, set }) {
   return (
     <>
       <PageHeader title={t("tab.dock")}>{t("gp.dockHint")}</PageHeader>
+      <SettingsSection title={t("overhaul.scenarios")} hint={t("overhaul.scenariosHint")}><ScenarioPicker cfg={cfg} set={set} /></SettingsSection>
 
       <SettingsSection title={t("be.position")} hint={t("be.positionHint")}>
         <div className="ui-row ui-row-stack">
@@ -1067,7 +785,7 @@ function DockPage({ cfg, set }) {
         </div>
         {monitors.length > 1 && (
           <Row label={t("be.monitor")}>
-            <MonitorPicker value={cfg.monitor} monitors={monitors} onChange={(v) => set({ monitor: v })} />
+            <MonitorPicker value={cfg.monitor} monitors={monitors} onChange={(v) => set({ monitor: v, monitorName: v < 0 ? "" : monitors.find((m) => m.index === v)?.name || "" }, afterPlacement(cfg))} />
           </Row>
         )}
         <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
@@ -1083,6 +801,7 @@ function DockPage({ cfg, set }) {
       </SettingsSection>
 
       <SettingsSection title={t("gp.interaction")}>
+        <Row label={t("overhaul.overflow")}><SegmentedControl value={cfg.overflowMode || "adapt"} onChange={(v) => set({ overflowMode: v })} options={[{ value: "adapt", label: t("overhaul.adapt") }, { value: "scroll", label: t("overhaul.scroll") }]} /></Row>
         <Toggle label={t("be.magnify")} checked={cfg.magnification} onChange={(v) => set({ magnification: v })} />
         {cfg.magnification && (
           <>
@@ -1488,7 +1207,9 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
             <p>{t(meta.desc)}</p>
           </div>
         </div>
+        <div className="widget-editor-preview"><WidgetPreview widget={item.widget} style={st} size={56} /></div>
         <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>
+        {["timer", "tasks", "calendar", "weather"].includes(item.widget) && <p className="muted">{t("overhaul.utilityHint")}</p>}
         {item.widget === "notes" && (
           <Row label={t("w.note")}>
             <input
@@ -1509,7 +1230,7 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
           />
         ) : item.widget === "clipboard" ? (
           <ClipboardSettingsPanel cfg={cfg} set={set} />
-        ) : item.widget !== "notes" ? (
+        ) : !["notes", "timer", "tasks", "calendar", "weather"].includes(item.widget) ? (
           <div className="widget-no-extra">
             <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
             <div>
@@ -1518,6 +1239,7 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
             </div>
           </div>
         ) : null}
+        {["media", "battery"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!st.hideWhenUnavailable} onChange={(value) => set1({ hideWhenUnavailable: value })} />}
         <SectionTitle name="palette">{t("w.appearance")}</SectionTitle>
         <Row label={t("w.variant")}>
           <SegmentedControl
@@ -1531,6 +1253,10 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
               { value: "minimal", label: t("w.v.minimal") },
             ]}
           />
+        </Row>
+        <Row label={t("overhaul.widgetSize")}>
+          <SegmentedControl value={String(st.span || "auto")} onChange={(v) => set1({ span: v === "auto" ? null : Number(v) })}
+            options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: `${n}×` }))]} />
         </Row>
         <Row label={t("w.color")}>
           <AccentPicker value={st.color || accent} onChange={(v) => set1({ color: v })} />
@@ -1559,6 +1285,7 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
         </div>
         {pinned && <span className="widget-store-badge">{t("widget.pinned")}</span>}
       </div>
+      <div className="widget-store-preview"><WidgetPreview widget={widget} /></div>
       <div className="widget-store-caps">
         {(meta.caps || []).map((cap) => <span key={cap}>{t(cap)}</span>)}
       </div>
@@ -1707,7 +1434,7 @@ function Apps({ cfg, set, section = "apps" }) {
         setDraftPinned(p);
       }
     });
-    const onUp = () => {
+    const onUp = (ev) => {
       detach();
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
@@ -1719,7 +1446,7 @@ function Apps({ cfg, set, section = "apps" }) {
         const target = next[m];
         if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
       }
-      set({ pinned: next });
+      if (ev.type !== "pointercancel") set({ pinned: next });
       setDraftPinned(null);
       mergeRef.current = -1;
       setMergeInto(-1);
@@ -1751,11 +1478,11 @@ function Apps({ cfg, set, section = "apps" }) {
         setDraftPinned(pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: kids } : p)));
       }
     });
-    const onUp = () => {
+    const onUp = (ev) => {
       detach();
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
-      set({ pinned: pinnedRef.current });
+      if (ev.type !== "pointercancel") set({ pinned: pinnedRef.current });
       setDraftPinned(null);
       childDrag.current = null;
     };
@@ -1802,7 +1529,7 @@ function Apps({ cfg, set, section = "apps" }) {
         setDraftPinned(p);
       }
     });
-    const onUp = () => {
+    const onUp = (ev) => {
       detach();
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
@@ -1814,7 +1541,7 @@ function Apps({ cfg, set, section = "apps" }) {
         const target = next[m];
         if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
       }
-      set({ pinned: next });
+      if (ev.type !== "pointercancel") set({ pinned: next });
       setDraftPinned(null);
       mergeRef.current = -1;
       setMergeInto(-1);
@@ -1943,10 +1670,12 @@ function Apps({ cfg, set, section = "apps" }) {
         set({ pinned: pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: arr } : p)) });
       }
     };
-    const onUp = () => {
+    const onUp = (ev) => {
       window.removeEventListener("pointermove", onMove);
-      if (kidTargetRef.current) moveChildToGroupById(srcGroupId, kidDrag.current.id, kidTargetRef.current);
-      else if (kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (ev.type !== "pointercancel" && kidTargetRef.current) moveChildToGroupById(srcGroupId, kidDrag.current.id, kidTargetRef.current);
+      else if (ev.type !== "pointercancel" && kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
       kidTargetRef.current = null;
       kidOutRef.current = -1;
       setKidOut(-1);
@@ -1955,6 +1684,7 @@ function Apps({ cfg, set, section = "apps" }) {
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp, { once: true });
+    window.addEventListener("pointercancel", onUp, { once: true });
   };
   // Flag pins whose target doesn't exist on THIS machine (moved, uninstalled,
   // or config imported from another PC) and offer to reassign the path.
@@ -2468,7 +2198,7 @@ function Apps({ cfg, set, section = "apps" }) {
         </div>
       </CollapsibleSection>
       )}
-      {section === "apps" && <Suggestions cfg={cfg} set={set} />}
+      {section === "apps" && <AppLibrary cfg={cfg} set={set} listInstalled={installedAppsOnce} />}
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
           item={cfg.pinned[iconFor]}
@@ -2506,11 +2236,6 @@ function Apps({ cfg, set, section = "apps" }) {
       )}
     </>
   );
-}
-
-function mkApp(path) {
-  const file = String(path).replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "App";
-  return { id: uid(), name: file.replace(/\.(exe|lnk|bat|cmd)$/i, ""), path, args: [], kind: "app" };
 }
 
 // Keyboard shortcuts — a SECTION of the General tab (it never warranted a whole
@@ -2712,10 +2437,11 @@ function UpdatesCard({ onWhatsNew }) {
   // waiting — not another "check for updates" click.
   useEffect(() => { check(); }, []);
   const install = async () => {
+    setPct(null);
     setStatus("downloading");
     try {
       await installUpdate(update, (p) => {
-        setPct(p.pct || 0);
+        setPct(p.pct);
         if (p.phase === "install") setStatus("installing");
       });
     } catch (e) {
@@ -2730,8 +2456,8 @@ function UpdatesCard({ onWhatsNew }) {
           <Button appearance="primary" onClick={install}>{t("ab.install")}</Button>
         </Row>
       ) : status === "downloading" || status === "installing" ? (
-        <Row label={status === "installing" ? t("ab.installing") : `${t("ab.downloading")} ${Math.round(pct * 100)}%`}>
-          <div className="upd-bar"><i style={{ transform: `scaleX(${status === "installing" ? 1 : pct.toFixed(3)})` }} /></div>
+        <Row label={status === "installing" ? t("ab.installing") : `${t("ab.downloading")} ${pct == null ? "…" : Math.round(pct * 100) + "%"}`}>
+          <div className={"upd-bar" + (pct == null ? " indeterminate" : "")} role="progressbar" aria-label={t("ab.downloading")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct == null ? undefined : Math.round(pct * 100)}><i style={{ transform: `scaleX(${status === "installing" ? 1 : pct == null ? .35 : pct.toFixed(3)})` }} /></div>
         </Row>
       ) : (
         <Row
@@ -2743,6 +2469,7 @@ function UpdatesCard({ onWhatsNew }) {
           </Button>
         </Row>
       )}
+      {update?.body && <details className="update-notes"><summary>{t("overhaul.updateNotes")}</summary><pre>{update.body}</pre></details>}
       <Row label={t("ab.whatsNew")}>
         <Button onClick={onWhatsNew}>{t("ab.whatsNew")}</Button>
       </Row>
@@ -2752,6 +2479,20 @@ function UpdatesCard({ onWhatsNew }) {
 
 // The "everything general" tab: system toggles, language, shortcuts, updates
 // and backup — anything that isn't about how the dock looks or moves.
+function DiagnosticsCard() {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true); setStatus("");
+    try {
+      const path = await pickSavePath("booki-diagnostics.json");
+      if (path) { await dockApi.exportDiagnostics(path); setStatus(t("overhaul.exported")); }
+    } catch (_) { setStatus(t("overhaul.failed")); }
+    finally { setBusy(false); }
+  };
+  return <SettingsSection title={t("overhaul.diagnostics")} hint={t("overhaul.diagnosticsHint")}><div className="diagnostics-row"><button className="s-btn s-btn-soft" disabled={busy} onClick={save}>{t("overhaul.diagnostics")}</button><span role="status">{status}</span></div></SettingsSection>;
+}
+
 function General({ cfg, set, onWhatsNew }) {
   const [autostart, setAutostart] = useState(!!cfg.autostart);
   useEffect(() => {
@@ -2794,6 +2535,7 @@ function General({ cfg, set, onWhatsNew }) {
         <UpdatesCard onWhatsNew={onWhatsNew} />
       </SettingsSection>
 
+      <DiagnosticsCard />
       <SettingsSection title={t("gen.more")}>
         <Toggle
           label={t("gen.captureVisible")}
@@ -2888,9 +2630,9 @@ function App() {
   const [tab, setTabRaw] = useState(() => {
     try {
       const saved = localStorage.getItem("booki.lastTab");
-      return TAB_IDS.includes(saved) ? saved : "general";
+      return [...TAB_IDS, ...LEGACY_TABS].includes(saved) ? saved : "home";
     } catch (_) {
-      return "general";
+      return "home";
     }
   });
   const setTab = (t) => {
@@ -2915,16 +2657,25 @@ function App() {
   const saveTimer = useRef(null);
   const cfgRef = useRef(null);
   const dirtyKeys = useRef(new Set());
+  const savingKeys = useRef(new Set());
+  const closeAllowed = useRef(false);
   const afterSaveCb = useRef(null);
   cfgRef.current = cfg;
 
   // Merge only the keys Settings actually touched onto a fresh disk snapshot so
   // a debounced slider save cannot wipe pins the dock wrote a moment earlier.
-  const flushSave = async () => {
+  const saveQueue = useRef(Promise.resolve());
+  const flushSave = () => {
+    const queued = saveQueue.current.then(() => performSave());
+    saveQueue.current = queued.catch(() => {});
+    return queued;
+  };
+  const performSave = async () => {
     clearTimeout(saveTimer.current);
     saveTimer.current = null;
     const keys = [...dirtyKeys.current];
     dirtyKeys.current.clear();
+    savingKeys.current = new Set(keys);
     const cb = afterSaveCb.current;
     afterSaveCb.current = null;
     if (!keys.length) return;
@@ -2932,21 +2683,12 @@ function App() {
     if (!snap) return;
     setSaveState("saving");
     try {
-      const disk = (await configApi.get()) || {};
-      const toSave = { ...disk };
-      for (const k of keys) {
-        if (k in snap) toSave[k] = snap[k];
-      }
-      if (keys.includes("pinned")) {
-        toSave.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
-      }
-      // Sticky one-way progress flags (also enforced in Rust save).
-      toSave.onboarded = !!(snap.onboarded || disk.onboarded);
-      toSave.settingsIntroSeen = !!(snap.settingsIntroSeen || disk.settingsIntroSeen);
-      toSave.seenVersion = snap.seenVersion || disk.seenVersion || "";
-      await configApi.save(toSave);
+      const patch = {};
+      for (const key of keys) if (key in snap) patch[key] = snap[key];
+      if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
+      const toSave = await configApi.patch(patch) || { ...snap, ...patch };
       await emitConfigChanged();
-      cfgRef.current = toSave;
+      if (!dirtyKeys.current.size) cfgRef.current = toSave;
       setCfg((prev) => {
         if (!prev) return toSave;
         // Keep any edits typed while the save was in flight.
@@ -2959,8 +2701,23 @@ function App() {
       // Re-queue failed keys so the next edit (or close) retries.
       for (const k of keys) dirtyKeys.current.add(k);
       setSaveState("error");
+    } finally {
+      savingKeys.current.clear();
     }
   };
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten;
+    onCloseRequest((event) => {
+      if (closeAllowed.current) return;
+      event.preventDefault();
+      flushSave().then(() => {
+        if (!dirtyKeys.current.size) { closeAllowed.current = true; closeSelf(); }
+      });
+    }).then((un) => { if (disposed) un(); else unlisten = un; });
+    return () => { disposed = true; unlisten?.(); };
+  }, []);
 
   // Flush pending edits on close — never drop a slider/toggle by clearing the timer.
   useEffect(() => () => {
@@ -3087,6 +2844,16 @@ function App() {
     });
   };
 
+  const applyProfile = async (name) => {
+    await flushSave();
+    if (dirtyKeys.current.size) throw new Error("pending settings could not be saved");
+    const fresh = await dockApi.profileApply(name);
+    if (!fresh) throw new Error("profile unavailable");
+    await ensureLang(fresh.language);
+    cfgRef.current = fresh; setCfg(fresh); applyTheme(fresh); applySurfaceVars(fresh);
+    await emitConfigChanged();
+  };
+
   const reset = async () => {
     const fresh = await configApi.reset();
     if (fresh) {
@@ -3098,11 +2865,11 @@ function App() {
   };
 
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = async (e) => {
       if (e.defaultPrevented || e.key !== "Escape") return;
       // Escape closes the changelog modal first, then the window.
       if (showChangelog) setShowChangelog(false);
-      else closeSelf();
+      else { await flushSave(); if (!dirtyKeys.current.size) closeSelf(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -3117,14 +2884,14 @@ function App() {
       configApi.get().then((c) =>
         setCfg((prev) => {
           if (!prev) return c;
-          const next = {
-            ...prev,
-            onboarded: prev.onboarded || c.onboarded,
-            settingsIntroSeen: prev.settingsIntroSeen || c.settingsIntroSeen,
-            seenVersion: c.seenVersion || prev.seenVersion,
-          };
-          // Do not stomp pins the user is editing in Settings right now.
-          if (!dirtyKeys.current.has("pinned")) next.pinned = c.pinned;
+          const next = { ...c };
+          for (const key of new Set([...savingKeys.current, ...dirtyKeys.current])) next[key] = prev[key];
+          next.onboarded = prev.onboarded || c.onboarded;
+          next.settingsIntroSeen = prev.settingsIntroSeen || c.settingsIntroSeen;
+          next.seenVersion = c.seenVersion || prev.seenVersion;
+          applyTheme(next);
+          applySurfaceVars(next);
+          ensureLang(next.language).then(() => setCfg((current) => ({ ...current })));
           cfgRef.current = next;
           return next;
         })
@@ -3135,14 +2902,14 @@ function App() {
 
   if (!cfg) {
     return (
-      <FluentProvider>
+      <>
         <SettingsSkeleton />
-      </FluentProvider>
+      </>
     );
   }
 
   return (
-    <FluentProvider>
+    <>
       <div className="s-shell">
         <aside className="s-sidebar">
           <div className="s-brand">
@@ -3194,8 +2961,8 @@ function App() {
               entry ? (
                 <button
                   key={entry[0]}
-                  className={"s-navitem" + (tab === entry[0] ? " active" : "")}
-                  aria-current={tab === entry[0] ? "page" : undefined}
+                  className={"s-navitem" + ((NAV_PARENT[tab] || tab) === entry[0] ? " active" : "")}
+                  aria-current={(NAV_PARENT[tab] || tab) === entry[0] ? "page" : undefined}
                   type="button"
                   onClick={() => setTab(entry[0])}
                 >
@@ -3234,8 +3001,9 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
+            {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
-            {tab === "dock" && <DockPage cfg={cfg} set={set} />}
+            {tab === "dock" && <><DockPage cfg={cfg} set={set} /><CollapsibleSection title={t("tab.autohide")} defaultOpen={false}><AutoHidePage cfg={cfg} set={set} /></CollapsibleSection><CollapsibleSection title={t("tab.notch")} defaultOpen={false}><NotchPage cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "autohide" && <AutoHidePage cfg={cfg} set={set} />}
             {tab === "notch" && <NotchPage cfg={cfg} set={set} />}
             {tab === "apps" && <Apps cfg={cfg} set={set} section="apps" />}
@@ -3243,14 +3011,14 @@ function App() {
             {tab === "clipboard" && <ClipboardPage cfg={cfg} set={set} />}
             {tab === "shortcuts" && <ShortcutsPage cfg={cfg} set={set} />}
             {tab === "profiles" && <ProfilesPage cfg={cfg} set={set} />}
-            {tab === "general" && <General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} />}
+            {tab === "general" && <><General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} /><CollapsibleSection title={t("tab.shortcuts")} defaultOpen={false}><ShortcutsSection cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "faq" && <Faq version={version || "..."} />}
             {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
           </div>
         </main>
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
       </div>
-    </FluentProvider>
+    </>
   );
 }
 
@@ -3292,7 +3060,7 @@ function ChangelogModal({ onClose }) {
       alive = false;
     };
   }, []);
-  const log = entries || [];
+  const log = entries ? [currentRelease(), ...entries] : [];
   return createPortal((
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>
@@ -3324,19 +3092,11 @@ function ChangelogModal({ onClose }) {
               ))}
             </section>
           ))}
-          {log.length > 1 && (
-            <div className="cl-recent">
-              <h4 className="cl-recent-title">{t("cl.recentTitle")}</h4>
-              <ul className="cl-recent-list">
-                {log.slice(1, 5).map((entry) => (
-                  <li key={entry.version}>
-                    <span className="cl-recent-ver">v{entry.version}</span>
-                    <span className="cl-recent-headline">{entry.headline}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {log.length > 1 && <details className="cl-history"><summary>{t("overhaul.history")}</summary>
+            {log.slice(1).map((entry) => <details className="cl-history-entry" key={entry.version}><summary><strong>v{entry.version}</strong><span>{entry.date}</span><span>{entry.headline}</span></summary>
+              {entry.sections.map((section, index) => <section key={index}><h3>{section.title}</h3><ul>{section.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section>)}
+            </details>)}
+          </details>}
         </div>
         <div className="cl-foot">
           <span className="cl-credit">{t("cl.by")} Punkable · @0xPunki</span>

@@ -1,0 +1,78 @@
+import { t, curLang } from "../i18n.js";
+import { calendarMonth, toggleTimer, timerSeconds, formatTimer } from "./productivity.js";
+
+/* Build with textContent: task text and remote city names never become HTML. */
+export function buildProductivityPanel(item, { save, weatherSearch, close }) {
+  const panel = document.createElement("div");
+  panel.className = "productivity-panel";
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", t(`w.${item.widget}`));
+  const head = document.createElement("div"); head.className = "productivity-head";
+  const title = document.createElement("strong"); title.textContent = t(`w.${item.widget}`); head.appendChild(title);
+  const button = (label, fn, container = panel) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+    b.className = "productivity-button"; b.addEventListener("click", fn); container.appendChild(b); return b;
+  };
+  button(t("stack.close"), close, head); panel.appendChild(head);
+  const body = document.createElement("div"); panel.appendChild(body);
+  let timer = null;
+  panel.dispose = () => clearInterval(timer);
+  const update = async (patch) => {
+    const old = item.style;
+    item.style = { ...(item.style || {}), ...patch };
+    try { await save(item); draw(); }
+    catch (_) { item.style = old; const error = document.createElement("p"); error.textContent = t("overhaul.failed"); error.setAttribute("role", "alert"); body.appendChild(error); }
+  };
+  function draw() {
+    clearInterval(timer);
+    body.replaceChildren();
+    const st = item.style || {};
+    if (item.widget === "timer") {
+      const value = document.createElement("div"); value.className = "focus-countdown";
+      value.textContent = formatTimer(timerSeconds(st)); body.appendChild(value);
+      if (st.endsAt) timer = setInterval(() => { if (!panel.isConnected) { clearInterval(timer); return; } value.textContent = formatTimer(timerSeconds(st)); }, 1000);
+      const row = document.createElement("div"); row.className = "focus-actions"; body.appendChild(row);
+      button(t(st.endsAt && timerSeconds(st) > 0 ? "focus.pause" : "focus.start"), () => update(toggleTimer(st)), row);
+      button(t("focus.reset"), () => update({ endsAt: null, remaining: null }), row);
+      const label = document.createElement("label"); label.textContent = t("focus.duration");
+      const input = document.createElement("input"); input.type = "number"; input.min = "1"; input.max = "180"; input.value = String(st.minutes || 25);
+      input.addEventListener("change", () => update({ minutes: Math.max(1, Math.min(180, Number(input.value) || 25)), endsAt: null, remaining: null }));
+      label.appendChild(input); body.appendChild(label);
+    } else if (item.widget === "tasks") {
+      const list = Array.isArray(st.tasks) ? st.tasks : [];
+      for (const task of list) {
+        const row = document.createElement("div"); row.className = "focus-task";
+        const label = document.createElement("label"); const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = !!task.done;
+        checkbox.addEventListener("change", () => update({ tasks: list.map((entry) => entry.id === task.id ? { ...entry, done: checkbox.checked } : entry) }));
+        const text = document.createElement("span"); text.textContent = task.text; label.append(checkbox, text); row.appendChild(label);
+        const remove = button("×", () => update({ tasks: list.filter((entry) => entry.id !== task.id) }), row); remove.setAttribute("aria-label", t("apps.remove")); body.appendChild(row);
+      }
+      const form = document.createElement("form"); form.className = "focus-actions";
+      const input = document.createElement("input"); input.placeholder = t("focus.newTask"); input.setAttribute("aria-label", t("focus.newTask")); input.maxLength = 200; form.appendChild(input);
+      const add = button("+", () => {}, form); add.type = "submit"; add.setAttribute("aria-label", t("focus.newTask"));
+      form.addEventListener("submit", (event) => { event.preventDefault(); if (input.value.trim() && list.length < 100) update({ tasks: [...list, { id: crypto.randomUUID(), text: input.value.trim(), done: false }] }); }); body.appendChild(form);
+    } else if (item.widget === "calendar") {
+      const date = new Date();
+      const label = document.createElement("p"); label.textContent = date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }); body.appendChild(label);
+      const grid = document.createElement("div"); grid.className = "focus-calendar";
+      for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, i + 1).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
+      for (const day of calendarMonth(date)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (day === date.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
+    } else if (item.widget === "weather") {
+      const help = document.createElement("p"); help.textContent = t("focus.cityHint"); body.appendChild(help);
+      const input = document.createElement("input"); input.placeholder = t("focus.city"); input.setAttribute("aria-label", t("focus.city")); input.value = st.city || ""; input.maxLength = 100; body.appendChild(input);
+      const results = document.createElement("div"); results.setAttribute("role", "status");
+      const search = button(t("focus.search"), async () => {
+        if (!input.value.trim()) return;
+        search.disabled = true; results.textContent = "…";
+        try {
+          const cities = await weatherSearch(input.value.trim()); results.replaceChildren();
+          if (!cities.length) results.textContent = t("focus.noCity");
+          for (const city of cities) button([city.name, city.admin1, city.country].filter(Boolean).join(", "), () => update({ city: city.name, latitude: city.latitude, longitude: city.longitude }), results);
+        } catch (_) { results.textContent = t("focus.weatherError"); }
+        finally { search.disabled = false; }
+      }); body.appendChild(results);
+    }
+  }
+  draw();
+  return panel;
+}

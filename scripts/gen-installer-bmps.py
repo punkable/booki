@@ -3,7 +3,7 @@
 
 NSIS: header 150x57, sidebar 164x314
 WiX:  banner 493x58, dialog 493x312
-Palette: warm charcoal + soft sand accent (matches Booki brand, not purple AI).
+Palette: warm charcoal + soft sand accent (matches the Booki brand).
 """
 from __future__ import annotations
 

@@ -569,8 +569,8 @@ export const CHANGELOG = [
         icon: "search",
         title: "Basura retirada",
         notes: [
-          "Eliminado el workflow WinUI 3 que apuntaba a código ya borrado.",
-          "Docs WINUI3 actualizadas; alias de búsqueda de backup corregido.",
+          "Retirados los workflows que apuntaban a código eliminado.",
+          "Corregido el alias de búsqueda de copias de seguridad.",
         ],
       },
     ],
@@ -738,7 +738,7 @@ export const CHANGELOG = [
       },
       {
         icon: "search",
-        title: "Look mas WinUI / Windows 11",
+        title: "Diseño más cercano a Windows 11",
         notes: [
           "El dock recupera su sombra exterior direccional (antes solo tenia variables sin usar).",
           "Las tarjetas de Ajustes tienen elevacion con sombra en dos niveles y hover sutil.",

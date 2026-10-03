@@ -171,3 +171,7 @@ pub fn sync_context_menu(
 pub fn cursor_at_edge(_edge: &str) -> bool {
     false
 }
+
+pub fn desktop_foreground() -> bool {
+    false
+}

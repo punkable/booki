@@ -316,3 +316,24 @@ body.edge-right .tile.widget[data-widget="net"] .w-value { font-size: calc(var(-
 
 /* A widget grouped into a folder is shown live inside the flyout at full width. */
 .stack-widget .tile.widget.in-flyout { width: 100%; }
+
+/* Width comes from the shared model, including per-widget size choices. */
+body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, var(--size)); }
+.productivity-panel, .edit-toolbar { position: fixed; z-index: 50; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 40px #0004; }
+.productivity-panel { width: min(320px, calc(100vw - 24px)); max-height: min(420px, calc(100vh - 24px)); overflow: auto; background: var(--w-tile, #232426); }
+[data-theme="light"] .productivity-panel, [data-theme="light"] .edit-toolbar { background: #fff; }
+.productivity-head, .focus-actions, .focus-task, .edit-toolbar { display: flex; align-items: center; gap: 10px; }
+.productivity-head { justify-content: space-between; margin-bottom: 14px; }
+.productivity-button, .edit-toolbar button { color: var(--ink); border: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 8px 12px; border-radius: 9px; cursor: pointer; }
+.productivity-panel input { min-width: 0; max-width: 100%; padding: 8px; border-radius: 8px; background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.productivity-panel label { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.productivity-panel input[type="number"] { width: 65px; }
+.focus-countdown { font-size: 44px; text-align: center; font-variant-numeric: tabular-nums; padding: 10px; }
+.focus-task label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.focus-task label:has(input:checked) span { text-decoration: line-through; opacity: .6; }
+.focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.focus-calendar > * { font-size: 11px; padding: 6px 0; }
+.focus-calendar .today { background: var(--accent); color: #161618; border-radius: 8px; font-weight: 700; }
+.focus-finished .w-card { box-shadow: inset 0 0 0 2px var(--w-accent); }
+.reduce-transparency .dock, .reduce-transparency .w-card, .reduce-transparency .live-preview-bar { backdrop-filter: none !important; }
+.tile.widget.conditionally-hidden { display: none; }

@@ -259,11 +259,6 @@ export function Card({ children, className = "" }) {
   return <div className={className}>{children}</div>;
 }
 
-/** Passes children through (the old theme provider). */
-export function FluentProvider({ children }) {
-  return children;
-}
-
 const MenuCtx = createContext(null);
 
 /** Menu = one trigger + one popover; closes on item click, outside click or Escape. */

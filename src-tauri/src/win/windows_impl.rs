@@ -680,6 +680,19 @@ pub fn foreground_app_name() -> Option<String> {
     }
 }
 
+/// A real desktop foreground, as opposed to a gap while switching apps.
+pub fn desktop_foreground() -> bool {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        matches!(
+            String::from_utf16_lossy(&buf[..n.max(0) as usize]).as_str(),
+            "Progman" | "WorkerW"
+        )
+    }
+}
+
 /// True if the foreground window (not the desktop, not our own dock) overlaps
 /// the given dock rectangle (left, top, right, bottom) — used for smart hide.
 pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize) -> bool {

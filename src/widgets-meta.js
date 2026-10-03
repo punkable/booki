@@ -2,11 +2,12 @@
 
 export const WIDGET_ORDER = [
   "clock", "cpu", "ram", "disk", "net", "uptime", "battery",
-  "notes", "media", "volume", "clipboard",
+  "notes", "media", "volume", "clipboard", "timer", "tasks", "calendar", "weather",
 ];
 
 /** Fluent emoji token per widget (see emoji.js / assets/emoji). */
 export const WIDGET_ICONS = {
+  timer: "stopwatch", tasks: "memo", calendar: "clock", weather: "antenna",
   clock: "clock",
   cpu: "brain",
   ram: "ice",
@@ -24,6 +25,7 @@ export const WIDGET_ICONS = {
     a ring there instead) and in the add panel's gallery. The Fluent emoji
     above stay for the larger catalog surfaces in Settings. */
 export const WIDGET_GLYPHS = {
+  timer: "timer", tasks: "note", calendar: "clock", weather: "sparkles",
   clock: "clock",
   cpu: "cpu",
   ram: "memory",
@@ -54,6 +56,10 @@ export const RING_DEFAULTS = {
 
 /** Settings store cards: emoji token, accent, i18n desc + capability chips. */
 export const WIDGET_META = {
+  timer: { emoji: "stopwatch", accent: "#ff9f0a", desc: "widget.timerDesc", caps: ["widget.cap.controls", "widget.cap.private"] },
+  tasks: { emoji: "memo", accent: "#30d158", desc: "widget.tasksDesc", caps: ["widget.cap.editable", "widget.cap.private"] },
+  calendar: { emoji: "clock", accent: "#ff375f", desc: "widget.calendarDesc", caps: ["widget.cap.clean"] },
+  weather: { emoji: "antenna", accent: "#40c8e0", desc: "widget.weatherDesc", caps: ["widget.cap.live"] },
   clock: { emoji: "clock", accent: "#ff9f0a", desc: "widget.clockDesc", caps: ["widget.cap.live", "widget.cap.clean"] },
   cpu: { emoji: "brain", accent: "#0a84ff", desc: "widget.cpuDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
   ram: { emoji: "ice", accent: "#bf5af2", desc: "widget.ramDesc", caps: ["widget.cap.live", "widget.cap.ring"] },
@@ -71,6 +77,7 @@ export const WIDGET_META = {
 export function widgetDisplayName(widget, t) {
   return (
     {
+      timer: t("w.timer"), tasks: t("w.tasks"), calendar: t("w.calendar"), weather: t("w.weather"),
       clock: t("w.clock"),
       cpu: "CPU",
       ram: "RAM",

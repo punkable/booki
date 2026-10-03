@@ -148,13 +148,15 @@ function bridgeSource(cfg, { stats = {} } = {}) {
     ...stats,
   };
   return `
+    let storedConfig = ${JSON.stringify(cfg)};
     window.__bookiErrors = [];
     window.__listeners = {};
     window.__TAURI__ = {
       core: {
-        invoke: (cmd) => {
+        invoke: (cmd, args = {}) => {
           switch (cmd) {
-            case "get_config": return Promise.resolve(${JSON.stringify(cfg)});
+            case "get_config": return Promise.resolve(structuredClone(storedConfig));
+            case "save_config": storedConfig = args.patch ? { ...storedConfig, ...args.patch } : args.config; return Promise.resolve(structuredClone(storedConfig));
             case "system_stats": return Promise.resolve(${JSON.stringify(sys)});
             case "volume_info": return Promise.resolve([40, false]);
             case "media_info": return Promise.resolve(null);
