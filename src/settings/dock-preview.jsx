@@ -10,7 +10,7 @@ import { resolveSurfaceStyle, glassFillColor, surfaceAlpha } from "../surface.js
 
 /* The real widget markup/styles, with safe example data. Private notes and
    clipboard contents never appear in a preview or diagnostic screenshot. */
-export function WidgetPreview({ widget, style = {}, size = 48 }) {
+export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -37,12 +37,12 @@ export function WidgetPreview({ widget, style = {}, size = 48 }) {
   }, [widget, style, size]);
   return <span ref={ref} className={"tile widget preview-static" + (PREVIEW_WIDGETS.includes(widget) ? " preview" : "") + (style.icon === false ? " no-ico" : "")}
     data-widget={widget} data-variant={style.variant || "glass"} aria-label={widgetDisplayName(widget, t)}
-    style={{ "--size": `${size}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, width: widgetWidth(widget, size, 6, style) }}>
+    style={{ "--size": `${size}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, "--widget-width": `${widgetWidth(widget, size, gap, style)}px`, width: widgetWidth(widget, size, gap, style) }}>
     <span className="w-card" dangerouslySetInnerHTML={{ __html: widgetCardHTML(widget) }} />
   </span>;
 }
 const previewIcons = new Map();
-function PreviewPin({ item, size }) {
+function PreviewPin({ item, size, gap }) {
   const [src, setSrc] = useState(() => item.icon || previewIcons.get(item.path));
   useEffect(() => {
     let alive = true;
@@ -53,7 +53,7 @@ function PreviewPin({ item, size }) {
     if (item.kind === "app" && item.path) dock.appIcon(item.path).then((uri) => { if (uri) { previewIcons.set(item.path, uri); if (alive) setSrc(uri); } }).catch(() => {});
     return () => { alive = false; };
   }, [item.icon, item.path, item.kind]);
-  if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} />;
+  if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} gap={gap} />;
   if (item.kind === "separator") return <span className="live-preview-separator" />;
   return <span className="live-preview-app" title={item.name} style={{ width: size, height: size }}>
     {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.name?.charAt(0) || "•"}</span>)}</span>
@@ -72,7 +72,7 @@ export function DockPreview({ cfg, large = false }) {
   return <div className={"live-preview-scene" + (large ? " large" : "")}>
     <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, gap, borderRadius: cfg.cornerRadius ?? 16,
       background: `color-mix(in srgb, ${fill} ${Math.round((cfg.reduceTransparency ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
-      {items.length ? items.map((item) => <PreviewPin key={item.id} item={item} size={size} />) : <span className="muted">{t("overhaul.empty")}</span>}
+      {items.length ? items.map((item) => <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
     </div>
     <span className="live-preview-caption">{t("overhaul.previewHint")}</span>
   </div>;

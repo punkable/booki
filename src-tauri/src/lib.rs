@@ -2345,8 +2345,8 @@ fn open_settings_url(app: &AppHandle, url: &str) {
     }
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
         .title("Booki — Ajustes")
-        .inner_size(760.0, 800.0)
-        .min_inner_size(560.0, 560.0)
+        .inner_size(960.0, 760.0)
+        .min_inner_size(520.0, 480.0)
         .resizable(true)
         .center()
         .decorations(true)

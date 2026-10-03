@@ -881,6 +881,7 @@ const pollStats = singleFlight(async () => {
   });
   eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
   eachWidget("battery", (el) => {
+    setWidgetAvailable(el, s.battery >= 0);
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
     setMetric(el, t("w.battery"), s.battery);
     el.classList.toggle("charging", !!s.charging);
@@ -893,6 +894,14 @@ const pollStats = singleFlight(async () => {
   });
 });
 
+function setWidgetAvailable(el, available) {
+  const item = findWidgetPin(el.dataset.id);
+  const hide = !!item?.style?.hideWhenUnavailable && !available;
+  if (el.classList.contains("conditionally-hidden") === hide) return;
+  el.classList.toggle("conditionally-hidden", hide);
+  requestAnimationFrame(() => { fitDock(); reframe(); });
+}
+
 // Now-playing card: the system media session (Spotify, browser, …).
 const pollMedia = singleFlight(async () => {
   const m = await dockApi.mediaInfo().catch(() => null);
@@ -900,6 +909,7 @@ const pollMedia = singleFlight(async () => {
     const art = el.querySelector(".w-art");
     const ico = el.querySelector(".w-ico");
     const toggle = el.querySelector(".w-ctl-toggle");
+    setWidgetAvailable(el, !!m);
     if (!m) {
       setText(el, t("w.media"), "—", t("w.media"));
       delete el.dataset.mqTitle;
@@ -1035,16 +1045,17 @@ function startPolls() {
   widgetPollTimer = null;
   if (hiddenState) return; // tucked away → stay idle until revealed
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const hasClock = widgetPresent(["clock", "timer", "tasks", "calendar", "weather"]);
+  const hasClock = widgetPresent(["clock", "timer"]);
+  const hasLocal = widgetPresent(["tasks", "calendar", "weather"]);
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
   const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
   const hasClipboard = widgetPresent("clipboard");
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
-  if (hasClock) tickClocks();
+  if (hasClock || hasLocal) tickClocks();
   if (hasStats) pollStats();
   if (hasMedia) pollMedia();
   if (hasVolume) pollVolume();
@@ -1053,11 +1064,11 @@ function startPolls() {
   pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000, clipboard: t0 + 4000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : 1500;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 : 60000;
   widgetPollTimer = setInterval(() => {
     if (hiddenState) return; // don't poll a tucked-away dock
     const now = Date.now();
-    if (hasClock) tickClocks();
+    if (hasClock || hasLocal) tickClocks();
     if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
     if (hasMedia && now >= pollDue.media) { pollDue.media = now + 3000; pollMedia(); }
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + 4000; pollVolume(); }
@@ -2591,6 +2602,14 @@ async function openBackgroundMenu(e) {
   addMenuLabel(t("m.add"));
   // Apps, folders, files and widgets all live in the add panel now.
   add("plus", t("add.open"), () => openAddPanel(dockEl));
+  const hiddenWidgets = [...dockEl.querySelectorAll(".conditionally-hidden")];
+  if (hiddenWidgets.length) {
+    sep(); addMenuLabel(t("overhaul.hiddenWidgets"));
+    for (const el of hiddenWidgets) {
+      const item = findWidgetPin(el.dataset.id);
+      if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; await persist(); await render(); reframe(); });
+    }
+  }
   // Saved profiles → one-click switch, right from the dock. The active one
   // (last applied/saved) is marked with a check.
   const profiles = await dockApi.profileList().catch(() => []);

@@ -5,7 +5,8 @@
 //! `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist`. Value
 //! names are ROT13-encoded paths, often starting with a known-folder GUID; the
 //! data is a small binary record. Booki reads it locally to put the apps you
-//! actually use at the top of its add lists. Nothing is stored or sent.
+//! actually use at the top of its add lists. OS history is read-only; successful
+//! launches made through Booki are counted in a local file. Nothing is sent.
 //!
 //! Parsing is pure and tested; only `frequent_apps()` touches the registry.
 

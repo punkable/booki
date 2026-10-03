@@ -18,8 +18,10 @@ import {
   onShowChangelog,
   onShowTab,
   closeSelf,
+  onCloseRequest,
   logMessage,
 } from "./api.js";
+import { currentRelease } from "./release-notes.js";
 import { AppLibrary } from "./settings/app-library.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
 import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
@@ -1237,6 +1239,7 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
             </div>
           </div>
         ) : null}
+        {["media", "battery"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!st.hideWhenUnavailable} onChange={(value) => set1({ hideWhenUnavailable: value })} />}
         <SectionTitle name="palette">{t("w.appearance")}</SectionTitle>
         <Row label={t("w.variant")}>
           <SegmentedControl
@@ -2654,6 +2657,8 @@ function App() {
   const saveTimer = useRef(null);
   const cfgRef = useRef(null);
   const dirtyKeys = useRef(new Set());
+  const savingKeys = useRef(new Set());
+  const closeAllowed = useRef(false);
   const afterSaveCb = useRef(null);
   cfgRef.current = cfg;
 
@@ -2670,6 +2675,7 @@ function App() {
     saveTimer.current = null;
     const keys = [...dirtyKeys.current];
     dirtyKeys.current.clear();
+    savingKeys.current = new Set(keys);
     const cb = afterSaveCb.current;
     afterSaveCb.current = null;
     if (!keys.length) return;
@@ -2695,8 +2701,23 @@ function App() {
       // Re-queue failed keys so the next edit (or close) retries.
       for (const k of keys) dirtyKeys.current.add(k);
       setSaveState("error");
+    } finally {
+      savingKeys.current.clear();
     }
   };
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten;
+    onCloseRequest((event) => {
+      if (closeAllowed.current) return;
+      event.preventDefault();
+      flushSave().then(() => {
+        if (!dirtyKeys.current.size) { closeAllowed.current = true; closeSelf(); }
+      });
+    }).then((un) => { if (disposed) un(); else unlisten = un; });
+    return () => { disposed = true; unlisten?.(); };
+  }, []);
 
   // Flush pending edits on close — never drop a slider/toggle by clearing the timer.
   useEffect(() => () => {
@@ -2823,6 +2844,16 @@ function App() {
     });
   };
 
+  const applyProfile = async (name) => {
+    await flushSave();
+    if (dirtyKeys.current.size) throw new Error("pending settings could not be saved");
+    const fresh = await dockApi.profileApply(name);
+    if (!fresh) throw new Error("profile unavailable");
+    await ensureLang(fresh.language);
+    cfgRef.current = fresh; setCfg(fresh); applyTheme(fresh); applySurfaceVars(fresh);
+    await emitConfigChanged();
+  };
+
   const reset = async () => {
     const fresh = await configApi.reset();
     if (fresh) {
@@ -2834,11 +2865,11 @@ function App() {
   };
 
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = async (e) => {
       if (e.defaultPrevented || e.key !== "Escape") return;
       // Escape closes the changelog modal first, then the window.
       if (showChangelog) setShowChangelog(false);
-      else closeSelf();
+      else { await flushSave(); if (!dirtyKeys.current.size) closeSelf(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -2854,7 +2885,7 @@ function App() {
         setCfg((prev) => {
           if (!prev) return c;
           const next = { ...c };
-          for (const key of dirtyKeys.current) next[key] = prev[key];
+          for (const key of new Set([...savingKeys.current, ...dirtyKeys.current])) next[key] = prev[key];
           next.onboarded = prev.onboarded || c.onboarded;
           next.settingsIntroSeen = prev.settingsIntroSeen || c.settingsIntroSeen;
           next.seenVersion = c.seenVersion || prev.seenVersion;
@@ -2970,7 +3001,7 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
-            {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} />}
+            {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
             {tab === "dock" && <><DockPage cfg={cfg} set={set} /><CollapsibleSection title={t("tab.autohide")} defaultOpen={false}><AutoHidePage cfg={cfg} set={set} /></CollapsibleSection><CollapsibleSection title={t("tab.notch")} defaultOpen={false}><NotchPage cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "autohide" && <AutoHidePage cfg={cfg} set={set} />}
@@ -3029,7 +3060,7 @@ function ChangelogModal({ onClose }) {
       alive = false;
     };
   }, []);
-  const log = entries || [];
+  const log = entries ? [currentRelease(), ...entries] : [];
   return createPortal((
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>

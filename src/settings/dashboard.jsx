@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import { LAYOUT_SCENARIOS, countContent } from "../dock/layout-model.js";
@@ -15,19 +15,24 @@ export function ScenarioPicker({ cfg, set }) {
     </button>)}
   </div>;
 }
-export function Dashboard({ cfg, set, navigate, version }) {
+export function Dashboard({ cfg, set, navigate, version, onProfile, listProfiles }) {
+  const [profiles, setProfiles] = useState([]);
+  const [profileError, setProfileError] = useState("");
+  useEffect(() => { let alive = true; listProfiles().then((names) => { if (alive) setProfiles(names || []); }).catch(() => {}); return () => { alive = false; }; }, []);
   const counts = countContent(cfg.pinned);
   return <>
     <PageHeader title={t("overhaul.home")}>{t("overhaul.welcome")}</PageHeader>
     <section className="dashboard-hero" aria-label={t("overhaul.preview")}>
       <div className="dashboard-hero-head"><div><span className="dashboard-eyebrow">Booki · {version ? `v${version}` : "…"}</span>
-        <h2>{cfg.lastProfile || t("overhaul.yourDock")}</h2></div>
+        <h2>{cfg.lastProfile || t("overhaul.yourDock")}</h2>
+        {profiles.length > 0 && <select aria-label={t("tab.profiles")} value={cfg.lastProfile || ""} onChange={async (event) => { try { await onProfile(event.target.value); setProfileError(""); } catch (_) { setProfileError(t("overhaul.failed")); } }}><option value="" disabled>{t("tab.profiles")}</option>{profiles.map((name) => <option key={name}>{name}</option>)}</select>}
+        {profileError && <p role="alert">{profileError}</p>}</div>
         <button className="s-btn s-btn-soft" onClick={() => navigate("appearance")}>{t("overhaul.personalize")}</button></div>
       <DockPreview cfg={cfg} large />
       <div className="dashboard-summary">
         <button onClick={() => navigate("apps")}><strong>{counts.apps}</strong>{t("overhaul.apps")}</button>
         <button onClick={() => navigate("widgets")}><strong>{counts.widgets}</strong>{t("tab.widgets")}</button>
-        <button onClick={() => navigate("profiles")}><strong>{counts.groups}</strong>{t("overhaul.groups")}</button>
+        <button onClick={() => navigate("apps")}><strong>{counts.groups}</strong>{t("overhaul.groups")}</button>
       </div>
     </section>
     <div className="dashboard-actions">

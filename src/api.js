@@ -363,6 +363,12 @@ export async function closeSelf() {
   window.close();
 }
 
+/** Let Settings finish pending writes before the native close request. */
+export async function onCloseRequest(cb) {
+  const current = T?.window?.getCurrentWindow?.();
+  return current?.onCloseRequested ? current.onCloseRequested(cb) : () => {};
+}
+
 /** Broadcast that the config changed so other windows can live-refresh. */
 export async function emitConfigChanged() {
   if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed");

@@ -21,3 +21,13 @@ if (tag && (tag !== `v${packageVersion}` || !/^v\d+\.\d+\.\d+$/.test(tag))) {
   process.exit(1);
 }
 console.log(`Versions match: ${packageVersion}`);
+
+// Tauri's bundler rejects different major/minor releases across its bridges.
+for (const [crate, npmPackage] of [["tauri", "@tauri-apps/api"], ["tauri-plugin-dialog", "@tauri-apps/plugin-dialog"], ["tauri-plugin-process", "@tauri-apps/plugin-process"], ["tauri-plugin-updater", "@tauri-apps/plugin-updater"]]) {
+  const native = cargoLock.match(new RegExp(`name = "${crate}"\\s+version = "([^" ]+)"`))?.[1];
+  const frontend = lock.packages?.[`node_modules/${npmPackage}`]?.version;
+  if (!native || !frontend || native.split(".").slice(0, 2).join(".") !== frontend.split(".").slice(0, 2).join(".")) {
+    console.error(`Tauri bridge mismatch: ${crate} ${native}, ${npmPackage} ${frontend}`);
+    process.exit(1);
+  }
+}

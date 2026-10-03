@@ -107,8 +107,14 @@ Older notes live in Settings → What's new.
 | `Alt` + `1…9` | Launch the Nth pin (modifier is configurable) |
 | Push cursor into the screen edge | Reveal a hidden dock |
 
-## Next update (unreleased)
+## Next update: 0.70 (unreleased)
 
+- A new Home dashboard, shared dock previews, quick profile switching and behavior scenarios. Settings group related options and adapt to smaller windows.
+- Redesigned app library: search, real local usage recommendations, running apps and paginated installed apps. Ordinary pinning preserves originals.
+- Timer, tasks, calendar and optional city weather widgets; visual previews, configurable widths, and recoverable conditional visibility for media/battery.
+- Scroll crowded docks or adapt their size, reduce transparency, and remember displays by stable name.
+- Partial configuration writes prevent the dock and Settings from replacing each other's changes. Local diagnostics omit widget content and personal paths.
+- More reliable update progress and retry, expandable release history, five installer languages, and startup cleanup on uninstall.
 - Explicit shortcut actions: **Move shortcut into Booki** stores a desktop `.lnk` in Booki and removes its desktop copy only after saving the pin. **Return shortcut to desktop** restores it without overwriting existing files. Ordinary pinning keeps the original.
 - Returning to the Windows desktop (including `Win+D`) reveals a dock hidden by smart auto-hide, even with the click trigger. Manually hidden docks still wait to be summoned.
 - Folder flyouts have Previous/Next pages instead of stopping at 80 entries.
@@ -117,7 +123,8 @@ Older notes live in Settings → What's new.
 
 ## Privacy
 
-- Fully offline except: GitHub update checks (signed releases), and favicon fetch if you pin a website. **No telemetry, no accounts, no data collection.**
+- Network access: GitHub update checks (signed releases), favicon fetch if you pin a website, and optional Open-Meteo weather only after selecting a city. Weather uses that city’s coordinates without device location. **No telemetry, no accounts, no data collection.**
+- App recommendations read Windows’ local usage record and successful launches through Booki (`app-usage.json`). Usage stays on your device.
 - Config: `%APPDATA%\Booki\config.json` (plus a `config.bak.json` safety copy). Export/import from Settings anytime.
 - Uninstall keeps that folder by default so a reinstall restores your dock. Only the uninstaller checkbox *Delete app data* wipes it.
 - Clipboard history is local. Restart memory is **off by default**; when enabled it is protected for your Windows user and can expire.

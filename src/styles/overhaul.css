@@ -94,3 +94,15 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 @keyframes progress-wait { to { transform: translateX(180%) scaleX(.35); } }
 @media (prefers-reduced-motion: reduce) { .upd-bar.indeterminate i { animation: none; } }
 .live-preview-bar.vertical { flex-direction: column; max-height: 280px; overflow-y: auto; }
+.live-preview-bar.vertical .tile.widget { width: var(--size) !important; }
+.live-preview-bar.vertical .w-card { justify-content: center; padding: 4px; }
+.live-preview-bar.vertical .w-label, .live-preview-bar.vertical .w-spark, .live-preview-bar.vertical .w-pv-main, .live-preview-bar.vertical .w-pv-badge { display: none; }
+.live-preview-bar.vertical .w-value { font-size: calc(var(--size) * .26); }
+.dashboard-hero-head select { padding: 5px 8px; margin-top: 8px; background: var(--set-card); color: var(--ink); border: 1px solid var(--set-line); border-radius: 8px; }
+@media (max-width: 560px) {
+  .s-shell { grid-template-columns: 132px minmax(0, 1fr); }
+  .s-navitem { padding: 6px; gap: 5px; font-size: 11px; }
+  .s-sidebar { padding-inline: 6px; }
+  .s-content { padding-inline: 12px; }
+  .s-search input { font-size: 11px; padding-inline: 6px; }
+}
