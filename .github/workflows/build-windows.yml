@@ -39,6 +39,9 @@ jobs:
         with:
           workspaces: src-tauri
           key: ${{ matrix.target }}
+      - name: Native Windows tests
+        if: matrix.arch == 'x64'
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --target ${{ matrix.target }}
       - run: npm ci
       # PRs (including forks) must build without production signing secrets.
       - name: Package without updater signatures

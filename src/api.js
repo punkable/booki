@@ -1,6 +1,7 @@
 /* Thin wrapper over the Tauri bridge with browser fallbacks, so the UI can be
    previewed with `vite` in a normal browser during development. */
 
+import { version as appVersion } from "../package.json";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 
 const T = typeof window !== "undefined" ? window.__TAURI__ : undefined;
@@ -104,7 +105,7 @@ async function mockInvoke(cmd, args) {
     case "list_windows":
       return [];
     case "app_version":
-      return "0.56.1";
+      return appVersion;
     case "reset_config":
       demoConfig = structuredClone(DEMO_CONFIG);
       return structuredClone(demoConfig);
@@ -505,7 +506,8 @@ export const dock = {
   pathsExist: (paths) => invoke("paths_exist", { paths }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
-  listDir: (path) => invoke("list_dir", { path }),
+  listDir: (path, offset = 0, limit = 80) => invoke("list_dir", { path, offset, limit }),
+  relocateShortcut: (id, toDesktop) => invoke("relocate_shortcut", { id, toDesktop }),
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: () => invoke("list_installed_apps"),
   frequentApps: (limit = 12) => invoke("frequent_apps", { limit }),
@@ -527,6 +529,12 @@ export async function onLaunchIndex(cb) {
 export async function onHotEdge(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://hot-edge", () => cb());
+}
+
+/** Only the actual Windows desktop, including Win+D, emits this signal. */
+export async function onDesktop(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://desktop", (e) => cb(!!e.payload));
 }
 
 /** Listen for the smart-hide occlusion signal from the backend. */

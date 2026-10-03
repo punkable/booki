@@ -1,6 +1,13 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "shortcut.store": "Mover atalho para o Booki",
+    "shortcut.desktop": "Devolver atalho à área de trabalho",
+    "shortcut.error": "Não foi possível mover o atalho. O original foi preservado.",
+    "stack.previous": "Anterior",
+    "stack.next": "Seguinte",
+    "stack.page": "Página {n}",
+    "shortcut.unpinHint": "Arrastar para fora desafixa; não move nem exclui o arquivo.",
     "tab.appearance": "Aparência",
     "tab.dock": "Dock",
     "tab.autohide": "Ocultar automaticamente",
@@ -546,6 +553,13 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "shortcut.store": "Déplacer le raccourci dans Booki",
+    "shortcut.desktop": "Remettre le raccourci sur le bureau",
+    "shortcut.error": "Impossible de déplacer le raccourci. L’original est conservé.",
+    "stack.previous": "Précédent",
+    "stack.next": "Suivant",
+    "stack.page": "Page {n}",
+    "shortcut.unpinHint": "Glisser dehors détache ; le fichier reste en place.",
     "tab.appearance": "Apparence",
     "tab.dock": "Dock",
     "tab.autohide": "Masquage auto",
@@ -1091,6 +1105,13 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "shortcut.store": "Verknüpfung nach Booki verschieben",
+    "shortcut.desktop": "Verknüpfung auf den Desktop zurücklegen",
+    "shortcut.error": "Die Verknüpfung konnte nicht verschoben werden. Das Original bleibt erhalten.",
+    "stack.previous": "Zurück",
+    "stack.next": "Weiter",
+    "stack.page": "Seite {n}",
+    "shortcut.unpinHint": "Herausziehen löst die Anheftung; die Datei bleibt unverändert.",
     "tab.appearance": "Aussehen",
     "tab.dock": "Dock",
     "tab.autohide": "Automatisch ausblenden",

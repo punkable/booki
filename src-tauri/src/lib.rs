@@ -5,6 +5,7 @@
 
 mod apps;
 mod config;
+mod shortcuts;
 mod usage;
 mod util;
 mod win;
@@ -382,6 +383,71 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
         }
     }
     result
+}
+
+/// Moving into Booki is explicit and limited to the user's desktop.
+/// Copy first, commit the new pin path, then remove the old shortcut.
+#[tauri::command]
+fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<String, String> {
+    fn find(items: &mut [config::PinnedApp], id: &str) -> Option<String> {
+        for pin in items {
+            if pin.id == id && pin.kind == "app" {
+                return Some(pin.path.clone());
+            }
+            if let Some(path) = find(&mut pin.children, id) {
+                return Some(path);
+            }
+        }
+        None
+    }
+    fn update(items: &mut [config::PinnedApp], original: &str, path: &str) {
+        for pin in items {
+            if pin.path == original {
+                pin.path = path.into();
+            }
+            update(&mut pin.children, original, path);
+        }
+    }
+    let mut cfg = config::load();
+    let original = find(&mut cfg.pinned, &id).ok_or("Shortcut pin not found")?;
+    let source = std::path::Path::new(&original);
+    let desktop = win::known_folders()
+        .into_iter()
+        .find(|(key, _)| key == "desktop")
+        .map(|(_, path)| std::path::PathBuf::from(path))
+        .ok_or("Desktop folder unavailable")?;
+    let managed = config::config_dir().join("shortcuts");
+    let parent = source
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .ok_or("Shortcut folder unavailable")?;
+    let on_desktop = desktop.canonicalize().ok().as_ref() == Some(&parent);
+    let in_booki = managed.canonicalize().ok().as_ref() == Some(&parent);
+    if to_desktop && on_desktop {
+        return Ok(original);
+    }
+    if !to_desktop && in_booki {
+        return Ok(original);
+    }
+    if !to_desktop && !on_desktop {
+        return Err("Only desktop shortcuts can be moved into Booki".into());
+    }
+    let copied = shortcuts::copy_unique(source, if to_desktop { &desktop } else { &managed })?;
+    let next = copied.to_string_lossy().to_string();
+    update(&mut cfg.pinned, &original, &next);
+    if let Err(err) = config::save(&cfg) {
+        let _ = fs::remove_file(&copied);
+        return Err(err);
+    }
+    // Installed Start Menu shortcuts are copied, never removed. Failure to
+    // remove an original leaves two valid shortcuts rather than a broken pin.
+    if on_desktop || in_booki {
+        if let Err(err) = fs::remove_file(source) {
+            log::warn!("Shortcut original retained: {err}");
+        }
+    }
+    let _ = app.emit("booki://config-changed", ());
+    Ok(next)
 }
 
 #[tauri::command]
@@ -1872,34 +1938,37 @@ struct DirItem {
 
 /// List a folder's contents for the "stack" flyout.
 #[tauri::command]
-async fn list_dir(path: String) -> Vec<DirItem> {
-    let mut out: Vec<DirItem> = Vec::new();
-    if let Ok(rd) = std::fs::read_dir(&path) {
-        for e in rd.flatten() {
-            let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') {
-                continue;
-            }
-            let p = e.path();
-            let is_dir = p.is_dir();
-            out.push(DirItem {
-                name,
-                path: p.to_string_lossy().to_string(),
-                is_dir,
-            });
-            // Cap AFTER the hidden filter, so a full flyout reliably means
-            // "there may be more" (the UI shows an open-in-Explorer row at 80).
-            if out.len() >= 80 {
-                break;
+async fn list_dir(path: String, offset: Option<usize>, limit: Option<usize>) -> Vec<DirItem> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut out: Vec<DirItem> = Vec::new();
+        if let Ok(rd) = std::fs::read_dir(&path) {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with('.') {
+                    continue;
+                }
+                let p = e.path();
+                let is_dir = p.is_dir();
+                out.push(DirItem {
+                    name,
+                    path: p.to_string_lossy().to_string(),
+                    is_dir,
+                });
             }
         }
-    }
-    out.sort_by(|a, b| {
-        b.is_dir
-            .cmp(&a.is_dir)
-            .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
-    out
+        out.sort_by(|a, b| {
+            b.is_dir
+                .cmp(&a.is_dir)
+                .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+                .then(a.name.cmp(&b.name))
+        });
+        out.into_iter()
+            .skip(offset.unwrap_or(0))
+            .take(limit.unwrap_or(80).clamp(1, 81))
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -2354,6 +2423,7 @@ pub fn run() {
             get_config,
             save_config,
             launch_app,
+            relocate_shortcut,
             app_icon,
             list_windows,
             focus_window,
@@ -2543,6 +2613,7 @@ pub fn run() {
                         // (last, candidate, streak) for each debounced signal.
                         let mut occ = (false, false, 0u8);
                         let mut fs = (false, false, 0u8);
+                        let mut desktop = (false, false, 0u8);
                         // Debounce helper: returns Some(new) when the value has held
                         // for two polls (so momentary changes can't make it flap).
                         fn debounce(s: &mut (bool, bool, u8), v: bool) -> Option<bool> {
@@ -2588,6 +2659,9 @@ pub fn run() {
                                         let _ = notch.set_always_on_top(true);
                                     }
                                 }
+                            }
+                            if let Some(v) = debounce(&mut desktop, win::desktop_foreground()) {
+                                let _ = handle.emit("booki://desktop", v);
                             }
                             // foreground_occludes = "the user is in an app". Smart
                             // auto-hide and the smart notch both consume this.
@@ -2981,4 +3055,28 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Booki dock");
+}
+
+#[cfg(test)]
+mod directory_tests {
+    use super::*;
+    #[test]
+    fn paging_sorts_before_slicing_and_reaches_entries_after_eighty() {
+        let root = std::env::temp_dir().join(format!("booki-directory-{}", std::process::id()));
+        fs::create_dir_all(root.join("Z folder")).unwrap();
+        for i in (0..100).rev() {
+            fs::write(root.join(format!("File {i:03}.txt")), b"").unwrap();
+        }
+        fs::write(root.join(".hidden"), b"").unwrap();
+        let path = root.to_string_lossy().to_string();
+        let first = tauri::async_runtime::block_on(list_dir(path.clone(), Some(0), Some(25)));
+        assert_eq!(first.len(), 25);
+        assert_eq!(first[0].name, "Z folder");
+        assert_eq!(first[1].name, "File 000.txt");
+        let last = tauri::async_runtime::block_on(list_dir(path, Some(96), Some(25)));
+        assert_eq!(last.len(), 5);
+        assert_eq!(last[0].name, "File 095.txt");
+        assert_eq!(last[4].name, "File 099.txt");
+        fs::remove_dir_all(root).unwrap();
+    }
 }

@@ -10,6 +10,7 @@ import {
   onFileDrop,
   onConfigChanged,
   onOcclusion,
+  onDesktop,
   onReveal,
   onSoftReveal,
   onFullscreen,
@@ -166,6 +167,7 @@ async function boot() {
     // is bumped whenever the dock itself emits.
     onConfigChanged(() => { if (Date.now() < selfChangeUntil) return; reloadConfig(); });
     onOcclusion(onOcclusionSignal);
+    onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
     // Tray / global hotkey: tuck or summon through the same hide/reveal path
     // the notch uses so JS hiddenState stays in sync with the native windows.
@@ -251,7 +253,9 @@ async function reloadConfig() {
   applyAll();
   // Only rebuild the bar when the pinned items actually changed — sliders and
   // toggles in Settings shouldn't make the whole dock flash.
-  const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
+  const languageChanged = !!prev && prev.language !== cfg.language;
+  if (languageChanged) { closeMenu(); closeTrashPop(); hideTip(); }
+  const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
     // Stale flyout handlers hold old children — close rather than lie.
     if (stackOpen) closeStack();
@@ -1754,7 +1758,7 @@ function processMove(e) {
   }
   if (willUnpin) {
     clearMerge();
-    placeHint(t("m.remove"), press.el);
+    placeHint(/\.lnk$/i.test(press.item.path || "") ? t("shortcut.unpinHint") : t("m.remove"), press.el);
     return; // no reordering/merging while aiming outside the bar
   }
 
@@ -1867,7 +1871,8 @@ async function onPressUp() {
         setTimeout(() => c.remove(), 280);
       }
       willUnpin = false;
-      await removeItem(p.item.id);
+      if (isTauri && /\.lnk$/i.test(p.item.path || "")) confirmShortcutOut(p.item);
+      else await removeItem(p.item.id);
       return;
     }
     // Settle the floating copy into the tile's final slot, then drop it.
@@ -2210,7 +2215,17 @@ function wireStackDragOut(cell, group, child) {
     }
   };
   cell.addEventListener("pointerup", finish);
-  cell.addEventListener("pointercancel", finish);
+  cell.addEventListener("pointercancel", () => {
+    if (!st) return;
+    const cancelled = st;
+    st = null;
+    try { cell.releasePointerCapture(cancelled.pointerId); } catch (_) {}
+    cell.classList.remove("dragging");
+    cancelled.clone?.remove();
+    clearDropHint();
+    cell._suppressClick = true;
+    setTimeout(() => { cell._suppressClick = false; }, 0);
+  });
 }
 
 // Exit edit mode by clicking empty space or pressing Escape.
@@ -2226,6 +2241,47 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 // ───────────────────────── Context menu ─────────────────────────
+
+function confirmShortcutOut(item) {
+  closeTrashPop();
+  const pop = document.createElement("div");
+  pop.className = "trash-pop";
+  const hint = document.createElement("span");
+  hint.className = "tp-text";
+  hint.textContent = t("shortcut.unpinHint");
+  pop.appendChild(hint);
+  const button = (key, action) => {
+    const b = document.createElement("button");
+    b.className = "tp-btn";
+    b.textContent = t(key);
+    b.addEventListener("click", async () => { closeTrashPop(); await action(); });
+    pop.appendChild(b);
+  };
+  button("shortcut.desktop", async () => {
+    if (await relocateShortcut(item, true)) await removeItem(item.id);
+  });
+  button("m.remove", () => removeItem(item.id));
+  button("trash.cancel", () => {});
+  trashPop = pop;
+  placePop(pop);
+}
+
+async function relocateShortcut(item, toDesktop) {
+  try {
+    await dockApi.relocateShortcut(item.id, toDesktop);
+    await reloadConfig();
+    return true;
+  } catch (err) {
+    logMessage("error", `shortcut transfer: ${err}`);
+    const pop = document.createElement("div");
+    pop.className = "trash-pop";
+    pop.textContent = t("shortcut.error");
+    closeTrashPop();
+    trashPop = pop;
+    placePop(pop);
+    return false;
+  }
+}
 
 function menuPinTitle(item) {
   if (!item) return "Booki";
@@ -2309,6 +2365,10 @@ function openMenu(e, item) {
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
+  if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
+    add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
+    add("external", t("shortcut.desktop"), () => relocateShortcut(item, true));
+  }
   if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
   if (wins.length) {
     add("x", t(wins.length > 1 ? "m.closeAll" : "m.closeWindow"), async () => {
@@ -2460,6 +2520,8 @@ async function openBackgroundMenu(e) {
         const fresh = await dockApi.profileApply(name).catch(() => null);
         if (fresh) {
           cfg = fresh;
+          await ensureLang(cfg.language);
+          maybeSyncCtxMenu();
           applyAll();
           await render();
           reframe();
@@ -2753,6 +2815,7 @@ window.addEventListener("resize", () => {
 
 let hiddenState = false;
 let hideTimer = null;
+let desktopActive = false;
 let occluded = false; // last occlusion signal from the backend (smart mode)
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
@@ -2902,6 +2965,7 @@ function visibilityState() {
     fullscreen,
     previewing,
     occluded,
+    desktop: desktopActive,
     manualHide,
     summoned: pinnedReveal,
     draggingFile,
@@ -3158,6 +3222,12 @@ function scheduleHide() {
 // Smart-hide: the backend tells us when a window covers the dock's home area.
 // We hide to the notch when covered and reappear when the desktop is clear —
 // measured against a stable rect in Rust, so it can no longer flap.
+function onDesktopSignal(value) {
+  desktopActive = value;
+  if (value) occluded = false;
+  onOcclusionSignal(occluded);
+}
+
 function onOcclusionSignal(value) {
   occluded = value;
   // Going back to work in an app releases a manual swipe-hide: next time the
@@ -4108,7 +4178,7 @@ async function openStack(tileEl, item) {
       mkAdd(t("apps.addToFolder"), "app");
       mkAdd(t("m.addFolder"), "folder");
     } else if (items.length >= 80) {
-      // list_dir caps at 80 entries — say so and hand off to Explorer.
+      // Legacy listing clients may still hand back a capped slice.
       const more = document.createElement("button");
       more.className = "stack-more";
       more.textContent = t("stack.more");
@@ -4131,18 +4201,44 @@ async function openStack(tileEl, item) {
       c.innerHTML = `<span class="stack-glyph skel"></span><span class="stack-name skel"></span>`;
       grid.appendChild(c);
     }
-    dockApi
-      .listDir(item.path)
-      .then((items) => {
-        if (seq !== stackSeq || !stackOpen) return;
-        fillGrid(items || []);
+    let page = 0;
+    let request = 0;
+    const pageSize = 24;
+    const pager = document.createElement("div");
+    pager.className = "stack-pager";
+    const loadPage = async (nextPage) => {
+      const current = ++request;
+      pager.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+      try {
+        const rows = await dockApi.listDir(item.path, nextPage * pageSize, pageSize + 1);
+        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        page = nextPage;
+        fillGrid((rows || []).slice(0, pageSize));
+        pager.replaceChildren();
+        const button = (key, next, disabled) => {
+          const b = document.createElement("button");
+          b.className = "stack-more";
+          b.textContent = t(key);
+          b.disabled = disabled;
+          b.addEventListener("click", () => loadPage(next));
+          pager.appendChild(b);
+        };
+        button("stack.previous", page - 1, page === 0);
+        const label = document.createElement("span");
+        label.textContent = t("stack.page").replace("{n}", String(page + 1));
+        label.setAttribute("aria-live", "polite");
+        pager.appendChild(label);
+        button("stack.next", page + 1, !rows || rows.length <= pageSize);
+        grid.appendChild(pager);
+        grid.parentElement.scrollTop = 0;
         applyFrame();
         if (pendingReplace) requestAnimationFrame(pendingReplace);
-      })
-      .catch(() => {
-        if (seq !== stackSeq || !stackOpen) return;
-        fillGrid([]);
-      });
+      } catch (_) {
+        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        pager.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+      }
+    };
+    loadPage(0);
   }
   stackEl.appendChild(grid);
 

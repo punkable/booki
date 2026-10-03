@@ -25,7 +25,6 @@ import { findSettings } from "./settings/search.js";
 import { widgetRefs, itemForWidgetRef, updateWidgetStyleForRef } from "./settings/pin-model.js";
 import { emoSrc } from "./emoji.js";
 import {
-  FluentProvider,
   Button,
   Menu,
   MenuTrigger,
@@ -3135,14 +3134,14 @@ function App() {
 
   if (!cfg) {
     return (
-      <FluentProvider>
+      <>
         <SettingsSkeleton />
-      </FluentProvider>
+      </>
     );
   }
 
   return (
-    <FluentProvider>
+    <>
       <div className="s-shell">
         <aside className="s-sidebar">
           <div className="s-brand">
@@ -3250,7 +3249,7 @@ function App() {
         </main>
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
       </div>
-    </FluentProvider>
+    </>
   );
 }
 

@@ -6,6 +6,13 @@
 
 export const DICT = {
   es: {
+    "shortcut.store": "Mover acceso directo a Booki",
+    "shortcut.desktop": "Devolver acceso directo al escritorio",
+    "shortcut.error": "No se pudo mover el acceso directo. El original se conserva.",
+    "stack.previous": "Anterior",
+    "stack.next": "Siguiente",
+    "stack.page": "Página {n}",
+    "shortcut.unpinHint": "Arrastrar fuera desancla; no mueve ni elimina el archivo.",
     "tab.appearance": "Apariencia",
     "tab.dock": "Dock",
     "tab.autohide": "Ocultar automáticamente",
@@ -559,6 +566,13 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "shortcut.store": "Move shortcut into Booki",
+    "shortcut.desktop": "Return shortcut to desktop",
+    "shortcut.error": "Could not move the shortcut. The original is preserved.",
+    "stack.previous": "Previous",
+    "stack.next": "Next",
+    "stack.page": "Page {n}",
+    "shortcut.unpinHint": "Dragging out unpins; it does not move or delete the file.",
     "tab.appearance": "Appearance",
     "tab.dock": "Dock",
     "tab.autohide": "Auto-hide",

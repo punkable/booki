@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/dock.png" alt="Booki Dock on Windows with live widgets and a floating notch" width="920" />
+  <img src="docs/screenshots/dock.png" alt="Booki Dock on Windows with live widgets and a floating notch" width="920" />
 </p>
 
 <p align="center">
@@ -42,14 +42,13 @@
 | **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
 | **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
 
-## What's new in 0.68
+## What's new in 0.69
 
-- **Fixed a crash on desktop PCs** — a pinned battery widget threw on every poll on any machine without a battery, froze on a placeholder, and filled the log.
-- **Widgets line up** — ring gauges and card artwork are sized from the space the card actually has, so nothing is clipped, and a vertical dock keeps one width for every widget.
-- **Lighter at rest** — settings are cached instead of read from disk twelve times a second, two duplicate cursor watchers became one, and the clock stopped reformatting itself sixty times a minute.
-- **All five languages complete** — Portuguese, French and German were each missing ninety strings and silently fell back to English.
-- **Usable from the keyboard** — Enter and Space launch a focused tile, the menu key opens its actions, and live widgets announce their updates.
-- **Reduced motion is respected everywhere** — including the two largest movements, which are drawn in JS and were never covered by the CSS setting.
+- Native Windows acrylic behind the dock, flyouts, menus and notch; optional in Appearance.
+- Tile widgets with ring gauges, a network sparkline and media controls.
+- A live notch with now-playing controls or the time.
+- Redesigned Settings and an add panel for frequent, open and installed apps.
+- Context menus list open windows, launch a new window, close windows and reveal files in Explorer.
 
 Older notes live in Settings → What's new.
 
@@ -60,28 +59,28 @@ Older notes live in Settings → What's new.
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="assets/screenshots/genie.gif" alt="The dock funnelling into the notch" width="420" /><br/>
+      <img src="docs/screenshots/genie.gif" alt="The dock funnelling into the notch" width="420" /><br/>
       <sub><b>Smart hide</b> — the bar genies into the notch when you start working.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="assets/screenshots/folder.gif" alt="A folder flyout opening" width="360" /><br/>
+      <img src="docs/screenshots/folder.gif" alt="A folder flyout opening" width="360" /><br/>
       <sub><b>Folders</b> — group pins and open them in a glass flyout.</sub>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="assets/screenshots/settings.png" alt="The settings window" width="380" /><br/>
+      <img src="docs/screenshots/settings.png" alt="The settings window" width="380" /><br/>
       <sub><b>Settings</b> — live preview, visual pickers, searchable.</sub>
     </td>
     <td align="center">
-      <img src="assets/screenshots/vertical.png" alt="Booki docked vertically on a side edge" height="230" /><br/>
+      <img src="docs/screenshots/vertical.png" alt="Booki docked vertically on a side edge" height="230" /><br/>
       <sub><b>Any edge</b> — a slim vertical column on the sides, widgets and all.</sub>
     </td>
   </tr>
 </table>
 
 <p align="center">
-  <img src="assets/screenshots/notch.png" alt="The notch — a slim glass tab blended into the taskbar" width="220" /><br/>
+  <img src="docs/screenshots/notch.png" alt="The notch — a slim glass tab blended into the taskbar" width="220" /><br/>
   <sub>The <em>notch</em>: a little glass tab that stays at the taskbar edge while the dock is away.</sub>
 </p>
 
@@ -100,13 +99,21 @@ Older notes live in Settings → What's new.
 |---------|--------|
 | Click a pin | Launch it (or focus its window) |
 | Drag from desktop → dock | Pin an app, folder, file or picture |
-| Drag a pin out of the dock | Unpin it |
+| Drag a pin out of the dock | Unpin it; files stay in place. Windows shortcuts offer a return-to-desktop action in the next update. |
 | **Middle-click** a pin | Open its location in Explorer |
 | Right-click the dock | Add apps / widgets / profiles / settings |
 | Double-click a widget | Jump to its style editor |
 | Mouse wheel over Media (optional) | Raise or lower system volume |
 | `Alt` + `1…9` | Launch the Nth pin (modifier is configurable) |
 | Push cursor into the screen edge | Reveal a hidden dock |
+
+## Next update (unreleased)
+
+- Explicit shortcut actions: **Move shortcut into Booki** stores a desktop `.lnk` in Booki and removes its desktop copy only after saving the pin. **Return shortcut to desktop** restores it without overwriting existing files. Ordinary pinning keeps the original.
+- Returning to the Windows desktop (including `Win+D`) reveals a dock hidden by smart auto-hide, even with the click trigger. Manually hidden docks still wait to be summoned.
+- Folder flyouts have Previous/Next pages instead of stopping at 80 entries.
+- Language changes refresh widget labels and dismiss menus in the previous language.
+- Cancelling a group drag leaves its items in place.
 
 ## Privacy
 
