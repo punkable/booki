@@ -108,6 +108,7 @@ export function installedCandidates(groups, keys) {
 
 /** Filter and rank a candidate list for a query. */
 export function rank(list, query) {
+  if (!norm(query).trim()) return [...list];
   return list
     .map((c) => ({ c, s: matchScore(c.name, query) }))
     .filter((x) => x.s > 0)
@@ -147,6 +148,7 @@ export function buildAddPanel(root, deps) {
   let installed = [];
   let frequent = [];
   let loaded = false;
+  let rowLimit = MAX_ROWS;
 
   root.innerHTML = "";
   const head = el("div", "stack-head add-head");
@@ -199,6 +201,7 @@ export function buildAddPanel(root, deps) {
 
   search.addEventListener("input", () => {
     query = search.value;
+    rowLimit = MAX_ROWS;
     draw();
   });
   search.addEventListener("keydown", (e) => {
@@ -251,10 +254,11 @@ export function buildAddPanel(root, deps) {
       body.appendChild(emptyNote(t("add.none")));
       return;
     }
-    let budget = MAX_ROWS;
+    let budget = rowLimit;
     if (top.length) {
       body.appendChild(label(t("add.frequent")));
       for (const c of top) body.appendChild(appRow(c));
+      budget -= top.length;
     }
     if (open.length) {
       body.appendChild(label(t("add.running")));
@@ -264,6 +268,10 @@ export function buildAddPanel(root, deps) {
     if (all.length && budget > 0) {
       body.appendChild(label(t("add.all")));
       for (const c of all.slice(0, budget)) body.appendChild(appRow(c));
+    }
+    if (top.length + open.length + all.length > rowLimit) {
+      const more = el("button", "add-foot-btn"); more.type = "button"; more.textContent = t("overhaul.loadMore");
+      more.addEventListener("click", () => { rowLimit += MAX_ROWS; draw(); }); body.appendChild(more);
     }
     loadIcons();
   }
@@ -284,7 +292,8 @@ export function buildAddPanel(root, deps) {
       markState(cell, pinned);
       cell.addEventListener("click", async () => {
         if (cell.classList.contains("pinned")) return;
-        await deps.addWidget(type);
+        cell.disabled = true;
+        try { await deps.addWidget(type); } catch (_) { cell.disabled = false; const error = emptyNote(t("overhaul.failed")); error.setAttribute("role", "alert"); body.prepend(error); return; }
         cell.classList.add("pinned");
         markState(cell, true);
       });
@@ -306,7 +315,8 @@ export function buildAddPanel(root, deps) {
     markState(row, c.pinned);
     row.addEventListener("click", async () => {
       if (c.pinned) return;
-      await deps.addPath(c.path);
+      row.disabled = true;
+      try { await deps.addPath(c.path); } catch (_) { row.disabled = false; const error = emptyNote(t("overhaul.failed")); error.setAttribute("role", "alert"); body.prepend(error); return; }
       c.pinned = true;
       row.classList.add("pinned");
       row.classList.remove("active");

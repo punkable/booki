@@ -74,7 +74,7 @@ async function applyLook() {
     pollMedia();
     applySurfaceVars(cfg);
     setMaterialTint(materialTint(cfg));
-    setMaterialEnabled(cfg.nativeMaterial);
+    setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency);
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));

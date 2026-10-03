@@ -21,6 +21,10 @@ import {
   logMessage,
   isTauri,
 } from "./api.js";
+import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
+import { buildProductivityPanel } from "./dock/productivity-panel.js";
+import { singleFlight } from "./dock/async-cache.js";
+import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
@@ -329,7 +333,7 @@ function applyAll() {
   // Solidity + optional glass tint drive dock/notch fill together.
   applySurfaceVars(cfg);
   setMaterialTint(materialTint(cfg));
-  setMaterialEnabled(cfg.nativeMaterial);
+  setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -371,10 +375,16 @@ function applyAll() {
   document.body.classList.add(`genie-${gedge}`);
 }
 
-async function persist() {
+let persistQueue = Promise.resolve();
+function persist(patch = {}) {
+  const pending = persistQueue.then(() => performPersist(patch));
+  persistQueue = pending.catch(() => {});
+  return pending;
+}
+async function performPersist(patch) {
   // Keep dissolve rules consistent with Settings (empty / 1-child groups).
   cfg.pinned = normalizeGroups(cfg.pinned);
-  await configApi.save(cfg);
+  await configApi.patch({ pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch });
   maybeSyncCtxMenu();
   await emitConfigChanged();
 }
@@ -473,9 +483,10 @@ function fitDock() {
   if (usable > 0) {
     const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
     if (natural > usable) {
-      const eff = Math.floor(baseSize() * (usable / natural));
+      const eff = chooseFitSize(baseSize(), natural, usable, cfg.overflowMode);
       if (eff >= MIN_TILE) {
-        setAllSizes(eff); // everything still fits at this smaller size
+        setAllSizes(eff);
+        overflow = (vertical ? dockEl.scrollHeight : dockEl.scrollWidth) > usable;
       } else {
         setAllSizes(MIN_TILE); // floor reached → the rest lives behind a scroll
         const natural2 = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
@@ -680,6 +691,8 @@ function widgetTile(item, { inFlyout = false } = {}) {
   el.className = "tile widget" + (inFlyout ? " in-flyout" : "");
   el.dataset.id = item.id;
   el.dataset.widget = type;
+  el.dataset.span = String(st.span || "auto");
+  el.style.setProperty("--widget-width", `${widgetWidth(type, baseSize(), cfg.spacing ?? 6, st)}px`);
   el.dataset.variant = st.variant || "glass";
   if (type === "media" && st.scrollVolume) el.dataset.scrollVolume = "1";
   if (st.color) el.style.setProperty("--w-accent", st.color);
@@ -751,7 +764,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
     mkCtl(t("w.next"), MEDIA_SVG.next, () => dockApi.mediaNext());
     card.appendChild(controls);
   }
-  if (type === "clock") tickClocks();
+  if (["clock", "timer", "calendar", "tasks", "weather"].includes(type)) tickClocks();
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
     setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
@@ -779,9 +792,64 @@ let lastClockKey = "";
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
   const { key, time, date } = clockParts(new Date(), curLang());
+  tickProductivity();
   if (key === lastClockKey) return;
   lastClockKey = key;
   eachWidget("clock", (el) => setText(el, date, time));
+}
+
+function findWidgetPin(id, items = cfg.pinned) {
+  for (const item of items) { if (item.id === id) return item; const child = item.children && findWidgetPin(id, item.children); if (child) return child; }
+  return null;
+}
+const weatherCache = new Map();
+function tickProductivity() {
+  eachWidget("timer", (el) => {
+    const item = findWidgetPin(el.dataset.id); if (!item) return;
+    const seconds = timerSeconds(item.style);
+    setText(el, item.style?.endsAt && !seconds ? t("focus.finished") : t("w.timer"), formatTimer(seconds));
+    el.classList.toggle("focus-finished", !!item.style?.endsAt && seconds === 0);
+  });
+  eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
+  eachWidget("tasks", (el) => {
+    const item = findWidgetPin(el.dataset.id); const summary = tasksSummary(item?.style?.tasks);
+    setText(el, summary.next || t("focus.noTasks"), `${summary.done} / ${summary.total}`);
+  });
+  eachWidget("weather", (el) => {
+    const style = findWidgetPin(el.dataset.id)?.style || {};
+    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("w.weather"), t("focus.noCity")); return; }
+    const key = `${style.latitude},${style.longitude}`;
+    let cached = weatherCache.get(key);
+    if (!cached || (!cached.pending && Date.now() >= cached.expires)) {
+      cached = { pending: true, expires: Date.now() + 600000, value: cached?.value }; weatherCache.set(key, cached);
+      const record = cached;
+      dockApi.weatherCurrent(style.latitude, style.longitude).then((value) => {
+        record.value = value; record.error = false;
+      }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
+    }
+    setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
+    el.title = `${style.city || t("w.weather")} · Open-Meteo`;
+  });
+}
+let productivityPanel = null;
+function closeProductivityPanel() {
+  productivityPanel?.dispose?.();
+  productivityPanel?.remove(); productivityPanel = null; pinnedReveal = false; reframe(); scheduleHide();
+}
+function openProductivity(item, tile) {
+  closeProductivityPanel();
+  const panel = buildProductivityPanel(item, { save: async () => { await persist(); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
+  panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
+  productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
+  const place = () => {
+    if (!panel.isConnected) return;
+    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
+  };
+  const dispose = panel.dispose;
+  const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
+  panel.dispose = () => { dispose?.(); observer.disconnect(); };
+  requestAnimationFrame(() => { place(); panel.querySelector("button")?.focus(); });
 }
 
 // Recent total throughput for the network sparkline (one sample per poll).
@@ -790,7 +858,7 @@ const netHistory = [];
 
 // System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
 // every stat card on the bar (from the cached element map).
-async function pollStats() {
+const pollStats = singleFlight(async () => {
   let s;
   try {
     s = await dockApi.systemStats();
@@ -823,10 +891,10 @@ async function pollStats() {
       el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
     }
   });
-}
+});
 
 // Now-playing card: the system media session (Spotify, browser, …).
-async function pollMedia() {
+const pollMedia = singleFlight(async () => {
   const m = await dockApi.mediaInfo().catch(() => null);
   eachWidget("media", (el) => {
     const art = el.querySelector(".w-art");
@@ -863,7 +931,7 @@ async function pollMedia() {
       if (ico) ico.style.display = "";
     }
   });
-}
+});
 
 // System volume — scroll changes it, click toggles mute.
 let lastVolumePct = NaN;
@@ -876,10 +944,10 @@ function renderVolume(pct, muted) {
     el.classList.toggle("muted", muted);
   });
 }
-async function pollVolume() {
+const pollVolume = singleFlight(async () => {
   const v = await dockApi.volumeInfo().catch(() => null);
   if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
-}
+});
 function readVolumeFromTile(tile) {
   const vEl = tile?.querySelector(".w-ring-num");
   const dataValue = Number(vEl?.dataset.v);
@@ -931,10 +999,10 @@ function renderClipboardSummary(count, preview) {
       : t("clip.empty");
   });
 }
-async function pollClipboard() {
+const pollClipboard = singleFlight(async () => {
   const s = await dockApi.clipboardSummary().catch(() => ({ count: 0, preview: null }));
   renderClipboardSummary(s.count, s.preview);
-}
+});
 
 // ONE poll loop drives every live widget on its own cadence — a single timer
 // instead of three, and it does nothing while the dock is tucked away. Fewer
@@ -967,7 +1035,7 @@ function startPolls() {
   widgetPollTimer = null;
   if (hiddenState) return; // tucked away → stay idle until revealed
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const hasClock = widgetPresent("clock");
+  const hasClock = widgetPresent(["clock", "timer", "tasks", "calendar", "weather"]);
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
   const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
@@ -1047,6 +1115,7 @@ function closeNoteEditor() {
   reframe();
 }
 function editNote(item) {
+  closeProductivityPanel();
   closeNoteEditor();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
@@ -1098,6 +1167,7 @@ function launch(el, item) {
     if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
+    if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -1188,6 +1258,7 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
+    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, { span: Number(t.dataset.span) })}px`);
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
@@ -1418,7 +1489,7 @@ dockEl.addEventListener("dblclick", (e) => {
     return;
   }
   // Double-click a widget → jump to its editor (styles/colors live in Apps).
-  if (tile.classList.contains("widget")) dockApi.openSettingsTab("apps");
+  if (tile.classList.contains("widget")) dockApi.openSettingsTab("widgets");
 });
 
 // Middle-click an app/folder/file pin → open its location in Explorer.
@@ -1524,7 +1595,7 @@ async function endEdgeMove(commit) {
     document.body.classList.add("edge-swap");
     applyFrame();
     await dockApi.setDockEdge(target);
-    await persist();
+    await persist({ edge: target });
     setTimeout(() => requestAnimationFrame(() => document.body.classList.remove("edge-swap")), 90);
   } else {
     applyFrame(); // same edge or cancelled → just shrink the window back to the bar
@@ -1657,12 +1728,23 @@ function enterEdit() {
   if (editMode) return;
   editMode = true;
   document.body.classList.add("edit");
+  const toolbar = document.createElement("div"); toolbar.className = "edit-toolbar";
+  const label = document.createElement("span"); label.textContent = t("overhaul.editing");
+  const done = document.createElement("button"); done.type = "button"; done.textContent = t("w.done"); done.addEventListener("click", exitEdit);
+  toolbar.append(label, done); document.body.appendChild(toolbar);
+  pinnedReveal = true; applyFrame();
+  requestAnimationFrame(() => {
+    const pos = placeBesideBar({ bar: dockEl.getBoundingClientRect(), box: { width: toolbar.offsetWidth, height: toolbar.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    toolbar.style.left = `${pos.left}px`; toolbar.style.top = `${pos.top}px`; scheduleHitReport();
+  });
   setAllSizes(baseSize());
 }
 function exitEdit() {
   if (!editMode) return;
   editMode = false;
   document.body.classList.remove("edit");
+  document.querySelector(".edit-toolbar")?.remove();
+  pinnedReveal = false; reframe();
 }
 
 function onPointerDown(e, el, item) {
@@ -2230,7 +2312,7 @@ function wireStackDragOut(cell, group, child) {
 
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
-  if (editMode && !closestSel(e.target, ".tile")) exitEdit();
+  if (editMode && !closestSel(e.target, ".tile, .edit-toolbar")) exitEdit();
   // Clicking anywhere outside the trash confirmation cancels it (never delete
   // on an ambiguous gesture).
   if (trashPop && !closestSel(e.target, ".trash-pop")) {
@@ -2364,6 +2446,7 @@ function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
+  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
   if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
     add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
@@ -2531,6 +2614,7 @@ async function openBackgroundMenu(e) {
   }
   sep();
   addMenuLabel(t("m.system"));
+  add("grid", t("overhaul.editing"), enterEdit);
   add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
@@ -2609,6 +2693,7 @@ window.addEventListener("keydown", (e) => {
     closeStack();
     cancelDrag();
     closeTrashPop();
+    closeProductivityPanel();
   }
 });
 
@@ -2986,7 +3071,7 @@ function interacting() {
   return (
     pointerInside || dragging || draggingFile || stackOpen ||
     !!edgeMove || document.body.classList.contains("menu-open") ||
-    !!document.querySelector(".trash-pop, .note-editor, .coach")
+    !!document.querySelector(".trash-pop, .note-editor, .coach, .productivity-panel")
   );
 }
 
@@ -3033,7 +3118,7 @@ const PANEL_HIT_PAD = 4;
 // Open panels that must stay clickable. Tooltips are not listed: they never
 // take input, and counting them blocked clicks on whatever sat under them.
 const HIT_PANELS =
-  ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
+  ".productivity-panel, .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
 
 function pointInLiveHitArea(x, y) {
   if (edgeMove || dragging || draggingFile) return true;

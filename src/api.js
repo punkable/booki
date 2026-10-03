@@ -94,8 +94,8 @@ async function mockInvoke(cmd, args) {
     case "get_config":
       return structuredClone(demoConfig);
     case "save_config":
-      demoConfig = structuredClone(args.config);
-      return null;
+      demoConfig = args.patch ? { ...demoConfig, ...structuredClone(args.patch) } : structuredClone(args.config);
+      return structuredClone(demoConfig);
     case "app_icon":
     case "image_data_uri":
       return null; // browser can't read native icons → UI falls back to letter tile
@@ -296,8 +296,9 @@ export async function invoke(cmd, args = {}) {
 }
 
 async function pickFile(filters) {
-  if (T && T.dialog && T.dialog.open) {
-    return T.dialog.open({ multiple: false, directory: false, filters });
+  if (isTauri) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    return open({ multiple: false, directory: false, filters });
   }
   const path = window.prompt("Ruta del archivo:", "C:/Windows/notepad.exe");
   return path || null;
@@ -310,8 +311,9 @@ export function pickAppFile() {
 
 /** Open a native folder picker for pinning a folder. */
 export async function pickFolder() {
-  if (T && T.dialog && T.dialog.open) {
-    return T.dialog.open({ multiple: false, directory: true });
+  if (isTauri) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    return open({ multiple: false, directory: true });
   }
   const path = window.prompt("Ruta de la carpeta:", "C:/Users");
   return path || null;
@@ -329,8 +331,9 @@ export function logMessage(level, message) {
 
 /** Pick a path to save a file to (for exporting config). */
 export async function pickSavePath(defaultName) {
-  if (T && T.dialog && T.dialog.save) {
-    return T.dialog.save({ defaultPath: defaultName, filters: [{ name: "JSON", extensions: ["json"] }] });
+  if (isTauri) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    return save({ defaultPath: defaultName, filters: [{ name: "JSON", extensions: ["json"] }] });
   }
   return window.prompt("Guardar como:", defaultName) || null;
 }
@@ -388,6 +391,7 @@ export async function onFileDrop({ onEnter, onOver, onLeave, onDrop } = {}) {
 export const config = {
   get: () => invoke("get_config"),
   save: (config) => invoke("save_config", { config }),
+  patch: (patch) => invoke("save_config", { patch }),
   reset: () => invoke("reset_config"),
 };
 
@@ -501,6 +505,9 @@ export const dock = {
   profileSave: (name) => invoke("profile_save", { name }),
   profileApply: (name) => invoke("profile_apply", { name }),
   profileDelete: (name) => invoke("profile_delete", { name }),
+  exportDiagnostics: (path) => invoke("export_diagnostics", { path }),
+  weatherSearch: (city) => invoke("weather_search", { city }),
+  weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path) => invoke("import_config", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),

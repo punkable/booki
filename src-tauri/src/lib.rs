@@ -8,6 +8,7 @@ mod config;
 mod shortcuts;
 mod usage;
 mod util;
+mod weather;
 mod win;
 
 use tauri::menu::{Menu, MenuItem};
@@ -358,9 +359,20 @@ fn get_config() -> Config {
 }
 
 #[tauri::command]
-fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
-    let result = config::save(&config);
-    if result.is_ok() {
+fn save_config(
+    app: AppHandle,
+    config: Option<Config>,
+    patch: Option<serde_json::Value>,
+) -> Result<Config, String> {
+    let config = if let Some(patch) = patch {
+        config::patch(patch)?
+    } else if let Some(config) = config {
+        config::save(&config)?;
+        config::load()
+    } else {
+        return Err("missing config or patch".into());
+    };
+    {
         clip_apply_config(&config);
         apply_always_on_top(&app);
         apply_capture_policy(&app, config.capture_visible);
@@ -382,7 +394,7 @@ fn save_config(app: AppHandle, config: Config) -> Result<(), String> {
             }
         }
     }
-    result
+    Ok(config)
 }
 
 /// Moving into Booki is explicit and limited to the user's desktop.
@@ -452,7 +464,9 @@ fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<Str
 
 #[tauri::command]
 fn launch_app(path: String, args: Option<Vec<String>>) -> Result<(), String> {
-    apps::launch(&path, &args.unwrap_or_default())
+    apps::launch(&path, &args.unwrap_or_default())?;
+    usage::record_launch(&path);
+    Ok(())
 }
 
 /// Return the app's icon as a base64 PNG data URI (Windows only; None elsewhere).
@@ -479,7 +493,10 @@ fn close_window(hwnd: i64) -> bool {
 /// The apps this user runs most, from Windows' local usage record.
 #[tauri::command]
 async fn frequent_apps(limit: Option<usize>) -> Vec<usage::UsedApp> {
-    usage::frequent_apps(limit.unwrap_or(12).min(50))
+    let limit = limit.unwrap_or(12).min(50);
+    tauri::async_runtime::spawn_blocking(move || usage::suggestions(limit))
+        .await
+        .unwrap_or_default()
 }
 
 /// Re-anchor the dock window to the given screen edge.
@@ -1272,6 +1289,7 @@ fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
     // PC rarely matches this one (paths DO travel — settings flags the ones
     // that don't exist here and offers to reassign them).
     cfg.monitor = -1;
+    cfg.monitor_name.clear();
     config::save(&cfg)?;
     clip_apply_config(&cfg);
     apply_always_on_top(&app);
@@ -1664,6 +1682,48 @@ fn open_data_dir() -> Result<(), String> {
     let dir = config::config_dir();
     let _ = std::fs::create_dir_all(&dir);
     apps::launch(&dir.to_string_lossy(), &[])
+}
+
+#[tauri::command]
+async fn weather_search(city: String) -> Result<Vec<serde_json::Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || weather::search(&city))
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn weather_current(latitude: f64, longitude: f64) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || weather::current(latitude, longitude))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Export an allowlist, never the user's config, paths, logs or widget contents.
+#[tauri::command]
+fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String> {
+    let cfg = config::load();
+    let displays: Vec<_> = window
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|monitor| {
+            serde_json::json!({
+                "width": monitor.size().width, "height": monitor.size().height,
+                "x": monitor.position().x, "y": monitor.position().y,
+                "scale": monitor.scale_factor()
+            })
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "version": env!("CARGO_PKG_VERSION"), "os": std::env::consts::OS,
+        "architecture": std::env::consts::ARCH, "displays": displays,
+        "dock": { "edge": cfg.edge, "autoHideMode": cfg.auto_hide_mode,
+            "hideInFullscreen": cfg.hide_in_fullscreen, "notchTrigger": cfg.notch_trigger,
+            "iconSize": cfg.icon_size, "overflowMode": cfg.overflow_mode,
+            "surfaceStyle": cfg.surface_style, "reduceTransparency": cfg.reduce_transparency,
+            "pinCount": cfg.pinned.len() }
+    });
+    let bytes = serde_json::to_vec_pretty(&payload).map_err(|e| e.to_string())?;
+    std::fs::write(path, bytes).map_err(|e| e.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -2193,17 +2253,30 @@ fn frontend_log(level: String, message: String) {
 
 // ─────────────────────────────── Helpers ────────────────────────────────
 
-/// Pick the configured monitor (config.monitor index, -1 = current/primary).
+/// Prefer the stable display name. Keep the preference while disconnected.
 fn pick_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
-    let idx = config::load().monitor;
-    if idx >= 0 {
-        if let Ok(mons) = window.available_monitors() {
-            if let Some(m) = mons.into_iter().nth(idx as usize) {
+    let cfg = config::load();
+    if let Ok(mons) = window.available_monitors() {
+        if !cfg.monitor_name.is_empty() {
+            if let Some(m) = mons
+                .iter()
+                .find(|m| m.name().is_some_and(|name| name == &cfg.monitor_name))
+            {
+                return Some(m.clone());
+            }
+            return window.primary_monitor().ok().flatten();
+        }
+        if cfg.monitor >= 0 {
+            if let Some(m) = mons.into_iter().nth(cfg.monitor as usize) {
                 return Some(m);
             }
         }
     }
-    window.current_monitor().ok().flatten()
+    window
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten())
 }
 
 /// Anchor a window to a screen edge of the chosen monitor.
@@ -2453,6 +2526,9 @@ pub fn run() {
             open_settings_tab,
             take_pending_tab,
             export_config,
+            export_diagnostics,
+            weather_search,
+            weather_current,
             import_config,
             paths_exist,
             image_data_uri,

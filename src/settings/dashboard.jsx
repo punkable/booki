@@ -1,0 +1,41 @@
+import React from "react";
+import { t } from "../i18n.js";
+import { icon } from "../icons.js";
+import { LAYOUT_SCENARIOS, countContent } from "../dock/layout-model.js";
+import { DockPreview } from "./dock-preview.jsx";
+import { PageHeader, SettingsSection } from "./ui.jsx";
+
+export function ScenarioPicker({ cfg, set }) {
+  return <div className="scenario-grid" role="group" aria-label={t("overhaul.scenarios")}>
+    {LAYOUT_SCENARIOS.map((scenario) => <button type="button" key={scenario.id}
+      className={"scenario-card" + ((cfg.autoHideMode || "smart") === scenario.id ? " selected" : "")}
+      aria-pressed={(cfg.autoHideMode || "smart") === scenario.id} onClick={() => set(scenario.patch)}>
+      <span className="scenario-icon" dangerouslySetInnerHTML={{ __html: icon(scenario.icon) }} />
+      <strong>{t(scenario.title)}</strong><span>{t(scenario.hint)}</span>
+    </button>)}
+  </div>;
+}
+export function Dashboard({ cfg, set, navigate, version }) {
+  const counts = countContent(cfg.pinned);
+  return <>
+    <PageHeader title={t("overhaul.home")}>{t("overhaul.welcome")}</PageHeader>
+    <section className="dashboard-hero" aria-label={t("overhaul.preview")}>
+      <div className="dashboard-hero-head"><div><span className="dashboard-eyebrow">Booki · {version ? `v${version}` : "…"}</span>
+        <h2>{cfg.lastProfile || t("overhaul.yourDock")}</h2></div>
+        <button className="s-btn s-btn-soft" onClick={() => navigate("appearance")}>{t("overhaul.personalize")}</button></div>
+      <DockPreview cfg={cfg} large />
+      <div className="dashboard-summary">
+        <button onClick={() => navigate("apps")}><strong>{counts.apps}</strong>{t("overhaul.apps")}</button>
+        <button onClick={() => navigate("widgets")}><strong>{counts.widgets}</strong>{t("tab.widgets")}</button>
+        <button onClick={() => navigate("profiles")}><strong>{counts.groups}</strong>{t("overhaul.groups")}</button>
+      </div>
+    </section>
+    <div className="dashboard-actions">
+      {[["widgets", "plus", "overhaul.addWidget"], ["apps", "grid", "overhaul.organize"], ["profiles", "copy", "tab.profiles"]].map(([tab, glyph, label]) =>
+        <button className="dashboard-action" key={tab} onClick={() => navigate(tab)}><span dangerouslySetInnerHTML={{ __html: icon(glyph) }} /><strong>{t(label)}</strong><span aria-hidden="true">↗</span></button>)}
+    </div>
+    <SettingsSection title={t("overhaul.scenarios")} hint={t("overhaul.scenariosHint")}><ScenarioPicker cfg={cfg} set={set} /></SettingsSection>
+    <div className="dashboard-tip"><span dangerouslySetInnerHTML={{ __html: icon("info") }} /><p>{t("overhaul.tip")}</p>
+      <button className="s-link" onClick={() => navigate("dock")}>{t("overhaul.configure")}</button></div>
+  </>;
+}

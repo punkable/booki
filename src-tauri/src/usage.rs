@@ -12,15 +12,66 @@
 // The parsers only run on Windows (and in tests); elsewhere they are unused.
 #![cfg_attr(not(windows), allow(dead_code))]
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UsedApp {
     pub name: String,
     pub path: String,
     pub runs: u32,
     /// Milliseconds the app had focus, as Windows counts it.
     pub focus_ms: u32,
+}
+
+// Only launches explicitly made through Booki are counted here. UserAssist is
+// still the primary signal; this local fallback covers disabled OS tracking.
+static LOCAL_USAGE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub fn record_launch(path: &str) {
+    if is_noise(path) {
+        return;
+    }
+    let Ok(_guard) = LOCAL_USAGE.lock() else {
+        return;
+    };
+    let file = crate::config::config_dir().join("app-usage.json");
+    let mut entries: Vec<UsedApp> = std::fs::read(&file)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    if let Some(entry) = entries
+        .iter_mut()
+        .find(|entry| entry.path.eq_ignore_ascii_case(path))
+    {
+        entry.runs = entry.runs.saturating_add(1);
+    } else {
+        entries.push(UsedApp {
+            name: display_name(path),
+            path: path.into(),
+            runs: 1,
+            focus_ms: 0,
+        });
+    }
+    let entries = rank(entries, 200);
+    if let Ok(bytes) = serde_json::to_vec(&entries) {
+        let temporary = file.with_extension("json.tmp");
+        if std::fs::write(&temporary, bytes).is_ok() {
+            let _ = std::fs::rename(temporary, file);
+        }
+    }
+}
+pub fn suggestions(limit: usize) -> Vec<UsedApp> {
+    let mut entries = frequent_apps(50);
+    let file = crate::config::config_dir().join("app-usage.json");
+    if let Ok(bytes) = std::fs::read(file) {
+        if let Ok(local) = serde_json::from_slice::<Vec<UsedApp>>(&bytes) {
+            for entry in local {
+                if !is_noise(&entry.path) && std::path::Path::new(&entry.path).is_file() {
+                    entries.push(entry);
+                }
+            }
+        }
+    }
+    rank(entries, limit)
 }
 
 /// ROT13 on ASCII letters; everything else unchanged.
