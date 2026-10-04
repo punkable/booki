@@ -2855,13 +2855,19 @@ function App() {
   };
 
   const reset = async () => {
-    const fresh = await configApi.reset();
-    if (fresh) {
-      setCfg(fresh);
-      applyTheme(fresh);
-      applySurfaceVars(fresh);
-      await emitConfigChanged();
-    }
+    await flushSave();
+    if (dirtyKeys.current.size) return;
+    try {
+      const fresh = await configApi.reset();
+      if (fresh) {
+        await ensureLang(fresh.language);
+        cfgRef.current = fresh;
+        setCfg(fresh);
+        applyTheme(fresh);
+        applySurfaceVars(fresh);
+        await emitConfigChanged();
+      }
+    } catch (_) { setSaveState("error"); }
   };
 
   useEffect(() => {

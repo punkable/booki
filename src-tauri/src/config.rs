@@ -725,12 +725,8 @@ fn save_locked(config: &Config) -> Result<(), String> {
     }
     let text = serde_json::to_string_pretty(&to_write).map_err(|e| e.to_string())?;
     let final_path = config_path();
-    // The temp name carries the pid. It used to be a single shared
-    // "config.json.tmp", which defeated the atomicity the rest of this function
-    // is built for: the dock window, the Settings window and the backend all
-    // call save(), and two concurrent writers would truncate each other's temp
-    // file — one could then rename the other's half-written bytes over the real
-    // config.
+    // WRITE_LOCK serializes the complete read/modify/write transaction in this
+    // process. The pid also isolates its temporary file from another process.
     let tmp_path = dir.join(format!("config.json.{}.tmp", std::process::id()));
     // Write the temp file and flush it all the way to disk before renaming, so a
     // power loss right after the rename can't leave an empty/zero-length config.
