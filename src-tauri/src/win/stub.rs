@@ -183,3 +183,7 @@ pub fn app_identity(path: &str) -> String {
 pub fn packaged_apps() -> Vec<(String, String)> {
     Vec::new()
 }
+
+pub fn quiet_update_supported() -> bool {
+    false
+}

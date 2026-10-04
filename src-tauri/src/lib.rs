@@ -30,6 +30,11 @@ use std::sync::Mutex;
 /// URL (a hash in the app URL made the window come up blank on Windows).
 static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
 
+#[tauri::command]
+fn quiet_update_supported() -> bool {
+    win::quiet_update_supported()
+}
+
 static UPDATE_LOCK: AtomicBool = AtomicBool::new(false);
 #[tauri::command]
 fn acquire_update_lock() -> bool {
@@ -45,6 +50,9 @@ fn release_update_lock() {
 async fn prepare_update() -> Result<(), String> {
     if !UPDATE_LOCK.load(Ordering::SeqCst) {
         return Err("No update session".into());
+    }
+    if !win::quiet_update_supported() {
+        return Err("Use the original installer type to update this MSI or portable copy".into());
     }
     tauri::async_runtime::spawn_blocking(config::backup_for_update)
         .await
@@ -2558,10 +2566,28 @@ pub fn run() {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin({
+            let updater = tauri_plugin_updater::Builder::new();
+            #[cfg(windows)]
+            let updater = match std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            {
+                Some(directory) => {
+                    // NSIS requires /D to be the final argument, without quotes.
+                    // Pin the update to this executable's directory, including custom paths.
+                    let mut argument = std::ffi::OsString::from("/D=");
+                    argument.push(directory.as_os_str());
+                    updater.installer_arg(argument)
+                }
+                None => updater,
+            };
+            updater.build()
+        })
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            quiet_update_supported,
             acquire_update_lock,
             release_update_lock,
             prepare_update,

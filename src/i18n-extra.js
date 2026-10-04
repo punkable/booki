@@ -1,6 +1,12 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "release.premium": "Acabamentos de vidro, mica e sólido coordenados, um espaço mais limpo, edição pelo Início e busca que foca a configuração escolhida.",
+    "release.discovery": "Descubra apps empacotados do Windows, selecione apps entre buscas e controle recomendações locais, sugestões ocultas e histórico do Booki.",
+    "release.productivity": "Edite tarefas, navegue entre meses, escolha unidades do clima e reinicie um temporizador concluído com um clique.",
+    "release.safeUpdates": "Baixe atualizações assinadas em segundo plano e reinicie quando quiser. Configurações e perfis são salvos; cópias MSI ou não registradas usam seu instalador correspondente.",
+    "premium.manualUpdate": "Abrir downloads da versão",
+    "premium.manualUpdateHint": "Para cópias MSI ou portáteis, use o mesmo tipo de instalador em Releases para evitar uma segunda instalação. Suas configurações locais são mantidas.",
     "premium.updateDownload": "Baixar em segundo plano",
     "premium.updateApply": "Reiniciar e aplicar atualização",
     "premium.updateReady": "Baixada e verificada. Suas configurações serão salvas antes de reiniciar.",
@@ -666,6 +672,12 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "release.premium": "Finitions verre, mica et solide harmonisées, espace plus sobre, édition depuis l’accueil et recherche ciblant le réglage choisi.",
+    "release.discovery": "Découvrez les apps empaquetées Windows, sélectionnez entre plusieurs recherches et contrôlez recommandations locales, suggestions masquées et historique Booki.",
+    "release.productivity": "Modifiez les tâches, parcourez les mois, choisissez les unités météo et relancez un minuteur terminé en un clic.",
+    "release.safeUpdates": "Téléchargez les mises à jour signées en arrière-plan, puis redémarrez à votre convenance. Réglages et profils sont sauvegardés ; les copies MSI ou non enregistrées utilisent leur installateur adapté.",
+    "premium.manualUpdate": "Ouvrir les téléchargements",
+    "premium.manualUpdateHint": "Pour une copie MSI ou portable, utilisez le même type d’installateur depuis Releases afin d’éviter une seconde installation. Vos réglages locaux sont conservés.",
     "premium.updateDownload": "Télécharger en arrière-plan",
     "premium.updateApply": "Redémarrer et appliquer la mise à jour",
     "premium.updateReady": "Téléchargée et vérifiée. Vos réglages seront sauvegardés avant le redémarrage.",
@@ -1331,6 +1343,12 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "release.premium": "Abgestimmte Glas-, Mica- und solide Oberflächen, ruhigerer Arbeitsbereich, Bearbeitung auf der Startseite und Suche mit direktem Einstellungsfokus.",
+    "release.discovery": "Windows-Paket-Apps finden, Apps über mehrere Suchen auswählen und lokale Empfehlungen, ausgeblendete Vorschläge und Booki-Verlauf verwalten.",
+    "release.productivity": "Aufgaben bearbeiten, Kalendermonate wechseln, Wettereinheiten wählen und abgelaufene Timer mit einem Klick neu starten.",
+    "release.safeUpdates": "Signierte Updates im Hintergrund laden und bei Bereitschaft neu starten. Einstellungen und Profile werden gesichert; MSI- oder unregistrierte Kopien verwenden ihren passenden Installer.",
+    "premium.manualUpdate": "Downloads der Version öffnen",
+    "premium.manualUpdateHint": "Für MSI- oder portable Kopien verwenden Sie denselben Installertyp unter Releases, um eine zweite Installation zu vermeiden. Lokale Einstellungen bleiben erhalten.",
     "premium.updateDownload": "Im Hintergrund herunterladen",
     "premium.updateApply": "Neu starten und Update anwenden",
     "premium.updateReady": "Heruntergeladen und geprüft. Ihre Einstellungen werden vor dem Neustart gesichert.",

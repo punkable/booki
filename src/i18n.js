@@ -6,6 +6,12 @@
 
 export const DICT = {
   es: {
+    "release.premium": "Acabados coordinados de cristal, mica y sólido, un espacio visual más limpio, edición desde Inicio y búsqueda que enfoca el ajuste elegido.",
+    "release.discovery": "Descubre apps empaquetadas de Windows, selecciona apps entre búsquedas y controla recomendaciones locales, sugerencias ocultas e historial de Booki.",
+    "release.productivity": "Edita tareas, navega entre meses, elige unidades del clima y reinicia un temporizador terminado con un clic.",
+    "release.safeUpdates": "Descarga actualizaciones firmadas en segundo plano y reinicia cuando quieras. Se respaldan ajustes y perfiles; las copias MSI o no registradas usan su instalador correspondiente.",
+    "premium.manualUpdate": "Abrir descargas de la versión",
+    "premium.manualUpdateHint": "Para copias MSI o portables, usa el mismo tipo de instalador desde Releases para evitar una segunda instalación. Se conservan tus ajustes locales.",
     "premium.updateDownload": "Descargar en segundo plano",
     "premium.updateApply": "Reiniciar y aplicar actualización",
     "premium.updateReady": "Descargada y verificada. Se respaldarán tus ajustes antes de reiniciar.",
@@ -679,6 +685,12 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "release.premium": "Coordinated glass, Mica and solid finishes, a quieter workspace, direct editing from Home and search that focuses the requested setting.",
+    "release.discovery": "Discover Windows packaged apps, select apps across searches and control local recommendations, hidden suggestions and Booki launch history.",
+    "release.productivity": "Edit tasks, browse calendar months, choose weather units and restart a finished timer with one click.",
+    "release.safeUpdates": "Download signed updates in the background, then restart when ready. Settings and profiles are backed up first; MSI or unregistered copies use their matching installer flow.",
+    "premium.manualUpdate": "Open release downloads",
+    "premium.manualUpdateHint": "For MSI or portable copies, use the same installer type from Releases to avoid creating a second installation. Your local settings are kept.",
     "premium.updateDownload": "Download in background",
     "premium.updateApply": "Restart and apply update",
     "premium.updateReady": "Downloaded and verified. Your settings will be backed up before restarting.",

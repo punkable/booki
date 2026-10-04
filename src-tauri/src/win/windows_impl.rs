@@ -1238,6 +1238,43 @@ pub fn get_autostart() -> bool {
     }
 }
 
+/// Quiet NSIS updates are safe only for the registered per-user installation.
+/// MSI/portable copies use their original installer flow to avoid a second copy.
+pub fn quiet_update_supported() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key = wide("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Booki");
+    let value = wide("InstallLocation");
+    let mut buffer = [0u16; 32768];
+    let mut size = std::mem::size_of_val(&buffer) as u32;
+    let found = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_SZ,
+            None,
+            Some(buffer.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+        .is_ok()
+    };
+    if !found {
+        return false;
+    }
+    let end = buffer.iter().position(|c| *c == 0).unwrap_or(buffer.len());
+    let location = String::from_utf16_lossy(&buffer[..end]);
+    let registered = Path::new(location.trim_matches('"')).canonicalize().ok();
+    let current = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().and_then(|parent| parent.canonicalize().ok()));
+    match (registered, current) {
+        (Some(a), Some(b)) => a
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&b.to_string_lossy()),
+        _ => false,
+    }
+}
+
 // ──────────────────────────── Recycle bin ────────────────────────────
 
 /// Send files/folders to the Recycle Bin (undoable — NOT a permanent delete).

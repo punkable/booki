@@ -28,10 +28,10 @@ pub use windows_impl::{
     cursor_at_edge, cursor_in_rects, desktop_foreground, empty_trash, file_thumbnail, focus_window,
     foreground_app_name, foreground_occludes, get_autostart, is_fullscreen, known_folders,
     list_windows, media_next, media_now_playing, media_prev, media_toggle, move_paths, move_window,
-    packaged_apps, protect_data, set_autostart, set_capture_visible, set_clipboard_text,
-    shortcut_target, sync_context_menu, taskbar_autohide, trash_count, trash_is_empty, trash_paths,
-    unprotect_data, volume_get, volume_mute_toggle, volume_set, wallpaper_accent, work_area,
-    work_area_ex,
+    packaged_apps, protect_data, quiet_update_supported, set_autostart, set_capture_visible,
+    set_clipboard_text, shortcut_target, sync_context_menu, taskbar_autohide, trash_count,
+    trash_is_empty, trash_paths, unprotect_data, volume_get, volume_mute_toggle, volume_set,
+    wallpaper_accent, work_area, work_area_ex,
 };
 
 #[cfg(not(windows))]
@@ -45,8 +45,8 @@ pub use stub::{
     cursor_at_edge, cursor_in_rects, desktop_foreground, empty_trash, file_thumbnail, focus_window,
     foreground_app_name, foreground_occludes, get_autostart, is_fullscreen, known_folders,
     list_windows, media_next, media_now_playing, media_prev, media_toggle, move_paths, move_window,
-    packaged_apps, protect_data, set_autostart, set_capture_visible, set_clipboard_text,
-    shortcut_target, sync_context_menu, taskbar_autohide, trash_count, trash_is_empty, trash_paths,
-    unprotect_data, volume_get, volume_mute_toggle, volume_set, wallpaper_accent, work_area,
-    work_area_ex,
+    packaged_apps, protect_data, quiet_update_supported, set_autostart, set_capture_visible,
+    set_clipboard_text, shortcut_target, sync_context_menu, taskbar_autohide, trash_count,
+    trash_is_empty, trash_paths, unprotect_data, volume_get, volume_mute_toggle, volume_set,
+    wallpaper_accent, work_area, work_area_ex,
 };

@@ -412,6 +412,7 @@ export const dock = {
   launch: (path, args = []) => invoke("launch_app", { path, args }),
   appIcon: (path) => icons.get(path),
   invalidateIcons: () => icons.clear(),
+  quietUpdateSupported: () => invoke("quiet_update_supported"),
   clearUsage: () => invoke("clear_app_usage"),
   appIdentities: (paths) => invoke("app_identities", { paths }),
   imageDataUri: (path) => invoke("image_data_uri", { path }),

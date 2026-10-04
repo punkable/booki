@@ -75,3 +75,42 @@ test('failed profile save keeps the name and explains the failure for retry', as
   assert.equal(await page.getByRole('button', { name: 'Save current', exact: true }).isEnabled(), true);
   assert.deepEqual(errors, []); await page.close();
 });
+async function mockUpdate(page, managed) {
+  await page.evaluate((managed) => {
+    const old = window.__TAURI__.core.invoke;
+    window.__updateCalls = [];
+    window.__TAURI_INTERNALS__ = { invoke: (cmd, args) => window.__TAURI__.core.invoke(cmd, args), transformCallback: () => 1 };
+    window.__TAURI__.core.invoke = async (cmd, args) => {
+      if (cmd === 'quiet_update_supported') return managed;
+      if (cmd === 'plugin:updater|check') return { rid: 1, version: '0.71.0', currentVersion: '0.70.0', body: 'Example release notes' };
+      if (cmd === 'acquire_update_lock') { window.__updateCalls.push('lock'); return true; }
+      if (cmd === 'plugin:updater|download') { window.__updateCalls.push('download'); args.onEvent.onmessage({ event: 'Started', data: { contentLength: 10 } }); args.onEvent.onmessage({ event: 'Progress', data: { chunkLength: 10 } }); return 2; }
+      if (cmd === 'prepare_update') { window.__updateCalls.push('backup'); return; }
+      if (cmd === 'plugin:updater|install') { window.__updateCalls.push('install'); return; }
+      if (cmd === 'launch_app') { window.__updateCalls.push(args.path); return; }
+      return old(cmd, args);
+    };
+  }, managed);
+}
+test('an MSI or unregistered copy opens releases without downloading or installing another copy', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await mockUpdate(page, false);
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'Open release downloads', exact: true }).click();
+  assert.deepEqual(await page.evaluate(() => window.__updateCalls), ['https://github.com/punkable/booki/releases/latest']);
+  assert.deepEqual(errors, []); await page.close();
+});
+test('managed update downloads separately, stays ready across tabs and backs up before applying', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await mockUpdate(page, true);
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'Download in background', exact: true }).click();
+  await page.getByRole('button', { name: 'Restart and apply update', exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.__updateCalls), ['lock', 'download']);
+  await page.getByRole('navigation').getByRole('button', { name: 'Home', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'Restart and apply update', exact: true }).click();
+  await page.waitForTimeout(100);
+  assert.deepEqual(await page.evaluate(() => window.__updateCalls), ['lock', 'download', 'backup', 'install']);
+  assert.deepEqual(errors, []); await page.close();
+});

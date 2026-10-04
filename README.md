@@ -72,7 +72,7 @@
 2. Launch **Booki** from the Start menu. The installer is per-user and fetches WebView2 if it's missing.
 3. Drag an app or folder onto the dock, or right-click the dock to add items.
 
-Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings.
+Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
 > The latest downloadable version is shown by the release badge above. The 0.70 presentation and notes describe the upcoming update until its signed release is published.
 
