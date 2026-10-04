@@ -43,7 +43,7 @@ export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
 }
 const previewIcons = new Map();
 function PreviewPin({ item, size, gap }) {
-  const [src, setSrc] = useState(() => item.icon || previewIcons.get(item.path));
+  const [src, setSrc] = useState(() => isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || previewIcons.get(item.path));
   useEffect(() => {
     let alive = true;
     if (isLibIcon(item.icon)) { setSrc(resolveLibIcon(item.icon)); return; }

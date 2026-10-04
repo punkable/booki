@@ -132,3 +132,10 @@ test("unavailable media widgets can be recovered from the dock menu", async () =
   assert.equal(saved.pinned[1].style.hideWhenUnavailable, false);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test("built-in icon previews use SVG data instead of requesting lib URLs", async () => {
+  const { page, errors } = await openPage(browser, port, "settings.html", { cfg: makeConfig({ pinned: [{ id: "terminal", kind: "app", name: "Terminal", path: "C:/terminal.exe", icon: "lib:terminal:badge" }] }) });
+  const src = await page.locator(".live-preview-app img").getAttribute("src");
+  assert.match(src, /^data:image\/svg\+xml/);
+  assert.deepEqual(errors, []); await page.close();
+});
