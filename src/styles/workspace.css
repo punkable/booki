@@ -1,0 +1,63 @@
+/* Booki workspace: shared depth, quiet contrast and intentional spacing. */
+:root { --workspace-radius: 20px; --workspace-shadow: 0 8px 28px #17202c0a, 0 1px 2px #17202c08; }
+body.settings-body { --set-bg: #17191d; --set-side: #1d2025; --set-card: #ffffff07; --set-line: #ffffff12; --set-field: #ffffff09; font-size: 14px; }
+[data-theme="light"] body.settings-body { --set-bg: #fbfbfd; --set-side: #f3f4f6; --set-card: #fff; --set-line: #27314212; --set-field: #f2f3f5; }
+.s-sidebar { background: linear-gradient(155deg, color-mix(in srgb, var(--set-side) 96%, white), var(--set-side)); }
+.s-content { padding: 32px 38px 48px; }
+.ui-page-head h1 { font-family: var(--font-display); font-size: 30px; font-weight: 650; letter-spacing: -.9px; }
+.ui-page-head p { max-width: 65ch; font-size: 14px; line-height: 1.65; }
+.ui-group { border-radius: 16px; box-shadow: 0 0 0 1px var(--set-line), var(--workspace-shadow); }
+.ui-row { min-height: 58px; }
+.ui-row-hint, .ui-group-foot { line-height: 1.6; }
+.dashboard-hero { border-radius: 24px; box-shadow: var(--workspace-shadow); }
+.dashboard-hero h2 { font-family: var(--font-display); font-size: 29px; letter-spacing: -.7px; }
+.dashboard-hero-head { padding: 26px 28px 0; }
+.live-preview-scene.large { min-height: 230px; background: radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 72%); }
+.live-preview-bar { box-shadow: 0 20px 40px #17202c16, inset 0 1px 0 #ffffff60; border: 1px solid color-mix(in srgb, var(--set-line) 70%, white); }
+.preview-edit-pin { appearance: none; border: 0; padding: 0; background: none; color: inherit; border-radius: 12px; cursor: pointer; transition: transform 160ms var(--ease); }
+.preview-edit-pin:hover { transform: translateY(-3px); }
+.dashboard-actions { gap: 12px; margin-block: 22px; }
+.dashboard-action { min-height: 76px; border-radius: 16px; box-shadow: var(--workspace-shadow); }
+.dashboard-action:hover, .scenario-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--set-line)); }
+.scenario-card { padding: 20px; border-radius: 16px; }
+.scenario-card > span:last-child { font-size: 13px; }
+.finish-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 16px; }
+.finish-card { appearance: none; border: 1px solid var(--set-line); border-radius: 14px; padding: 12px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.finish-card:hover { border-color: var(--accent); }
+.finish-card strong { display: block; margin-top: 12px; font-size: 13px; }
+.finish-sample { display: flex; gap: 5px; align-items: center; justify-content: center; height: 76px; border-radius: 10px; background: linear-gradient(145deg, #e1e9ed, #f0e1d0); }
+.finish-sample i { width: 22px; height: 25px; background: #ffffffbb; border: 1px solid #fff9; border-radius: 7px; box-shadow: 0 3px 8px #0001; }
+.finish-mica .finish-sample { background: linear-gradient(140deg, #d8dcde, #d9dfe8); }
+.finish-tinted .finish-sample { background: linear-gradient(140deg, #303a4f, #514245); }
+.finish-tinted .finish-sample i { background: #ffffff20; border-color: #ffffff25; }
+.finish-solid .finish-sample { background: #f4f4f6; }
+.finish-solid .finish-sample i { background: #fff; }
+.finish-note { margin: 0; padding: 0 16px 16px; color: var(--ink-2); font-size: 12px; }
+.app-library-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.app-library-choice { display: flex; align-items: center; border: 1px solid var(--set-line); border-radius: 14px; min-width: 0; background: var(--set-card); position: relative; }
+.app-library-card { flex: 1; border: 0; border-radius: 14px; min-height: 62px; }
+.app-library-card:hover { background: var(--set-field); }
+.app-library-choice > input { accent-color: var(--accent); margin: 0 12px 0 0; width: 16px; height: 16px; flex-shrink: 0; }
+.app-library-icon { width: 34px; height: 34px; border-radius: 9px; }
+.suggestion-dismiss { align-self: stretch; width: 28px; border: 0; background: transparent; color: var(--ink-2); border-radius: 10px; cursor: pointer; }
+.suggestion-dismiss:hover { background: var(--set-field); }
+.app-library-heading { font-size: 13px; margin-top: 24px; }
+.app-library-selection { display: flex; gap: 12px; align-items: center; position: sticky; top: 0; z-index: 2; background: var(--set-bg); padding: 12px; border: 1px solid var(--set-line); border-radius: 12px; }
+.app-library-privacy { margin-top: 24px; padding: 14px; border-top: 1px solid var(--set-line); color: var(--ink-2); }
+.app-library-privacy summary { cursor: pointer; margin-bottom: 12px; }
+.app-library-privacy label { display: flex; align-items: center; gap: 10px; margin: 14px 0; }
+.app-library-privacy button { margin: 0 8px 8px 0; }
+.setting-search-target { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 12px; }
+.productivity-panel { border-radius: 22px; padding: 20px; box-shadow: 0 24px 64px #10182024, inset 0 1px 0 #ffffff40; }
+.productivity-head { padding-bottom: 14px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.focus-countdown { font-variant-numeric: tabular-nums; letter-spacing: -1.8px; }
+.task-edit { font: inherit; color: inherit; border: 0; background: none; text-align: left; padding: 4px 0; cursor: text; }
+.focus-task label { min-width: 0; }
+.focus-task .task-edit { overflow-wrap: anywhere; }
+.focus-actions { flex-wrap: wrap; }
+body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c, inset 0 1px 0 #ffffff55; }
+[data-theme="dark"] body:not(.settings-body) .dock { box-shadow: 0 12px 30px #0004, inset 0 1px 0 #ffffff12; }
+@media (max-width: 850px) { .s-content { padding: 24px; } .finish-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .s-content { padding: 20px 14px; } .ui-page-head h1 { font-size: 25px; } .dashboard-hero-head { padding: 20px 16px 0; } .app-library-tools { flex-wrap: wrap; } .app-library-tools input { flex-basis: 100%; } .app-library-grid { grid-template-columns: minmax(0, 1fr); } .dashboard-hero h2 { font-size: 25px; } .finish-grid { gap: 8px; padding: 12px; } }
+@media (prefers-reduced-motion: reduce) { .preview-edit-pin { transition: none; } .preview-edit-pin:hover { transform: none; } }
+@media (forced-colors: active) { .finish-card, .app-library-choice, .scenario-card { border: 1px solid ButtonText; } .setting-search-target { outline-color: Highlight; } }

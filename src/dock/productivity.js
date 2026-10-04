@@ -5,7 +5,7 @@ export function timerSeconds(style = {}, now = Date.now()) {
   return style.endsAt ? Math.max(0, Math.ceil((Number(style.endsAt) - now) / 1000)) : Math.max(0, style.remaining == null ? duration : Number(style.remaining) || 0);
 }
 export function toggleTimer(style = {}, now = Date.now()) {
-  if (style.endsAt) return { ...style, remaining: Math.max(0, Math.ceil((style.endsAt - now) / 1000)), endsAt: null };
+  if (style.endsAt && timerSeconds(style, now) > 0) return { ...style, remaining: Math.max(0, Math.ceil((style.endsAt - now) / 1000)), endsAt: null };
   const seconds = timerSeconds(style, now);
   return { ...style, remaining: null, endsAt: now + (seconds || (Number(style.minutes) || 25) * 60) * 1000 };
 }

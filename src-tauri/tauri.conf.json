@@ -115,7 +115,7 @@
   "plugins": {
     "updater": {
       "windows": {
-        "installMode": "passive"
+        "installMode": "quiet"
       },
       "endpoints": [
         "https://github.com/punkable/booki/releases/latest/download/latest.json"

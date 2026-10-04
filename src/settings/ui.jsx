@@ -22,7 +22,7 @@ export function Icon({ name, className = "" }) {
 /** Page title, optional one-line description and a right-side slot. */
 export function PageHeader({ title, children, meta }) {
   return (
-    <header className="ui-page-head">
+    <header data-setting-label={typeof title === "string" ? title : undefined} className="ui-page-head">
       <div>
         <h1>{title}</h1>
         {children ? <p>{children}</p> : null}
@@ -35,7 +35,7 @@ export function PageHeader({ title, children, meta }) {
 /** A titled inset group of rows. `hint` sits under the group as its footer. */
 export function SettingsSection({ title, hint, children, className = "" }) {
   return (
-    <section className={"ui-group-wrap " + className}>
+    <section data-setting-label={typeof title === "string" ? title : undefined} className={"ui-group-wrap " + className}>
       {title ? <h2 className="ui-group-title">{title}</h2> : null}
       <div className="ui-group">{children}</div>
       {hint ? <p className="ui-group-foot">{hint}</p> : null}
@@ -47,7 +47,7 @@ export function SettingsSection({ title, hint, children, className = "" }) {
 export function CollapsibleSection({ title, hint, count, defaultOpen = false, children, className = "" }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className={"ui-group-wrap ui-collapsible " + (open ? "open " : "") + className}>
+    <section data-setting-label={typeof title === "string" ? title : undefined} className={"ui-group-wrap ui-collapsible " + (open ? "open " : "") + className}>
       <div className="ui-group">
         <button type="button" className="ui-row ui-disclosure" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
           <span className="ui-row-text">
@@ -66,7 +66,7 @@ export function CollapsibleSection({ title, hint, count, defaultOpen = false, ch
 /** Label (+ hint) on the left, one control on the right. */
 export function Row({ label, hint, children, stack = false }) {
   return (
-    <div className={"ui-row" + (stack ? " ui-row-stack" : "")}>
+    <div data-setting-label={typeof label === "string" ? label : undefined} className={"ui-row" + (stack ? " ui-row-stack" : "")}>
       <div className="ui-row-text">
         <span className="ui-row-label">{label}</span>
         {hint ? <span className="ui-row-hint">{hint}</span> : null}
@@ -97,7 +97,7 @@ export function Switch({ checked, onChange, label }) {
 /** A row whose control is a switch; the whole row toggles it. */
 export function Toggle({ checked, onChange, label, hint }) {
   return (
-    <div className="ui-row ui-toggle-row" onClick={(e) => { if (!e.target.closest(".ui-switch")) onChange(!checked); }}>
+    <div data-setting-label={typeof label === "string" ? label : undefined} className="ui-row ui-toggle-row" onClick={(e) => { if (!e.target.closest(".ui-switch")) onChange(!checked); }}>
       <div className="ui-row-text">
         <span className="ui-row-label">{label}</span>
         {hint ? <span className="ui-row-hint">{hint}</span> : null}

@@ -1,6 +1,7 @@
 /* Thin wrapper over the Tauri bridge with browser fallbacks, so the UI can be
    previewed with `vite` in a normal browser during development. */
 
+import { createAsyncCache } from "./dock/async-cache.js";
 import { version as appVersion } from "../package.json";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 
@@ -229,6 +230,8 @@ async function mockInvoke(cmd, args) {
     case "volume_mute":
       demoVolume.muted = !demoVolume.muted;
       return demoVolume.muted;
+    case "app_identities": return {};
+    case "clear_app_usage": return null;
     case "profile_list":
       return Object.keys(demoProfiles).sort();
     case "profile_save":
@@ -351,10 +354,12 @@ export function pickImageFile() {
 }
 
 /** Close the current window (used by the settings window). */
-export async function closeSelf() {
+export async function closeSelf({ keepAlive = false } = {}) {
   if (T && T.window && T.window.getCurrentWindow) {
     try {
-      await T.window.getCurrentWindow().close();
+      const current = T.window.getCurrentWindow();
+      if (keepAlive) await current.hide();
+      else await current.close();
       return;
     } catch (_) {
       /* fall through */
@@ -401,9 +406,14 @@ export const config = {
   reset: () => invoke("reset_config"),
 };
 
+const icons = createAsyncCache((path) => invoke("app_icon", { path }));
+
 export const dock = {
   launch: (path, args = []) => invoke("launch_app", { path, args }),
-  appIcon: (path) => invoke("app_icon", { path }),
+  appIcon: (path) => icons.get(path),
+  invalidateIcons: () => icons.clear(),
+  clearUsage: () => invoke("clear_app_usage"),
+  appIdentities: (paths) => invoke("app_identities", { paths }),
   imageDataUri: (path) => invoke("image_data_uri", { path }),
   reposition: (edge) => invoke("reposition_dock", { edge }),
   setDockFrame: (edge, width, height, hidden = false, homeWidth = null, homeHeight = null) =>

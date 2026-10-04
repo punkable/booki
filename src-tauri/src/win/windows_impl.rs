@@ -41,7 +41,11 @@ use super::WindowInfo;
 
 /// Extract the large icon for a file/exe and return it as a base64 PNG data URI.
 pub fn app_icon_data_uri(path: &str) -> Option<String> {
-    let png = unsafe { extract_icon_png(path) }?;
+    let png = if path.to_ascii_lowercase().starts_with("shell:appsfolder\\") {
+        unsafe { shell_image_png(path, 64, windows::Win32::UI::Shell::SIIGBF_ICONONLY) }
+    } else {
+        unsafe { extract_icon_png(path) }
+    }?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(png);
     Some(format!("data:image/png;base64,{b64}"))
 }
@@ -49,19 +53,25 @@ pub fn app_icon_data_uri(path: &str) -> Option<String> {
 /// Resolve a .lnk shortcut to its target path (so we can read the target's icon
 /// instead of the shell's shortcut icon, which carries the overlay arrow badge).
 unsafe fn resolve_shortcut_target(path: &str) -> Option<String> {
-    let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-    let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
-    let pf: IPersistFile = link.cast().ok()?;
-    let wpath = wide(path);
-    pf.Load(PCWSTR(wpath.as_ptr()), STGM_READ).ok()?;
-    let mut buf = [0u16; 260];
-    let mut fd = WIN32_FIND_DATAW::default();
-    link.GetPath(&mut buf, &mut fd, 0u32).ok()?;
-    let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-    if end == 0 {
-        return None;
+    let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+    let result = (|| {
+        let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
+        let pf: IPersistFile = link.cast().ok()?;
+        let wpath = wide(path);
+        pf.Load(PCWSTR(wpath.as_ptr()), STGM_READ).ok()?;
+        let mut buf = [0u16; 260];
+        let mut fd = WIN32_FIND_DATAW::default();
+        link.GetPath(&mut buf, &mut fd, 0u32).ok()?;
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        if end == 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&buf[..end]))
+    })();
+    if initialized {
+        windows::Win32::System::Com::CoUninitialize();
     }
-    Some(String::from_utf16_lossy(&buf[..end]))
+    result
 }
 
 /// Read the shell icon of a single file/exe/folder as PNG. No USEFILEATTRIBUTES,
@@ -199,28 +209,38 @@ fn encode_png(width: u32, height: u32, rgba: &[u8]) -> Option<Vec<u8>> {
 /// can preview) via IShellItemImageFactory. Warm requests hit the system
 /// thumbnail cache, so they're near-instant. Returns a PNG data URI.
 pub fn file_thumbnail(path: &str, size: i32) -> Option<String> {
+    use windows::Win32::UI::Shell::{SIIGBF, SIIGBF_BIGGERSIZEOK, SIIGBF_RESIZETOFIT};
+    let png = unsafe {
+        shell_image_png(
+            path,
+            size,
+            SIIGBF(SIIGBF_RESIZETOFIT.0 | SIIGBF_BIGGERSIZEOK.0),
+        )
+    }?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(png);
+    Some(format!("data:image/png;base64,{b64}"))
+}
+
+unsafe fn shell_image_png(
+    path: &str,
+    size: i32,
+    flags: windows::Win32::UI::Shell::SIIGBF,
+) -> Option<Vec<u8>> {
     use windows::Win32::Foundation::SIZE;
-    use windows::Win32::UI::Shell::{
-        IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF_BIGGERSIZEOK,
-        SIIGBF_RESIZETOFIT,
-    };
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-        let w = wide(path);
+    use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName};
+    let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+    let result = (|| {
         let item: IShellItemImageFactory =
-            SHCreateItemFromParsingName(PCWSTR(w.as_ptr()), None).ok()?;
-        let hbmp = item
-            .GetImage(
-                SIZE { cx: size, cy: size },
-                windows::Win32::UI::Shell::SIIGBF(SIIGBF_RESIZETOFIT.0 | SIIGBF_BIGGERSIZEOK.0),
-            )
-            .ok()?;
+            SHCreateItemFromParsingName(PCWSTR(wide(path).as_ptr()), None).ok()?;
+        let hbmp = item.GetImage(SIZE { cx: size, cy: size }, flags).ok()?;
         let png = hbitmap_png(hbmp);
         let _ = DeleteObject(HGDIOBJ(hbmp.0));
-        let png = png?;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(png);
-        Some(format!("data:image/png;base64,{b64}"))
+        png
+    })();
+    if initialized {
+        windows::Win32::System::Com::CoUninitialize();
     }
+    result
 }
 
 unsafe fn hbitmap_png(hbmp: HBITMAP) -> Option<Vec<u8>> {
@@ -341,6 +361,99 @@ pub fn clipboard_get_text() -> Option<String> {
 /// Recent-folder entries and pinned shortcuts to their real files).
 pub fn shortcut_target(path: &str) -> Option<String> {
     unsafe { resolve_shortcut_target(path) }
+}
+
+/// Discover packaged Windows apps from the native AppsFolder namespace.
+/// No PowerShell process, registry scraping, account or network is needed.
+pub fn packaged_apps() -> Vec<(String, String)> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{
+        BHID_EnumItems, IEnumShellItems, IShellItem, SHCreateItemFromParsingName,
+        SIGDN_DESKTOPABSOLUTEPARSING, SIGDN_NORMALDISPLAY,
+    };
+    unsafe {
+        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+        let result = (|| -> windows::core::Result<Vec<(String, String)>> {
+            let folder: IShellItem =
+                SHCreateItemFromParsingName(PCWSTR(wide("shell:AppsFolder").as_ptr()), None)?;
+            let enumeration: IEnumShellItems = folder.BindToHandler(None, &BHID_EnumItems)?;
+            let mut apps = Vec::new();
+            for _ in 0..2048 {
+                let mut items = [None];
+                let mut fetched = 0;
+                if enumeration.Next(&mut items, Some(&mut fetched)).is_err() {
+                    break;
+                }
+                if fetched == 0 {
+                    break;
+                }
+                let Some(item) = items[0].take() else {
+                    continue;
+                };
+                let Ok(display) = item.GetDisplayName(SIGDN_NORMALDISPLAY) else {
+                    continue;
+                };
+                let name = display.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(display.0.cast()));
+                let Ok(parsing) = item.GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING) else {
+                    continue;
+                };
+                let path = parsing.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(parsing.0.cast()));
+                // AUMIDs containing '!' identify packaged apps; .lnk discovery
+                // remains the authoritative source for classic desktop apps.
+                if let Some(aumid) = path.rsplit('\\').next().filter(|p| p.contains('!')) {
+                    if !name.is_empty() {
+                        apps.push((name, format!("shell:AppsFolder\\{aumid}")));
+                    }
+                }
+            }
+            Ok(apps)
+        })();
+        if initialized {
+            windows::Win32::System::Com::CoUninitialize();
+        }
+        result.unwrap_or_default()
+    }
+}
+
+/// Launch signature preserves shortcut arguments and working directory.
+pub fn app_identity(path: &str) -> String {
+    let normalize = |p: &str| p.replace('\\', "/").to_lowercase();
+    let fallback = || serde_json::json!([normalize(path), "", ""]).to_string();
+    if !path.to_ascii_lowercase().ends_with(".lnk") {
+        return fallback();
+    }
+    unsafe {
+        let initialized = CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok();
+        let result = (|| -> windows::core::Result<String> {
+            let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)?;
+            let pf: IPersistFile = link.cast()?;
+            pf.Load(PCWSTR(wide(path).as_ptr()), STGM_READ)?;
+            let mut target = [0u16; 32768];
+            let mut args = [0u16; 32768];
+            let mut working = [0u16; 32768];
+            let mut data = WIN32_FIND_DATAW::default();
+            link.GetPath(&mut target, &mut data, 0)?;
+            link.GetArguments(&mut args)?;
+            link.GetWorkingDirectory(&mut working)?;
+            let text = |v: &[u16]| {
+                String::from_utf16_lossy(&v[..v.iter().position(|c| *c == 0).unwrap_or(v.len())])
+            };
+            let target = text(&target);
+            if target.is_empty() {
+                return Ok(fallback());
+            }
+            Ok(
+                serde_json::json!([normalize(&target), text(&args), normalize(&text(&working))])
+                    .to_string(),
+            )
+        })();
+        if initialized {
+            windows::Win32::System::Com::CoUninitialize();
+        }
+        result.unwrap_or_else(|_| fallback())
+    }
 }
 
 /// The executable registered as the default "open" handler for a file

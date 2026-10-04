@@ -1,0 +1,77 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { serveDist, launchBrowser, openPage, makeConfig } from './harness.mjs';
+let srv, port, browser;
+test.before(async () => { ({ srv, port } = await serveDist()); browser = await launchBrowser(); });
+test.after(async () => { await browser?.close(); srv?.close(); });
+async function mockApps(page, fail = false) {
+  await page.evaluate((fail) => {
+    const old = window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke = (command, args) => {
+      if (command === 'frequent_apps') return Promise.resolve([{ name: 'Zed', path: 'C:/zed.exe' }]);
+      if (command === 'list_installed_apps') return fail ? Promise.reject(new Error('Start menu unavailable')) : Promise.resolve([{ items: [{ name: 'Alpha', path: 'C:/alpha.exe' }, { name: 'Beta', path: 'C:/beta.exe' }] }]);
+      return old(command, args);
+    };
+  }, fail);
+}
+test('bulk selection retains apps across searches and adds them together', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await mockApps(page); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Select app: Alpha', exact: true }).check();
+  await page.locator('.app-library-tools input').fill('Beta');
+  await page.getByRole('checkbox', { name: 'Select app: Beta', exact: true }).check();
+  await page.getByRole('button', { name: 'Add selected (2)', exact: true }).click();
+  await page.waitForTimeout(300);
+  const cfg = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
+  assert.deepEqual(cfg.pinned.map((p) => p.name), ['Alpha', 'Beta']);
+  assert.deepEqual(errors, []); await page.close();
+});
+test('partial discovery failure reports the problem while retaining usable recommendations', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await mockApps(page, true); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Some app sources' }).waitFor();
+  assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Zed' }).count(), 1);
+  await page.getByRole('button', { name: 'Hide suggestion: Zed', exact: true }).click();
+  assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Zed' }).count(), 0);
+  await page.getByText('Recommendations & privacy', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restore hidden suggestions', exact: true }).click();
+  assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Zed' }).count(), 1);
+  assert.deepEqual(errors, []); await page.close();
+});
+test('finish presets preserve pins and the library fits a narrow Settings window', async () => {
+  const cfg = makeConfig({ pinned: [{ id: 'editor', name: 'Editor', kind: 'app', path: 'C:/editor.exe' }] });
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 520, height: 680 } });
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('button', { name: 'Tinted Glass', exact: true }).click();
+  await page.waitForTimeout(300);
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
+  assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'tinted');
+  await mockApps(page); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.locator('.app-library-card').first().waitFor();
+  assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
+  assert.deepEqual(errors, []); await page.close();
+});
+test('search focuses the requested control instead of leaving focus in the search box', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  const search = page.getByRole('combobox'); await search.fill('Reduce transparency');
+  await page.getByRole('option').filter({ hasText: 'Reduce transparency' }).click();
+  await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).waitFor();
+  await page.waitForTimeout(150);
+  assert.equal(await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).evaluate((el) => el === document.activeElement), true);
+  assert.deepEqual(errors, []); await page.close();
+});
+test('failed profile save keeps the name and explains the failure for retry', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke = (command, args) => command === 'profile_save' ? Promise.reject(new Error('disk full')) : old(command, args);
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'Profiles & backup', exact: true }).click();
+  await page.getByRole('button', { name: /^Dock profiles/ }).click();
+  await page.getByPlaceholder('Name (e.g. Work)').fill('Work');
+  await page.getByRole('button', { name: 'Save current', exact: true }).click();
+  await page.getByRole('alert').waitFor();
+  assert.equal(await page.getByPlaceholder('Name (e.g. Work)').inputValue(), 'Work');
+  assert.equal(await page.getByRole('button', { name: 'Save current', exact: true }).isEnabled(), true);
+  assert.deepEqual(errors, []); await page.close();
+});

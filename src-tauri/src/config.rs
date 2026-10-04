@@ -157,6 +157,10 @@ fn default_hide_in_fullscreen() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    #[serde(default = "default_true")]
+    pub usage_recommendations_enabled: bool,
+    #[serde(default)]
+    pub ignored_app_suggestions: Vec<String>,
     #[serde(default)]
     pub pinned: Vec<PinnedApp>,
     /// Screen edge the dock is anchored to: "bottom" | "left" | "right" | "top".
@@ -365,6 +369,8 @@ fn default_overflow() -> String {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            usage_recommendations_enabled: true,
+            ignored_app_suggestions: Vec::new(),
             pinned: Vec::new(),
             edge: default_edge(),
             accent: default_accent(),
@@ -748,4 +754,10 @@ fn save_locked(config: &Config) -> Result<(), String> {
     // healed on the next load without losing the user's setup. Best-effort.
     let _ = fs::copy(&final_path, backup_path());
     Ok(())
+}
+
+/// Take a consistent snapshot under the same lock used by settings writes.
+pub fn backup_for_update() -> Result<(), String> {
+    let _guard = WRITE_LOCK.lock().map_err(|e| e.to_string())?;
+    crate::update_backup::snapshot(&config_dir()).map(|_| ())
 }

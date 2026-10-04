@@ -1,0 +1,41 @@
+{
+  "environment": "Linux Chromium; built UI; mocked native bridge; 300 apps; five runs. Timings include Playwright interaction overhead. Native CPU, RSS, compositor and installer behavior are not measured.",
+  "runs": [
+    {
+      "fcpMs": 192,
+      "libraryMs": 138,
+      "searchMs": 29,
+      "iconRequestsAfterRevisit": 11
+    },
+    {
+      "fcpMs": 324,
+      "libraryMs": 212,
+      "searchMs": 53,
+      "iconRequestsAfterRevisit": 11
+    },
+    {
+      "fcpMs": 328,
+      "libraryMs": 193,
+      "searchMs": 36,
+      "iconRequestsAfterRevisit": 11
+    },
+    {
+      "fcpMs": 136,
+      "libraryMs": 124,
+      "searchMs": 39,
+      "iconRequestsAfterRevisit": 11
+    },
+    {
+      "fcpMs": 132,
+      "libraryMs": 101,
+      "searchMs": 22,
+      "iconRequestsAfterRevisit": 11
+    }
+  ],
+  "median": {
+    "fcpMs": 192,
+    "libraryMs": 138,
+    "searchMs": 36,
+    "iconRequestsAfterRevisit": 11
+  }
+}

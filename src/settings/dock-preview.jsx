@@ -44,16 +44,14 @@ export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
     <span className="w-card" />
   </span>;
 }
-const previewIcons = new Map();
 function PreviewPin({ item, size, gap }) {
-  const [src, setSrc] = useState(() => isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || previewIcons.get(item.path));
+  const [src, setSrc] = useState(() => isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
   useEffect(() => {
     let alive = true;
     if (isLibIcon(item.icon)) { setSrc(resolveLibIcon(item.icon)); return; }
     if (item.icon) { setSrc(item.icon); return; }
-    const cached = previewIcons.get(item.path);
-    if (cached) { setSrc(cached); return; }
-    if (item.kind === "app" && item.path) dock.appIcon(item.path).then((uri) => { if (uri) { previewIcons.set(item.path, uri); if (alive) setSrc(uri); } }).catch(() => {});
+    setSrc(null);
+    if (item.kind === "app" && item.path) dock.appIcon(item.path).then((uri) => { if (alive) setSrc(uri); }).catch(() => {});
     return () => { alive = false; };
   }, [item.icon, item.path, item.kind]);
   if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} gap={gap} />;
@@ -65,7 +63,7 @@ function PreviewPin({ item, size, gap }) {
           : <span>{item.name?.charAt(0)?.toUpperCase() || "•"}</span>}
   </span>;
 }
-export function DockPreview({ cfg, large = false }) {
+export function DockPreview({ cfg, large = false, onSelect }) {
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const size = large ? Math.max(32, Math.min(56, cfg.iconSize || 48)) : 32;
@@ -75,8 +73,8 @@ export function DockPreview({ cfg, large = false }) {
   return <div className={"live-preview-scene" + (large ? " large" : "")}>
     <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, gap, borderRadius: cfg.cornerRadius ?? 16,
       background: `color-mix(in srgb, ${fill} ${Math.round((cfg.reduceTransparency ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
-      {items.length ? items.map((item) => <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
+      {items.length ? items.map((item) => onSelect && item.kind !== "separator" ? <button key={item.id} className="preview-edit-pin" type="button" aria-label={`${t("apps.rename")}: ${item.name || widgetDisplayName(item.widget, t)}`} onClick={() => onSelect(item)}><PreviewPin item={item} size={size} gap={gap} /></button> : <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
     </div>
-    <span className="live-preview-caption">{t("overhaul.previewHint")}</span>
+    <span className="live-preview-caption">{onSelect ? t("premium.editPreview") : t("overhaul.previewHint")}</span>
   </div>;
 }

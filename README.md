@@ -74,6 +74,8 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings.
 
+> The latest downloadable version is shown by the release badge above. The 0.70 presentation and notes describe the upcoming update until its signed release is published.
+
 ### New in 0.70
 
 - New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
@@ -147,3 +149,7 @@ Releases are built from version tags through [release.yml](.github/workflows/rel
 [MIT](LICENSE). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
 
 Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).
+
+### Quality and design
+
+See the [CoolDock research and design decisions](docs/research/cooldock.md) and [premium workspace implementation, measurements and verification limits](docs/quality/premium-workspace.md).

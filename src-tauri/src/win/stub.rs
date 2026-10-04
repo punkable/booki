@@ -175,3 +175,11 @@ pub fn cursor_at_edge(_edge: &str) -> bool {
 pub fn desktop_foreground() -> bool {
     false
 }
+
+pub fn app_identity(path: &str) -> String {
+    serde_json::json!([path.replace('\\', "/").to_lowercase(), "", ""]).to_string()
+}
+
+pub fn packaged_apps() -> Vec<(String, String)> {
+    Vec::new()
+}
