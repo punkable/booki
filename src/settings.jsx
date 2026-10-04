@@ -3043,11 +3043,19 @@ function SettingsSkeleton() {
   );
 }
 
+function HistoricalRelease({ entry }) {
+  const [open, setOpen] = useState(false);
+  return <details className="cl-history-entry" onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <summary><strong>v{entry.version}</strong><span>{entry.date}</span><span>{entry.headline}</span></summary>
+    {open && entry.sections.map((section, index) => <section key={index}><h3>{section.title}</h3><ul>{section.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section>)}
+  </details>;
+}
+
 // "What's new" shown as a modal inside Settings (no fragile extra window).
 function ChangelogModal({ onClose }) {
   useModalControls(onClose);
   // changelog-data.js is ~107KB of prose covering 97 releases, and this modal
-  // renders five of them. Importing it statically shipped the whole history in
+  // initially renders only the current update. Importing it statically shipped the whole history in
   // the Settings bundle for every user, every launch; loading it when the modal
   // actually opens keeps it out of the critical path.
   const [entries, setEntries] = useState(null);
@@ -3093,9 +3101,7 @@ function ChangelogModal({ onClose }) {
             </section>
           ))}
           {log.length > 1 && <details className="cl-history"><summary>{t("overhaul.history")}</summary>
-            {log.slice(1).map((entry) => <details className="cl-history-entry" key={entry.version}><summary><strong>v{entry.version}</strong><span>{entry.date}</span><span>{entry.headline}</span></summary>
-              {entry.sections.map((section, index) => <section key={index}><h3>{section.title}</h3><ul>{section.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section>)}
-            </details>)}
+            {log.slice(1).map((entry) => <HistoricalRelease key={entry.version} entry={entry} />)}
           </details>}
         </div>
         <div className="cl-foot">

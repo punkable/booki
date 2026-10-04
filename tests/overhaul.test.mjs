@@ -92,3 +92,41 @@ test("scroll overflow keeps chosen icon size and new widgets work vertically", a
   const widths = await vertical.page.locator("#dock > .tile.widget").evaluateAll((tiles) => tiles.map((tile) => tile.getBoundingClientRect().width));
   assert.ok(widths.every((width) => Math.abs(width - widths[0]) < 1)); assert.deepEqual(vertical.errors, []); await vertical.page.close();
 });
+
+
+test("settings preserve edits during a delayed save and an external dock update", async () => {
+  const { page, errors } = await openPage(browser, port, "settings.html", { viewport: { width: 960, height: 760 } });
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__saving = false;
+    window.__TAURI__.core.invoke = async (cmd, args) => {
+      if (cmd === "save_config") { window.__saving = true; await new Promise((resolve) => setTimeout(resolve, 700)); }
+      return old(cmd, args);
+    };
+  });
+  await page.getByRole("button", { name: /^Smart Moves/ }).click();
+  await page.waitForFunction(() => window.__saving);
+  await page.getByRole("button", { name: /^Reveal at the edge/ }).click();
+  await page.evaluate(async () => {
+    await window.__TAURI__.core.invoke("save_config", { patch: { pinned: [{ id: "external", kind: "app", name: "External", path: "C:/external.exe" }] } });
+    for (const cb of window.__listeners["booki://config-changed"] || []) cb({ payload: null });
+  });
+  await page.waitForTimeout(1800);
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
+  assert.equal(saved.autoHideMode, "edge"); assert.equal(saved.notchTrigger, "hover");
+  assert.equal(saved.pinned[0].name, "External");
+  assert.equal(await page.getByRole("button", { name: /^Reveal at the edge/ }).getAttribute("aria-pressed"), "true");
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("unavailable media widgets can be recovered from the dock menu", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("clock"), pin("media", { hideWhenUnavailable: true })] }) });
+  assert.equal(await page.locator('[data-widget="media"].conditionally-hidden').count(), 1);
+  await page.locator("#dock").dispatchEvent("contextmenu", { clientX: 800, clientY: 300 });
+  await page.getByRole("menuitem", { name: "Media", exact: true }).click();
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('[data-widget="media"].conditionally-hidden').count(), 0);
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
+  assert.equal(saved.pinned[1].style.hideWhenUnavailable, false);
+  assert.deepEqual(errors, []); await page.close();
+});

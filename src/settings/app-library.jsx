@@ -10,6 +10,7 @@ function AppIcon({ path, name }) {
   const ref = useRef(null);
   useEffect(() => {
     let alive = true;
+    setSrc(null);
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
@@ -29,7 +30,7 @@ export function AppLibrary({ cfg, set, listInstalled }) {
   const generation = useRef(0);
   const load = async (refresh = false) => {
     const seq = ++generation.current;
-    setLoading(true); setFailed(false);
+    setLoading(true); setFailed(false); setPage(0);
     const result = await Promise.allSettled([listInstalled(refresh), dock.listWindows(), dock.frequentApps(50), dock.knownFolders()]);
     if (seq !== generation.current) return;
     const value = (i) => result[i].status === "fulfilled" && Array.isArray(result[i].value) ? result[i].value : [];

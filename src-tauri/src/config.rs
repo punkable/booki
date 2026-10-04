@@ -669,6 +669,17 @@ pub fn patch(patch: serde_json::Value) -> Result<Config, String> {
     Ok(load_locked())
 }
 
+/// Apply a native mutation to the latest config in the same write transaction.
+pub fn update(edit: impl FnOnce(&mut Config) -> Result<(), String>) -> Result<Config, String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    let mut current = load_locked();
+    edit(&mut current)?;
+    save_locked(&current)?;
+    Ok(load_locked())
+}
+
 fn save_locked(config: &Config) -> Result<(), String> {
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

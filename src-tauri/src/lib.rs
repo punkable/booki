@@ -446,8 +446,13 @@ fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<Str
     }
     let copied = shortcuts::copy_unique(source, if to_desktop { &desktop } else { &managed })?;
     let next = copied.to_string_lossy().to_string();
-    update(&mut cfg.pinned, &original, &next);
-    if let Err(err) = config::save(&cfg) {
+    if let Err(err) = config::update(|current| {
+        if find(&mut current.pinned, &id).as_deref() != Some(original.as_str()) {
+            return Err("Shortcut pin changed during transfer".into());
+        }
+        update(&mut current.pinned, &original, &next);
+        Ok(())
+    }) {
         let _ = fs::remove_file(&copied);
         return Err(err);
     }
@@ -692,9 +697,7 @@ fn apply_always_on_top(app: &AppHandle) {
 
 #[tauri::command]
 fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
-    let mut cfg = config::load();
-    cfg.always_on_top = value;
-    config::save(&cfg)?;
+    config::patch(serde_json::json!({ "alwaysOnTop": value }))?;
     apply_always_on_top(&app);
     if let Some(dock) = app.get_webview_window("dock") {
         dock.set_always_on_top(value).map_err(|e| e.to_string())
@@ -744,12 +747,14 @@ fn current_foreground_app() -> serde_json::Value {
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
 fn reset_config(app: AppHandle) -> Result<Config, String> {
-    let c = Config {
-        pinned: config::load().pinned,
-        always_on_top: true,
-        ..Default::default()
-    };
-    config::save(&c)?;
+    let c = config::update(|current| {
+        *current = Config {
+            pinned: std::mem::take(&mut current.pinned),
+            always_on_top: true,
+            ..Default::default()
+        };
+        Ok(())
+    })?;
     apply_always_on_top(&app);
     apply_capture_policy(&app, c.capture_visible);
     Ok(c)
@@ -1198,16 +1203,21 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
         children: vec![],
         recents: vec![],
     };
-    let mut cfg = config::load();
-    match group.and_then(|gid| {
-        cfg.pinned
-            .iter_mut()
-            .find(|g| g.kind == "group" && g.id == gid)
-    }) {
-        Some(g) => g.children.push(item),
-        None => cfg.pinned.push(item),
+    if config::update(|cfg| {
+        match group.and_then(|gid| {
+            cfg.pinned
+                .iter_mut()
+                .find(|g| g.kind == "group" && g.id == gid)
+        }) {
+            Some(g) => g.children.push(item),
+            None => cfg.pinned.push(item),
+        }
+        Ok(())
+    })
+    .is_err()
+    {
+        return false;
     }
-    let _ = config::save(&cfg);
     let _ = app.emit("booki://config-changed", ());
     true
 }
@@ -1220,10 +1230,9 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
 /// the user just moved away from.
 #[tauri::command]
 fn set_dock_edge(app: AppHandle, edge: String) {
-    let mut cfg = config::load();
-    cfg.edge = edge.clone();
-    cfg.notch_edge = "auto".into();
-    let _ = config::save(&cfg);
+    if config::patch(serde_json::json!({ "edge": edge, "notchEdge": "auto" })).is_err() {
+        return;
+    }
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &edge);
     }
@@ -1352,7 +1361,7 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
     cfg.last_profile = name.trim().to_string();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     std::fs::write(path, text).map_err(|e| e.to_string())?;
-    config::save(&cfg)?;
+    config::patch(serde_json::json!({ "lastProfile": cfg.last_profile }))?;
     let _ = app.emit("booki://config-changed", ());
     Ok(())
 }
