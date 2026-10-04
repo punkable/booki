@@ -38,9 +38,13 @@ export const tasks = (locale) => (locale === 'es'
   : ['Review the design', 'Send the proposal', 'Call Ana', 'Prepare the demo', 'Buy coffee'])
   .map((text, i) => ({ id: `t${i}`, text, done: i < 2 }));
 export const city = (locale) => ({ city: locale === 'es' ? 'Ciudad de México' : 'Lisbon', latitude: 38.72, longitude: -9.14 });
+/* JSON that is safe to splice into a script: no tag, line-separator or
+   backslash-quote surprises. */
+const ESCAPES = { '<': '\\u003c', '>': '\\u003e', '/': '\\u002f', '\u2028': '\\u2028', '\u2029': '\\u2029' };
+const literal = (value) => JSON.stringify(value).replace(/[<>/\u2028\u2029]/g, (c) => ESCAPES[c]);
 /* Patch the fake backend with richer sample answers. Runs in the page. */
 export function bridgePatch(icons) {
-  return `(() => { const old = window.__TAURI__.core.invoke; const icons = ${JSON.stringify(icons)};
+  return `(() => { const old = window.__TAURI__.core.invoke; const icons = ${literal(icons)};
     window.__TAURI__.core.invoke = (cmd, args = {}) => {
       if (cmd === 'app_icon' || cmd === 'image_data_uri') return Promise.resolve(icons[args.path] || '');
       if (cmd === 'media_info') return Promise.resolve({ title: 'Golden Hour', artist: 'Sample Artist', album: 'Example', playing: true });
@@ -55,7 +59,7 @@ export const allIcons = () => Object.fromEntries(Object.keys(APP_NAMES).map((k) 
 export function studioPatch(fontPath, { clock = '2026-10-06T09:41:00' } = {}) {
   const font = (globalThis.__bookiFont ||= Buffer.from(globalThis.__readFile(fontPath)).toString('base64'));
   return `(() => {
-    const start = new Date(${JSON.stringify(clock)}).getTime(), real = Date.now(), Real = Date;
+    const start = new Date(${literal(clock)}).getTime(), real = Date.now(), Real = Date;
     class Fixed extends Real { constructor(...a) { super(...(a.length ? a : [start + (Real.now() - real)])); } static now() { return start + (Real.now() - real); } }
     window.Date = Fixed;
     const css = "@font-face{font-family:BookiStudio;src:url(data:font/ttf;base64,${font}) format('truetype');font-weight:100 900}:root{--font:BookiStudio,sans-serif!important;--font-display:BookiStudio,sans-serif!important}body{font-feature-settings:'cv11','ss01'}";
