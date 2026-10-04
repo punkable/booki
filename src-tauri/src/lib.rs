@@ -6,6 +6,7 @@
 mod apps;
 mod config;
 mod shortcuts;
+mod update_backup;
 mod usage;
 mod util;
 mod weather;
@@ -28,6 +29,35 @@ use std::sync::Mutex;
 /// never a URL hash — so the settings window always loads its normal, known-good
 /// URL (a hash in the app URL made the window come up blank on Windows).
 static PENDING_CHANGELOG: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn quiet_update_supported() -> bool {
+    win::quiet_update_supported()
+}
+
+static UPDATE_LOCK: AtomicBool = AtomicBool::new(false);
+#[tauri::command]
+fn acquire_update_lock() -> bool {
+    UPDATE_LOCK
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+}
+#[tauri::command]
+fn release_update_lock() {
+    UPDATE_LOCK.store(false, Ordering::SeqCst);
+}
+#[tauri::command]
+async fn prepare_update() -> Result<(), String> {
+    if !UPDATE_LOCK.load(Ordering::SeqCst) {
+        return Err("No update session".into());
+    }
+    if !win::quiet_update_supported() {
+        return Err("Use the original installer type to update this MSI or portable copy".into());
+    }
+    tauri::async_runtime::spawn_blocking(config::backup_for_update)
+        .await
+        .map_err(|e| e.to_string())?
+}
 
 /// True while hide_all has blacked out dock + notch for a fullscreen app.
 /// Reveal / tray / save_config must not resurface Booki until the frontend
@@ -470,14 +500,35 @@ fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<Str
 #[tauri::command]
 fn launch_app(path: String, args: Option<Vec<String>>) -> Result<(), String> {
     apps::launch(&path, &args.unwrap_or_default())?;
-    usage::record_launch(&path);
+    if config::load().usage_recommendations_enabled {
+        usage::record_launch(&path);
+    }
     Ok(())
 }
 
 /// Return the app's icon as a base64 PNG data URI (Windows only; None elsewhere).
 #[tauri::command]
-fn app_icon(path: String) -> Option<String> {
-    win::app_icon_data_uri(&path)
+async fn app_icon(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || win::app_icon_data_uri(&path))
+        .await
+        .ok()
+        .flatten()
+}
+
+#[tauri::command]
+async fn app_identities(paths: Vec<String>) -> std::collections::HashMap<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .into_iter()
+            .take(2048)
+            .map(|path| {
+                let identity = win::app_identity(&path);
+                (path, identity)
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -493,6 +544,13 @@ fn focus_window(hwnd: i64) -> bool {
 #[tauri::command]
 fn close_window(hwnd: i64) -> bool {
     win::close_window(hwnd as isize)
+}
+
+#[tauri::command]
+async fn clear_app_usage() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(usage::clear_local)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// The apps this user runs most, from Windows' local usage record.
@@ -2050,7 +2108,13 @@ struct AppGroup {
 }
 
 #[tauri::command]
-fn list_installed_apps() -> Vec<AppGroup> {
+async fn list_installed_apps() -> Vec<AppGroup> {
+    tauri::async_runtime::spawn_blocking(scan_installed_apps)
+        .await
+        .unwrap_or_default()
+}
+
+fn scan_installed_apps() -> Vec<AppGroup> {
     #[cfg(windows)]
     {
         use std::collections::{BTreeMap, HashSet};
@@ -2084,6 +2148,15 @@ fn list_installed_apps() -> Vec<AppGroup> {
             }
         }
         groups.sort_by_key(|a| a.name.to_lowercase());
+        for (name, path) in win::packaged_apps() {
+            if seen.insert(path.to_lowercase()) {
+                general.push(DirItem {
+                    name,
+                    path,
+                    is_dir: false,
+                });
+            }
+        }
         general.sort_by_key(|a| a.name.to_lowercase());
         if !general.is_empty() {
             groups.push(AppGroup {
@@ -2193,7 +2266,7 @@ fn scan_lnks(
         if JUNK.iter().any(|j| lower.contains(j)) {
             continue;
         }
-        if seen.insert(lower) {
+        if seen.insert(p.to_string_lossy().to_lowercase()) {
             let group = group_of(root, &p);
             map.entry(group).or_default().push(DirItem {
                 name,
@@ -2493,15 +2566,37 @@ pub fn run() {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin({
+            let updater = tauri_plugin_updater::Builder::new();
+            #[cfg(windows)]
+            let updater = match std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            {
+                Some(directory) => {
+                    // NSIS requires /D to be the final argument, without quotes.
+                    // Pin the update to this executable's directory, including custom paths.
+                    let mut argument = std::ffi::OsString::from("/D=");
+                    argument.push(directory.as_os_str());
+                    updater.installer_arg(argument)
+                }
+                None => updater,
+            };
+            updater.build()
+        })
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            quiet_update_supported,
+            acquire_update_lock,
+            release_update_lock,
+            prepare_update,
             get_config,
             save_config,
             launch_app,
             relocate_shortcut,
             app_icon,
+            app_identities,
             list_windows,
             focus_window,
             reposition_dock,
@@ -2549,6 +2644,7 @@ pub fn run() {
             open_location,
             close_window,
             frequent_apps,
+            clear_app_usage,
             set_hotkey,
             apply_hotkeys,
             move_paths,

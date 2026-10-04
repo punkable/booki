@@ -827,7 +827,7 @@ function tickProductivity() {
         record.value = value; record.error = false;
       }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
     }
-    setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
+    setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(style.units === "fahrenheit" ? cached.value.temperature_2m * 9 / 5 + 32 : cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
     el.title = `${style.city || t("w.weather")} · Open-Meteo`;
   });
 }
@@ -4432,7 +4432,8 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
     pinned: () => flattenPinned(cfg.pinned),
     listWindows: () => dockApi.listWindows(),
     listInstalled: () => dockApi.listInstalledApps(),
-    listFrequent: () => dockApi.frequentApps(12),
+    listFrequent: () => cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(50).then((apps) => apps.filter((a) => !(cfg.ignoredAppSuggestions || []).includes(a.path.replaceAll("\\", "/").toLowerCase()))),
+    identities: (paths) => dockApi.appIdentities(paths),
     appIcon: (path) => dockApi.appIcon(path),
     widgetLabel,
     widgetPresent,
@@ -4443,6 +4444,7 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
     close: closeStack,
     relayout: () => requestAnimationFrame(place),
   });
+  stackDispose = panel.dispose;
   stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
@@ -4459,9 +4461,12 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
 }
 
 let stackCloseTimer = null;
+let stackDispose = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
+  stackDispose?.();
+  stackDispose = null;
   stackItemId = null;
   pendingReplace = null;
   document.body.classList.remove("stack-open");

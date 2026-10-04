@@ -18,107 +18,9 @@ import { WIDGET_ORDER, WIDGET_GLYPHS } from "../widgets-meta.js";
 /** Most rows drawn at once; typing narrows the list long before this matters. */
 const MAX_ROWS = 80;
 
-/** Lowercase, accents stripped: "Música" matches "musica". */
-export function norm(s) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
-}
+import { matchScore, appKey, pinnedKeys, candidateSections } from "./app-candidates.js";
+export { norm, matchScore, baseTitle, pinnedKeys, runningCandidates, installedCandidates, frequentCandidates, rank } from "./app-candidates.js";
 
-/** 3 = name starts with the query, 2 = a word does, 1 = contains it, 0 = no match. */
-export function matchScore(name, query) {
-  const q = norm(query).trim();
-  if (!q) return 1;
-  const n = norm(name);
-  if (n.startsWith(q)) return 3;
-  if (n.split(/[\s\-_.]+/).some((w) => w.startsWith(q))) return 2;
-  return n.includes(q) ? 1 : 0;
-}
-
-/** File name without folder or extension. */
-export function baseTitle(path) {
-  const file = String(path || "").split(/[\\/]/).pop() || "";
-  return file.replace(/\.(exe|lnk|url|appref-ms)$/i, "");
-}
-
-/** Keys that identify something already on the dock: full paths and names. */
-export function pinnedKeys(pinned) {
-  const keys = new Set();
-  const walk = (items) => {
-    for (const it of items || []) {
-      if (it.path) keys.add(norm(it.path));
-      if (it.name) keys.add(norm(it.name));
-      if (it.path) keys.add(norm(baseTitle(it.path)));
-      if (it.children) walk(it.children);
-    }
-  };
-  walk(pinned);
-  return keys;
-}
-
-export function isPinned(keys, path, name) {
-  return keys.has(norm(path)) || keys.has(norm(name)) || keys.has(norm(baseTitle(path)));
-}
-
-/** Windows that are open now, one per executable, minus Booki and the shell. */
-export function runningCandidates(windows, keys) {
-  const seen = new Set();
-  const out = [];
-  for (const w of windows || []) {
-    const exe = String(w.exe || "");
-    if (!exe) continue;
-    const id = norm(exe);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const title = baseTitle(exe);
-    if (/^(booki|explorer|applicationframehost|searchhost|shellexperiencehost|textinputhost)$/i.test(title)) continue;
-    out.push({ name: prettyName(title), path: exe, pinned: isPinned(keys, exe, title) });
-  }
-  return out.sort((a, b) => Number(a.pinned) - Number(b.pinned) || a.name.localeCompare(b.name));
-}
-
-/** "chrome" → "Chrome"; names that already carry capitals are left alone. */
-function prettyName(title) {
-  return title && title === title.toLowerCase() ? title[0].toUpperCase() + title.slice(1) : title;
-}
-
-/** Most used apps not on the dock yet, in usage order (pinned ones dropped). */
-export function frequentCandidates(used, keys, max = 6) {
-  return (used || [])
-    .map((u) => ({ name: u.name, path: u.path, pinned: isPinned(keys, u.path, u.name) }))
-    .filter((c) => c.path && !c.pinned)
-    .slice(0, max);
-}
-
-/** Flatten Start-menu groups into one sorted list without duplicates. */
-export function installedCandidates(groups, keys) {
-  const seen = new Set();
-  const out = [];
-  for (const g of groups || []) {
-    for (const it of g.items || []) {
-      const id = norm(it.name);
-      if (!it.path || seen.has(id)) continue;
-      seen.add(id);
-      out.push({ name: it.name, path: it.path, pinned: isPinned(keys, it.path, it.name) });
-    }
-  }
-  return out.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** Filter and rank a candidate list for a query. */
-export function rank(list, query) {
-  if (!norm(query).trim()) return [...list];
-  return list
-    .map((c) => ({ c, s: matchScore(c.name, query) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s || a.c.name.localeCompare(b.c.name))
-    .map((x) => x.c);
-}
-
-// Icons are extracted by the shell, which is slow enough to notice; keep them
-// for the life of the dock window.
-const iconCache = new Map();
 
 /**
  * Draw the panel into `root` (the flyout element) and wire it.
@@ -148,6 +50,9 @@ export function buildAddPanel(root, deps) {
   let installed = [];
   let frequent = [];
   let loaded = false;
+  let disposed = false;
+  let identities = {};
+  let failures = false;
   let rowLimit = MAX_ROWS;
 
   root.innerHTML = "";
@@ -229,6 +134,8 @@ export function buildAddPanel(root, deps) {
   }
 
   function draw() {
+    if (disposed) return;
+    observer?.disconnect();
     for (const b of tabs.children) {
       const on = b.dataset.tab === tab;
       b.classList.toggle("on", on);
@@ -247,9 +154,9 @@ export function buildAddPanel(root, deps) {
       for (let i = 0; i < 6; i++) body.appendChild(el("div", "add-row add-skel"));
       return;
     }
-    const top = rank(frequent, query);
-    const open = rank(running, query);
-    const all = rank(installed, query);
+    const sections = candidateSections({ used: frequent, running, groups: installed }, pinnedKeys(deps.pinned(), identities), query, identities);
+    const top = sections.frequent, open = sections.running, all = sections.installed;
+    if (failures) { const note = emptyNote(t("overhaul.partialApps")); note.setAttribute("role", "status"); body.appendChild(note); }
     if (!top.length && !open.length && !all.length) {
       body.appendChild(emptyNote(t("add.none")));
       return;
@@ -302,6 +209,8 @@ export function buildAddPanel(root, deps) {
     body.appendChild(grid);
   }
 
+  function isAlreadyPinned(c) { return c.pinned || pinnedKeys(deps.pinned(), identities).has(appKey(c, identities)); }
+
   function appRow(c) {
     const row = el("button", "add-row" + (c.pinned ? " pinned" : ""));
     row.type = "button";
@@ -309,12 +218,10 @@ export function buildAddPanel(root, deps) {
     row.innerHTML = `<span class="add-ico"></span><span class="add-name"></span><span class="add-state"></span>`;
     row.querySelector(".add-name").textContent = c.name;
     const ico = row.querySelector(".add-ico");
-    const cached = iconCache.get(c.path);
-    if (cached) ico.appendChild(img(cached));
-    else ico.textContent = (c.name[0] || "?").toUpperCase();
+    ico.textContent = (c.name[0] || "?").toUpperCase();
     markState(row, c.pinned);
     row.addEventListener("click", async () => {
-      if (c.pinned) return;
+      if (isAlreadyPinned(c)) return;
       row.disabled = true;
       try { await deps.addPath(c.path); } catch (_) { row.disabled = false; const error = emptyNote(t("overhaul.failed")); error.setAttribute("role", "alert"); body.prepend(error); return; }
       c.pinned = true;
@@ -342,12 +249,10 @@ export function buildAddPanel(root, deps) {
           if (!e.isIntersecting) continue;
           observer.unobserve(e.target);
           const path = e.target.dataset.path;
-          if (iconCache.has(path)) continue;
           deps
             .appIcon(path)
             .then((uri) => {
               if (!uri) return;
-              iconCache.set(path, uri);
               const ico = e.target.querySelector(".add-ico");
               if (ico) ico.replaceChildren(img(uri));
             })
@@ -357,23 +262,18 @@ export function buildAddPanel(root, deps) {
       { root: body },
     );
     for (const row of body.querySelectorAll(".add-row[data-path]")) {
-      if (!iconCache.has(row.dataset.path)) observer.observe(row);
+      observer.observe(row);
     }
   }
 
   async function load() {
-    const keys = pinnedKeys(deps.pinned());
-    const [wins, groups, used] = await Promise.all([
-      deps.listWindows().catch(() => []),
-      deps.listInstalled().catch(() => []),
-      (deps.listFrequent ? deps.listFrequent() : Promise.resolve([])).catch(() => []),
-    ]);
-    frequent = frequentCandidates(used, keys);
-    // Each app appears once: most used wins, then open now, then the rest.
-    const shown = new Set(frequent.map((c) => norm(c.name)));
-    running = runningCandidates(wins, keys).filter((c) => !shown.has(norm(c.name)));
-    running.forEach((c) => shown.add(norm(c.name)));
-    installed = installedCandidates(groups, keys).filter((c) => !shown.has(norm(c.name)));
+    const results = await Promise.allSettled([deps.listWindows(), deps.listInstalled(), deps.listFrequent ? deps.listFrequent() : Promise.resolve([])]);
+    const value = (i) => results[i].status === "fulfilled" ? results[i].value || [] : [];
+    running = value(0); installed = value(1); frequent = value(2);
+    failures = results.some((r) => r.status === "rejected");
+    const paths = [...new Set([...running.map((w) => w.exe), ...installed.flatMap((g) => g.items.map((i) => i.path)), ...frequent.map((u) => u.path), ...deps.pinned().map((p) => p.path)].filter(Boolean))];
+    if (deps.identities) identities = await deps.identities(paths).then((v) => v || {}).catch(() => ({}));
+    if (disposed) return;
     loaded = true;
     if (tab === "apps") draw();
   }
@@ -381,7 +281,8 @@ export function buildAddPanel(root, deps) {
   draw();
   load();
   return {
-    focus: () => search.focus(),
+    focus: () => { if (!disposed) search.focus(); },
+    dispose: () => { disposed = true; observer?.disconnect(); },
   };
 }
 

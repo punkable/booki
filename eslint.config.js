@@ -71,7 +71,7 @@ export default [
   },
 
   {
-    files: ["tools/presentation/capture.mjs"],
+    files: ["tools/presentation/capture.mjs", "scripts/benchmark-ui.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 

@@ -12,7 +12,6 @@ import {
   pickFolder,
   pickImageFile,
   pickSavePath,
-  pickJsonFile,
   emitConfigChanged,
   onConfigChanged,
   onShowChangelog,
@@ -22,6 +21,8 @@ import {
   logMessage,
 } from "./api.js";
 import { currentRelease } from "./release-notes.js";
+import { FinishPicker } from "./settings/finish-picker.jsx";
+import { ProfilesPage } from "./settings/profiles.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
 import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
@@ -105,7 +106,8 @@ import {
   applySurfaceVars,
 } from "./surface.js";
 import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
-import { checkForUpdate, installUpdate } from "./update.js";
+import { UpdatesCard } from "./settings/updates.jsx";
+import { updates } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { icon } from "./icons.js";
 
@@ -232,9 +234,9 @@ function widgetDisplayName(widget) {
 let _installedApps = null;
 function installedAppsOnce(force = false) {
   if (force || !_installedApps) {
-    _installedApps = dockApi.listInstalledApps().catch(() => {
+    _installedApps = dockApi.listInstalledApps().catch((error) => {
       _installedApps = null;
-      return [];
+      throw error;
     });
   }
   return _installedApps;
@@ -302,90 +304,6 @@ function PositionPicker({ cfg, set }) {
         )}
       </p>
     </div>
-  );
-}
-
-// Saved dock profiles: whole-config snapshots you switch between in one click.
-function ProfilesCard({ cfg, set }) {
-  const [profiles, setProfiles] = useState([]);
-  const [name, setName] = useState("");
-  // Deleting a saved snapshot is irreversible: arm on first click (auto-disarms)
-  // and only delete on an explicit second click — same forgiveness model as
-  // "clear all pins" and factory reset.
-  const [delArm, setDelArm] = useState("");
-  useEffect(() => {
-    if (!delArm) return;
-    const id = setTimeout(() => setDelArm(""), 3500);
-    return () => clearTimeout(id);
-  }, [delArm]);
-  const refresh = () => dockApi.profileList().then((p) => setProfiles(p || []));
-  useEffect(() => {
-    refresh();
-  }, []);
-  const active = (cfg && cfg.lastProfile) || "";
-  return (
-    <CollapsibleSection
-      title={t("prof.title")}
-      icon="copy"
-      hint={t("prof.hint")}
-      count={profiles.length || null}
-      defaultOpen={false}
-      className="profiles-section"
-    >
-      {profiles.map((n) => (
-        <div key={n} className={"prof-row" + (n === active ? " prof-active" : "")}>
-          <span className="prof-name">
-            {n === active && (
-              <span className="prof-check" dangerouslySetInnerHTML={{ __html: icon("check") }} />
-            )}
-            {n}
-          </span>
-          <button
-            className="s-btn s-btn-soft"
-            onClick={async () => {
-              const fresh = await dockApi.profileApply(n).catch(() => null);
-              if (fresh) set(fresh);
-            }}
-          >
-            {t("prof.apply")}
-          </button>
-          <button
-            className={"s-btn " + (delArm === n ? "s-btn-danger" : "s-btn-soft")}
-            title={delArm === n ? t("prof.deleteConfirm") : t("apps.remove")}
-            onClick={async () => {
-              if (delArm !== n) return setDelArm(n);
-              setDelArm("");
-              await dockApi.profileDelete(n).catch(() => {});
-              refresh();
-            }}
-          >
-            {delArm === n
-              ? t("prof.deleteConfirm")
-              : <span dangerouslySetInnerHTML={{ __html: icon("x") }} />}
-          </button>
-        </div>
-      ))}
-      <div className="prof-row prof-new">
-        <input
-          className="sugg-search"
-          placeholder={t("prof.name")}
-          value={name}
-          maxLength={40}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <button
-          className="s-btn"
-          disabled={!name.trim()}
-          onClick={async () => {
-            await dockApi.profileSave(name.trim()).catch(() => {});
-            setName("");
-            refresh();
-          }}
-        >
-          {t("prof.save")}
-        </button>
-      </div>
-    </CollapsibleSection>
   );
 }
 
@@ -683,6 +601,7 @@ function Appearance({ cfg, set }) {
     <>
       <PageHeader title={t("ap.title")}>{t("ap.hint")}</PageHeader>
       <MiniDockPreview cfg={cfg} />
+      <FinishPicker set={set} />
       <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v })} />
 
       <SettingsSection>
@@ -1018,61 +937,6 @@ function ShortcutsPage({ cfg, set }) {
   );
 }
 
-function ProfilesPage({ cfg, set }) {
-  const [backupMsg, setBackupMsg] = useState("");
-  const flash = (msg) => {
-    setBackupMsg(msg);
-    clearTimeout(flash._t);
-    flash._t = setTimeout(() => setBackupMsg(""), 3200);
-  };
-  return (
-    <>
-      <PageHeader title={t("tab.profiles")}>{t("ap.backupHint")}</PageHeader>
-      <ProfilesCard cfg={cfg} set={set} />
-      <SettingsSection title={t("ap.backup")} hint={backupMsg || t("ap.backupKeep")}>
-        <Row label={t("ap.export")}>
-          <Button
-            onClick={async () => {
-              try {
-                const p = await pickSavePath("booki-config.json");
-                if (!p) return;
-                await dockApi.exportConfig(p);
-                flash(t("ap.backupExported"));
-              } catch (_) {
-                flash(t("ap.backupError"));
-              }
-            }}
-          >
-            {t("ap.export")}
-          </Button>
-        </Row>
-        <Row label={t("ap.import")}>
-          <Button
-            onClick={async () => {
-              try {
-                const p = await pickJsonFile();
-                if (!p) return;
-                if (!window.confirm(t("ap.backupImportConfirm"))) return;
-                const fresh = await dockApi.importConfig(p);
-                if (fresh) {
-                  set(fresh);
-                  flash(t("ap.backupImported"));
-                } else {
-                  flash(t("ap.backupError"));
-                }
-              } catch (_) {
-                flash(t("ap.backupError"));
-              }
-            }}
-          >
-            {t("ap.import")}
-          </Button>
-        </Row>
-      </SettingsSection>
-    </>
-  );
-}
-
 // Modal to choose a pin's icon: built-in library (with styles), upload an image,
 // or reset to the app's real icon.
 function IconPickerModal({ item, onPick, onClose }) {
@@ -1322,7 +1186,7 @@ function bindRafMove(onFrame) {
   return { onMove, detach };
 }
 
-function Apps({ cfg, set, section = "apps" }) {
+function Apps({ cfg, set, section = "apps", focusedPin }) {
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const kidMenuRef = useRef(null);
@@ -1367,6 +1231,14 @@ function Apps({ cfg, set, section = "apps" }) {
     const ref = widgetRefs(cfg.pinned, widget)[0];
     if (ref) setStyleFor(ref);
   };
+  useEffect(() => {
+    if (!focusedPin) return;
+    const find = (items) => { for (const item of items) { if (item.id === focusedPin) return item; const child = find(item.children || []); if (child) return child; } };
+    const item = find(cfg.pinned);
+    if (item?.kind === "widget") { const ref = widgetRefs(cfg.pinned, item.widget).find((r) => r.id === item.id); if (ref) setStyleFor(ref); }
+    const frame = requestAnimationFrame(() => { const el = document.querySelector(`[data-pin-id="${CSS.escape(focusedPin)}"]`); el?.scrollIntoView({ block: "center" }); el?.classList.add("setting-search-target"); });
+    return () => cancelAnimationFrame(frame);
+  }, [focusedPin]);
   const addWebsite = async () => {
     let url = webUrl.trim();
     if (!url) return;
@@ -1893,7 +1765,7 @@ function Apps({ cfg, set, section = "apps" }) {
             const open = isGroup && openIds[item.id];
             const topKey = "top:" + item.id;
             return (
-              <div key={item.id} data-idx={i}
+              <div key={item.id} data-pin-id={item.id} data-idx={i}
                 className={"pin-card" + (isGroup ? " is-group" : "") + (item.kind === "separator" ? " is-sep" : "") +
                   (mergeInto === i ? " merge-into" : "") + (open ? " open" : "")}>
                 <button className="pin-card-grip" title={t("apps.drag")} aria-label={t("apps.drag")}
@@ -2020,7 +1892,7 @@ function Apps({ cfg, set, section = "apps" }) {
           const open = isGroup && openIds[item.id];
           const topKey = "top:" + item.id;
           const rows = [
-            <li key={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
+            <li key={item.id} data-pin-id={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
               <span className="pin-left">
                 <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
                   onPointerDown={startDrag(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
@@ -2422,61 +2294,6 @@ function Faq({ version }) {
 
 // Updates live in the General tab (the dock's "update available" pill opens it),
 // so the check + install button is always where you'd look for it.
-function UpdatesCard({ onWhatsNew }) {
-  const [status, setStatus] = useState("idle"); // idle|checking|none|available|downloading|installing|error
-  const [update, setUpdate] = useState(null);
-  const [pct, setPct] = useState(0);
-  const check = async () => {
-    setStatus("checking");
-    let failed = false;
-    const u = await checkForUpdate(() => { failed = true; });
-    if (u) { setUpdate(u); setStatus("available"); }
-    else setStatus(failed ? "error" : "none");
-  };
-  // Check on arrival: the pill lands on this tab, so the install button must be
-  // waiting — not another "check for updates" click.
-  useEffect(() => { check(); }, []);
-  const install = async () => {
-    setPct(null);
-    setStatus("downloading");
-    try {
-      await installUpdate(update, (p) => {
-        setPct(p.pct);
-        if (p.phase === "install") setStatus("installing");
-      });
-    } catch (e) {
-      logMessage("error", `update install: ${e}`);
-      setStatus("error");
-    }
-  };
-  return (
-    <>
-      {status === "available" ? (
-        <Row label={<>{t("ab.newVersion")} <strong>v{update.version}</strong> {t("ab.available")}</>} hint={t("ab.keeps")}>
-          <Button appearance="primary" onClick={install}>{t("ab.install")}</Button>
-        </Row>
-      ) : status === "downloading" || status === "installing" ? (
-        <Row label={status === "installing" ? t("ab.installing") : `${t("ab.downloading")} ${pct == null ? "…" : Math.round(pct * 100) + "%"}`}>
-          <div className={"upd-bar" + (pct == null ? " indeterminate" : "")} role="progressbar" aria-label={t("ab.downloading")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct == null ? undefined : Math.round(pct * 100)}><i style={{ transform: `scaleX(${status === "installing" ? 1 : pct == null ? .35 : pct.toFixed(3)})` }} /></div>
-        </Row>
-      ) : (
-        <Row
-          label={status === "none" ? t("ab.upToDate") : status === "error" ? t("ab.error") : t("ab.check")}
-          hint={t("ab.keeps")}
-        >
-          <Button onClick={check} disabled={status === "checking"}>
-            {status === "checking" ? t("ab.checking") : t("ab.check")}
-          </Button>
-        </Row>
-      )}
-      {update?.body && <details className="update-notes"><summary>{t("overhaul.updateNotes")}</summary><pre>{update.body}</pre></details>}
-      <Row label={t("ab.whatsNew")}>
-        <Button onClick={onWhatsNew}>{t("ab.whatsNew")}</Button>
-      </Row>
-    </>
-  );
-}
-
 // The "everything general" tab: system toggles, language, shortcuts, updates
 // and backup — anything that isn't about how the dock looks or moves.
 function DiagnosticsCard() {
@@ -2493,7 +2310,7 @@ function DiagnosticsCard() {
   return <SettingsSection title={t("overhaul.diagnostics")} hint={t("overhaul.diagnosticsHint")}><div className="diagnostics-row"><button className="s-btn s-btn-soft" disabled={busy} onClick={save}>{t("overhaul.diagnostics")}</button><span role="status">{status}</span></div></SettingsSection>;
 }
 
-function General({ cfg, set, onWhatsNew }) {
+function General({ cfg, set, onWhatsNew, beforeApply }) {
   const [autostart, setAutostart] = useState(!!cfg.autostart);
   useEffect(() => {
     dockApi.getAutostart().then((v) => setAutostart(!!v));
@@ -2532,7 +2349,7 @@ function General({ cfg, set, onWhatsNew }) {
       </SettingsSection>
 
       <SettingsSection title={t("ab.updates")} hint={t("ab.updatesHint")}>
-        <UpdatesCard onWhatsNew={onWhatsNew} />
+        <UpdatesCard onWhatsNew={onWhatsNew} beforeApply={beforeApply} />
       </SettingsSection>
 
       <DiagnosticsCard />
@@ -2627,6 +2444,8 @@ function App() {
   const contentRef = useRef(null);
   const searchRef = useRef(null);
   // Reopen on the last tab the user was looking at.
+  const [searchTarget, setSearchTarget] = useState(null);
+  const [focusedPin, setFocusedPin] = useState(null);
   const [tab, setTabRaw] = useState(() => {
     try {
       const saved = localStorage.getItem("booki.lastTab");
@@ -2636,6 +2455,7 @@ function App() {
     }
   });
   const setTab = (t) => {
+    setFocusedPin(null);
     setTabRaw(t);
     try { localStorage.setItem("booki.lastTab", t); } catch (_) {}
     requestAnimationFrame(() => {
@@ -2713,7 +2533,7 @@ function App() {
       if (closeAllowed.current) return;
       event.preventDefault();
       flushSave().then(() => {
-        if (!dirtyKeys.current.size) { closeAllowed.current = true; closeSelf(); }
+        if (!dirtyKeys.current.size) finishClose();
       });
     }).then((un) => { if (disposed) un(); else unlisten = un; });
     return () => { disposed = true; unlisten?.(); };
@@ -2779,8 +2599,26 @@ function App() {
     if (!result) return;
     setTab(result.tab);
     setQuery("");
-    requestAnimationFrame(() => searchRef.current?.focus());
+    setSearchTarget(result);
   };
+
+  useEffect(() => {
+    if (!searchTarget) return;
+    let frame, timer;
+    frame = requestAnimationFrame(() => {
+      let target = [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === searchTarget.label);
+      if (!target) document.querySelectorAll(".ui-disclosure[aria-expanded=false]").forEach((button) => button.click());
+      frame = requestAnimationFrame(() => {
+        target = [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === searchTarget.label);
+        if (!target) return;
+        target.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        target.classList.add("setting-search-target");
+        target.querySelector("input, select, button")?.focus({ preventScroll: true });
+        timer = setTimeout(() => target.classList.remove("setting-search-target"), 2500);
+      });
+    });
+    return () => { cancelAnimationFrame(frame); clearTimeout(timer); };
+  }, [tab, searchTarget]);
 
   const onSearchKeyDown = (e) => {
     if (!searchResults.length) {
@@ -2844,15 +2682,24 @@ function App() {
     });
   };
 
-  const applyProfile = async (name) => {
-    await flushSave();
-    if (dirtyKeys.current.size) throw new Error("pending settings could not be saved");
-    const fresh = await dockApi.profileApply(name);
+  const finishClose = () => {
+    const keepAlive = ["downloading", "ready", "installing"].includes(updates.snapshot().phase);
+    closeAllowed.current = !keepAlive;
+    closeSelf({ keepAlive });
+  };
+
+  const prepareConfigOperation = async () => { await flushSave(); if (dirtyKeys.current.size) throw new Error("pending settings could not be saved"); };
+  const applySnapshot = async (operation) => {
+    await prepareConfigOperation();
+    const fresh = await operation();
     if (!fresh) throw new Error("profile unavailable");
     await ensureLang(fresh.language);
     cfgRef.current = fresh; setCfg(fresh); applyTheme(fresh); applySurfaceVars(fresh);
     await emitConfigChanged();
+    return fresh;
   };
+  const applyProfile = (name) => applySnapshot(() => dockApi.profileApply(name));
+  const importProfile = (path) => applySnapshot(() => dockApi.importConfig(path));
 
   const reset = async () => {
     await flushSave();
@@ -2875,7 +2722,7 @@ function App() {
       if (e.defaultPrevented || e.key !== "Escape") return;
       // Escape closes the changelog modal first, then the window.
       if (showChangelog) setShowChangelog(false);
-      else { await flushSave(); if (!dirtyKeys.current.size) closeSelf(); }
+      else { await flushSave(); if (!dirtyKeys.current.size) finishClose(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -3007,17 +2854,17 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
-            {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} />}
+            {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
             {tab === "dock" && <><DockPage cfg={cfg} set={set} /><CollapsibleSection title={t("tab.autohide")} defaultOpen={false}><AutoHidePage cfg={cfg} set={set} /></CollapsibleSection><CollapsibleSection title={t("tab.notch")} defaultOpen={false}><NotchPage cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "autohide" && <AutoHidePage cfg={cfg} set={set} />}
             {tab === "notch" && <NotchPage cfg={cfg} set={set} />}
-            {tab === "apps" && <Apps cfg={cfg} set={set} section="apps" />}
-            {tab === "widgets" && <Apps cfg={cfg} set={set} section="widgets" />}
+            {tab === "apps" && <Apps cfg={cfg} set={set} section="apps" focusedPin={focusedPin} />}
+            {tab === "widgets" && <Apps cfg={cfg} set={set} section="widgets" focusedPin={focusedPin} />}
             {tab === "clipboard" && <ClipboardPage cfg={cfg} set={set} />}
             {tab === "shortcuts" && <ShortcutsPage cfg={cfg} set={set} />}
-            {tab === "profiles" && <ProfilesPage cfg={cfg} set={set} />}
-            {tab === "general" && <><General cfg={cfg} set={set} onWhatsNew={() => setShowChangelog(true)} /><CollapsibleSection title={t("tab.shortcuts")} defaultOpen={false}><ShortcutsSection cfg={cfg} set={set} /></CollapsibleSection></>}
+            {tab === "profiles" && <ProfilesPage cfg={cfg} onApply={applyProfile} beforeSnapshot={prepareConfigOperation} onImport={importProfile} />}
+            {tab === "general" && <><General cfg={cfg} set={set} beforeApply={prepareConfigOperation} onWhatsNew={() => setShowChangelog(true)} /><CollapsibleSection title={t("tab.shortcuts")} defaultOpen={false}><ShortcutsSection cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "faq" && <Faq version={version || "..."} />}
             {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
           </div>

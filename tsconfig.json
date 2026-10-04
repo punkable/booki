@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["src/dock/geometry.js", "src/dock/placement.js", "src/dock/visibility-policy.js"]
+  "include": ["src/dock/geometry.js", "src/dock/placement.js", "src/dock/visibility-policy.js", "src/update-controller.js", "src/update-state.js"]
 }

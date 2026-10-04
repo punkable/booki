@@ -7,6 +7,8 @@ import { t } from "../i18n.js";
 
 // Searchable option index: i18n key → tab that hosts it (settings search).
 const SEARCH_INDEX = [
+  ["premium.finishes", "appearance"], ["overhaul.reduceTransparency", "appearance"],
+  ["overhaul.overflow", "dock"], ["premium.suggestionSettings", "apps"],
   ["ap.theme", "appearance"], ["ap.accent", "appearance"],
   ["ap.surface", "appearance"], ["ap.translucency", "appearance"],
   ["ap.solidity", "appearance"], ["ap.surfaceTint", "appearance"],

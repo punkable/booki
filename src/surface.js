@@ -128,3 +128,11 @@ export function applySurfaceVars(cfg, roots = [document.documentElement, documen
   applySurfaceClass(cfg);
   return alpha;
 }
+
+/* Intentional starting points; existing user finishes are never migrated. */
+export const FINISH_PRESETS = [
+  { id: 'air', patch: { theme: 'light', surfaceStyle: 'acrylic', surfaceTint: '#fcfcfd', materialStrength: 38, cornerRadius: 22, spacing: 8, iconSize: 44 } },
+  { id: 'mica', patch: { theme: 'system', surfaceStyle: 'mica', surfaceTint: '', materialStrength: 65, cornerRadius: 18, spacing: 8, iconSize: 44 } },
+  { id: 'tinted', patch: { theme: 'dark', surfaceStyle: 'tinted', surfaceTint: '#252832', materialStrength: 45, cornerRadius: 22, spacing: 8, iconSize: 44 } },
+  { id: 'solid', patch: { theme: 'light', surfaceStyle: 'solid', surfaceTint: '', materialStrength: 100, cornerRadius: 18, spacing: 6, iconSize: 40 } },
+];

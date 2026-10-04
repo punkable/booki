@@ -26,7 +26,7 @@ test("ranking puts prefix matches first and drops non-matches", () => {
   assert.deepEqual(rank(list, "st").map((c) => c.name), ["Steam", "Visual Studio"]);
 });
 
-test("pinned items are recognised by path, name or file name", () => {
+test("pinned items use launch identity rather than display name", () => {
   const keys = pinnedKeys([
     { name: "Code", path: "C:/Apps/code.exe" },
     { kind: "group", children: [{ name: "Spotify", path: "C:/Start/Spotify.lnk" }] },
@@ -42,7 +42,7 @@ test("pinned items are recognised by path, name or file name", () => {
     keys,
   );
   // One entry per executable, the shell left out, pinned ones sorted last.
-  assert.deepEqual(running.map((c) => [c.name, c.pinned]), [["Code", true], ["Spotify", true]].sort((a, b) => Number(a[1]) - Number(b[1])));
+  assert.deepEqual(running.map((c) => [c.name, c.pinned]), [["Spotify", false], ["Code", true]]);
   assert.equal(baseTitle("C:\\Start\\Visual Studio Code.lnk"), "Visual Studio Code");
 });
 
@@ -54,5 +54,5 @@ test("installed apps are flattened, deduplicated and sorted", () => {
     ],
     new Set(),
   );
-  assert.deepEqual(list.map((c) => c.name), ["Atom", "Mail", "Zed"]);
+  assert.deepEqual(list.map((c) => c.name), ["atom", "Atom", "Mail", "Zed"]);
 });

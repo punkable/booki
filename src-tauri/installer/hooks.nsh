@@ -3,6 +3,12 @@
 ; it across uninstall/reinstall by default; only wipe when the user checks
 ; "Delete app data" and this is not an updater (/UPDATE) run.
 
+!macro NSIS_HOOK_PREUNINSTALL
+  ${If} $UpdateMode = 1
+    StrCpy $DeleteAppDataCheckboxState 0
+  ${EndIf}
+!macroend
+
 !macro NSIS_HOOK_POSTUNINSTALL
   ; Clean Explorer "Booki" shell verbs (registry only — never touch config).
   DeleteRegKey HKCU "Software\Classes\*\shell\Booki"

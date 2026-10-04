@@ -2,7 +2,7 @@ import { writeCaptions } from './captions.mjs';
 import { bundle } from '@remotion/bundler';
 import { selectComposition, renderMedia, renderStill } from '@remotion/renderer';
 import { mkdirSync } from 'node:fs';
-import { cpus } from 'node:os';
+import { availableParallelism } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)); const out = resolve(here, '../../docs/presentation');
@@ -22,7 +22,7 @@ for (const locale of locales) {
   if (process.env.BOOKI_STILLS_ONLY) continue;
   const inputProps = { locale }; const composition = await selectComposition({ serveUrl, id: 'BookiFilm', inputProps, ...common });
   let last = -1;
-  await renderMedia({ serveUrl, composition, inputProps, codec: 'h264', crf: 20, pixelFormat: 'yuv420p', outputLocation: resolve(out, `booki-070-${locale}.mp4`), concurrency: Math.min(cpus().length, Number(process.env.BOOKI_CONCURRENCY) || 4), ...common,
+  await renderMedia({ serveUrl, composition, inputProps, codec: 'h264', crf: 20, pixelFormat: 'yuv420p', outputLocation: resolve(out, `booki-070-${locale}.mp4`), concurrency: Math.max(1, Math.min(availableParallelism(), Number(process.env.BOOKI_CONCURRENCY) || 4)), ...common,
     onProgress: ({ progress }) => { const part = Math.floor(progress * 10); if (part !== last) { last = part; console.log(`${locale} film ${Math.round(progress * 100)}%`); } },
   });
   writeCaptions(out, locale);
