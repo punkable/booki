@@ -3,48 +3,76 @@ import { mkdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { serveDist, launchBrowser, openPage, makeConfig } from '../../tests/harness.mjs';
+import { app, widget, tasks, city, allIcons, bridgePatch, studioPatch } from './fixtures.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const out = resolve(here, 'public'); mkdirSync(out, { recursive: true });
 copyFileSync(resolve(here, '../../assets/brand/svg/logo.svg'), resolve(out, 'logo.svg'));
 copyFileSync(resolve(here, '../../assets/brand/svg/isotype.svg'), resolve(out, 'mark.svg'));
 copyFileSync(resolve(here, 'fonts/Inter.ttf'), resolve(out, 'Inter.ttf'));
 const { srv, port } = await serveDist(); const browser = await launchBrowser();
-const camera = { newPage: (options) => browser.newPage({ ...options, deviceScaleFactor: 2 }) };
-const app = (id, name, glyph) => ({ id, name, kind: 'app', path: `C:/Examples/${name}.exe`, icon: `lib:${glyph}:badge` });
-const widget = (name, style = {}) => ({ id: `w-${name}`, kind: 'widget', widget: name, style });
-const pins = [app('files', 'Files', 'folder'), app('code', 'Editor', 'code'), app('terminal', 'Terminal', 'terminal'), { id: 'sep', kind: 'separator' }, widget('clock'), widget('cpu'), widget('tasks'), widget('timer')];
+const patch = bridgePatch(allIcons()) + studioPatch(resolve(here, 'fonts/Inter.ttf'));
+// Append the sample-data patch to the harness's fake bridge, before the page boots.
+const camera = { newPage: async (options) => {
+  const page = await browser.newPage({ ...options, deviceScaleFactor: 2 });
+  const add = page.addInitScript.bind(page); page.addInitScript = (source) => add(source + patch); return page;
+} };
+const pinsFor = (locale) => [
+  ...['files', 'browser', 'mail', 'music', 'photos', 'editor', 'terminal', 'chat'].map(app), { id: 'sep', kind: 'separator' },
+  widget('clock'), widget('weather', city(locale)), widget('cpu'), widget('tasks', { tasks: tasks(locale) }), widget('media'),
+];
+const fail = (errors) => { if (errors.length) throw new Error(errors.join('\n')); };
+async function shootDock(locale, theme) {
+  const cfg = makeConfig({ captureVisible: true, theme, language: locale, pinned: pinsFor(locale), iconSize: 56, spacing: 8 });
+  const { page, errors } = await openPage(camera, port, 'index.html', { cfg, viewport: { width: 1700, height: 760 } });
+  await page.mouse.move(0, 0); await page.waitForTimeout(800);
+  const bar = await page.locator('#dock').boundingBox();
+  const clip = { x: bar.x - 24, y: bar.y - 24, width: bar.width + 48, height: bar.height + 48 };
+  await page.screenshot({ path: resolve(out, `dock-${theme}-${locale}.png`), omitBackground: true, clip });
+  if (theme === 'light') {
+    // The tasks widget opens its own local list above the bar.
+    await page.locator('.tile[data-widget="tasks"]').click(); await page.waitForTimeout(500);
+    const panel = await page.locator('.productivity-panel').boundingBox();
+    await page.screenshot({ path: resolve(out, `tasks-${locale}.png`), omitBackground: true, clip: { x: panel.x - 30, y: panel.y - 30, width: panel.width + 60, height: panel.height + 38 } });
+  }
+  fail(errors); await page.close();
+}
+// Soft abstract wallpapers, drawn once so the film composites cheap stills.
+async function wallpaper(name, css) {
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  await page.setContent(`<body style="margin:0;width:1920px;height:1080px;overflow:hidden;background:${css.base}">${css.blobs.map(([x, y, r, c]) => `<div style="position:absolute;left:${x - r}px;top:${y - r}px;width:${r * 2}px;height:${r * 2}px;border-radius:50%;background:${c};filter:blur(140px)"></div>`).join('')}</body>`);
+  await page.waitForTimeout(200); await page.screenshot({ path: resolve(out, `wallpaper-${name}.jpg`), quality: 94, type: 'jpeg' }); await page.close();
+}
 try {
-  const { page: dock, errors: dockErrors } = await openPage(camera, port, 'index.html', { cfg: makeConfig({ captureVisible: true, theme: 'light', pinned: pins, iconSize: 52, spacing: 8 }), viewport: { width: 1440, height: 420 } });
-  await dock.mouse.move(0, 0); await dock.waitForTimeout(400);
-  const rect = await dock.locator('#dock').boundingBox();
-  await dock.screenshot({ path: resolve(out, 'dock.png'), omitBackground: true, clip: { x: Math.max(0, rect.x - 20), y: Math.max(0, rect.y - 20), width: rect.width + 40, height: rect.height + 40 } });
-  if (dockErrors.length) throw new Error(dockErrors.join('\n')); await dock.close();
-  for (const language of ['en', 'es']) {
-    const cfg = makeConfig({ pinned: pins, theme: 'light', language, autoHideMode: 'smart', lastProfile: language === 'es' ? 'Trabajo' : 'Work' });
-    const { page, errors } = await openPage(camera, port, 'settings.html', { cfg, viewport: { width: 1280, height: 960 } });
-    await page.screenshot({ path: resolve(out, `home-${language}.png`) });
+  await wallpaper('light', { base: '#f4efe8', blobs: [[260, 220, 520, '#f6c99a'], [1500, 160, 560, '#c9dcff'], [1100, 900, 620, '#f3d6e6'], [300, 1000, 420, '#d8ecdf']] });
+  await wallpaper('dark', { base: '#0d0d12', blobs: [[300, 260, 520, '#5b3a1e'], [1550, 220, 560, '#1d3266'], [1000, 980, 640, '#3a1f4a'], [200, 1000, 360, '#123b33']] });
+  for (const locale of ['en', 'es']) {
+    await shootDock(locale, 'light'); await shootDock(locale, 'dark');
+    const cfg = makeConfig({ pinned: pinsFor(locale), theme: 'light', language: locale, autoHideMode: 'smart', lastProfile: locale === 'es' ? 'Trabajo' : 'Work' });
+    const { page, errors } = await openPage(camera, port, 'settings.html', { cfg, viewport: { width: 1180, height: 760 } });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: resolve(out, `home-${locale}.png`) });
     await page.getByRole('button', { name: 'Widgets', exact: true }).click();
     await page.waitForTimeout(250); // let the tab's scroll-reset animation frame finish
-    const timer = page.locator('.widget-store-card').filter({ hasText: language === 'es' ? 'Temporizador' : 'Timer' }).first();
-    await timer.evaluate((target) => { const main = target.closest('.s-content'); main.scrollTop += target.getBoundingClientRect().top - main.getBoundingClientRect().top - 110; });
-    await page.screenshot({ path: resolve(out, `widgets-${language}.png`) });
     for (const type of ['timer', 'tasks', 'calendar', 'weather']) {
-      await page.locator('.widget-store-card').filter({ has: page.locator(`[data-widget="${type}"]`) }).screenshot({ path: resolve(out, `widget-${type}-${language}.png`) });
+      await page.locator('.widget-store-card').filter({ has: page.locator(`[data-widget="${type}"]`) }).screenshot({ path: resolve(out, `widget-${type}-${locale}.png`) });
     }
-    await page.evaluate(() => {
+    await page.evaluate(({ names, icons }) => {
       const old = window.__TAURI__.core.invoke;
+      const item = (name) => ({ name, path: `C:/Examples/${name.replace(/ /g, '')}.exe` });
       window.__TAURI__.core.invoke = (cmd, args) => {
-        if (cmd === 'frequent_apps') return Promise.resolve([{ name: 'Browser', path: 'C:/Examples/Browser.exe', runs: 42, focus_ms: 700000 }, { name: 'Music', path: 'C:/Examples/Music.exe', runs: 31, focus_ms: 600000 }, { name: 'Mail', path: 'C:/Examples/Mail.exe', runs: 15, focus_ms: 250000 }]);
-        if (cmd === 'list_installed_apps') return Promise.resolve([{ name: 'Examples', items: ['Browser', 'Calendar', 'Camera', 'Editor', 'Files', 'Mail', 'Music', 'Notes', 'Photos', 'Settings', 'Terminal', 'Videos'].map((name) => ({ name, path: `C:/Examples/${name}.exe` })) }]);
+        if (cmd === 'frequent_apps') return Promise.resolve([['Notes', 42], ['Calendar', 31], ['Videos', 24], ['Camera', 15]].map(([name, runs]) => ({ ...item(name), runs, focus_ms: runs * 20000 })));
+        if (cmd === 'list_installed_apps') return Promise.resolve([{ name: 'Examples', items: names.map(item) }]);
+        if (cmd === 'app_icon') return Promise.resolve(icons[args.path] || '');
         return old(cmd, args);
       };
-    });
-    await page.getByRole('button', { name: language === 'es' ? 'Apps y carpetas' : 'Apps & folders', exact: true }).click();
+    }, { names: ['Browser', 'Calendar', 'Camera', 'Chat', 'Code Editor', 'Files', 'Mail', 'Music', 'Notes', 'Photos', 'Settings', 'Terminal', 'Videos'], icons: allIcons() });
+    await page.getByRole('button', { name: locale === 'es' ? 'Apps y carpetas' : 'Apps & folders', exact: true }).click();
     await page.locator('.app-library-card').first().waitFor();
-    await page.waitForTimeout(250);
-    await page.locator('.app-library-tools').evaluate((target) => { const main = target.closest('.s-content'); main.scrollTop += target.getBoundingClientRect().top - main.getBoundingClientRect().top - 100; });
-    await page.locator('.app-library-tools').locator('xpath=ancestor::section[1]').screenshot({ path: resolve(out, `apps-${language}.png`) });
-    if (errors.length) throw new Error(errors.join('\n')); await page.close();
+    await page.waitForTimeout(400);
+    await page.locator('.app-library-tools').evaluate((target) => { const main = target.closest('.s-content'); main.scrollTop += target.getBoundingClientRect().top - main.getBoundingClientRect().top - 24; });
+    await page.waitForTimeout(200);
+    await page.screenshot({ path: resolve(out, `apps-${locale}.png`) });
+    fail(errors); await page.close();
   }
   console.log('Captured real Booki UI with example data in English and Spanish.');
 } finally { await browser.close(); srv.close(); }

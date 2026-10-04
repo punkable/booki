@@ -1,37 +1,38 @@
 # Booki presentation
 
-A reproducible, silent 30-second product film and four 1920×1080 stills per language (English and Spanish). The visual direction uses Booki's own capybara logo, white surfaces, elegant Inter typography, soft warm accents, generous spacing and restrained motion. English is the primary language for GitHub, release communication and the featured film. Spanish resources remain optional translations. Assets are labelled **0.70 preview** while that release is unpublished.
+A reproducible, silent 40-second film and six 1920×1080 stills per language (English and Spanish), used by the READMEs.
 
-The screenshots come from the actual built frontend with safe sample apps, usage counts and widget data. They are browser renders, not proof of native Windows materials, Show Desktop, installed-app discovery or hardware performance. No private configuration, clipboard, notes, third-party artwork or music is captured. Text captions accompany the video.
+Every product image is a capture of the actual built frontend, driven by safe fixtures in `fixtures.mjs`: generic glyph app icons (no third-party logos), made-up tasks, a fixed 9:41 clock and example weather, CPU and media data. Windows renders Booki in Segoe UI, which Linux lacks, so captures use Inter, the closest open face. Browser renders do not show native acrylic, Show Desktop, real installed apps or hardware performance. No private configuration, clipboard, notes, third-party artwork or music is captured.
+
+## Scenes
+
+| # | Scene | Still |
+|---|---|---|
+| 1 | Intro: logo and tagline | — |
+| 2 | Desktop: the dock rises over a soft wallpaper | `hero-*.jpg` |
+| 3 | Glide along the bar to the live widgets | `widgets-*.jpg` |
+| 4 | Focus: tasks panel and the four new widgets | `focus-*.jpg` |
+| 5 | App library window | `apps-*.jpg` |
+| 6 | Settings Home window | `settings-*.jpg` |
+| 7 | Dark mode desktop | `dark-*.jpg` |
+| 8 | Privacy and release card | — |
 
 ## Reproduce
 
-From the repository root, using the project's required Node version:
+From the repository root, with the project’s Node version:
 
 ```bash
 npm ci
 npm run build
-npx playwright install chromium
 npm ci --prefix tools/presentation
 npm run capture --prefix tools/presentation
 npm run render --prefix tools/presentation
 ```
 
-Install FFmpeg for the default video encoder. Remotion renders the six original scenes; FFmpeg assembles them with slow camera movement and fades, avoiding repeated software-browser painting of static art. Set `BOOKI_RENDER_ENGINE=browser` to render the film entirely in Remotion instead.
+- `capture.mjs`: wallpapers, dock (light/dark), tasks panel, widget cards and Settings windows into ignored `public/`.
+- `src/copy.mjs`: all film copy in both languages; `src/index.jsx`: scenes and motion (30 fps, 5 s per scene).
+- `render.mjs`: stills, H.264 MP4 and WebVTT captions into `docs/presentation/`.
 
-Remotion can download its own headless browser. To reuse an installed Chrome/Chromium instead, set `BOOKI_CHROMIUM` to its absolute executable path. `BOOKI_FILM_LANGUAGE=es` renders the Spanish edition; English is the default.
+Environment: `BOOKI_CHROMIUM` reuses an installed Chrome/headless shell; `BOOKI_FILM_LANGUAGE=en` (or `es`) limits the languages; `BOOKI_STILLS_ONLY=1` skips the films; `BOOKI_CONCURRENCY` sets render workers.
 
-- `capture.mjs`: fresh English/Spanish screenshots and copies of the official brand SVGs in ignored `public/`.
-- `src/index.jsx`: six scenes, 5 seconds each, 30 fps, 1920×1080. Edit copy here.
-- `render.mjs` / `encode.mjs`: creates JPG stills, H.264 MP4 and WebVTT captions in `docs/presentation/`.
-- Remotion dependencies are isolated here and locked; they never enter Booki's application bundle.
-
-Check the video with `ffprobe`, inspect frames from every scene, and check copy against the release status before sharing. The film is silent by design, with the explanation visible on screen and in captions.
-
-## Useful existing material
-
-Keep `docs/screenshots/`: the earlier native Windows screenshots and GIFs show 0.69 behavior and remain useful reference material. Keep `docs/brand/png/`: original PNG exports are useful to contributors. Neither directory is shipped by Vite.
-
-Generated fixture captures, temporary renders and dependency folders are ignored. Finished presentation assets live in `docs/presentation/`; temporary audit downloads belong outside the repository.
-
-The presentation bundles Inter (SIL Open Font License) for consistent offline rendering. See `fonts/OFL.txt`. Use the official dark-wordmark logo on white; preserve the capybara and warm accent. Keep screenshots in Booki’s existing light theme and transitions white, with restrained shadows and no decorative chrome.
+Remotion dependencies are isolated here and never enter Booki's application bundle. Check frames from every scene and the copy against the release status before sharing.

@@ -1,79 +1,126 @@
 import React from 'react';
-import { registerRoot, Composition, AbsoluteFill, Img, interpolate, useCurrentFrame, staticFile, delayRender, continueRender } from 'remotion';
-const copy = {
-  en: [
-    ['Your Windows. Your workspace.', 'Booki · a smart dock for Windows'],
-    ['Everything within reach.', 'Apps, folders and live widgets. One place to start.'],
-    ['A little more focus.', 'Timers. Tasks. Calendar. Optional city weather.'],
-    ['Less searching. More doing.', 'Find installed apps and suggestions from local usage.'],
-    ['Make it yours.', 'Preview your dock. Choose how it behaves. Keep your setup.'],
-    ['Meet the next Booki.', '0.70 preview · Windows 10 / 11 · punkable/booki'],
-  ],
-  es: [
-    ['Tu Windows. Tu espacio.', 'Booki · un dock inteligente para Windows'],
-    ['Todo al alcance.', 'Apps, carpetas y widgets. Un lugar para empezar.'],
-    ['Un poco más de enfoque.', 'Temporizador. Tareas. Calendario. Clima opcional.'],
-    ['Menos búsqueda. Más acción.', 'Apps instaladas y sugerencias según tu uso local.'],
-    ['Hazlo tuyo.', 'Previsualiza tu dock. Elige cómo se comporta. Conserva tu configuración.'],
-    ['Conoce el próximo Booki.', 'Vista previa 0.70 · Windows 10 / 11 · punkable/booki'],
-  ],
-};
+import { registerRoot, Composition, AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, delayRender, continueRender, Easing } from 'remotion';
+
+/* Eight scenes, five seconds each. Every product image is a capture of the real
+   built frontend with example data (see capture.mjs); only the backdrops,
+   type and motion are drawn here. */
+import { copy, SCENE, SCENES } from './copy.mjs';
 const font = 'Inter, Arial, Helvetica, sans-serif';
+const ink = '#1d1d1f'; const quiet = '#6e6e73';
 const fontReady = delayRender('Load the presentation typeface');
 const face = new FontFace('Inter', `url(${staticFile('Inter.ttf')})`, { weight: '100 900' });
 face.load().then((loaded) => { document.fonts.add(loaded); continueRender(fontReady); }).catch((error) => { throw error; });
-function Background() {
-  return <AbsoluteFill style={{ background: '#ffffff', overflow: 'hidden' }}>
-    <div style={{ position: 'absolute', left: 250, right: 250, top: 470, height: 420, background: 'radial-gradient(ellipse, #f7f5f1, #ffffff00 72%)' }} />
-  </AbsoluteFill>;
-}
-function Label({ locale }) {
-  return <div style={{ position: 'absolute', top: 68, right: 84, padding: '12px 22px', border: '1px solid #e8e8ed', borderRadius: 40, color: '#737378', fontSize: 17, letterSpacing: 1.4 }}>
-    {locale === 'es' ? 'VISTA PREVIA · 0.70' : 'PREVIEW · 0.70'}
+
+const ease = Easing.bezier(0.22, 1, 0.36, 1);
+const lerp = (t, from, to, a, b) => interpolate(t, [from, to], [a, b], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: ease });
+function useRise(t, delay = 0) { const { fps } = useVideoConfig(); return spring({ frame: t - delay, fps, config: { damping: 200, mass: 0.9 } }); }
+
+function Title({ t, lines, color = ink, sub = quiet, align = 'left', size = 96, delay = 4, style }) {
+  const a = useRise(t, delay); const b = useRise(t, delay + 8);
+  return <div style={{ textAlign: align, ...style }}>
+    <h1 style={{ margin: 0, fontSize: size, lineHeight: 1.04, letterSpacing: -size * 0.035, fontWeight: 650, color, opacity: a, transform: `translateY(${(1 - a) * 40}px)` }}>{lines[0]}</h1>
+    {lines[1] && <p style={{ margin: '22px 0 0', fontSize: size * 0.33, lineHeight: 1.35, fontWeight: 450, color: sub, opacity: b, transform: `translateY(${(1 - b) * 30}px)` }}>{lines[1]}</p>}
   </div>;
 }
-function Brand({ width = 220 }) { return <Img src={staticFile('logo.svg')} style={{ width }} />; }
-function Content({ scene, locale, time = 60 }) {
-  const words = copy[locale][scene];
-  const reveal = interpolate(time, [0, 24], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const shift = (1 - reveal) * 32;
-  if (scene === 0 || scene === 5) return <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', gap: 40, opacity: reveal, transform: `translateY(${shift}px)` }}>
-    <Brand width={430} />
-    <h1 style={{ fontSize: 78, letterSpacing: -3.4, fontWeight: 600, margin: '12px 0 0', textAlign: 'center' }}>{words[0]}</h1>
-    <p style={{ fontSize: 30, color: '#6e6e73', margin: 0 }}>{words[1]}</p>
-    {scene === 5 && <div style={{ padding: '15px 30px', border: '1px solid #e9ddcf', background: '#faf6ef', borderRadius: 50, color: '#87613b', fontSize: 24 }}>{locale === 'es' ? 'Código abierto. Sin cuentas. Tu configuración, local.' : 'Open source. No accounts. Your setup stays local.'}</div>}
-  </AbsoluteFill>;
-  const image = scene === 1 ? 'dock.png' : scene === 2 ? `widgets-${locale}.png` : scene === 3 ? `apps-${locale}.png` : `home-${locale}.png`;
-  return <AbsoluteFill style={{ padding: '68px 84px', opacity: reveal, transform: `translateY(${shift}px)` }}>
-    <Brand width={180} />
-    <div style={{ marginTop: 66, maxWidth: 1700 }}>
-      <h1 style={{ margin: 0, fontSize: 76, letterSpacing: -3.2, fontWeight: 600 }}>{words[0]}</h1>
-      <p style={{ margin: '20px 0 0', fontSize: 28, color: '#6e6e73', lineHeight: 1.4 }}>{words[1]}</p>
+function Note({ text, color = '#86868b' }) { return <span style={{ position: 'absolute', left: 96, bottom: 56, fontSize: 17, letterSpacing: 1.6, textTransform: 'uppercase', color }}>{text}</span>; }
+function Window({ src, width, children, style }) {
+  return <div style={{ position: 'absolute', width, borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: '0 50px 100px #2a1d1033, 0 0 0 1px #00000014', ...style }}>
+    <div style={{ height: 40, background: '#f3f1ee', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 30, padding: '0 22px', color: '#444', fontSize: 16 }}><span>—</span><span>☐</span><span>✕</span></div>
+    <Img src={staticFile(src)} style={{ width: '100%', display: 'block' }} />{children}
+  </div>;
+}
+
+function Intro({ t, c }) {
+  const m = useRise(t, 2); const w = useRise(t, 16); const s = useRise(t, 30);
+  return <AbsoluteFill style={{ background: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
+      <Img src={staticFile('mark.svg')} style={{ width: 200, opacity: m, transform: `scale(${0.6 + 0.4 * m}) rotate(${(1 - m) * -12}deg)` }} />
+      <span style={{ fontSize: 190, fontWeight: 700, letterSpacing: -8, color: ink, opacity: w, transform: `translateX(${(1 - w) * -40}px)` }}>{c.intro[0]}</span>
     </div>
-    {scene === 1 ? <>
-      <div style={{ position: 'absolute', left: 150, right: 150, top: 555, height: 270, borderRadius: 140, background: 'radial-gradient(ellipse, #dfaa7518, transparent 70%)' }} />
-      <Img src={staticFile(image)} style={{ position: 'absolute', width: 1610, left: 155, top: 585, filter: 'drop-shadow(0 28px 28px #302f351c)' }} />
-      <p style={{ position: 'absolute', bottom: 112, width: 1752, textAlign: 'center', color: '#6e6e73', fontSize: 21 }}>{locale === 'es' ? 'Ancla tus accesos. Mantén los archivos originales.' : 'Pin your shortcuts. Keep your original files.'}</p>
-    </> : scene === 2 ? <div style={{ position: 'absolute', left: 260, right: 260, top: 460, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-      {['timer', 'tasks', 'calendar', 'weather'].map((type) => <Img key={type} src={staticFile(`widget-${type}-${locale}.png`)} style={{ width: '100%', borderRadius: 18, boxShadow: '0 24px 48px #302f3514' }} />)}
-    </div> : <div style={{ position: 'absolute', left: 370, top: 400, width: 1180, height: 620, border: '1px solid #e8e8ed', borderRadius: 20, overflow: 'hidden', boxShadow: '0 28px 70px #302f351c', transform: `perspective(2000px) rotateX(${interpolate(time, [0, 100], [3, 0], { extrapolateRight: 'clamp' })}deg)` }}>
-      <Img src={staticFile(image)} style={{ width: '100%' }} />
-    </div>}
-    <span style={{ position: 'absolute', left: 84, bottom: 58, fontSize: 16, letterSpacing: 1.5, color: '#86868b' }}>{locale === 'es' ? 'INTERFAZ REAL · DATOS DE EJEMPLO' : 'ACTUAL INTERFACE · EXAMPLE DATA'}</span>
+    <p style={{ position: 'absolute', top: 690, fontSize: 44, color: quiet, margin: 0, opacity: s, transform: `translateY(${(1 - s) * 24}px)` }}>{c.intro[1]}</p>
   </AbsoluteFill>;
 }
-export function Film({ locale = 'en', baked = false }) {
-  const frame = useCurrentFrame();
-  const scene = Math.min(5, Math.floor(frame / 150)); const time = frame % 150;
-  const fade = interpolate(time, [0, 12, 135, 149], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  if (baked) return <AbsoluteFill style={{ background: '#ffffff' }}><Img src={staticFile(`scene-${scene}-${locale}.jpg`)} style={{ width: '100%', height: '100%', opacity: fade, transform: `scale(${interpolate(time, [0, 149], [1.01, 1])})` }} /></AbsoluteFill>;
-  return <AbsoluteFill style={{ color: '#1d1d1f', fontFamily: font }}><Background /><div style={{ position: 'absolute', inset: 0, opacity: fade }}><Content scene={scene} locale={locale} time={time} /></div><Label locale={locale} /></AbsoluteFill>;
+function Desktop({ t, c, locale, theme = 'light' }) {
+  const dock = useRise(t, 18); const zoom = lerp(t, 0, SCENE, 1.06, 1);
+  const dark = theme === 'dark';
+  return <AbsoluteFill style={{ overflow: 'hidden' }}>
+    <Img src={staticFile(`wallpaper-${theme}.jpg`)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: `scale(${zoom})` }} />
+    <Title t={t} lines={dark ? c.dark : c.desktop} color={dark ? '#f5f5f7' : ink} sub={dark ? '#a1a1a6' : '#4a4a4f'} align="center" size={104} style={{ position: 'absolute', top: 210, width: '100%' }} />
+    <Img src={staticFile(`dock-${theme}-${locale}.png`)} style={{ position: 'absolute', left: (1920 - 1700) / 2, width: 1700, top: 840 + (1 - dock) * 260, opacity: dock, filter: `drop-shadow(0 30px 40px ${dark ? '#00000080' : '#5a3d2030'})` }} />
+    <Note text={c.note} color={dark ? '#8e8e93' : '#7a7068'} />
+  </AbsoluteFill>;
 }
+function Widgets({ t, c, locale }) {
+  // Glide along the bar from the apps to the widgets, then settle.
+  const x = lerp(t, 10, 120, -40, -1690); const s = lerp(t, 0, 50, 1.6, 1.95);
+  return <AbsoluteFill style={{ overflow: 'hidden' }}>
+    <Img src={staticFile('wallpaper-light.jpg')} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', filter: 'blur(6px)', transform: 'scale(1.1)' }} />
+    <Title t={t} lines={c.widgets} size={92} style={{ position: 'absolute', left: 96, top: 140 }} />
+    <div style={{ position: 'absolute', left: 300, top: 640, transformOrigin: '0 50%', transform: `translateX(${x}px) scale(${s})` }}>
+      <Img src={staticFile(`dock-light-${locale}.png`)} style={{ width: 1700, filter: 'drop-shadow(0 18px 24px #5a3d2024)' }} />
+    </div>
+    <Note text={c.note} color="#7a7068" />
+  </AbsoluteFill>;
+}
+function Focus({ t, c, locale }) {
+  const panel = useRise(t, 14);
+  return <AbsoluteFill style={{ background: '#fbfaf8' }}>
+    <Title t={t} lines={c.focus} size={92} style={{ position: 'absolute', left: 96, top: 140, width: 900 }} />
+    <Img src={staticFile(`tasks-${locale}.png`)} style={{ position: 'absolute', left: 1290, top: 150, width: 560, opacity: panel, transform: `translateY(${(1 - panel) * 60}px)`, filter: 'drop-shadow(0 40px 60px #5a3d2026)' }} />
+    {['timer', 'tasks', 'calendar', 'weather'].map((type, i) => {
+      const r = useRise(t, 30 + i * 7);
+      return <Img key={type} src={staticFile(`widget-${type}-${locale}.png`)} style={{ position: 'absolute', left: 96 + i * 292, top: 520, width: 270, borderRadius: 18, opacity: r, transform: `translateY(${(1 - r) * 80}px)`, boxShadow: '0 24px 48px #302f3514' }} />;
+    })}
+    <Note text={c.note} />
+  </AbsoluteFill>;
+}
+function Screen({ t, c, lines, src }) {
+  const w = useRise(t, 12); const tilt = lerp(t, 12, 90, 14, 0);
+  return <AbsoluteFill style={{ background: 'linear-gradient(#ffffff, #f5f1ec)', perspective: 2400 }}>
+    <Title t={t} lines={lines} size={92} align="center" style={{ position: 'absolute', top: 90, width: '100%' }} />
+    <Window src={src} width={1240} style={{ left: 340, top: 380 + (1 - w) * 200, opacity: w, transform: `rotateX(${tilt}deg)`, transformOrigin: '50% 0' }} />
+    <Note text={c.note} />
+  </AbsoluteFill>;
+}
+function Outro({ t, c }) {
+  const a = useRise(t, 4); const b = useRise(t, 40); const d = useRise(t, 56);
+  return <AbsoluteFill style={{ background: '#fff', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ opacity: a, transform: `translateY(${(1 - a) * 30}px)`, textAlign: 'center' }}>
+      <h1 style={{ margin: 0, fontSize: 110, letterSpacing: -4, fontWeight: 650, color: ink }}>{c.outro[0]}</h1>
+      <p style={{ margin: '24px 0 0', fontSize: 40, color: quiet }}>{c.outro[1]}</p>
+    </div>
+    <div style={{ position: 'absolute', top: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, opacity: b, transform: `scale(${0.94 + 0.06 * b})` }}>
+      <Img src={staticFile('logo.svg')} style={{ width: 300 }} />
+      <span style={{ fontSize: 24, color: '#87613b', padding: '12px 28px', borderRadius: 40, background: '#faf6ef', border: '1px solid #ecdfcf', opacity: d }}>{c.outro[2]}</span>
+    </div>
+  </AbsoluteFill>;
+}
+function Scene({ scene, t, locale }) {
+  const c = copy[locale];
+  switch (scene) {
+    case 0: return <Intro t={t} c={c} />;
+    case 1: return <Desktop t={t} c={c} locale={locale} />;
+    case 2: return <Widgets t={t} c={c} locale={locale} />;
+    case 3: return <Focus t={t} c={c} locale={locale} />;
+    case 4: return <Screen t={t} c={c} lines={c.apps} src={`apps-${locale}.png`} />;
+    case 5: return <Screen t={t} c={c} lines={c.home} src={`home-${locale}.png`} />;
+    case 6: return <Desktop t={t} c={c} locale={locale} theme="dark" />;
+    default: return <Outro t={t} c={c} />;
+  }
+}
+export function Film({ locale = 'en' }) {
+  const frame = useCurrentFrame();
+  const scene = Math.min(SCENES - 1, Math.floor(frame / SCENE)); const t = frame % SCENE;
+  const fade = scene === SCENES - 1 ? lerp(t, 0, 12, 0, 1) : interpolate(t, [0, 12, SCENE - 10, SCENE - 1], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  return <AbsoluteFill style={{ background: scene === 6 ? '#000' : '#fff', fontFamily: font }}><AbsoluteFill style={{ opacity: scene === 0 ? 1 : fade }}><Scene scene={scene} t={t} locale={locale} /></AbsoluteFill></AbsoluteFill>;
+}
+/* A still is a scene after its entrance has settled. */
 export function Poster({ locale = 'en', scene = 1 }) {
-  return <AbsoluteFill style={{ color: '#1d1d1f', fontFamily: font }}><Background /><Content scene={scene} locale={locale} /><Label locale={locale} /></AbsoluteFill>;
+  const t = scene === 2 ? SCENE - 1 : 110;
+  return <AbsoluteFill style={{ fontFamily: font }}><Scene scene={scene} t={t} locale={locale} /></AbsoluteFill>;
 }
 function Root() { return <>
-  <Composition id="BookiFilm" component={Film} durationInFrames={900} fps={30} width={1920} height={1080} defaultProps={{ locale: 'en' }} />
+  <Composition id="BookiFilm" component={Film} durationInFrames={SCENE * SCENES} fps={30} width={1920} height={1080} defaultProps={{ locale: 'en' }} />
   <Composition id="BookiPoster" component={Poster} durationInFrames={1} fps={30} width={1920} height={1080} defaultProps={{ locale: 'en', scene: 1 }} />
 </>; }
 registerRoot(Root);

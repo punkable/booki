@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/brand/svg/isotype.svg" alt="Booki capybara" height="64" />
+  <img src="assets/brand/svg/isotype.svg" alt="Booki capybara" height="72" />
 </p>
 
 <h1 align="center">Booki</h1>
 
-<p align="center">Your apps, folders and widgets. A calmer workspace on Windows.</p>
+<h3 align="center">A calmer way to use Windows.</h3>
 
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest">Download the current release</a> ·
-  <a href="#preview-the-next-booki">Preview 0.70</a> ·
+  <a href="https://github.com/punkable/booki/releases/latest"><b>Download</b></a> ·
+  <a href="docs/presentation/booki-070-en.mp4"><b>Watch the film</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
@@ -18,74 +18,69 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-**Release status:** the published installer is **0.69.0**. The **0.70 overhaul is an unreleased preview** in [PR #75](https://github.com/punkable/booki/pull/75). The preview images and film below show that upcoming version with example data. They are not a promise that the latest download already contains those changes.
-
-## Install and get started
-
-1. Open [Releases](https://github.com/punkable/booki/releases/latest). Choose `Booki_*_x64-setup.exe` for Intel/AMD Windows, or `Booki_*_arm64-setup.exe` for Windows on ARM. An x64 MSI is also available.
-2. Install and launch **Booki** from the Start menu. The standard installer is per-user; WebView2 is fetched if missing.
-3. Drag an app or folder onto the dock, or right-click the dock to add items. Open Settings from its menu or tray icon.
-
-Windows 10/11 is required. The beta installer is not Authenticode-signed: Windows may show a SmartScreen warning. Updater signatures verify downloaded update files; they do not remove SmartScreen warnings. In-app updates preserve your configuration.
-
-## What Booki does
-
-| Use it for | How it works |
-|---|---|
-| **Your daily apps** | Pin apps, folders, files, images and websites. Click to launch; optionally focus an existing window. Right-click for app/window actions and recent files. |
-| **Useful information** | Clock, CPU/RAM/disk/battery, network, uptime, volume, notes, clipboard history and now-playing widgets. |
-| **Room to work** | Smart hiding moves the dock out of the way. A small notch keeps it reachable; fullscreen behavior is configurable. |
-| **Your layout** | Any screen edge, groups, custom icons, light/dark/system themes, glass or solid surfaces, sizing and spacing. |
-| **Your settings** | Local configuration, named profiles, JSON backup/import and five interface languages. No account or cloud sync. |
-
-Clicks outside the painted dock pass through to the window behind it. Widget rendering pauses while hidden to avoid unnecessary updates.
-
-<details>
-<summary>See native Windows captures from 0.69</summary>
-
-<p align="center"><img src="docs/screenshots/dock.png" width="920" alt="Booki 0.69 dock on Windows" /></p>
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/genie.gif" width="400" alt="Booki 0.69 dock hiding into its notch" /><br/>Smart hide</td>
-    <td align="center"><img src="docs/screenshots/folder.gif" width="360" alt="Booki 0.69 folder flyout" /><br/>Folder flyouts</td>
-  </tr>
-</table>
-
-These earlier captures are kept as useful reference material. The 0.70 presentation below is rendered from the new frontend, rather than recorded on Windows hardware.
-
-</details>
-
-## Preview the next Booki
-
 <p align="center">
-  <a href="docs/presentation/booki-070-preview-en.mp4"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki 0.70 preview: official logo and a dock with apps, clock, CPU, tasks and timer" /></a>
+  <a href="docs/presentation/booki-070-en.mp4"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock on a soft desktop: apps, clock, weather, CPU, tasks and now playing" /></a>
 </p>
 
-**[Watch the 30-second preview](docs/presentation/booki-070-preview-en.mp4)** · [Text captions](docs/presentation/booki-070-preview-en.vtt)
+---
 
-The film is silent, with explanations on screen. It uses actual Booki UI, sample app/usage data and the official logo. Native materials and Windows behavior still need testing on Windows.
+<h2 align="center">Everything you use. One beautiful dock.</h2>
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/presentation/settings-en.jpg" alt="Booki 0.70 Home dashboard preview" /><br/><b>Make it yours.</b> Shared dock previews, behavior scenarios, profiles and grouped responsive settings.</td>
-    <td width="50%"><img src="docs/presentation/apps-en.jpg" alt="Booki 0.70 app library preview with sample local usage data" /><br/><b>Find your apps.</b> Search installed apps, browse running apps and see suggestions based on local usage.</td>
-  </tr>
-  <tr>
-    <td><img src="docs/presentation/widgets-en.jpg" alt="Booki 0.70 timer, tasks, calendar and weather cards with example data" /><br/><b>Useful at a glance.</b> A visual gallery, adjustable widths and four new widgets: timer, tasks, calendar and optional city weather.</td>
-    <td><br/><b>A better dock.</b><br/><br/>Scroll crowded layouts or adapt their size. Reduce transparency. Recover conditionally hidden widgets. Edit your layout with a visible mode and a Done action.</td>
-  </tr>
-</table>
+<p align="center">Pin apps, folders, files and websites. Click to launch, or jump back to a window that's already open.<br/>Clicks outside the bar go straight through to whatever is behind it.</p>
 
-The same update includes the fixes from [#64](https://github.com/punkable/booki/issues/64):
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Close-up of Booki's live widgets: clock, weather, CPU and tasks" /></p>
 
-- Pinning keeps originals. Explicit shortcut moves preserve `.lnk` contents and avoid overwriting files; dragging out offers return to desktop, unpin or cancel.
-- Show Desktop signals reveal a smart-hidden dock, including with the click trigger. Manual hiding stays manual.
-- Folder pagination reaches all entries; language changes refresh widget labels and menus; cancelling a drag keeps items in place.
-- Partial configuration writes preserve unrelated changes, native polling avoids overlap, and diagnostics omit personal widget content and paths.
-- Installer language support, startup cleanup, updater progress and release history are improved.
+<h2 align="center">Live, at a glance.</h2>
 
-Read the complete [0.70 notes](docs/releases/v0.70.0.md). Automated frontend/Rust checks, native Windows regression tests and x64/ARM64 packaging passed for the overhaul. Interactive Win+D, monitor/DPI changes and a real install/update cycle remain required before publication. ARM64 packaging is not an ARM64 runtime test.
+<p align="center">Time, weather, CPU, memory, network, battery, notes, clipboard and now playing — compact tiles that sit right on the bar and pause when the dock is hidden.</p>
+
+<p align="center"><img src="docs/presentation/focus-en.jpg" width="1000" alt="Booki timer, tasks, calendar and weather widgets with the tasks list open" /></p>
+
+<h2 align="center">A little more focus.</h2>
+
+<p align="center">A countdown timer, a task list, a monthly calendar and optional city weather.<br/>Your tasks stay on your PC. Weather asks only for the city you choose — never your location.</p>
+
+<p align="center"><img src="docs/presentation/apps-en.jpg" width="1000" alt="Booki app library with most-used suggestions, open apps and all installed apps" /></p>
+
+<h2 align="center">Find any app. Fast.</h2>
+
+<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
+
+<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with a live dock preview and behavior scenarios" /></p>
+
+<h2 align="center">Make it yours.</h2>
+
+<p align="center">A live preview of your dock, three behaviors to choose from — always visible, smart, or reveal at the edge — named profiles, any screen edge, glass or solid surfaces, and five languages.</p>
+
+<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki in dark mode on a dark desktop" /></p>
+
+<h2 align="center">Light or dark. At home in either.</h2>
+
+<p align="center">Follows your Windows theme and wallpaper accent, with real acrylic behind the bar. When a game or video goes fullscreen, Booki steps aside.</p>
+
+---
+
+<h2 align="center">Private by design.</h2>
+
+<p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
+
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. See what's new in the <a href="docs/releases/v0.70.0.md">0.70 notes</a>.</sub></p>
+
+## Get started
+
+1. Open [Releases](https://github.com/punkable/booki/releases/latest) and pick `Booki_*_x64-setup.exe` (Intel/AMD) or `Booki_*_arm64-setup.exe` (Windows on ARM). An x64 MSI is also available.
+2. Launch **Booki** from the Start menu. The installer is per-user and fetches WebView2 if it's missing.
+3. Drag an app or folder onto the dock, or right-click the dock to add items.
+
+Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings.
+
+### New in 0.70
+
+- New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
+- Four new widgets: timer, tasks, calendar and optional city weather (Open-Meteo).
+- A redesigned app library with search, running apps and local usage suggestions.
+- Fixes from [#64](https://github.com/punkable/booki/issues/64): pinning keeps your original shortcuts, dragging out can return a shortcut to the desktop, folders show every entry, smart hide responds to Show Desktop, and changing language refreshes widgets and menus.
+- Safer configuration writes, a privacy-respecting diagnostics export, steadier updates and a fully translated installer.
 
 ## Everyday controls
 
@@ -135,7 +130,7 @@ npm run tauri:dev    # native app on Windows with Rust installed
 npm run tauri:build  # Windows packages
 ```
 
-For the presentation, see [tools/presentation](tools/presentation/README.md). Remotion, source scenes and generated fixtures are isolated from the app; finished media live in `docs/presentation/`. Useful historical screenshots and PNG brand exports are retained in `docs/`, outside the shipped assets.
+The images and film are rebuilt from the real frontend by [tools/presentation](tools/presentation/README.md); finished media live in `docs/presentation/`. Older native Windows captures and PNG brand exports are kept in `docs/`.
 
 To audit the current public release without running its installers:
 

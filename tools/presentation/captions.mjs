@@ -1,7 +1,10 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { copy, SCENE, SCENES } from './src/copy.mjs';
+/* One caption per scene, so the silent film also reads without the picture. */
 export function writeCaptions(out, locale) {
-const descriptions = locale === 'es' ? ['Booki. Tu Windows. Tu espacio.', 'Apps, carpetas y widgets. Ancla tus accesos y conserva los originales.', 'Temporizador, tareas, calendario y clima opcional.', 'Encuentra apps instaladas y sugerencias según tu uso local.', 'Vista previa del dock y escenarios de comportamiento.', 'Vista previa de Booki 0.70. Código abierto. Sin cuentas. Configuración local.'] : ['Booki. Your Windows. Your workspace.', 'Apps, folders and widgets. Pin your shortcuts and keep originals.', 'Timers, tasks, calendar and optional city weather.', 'Find installed apps and suggestions from local usage.', 'Dock previews and behavior scenarios.', 'Booki 0.70 preview. Open source. No accounts. Local settings.'];
-const timestamp = (seconds) => `00:00:${String(seconds).padStart(2, '0')}.000`;
-writeFileSync(resolve(out, `booki-070-preview-${locale}.vtt`), 'WEBVTT\n\n' + descriptions.map((text, i) => `${timestamp(i * 5)} --> ${timestamp((i + 1) * 5)}\n${text}\n`).join('\n'));
+  const c = copy[locale];
+  const lines = [c.intro.join('. '), c.desktop.join(' '), c.widgets.join(' '), c.focus.join(' '), c.apps.join(' '), c.home.join(' '), c.dark.join(' '), c.outro.join(' ')];
+  const stamp = (s) => `00:00:${String(s).padStart(2, '0')}.000`; const len = SCENE / 30;
+  writeFileSync(resolve(out, `booki-070-${locale}.vtt`), 'WEBVTT\n\n' + lines.slice(0, SCENES).map((text, i) => `${stamp(i * len)} --> ${stamp((i + 1) * len)}\n${text}\n`).join('\n'));
 }
