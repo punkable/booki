@@ -8,7 +8,7 @@ The latest public release verified during this work is **v0.69.0**. A package ve
 
 ## Delivered changes
 
-1. **Discovery and recommendations:** native packaged-app discovery, launch identities for shortcuts, shared matching/sections, Windows/local recency, explicit partial-source errors, recommendations/privacy controls and bulk selection that survives searches.
+1. **Discovery and recommendations:** native packaged-app discovery, launch identities for shortcuts, shared matching/sections, Windows/local recency (including packaged-app UserAssist records), explicit partial-source errors, recommendations/privacy controls and bulk selection that survives searches.
 2. **Design and navigation:** neutral white/dark Settings surfaces, coordinated material presets, responsive app cards, interactive Home preview and search that scrolls to and focuses the requested setting.
 3. **Productivity:** one-click timer restart, serialized task writes, task editing, previous/next/current calendar month and Celsius/Fahrenheit choice.
 4. **Performance and structure:** one bounded icon cache shared across consumers with four concurrent extractions; native extraction/scanning off the async command thread; app-candidate, profile and update modules separated from the large entrypoints. Observers are disconnected on panel disposal. Update lifecycle contracts join the existing TypeScript-checked JavaScript modules.
@@ -33,7 +33,7 @@ Timings include Playwright interaction overhead and vary with machine load. This
 - Frontend checks cover lint, strict contracts for extracted logic, encoding, versions, icons, five-language coverage, release-manifest validation, production build and functional browser tests.
 - The complete Windows integration module, including new discovery, shortcut identities and packaged-app icons, was type-checked against `windows` 0.58.0 for the Windows MSVC target.
 - Settings snapshots and usage parsing/ranking are tested separately without the Tauri host.
-- The full frontend suite passes with 112 tests. The initial PR CI passed full native Linux checks, native Windows x64 tests and x64/ARM64 installer packaging.
+- The frontend suite contains 115 functional/model tests, including the update UI flows and filtering removed packaged apps from recommendations. The initial PR CI passed full native Linux checks, native Windows x64 tests and x64/ARM64 installer packaging.
 - The local full native Linux build needs GTK/WebKit development packages absent on this host. Windows packaging and full native checks run in the PR's existing CI, for x64 and ARM64. Packaging success is not interactive Windows runtime verification.
 
 The new separated download/apply flow requires this client version. An older installed updater retains its prior UI for the first upgrade.

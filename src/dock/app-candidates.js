@@ -50,7 +50,9 @@ export function rank(list, query) {
 export function candidateSections(data, keys, query = '', identities = {}) {
   const catalog = installedCandidates(data.groups, keys, identities);
   const names = new Map(catalog.map((c) => [appKey(c, identities), c.name]));
-  const frequent = frequentCandidates(data.used, keys, 12, identities).map((c) => ({ ...c, name: names.get(appKey(c, identities)) || c.name }));
+  const catalogIds = new Set(catalog.map((c) => appKey(c, identities)));
+  const used = (data.used || []).filter((u) => !catalog.length || !pathKey(u.path).startsWith('shell:appsfolder/') || catalogIds.has(appKey(u, identities)));
+  const frequent = frequentCandidates(used, keys, 12, identities).map((c) => ({ ...c, name: names.get(appKey(c, identities)) || c.name }));
   const seen = new Set(frequent.map((c) => appKey(c, identities)));
   const running = runningCandidates(data.running, keys, identities).filter((c) => !seen.has(appKey(c, identities)));
   running.forEach((c) => seen.add(appKey(c, identities)));

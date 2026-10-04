@@ -139,6 +139,16 @@ pub fn resolve(decoded: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Option
     if decoded.len() > 2 && decoded.as_bytes()[1] == b':' {
         return Some(decoded.to_string());
     }
+    // Windows also records packaged app launches as AUMIDs rather than paths.
+    let parts = decoded.split('!').collect::<Vec<_>>();
+    if parts.len() == 2
+        && parts.iter().all(|part| !part.is_empty())
+        && decoded
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-!".contains(c))
+    {
+        return Some(format!("shell:AppsFolder\\{decoded}"));
+    }
     None
 }
 
@@ -296,7 +306,8 @@ pub fn frequent_apps(limit: usize) -> Vec<UsedApp> {
             let Some(path) = resolve(&decoded, &known_folder) else {
                 continue;
             };
-            if is_noise(&path) || !std::path::Path::new(&path).exists() {
+            if is_noise(&path) || !(is_packaged_app(&path) || std::path::Path::new(&path).exists())
+            {
                 continue;
             }
             out.push(UsedApp {
@@ -353,7 +364,12 @@ mod tests {
             resolve("D:\\Games\\g.exe", &lookup).as_deref(),
             Some("D:\\Games\\g.exe")
         );
-        assert_eq!(resolve("Microsoft.Windows.Calc!App", &lookup), None);
+        assert_eq!(
+            resolve("Microsoft.Windows.Calc!App", &lookup).as_deref(),
+            Some("shell:AppsFolder\\Microsoft.Windows.Calc!App")
+        );
+        assert_eq!(resolve("javascript:bad!App", &lookup), None);
+        assert_eq!(resolve("Package!", &lookup), None);
     }
 
     #[test]

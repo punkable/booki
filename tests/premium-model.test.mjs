@@ -95,3 +95,9 @@ test('a stale icon request failing after refresh does not erase the replacement 
   assert.equal(cache.get('app'), fresh);
   resolveNew('new icon'); assert.equal(await fresh, 'new icon'); assert.equal(calls, 2);
 });
+test('removed packaged apps are excluded when discovery succeeds but recommendations survive a source failure', () => {
+  const used = [{ name: 'Removed', path: 'shell:AppsFolder\\Removed!App' }];
+  const groups = [{ items: [{ name: 'Installed', path: 'shell:AppsFolder\\Installed!App' }] }];
+  assert.equal(candidateSections({ used, groups }, new Set()).frequent.length, 0);
+  assert.equal(candidateSections({ used, groups: [] }, new Set()).frequent.length, 1);
+});
