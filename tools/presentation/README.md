@@ -1,6 +1,6 @@
 # Booki presentation
 
-A reproducible, silent 30-second product film and four 1920×1080 stills per language (English and Spanish). The visual direction uses Booki's own capybara logo, charcoal surfaces, warm accents, generous spacing and restrained motion. Assets are labelled **0.70 preview** while that release is unpublished.
+A reproducible, silent 30-second product film and four 1920×1080 stills per language (English and Spanish). The visual direction uses Booki's own capybara logo, white surfaces, elegant Inter typography, soft warm accents, generous spacing and restrained motion. English is the primary language for GitHub, release communication and the featured film. Spanish resources remain optional translations. Assets are labelled **0.70 preview** while that release is unpublished.
 
 The screenshots come from the actual built frontend with safe sample apps, usage counts and widget data. They are browser renders, not proof of native Windows materials, Show Desktop, installed-app discovery or hardware performance. No private configuration, clipboard, notes, third-party artwork or music is captured. Text captions accompany the video.
 
@@ -33,3 +33,5 @@ Check the video with `ffprobe`, inspect frames from every scene, and check copy 
 Keep `docs/screenshots/`: the earlier native Windows screenshots and GIFs show 0.69 behavior and remain useful reference material. Keep `docs/brand/png/`: original PNG exports are useful to contributors. Neither directory is shipped by Vite.
 
 Generated fixture captures, temporary renders and dependency folders are ignored. Finished presentation assets live in `docs/presentation/`; temporary audit downloads belong outside the repository.
+
+The presentation bundles Inter (SIL Open Font License) for consistent offline rendering. See `fonts/OFL.txt`. Use the official dark-wordmark logo on white; preserve the capybara and warm accent. Keep screenshots in Booki’s existing light theme and transitions white, with restrained shadows and no decorative chrome.

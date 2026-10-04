@@ -62,7 +62,7 @@ These earlier captures are kept as useful reference material. The 0.70 presentat
   <a href="docs/presentation/booki-070-preview-en.mp4"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki 0.70 preview: official logo and a dock with apps, clock, CPU, tasks and timer" /></a>
 </p>
 
-**[Watch the 30-second preview](docs/presentation/booki-070-preview-en.mp4)** · [Spanish edition](docs/presentation/booki-070-preview-es.mp4) · [Text captions](docs/presentation/booki-070-preview-en.vtt)
+**[Watch the 30-second preview](docs/presentation/booki-070-preview-en.mp4)** · [Text captions](docs/presentation/booki-070-preview-en.vtt)
 
 The film is silent, with explanations on screen. It uses actual Booki UI, sample app/usage data and the official logo. Native materials and Windows behavior still need testing on Windows.
 
@@ -151,4 +151,4 @@ Releases are built from version tags through [release.yml](.github/workflows/rel
 
 [MIT](LICENSE). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
 
-Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo and no third-party music.
+Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).
