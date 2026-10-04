@@ -15,6 +15,9 @@ export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Write the markup here, not via dangerouslySetInnerHTML: React re-applies
+    // that on later renders and wipes the example values filled in below.
+    el.querySelector(".w-card").innerHTML = widgetCardHTML(widget);
     if (PREVIEW_WIDGETS.includes(widget)) {
       el.querySelector(".w-pv-title").textContent = widgetDisplayName(widget, t);
       el.querySelector(".w-pv-sub").textContent = t("overhaul.sample");
@@ -38,7 +41,7 @@ export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
   return <span ref={ref} className={"tile widget preview-static" + (PREVIEW_WIDGETS.includes(widget) ? " preview" : "") + (style.icon === false ? " no-ico" : "")}
     data-widget={widget} data-variant={style.variant || "glass"} aria-label={widgetDisplayName(widget, t)}
     style={{ "--size": `${size}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, "--widget-width": `${widgetWidth(widget, size, gap, style)}px`, width: widgetWidth(widget, size, gap, style) }}>
-    <span className="w-card" dangerouslySetInnerHTML={{ __html: widgetCardHTML(widget) }} />
+    <span className="w-card" />
   </span>;
 }
 const previewIcons = new Map();

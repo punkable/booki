@@ -139,3 +139,12 @@ test("built-in icon previews use SVG data instead of requesting lib URLs", async
   assert.match(src, /^data:image\/svg\+xml/);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test("the Home dock preview shows example values instead of empty placeholders", async () => {
+  const cfg = makeConfig({ pinned: [pin("clock"), pin("tasks"), pin("weather")] });
+  const { page, errors } = await openPage(browser, port, "settings.html", { cfg, viewport: { width: 1180, height: 760 } });
+  const values = await page.locator(".preview-static .w-value").allTextContents();
+  assert.equal(values.length, 3);
+  assert.ok(values.every((value) => value && value !== "…"), `preview values: ${values.join(", ")}`);
+  assert.deepEqual(errors, []); await page.close();
+});
