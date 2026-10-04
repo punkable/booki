@@ -1,58 +1,32 @@
-/* Auto-update via the Tauri updater. Checks the GitHub release manifest and
-   installs only signed installers. Updating the app does not replace its
-   saved configuration.
-   Dynamic imports so the browser preview (no Tauri) doesn't choke. */
-
+/* Signed Tauri updates. One installation at a time across callers in a WebView. */
+import { updateProgress } from "./update-state.js";
 import { isTauri, logMessage } from "./api.js";
-
-/** Check for an available update. Returns the update object or null. */
+let checking = null;
+let installing = null;
 export async function checkForUpdate(onError) {
   if (!isTauri) return null;
-  try {
-    const { check } = await import("@tauri-apps/plugin-updater");
-    const update = await check();
-    return update && update.available ? update : null;
-  } catch (e) {
-    logMessage("warn", `update check failed: ${e}`);
-    onError?.(e);
-    return null;
-  }
+  if (!checking) checking = import("@tauri-apps/plugin-updater").then(({ check }) => check({ timeout: 20000 })).finally(() => { checking = null; });
+  try { const update = await checking; return update?.available ? update : null; }
+  catch (error) { logMessage("warn", `update check failed: ${error}`); onError?.(error); return null; }
 }
-
-/** Download + install an update, reporting progress, then relaunch.
-    Download and install run as SEPARATE steps so the UI gets a beat to show
-    "installing — Booki will restart itself" before the installer closes the
-    app; with the old all-in-one call the progress bar just vanished. */
-export async function installUpdate(update, onProgress) {
-  let total = 0;
-  let received = 0;
-  const onEvent = (event) => {
-    switch (event.event) {
-      case "Started":
-        total = event.data.contentLength || 0;
-        onProgress && onProgress({ phase: "download", pct: 0 });
-        break;
-      case "Progress":
-        received += event.data.chunkLength || 0;
-        onProgress && onProgress({ phase: "download", pct: total ? received / total : 0 });
-        break;
-      case "Finished":
-        onProgress && onProgress({ phase: "install", pct: 1 });
-        break;
-    }
+export function installUpdate(update, onProgress) {
+  if (installing) return installing;
+  installing = performInstall(update, onProgress).finally(() => { installing = null; });
+  return installing;
+}
+async function performInstall(update, onProgress) {
+  if (!update) throw new Error("No update available");
+  let total = 0, received = 0;
+  const event = (event) => {
+    if (event.event === "Started") { total = event.data.contentLength || 0; received = 0; onProgress?.({ phase: "download", pct: updateProgress(total, 0) }); }
+    else if (event.event === "Progress") { received += Math.max(0, event.data.chunkLength || 0); onProgress?.({ phase: "download", pct: updateProgress(total, received) }); }
+    else if (event.event === "Finished") onProgress?.({ phase: "install", pct: 1 });
   };
   if (typeof update.download === "function" && typeof update.install === "function") {
-    await update.download(onEvent);
-    onProgress && onProgress({ phase: "install", pct: 1 });
-    await new Promise((r) => setTimeout(r, 1600)); // let the message be read
-    await update.install(); // on Windows this exits the app into the installer
-  } else {
-    await update.downloadAndInstall(onEvent);
-  }
-  try {
-    const { relaunch } = await import("@tauri-apps/plugin-process");
-    await relaunch();
-  } catch (_) {
-    /* on Windows the app is already exiting into the installer */
-  }
+    await update.download(event);
+    onProgress?.({ phase: "install", pct: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await update.install();
+  } else await update.downloadAndInstall(event);
+  try { const { relaunch } = await import("@tauri-apps/plugin-process"); await relaunch(); } catch (_) { /* Windows installer exits the app. */ }
 }

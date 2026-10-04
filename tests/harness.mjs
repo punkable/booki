@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const APP_VERSION = JSON.parse(readFileSync(join(HERE, "..", "package.json"), "utf8")).version;
 export const DIST = resolve(HERE, "..", "dist");
 
 const MIME = {
@@ -148,13 +149,16 @@ function bridgeSource(cfg, { stats = {} } = {}) {
     ...stats,
   };
   return `
+    let storedConfig = ${JSON.stringify(cfg)};
     window.__bookiErrors = [];
     window.__listeners = {};
     window.__TAURI__ = {
       core: {
-        invoke: (cmd) => {
+        invoke: (cmd, args = {}) => {
           switch (cmd) {
-            case "get_config": return Promise.resolve(${JSON.stringify(cfg)});
+            case "app_version": return Promise.resolve(${JSON.stringify(APP_VERSION)});
+            case "get_config": return Promise.resolve(structuredClone(storedConfig));
+            case "save_config": storedConfig = args.patch ? { ...storedConfig, ...args.patch } : args.config; return Promise.resolve(structuredClone(storedConfig));
             case "system_stats": return Promise.resolve(${JSON.stringify(sys)});
             case "volume_info": return Promise.resolve([40, false]);
             case "media_info": return Promise.resolve(null);

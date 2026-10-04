@@ -4051,3 +4051,6 @@ body.native-material .notch-pill {
     linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, calc(var(--surf-sheen) * 0.2)), transparent 55%),
     color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 8%, transparent);
 }
+
+.stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.stack-pager .stack-more:disabled { opacity: .4; cursor: default; }

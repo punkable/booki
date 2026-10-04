@@ -106,7 +106,8 @@ const LEGACY_NOTCH_CLASSES = [
 
 /** Apply body.surface-* on dock or notch documents. */
 export function applySurfaceClass(cfg, body = document.body) {
-  const surface = resolveSurfaceStyle(cfg);
+  const surface = cfg.reduceTransparency ? "solid" : resolveSurfaceStyle(cfg);
+  body.classList.toggle("reduce-transparency", !!cfg.reduceTransparency);
   for (const c of SURFACE_CLASSES) body.classList.remove(c);
   for (const c of LEGACY_NOTCH_CLASSES) body.classList.remove(c);
   body.classList.add(`surface-${surface}`);
@@ -115,7 +116,7 @@ export function applySurfaceClass(cfg, body = document.body) {
 
 /** Set --material / --glass-alpha / --glass-tint on html + body. */
 export function applySurfaceVars(cfg, roots = [document.documentElement, document.body]) {
-  const alpha = surfaceAlpha(cfg);
+  const alpha = cfg.reduceTransparency ? 1 : surfaceAlpha(cfg);
   const tint = resolveGlassTint(cfg);
   for (const el of [].concat(roots)) {
     if (!el?.style) continue;

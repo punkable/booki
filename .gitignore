@@ -23,3 +23,7 @@ dist/
 # Rust / Tauri
 src-tauri/target/
 src-tauri/gen/
+
+# Presentation: generated capture fixtures and temporary render bundles
+tools/presentation/public/
+tools/presentation/.remotion/

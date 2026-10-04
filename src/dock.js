@@ -10,6 +10,7 @@ import {
   onFileDrop,
   onConfigChanged,
   onOcclusion,
+  onDesktop,
   onReveal,
   onSoftReveal,
   onFullscreen,
@@ -20,6 +21,10 @@ import {
   logMessage,
   isTauri,
 } from "./api.js";
+import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
+import { buildProductivityPanel } from "./dock/productivity-panel.js";
+import { singleFlight } from "./dock/async-cache.js";
+import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
@@ -166,6 +171,7 @@ async function boot() {
     // is bumped whenever the dock itself emits.
     onConfigChanged(() => { if (Date.now() < selfChangeUntil) return; reloadConfig(); });
     onOcclusion(onOcclusionSignal);
+    onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
     // Tray / global hotkey: tuck or summon through the same hide/reveal path
     // the notch uses so JS hiddenState stays in sync with the native windows.
@@ -251,7 +257,9 @@ async function reloadConfig() {
   applyAll();
   // Only rebuild the bar when the pinned items actually changed — sliders and
   // toggles in Settings shouldn't make the whole dock flash.
-  const pinsChanged = !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
+  const languageChanged = !!prev && prev.language !== cfg.language;
+  if (languageChanged) { closeMenu(); closeTrashPop(); hideTip(); }
+  const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
     // Stale flyout handlers hold old children — close rather than lie.
     if (stackOpen) closeStack();
@@ -325,7 +333,7 @@ function applyAll() {
   // Solidity + optional glass tint drive dock/notch fill together.
   applySurfaceVars(cfg);
   setMaterialTint(materialTint(cfg));
-  setMaterialEnabled(cfg.nativeMaterial);
+  setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -367,10 +375,16 @@ function applyAll() {
   document.body.classList.add(`genie-${gedge}`);
 }
 
-async function persist() {
+let persistQueue = Promise.resolve();
+function persist(patch = {}) {
+  const pending = persistQueue.then(() => performPersist(patch));
+  persistQueue = pending.catch(() => {});
+  return pending;
+}
+async function performPersist(patch) {
   // Keep dissolve rules consistent with Settings (empty / 1-child groups).
   cfg.pinned = normalizeGroups(cfg.pinned);
-  await configApi.save(cfg);
+  await configApi.patch({ pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch });
   maybeSyncCtxMenu();
   await emitConfigChanged();
 }
@@ -469,9 +483,10 @@ function fitDock() {
   if (usable > 0) {
     const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
     if (natural > usable) {
-      const eff = Math.floor(baseSize() * (usable / natural));
+      const eff = chooseFitSize(baseSize(), natural, usable, cfg.overflowMode);
       if (eff >= MIN_TILE) {
-        setAllSizes(eff); // everything still fits at this smaller size
+        setAllSizes(eff);
+        overflow = (vertical ? dockEl.scrollHeight : dockEl.scrollWidth) > usable;
       } else {
         setAllSizes(MIN_TILE); // floor reached → the rest lives behind a scroll
         const natural2 = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
@@ -676,6 +691,8 @@ function widgetTile(item, { inFlyout = false } = {}) {
   el.className = "tile widget" + (inFlyout ? " in-flyout" : "");
   el.dataset.id = item.id;
   el.dataset.widget = type;
+  el.dataset.span = String(st.span || "auto");
+  el.style.setProperty("--widget-width", `${widgetWidth(type, baseSize(), cfg.spacing ?? 6, st)}px`);
   el.dataset.variant = st.variant || "glass";
   if (type === "media" && st.scrollVolume) el.dataset.scrollVolume = "1";
   if (st.color) el.style.setProperty("--w-accent", st.color);
@@ -747,7 +764,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
     mkCtl(t("w.next"), MEDIA_SVG.next, () => dockApi.mediaNext());
     card.appendChild(controls);
   }
-  if (type === "clock") tickClocks();
+  if (["clock", "timer", "calendar", "tasks", "weather"].includes(type)) tickClocks();
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
     setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
@@ -775,9 +792,64 @@ let lastClockKey = "";
 function tickClocks() {
   if (hiddenState) return; // don't update a tucked-away dock
   const { key, time, date } = clockParts(new Date(), curLang());
+  tickProductivity();
   if (key === lastClockKey) return;
   lastClockKey = key;
   eachWidget("clock", (el) => setText(el, date, time));
+}
+
+function findWidgetPin(id, items = cfg.pinned) {
+  for (const item of items) { if (item.id === id) return item; const child = item.children && findWidgetPin(id, item.children); if (child) return child; }
+  return null;
+}
+const weatherCache = new Map();
+function tickProductivity() {
+  eachWidget("timer", (el) => {
+    const item = findWidgetPin(el.dataset.id); if (!item) return;
+    const seconds = timerSeconds(item.style);
+    setText(el, item.style?.endsAt && !seconds ? t("focus.finished") : t("w.timer"), formatTimer(seconds));
+    el.classList.toggle("focus-finished", !!item.style?.endsAt && seconds === 0);
+  });
+  eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
+  eachWidget("tasks", (el) => {
+    const item = findWidgetPin(el.dataset.id); const summary = tasksSummary(item?.style?.tasks);
+    setText(el, summary.next || t("focus.noTasks"), `${summary.done} / ${summary.total}`);
+  });
+  eachWidget("weather", (el) => {
+    const style = findWidgetPin(el.dataset.id)?.style || {};
+    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("w.weather"), t("focus.noCity")); return; }
+    const key = `${style.latitude},${style.longitude}`;
+    let cached = weatherCache.get(key);
+    if (!cached || (!cached.pending && Date.now() >= cached.expires)) {
+      cached = { pending: true, expires: Date.now() + 600000, value: cached?.value }; weatherCache.set(key, cached);
+      const record = cached;
+      dockApi.weatherCurrent(style.latitude, style.longitude).then((value) => {
+        record.value = value; record.error = false;
+      }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
+    }
+    setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
+    el.title = `${style.city || t("w.weather")} · Open-Meteo`;
+  });
+}
+let productivityPanel = null;
+function closeProductivityPanel() {
+  productivityPanel?.dispose?.();
+  productivityPanel?.remove(); productivityPanel = null; pinnedReveal = false; reframe(); scheduleHide();
+}
+function openProductivity(item, tile) {
+  closeProductivityPanel();
+  const panel = buildProductivityPanel(item, { save: async () => { await persist(); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
+  panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
+  productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
+  const place = () => {
+    if (!panel.isConnected) return;
+    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
+  };
+  const dispose = panel.dispose;
+  const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
+  panel.dispose = () => { dispose?.(); observer.disconnect(); };
+  requestAnimationFrame(() => { place(); panel.querySelector("button")?.focus(); });
 }
 
 // Recent total throughput for the network sparkline (one sample per poll).
@@ -786,7 +858,7 @@ const netHistory = [];
 
 // System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
 // every stat card on the bar (from the cached element map).
-async function pollStats() {
+const pollStats = singleFlight(async () => {
   let s;
   try {
     s = await dockApi.systemStats();
@@ -809,6 +881,7 @@ async function pollStats() {
   });
   eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
   eachWidget("battery", (el) => {
+    setWidgetAvailable(el, s.battery >= 0);
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
     setMetric(el, t("w.battery"), s.battery);
     el.classList.toggle("charging", !!s.charging);
@@ -819,15 +892,24 @@ async function pollStats() {
       el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
     }
   });
+});
+
+function setWidgetAvailable(el, available) {
+  const item = findWidgetPin(el.dataset.id);
+  const hide = !!item?.style?.hideWhenUnavailable && !available;
+  if (el.classList.contains("conditionally-hidden") === hide) return;
+  el.classList.toggle("conditionally-hidden", hide);
+  requestAnimationFrame(() => { fitDock(); reframe(); });
 }
 
 // Now-playing card: the system media session (Spotify, browser, …).
-async function pollMedia() {
+const pollMedia = singleFlight(async () => {
   const m = await dockApi.mediaInfo().catch(() => null);
   eachWidget("media", (el) => {
     const art = el.querySelector(".w-art");
     const ico = el.querySelector(".w-ico");
     const toggle = el.querySelector(".w-ctl-toggle");
+    setWidgetAvailable(el, !!m);
     if (!m) {
       setText(el, t("w.media"), "—", t("w.media"));
       delete el.dataset.mqTitle;
@@ -859,7 +941,7 @@ async function pollMedia() {
       if (ico) ico.style.display = "";
     }
   });
-}
+});
 
 // System volume — scroll changes it, click toggles mute.
 let lastVolumePct = NaN;
@@ -872,10 +954,10 @@ function renderVolume(pct, muted) {
     el.classList.toggle("muted", muted);
   });
 }
-async function pollVolume() {
+const pollVolume = singleFlight(async () => {
   const v = await dockApi.volumeInfo().catch(() => null);
   if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
-}
+});
 function readVolumeFromTile(tile) {
   const vEl = tile?.querySelector(".w-ring-num");
   const dataValue = Number(vEl?.dataset.v);
@@ -927,10 +1009,10 @@ function renderClipboardSummary(count, preview) {
       : t("clip.empty");
   });
 }
-async function pollClipboard() {
+const pollClipboard = singleFlight(async () => {
   const s = await dockApi.clipboardSummary().catch(() => ({ count: 0, preview: null }));
   renderClipboardSummary(s.count, s.preview);
-}
+});
 
 // ONE poll loop drives every live widget on its own cadence — a single timer
 // instead of three, and it does nothing while the dock is tucked away. Fewer
@@ -963,16 +1045,17 @@ function startPolls() {
   widgetPollTimer = null;
   if (hiddenState) return; // tucked away → stay idle until revealed
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const hasClock = widgetPresent("clock");
+  const hasClock = widgetPresent(["clock", "timer"]);
+  const hasLocal = widgetPresent(["tasks", "calendar", "weather"]);
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
   const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
   const hasClipboard = widgetPresent("clipboard");
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
-  if (hasClock) tickClocks();
+  if (hasClock || hasLocal) tickClocks();
   if (hasStats) pollStats();
   if (hasMedia) pollMedia();
   if (hasVolume) pollVolume();
@@ -981,11 +1064,11 @@ function startPolls() {
   pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000, clipboard: t0 + 4000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : 1500;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 : 60000;
   widgetPollTimer = setInterval(() => {
     if (hiddenState) return; // don't poll a tucked-away dock
     const now = Date.now();
-    if (hasClock) tickClocks();
+    if (hasClock || hasLocal) tickClocks();
     if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
     if (hasMedia && now >= pollDue.media) { pollDue.media = now + 3000; pollMedia(); }
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + 4000; pollVolume(); }
@@ -1043,6 +1126,7 @@ function closeNoteEditor() {
   reframe();
 }
 function editNote(item) {
+  closeProductivityPanel();
   closeNoteEditor();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
@@ -1094,6 +1178,7 @@ function launch(el, item) {
     if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
+    if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -1184,6 +1269,7 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
+    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, { span: Number(t.dataset.span) })}px`);
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
@@ -1414,7 +1500,7 @@ dockEl.addEventListener("dblclick", (e) => {
     return;
   }
   // Double-click a widget → jump to its editor (styles/colors live in Apps).
-  if (tile.classList.contains("widget")) dockApi.openSettingsTab("apps");
+  if (tile.classList.contains("widget")) dockApi.openSettingsTab("widgets");
 });
 
 // Middle-click an app/folder/file pin → open its location in Explorer.
@@ -1520,7 +1606,7 @@ async function endEdgeMove(commit) {
     document.body.classList.add("edge-swap");
     applyFrame();
     await dockApi.setDockEdge(target);
-    await persist();
+    await persist({ edge: target });
     setTimeout(() => requestAnimationFrame(() => document.body.classList.remove("edge-swap")), 90);
   } else {
     applyFrame(); // same edge or cancelled → just shrink the window back to the bar
@@ -1653,12 +1739,23 @@ function enterEdit() {
   if (editMode) return;
   editMode = true;
   document.body.classList.add("edit");
+  const toolbar = document.createElement("div"); toolbar.className = "edit-toolbar";
+  const label = document.createElement("span"); label.textContent = t("overhaul.editing");
+  const done = document.createElement("button"); done.type = "button"; done.textContent = t("w.done"); done.addEventListener("click", exitEdit);
+  toolbar.append(label, done); document.body.appendChild(toolbar);
+  pinnedReveal = true; applyFrame();
+  requestAnimationFrame(() => {
+    const pos = placeBesideBar({ bar: dockEl.getBoundingClientRect(), box: { width: toolbar.offsetWidth, height: toolbar.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    toolbar.style.left = `${pos.left}px`; toolbar.style.top = `${pos.top}px`; scheduleHitReport();
+  });
   setAllSizes(baseSize());
 }
 function exitEdit() {
   if (!editMode) return;
   editMode = false;
   document.body.classList.remove("edit");
+  document.querySelector(".edit-toolbar")?.remove();
+  pinnedReveal = false; reframe();
 }
 
 function onPointerDown(e, el, item) {
@@ -1754,7 +1851,7 @@ function processMove(e) {
   }
   if (willUnpin) {
     clearMerge();
-    placeHint(t("m.remove"), press.el);
+    placeHint(/\.lnk$/i.test(press.item.path || "") ? t("shortcut.unpinHint") : t("m.remove"), press.el);
     return; // no reordering/merging while aiming outside the bar
   }
 
@@ -1867,7 +1964,8 @@ async function onPressUp() {
         setTimeout(() => c.remove(), 280);
       }
       willUnpin = false;
-      await removeItem(p.item.id);
+      if (isTauri && /\.lnk$/i.test(p.item.path || "")) confirmShortcutOut(p.item);
+      else await removeItem(p.item.id);
       return;
     }
     // Settle the floating copy into the tile's final slot, then drop it.
@@ -2210,12 +2308,22 @@ function wireStackDragOut(cell, group, child) {
     }
   };
   cell.addEventListener("pointerup", finish);
-  cell.addEventListener("pointercancel", finish);
+  cell.addEventListener("pointercancel", () => {
+    if (!st) return;
+    const cancelled = st;
+    st = null;
+    try { cell.releasePointerCapture(cancelled.pointerId); } catch (_) {}
+    cell.classList.remove("dragging");
+    cancelled.clone?.remove();
+    clearDropHint();
+    cell._suppressClick = true;
+    setTimeout(() => { cell._suppressClick = false; }, 0);
+  });
 }
 
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
-  if (editMode && !closestSel(e.target, ".tile")) exitEdit();
+  if (editMode && !closestSel(e.target, ".tile, .edit-toolbar")) exitEdit();
   // Clicking anywhere outside the trash confirmation cancels it (never delete
   // on an ambiguous gesture).
   if (trashPop && !closestSel(e.target, ".trash-pop")) {
@@ -2226,6 +2334,47 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 // ───────────────────────── Context menu ─────────────────────────
+
+function confirmShortcutOut(item) {
+  closeTrashPop();
+  const pop = document.createElement("div");
+  pop.className = "trash-pop";
+  const hint = document.createElement("span");
+  hint.className = "tp-text";
+  hint.textContent = t("shortcut.unpinHint");
+  pop.appendChild(hint);
+  const button = (key, action) => {
+    const b = document.createElement("button");
+    b.className = "tp-btn";
+    b.textContent = t(key);
+    b.addEventListener("click", async () => { closeTrashPop(); await action(); });
+    pop.appendChild(b);
+  };
+  button("shortcut.desktop", async () => {
+    if (await relocateShortcut(item, true)) await removeItem(item.id);
+  });
+  button("m.remove", () => removeItem(item.id));
+  button("trash.cancel", () => {});
+  trashPop = pop;
+  placePop(pop);
+}
+
+async function relocateShortcut(item, toDesktop) {
+  try {
+    await dockApi.relocateShortcut(item.id, toDesktop);
+    await reloadConfig();
+    return true;
+  } catch (err) {
+    logMessage("error", `shortcut transfer: ${err}`);
+    const pop = document.createElement("div");
+    pop.className = "trash-pop";
+    pop.textContent = t("shortcut.error");
+    closeTrashPop();
+    trashPop = pop;
+    placePop(pop);
+    return false;
+  }
+}
 
 function menuPinTitle(item) {
   if (!item) return "Booki";
@@ -2308,7 +2457,12 @@ function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
+  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
+  if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
+    add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
+    add("external", t("shortcut.desktop"), () => relocateShortcut(item, true));
+  }
   if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
   if (wins.length) {
     add("x", t(wins.length > 1 ? "m.closeAll" : "m.closeWindow"), async () => {
@@ -2448,6 +2602,14 @@ async function openBackgroundMenu(e) {
   addMenuLabel(t("m.add"));
   // Apps, folders, files and widgets all live in the add panel now.
   add("plus", t("add.open"), () => openAddPanel(dockEl));
+  const hiddenWidgets = [...dockEl.querySelectorAll(".conditionally-hidden")];
+  if (hiddenWidgets.length) {
+    sep(); addMenuLabel(t("overhaul.hiddenWidgets"));
+    for (const el of hiddenWidgets) {
+      const item = findWidgetPin(el.dataset.id);
+      if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; await persist(); await render(); reframe(); });
+    }
+  }
   // Saved profiles → one-click switch, right from the dock. The active one
   // (last applied/saved) is marked with a check.
   const profiles = await dockApi.profileList().catch(() => []);
@@ -2460,6 +2622,8 @@ async function openBackgroundMenu(e) {
         const fresh = await dockApi.profileApply(name).catch(() => null);
         if (fresh) {
           cfg = fresh;
+          await ensureLang(cfg.language);
+          maybeSyncCtxMenu();
           applyAll();
           await render();
           reframe();
@@ -2469,6 +2633,7 @@ async function openBackgroundMenu(e) {
   }
   sep();
   addMenuLabel(t("m.system"));
+  add("grid", t("overhaul.editing"), enterEdit);
   add("settings", t("m.settings"), () => dockApi.openSettings());
   placeMenu(e);
 }
@@ -2547,6 +2712,7 @@ window.addEventListener("keydown", (e) => {
     closeStack();
     cancelDrag();
     closeTrashPop();
+    closeProductivityPanel();
   }
 });
 
@@ -2753,6 +2919,7 @@ window.addEventListener("resize", () => {
 
 let hiddenState = false;
 let hideTimer = null;
+let desktopActive = false;
 let occluded = false; // last occlusion signal from the backend (smart mode)
 let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
 let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
@@ -2823,7 +2990,7 @@ function onFullscreenSignal(value) {
       await dockApi.notchToastDismiss().catch(() => {});
       // Restore the pre-FS visibility for every hide mode, not only smart+click.
       // setupAutoHide() starts edge visible — that would pop a tucked dock open.
-      if (wasTucked) {
+      if (wasTucked && !(hideMode() === "smart" && desktopActive && !manualHide)) {
         hiddenState = true;
         stopPolls();
         document.body.classList.add("tucked");
@@ -2902,6 +3069,7 @@ function visibilityState() {
     fullscreen,
     previewing,
     occluded,
+    desktop: desktopActive,
     manualHide,
     summoned: pinnedReveal,
     draggingFile,
@@ -2922,7 +3090,7 @@ function interacting() {
   return (
     pointerInside || dragging || draggingFile || stackOpen ||
     !!edgeMove || document.body.classList.contains("menu-open") ||
-    !!document.querySelector(".trash-pop, .note-editor, .coach")
+    !!document.querySelector(".trash-pop, .note-editor, .coach, .productivity-panel")
   );
 }
 
@@ -2969,7 +3137,7 @@ const PANEL_HIT_PAD = 4;
 // Open panels that must stay clickable. Tooltips are not listed: they never
 // take input, and counting them blocked clicks on whatever sat under them.
 const HIT_PANELS =
-  ".trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
+  ".productivity-panel, .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
 
 function pointInLiveHitArea(x, y) {
   if (edgeMove || dragging || draggingFile) return true;
@@ -3158,6 +3326,16 @@ function scheduleHide() {
 // Smart-hide: the backend tells us when a window covers the dock's home area.
 // We hide to the notch when covered and reappear when the desktop is clear —
 // measured against a stable rect in Rust, so it can no longer flap.
+function onDesktopSignal(value) {
+  desktopActive = value;
+  if (value) occluded = false;
+  // Win+D can hide a native window without changing our JS visibility.
+  if (value && !hiddenState && decideVisible(visibilityState()) === true) {
+    dockApi.revealDock().catch(() => {});
+  }
+  onOcclusionSignal(occluded);
+}
+
 function onOcclusionSignal(value) {
   occluded = value;
   // Going back to work in an app releases a manual swipe-hide: next time the
@@ -4108,7 +4286,7 @@ async function openStack(tileEl, item) {
       mkAdd(t("apps.addToFolder"), "app");
       mkAdd(t("m.addFolder"), "folder");
     } else if (items.length >= 80) {
-      // list_dir caps at 80 entries — say so and hand off to Explorer.
+      // Legacy listing clients may still hand back a capped slice.
       const more = document.createElement("button");
       more.className = "stack-more";
       more.textContent = t("stack.more");
@@ -4131,18 +4309,46 @@ async function openStack(tileEl, item) {
       c.innerHTML = `<span class="stack-glyph skel"></span><span class="stack-name skel"></span>`;
       grid.appendChild(c);
     }
-    dockApi
-      .listDir(item.path)
-      .then((items) => {
-        if (seq !== stackSeq || !stackOpen) return;
-        fillGrid(items || []);
+    let page = 0;
+    let request = 0;
+    const pageSize = 24;
+    const pager = document.createElement("div");
+    pager.className = "stack-pager";
+    const loadPage = async (nextPage) => {
+      const current = ++request;
+      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.disabled]);
+      buttonStates.forEach(([b]) => { b.disabled = true; });
+      try {
+        const rows = await dockApi.listDir(item.path, nextPage * pageSize, pageSize + 1);
+        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        page = nextPage;
+        fillGrid((rows || []).slice(0, pageSize));
+        pager.replaceChildren();
+        const button = (key, next, disabled) => {
+          const b = document.createElement("button");
+          b.className = "stack-more";
+          b.textContent = t(key);
+          b.disabled = disabled;
+          b.addEventListener("click", () => loadPage(next));
+          pager.appendChild(b);
+        };
+        button("stack.previous", page - 1, page === 0);
+        const label = document.createElement("span");
+        label.textContent = t("stack.page").replace("{n}", String(page + 1));
+        label.setAttribute("aria-live", "polite");
+        pager.appendChild(label);
+        button("stack.next", page + 1, !rows || rows.length <= pageSize);
+        grid.appendChild(pager);
+        grid.parentElement.scrollTop = 0;
         applyFrame();
         if (pendingReplace) requestAnimationFrame(pendingReplace);
-      })
-      .catch(() => {
-        if (seq !== stackSeq || !stackOpen) return;
-        fillGrid([]);
-      });
+      } catch (_) {
+        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
+        if (!pager.isConnected) { fillGrid([]); applyFrame(); }
+      }
+    };
+    loadPage(0);
   }
   stackEl.appendChild(grid);
 

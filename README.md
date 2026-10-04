@@ -1,122 +1,109 @@
 <p align="center">
-  <img src="assets/brand/svg/logo.svg" alt="Booki" height="56" />
+  <img src="assets/brand/svg/isotype.svg" alt="Booki capybara" height="72" />
 </p>
 
 <h1 align="center">Booki</h1>
 
+<h3 align="center">A calmer way to use Windows.</h3>
+
 <p align="center">
-  Smart dock for Windows — apps, folders, live widgets, clipboard history, and a floating notch.
+  <a href="https://github.com/punkable/booki/releases/latest"><b>Download</b></a> ·
+  <a href="docs/presentation/booki-070-en.mp4"><b>Watch the film</b></a> ·
+  <a href="README.es.md">Español</a>
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/dock.png" alt="Booki Dock on Windows with live widgets and a floating notch" width="920" />
-</p>
-
-<p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest">Download latest installer</a>
-  ·
-  <a href="https://github.com/punkable/booki/releases">All releases</a>
-  ·
-  <a href="#gallery">Gallery</a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=latest&style=flat-square" alt="Latest release" /></a>
-  <a href="https://github.com/punkable/booki/releases"><img src="https://img.shields.io/github/downloads/punkable/booki/total?label=downloads&style=flat-square" alt="Downloads" /></a>
-  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?style=flat-square" alt="Windows 10/11" />
+  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=available&style=flat-square" alt="Available release" /></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?style=flat-square" alt="Windows 10 and 11" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
+</p>
+
+<p align="center">
+  <a href="docs/presentation/booki-070-en.mp4"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock on a soft desktop: apps, clock, weather, CPU, tasks and now playing" /></a>
 </p>
 
 ---
 
-## Why Booki
+<h2 align="center">Everything you use. One beautiful dock.</h2>
 
-| | |
+<p align="center">Pin apps, folders, files and websites. Click to launch, or jump back to a window that's already open.<br/>Clicks outside the bar go straight through to whatever is behind it.</p>
+
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Close-up of Booki's live widgets: clock, weather, CPU and tasks" /></p>
+
+<h2 align="center">Live, at a glance.</h2>
+
+<p align="center">Time, weather, CPU, memory, network, battery, notes, clipboard and now playing — compact tiles that sit right on the bar and pause when the dock is hidden.</p>
+
+<p align="center"><img src="docs/presentation/focus-en.jpg" width="1000" alt="Booki timer, tasks, calendar and weather widgets with the tasks list open" /></p>
+
+<h2 align="center">A little more focus.</h2>
+
+<p align="center">A countdown timer, a task list, a monthly calendar and optional city weather.<br/>Your tasks stay on your PC. Weather asks only for the city you choose — never your location.</p>
+
+<p align="center"><img src="docs/presentation/apps-en.jpg" width="1000" alt="Booki app library with most-used suggestions, open apps and all installed apps" /></p>
+
+<h2 align="center">Find any app. Fast.</h2>
+
+<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
+
+<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with a live dock preview and behavior scenarios" /></p>
+
+<h2 align="center">Make it yours.</h2>
+
+<p align="center">A live preview of your dock, three behaviors to choose from — always visible, smart, or reveal at the edge — named profiles, any screen edge, glass or solid surfaces, and five languages.</p>
+
+<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki in dark mode on a dark desktop" /></p>
+
+<h2 align="center">Light or dark. At home in either.</h2>
+
+<p align="center">Follows your Windows theme and wallpaper accent, with real acrylic behind the bar. When a game or video goes fullscreen, Booki steps aside.</p>
+
+---
+
+<h2 align="center">Private by design.</h2>
+
+<p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
+
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. See what's new in the <a href="docs/releases/v0.70.0.md">0.70 notes</a>.</sub></p>
+
+## Get started
+
+1. Open [Releases](https://github.com/punkable/booki/releases/latest) and pick `Booki_*_x64-setup.exe` (Intel/AMD) or `Booki_*_arm64-setup.exe` (Windows on ARM). An x64 MSI is also available.
+2. Launch **Booki** from the Start menu. The installer is per-user and fetches WebView2 if it's missing.
+3. Drag an app or folder onto the dock, or right-click the dock to add items.
+
+Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings.
+
+### New in 0.70
+
+- New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
+- Four new widgets: timer, tasks, calendar and optional city weather (Open-Meteo).
+- A redesigned app library with search, running apps and local usage suggestions.
+- Fixes from [#64](https://github.com/punkable/booki/issues/64): pinning keeps your original shortcuts, dragging out can return a shortcut to the desktop, folders show every entry, smart hide responds to Show Desktop, and changing language refreshes widgets and menus.
+- Safer configuration writes, a privacy-respecting diagnostics export, steadier updates and a fully translated installer.
+
+## Everyday controls
+
+| Action | Result |
 |---|---|
-| **A dock, not a taskbar** | Pin apps, folders, files, pictures and websites. Click to launch or focus an open window. Right-click a pin for recent files. |
-| **Arrange everything** | Drag from the desktop to pin, drag out to unpin, drop on the bin to delete, group apps and widgets, reorder on the bar. |
-| **Live widgets** | CPU/RAM/disk/battery/volume rings, clock, network, uptime, notes, clipboard history and now-playing — compact cards that do not stretch the dock. |
-| **Smart hide + notch** | The dock tucks into a slim notch and comes back when you need it. Stays out of fullscreen games and videos. Notch size is adjustable in Settings. |
-| **Precise clicks** | Clicks outside the painted dock pass through to the app behind it. |
-| **Fits Windows** | Light/dark/system themes, wallpaper-aware accent, glass materials, size/spacing/radius, multi-monitor, five languages. |
-| **Private by design** | No accounts, no telemetry, no cloud sync. Config stays in `%APPDATA%\Booki`. Clipboard memory is opt-in. |
-| **Small and native** | Tauri 2 + Rust on system WebView2 — small installer, timers pause when the dock is hidden. |
+| Click a pin | Launch it or focus its window |
+| Drag desktop → dock | Pin an app, folder, file or image; ordinary pinning preserves the original |
+| Drag a pin out | Unpin; 0.70 additionally offers an explicit desktop-return action for shortcuts |
+| Right-click the dock | Add items, choose a profile or open Settings |
+| Middle-click a pin | Reveal its location in Explorer |
+| Double-click a widget | Open its configuration; utility widgets in 0.70 also open their own panel |
+| `Alt` + `1…9` | Launch the corresponding pin; the modifier is configurable |
+| Push the cursor to the edge | Reveal a hidden dock when edge/hover behavior is enabled |
+| Wheel over Media, if enabled | Change system volume |
 
-## What's new in 0.68
+## Privacy and your data
 
-- **Fixed a crash on desktop PCs** — a pinned battery widget threw on every poll on any machine without a battery, froze on a placeholder, and filled the log.
-- **Widgets line up** — ring gauges and card artwork are sized from the space the card actually has, so nothing is clipped, and a vertical dock keeps one width for every widget.
-- **Lighter at rest** — settings are cached instead of read from disk twelve times a second, two duplicate cursor watchers became one, and the clock stopped reformatting itself sixty times a minute.
-- **All five languages complete** — Portuguese, French and German were each missing ninety strings and silently fell back to English.
-- **Usable from the keyboard** — Enter and Space launch a focused tile, the menu key opens its actions, and live widgets announce their updates.
-- **Reduced motion is respected everywhere** — including the two largest movements, which are drawn in JS and were never covered by the CSS setting.
-
-Older notes live in Settings → What's new.
-
-<a id="gallery"></a>
-
-## Gallery
-
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <img src="assets/screenshots/genie.gif" alt="The dock funnelling into the notch" width="420" /><br/>
-      <sub><b>Smart hide</b> — the bar genies into the notch when you start working.</sub>
-    </td>
-    <td width="50%" align="center">
-      <img src="assets/screenshots/folder.gif" alt="A folder flyout opening" width="360" /><br/>
-      <sub><b>Folders</b> — group pins and open them in a glass flyout.</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="assets/screenshots/settings.png" alt="The settings window" width="380" /><br/>
-      <sub><b>Settings</b> — live preview, visual pickers, searchable.</sub>
-    </td>
-    <td align="center">
-      <img src="assets/screenshots/vertical.png" alt="Booki docked vertically on a side edge" height="230" /><br/>
-      <sub><b>Any edge</b> — a slim vertical column on the sides, widgets and all.</sub>
-    </td>
-  </tr>
-</table>
-
-<p align="center">
-  <img src="assets/screenshots/notch.png" alt="The notch — a slim glass tab blended into the taskbar" width="220" /><br/>
-  <sub>The <em>notch</em>: a little glass tab that stays at the taskbar edge while the dock is away.</sub>
-</p>
-
-## Install
-
-1. Download `Booki_*_x64-setup.exe` from [Releases](https://github.com/punkable/booki/releases/latest) (per-user, no admin).
-2. Run it and launch **Booki** from the Start menu. Tray icon: show/hide, settings, quit.
-
-> **Requires Windows 10/11** — WebView2 is fetched automatically if missing.
->
-> **SmartScreen:** this beta is not commercially code-signed yet. If Windows shows *Windows protected your PC*, choose **More info → Run anyway**.
-
-## Gestures
-
-| Gesture | Action |
-|---------|--------|
-| Click a pin | Launch it (or focus its window) |
-| Drag from desktop → dock | Pin an app, folder, file or picture |
-| Drag a pin out of the dock | Unpin it |
-| **Middle-click** a pin | Open its location in Explorer |
-| Right-click the dock | Add apps / widgets / profiles / settings |
-| Double-click a widget | Jump to its style editor |
-| Mouse wheel over Media (optional) | Raise or lower system volume |
-| `Alt` + `1…9` | Launch the Nth pin (modifier is configurable) |
-| Push cursor into the screen edge | Reveal a hidden dock |
-
-## Privacy
-
-- Fully offline except: GitHub update checks (signed releases), and favicon fetch if you pin a website. **No telemetry, no accounts, no data collection.**
-- Config: `%APPDATA%\Booki\config.json` (plus a `config.bak.json` safety copy). Export/import from Settings anytime.
-- Uninstall keeps that folder by default so a reinstall restores your dock. Only the uninstaller checkbox *Delete app data* wipes it.
-- Clipboard history is local. Restart memory is **off by default**; when enabled it is protected for your Windows user and can expire.
-- Hidden from compatible captures by default; Settings can show the dock/notch in screenshots and recordings.
-- In-app updates download the signed installer and keep your settings.
-- "Start with Windows" writes `HKCU\…\Run\Booki`; uninstall clears that entry (and Explorer shell verbs) without deleting your config unless you ask.
+- No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
+- Network requests are limited to update checks/downloads and website favicons; 0.70 adds optional Open-Meteo weather after choosing a city, without device-location access.
+- 0.70 app recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
+- Clipboard history is local. Restart persistence is off by default; when enabled, it is protected for your Windows user and can expire.
+- Compatible captures hide the dock by default. Enable **Visible in captures** in Settings when recording it.
+- Uninstall preserves settings unless you select **Delete app data**. Normal uninstall removes the startup entry and Explorer shell actions.
 
 ## Support
 
@@ -131,35 +118,32 @@ Donations are optional:
 
 Questions or bugs: **[punkable@protonmail.com](mailto:punkable@protonmail.com)** or open an issue. See [SECURITY.md](SECURITY.md) for vulnerabilities.
 
-## Tech stack
-
-| Layer | Tech |
-| -------- | ------------------------------------------------------------------ |
-| Shell | [Tauri 2](https://tauri.app) (system WebView2) |
-| Backend | Rust + [`windows`](https://crates.io/crates/windows) |
-| Frontend | Vanilla-JS dock + React settings (Vite) |
-| Art | [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) 3D (Microsoft, MIT) |
-
 ## Development
 
-> On Linux/macOS you can preview the UI in a browser — the frontend ships demo data without Tauri.
+Booki uses Tauri 2, Rust/Win32, a vanilla JavaScript dock and React settings, built with Vite. Linux/macOS can preview the frontend with sample data; native behavior requires Windows and WebView2.
 
 ```bash
-npm install
-npm run dev          # browser preview → http://localhost:1420
-npm run tauri:dev    # real app (Windows + Rust + WebView2)
-npm run tauri:build  # NSIS installer
+npm ci
+npm run dev          # browser preview at http://localhost:1420
+npm run check:all    # contracts, build and functional tests
+npm run tauri:dev    # native app on Windows with Rust installed
+npm run tauri:build  # Windows packages
 ```
 
-Releases are built by CI on version tags ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+The images and film are rebuilt from the real frontend by [tools/presentation](tools/presentation/README.md); finished media live in `docs/presentation/`. Older native Windows captures and PNG brand exports are kept in `docs/`.
 
-## License
+To audit the current public release without running its installers:
 
-MIT — do whatever makes you happy; credit is appreciated.
+```bash
+node scripts/audit-release.mjs /absolute/path/to/release-audit
+```
 
-<sub>Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT license.</sub>
+This downloads the public assets, checks GitHub hashes, verifies updater signatures using Booki's configured public key, and validates the manifest and installer containers. It does not verify Windows runtime behavior or Authenticode.
 
-<p align="center">
-  <img src="assets/brand/svg/isotype.svg" alt="Booki the capybara" height="96" /><br/>
-  <sub>Made by <a href="https://github.com/punkable">Punkable</a> · <a href="https://x.com/0xPunki">@0xPunki</a></sub>
-</p>
+Releases are built from version tags through [release.yml](.github/workflows/release.yml). Publishing requires the complete signed updater asset set and matching versions. The workflow uploads and re-downloads the draft assets for integrity checks before publication, preserving older releases for rollback.
+
+## License and credits
+
+[MIT](LICENSE). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
+
+Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).

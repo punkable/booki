@@ -4,7 +4,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// In-memory copy of what is on disk.
 ///
@@ -236,6 +237,13 @@ pub struct Config {
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
+    /// Stable display name; fall back to primary while disconnected.
+    #[serde(default)]
+    pub monitor_name: String,
+    #[serde(default = "default_overflow")]
+    pub overflow_mode: String,
+    #[serde(default)]
+    pub reduce_transparency: bool,
     /// Glass solidity 0–100 (higher = more opaque fill; blur stays).
     #[serde(default = "default_material")]
     pub material_strength: u32,
@@ -350,6 +358,10 @@ fn default_notch_scale() -> f32 {
     1.0
 }
 
+fn default_overflow() -> String {
+    "adapt".into()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -380,6 +392,9 @@ impl Default for Config {
             magnify_style: default_anim(),
             hotkey: String::new(),
             monitor: default_monitor(),
+            monitor_name: String::new(),
+            overflow_mode: default_overflow(),
+            reduce_transparency: false,
             material_strength: default_material(),
             surface_tint: default_surface_tint(),
             autostart: false,
@@ -446,6 +461,16 @@ pub fn load() -> Config {
     if let Some(cfg) = CACHE.read().ok().and_then(|g| g.clone()) {
         return cfg;
     }
+    let Ok(_guard) = WRITE_LOCK.lock() else {
+        return Config::default();
+    };
+    load_locked()
+}
+
+fn load_locked() -> Config {
+    if let Some(cfg) = CACHE.read().ok().and_then(|g| g.clone()) {
+        return cfg;
+    }
     let cfg = load_from_disk();
     if let Ok(mut w) = CACHE.write() {
         *w = Some(cfg.clone());
@@ -492,14 +517,14 @@ fn load_from_disk() -> Config {
     if cfg.settings_rev < 2 {
         cfg.auto_hide_mode = "smart".into();
         cfg.settings_rev = 2;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 3: Windows-native default — icons no longer magnify on hover by default
     // (a subtle highlight is used instead). Users can re-enable it in settings.
     if cfg.settings_rev < 3 {
         cfg.magnification = false;
         cfg.settings_rev = 3;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 4: the default icon size dropped 48 → 36. Only migrate installs still
     // on the old default (a hand-picked 48 was never distinguishable from it).
@@ -508,7 +533,7 @@ fn load_from_disk() -> Config {
             cfg.icon_size = 36;
         }
         cfg.settings_rev = 4;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 5: the notch follows the dock again. Older builds could leave an
     // explicit notch_edge behind (e.g. "bottom"), and moving the dock from
@@ -517,7 +542,7 @@ fn load_from_disk() -> Config {
     if cfg.settings_rev < 5 {
         cfg.notch_edge = "auto".into();
         cfg.settings_rev = 5;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 6: one surface finish for dock + notch. Derive from the old notchStyle
     // when the new key is still at its default and the legacy value differs.
@@ -538,7 +563,7 @@ fn load_from_disk() -> Config {
         }
         .into();
         cfg.settings_rev = 6;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 7: explicit notch modes (attached / floating / smart). Derive from the
     // older peek + multi-notch toggles so existing installs keep their look.
@@ -555,7 +580,7 @@ fn load_from_disk() -> Config {
         cfg.multi_notch_enabled = false;
         cfg.multi_notch_apps.clear();
         cfg.settings_rev = 7;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // rev 8: smart is always circular (ambient behaviours only). Clear any leftover
     // multi-notch app list so the old whitelist cannot resurrect in Settings.
@@ -572,7 +597,7 @@ fn load_from_disk() -> Config {
         cfg.multi_notch_enabled = false;
         cfg.multi_notch_apps.clear();
         cfg.settings_rev = 8;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     // Promote 1-child groups; keep empty groups (Settings uses them as staging
     // for "+ New group"). The dock frontend dissolves empties on its own persist.
@@ -583,7 +608,7 @@ fn load_from_disk() -> Config {
     if !cfg.onboarded && !cfg.pinned.is_empty() {
         cfg.onboarded = true;
         cfg.settings_intro_seen = true;
-        let _ = save(&cfg);
+        let _ = save_locked(&cfg);
     }
     cfg
 }
@@ -619,6 +644,43 @@ fn normalize_pinned(pinned: Vec<PinnedApp>, keep_empty: bool) -> Vec<PinnedApp> 
 /// Writes to a temp file then renames, so a crash mid-write can never leave a
 /// truncated/corrupt config that would wipe the user's pinned apps.
 pub fn save(config: &Config) -> Result<(), String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    save_locked(config)
+}
+
+/// Merge only edited top-level keys while holding the same lock as all writes.
+pub fn patch(patch: serde_json::Value) -> Result<Config, String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    let mut current = serde_json::to_value(load_locked()).map_err(|e| e.to_string())?;
+    let object = current.as_object_mut().ok_or("invalid config")?;
+    let fields = patch.as_object().ok_or("invalid config patch")?;
+    for (key, value) in fields {
+        if !object.contains_key(key) {
+            return Err(format!("unknown config field: {key}"));
+        }
+        object.insert(key.clone(), value.clone());
+    }
+    let updated: Config = serde_json::from_value(current).map_err(|e| e.to_string())?;
+    save_locked(&updated)?;
+    Ok(load_locked())
+}
+
+/// Apply a native mutation to the latest config in the same write transaction.
+pub fn update(edit: impl FnOnce(&mut Config) -> Result<(), String>) -> Result<Config, String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    let mut current = load_locked();
+    edit(&mut current)?;
+    save_locked(&current)?;
+    Ok(load_locked())
+}
+
+fn save_locked(config: &Config) -> Result<(), String> {
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // Do not dissolve groups here — Settings may temporarily save an empty
@@ -663,12 +725,8 @@ pub fn save(config: &Config) -> Result<(), String> {
     }
     let text = serde_json::to_string_pretty(&to_write).map_err(|e| e.to_string())?;
     let final_path = config_path();
-    // The temp name carries the pid. It used to be a single shared
-    // "config.json.tmp", which defeated the atomicity the rest of this function
-    // is built for: the dock window, the Settings window and the backend all
-    // call save(), and two concurrent writers would truncate each other's temp
-    // file — one could then rename the other's half-written bytes over the real
-    // config.
+    // WRITE_LOCK serializes the complete read/modify/write transaction in this
+    // process. The pid also isolates its temporary file from another process.
     let tmp_path = dir.join(format!("config.json.{}.tmp", std::process::id()));
     // Write the temp file and flush it all the way to disk before renaming, so a
     // power loss right after the rename can't leave an empty/zero-length config.

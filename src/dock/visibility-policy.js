@@ -29,6 +29,7 @@
  * @property {boolean} fullscreen   a fullscreen app owns the screen
  * @property {boolean} previewing   Settings is driving position live
  * @property {boolean} occluded     another window covers the dock's home rect
+ * @property {boolean} [desktop]    the Windows desktop is foreground
  * @property {boolean} manualHide   the user swiped the bar away
  * @property {boolean} summoned     the user asked for it (notch click / hot edge)
  * @property {boolean} draggingFile an OS file drag is over the dock
@@ -70,6 +71,7 @@ export function decideVisible(s) {
   }
 
   // smart: tied to whether another window is covering the dock's spot.
+  if (s.desktop) return true;
   if (s.occluded) return false;
   // Desktop is clear. Hover mode brings the bar back by itself; click mode
   // waits to be asked, which is the `null` case above.

@@ -26,5 +26,7 @@ const msiDir = join("src-tauri", "target", "x86_64-pc-windows-msvc", "release", 
 const msi = existsSync(msiDir) ? readdirSync(msiDir).find((name) => name === `Booki_${version}_x64_en-US.msi`) : null;
 if (!msi) throw new Error("Missing x64 MSI installer.");
 copyFileSync(join(msiDir, msi), join(output, msi));
-writeFileSync(join(output, "latest.json"), `${JSON.stringify({ version, notes: "", pub_date: new Date().toISOString(), platforms }, null, 2)}\n`);
+const notesPath = join("docs", "releases", `${tag}.md`);
+const notes = existsSync(notesPath) ? readFileSync(notesPath, "utf8").trim() : "";
+writeFileSync(join(output, "latest.json"), `${JSON.stringify({ version, notes, pub_date: new Date().toISOString(), platforms }, null, 2)}\n`);
 console.log(`Prepared ${tag} with x64, arm64 and MSI assets.`);

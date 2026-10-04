@@ -107,3 +107,10 @@ test("the answer never depends on argument order or extra keys", () => {
   const b = decideVisible(S({ manualHide: true, occluded: true }));
   assert.equal(a, b);
 });
+
+test("the actual desktop reveals in click mode but respects manual hide and fullscreen", () => {
+  const s = { mode: "smart", trigger: "click", desktop: true, occluded: false };
+  assert.equal(decideVisible(s), true);
+  assert.equal(decideVisible({ ...s, manualHide: true }), false);
+  assert.equal(decideVisible({ ...s, fullscreen: true }), false);
+});

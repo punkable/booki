@@ -1,7 +1,7 @@
 {
   "name": "booki-dock",
   "private": true,
-  "version": "0.69.0",
+  "version": "0.70.0",
   "type": "module",
   "engines": {
     "node": ">=24.18.0 <25",
@@ -44,7 +44,8 @@
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",
-    "@tauri-apps/api": "^2.1.0",
+    "@tauri-apps/api": "~2.11.1",
+    "@tauri-apps/plugin-dialog": "~2.7.3",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "react": "^19.2.7",

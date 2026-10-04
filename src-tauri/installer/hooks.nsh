@@ -8,6 +8,11 @@
   DeleteRegKey HKCU "Software\Classes\*\shell\Booki"
   DeleteRegKey HKCU "Software\Classes\Directory\shell\Booki"
 
+  ; A real uninstall must not leave a broken startup target. Updates retain it.
+  ${If} $UpdateMode <> 1
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Booki"
+  ${EndIf}
+
   ; Wipe per-user data only when the uninstaller checkbox is checked.
   ; $DeleteAppDataCheckboxState / $UpdateMode come from Tauri's NSIS template.
   ${If} $DeleteAppDataCheckboxState = 1

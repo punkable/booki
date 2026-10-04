@@ -21,7 +21,7 @@ export default [
   js.configs.recommended,
 
   {
-    files: ["src/**/*.js", "src/**/*.jsx"],
+    files: ["src/**/*.js", "src/**/*.jsx", "tools/presentation/src/**/*.jsx"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
@@ -62,12 +62,17 @@ export default [
 
   {
     // Node tooling: different globals, and console output is the point.
-    files: ["scripts/**/*.mjs", "*.config.js"],
+    files: ["scripts/**/*.mjs", "tools/presentation/*.mjs", "*.config.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
       globals: { ...globals.node },
     },
+  },
+
+  {
+    files: ["tools/presentation/capture.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 
   {
