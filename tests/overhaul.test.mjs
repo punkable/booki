@@ -8,7 +8,9 @@ const pin = (widget, style = {}) => ({ id: `w-${widget}`, kind: "widget", widget
 
 test("dashboard applies scenarios without replacing pins and stays inside a small window", async () => {
   const cfg = makeConfig({ pinned: [pin("clock")] });
-  const { page, errors } = await openPage(browser, port, "settings.html", { cfg, viewport: { width: 560, height: 650 } });
+  const { page, errors } = await openPage(browser, port, "settings.html", { cfg, viewport: { width: 520, height: 650 } });
+  const navigation = await page.locator(".s-navitem").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().toJSON()));
+  assert.ok(navigation.every((rect) => rect.y >= 0 && rect.bottom <= 650), "navigation stays on screen");
   await page.getByRole("button", { name: /^Smart Moves/ }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));

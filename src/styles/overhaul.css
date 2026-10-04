@@ -100,7 +100,15 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .live-preview-bar.vertical .w-value { font-size: calc(var(--size) * .26); }
 .dashboard-hero-head select { padding: 5px 8px; margin-top: 8px; background: var(--set-card); color: var(--ink); border: 1px solid var(--set-line); border-radius: 8px; }
 @media (max-width: 560px) {
-  .s-shell { grid-template-columns: 132px minmax(0, 1fr); }
+  body.settings-body { overflow: hidden; }
+  .s-shell { grid-template-columns: 132px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100vh; min-height: 0; }
+  .s-sidebar { display: flex; flex-direction: column; position: static; grid-template-areas: none; border-right: 1px solid var(--set-line); border-bottom: 0; }
+  .s-brand, .s-search, .s-nav, .s-sidebar-foot { grid-area: auto; }
+  .s-brand { padding-bottom: 16px; }
+  .s-search { margin-bottom: 10px; }
+  .s-nav { display: flex; flex-direction: column; }
+  .s-sidebar-foot { margin-top: auto; padding-top: 10px; }
+  .s-content { overflow: auto; }
   .s-navitem { padding: 6px; gap: 5px; font-size: 11px; }
   .s-sidebar { padding-inline: 6px; }
   .s-content { padding-inline: 12px; }
