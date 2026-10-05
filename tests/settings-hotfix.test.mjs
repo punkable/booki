@@ -100,3 +100,21 @@ test('an injected Home render failure preserves navigation without rewriting set
   assert.deepEqual(await page.evaluate(() => window.__TAURI__.core.invoke('get_config')), cfg);
   await page.close();
 });
+
+test('native blur keeps the configured dock fill and single CSS outline', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ surfaceStyle: 'tinted', surfaceTint: '#223344', cornerRadius: 22 }) });
+  const read = () => page.locator('.dock').evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { fill: cs.backgroundColor, border: cs.borderTopWidth, radius: cs.borderTopLeftRadius, shadow: cs.boxShadow };
+  });
+  const before = await read();
+  await page.evaluate(() => document.body.classList.add('native-material'));
+  await page.waitForTimeout(250);
+  const after = await read();
+  assert.equal(after.fill, before.fill);
+  assert.equal(after.border, '1px');
+  assert.equal(after.radius, before.radius);
+  assert.equal(after.shadow.includes('inset'), false);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

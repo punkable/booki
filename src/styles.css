@@ -4021,9 +4021,10 @@ body.notch-body.smart.smart-busy .notch-pill {
 /* ─────────── Native material (src/material.js + win/material.rs) ───────────
    When the backend draws Windows' real acrylic behind a surface, the page
    stops faking it: no CSS blur (it could only blur the page itself), and the
-   fill drops to a thin film so the blurred desktop shows through. Borders,
+   CSS keeps the configured fill, radius and single border. No second native
+   tint or thinner replacement fill is applied. Borders,
    the lit top edge and shadows stay — they are what makes it read as glass.
-   The acrylic tint already carries the colour and solidity settings. */
+   The CSS fill carries the colour and solidity settings in both paths. */
 body.native-material .dock,
 body.native-material .stack,
 body.native-material .menu,
@@ -4033,21 +4034,6 @@ body.native-material .coach,
 body.native-material .dock-tip {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-body.native-material .dock {
-  background: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 8%, transparent);
-}
-body.native-material .stack,
-body.native-material .menu,
-body.native-material .trash-pop,
-body.native-material .coach,
-body.native-material .dock-tip {
-  background: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 10%, transparent);
-}
-body.native-material .notch-pill {
-  background:
-    linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, calc(var(--surf-sheen) * 0.2)), transparent 55%),
-    color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 8%, transparent);
 }
 
 .stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }

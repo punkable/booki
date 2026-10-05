@@ -1,9 +1,9 @@
 /* Native material: tells the backend which shapes of this window should sit
- * on Windows' real blurred acrylic, and with what tint.
+ * on Windows' real blur. CSS owns the tint and outline.
  *
- * The CSS surfaces keep a translucent fallback fill; once the backend confirms
- * it drew the material, `body.native-material` switches them to a thin film
- * over the real blur. Reports are deduplicated, so callers can report from
+ * The configured CSS fill remains in both paths; once the backend confirms
+ * the blur, `body.native-material` disables the page-only CSS blur.
+ * Reports are deduplicated, so callers can report from
  * every frame of an animation without flooding IPC.
  */
 import { invoke, isTauri } from "./api.js";
@@ -36,8 +36,8 @@ export function isDark() {
 
 /**
  * Tint (`#RRGGBBAA`) for the current surface settings and theme. Same inputs
- * as the CSS fallback (surface.js), but lighter: the real blur behind it does
- * part of the work a flat fill had to do alone.
+ * as the CSS fallback (surface.js). This also identifies appearance changes
+ * in deduplicated reports; native blur does not add a second fill.
  */
 export function materialTint(cfg, dark = isDark()) {
   const base = resolveGlassTint(cfg) || (dark ? "#161618" : "#f4f4f7");

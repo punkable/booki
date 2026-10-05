@@ -3,7 +3,7 @@
 //! A WebView2 window can be transparent, but CSS `backdrop-filter` inside it
 //! only blurs the page's own content, never the desktop behind the window. So
 //! Booki's "glass" used to be a flat translucent colour. This module gives each
-//! surface a real one: small Win32 windows with Windows' acrylic blur, tinted,
+//! surface a real one: small Win32 windows with Windows' blur,
 //! placed exactly under the shapes the page reports (the bar, an open flyout,
 //! a menu, the notch pill) and kept directly below their webview window.
 //!
@@ -15,7 +15,7 @@
 //! System corner rounding and borders are disabled to avoid a second outline.
 //!
 //! The material windows never take input (`WM_NCHITTEST` → `HTTRANSPARENT`)
-//! and never activate. Acrylic uses `SetWindowCompositionAttribute`, the call
+//! and never activate. The blur uses `SetWindowCompositionAttribute`, the call
 //! the Windows 10 and 11 shells use for their own flyouts; it is undocumented,
 //! so it is looked up at runtime and everything degrades to "no material".
 
@@ -138,10 +138,11 @@ struct CompositionData {
 type SetCompositionFn = unsafe extern "system" fn(HWND, *mut CompositionData) -> BOOL;
 
 const WCA_ACCENT_POLICY: u32 = 19;
-const ACCENT_ENABLE_ACRYLICBLURBEHIND: u32 = 4;
+const ACCENT_ENABLE_BLURBEHIND: u32 = 3;
 
-/// Tint is 0xAARRGGBB; the accent API wants 0xAABBGGRR.
-fn apply_acrylic(hwnd: HWND, tint: u32) -> bool {
+/// Blur only: CSS owns the fill and outline, so no tinted acrylic box can
+/// disagree with the rounded webview surface.
+fn apply_blur(hwnd: HWND) -> bool {
     unsafe {
         let Ok(user32) = GetModuleHandleW(w!("user32.dll")) else {
             return false;
@@ -150,18 +151,10 @@ fn apply_acrylic(hwnd: HWND, tint: u32) -> bool {
             return false;
         };
         let set: SetCompositionFn = std::mem::transmute(proc);
-        let (a, r, g, b) = (
-            tint >> 24,
-            (tint >> 16) & 0xff,
-            (tint >> 8) & 0xff,
-            tint & 0xff,
-        );
-        // Acrylic misbehaves with a fully transparent tint on Windows 10.
-        let a = a.max(1);
         let mut policy = AccentPolicy {
-            state: ACCENT_ENABLE_ACRYLICBLURBEHIND,
+            state: ACCENT_ENABLE_BLURBEHIND,
             flags: 0,
-            gradient: (a << 24) | (b << 16) | (g << 8) | r,
+            gradient: 0,
             animation: 0,
         };
         let mut data = CompositionData {
@@ -223,7 +216,7 @@ pub fn apply(
         let r = [tl, tr, br, bl].map(|v| px(v).max(0));
         let rect = (origin.left + px(x), origin.top + px(y), w, h, r);
         if piece.tint != tint {
-            if !apply_acrylic(hwnd, tint) {
+            if !apply_blur(hwnd) {
                 surface.pieces.iter_mut().for_each(hide);
                 return false;
             }
