@@ -64,7 +64,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. See what's new in the <a href="docs/releases/v0.70.0.md">0.70 notes</a>.</sub></p>
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. See the <a href="docs/releases/v0.70.1.md">0.70.1 stability fixes</a>.</sub></p>
 
 ## Get started
 

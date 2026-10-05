@@ -74,4 +74,5 @@ jobs:
         run: node scripts/publish-release.mjs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # No pruning: retain older releases and tags for rollback and pinned URLs.
+      # Superseded installers become private drafts after verification.
+      # Retain tags and source history; expose only the replacement release.

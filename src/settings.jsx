@@ -20,10 +20,11 @@ import {
   onCloseRequest,
   logMessage,
 } from "./api.js";
-import { currentRelease } from "./release-notes.js";
+import { currentRelease, previousRelease } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
+import { SettingsBoundary } from "./settings/error-boundary.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
 import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
 import { resolveNotchMode } from "./notch-mode.js";
@@ -69,6 +70,7 @@ import {
 } from "./widgets-meta.js";
 
 const CHANGELOG_ICONS = {
+  sparkles: () => <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />,
   search: Search24Regular,
   undo: ArrowUndo24Regular,
   performance: Flash24Regular,
@@ -83,7 +85,7 @@ function ChangelogIcon({ name }) {
       </span>
     );
   }
-  if (name) {
+  if (name && /\p{Extended_Pictographic}/u.test(name)) {
     return (
       <span className="cl-ico cl-ico-emoji" aria-hidden="true">
         {name}
@@ -2854,6 +2856,7 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
+            <SettingsBoundary key={tab} onHome={() => setTab("home")}>
             {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
             {tab === "dock" && <><DockPage cfg={cfg} set={set} /><CollapsibleSection title={t("tab.autohide")} defaultOpen={false}><AutoHidePage cfg={cfg} set={set} /></CollapsibleSection><CollapsibleSection title={t("tab.notch")} defaultOpen={false}><NotchPage cfg={cfg} set={set} /></CollapsibleSection></>}
@@ -2867,6 +2870,7 @@ function App() {
             {tab === "general" && <><General cfg={cfg} set={set} beforeApply={prepareConfigOperation} onWhatsNew={() => setShowChangelog(true)} /><CollapsibleSection title={t("tab.shortcuts")} defaultOpen={false}><ShortcutsSection cfg={cfg} set={set} /></CollapsibleSection></>}
             {tab === "faq" && <Faq version={version || "..."} />}
             {tab === "about" && <About version={version || "..."} onWhatsNew={() => setShowChangelog(true)} onReset={reset} />}
+            </SettingsBoundary>
           </div>
         </main>
         {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
@@ -2900,7 +2904,7 @@ function HistoricalRelease({ entry }) {
   const [open, setOpen] = useState(false);
   return <details className="cl-history-entry" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary><strong>v{entry.version}</strong><span>{entry.date}</span><span>{entry.headline}</span></summary>
-    {open && entry.sections.map((section, index) => <section key={index}><h3>{section.title}</h3><ul>{section.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section>)}
+    {open && entry.sections.map((section, index) => <section key={index}><h3 className="cl-section-title"><ChangelogIcon name={section.icon} />{section.title}</h3><ul>{section.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></section>)}
   </details>;
 }
 
@@ -2921,7 +2925,7 @@ function ChangelogModal({ onClose }) {
       alive = false;
     };
   }, []);
-  const log = entries ? [currentRelease(), ...entries] : [];
+  const log = entries ? [currentRelease(), previousRelease(), ...entries] : [];
   return createPortal((
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>
@@ -2967,7 +2971,7 @@ function ChangelogModal({ onClose }) {
 }
 
 const settingsRoot = import.meta.hot?.data.settingsRoot || createRoot(document.getElementById("root"));
-settingsRoot.render(<App />);
+settingsRoot.render(<SettingsBoundary><App /></SettingsBoundary>);
 if (import.meta.hot) {
   import.meta.hot.dispose((data) => {
     data.settingsRoot = settingsRoot;

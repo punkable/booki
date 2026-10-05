@@ -31,6 +31,16 @@ const hash = (file) => createHash("sha256").update(readFileSync(file)).digest("h
 for (const name of expected) {
   if (hash(join(source, name)) !== hash(join(verifyDir, name))) throw new Error(`Downloaded asset differs: ${name}`);
 }
-gh("release", "edit", tag, "--draft=false");
+gh("release", "edit", tag, "--draft=false", "--latest");
 if (JSON.parse(gh("release", "view", tag, "--json", "isDraft")).isDraft) throw new Error(`${tag} is still a draft.`);
+const api = (...args) => execFileSync("gh", ["api", ...args], { encoding: "utf8" }).trim();
+const latest = JSON.parse(api(`repos/${repo}/releases/latest`));
+if (latest.tag_name !== tag) throw new Error(`${tag} is not the latest public release.`);
+// Keep superseded installers privately for rollback, with only the verified
+// replacement publicly downloadable. Tags and repository history are retained.
+const superseded = api(`repos/${repo}/releases?per_page=100`, "--paginate", "--jq", `.[] | select(.draft == false and .tag_name != ${JSON.stringify(tag)}) | .id`).split(/\r?\n/).filter(Boolean);
+for (const id of superseded) {
+  if (!/^\d+$/.test(id)) throw new Error("Invalid release ID.");
+  api("--method", "PATCH", `repos/${repo}/releases/${id}`, "-F", "draft=true");
+}
 console.log(`Published verified ${tag}.`);

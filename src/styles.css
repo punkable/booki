@@ -236,8 +236,6 @@ body.dock-body.edge-right { padding-right: var(--edge-pad, 18px); }
 /* Tight to the taskbar: keep material insets, only shrink the outer cast. */
 body.tight-edge .dock {
   box-shadow:
-    inset var(--lit-x, 0) var(--lit-y, 1px) 0 var(--surf-inset-lit),
-    inset var(--shade-x, 0) var(--shade-y, -1px) 0 var(--surf-inset-shade),
     0 1px 3px color-mix(in srgb, #000 12%, transparent);
 }
 body.edge-bottom { align-items: flex-end; justify-content: center; }
@@ -386,8 +384,8 @@ body.surface-solid .dock {
 .dock::before {
   content: "";
   position: absolute;
-  inset: 1px;
-  border-radius: inherit;
+  inset: 0;
+  border-radius: max(0px, calc(var(--dock-r) - 1px));
   pointer-events: none;
   z-index: 0;
   background: linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, 0.18), transparent 48%);
@@ -4023,9 +4021,10 @@ body.notch-body.smart.smart-busy .notch-pill {
 /* ─────────── Native material (src/material.js + win/material.rs) ───────────
    When the backend draws Windows' real acrylic behind a surface, the page
    stops faking it: no CSS blur (it could only blur the page itself), and the
-   fill drops to a thin film so the blurred desktop shows through. Borders,
+   CSS keeps the configured fill, radius and single border. No second native
+   tint or thinner replacement fill is applied. Borders,
    the lit top edge and shadows stay — they are what makes it read as glass.
-   The acrylic tint already carries the colour and solidity settings. */
+   The CSS fill carries the colour and solidity settings in both paths. */
 body.native-material .dock,
 body.native-material .stack,
 body.native-material .menu,
@@ -4036,21 +4035,10 @@ body.native-material .dock-tip {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-body.native-material .dock {
-  background: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 8%, transparent);
-}
-body.native-material .stack,
-body.native-material .menu,
-body.native-material .trash-pop,
-body.native-material .coach,
-body.native-material .dock-tip {
-  background: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 10%, transparent);
-}
-body.native-material .notch-pill {
-  background:
-    linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, calc(var(--surf-sheen) * 0.2)), transparent 55%),
-    color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 8%, transparent);
-}
 
 .stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .stack-pager .stack-more:disabled { opacity: .4; cursor: default; }
+
+/* Keep one outline: native material supplies fill, CSS owns the border. */
+body.notch-body .notch-pill { box-shadow: none; }
+body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.notch-body.smart.smart-focus .notch-pill, body.notch-body.smart.smart-busy .notch-pill { box-shadow: 0 4px 14px #0003; }

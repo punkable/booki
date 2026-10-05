@@ -11,7 +11,7 @@ pub fn snapshot(root: &Path) -> Result<PathBuf, String> {
     let directory = backups.join(format!("snapshot-{stamp:020}"));
     let copy = || -> std::io::Result<()> {
         fs::create_dir_all(&directory)?;
-        for name in ["config.json", "config.json.bak"] {
+        for name in ["config.json", "config.bak.json"] {
             let source = root.join(name);
             if source.symlink_metadata().is_ok_and(|m| m.is_file()) {
                 fs::copy(source, directory.join(name))?;
@@ -65,6 +65,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("profiles")).unwrap();
         fs::write(root.join("config.json"), "original settings").unwrap();
+        fs::write(root.join("config.bak.json"), "last-good settings").unwrap();
         fs::write(root.join("profiles/work.json"), "work profile").unwrap();
         fs::write(root.join("clipboard.json"), "private history").unwrap();
         for _ in 0..5 {
@@ -76,6 +77,10 @@ mod tests {
             assert_eq!(
                 fs::read_to_string(snapshot.join("profiles/work.json")).unwrap(),
                 "work profile"
+            );
+            assert_eq!(
+                fs::read_to_string(snapshot.join("config.bak.json")).unwrap(),
+                "last-good settings"
             );
             assert!(!snapshot.join("clipboard.json").exists());
         }

@@ -10,7 +10,8 @@ import { resolveSurfaceStyle, glassFillColor, surfaceAlpha } from "../surface.js
 
 /* The real widget markup/styles, with safe example data. Private notes and
    clipboard contents never appear in a preview or diagnostic screenshot. */
-export function WidgetPreview({ widget, style = {}, size = 48, gap = 6 }) {
+export function WidgetPreview({ widget, style: rawStyle, size = 48, gap = 6 }) {
+  const style = rawStyle && typeof rawStyle === "object" && !Array.isArray(rawStyle) ? rawStyle : {};
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;

@@ -1,9 +1,9 @@
 /* Native material: tells the backend which shapes of this window should sit
- * on Windows' real blurred acrylic, and with what tint.
+ * on Windows' real blur. CSS owns the tint and outline.
  *
- * The CSS surfaces keep a translucent fallback fill; once the backend confirms
- * it drew the material, `body.native-material` switches them to a thin film
- * over the real blur. Reports are deduplicated, so callers can report from
+ * The configured CSS fill remains in both paths; once the backend confirms
+ * the blur, `body.native-material` disables the page-only CSS blur.
+ * Reports are deduplicated, so callers can report from
  * every frame of an animation without flooding IPC.
  */
 import { invoke, isTauri } from "./api.js";
@@ -11,6 +11,8 @@ import { resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "./surface.j
 
 let lastSig = "";
 let supported = null;
+let generation = 0;
+let retryAfter = 0;
 let tint = "#161618b8";
 
 /** `[x, y, w, h, radius]` in window CSS px for an element, or null if hidden. */
@@ -20,8 +22,9 @@ export function shapeOf(el, radius) {
   if (r.width < 1 || r.height < 1) return null;
   const cs = getComputedStyle(el);
   if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) < 0.05) return null;
-  const rad = radius ?? (parseFloat(cs.borderTopLeftRadius) || 0);
-  return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), Math.round(rad)];
+  const scale = Math.min(r.width / (el.offsetWidth || r.width), r.height / (el.offsetHeight || r.height));
+  const radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map((value) => Math.round((radius ?? (parseFloat(value) || 0)) * scale));
+  return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), ...radii];
 }
 
 /** Is the page currently dark (explicit theme or following the system)? */
@@ -33,8 +36,8 @@ export function isDark() {
 
 /**
  * Tint (`#RRGGBBAA`) for the current surface settings and theme. Same inputs
- * as the CSS fallback (surface.js), but lighter: the real blur behind it does
- * part of the work a flat fill had to do alone.
+ * as the CSS fallback (surface.js). This also identifies appearance changes
+ * in deduplicated reports; native blur does not add a second fill.
  */
 export function materialTint(cfg, dark = isDark()) {
   const base = resolveGlassTint(cfg) || (dark ? "#161618" : "#f4f4f7");
@@ -45,6 +48,8 @@ export function materialTint(cfg, dark = isDark()) {
 export function setMaterialTint(value) {
   if (value === tint) return;
   tint = value;
+  generation++;
+  retryAfter = 0;
   lastSig = "";
 }
 
@@ -56,6 +61,8 @@ export function setMaterialEnabled(on) {
   on = on !== false;
   if (on === enabled) return;
   enabled = on;
+  retryAfter = 0;
+  generation++;
   lastSig = "";
   if (!on) {
     if (isTauri) invoke("set_material", { shapes: [], tint }).catch(() => {});
@@ -67,17 +74,26 @@ export function setMaterialEnabled(on) {
 /** Report the shapes (empty = hide). */
 export function reportMaterial(shapes) {
   if (!isTauri || !enabled) return;
+  if (supported === false && Date.now() < retryAfter && shapes.some(Boolean)) return;
   const list = shapes.filter(Boolean);
-  const sig = tint + JSON.stringify(list);
+  const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, list]);
   if (sig === lastSig) return;
   lastSig = sig;
+  const request = ++generation;
   invoke("set_material", { shapes: list, tint })
     .then((ok) => {
+      if (request !== generation || !enabled) return;
+      if (!ok) { lastSig = ""; retryAfter = Date.now() + 5000; }
+      else retryAfter = 0;
       if (ok === supported) return;
       supported = !!ok;
       document.body.classList.toggle("native-material", supported);
     })
-    .catch(() => {});
+    .catch(() => {
+      if (request !== generation) return;
+      lastSig = ""; supported = false; retryAfter = Date.now() + 5000;
+      document.body.classList.remove("native-material");
+    });
 }
 
 /** Keep reporting every frame for `ms` (a CSS transition is moving a surface). */

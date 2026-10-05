@@ -55,9 +55,12 @@ body.settings-body { --set-bg: #17191d; --set-side: #1d2025; --set-card: #ffffff
 .focus-task label { min-width: 0; }
 .focus-task .task-edit { overflow-wrap: anywhere; }
 .focus-actions { flex-wrap: wrap; }
-body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c, inset 0 1px 0 #ffffff55; }
-[data-theme="dark"] body:not(.settings-body) .dock { box-shadow: 0 12px 30px #0004, inset 0 1px 0 #ffffff12; }
+body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
+[data-theme="dark"] body:not(.settings-body) .dock { box-shadow: 0 12px 30px #0004; }
 @media (max-width: 850px) { .s-content { padding: 24px; } .finish-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .s-content { padding: 20px 14px; } .ui-page-head h1 { font-size: 25px; } .dashboard-hero-head { padding: 20px 16px 0; } .app-library-tools { flex-wrap: wrap; } .app-library-tools input { flex-basis: 100%; } .app-library-grid { grid-template-columns: minmax(0, 1fr); } .dashboard-hero h2 { font-size: 25px; } .finish-grid { gap: 8px; padding: 12px; } }
 @media (prefers-reduced-motion: reduce) { .preview-edit-pin { transition: none; } .preview-edit-pin:hover { transform: none; } }
 @media (forced-colors: active) { .finish-card, .app-library-choice, .scenario-card { border: 1px solid ButtonText; } .setting-search-target { outline-color: Highlight; } }
+
+.settings-recovery { padding: 24px; border: 1px solid var(--set-line); border-radius: 16px; background: var(--set-card); }
+.settings-recovery .s-btn { margin: 8px 8px 0 0; }

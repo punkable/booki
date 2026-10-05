@@ -1,6 +1,6 @@
 /* Geometry shared by the live bar and its Settings previews. */
 export function widgetSpan(type, style = {}) {
-  const requested = Number(style.span);
+  const requested = Number(style?.span);
   if ([1, 2, 3].includes(requested)) return requested;
   if (["media", "notes", "clipboard", "tasks"].includes(type)) return 3;
   return ["clock", "net", "uptime", "timer", "calendar", "weather"].includes(type) ? 2 : 1;
