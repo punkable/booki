@@ -6,7 +6,6 @@
 mod apps;
 mod config;
 mod shortcuts;
-#[cfg(any(windows, test))]
 mod surface_geometry;
 mod update_backup;
 mod usage;
@@ -637,7 +636,7 @@ fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
 async fn set_material(
     app: AppHandle,
     window: tauri::WebviewWindow,
-    shapes: Vec<(f64, f64, f64, f64, f64, f64, f64, f64)>,
+    shapes: Vec<surface_geometry::MaterialShape>,
     tint: String,
 ) -> bool {
     #[cfg(windows)]

@@ -186,7 +186,7 @@ fn hide(piece: &mut Piece) {
 pub fn apply(
     owner: isize,
     key: &str,
-    shapes: &[(f64, f64, f64, f64, f64, f64, f64, f64)],
+    shapes: &[crate::surface_geometry::MaterialShape],
     dpr: f64,
     tint: u32,
 ) -> bool {

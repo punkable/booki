@@ -1,4 +1,7 @@
 //! CSS-compatible corner normalization for the native material clip.
+pub type MaterialShape = (f64, f64, f64, f64, f64, f64, f64, f64);
+
+#[cfg(any(windows, test))]
 pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
     let (w, h) = (width.max(1) as f64, height.max(1) as f64);
     let mut r = radii.map(|v| v.max(0) as f64);
