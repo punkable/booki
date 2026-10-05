@@ -238,3 +238,26 @@ test('system reduced transparency disables native blur without rewriting the sav
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test('creating a Settings group commits its members together and cancel preserves pins', async () => {
+  const cfg = makeConfig({ pinned: pins });
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg });
+  await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'New group', exact: true });
+  await dialog.getByRole('checkbox', { name: 'Editor', exact: true }).check();
+  assert.equal(await dialog.getByRole('button', { name: 'Create group (1)' }).isDisabled(), true);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.deepEqual((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).pinned, pins);
+  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: 'Editor', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Browser', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Create group (2)' }).click();
+  await page.waitForTimeout(200);
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
+  assert.equal(saved.pinned.length, 2);
+  assert.deepEqual(saved.pinned[0].children, pins.slice(0, 2));
+  assert.deepEqual(saved.pinned[1], pins[2]);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

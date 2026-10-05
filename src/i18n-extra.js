@@ -1,6 +1,9 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "workspace.groupHint": "Selecione pelo menos dois apps, pastas ou widgets do seu dock.",
+    "workspace.groupEmpty": "Fixe dois itens antes de criar um grupo.",
+    "workspace.createGroup": "Criar grupo",
     "workspace.libraryHint": "Encontre seus apps, fixe favoritos e organize seu dock.",
     "surfaces.headline": "Um acabamento coerente. Um Booki mais fácil de usar.",
     "surfaces.design": "Superfícies e design",
@@ -695,6 +698,9 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "workspace.groupHint": "Sélectionnez au moins deux apps, dossiers ou widgets du dock.",
+    "workspace.groupEmpty": "Épinglez deux éléments avant de créer un groupe.",
+    "workspace.createGroup": "Créer un groupe",
     "workspace.libraryHint": "Trouvez vos apps, épinglez vos favorites et organisez votre dock.",
     "surfaces.headline": "Une finition cohérente. Un Booki plus simple à utiliser.",
     "surfaces.design": "Surfaces et design",
@@ -1389,6 +1395,9 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "workspace.groupHint": "Mindestens zwei Apps, Ordner oder Widgets aus dem Dock auswählen.",
+    "workspace.groupEmpty": "Vor dem Erstellen einer Gruppe zwei Elemente anheften.",
+    "workspace.createGroup": "Gruppe erstellen",
     "workspace.libraryHint": "Apps finden, Favoriten anheften und das Dock organisieren.",
     "surfaces.headline": "Eine stimmige Oberfläche. Ein besser bedienbares Booki.",
     "surfaces.design": "Oberflächen und Design",

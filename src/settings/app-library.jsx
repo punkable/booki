@@ -67,7 +67,7 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder }
       {[['all', 'add.all'], ['frequent', 'add.frequent'], ['running', 'add.running']].map(([value, key]) => <button type="button" key={value} aria-pressed={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
     </div>
     <div role="status" aria-live="polite">{message}</div>
-    {chosen.length > 0 && <div className="app-library-selection"><button className="s-btn" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="s-btn s-btn-soft" onClick={() => setSelected({})}>{t('act.cancel')}</button></div>}
+    {chosen.length > 0 && <div className="app-library-selection"><button className="s-btn" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="s-btn s-btn-soft" onClick={() => setSelected({})}>{t('trash.cancel')}</button></div>}
     {loading ? <p className="muted" role="status">{t('overhaul.loading')}</p> : <>
       {failed.length > 0 && <p role="alert">{t('overhaul.partialApps')}</p>}
       {(showAll || filter === 'frequent') && sections.frequent.length > 0 && <><h3 className="app-library-heading">{t('add.frequent')}</h3>{cards(sections.frequent, true)}</>}

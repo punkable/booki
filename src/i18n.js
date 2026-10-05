@@ -6,6 +6,9 @@
 
 export const DICT = {
   es: {
+    "workspace.groupHint": "Selecciona al menos dos apps, carpetas o widgets de tu dock.",
+    "workspace.groupEmpty": "Ancla dos elementos antes de crear un grupo.",
+    "workspace.createGroup": "Crear grupo",
     "workspace.libraryHint": "Encuentra tus apps, ancla favoritas y organiza tu dock.",
     "surfaces.headline": "Un acabado coherente. Un Booki más usable.",
     "surfaces.design": "Superficies y diseño",
@@ -708,6 +711,9 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "workspace.groupHint": "Select at least two apps, folders or widgets from your dock.",
+    "workspace.groupEmpty": "Pin two items before creating a group.",
+    "workspace.createGroup": "Create group",
     "workspace.libraryHint": "Find your apps, pin favorites and organize your dock.",
     "surfaces.headline": "One coherent finish. A more usable Booki.",
     "surfaces.design": "Surfaces and design",

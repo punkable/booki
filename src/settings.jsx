@@ -23,6 +23,7 @@ import {
 import { currentRelease, previousReleases } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
+import { GroupCreator } from "./settings/group-creator.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
@@ -1153,6 +1154,7 @@ function bindRafMove(onFrame) {
 }
 
 function Apps({ cfg, set, section = "apps", focusedPin }) {
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const kidMenuRef = useRef(null);
@@ -1574,11 +1576,7 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
   const addWidget = (widget, label) =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
-  const newFolder = () => {
-    const id = uid();
-    set({ pinned: [...cfg.pinned, { id, name: t("group.new"), path: "", args: [], kind: "group", children: [] }] });
-    setOpenIds((o) => ({ ...o, [id]: true }));
-  };
+  const newFolder = () => setCreatingGroup(true);
   // Edit a folder's contents (kind === "group", children[]). Auto-dissolves a
   // folder left with fewer than 2 items, matching the dock's behavior.
   const settleFolder = (gi, kids, extra = []) => {
@@ -2037,6 +2035,7 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
         </div>
       </CollapsibleSection>
       )}
+      {creatingGroup && <GroupCreator pinned={cfg.pinned} onClose={() => setCreatingGroup(false)} onCreate={(pinned) => { set({ pinned }); setCreatingGroup(false); }} />}
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
           item={cfg.pinned[iconFor]}
