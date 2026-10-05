@@ -54,6 +54,7 @@ export function buildAddPanel(root, deps) {
   let identities = {};
   let failures = false;
   let rowLimit = MAX_ROWS;
+  let loadGeneration = 0;
 
   root.innerHTML = "";
   const head = el("div", "stack-head add-head");
@@ -67,16 +68,26 @@ export function buildAddPanel(root, deps) {
   const close = el("button", "stack-close");
   close.type = "button";
   close.title = t("stack.close");
+  close.setAttribute("aria-label", t("stack.close"));
   close.innerHTML = icon("x");
   close.addEventListener("click", () => deps.close());
-  head.append(searchWrap, close);
+  const refresh = el("button", "stack-close add-refresh");
+  refresh.type = "button";
+  refresh.title = t("apps.refresh");
+  refresh.setAttribute("aria-label", t("apps.refresh"));
+  refresh.innerHTML = icon("refresh");
+  refresh.addEventListener("click", () => load());
+  head.append(searchWrap, refresh, close);
 
   const tabs = el("div", "add-tabs");
   tabs.setAttribute("role", "tablist");
+  tabs.setAttribute("aria-label", t("dock.emptyAdd"));
   const tabBtn = (id, label) => {
     const b = el("button", "add-tab");
     b.type = "button";
     b.dataset.tab = id;
+    b.id = `add-tab-${id}`;
+    b.setAttribute("aria-controls", "add-results");
     b.setAttribute("role", "tab");
     b.textContent = label;
     b.addEventListener("click", () => {
@@ -88,7 +99,19 @@ export function buildAddPanel(root, deps) {
   };
   tabs.append(tabBtn("apps", t("add.apps")), tabBtn("widgets", t("m.widgets")));
 
+  tabs.addEventListener("keydown", (event) => {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    const buttons = [...tabs.children];
+    const index = buttons.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].click();
+    buttons[next].focus();
+  });
   const body = el("div", "add-body");
+  body.id = "add-results";
+  body.setAttribute("role", "tabpanel");
   const foot = el("div", "add-foot");
   const footBtn = (glyph, label, fn) => {
     const b = el("button", "add-foot-btn");
@@ -140,7 +163,10 @@ export function buildAddPanel(root, deps) {
       const on = b.dataset.tab === tab;
       b.classList.toggle("on", on);
       b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
     }
+    body.setAttribute("aria-labelledby", `add-tab-${tab}`);
+    body.setAttribute("aria-busy", String(!loaded));
     body.innerHTML = "";
     if (tab === "widgets") drawWidgets();
     else drawApps();
@@ -267,13 +293,20 @@ export function buildAddPanel(root, deps) {
   }
 
   async function load() {
+    if (disposed) return;
+    const request = ++loadGeneration;
+    loaded = false;
+    refresh.disabled = true;
+    if (tab === "apps") draw();
     const results = await Promise.allSettled([deps.listWindows(), deps.listInstalled(), deps.listFrequent ? deps.listFrequent() : Promise.resolve([])]);
+    if (disposed || request !== loadGeneration) return;
     const value = (i) => results[i].status === "fulfilled" ? results[i].value || [] : [];
     running = value(0); installed = value(1); frequent = value(2);
     failures = results.some((r) => r.status === "rejected");
     const paths = [...new Set([...running.map((w) => w.exe), ...installed.flatMap((g) => g.items.map((i) => i.path)), ...frequent.map((u) => u.path), ...deps.pinned().map((p) => p.path)].filter(Boolean))];
     if (deps.identities) identities = await deps.identities(paths).then((v) => v || {}).catch(() => ({}));
-    if (disposed) return;
+    if (disposed || request !== loadGeneration) return;
+    refresh.disabled = false;
     loaded = true;
     if (tab === "apps") draw();
   }
@@ -282,7 +315,7 @@ export function buildAddPanel(root, deps) {
   load();
   return {
     focus: () => { if (!disposed) search.focus(); },
-    dispose: () => { disposed = true; observer?.disconnect(); },
+    dispose: () => { disposed = true; loadGeneration++; observer?.disconnect(); },
   };
 }
 

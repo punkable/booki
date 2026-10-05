@@ -6,7 +6,7 @@ import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
 import { isLibIcon, resolveLibIcon } from "../icon-library.js";
 import { icon } from "../icons.js";
-import { resolveSurfaceStyle, glassFillColor, surfaceAlpha } from "../surface.js";
+import { resolveSurfaceStyle, glassFillColor, surfaceAlpha, dockRadius, surfaceForeground, transparencyReduced } from "../surface.js";
 
 /* The real widget markup/styles, with safe example data. Private notes and
    clipboard contents never appear in a preview or diagnostic screenshot. */
@@ -68,12 +68,12 @@ export function DockPreview({ cfg, large = false, onSelect }) {
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const size = large ? Math.max(32, Math.min(56, cfg.iconSize || 48)) : 32;
-  const surface = cfg.reduceTransparency ? "solid" : resolveSurfaceStyle(cfg);
+  const surface = transparencyReduced(cfg) ? "solid" : resolveSurfaceStyle(cfg);
   const fill = glassFillColor(cfg);
   const items = cfg.pinned || [];
   return <div className={"live-preview-scene" + (large ? " large" : "")}>
-    <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, gap, borderRadius: cfg.cornerRadius ?? 16,
-      background: `color-mix(in srgb, ${fill} ${Math.round((cfg.reduceTransparency ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
+    <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
+      background: `color-mix(in srgb, ${fill} ${Math.round((transparencyReduced(cfg) ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
       {items.length ? items.map((item) => onSelect && item.kind !== "separator" ? <button key={item.id} className="preview-edit-pin" type="button" aria-label={`${t("apps.rename")}: ${item.name || widgetDisplayName(item.widget, t)}`} onClick={() => onSelect(item)}><PreviewPin item={item} size={size} gap={gap} /></button> : <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
     </div>
     <span className="live-preview-caption">{onSelect ? t("premium.editPreview") : t("overhaul.previewHint")}</span>

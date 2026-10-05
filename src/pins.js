@@ -20,8 +20,8 @@ export async function kindForPath(path, isDirFn) {
 /**
  * Dissolve groups that have fewer than 2 children.
  * Empty groups are removed (unless keepEmpty); a single leftover child is
- * promoted to the dock. Settings uses keepEmpty so "+ New group" can stay
- * open while the user fills it.
+ * promoted to the dock. keepEmpty retains legacy placeholders while editing existing layouts.
+ * New groups are created with all selected members in one edit.
  */
 export function normalizeGroups(pinned, { keepEmpty = false } = {}) {
   const out = [];
@@ -87,6 +87,16 @@ export function mergePins(pinned, fromId, toId, newGroupName = "Group") {
   if (newTo < 0) return list;
   withoutFrom.splice(newTo, 1, group);
   return withoutFrom;
+}
+
+/** Build a complete group in one edit, preserving member data and order. */
+export function groupSelected(pinned, ids, name, id) {
+  const selected = new Set(ids);
+  const children = pinned.filter((item) => selected.has(item.id) && canMergeKind(item.kind));
+  if (children.length < 2) return pinned;
+  const members = new Set(children.map((item) => item.id));
+  const group = { id, name, path: "", args: [], kind: "group", children };
+  return pinned.flatMap((item) => item.id === children[0].id ? [group] : members.has(item.id) ? [] : [item]);
 }
 
 /** Pull child out of group onto the dock; dissolve if < 2 remain. */

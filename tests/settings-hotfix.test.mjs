@@ -33,9 +33,11 @@ test('the current changelog renders every section icon as SVG', async () => {
   await page.getByRole('button', { name: "What's new", exact: true }).click();
   await page.locator('.cl-section-title').first().waitFor();
   await page.locator('.cl-history > summary').click();
-  await page.locator('.cl-history-entry').first().locator('summary').click();
+  await page.locator('.cl-history-entry').nth(0).locator('summary').click();
+  await page.locator('.cl-history-entry').nth(1).locator('summary').click();
   await page.locator('.cl-history-entry').first().locator('.cl-section-title').first().waitFor();
-  assert.equal(await page.locator('.cl-section-title .cl-ico svg').count(), 5);
+  await page.locator('.cl-history-entry').nth(1).locator('.cl-section-title').first().waitFor();
+  assert.equal(await page.locator('.cl-section-title .cl-ico svg').count(), 7);
   assert.equal(await page.locator('.cl-section-title .cl-ico').allTextContents().then((texts) => texts.join('')), '');
   assert.deepEqual(errors, []);
   await page.close();

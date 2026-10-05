@@ -7,10 +7,9 @@ import { t } from "../i18n.js";
 
 // Searchable option index: i18n key → tab that hosts it (settings search).
 const SEARCH_INDEX = [
-  ["premium.finishes", "appearance"], ["overhaul.reduceTransparency", "appearance"],
+  ["premium.finishes", "appearance"], ["workspace.library", "apps"], ["overhaul.reduceTransparency", "appearance"],
   ["overhaul.overflow", "dock"], ["premium.suggestionSettings", "apps"],
   ["ap.theme", "appearance"], ["ap.accent", "appearance"],
-  ["ap.surface", "appearance"], ["ap.translucency", "appearance"],
   ["ap.solidity", "appearance"], ["ap.surfaceTint", "appearance"],
   ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
   ["ap.compact", "appearance"], ["ap.nativeMaterial", "appearance"],
@@ -39,7 +38,7 @@ const SEARCH_INDEX = [
 const SEARCH_ALIASES = {
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper",
-  "ap.surface": "mica acrylic acrilico tintado tinted solido solid material cristal glass windhawk taskbar barra",
+  "premium.finishes": "acabado surface fondo background mica acrylic acrilico tintado tinted solido solid material cristal glass windhawk taskbar barra",
   "ap.solidity": "solidez opacity opacidad translucidez translucency cristal",
   "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",

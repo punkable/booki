@@ -63,7 +63,7 @@ import {
   LIVE_WIDGETS,
   sparkPaths,
 } from "./dock/widget-view.js";
-import { applySurfaceVars, resolveSurfaceStyle } from "./surface.js";
+import { applySurfaceVars, dockRadius, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
@@ -333,7 +333,7 @@ function applyAll() {
   // Solidity + optional glass tint drive dock/notch fill together.
   applySurfaceVars(cfg);
   setMaterialTint(materialTint(cfg));
-  setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency && resolveSurfaceStyle(cfg) !== "solid");
+  setMaterialEnabled(cfg.nativeMaterial !== false && !transparencyReduced(cfg) && resolveSurfaceStyle(cfg) !== "solid");
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -355,7 +355,7 @@ function applyAll() {
   // group grids/minis, and letter glyphs. Dock chrome is a touch rounder.
   const cr = cfg.cornerRadius ?? 12;
   root.style.setProperty("--tile-r", `${cr}px`);
-  root.style.setProperty("--dock-r", `${cr + 8}px`);
+  root.style.setProperty("--dock-r", `${dockRadius(cfg)}px`);
   document.body.classList.toggle("show-labels", cfg.showLabels !== false);
   document.body.classList.toggle("compact", !!cfg.compact);
   document.body.classList.toggle("autohide", hideMode() !== "off");
@@ -437,8 +437,7 @@ async function render() {
   cacheWidgetEls();
   requestAnimationFrame(refreshPreviewMarquees);
 
-  // Friendly empty state: a "+" tile that opens Settings on the Pinned-apps tab
-  // (suggestions, widgets, tips) — much clearer than a bare file picker.
+  // Empty state opens the same searchable app/widget panel as the dock menu.
   if (!cfg.pinned.some((p) => p.kind !== "separator")) {
     const hint = document.createElement("button");
     hint.className = "tile hint";
@@ -1945,6 +1944,7 @@ async function onPressUp() {
   pressMoveRaf = 0;
   const p = press;
   press = null;
+  placeHint(null);
   if (!p) return;
   clearTimeout(p.longTimer);
   try { p.el.releasePointerCapture(p.pointerId); } catch (_) {}
@@ -3167,9 +3167,23 @@ function reportDockMaterial() {
 }
 // Surfaces move under CSS transitions (reveal, tuck, a flyout opening) that
 // fire no mutations mid-flight; follow them frame by frame for their length.
-new MutationObserver(() => followFrames(reportDockMaterial)).observe(document.body, {
-  attributes: true,
-  attributeFilter: ["class"],
+const materialObserver = new MutationObserver(() => followFrames(reportDockMaterial));
+materialObserver.observe(document.body, { attributes: true, attributeFilter: ["class"], childList: true });
+materialObserver.observe(dockEl, { attributes: true, attributeFilter: ["class", "style"] });
+
+// Refresh on motion boundaries too: a transition can outlast the default
+// follow window, and native geometry must resume only after it settles.
+for (const event of ["transitionrun", "transitionend", "transitioncancel", "animationstart", "animationend", "animationcancel"]) {
+  document.body.addEventListener(event, (e) => {
+    if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial);
+  });
+}
+
+
+matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", () => {
+  if (!cfg) return;
+  applyAll();
+  reportDockMaterial();
 });
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
@@ -4380,39 +4394,30 @@ async function openStack(tileEl, item) {
 // anchored-side padding and sits the flyout ON TOP of the bar's first row).
 // Shared by the folder/group flyout and the clipboard-history flyout below.
 function placeStackNear(tileEl) {
-  const dr = dockEl.getBoundingClientRect();
-  // Keep gap ≤ hit-pad bridge so the pointer path bar→flyout stays interactive.
+  const bar = dockEl.getBoundingClientRect();
+  const anchor = tileEl.getBoundingClientRect();
   const gap = 6;
-  const r = tileEl.getBoundingClientRect();
-  stackEl.style.left = stackEl.style.right = stackEl.style.top = stackEl.style.bottom = "";
-  // Grow the flyout from the triggering tile's center so the open feels attached.
-  if (!isVertical()) {
-    const sw = stackEl.offsetWidth;
-    let left = r.left + r.width / 2 - sw / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - sw - 8));
-    stackEl.style.left = `${left}px`;
-    const originX = ((r.left + r.width / 2 - left) / Math.max(1, sw)) * 100;
-    if (cfg.edge === "top") {
-      stackEl.style.top = `${dr.bottom + gap}px`;
-      stackEl.style.transformOrigin = `${originX.toFixed(1)}% 0%`;
-    } else {
-      stackEl.style.bottom = `${window.innerHeight - dr.top + gap}px`;
-      stackEl.style.transformOrigin = `${originX.toFixed(1)}% 100%`;
-    }
-  } else {
-    const sh = stackEl.offsetHeight;
-    let top = r.top + r.height / 2 - sh / 2;
-    top = Math.max(8, Math.min(top, window.innerHeight - sh - 8));
-    stackEl.style.top = `${top}px`;
-    const originY = ((r.top + r.height / 2 - top) / Math.max(1, sh)) * 100;
-    if (cfg.edge === "left") {
-      stackEl.style.left = `${dr.right + gap}px`;
-      stackEl.style.transformOrigin = `0% ${originY.toFixed(1)}%`;
-    } else {
-      stackEl.style.right = `${window.innerWidth - dr.left + gap}px`;
-      stackEl.style.transformOrigin = `100% ${originY.toFixed(1)}%`;
-    }
-  }
+  const pad = 8;
+  const edge = cfg.edge || "bottom";
+  const availableHeight = isVertical() ? window.innerHeight - pad * 2
+    : edge === "top" ? window.innerHeight - bar.bottom - gap - pad : bar.top - gap - pad;
+  const availableWidth = !isVertical() ? window.innerWidth - pad * 2
+    : edge === "left" ? window.innerWidth - bar.right - gap - pad : bar.left - gap - pad;
+  // Leave the header/close action visible and scroll the contents. On a
+  // small stage the old fixed-height panel started above the viewport.
+  stackEl.style.maxHeight = `${Math.max(1, Math.min(window.innerHeight - pad * 2, Math.max(160, availableHeight)))}px`;
+  stackEl.style.maxWidth = `${Math.max(1, Math.min(window.innerWidth - pad * 2, Math.max(240, availableWidth)))}px`;
+  const box = { width: stackEl.offsetWidth, height: stackEl.offsetHeight };
+  const { left, top } = placeBesideBar({
+    bar, box, edge, viewport: { width: window.innerWidth, height: window.innerHeight },
+    along: isVertical() ? anchor.top + anchor.height / 2 : anchor.left + anchor.width / 2,
+    gap, pad,
+  });
+  stackEl.style.right = stackEl.style.bottom = "";
+  stackEl.style.left = `${left}px`;
+  stackEl.style.top = `${top}px`;
+  const origin = transformOrigin({ left, top, ...box }, anchor.left + anchor.width / 2, anchor.top + anchor.height / 2);
+  stackEl.style.transformOrigin = `${origin.x}px ${origin.y}px`;
 }
 
 // The add panel shares the flyout with folders and the clipboard, so it gets

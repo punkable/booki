@@ -20,9 +20,10 @@ import {
   onCloseRequest,
   logMessage,
 } from "./api.js";
-import { currentRelease, previousRelease } from "./release-notes.js";
+import { currentRelease, previousReleases } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
+import { GroupCreator } from "./settings/group-creator.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
@@ -101,10 +102,8 @@ function ChangelogIcon({ name }) {
 
 import { applyTheme } from "./theme.js";
 import {
-  SURFACE_STYLES,
   SURFACE_TINT_PRESETS,
   resolveSurfaceStyle,
-  legacyNotchFromSurface,
   applySurfaceVars,
 } from "./surface.js";
 import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
@@ -305,34 +304,6 @@ function PositionPicker({ cfg, set }) {
           </>
         )}
       </p>
-    </div>
-  );
-}
-
-/** Unified dock + notch surface picker — one finish for both windows. */
-function SurfaceStylePicker({ cfg, set }) {
-  const cur = resolveSurfaceStyle(cfg);
-  return (
-    <div className="surface-row surface-row-compact" role="listbox" aria-label={t("ap.surface")}>
-      {SURFACE_STYLES.map((s) => (
-        <button
-          key={s}
-          type="button"
-          role="option"
-          aria-selected={cur === s}
-          className={"surface-chip surface-" + s + (cur === s ? " active" : "")}
-          onClick={() => {
-            set(
-              { surfaceStyle: s, notchStyle: legacyNotchFromSurface(s) },
-              { flush: true, afterSave: () => dockApi.notchPreview() }
-            );
-          }}
-          title={t(`surface.${s}Hint`)}
-        >
-          <span className="surface-swatch" aria-hidden="true" />
-          <strong>{t(`surface.${s}`)}</strong>
-        </button>
-      ))}
     </div>
   );
 }
@@ -603,8 +574,6 @@ function Appearance({ cfg, set }) {
     <>
       <PageHeader title={t("ap.title")}>{t("ap.hint")}</PageHeader>
       <MiniDockPreview cfg={cfg} />
-      <FinishPicker set={set} />
-      <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v })} />
 
       <SettingsSection>
         <Row label={t("ap.theme")}>
@@ -624,38 +593,34 @@ function Appearance({ cfg, set }) {
         </Row>
       </SettingsSection>
 
-      <SettingsSection title={t("gp.surface")} hint={t("ap.surfaceHint")}>
-        <div className="ui-row ui-row-stack">
-          <SurfaceStylePicker cfg={cfg} set={set} />
-        </div>
-        <Toggle
+      <SettingsSection title={t("premium.finishes")} hint={t("premium.finishesHint")}>
+        <FinishPicker cfg={cfg} set={flushSurface} />
+        <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => flushSurface({ reduceTransparency: v })} />
+        {(!solidSurface && !cfg.reduceTransparency) && <Toggle
           checked={cfg.nativeMaterial !== false}
-          onChange={(v) => set({ nativeMaterial: v })}
+          onChange={(v) => flushSurface({ nativeMaterial: v })}
           label={t("ap.nativeMaterial")}
           hint={t("ap.nativeMaterialHint")}
-        />
-        {!solidSurface && (
-          <>
-            <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")}>
-              <SurfaceTintPicker
-                value={cfg.surfaceTint || ""}
-                accent={cfg.accent}
-                autoBlack={surface === "tinted"}
-                onChange={(v) => flushSurface({ surfaceTint: v })}
-              />
-            </Row>
-            <Row label={t("ap.solidity")} hint={t("ap.solidityHint")}>
-              <Slider
-                value={cfg.materialStrength ?? 80}
-                min={40}
-                max={100}
-                step={5}
-                fmt={(v) => `${v}%`}
-                onChange={(v) => flushSurface({ materialStrength: v })}
-              />
-            </Row>
-          </>
-        )}
+        />}
+        <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")}>
+          <SurfaceTintPicker
+            value={cfg.surfaceTint || ""}
+            accent={cfg.accent}
+            autoBlack={surface === "tinted"}
+            onChange={(v) => flushSurface({ surfaceTint: v })}
+          />
+        </Row>
+        {!solidSurface && !cfg.reduceTransparency && <Row label={t("ap.solidity")} hint={t("ap.solidityHint")}>
+          <Slider
+            value={cfg.materialStrength ?? 80}
+            min={0}
+            max={100}
+            step={1}
+            fmt={(v) => `${v}%`}
+            onChange={(v) => flushSurface({ materialStrength: v })}
+          />
+        </Row>}
+
       </SettingsSection>
 
       <SettingsSection title={t("gp.size")} hint={t("gp.sizeHint")}>
@@ -1189,6 +1154,7 @@ function bindRafMove(onFrame) {
 }
 
 function Apps({ cfg, set, section = "apps", focusedPin }) {
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const listRef = useRef(null);
   const gridRef = useRef(null);
   const kidMenuRef = useRef(null);
@@ -1610,11 +1576,7 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
     set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
   const addWidget = (widget, label) =>
     set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
-  const newFolder = () => {
-    const id = uid();
-    set({ pinned: [...cfg.pinned, { id, name: t("group.new"), path: "", args: [], kind: "group", children: [] }] });
-    setOpenIds((o) => ({ ...o, [id]: true }));
-  };
+  const newFolder = () => setCreatingGroup(true);
   // Edit a folder's contents (kind === "group", children[]). Auto-dissolves a
   // folder left with fewer than 2 items, matching the dock's behavior.
   const settleFolder = (gi, kids, extra = []) => {
@@ -1653,7 +1615,7 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
   return (
     <>
       <PageHeader
-        title={section === "widgets" ? t("tab.widgets") : t("apps.title")}
+        title={section === "widgets" ? t("tab.widgets") : t("overhaul.appsFolders")}
         meta={(
           <>
             <span>{cfg.pinned.length}</span>
@@ -1661,16 +1623,17 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
           </>
         )}
       >
-        {section === "widgets" ? t("apps.widgetsHint") : t("apps.hint")}
+        {section === "widgets" ? t("apps.widgetsHint") : t("workspace.libraryHint")}
       </PageHeader>
 
+      {section === "apps" && <AppLibrary cfg={cfg} set={set} listInstalled={installedAppsOnce} browseFile={addApp} browseFolder={addFolder} />}
       {section === "apps" && (
-      <SettingsSection title={null} className="apps-primary-section">
+      <SettingsSection title={t("workspace.pinned")} className="apps-primary-section">
         <div className="pin-board">
           <div className="pin-toolbar">
             <div className="pin-toolbar-main">
               <div className="pin-quick-add" role="group" aria-label={t("apps.quickAdd")}>
-                <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={addApp}>
+                <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={() => { const input = document.querySelector(".app-library-tools input"); input?.scrollIntoView({ block: "center", behavior: "smooth" }); input?.focus({ preventScroll: true }); }}>
                   {t("apps.addApp")}
                 </Button>
                 <Button appearance="subtle" icon={<FolderAddRegular />} onClick={addFolder} title={t("apps.addFolder")}>
@@ -2072,7 +2035,7 @@ function Apps({ cfg, set, section = "apps", focusedPin }) {
         </div>
       </CollapsibleSection>
       )}
-      {section === "apps" && <AppLibrary cfg={cfg} set={set} listInstalled={installedAppsOnce} />}
+      {creatingGroup && <GroupCreator pinned={cfg.pinned} onClose={() => setCreatingGroup(false)} onCreate={(pinned) => { set({ pinned }); setCreatingGroup(false); }} />}
       {iconFor >= 0 && cfg.pinned[iconFor] && (
         <IconPickerModal
           item={cfg.pinned[iconFor]}
@@ -2467,6 +2430,7 @@ function App() {
   const [version, setVersion] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [saveState, setSaveState] = useState("idle");
+  const [closeError, setCloseError] = useState(false);
   const [query, setQuery] = useState("");
   const searchResults = useMemo(() => findSettings(query), [query]);
   const [activeSearchResult, setActiveSearchResult] = useState(0);
@@ -2480,7 +2444,7 @@ function App() {
   const cfgRef = useRef(null);
   const dirtyKeys = useRef(new Set());
   const savingKeys = useRef(new Set());
-  const closeAllowed = useRef(false);
+  const closing = useRef(false);
   const afterSaveCb = useRef(null);
   cfgRef.current = cfg;
 
@@ -2532,7 +2496,6 @@ function App() {
     let disposed = false;
     let unlisten;
     onCloseRequest((event) => {
-      if (closeAllowed.current) return;
       event.preventDefault();
       flushSave().then(() => {
         if (!dirtyKeys.current.size) finishClose();
@@ -2655,39 +2618,36 @@ function App() {
   }, []);
 
   const set = (patch, opts = {}) => {
-    setCfg((prev) => {
-      const next = { ...prev, ...patch };
-      // Keep empty staging groups in Settings; dock persist dissolves them.
-      if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
-      for (const k of Object.keys(patch)) dirtyKeys.current.add(k);
-      cfgRef.current = next;
-      // Switching language may need its dictionary → load then re-render.
-      if (prev && prev.language !== next.language) {
-        ensureLang(next.language).then(() => {
-          setLang(next.language);
-          setCfg((c) => ({ ...c }));
-        });
-      } else {
+    const prev = cfgRef.current;
+    const next = { ...prev, ...patch };
+    if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
+    // Record the draft synchronously: a native close can arrive before React
+    // renders the edit, and must still wait for those keys to reach disk.
+    for (const k of Object.keys(patch)) dirtyKeys.current.add(k);
+    cfgRef.current = next;
+    setCfg(next);
+    if (prev && prev.language !== next.language) {
+      ensureLang(next.language).then(() => {
         setLang(next.language);
-      }
-      applyTheme(next);
-      applySurfaceVars(next);
-      setSaveState("saving");
-      clearTimeout(saveTimer.current);
-      if (typeof opts.afterSave === "function") afterSaveCb.current = opts.afterSave;
-      // flush:0 — notch size/surface must hit disk before notch_preview reads config.
-      const delay = opts.flush ? 0 : 120;
-      saveTimer.current = setTimeout(() => {
-        flushSave();
-      }, delay);
-      return next;
-    });
+        setCfg((c) => ({ ...c }));
+      });
+    } else setLang(next.language);
+    applyTheme(next);
+    applySurfaceVars(next);
+    setSaveState("saving");
+    clearTimeout(saveTimer.current);
+    if (typeof opts.afterSave === "function") afterSaveCb.current = opts.afterSave;
+    saveTimer.current = setTimeout(flushSave, opts.flush ? 0 : 120);
   };
 
-  const finishClose = () => {
+  const finishClose = async () => {
+    if (closing.current) return;
+    closing.current = true;
+    setCloseError(false);
     const keepAlive = ["downloading", "ready", "installing"].includes(updates.snapshot().phase);
-    closeAllowed.current = !keepAlive;
-    closeSelf({ keepAlive });
+    try { await closeSelf({ keepAlive }); }
+    catch (_) { setCloseError(true); }
+    finally { closing.current = false; }
   };
 
   const prepareConfigOperation = async () => { await flushSave(); if (dirtyKeys.current.size) throw new Error("pending settings could not be saved"); };
@@ -2830,7 +2790,7 @@ function App() {
             )}
           </nav>
           <div className="s-sidebar-foot">
-            <button className="s-btn s-btn-ghost" onClick={() => dockApi.quit()}>{t("act.quit")}</button>
+            <button className="s-btn s-btn-ghost" onClick={async () => { await flushSave(); if (!dirtyKeys.current.size) dockApi.quit(); }}>{t("act.quit")}</button>
           </div>
         </aside>
         <main ref={contentRef} className="s-content">
@@ -2856,6 +2816,7 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
+            {closeError && <div className="settings-close-error" role="alert"><span>{t("workspace.closeFailed")}</span><button className="s-btn s-btn-soft" onClick={async () => { await flushSave(); if (!dirtyKeys.current.size) finishClose(); }}>{t("focus.retry")}</button></div>}
             <SettingsBoundary key={tab} onHome={() => setTab("home")}>
             {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
@@ -2925,7 +2886,7 @@ function ChangelogModal({ onClose }) {
       alive = false;
     };
   }, []);
-  const log = entries ? [currentRelease(), previousRelease(), ...entries] : [];
+  const log = entries ? [currentRelease(), ...previousReleases(), ...entries] : [];
   return createPortal((
     <div className="modal-scrim" onClick={onClose}>
       <div className="modal cl-modal" role="dialog" aria-modal="true" aria-label={t("cl.title")} onClick={(e) => e.stopPropagation()}>

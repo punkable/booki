@@ -51,7 +51,7 @@ body.settings-body { --set-bg: #171819; --set-side: #1d1e20; --set-card: #232426
 .widget-store-caps { display: none; }
 button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 850px) { .s-shell { grid-template-columns: 190px minmax(0, 1fr); } .s-content { padding: 20px; } .dashboard-actions { grid-template-columns: 1fr; } .scenario-grid { grid-template-columns: 1fr; } .scenario-card { padding: 12px; } }
-@media (prefers-reduced-transparency: reduce) { .live-preview-bar { background: var(--set-card) !important; backdrop-filter: none; } }
+@media (prefers-reduced-transparency: reduce) { .live-preview-bar { backdrop-filter: none; } }
 .app-library-tools { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; }
 .app-library-tools input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--set-line); border-radius: 10px; color: var(--ink); background: var(--set-field); }
 .app-library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }

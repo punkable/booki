@@ -47,7 +47,7 @@ struct Piece {
     hwnd: isize,
     /// Screen rect and four radii in physical px, to skip moves that change nothing.
     placed: Option<(i32, i32, i32, i32, [i32; 4])>,
-    tint: u32,
+    blurred: bool,
 }
 
 /// Everything under one webview window (keyed by its label).
@@ -181,7 +181,7 @@ pub fn apply(
     key: &str,
     shapes: &[crate::surface_geometry::MaterialShape],
     dpr: f64,
-    tint: u32,
+    _tint: u32,
 ) -> bool {
     let mut map = surfaces().lock().unwrap();
     let surface = map.entry(key.to_string()).or_insert_with(|| Surface {
@@ -206,21 +206,23 @@ pub fn apply(
         surface.pieces.push(Piece {
             hwnd: hwnd.0 as isize,
             placed: None,
-            tint: 0,
+            blurred: false,
         });
     }
     let px = |v: f64| (v * dpr).round() as i32;
     for (piece, &(x, y, w, h, tl, tr, br, bl)) in surface.pieces.iter_mut().zip(shapes) {
         let hwnd = HWND(piece.hwnd as *mut c_void);
-        let (w, h) = (px(w).max(1), px(h).max(1));
+        let (x, y, w, h) = crate::surface_geometry::physical_bounds(x, y, w, h, dpr);
         let r = [tl, tr, br, bl].map(|v| px(v).max(0));
-        let rect = (origin.left + px(x), origin.top + px(y), w, h, r);
-        if piece.tint != tint {
+        let rect = (origin.left + x, origin.top + y, w, h, r);
+        // Color/opacity are CSS-only; do not reset the compositor effect
+        // on every tint or opacity edit.
+        if !piece.blurred {
             if !apply_blur(hwnd) {
                 surface.pieces.iter_mut().for_each(hide);
                 return false;
             }
-            piece.tint = tint;
+            piece.blurred = true;
         }
         if piece.placed == Some(rect) {
             continue;

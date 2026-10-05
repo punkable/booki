@@ -12,12 +12,12 @@ import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen,
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
-import { applySurfaceVars, resolveSurfaceStyle } from "./surface.js";
+import { applySurfaceVars, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
-import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled } from "./material.js";
+import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -74,7 +74,7 @@ async function applyLook() {
     pollMedia();
     applySurfaceVars(cfg);
     setMaterialTint(materialTint(cfg));
-    setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency && resolveSurfaceStyle(cfg) !== "solid");
+    setMaterialEnabled(cfg.nativeMaterial !== false && !transparencyReduced(cfg) && resolveSurfaceStyle(cfg) !== "solid");
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
@@ -88,6 +88,7 @@ async function applyLook() {
 
 applyLook();
 onConfigChanged(applyLook);
+matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", applyLook);
 
 // Smart ambient behaviours: stay circular always, but react to fullscreen /
 // occlusion so the dot feels alive — no app whitelist required.
@@ -147,11 +148,17 @@ window.addEventListener("resize", scheduleHitReport);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") scheduleHitReport();
 });
-new MutationObserver(scheduleHitReport).observe(document.body, {
+new MutationObserver(() => { scheduleHitReport(); followMorph(); }).observe(document.body, {
   attributes: true,
   attributeFilter: ["class", "style"],
   subtree: true,
 });
+
+for (const event of ["transitionrun", "transitionend", "transitioncancel", "animationstart", "animationend", "animationcancel"]) {
+  document.body.addEventListener(event, (e) => {
+    if (e.target === pill || e.target === toastEl) followMorph();
+  });
+}
 
 // Brief status chip (e.g. fullscreen hide). Dock owns hide_all timing — this
 // window only paints. Never call hide_all here (a short fullscreen would
@@ -265,12 +272,7 @@ async function pollMedia() {
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 420) {
-  const end = performance.now() + ms;
-  const step = () => {
-    reportNotchHitRects();
-    if (performance.now() < end) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  followFrames(reportNotchHitRects, ms);
 }
 
 function openCard() {

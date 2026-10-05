@@ -95,6 +95,18 @@ export function glassFillColor(cfg) {
   return resolveGlassTint(cfg) || "var(--surface-tint)";
 }
 
+/** Keep text readable when a sufficiently opaque custom fill overrides theme. */
+export function surfaceForeground(cfg) {
+  const tint = resolveGlassTint(cfg);
+  if (!tint || (!transparencyReduced(cfg) && surfaceAlpha(cfg) < 0.6)) return "";
+  const linear = [1, 3, 5].map((start) => {
+    const value = parseInt(tint.slice(start, start + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  return luminance > 0.179 ? "#1b1b1b" : "#f2f2f2";
+}
+
 const SURFACE_CLASSES = SURFACE_STYLES.map((s) => `surface-${s}`);
 const LEGACY_NOTCH_CLASSES = [
   "style-island",
@@ -104,10 +116,15 @@ const LEGACY_NOTCH_CLASSES = [
   "style-windows",
 ];
 
+/** System accessibility preferences apply without rewriting the saved finish. */
+export function transparencyReduced(cfg) {
+  return !!cfg?.reduceTransparency || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-transparency: reduce)").matches);
+}
+
 /** Apply body.surface-* on dock or notch documents. */
 export function applySurfaceClass(cfg, body = document.body) {
-  const surface = cfg.reduceTransparency ? "solid" : resolveSurfaceStyle(cfg);
-  body.classList.toggle("reduce-transparency", !!cfg.reduceTransparency);
+  const surface = transparencyReduced(cfg) ? "solid" : resolveSurfaceStyle(cfg);
+  body.classList.toggle("reduce-transparency", transparencyReduced(cfg));
   for (const c of SURFACE_CLASSES) body.classList.remove(c);
   for (const c of LEGACY_NOTCH_CLASSES) body.classList.remove(c);
   body.classList.add(`surface-${surface}`);
@@ -116,23 +133,32 @@ export function applySurfaceClass(cfg, body = document.body) {
 
 /** Set --material / --glass-alpha / --glass-tint on html + body. */
 export function applySurfaceVars(cfg, roots = [document.documentElement, document.body]) {
-  const alpha = cfg.reduceTransparency ? 1 : surfaceAlpha(cfg);
+  const alpha = transparencyReduced(cfg) ? 1 : surfaceAlpha(cfg);
   const tint = resolveGlassTint(cfg);
+  const foreground = surfaceForeground(cfg);
   for (const el of [].concat(roots)) {
     if (!el?.style) continue;
     el.style.setProperty("--material", String(alpha));
     el.style.setProperty("--glass-alpha", String(alpha));
     if (tint) el.style.setProperty("--glass-tint", tint);
     else el.style.removeProperty("--glass-tint");
+    if (foreground) el.style.setProperty("--surface-ink", foreground);
+    else el.style.removeProperty("--surface-ink");
   }
   applySurfaceClass(cfg);
   return alpha;
 }
 
-/* Intentional starting points; existing user finishes are never migrated. */
+/** Shared bar radius. Keep legacy tile rounding and the bar's 8px inset. */
+export function dockRadius(cfg) {
+  const radius = Number(cfg?.cornerRadius ?? 12);
+  return Math.max(0, Number.isFinite(radius) ? radius : 12) + 8;
+}
+
+/* Material presets only change the material, never layout or theme. */
 export const FINISH_PRESETS = [
-  { id: 'air', patch: { theme: 'light', surfaceStyle: 'acrylic', surfaceTint: '#fcfcfd', materialStrength: 38, cornerRadius: 22, spacing: 8, iconSize: 44 } },
-  { id: 'mica', patch: { theme: 'system', surfaceStyle: 'mica', surfaceTint: '', materialStrength: 65, cornerRadius: 18, spacing: 8, iconSize: 44 } },
-  { id: 'tinted', patch: { theme: 'dark', surfaceStyle: 'tinted', surfaceTint: '#252832', materialStrength: 45, cornerRadius: 22, spacing: 8, iconSize: 44 } },
-  { id: 'solid', patch: { theme: 'light', surfaceStyle: 'solid', surfaceTint: '', materialStrength: 100, cornerRadius: 18, spacing: 6, iconSize: 40 } },
+  { id: 'air', patch: { surfaceStyle: 'acrylic', surfaceTint: '', materialStrength: 38 } },
+  { id: 'mica', patch: { surfaceStyle: 'mica', surfaceTint: '', materialStrength: 65 } },
+  { id: 'tinted', patch: { surfaceStyle: 'tinted', surfaceTint: '', materialStrength: 45 } },
+  { id: 'solid', patch: { surfaceStyle: 'solid', surfaceTint: '', materialStrength: 100 } },
 ];
