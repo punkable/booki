@@ -38,10 +38,9 @@ const latest = JSON.parse(api(`repos/${repo}/releases/latest`));
 if (latest.tag_name !== tag) throw new Error(`${tag} is not the latest public release.`);
 // Keep superseded installers privately for rollback, with only the verified
 // replacement publicly downloadable. Tags and repository history are retained.
-const releases = JSON.parse(api(`repos/${repo}/releases?per_page=100`, "--paginate", "--slurp")).flat();
-for (const release of releases) {
-  if (release.tag_name !== tag && !release.draft) {
-    api("--method", "PATCH", `repos/${repo}/releases/${release.id}`, "-F", "draft=true");
-  }
+const superseded = api(`repos/${repo}/releases?per_page=100`, "--paginate", "--jq", `.[] | select(.draft == false and .tag_name != ${JSON.stringify(tag)}) | .id`).split(/\r?\n/).filter(Boolean);
+for (const id of superseded) {
+  if (!/^\d+$/.test(id)) throw new Error("Invalid release ID.");
+  api("--method", "PATCH", `repos/${repo}/releases/${id}`, "-F", "draft=true");
 }
 console.log(`Published verified ${tag}.`);
