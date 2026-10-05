@@ -74,7 +74,7 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-> The latest downloadable version is shown by the release badge above. The 0.70 presentation and notes describe the upcoming update until its signed release is published.
+> Download the latest published version using the release badge above. Booki checks the same release channel for updates; existing clients keep their current update interface for the first upgrade to 0.70.
 
 ### New in 0.70
 

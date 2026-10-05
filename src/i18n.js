@@ -6,6 +6,8 @@
 
 export const DICT = {
   es: {
+    "premium.updateDownloadError": "No se pudo descargar la actualización. Revisa tu conexión y vuelve a intentarlo.",
+    "premium.updateApplyError": "No se pudo aplicar la actualización. Guarda tus ajustes, revisa el espacio disponible y vuelve a intentarlo.",
     "release.premium": "Acabados coordinados de cristal, mica y sólido, un espacio visual más limpio, edición desde Inicio y búsqueda que enfoca el ajuste elegido.",
     "release.discovery": "Descubre apps empaquetadas de Windows, selecciona apps entre búsquedas y controla recomendaciones locales, sugerencias ocultas e historial de Booki.",
     "release.productivity": "Edita tareas, navega entre meses, elige unidades del clima y reinicia un temporizador terminado con un clic.",
@@ -34,12 +36,10 @@ export const DICT = {
     "premium.finishesHint": "Superficies, espacios y colores coordinados. Ajusta los detalles abajo.",
     "premium.editPreview": "Selecciona un elemento para editarlo",
     "premium.addApps": "Añadir apps",
-    "premium.timerAlert": "Sonido al terminar",
     "premium.previousMonth": "Mes anterior",
     "premium.nextMonth": "Mes siguiente",
     "premium.celsius": "Celsius",
     "premium.fahrenheit": "Fahrenheit",
-    "premium.completedTasks": "Tareas completadas",
     "premium.nativeHint": "Los materiales se adaptan a Windows y a tu preferencia de transparencia.",
     "overhaul.relevant": "Mostrar solo si está disponible",
     "overhaul.relevantHint": "Puedes recuperarlo desde el menú del dock o su ficha en Widgets.",
@@ -685,6 +685,8 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "premium.updateDownloadError": "Could not download the update. Check your connection and try again.",
+    "premium.updateApplyError": "Could not apply the update. Save your settings, check available disk space and try again.",
     "release.premium": "Coordinated glass, Mica and solid finishes, a quieter workspace, direct editing from Home and search that focuses the requested setting.",
     "release.discovery": "Discover Windows packaged apps, select apps across searches and control local recommendations, hidden suggestions and Booki launch history.",
     "release.productivity": "Edit tasks, browse calendar months, choose weather units and restart a finished timer with one click.",
@@ -713,12 +715,10 @@ export const DICT = {
     "premium.finishesHint": "Coordinated surfaces, spacing and colors. Fine-tune below.",
     "premium.editPreview": "Select an item to edit it",
     "premium.addApps": "Add apps",
-    "premium.timerAlert": "Sound when finished",
     "premium.previousMonth": "Previous month",
     "premium.nextMonth": "Next month",
     "premium.celsius": "Celsius",
     "premium.fahrenheit": "Fahrenheit",
-    "premium.completedTasks": "Completed tasks",
     "premium.nativeHint": "Materials adapt to Windows capabilities and your transparency preference.",
     "overhaul.relevant": "Show only when available",
     "overhaul.relevantHint": "Restore it from the dock menu or its card in Widgets.",

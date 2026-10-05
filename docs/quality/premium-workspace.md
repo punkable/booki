@@ -4,7 +4,7 @@
 
 This work starts from `d2f1c849`, the 0.70 overhaul merged through PR #78. It preserves the issue #64 shortcut fixes, explicit copy/move behavior, Win+D recovery, pagination, translations, config write coordination, the repaired widget previews and the eight-scene 40-second Remotion presentation.
 
-The latest public release verified during this work is **v0.69.0**. A package version of 0.70.0 and a merged PR do not establish that a signed 0.70 release has shipped.
+The implementation baseline was the public **v0.69.0** release. Publication is verified separately through the GitHub release, complete signed installer assets and the public updater manifest; a package version or merged PR alone is insufficient.
 
 ## Delivered changes
 
@@ -33,12 +33,12 @@ Timings include Playwright interaction overhead and vary with machine load. This
 - Frontend checks cover lint, strict contracts for extracted logic, encoding, versions, icons, five-language coverage, release-manifest validation, production build and functional browser tests.
 - The complete Windows integration module, including new discovery, shortcut identities and packaged-app icons, was type-checked against `windows` 0.58.0 for the Windows MSVC target.
 - Settings snapshots and usage parsing/ranking are tested separately without the Tauri host.
-- The frontend suite contains 115 functional/model tests, including the update UI flows and filtering removed packaged apps from recommendations. The initial PR CI passed full native Linux checks, native Windows x64 tests and x64/ARM64 installer packaging.
+- The frontend suite contains 116 functional/model tests, including the update UI flows and filtering removed packaged apps from recommendations. The initial PR CI passed full native Linux checks, native Windows x64 tests and x64/ARM64 installer packaging.
 - The local full native Linux build needs GTK/WebKit development packages absent on this host. Windows packaging and full native checks run in the PR's existing CI, for x64 and ARM64. Packaging success is not interactive Windows runtime verification.
 
 The new separated download/apply flow requires this client version. An older installed updater retains its prior UI for the first upgrade.
 
-Before publishing: verify a real signed upgrade from 0.69, configured apps/profiles retained, restart behavior, uninstall/reinstall without data deletion, app discovery with real shortcuts/MSIX apps, DPI/multiple monitors, native glass, keyboard navigation and idle CPU/RSS. Publish one complete release with matching versions and signed assets after those checks; do not tell an issue reporter a pending update is already available.
+Remaining real-device checks: signed upgrade from 0.69, configured apps/profiles retained, restart behavior, uninstall/reinstall without data deletion, discovery with real shortcuts/MSIX apps, DPI/multiple monitors, native glass, keyboard navigation and idle CPU/RSS. These require an interactive Windows device and are not established by browser fixtures or packaging CI. The release pipeline gates publication on frontend/native checks, complete x64/ARM64 updater assets and byte-for-byte verification after upload.
 
 ## Windows performance capture
 

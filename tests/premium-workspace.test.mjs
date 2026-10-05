@@ -114,3 +114,18 @@ test('managed update downloads separately, stays ready across tabs and backs up 
   assert.deepEqual(await page.evaluate(() => window.__updateCalls), ['lock', 'download', 'backup', 'install']);
   assert.deepEqual(errors, []); await page.close();
 });
+test('an update backup failure explains the apply problem and keeps the download ready without installing', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await mockUpdate(page, true);
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke = (cmd, args) => cmd === 'prepare_update' ? Promise.reject(new Error('disk full')) : old(cmd, args);
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('button', { name: 'Download in background', exact: true }).click();
+  await page.getByRole('button', { name: 'Restart and apply update', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Could not apply the update' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Restart and apply update', exact: true }).isEnabled(), true);
+  assert.ok(!(await page.evaluate(() => window.__updateCalls)).includes('install'));
+  assert.deepEqual(errors, []); await page.close();
+});
