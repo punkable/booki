@@ -1,7 +1,7 @@
 /* ───────────────────────────────────────────────────────────
    Booki Dock — Windows 11 / Fluent design system.
-   The dock & settings windows get native Acrylic/Mica material
-   (window-vibrancy) on Windows; this CSS is a thin complement:
+   CSS owns surface color and shape; optional native Windows blur
+   supplies desktop depth behind stable surfaces:
    restrained translucency, light borders, depth, Segoe UI.
    ─────────────────────────────────────────────────────────── */
 
@@ -272,7 +272,7 @@ body {
 body.surface-mica {
   --surf-blur: 20px;
   --surf-sat: 110%;
-  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(72% + var(--material, 0.55) * 22%), transparent);
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.84) * 100%), transparent);
   --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.14);
   --surf-inset-shade: rgba(0, 0, 0, 0.04);
@@ -284,7 +284,7 @@ body.surface-mica {
 body.surface-acrylic {
   --surf-blur: 36px;
   --surf-sat: 165%;
-  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--material, 0.55) * 88%), transparent);
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.64) * 100%), transparent);
   --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.26);
   --surf-sheen: 0.62;
@@ -318,14 +318,14 @@ body.surface-tinted {
 body.surface-solid {
   --surf-blur: 0px;
   --surf-sat: 100%;
-  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
+  --surf-fill: var(--glass-tint, var(--surface-tint));
   --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
   --surf-inset-lit: rgba(255, 255, 255, 0.1);
   --surf-inset-shade: rgba(0, 0, 0, 0.08);
   --surf-sheen: 0.12;
   --panel-blur: 0px;
   --panel-sat: 100%;
-  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
+  --panel-fill: var(--glass-tint, var(--surface-tint));
 }
 html[data-theme="dark"] body.surface-tinted,
 html[data-theme="light"] body.surface-tinted {
@@ -342,9 +342,16 @@ html[data-theme="light"] body.surface-tinted {
   body {
     --surf-blur: 0px;
     --panel-blur: 0px;
-    --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 92%, transparent);
+    --surf-fill: var(--glass-tint, var(--surface-tint));
     --panel-fill: var(--layer-strong);
   }
+}
+
+:root { --surface-ink: var(--ink); }
+.dock, .notch-pill {
+  --ink: var(--surface-ink);
+  --ink-2: color-mix(in srgb, var(--ink) 72%, transparent);
+  color: var(--ink);
 }
 
 .dock {
@@ -386,6 +393,7 @@ body.surface-solid .dock {
   position: absolute;
   inset: 0;
   border-radius: max(0px, calc(var(--dock-r) - 1px));
+  overflow: hidden;
   pointer-events: none;
   z-index: 0;
   background: linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, 0.18), transparent 48%);
@@ -2744,7 +2752,7 @@ body.settings-body::before {
 }
 .surface-solid .surface-swatch {
   background-image: none;
-  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 94%, var(--accent) 6%);
+  background-color: var(--glass-tint, var(--surface-tint));
   border-radius: 4px;
 }
 .surface-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
@@ -4019,7 +4027,7 @@ body.notch-body.smart.smart-busy .notch-pill {
 }
 
 /* ─────────── Native material (src/material.js + win/material.rs) ───────────
-   When the backend draws Windows' real acrylic behind a surface, the page
+   When the backend draws Windows' real blur behind a surface, the page
    stops faking it: no CSS blur (it could only blur the page itself), and the
    CSS keeps the configured fill, radius and single border. No second native
    tint or thinner replacement fill is applied. Borders,
@@ -4039,6 +4047,6 @@ body.native-material .dock-tip {
 .stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .stack-pager .stack-more:disabled { opacity: .4; cursor: default; }
 
-/* Keep one outline: native material supplies fill, CSS owns the border. */
+/* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
 body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.notch-body.smart.smart-focus .notch-pill, body.notch-body.smart.smart-busy .notch-pill { box-shadow: 0 4px 14px #0003; }

@@ -58,7 +58,7 @@
 
 <p align="center">Sin cuentas. Sin telemetría. Sin nube. Código abierto con licencia MIT.</p>
 
-<p align="center"><sub>Las imágenes y el video muestran la interfaz real de Booki con datos e iconos de ejemplo. La presentación muestra el rediseño de 0.70. Consulta las <a href="docs/releases/v0.70.1.md">correcciones de 0.70.1</a>.</sub></p>
+<p align="center"><sub>Las imágenes y el video muestran la interfaz real de Booki con datos e iconos de ejemplo. La presentación muestra el rediseño de 0.70. Consulta las <a href="docs/releases/v0.70.2.md">correcciones de superficies y funcionamiento de 0.70.2</a>.</sub></p>
 
 ## Instalar y empezar
 

@@ -56,7 +56,7 @@
 
 <h2 align="center">Light or dark. At home in either.</h2>
 
-<p align="center">Follows your Windows theme and wallpaper accent, with real acrylic behind the bar. When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center">Follows your Windows theme and wallpaper accent, with optional native desktop blur behind the bar. When a game or video goes fullscreen, Booki steps aside.</p>
 
 ---
 
@@ -64,7 +64,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. See the <a href="docs/releases/v0.70.1.md">0.70.1 stability fixes</a>.</sub></p>
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. See the <a href="docs/releases/v0.70.2.md">0.70.2 surface and usability fixes</a>.</sub></p>
 
 ## Get started
 

@@ -1,0 +1,3 @@
+/* Explicit layers keep production CSS chunks from reviving legacy styles. */
+@layer booki-base, booki-widgets, booki-menus, booki-settings, booki-overhaul, booki-workspace;
+@import "./styles.css" layer(booki-base);

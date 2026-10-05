@@ -355,15 +355,12 @@ export function pickImageFile() {
 
 /** Close the current window (used by the settings window). */
 export async function closeSelf({ keepAlive = false } = {}) {
-  if (T && T.window && T.window.getCurrentWindow) {
-    try {
-      const current = T.window.getCurrentWindow();
-      if (keepAlive) await current.hide();
-      else await current.close();
-      return;
-    } catch (_) {
-      /* fall through */
-    }
+  if (isTauri) {
+    const current = T.window?.getCurrentWindow?.();
+    if (!current) throw new Error("Settings window API unavailable");
+    if (keepAlive) await current.hide();
+    else await current.destroy();
+    return;
   }
   window.close();
 }

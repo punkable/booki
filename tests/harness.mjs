@@ -193,6 +193,9 @@ function bridgeSource(cfg, { stats = {} } = {}) {
       },
       window: {
         getCurrentWindow: () => ({
+          destroy: () => window.__TAURI__.core.invoke('plugin:window|destroy', { label: 'settings' }),
+          hide: () => window.__TAURI__.core.invoke('plugin:window|hide', { label: 'settings' }),
+          onCloseRequested: (cb) => { window.__nativeCloseRequested = cb; return Promise.resolve(() => { delete window.__nativeCloseRequested; }); },
           setSize: () => Promise.resolve(),
           setPosition: () => Promise.resolve(),
           innerSize: () => Promise.resolve({ width: window.innerWidth, height: window.innerHeight }),

@@ -1,6 +1,19 @@
 //! CSS-compatible corner normalization for the native material clip.
 pub type MaterialShape = (f64, f64, f64, f64, f64, f64, f64, f64);
 
+/// Round the two physical edges, rather than rounding CSS dimensions first.
+#[cfg(any(windows, test))]
+pub fn physical_bounds(x: f64, y: f64, width: f64, height: f64, dpr: f64) -> (i32, i32, i32, i32) {
+    let px = |value: f64| (value * dpr).round() as i32;
+    let (left, top) = (px(x), px(y));
+    (
+        left,
+        top,
+        px(x + width).saturating_sub(left).max(1),
+        px(y + height).saturating_sub(top).max(1),
+    )
+}
+
 #[cfg(any(windows, test))]
 pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
     let (w, h) = (width.max(1) as f64, height.max(1) as f64);
@@ -42,6 +55,17 @@ pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fractional_dpi_rounds_edges_without_shrinking_or_expanding_the_surface() {
+        for dpr in [1.0, 1.25, 1.5, 1.75, 2.0] {
+            for x in [0.4, 18.25, -15.75] {
+                let (left, top, width, height) = physical_bounds(x, 9.4, 50.4, 23.25, dpr);
+                assert_eq!(left + width, ((x + 50.4) * dpr).round() as i32);
+                assert_eq!(top + height, ((9.4 + 23.25) * dpr).round() as i32);
+            }
+        }
+        assert_eq!(physical_bounds(0.4, 0.4, 50.4, 20.4, 1.0), (0, 0, 51, 21));
+    }
     #[test]
     fn attached_notch_keeps_its_square_edge() {
         let points = outline(112, 12, [11, 11, 0, 0]);
