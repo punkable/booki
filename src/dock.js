@@ -63,7 +63,7 @@ import {
   LIVE_WIDGETS,
   sparkPaths,
 } from "./dock/widget-view.js";
-import { applySurfaceVars } from "./surface.js";
+import { applySurfaceVars, resolveSurfaceStyle } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
@@ -333,7 +333,7 @@ function applyAll() {
   // Solidity + optional glass tint drive dock/notch fill together.
   applySurfaceVars(cfg);
   setMaterialTint(materialTint(cfg));
-  setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency);
+  setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency && resolveSurfaceStyle(cfg) !== "solid");
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }

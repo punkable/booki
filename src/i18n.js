@@ -6,6 +6,13 @@
 
 export const DICT = {
   es: {
+    "hotfix.headline": "Ajustes restaurados y superficies corregidas",
+    "hotfix.title": "Correcciones de estabilidad",
+    "hotfix.settings": "Inicio vuelve a mostrar widgets sin estilo personalizado; un fallo de una sección conserva la navegación y los ajustes.",
+    "hotfix.surfaces": "Dock y notch comparten el contorno de sus cuatro esquinas, sin un segundo borde de Windows. El fondo conserva su alternativa si falla el material nativo.",
+    "hotfix.icons": "Los iconos de las notas de versión se muestran como gráficos, no como nombres de texto.",
+    "hotfix.backup": "El backup de actualización incluye la copia real de recuperación de la configuración.",
+    "hotfix.settingsFailed": "No se pudo mostrar esta sección. Tus ajustes se conservan. Puedes reintentar o abrir otra sección.",
     "premium.updateDownloadError": "No se pudo descargar la actualización. Revisa tu conexión y vuelve a intentarlo.",
     "premium.updateApplyError": "No se pudo aplicar la actualización. Guarda tus ajustes, revisa el espacio disponible y vuelve a intentarlo.",
     "release.premium": "Acabados coordinados de cristal, mica y sólido, un espacio visual más limpio, edición desde Inicio y búsqueda que enfoca el ajuste elegido.",
@@ -685,6 +692,13 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "hotfix.headline": "Restored Settings and corrected surfaces",
+    "hotfix.title": "Stability fixes",
+    "hotfix.settings": "Home displays widgets without custom styles again; a section failure preserves navigation and settings.",
+    "hotfix.surfaces": "Dock and notch share their four-corner outline without an extra Windows border. The background retains its fallback if native material fails.",
+    "hotfix.icons": "Release-note icons render as graphics rather than text names.",
+    "hotfix.backup": "Update backups include the actual configuration recovery copy.",
+    "hotfix.settingsFailed": "This section could not be displayed. Your settings are preserved. Retry or open another section.",
     "premium.updateDownloadError": "Could not download the update. Check your connection and try again.",
     "premium.updateApplyError": "Could not apply the update. Save your settings, check available disk space and try again.",
     "release.premium": "Coordinated glass, Mica and solid finishes, a quieter workspace, direct editing from Home and search that focuses the requested setting.",

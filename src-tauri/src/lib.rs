@@ -6,6 +6,8 @@
 mod apps;
 mod config;
 mod shortcuts;
+#[cfg(any(windows, test))]
+mod surface_geometry;
 mod update_backup;
 mod usage;
 mod util;
@@ -628,14 +630,14 @@ fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
 }
 
 /// Native blurred material behind the calling window, clipped to `shapes`
-/// (`[x, y, w, h, radius]`, window-relative CSS px). `tint` is `#RRGGBBAA`.
+/// (`[x, y, w, h, tl, tr, br, bl]`, window-relative CSS px). `tint` is `#RRGGBBAA`.
 /// Returns false where there is no native material (the page keeps its CSS
 /// fallback then). An empty list hides it.
 #[tauri::command]
-fn set_material(
+async fn set_material(
     app: AppHandle,
     window: tauri::WebviewWindow,
-    shapes: Vec<(f64, f64, f64, f64, f64)>,
+    shapes: Vec<(f64, f64, f64, f64, f64, f64, f64, f64)>,
     tint: String,
 ) -> bool {
     #[cfg(windows)]
@@ -654,10 +656,18 @@ fn set_material(
         };
         let key = window.label().to_string();
         let dpr = window.scale_factor().unwrap_or(1.0);
-        let _ = app.run_on_main_thread(move || {
-            win::material::apply(owner, &key, &shapes, dpr, argb);
-        });
-        true
+        let (tx, rx) = std::sync::mpsc::channel();
+        if app
+            .run_on_main_thread(move || {
+                let _ = tx.send(win::material::apply(owner, &key, &shapes, dpr, argb));
+            })
+            .is_err()
+        {
+            return false;
+        }
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(false))
+            .await
+            .unwrap_or(false)
     }
     #[cfg(not(windows))]
     {
@@ -1307,6 +1317,7 @@ fn set_dock_edge(app: AppHandle, edge: String) {
 #[tauri::command]
 async fn open_changelog(app: AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.show();
         let _ = app.emit("booki://show-changelog", ());
         let _ = w.set_focus();
     } else {
@@ -1326,6 +1337,7 @@ fn take_pending_changelog() -> bool {
 async fn open_settings_tab(app: AppHandle, tab: String) {
     *PENDING_TAB.lock().unwrap() = Some(tab);
     if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.show();
         let _ = app.emit("booki://show-tab", ());
         let _ = w.set_focus();
     } else {
@@ -2422,6 +2434,7 @@ fn open_settings_window(app: &AppHandle) {
 
 fn open_settings_url(app: &AppHandle, url: &str) {
     if let Some(existing) = app.get_webview_window("settings") {
+        let _ = existing.show();
         let _ = existing.set_focus();
         return;
     }

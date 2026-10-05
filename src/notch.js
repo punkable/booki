@@ -12,7 +12,7 @@ import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen,
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
-import { applySurfaceVars } from "./surface.js";
+import { applySurfaceVars, resolveSurfaceStyle } from "./surface.js";
 import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
@@ -74,7 +74,7 @@ async function applyLook() {
     pollMedia();
     applySurfaceVars(cfg);
     setMaterialTint(materialTint(cfg));
-    setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency);
+    setMaterialEnabled(cfg.nativeMaterial !== false && !cfg.reduceTransparency && resolveSurfaceStyle(cfg) !== "solid");
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));

@@ -17,7 +17,7 @@ body.settings-body { --set-bg: #171819; --set-side: #1d1e20; --set-card: #232426
 .dashboard-hero h2 { font-size: 23px; font-weight: 650; margin: 5px 0; }
 .live-preview-scene { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 30px 18px 22px; overflow: auto; background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%); }
 .live-preview-scene.large { min-height: 190px; justify-content: center; }
-.live-preview-bar { display: flex; align-items: center; padding: 10px; border: 1px solid var(--set-line); box-shadow: 0 12px 24px #0002; backdrop-filter: blur(16px); max-width: 100%; overflow-x: auto; min-height: 52px; }
+.live-preview-bar { display: flex; align-items: center; padding: 10px; border: 1px solid var(--set-line); box-shadow: 0 12px 24px #0002; max-width: 100%; overflow-x: auto; min-height: 52px; }
 .live-preview-bar > * { flex-shrink: 0; }
 .live-preview-app { display: grid; place-items: center; color: var(--ink); background: color-mix(in srgb, var(--accent) 15%, var(--set-card)); border: 1px solid var(--set-line); border-radius: 24%; font-size: 20px; font-weight: 650; }
 .live-preview-app svg { width: 26px; height: 26px; }

@@ -1,6 +1,13 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "hotfix.headline": "Definições restauradas e superfícies corrigidas",
+    "hotfix.title": "Correções de estabilidade",
+    "hotfix.settings": "O Início volta a mostrar widgets sem estilos personalizados; uma falha numa secção preserva a navegação e as definições.",
+    "hotfix.surfaces": "O dock e o notch partilham o contorno dos quatro cantos sem uma borda adicional do Windows. O fundo mantém a alternativa se o material nativo falhar.",
+    "hotfix.icons": "Os ícones das notas de versão são gráficos, em vez de nomes em texto.",
+    "hotfix.backup": "O backup de atualização inclui a cópia real de recuperação da configuração.",
+    "hotfix.settingsFailed": "Não foi possível mostrar esta secção. As suas definições foram preservadas. Tente novamente ou abra outra secção.",
     "premium.updateDownloadError": "Não foi possível baixar a atualização. Verifique sua conexão e tente novamente.",
     "premium.updateApplyError": "Não foi possível aplicar a atualização. Salve suas configurações, verifique o espaço disponível e tente novamente.",
     "release.premium": "Acabamentos de vidro, mica e sólido coordenados, um espaço mais limpo, edição pelo Início e busca que foca a configuração escolhida.",
@@ -672,6 +679,13 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "hotfix.headline": "Réglages rétablis et surfaces corrigées",
+    "hotfix.title": "Corrections de stabilité",
+    "hotfix.settings": "Accueil affiche les widgets sans style personnalisé ; une erreur de section conserve la navigation et les réglages.",
+    "hotfix.surfaces": "Le dock et le notch partagent le contour de leurs quatre coins sans bordure Windows supplémentaire. Le fond conserve son alternative si le matériau natif échoue.",
+    "hotfix.icons": "Les icônes des notes de version sont des graphiques plutôt que des noms textuels.",
+    "hotfix.backup": "La sauvegarde de mise à jour inclut la véritable copie de récupération de la configuration.",
+    "hotfix.settingsFailed": "Cette section ne peut pas être affichée. Vos réglages sont conservés. Réessayez ou ouvrez une autre section.",
     "premium.updateDownloadError": "Impossible de télécharger la mise à jour. Vérifiez votre connexion et réessayez.",
     "premium.updateApplyError": "Impossible d’appliquer la mise à jour. Enregistrez vos réglages, vérifiez l’espace disque et réessayez.",
     "release.premium": "Finitions verre, mica et solide harmonisées, espace plus sobre, édition depuis l’accueil et recherche ciblant le réglage choisi.",
@@ -1343,6 +1357,13 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "hotfix.headline": "Einstellungen wiederhergestellt und Oberflächen korrigiert",
+    "hotfix.title": "Stabilitätskorrekturen",
+    "hotfix.settings": "Start zeigt Widgets ohne eigene Stile wieder an; ein Bereichsfehler erhält Navigation und Einstellungen.",
+    "hotfix.surfaces": "Dock und Notch teilen ihre vier Eckkonturen ohne zusätzlichen Windows-Rand. Bei Fehlern des nativen Materials bleibt der Ersatzhintergrund erhalten.",
+    "hotfix.icons": "Symbole in Versionshinweisen werden als Grafiken statt als Textnamen angezeigt.",
+    "hotfix.backup": "Update-Sicherungen enthalten die tatsächliche Wiederherstellungskopie der Konfiguration.",
+    "hotfix.settingsFailed": "Dieser Bereich konnte nicht angezeigt werden. Deine Einstellungen bleiben erhalten. Versuche es erneut oder öffne einen anderen Bereich.",
     "premium.updateDownloadError": "Das Update konnte nicht heruntergeladen werden. Verbindung prüfen und erneut versuchen.",
     "premium.updateApplyError": "Das Update konnte nicht angewendet werden. Einstellungen speichern, freien Speicher prüfen und erneut versuchen.",
     "release.premium": "Abgestimmte Glas-, Mica- und solide Oberflächen, ruhigerer Arbeitsbereich, Bearbeitung auf der Startseite und Suche mit direktem Einstellungsfokus.",
