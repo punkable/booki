@@ -40,3 +40,20 @@ test('conflict details accept only actionable fields and retain the current snap
   assert.equal(parseConfigConflict('BOOKI_CONFIG_CONFLICT:broken'), null);
   assert.equal(parseConfigConflict('BOOKI_CONFIG_CONFLICT:{"keys":["revision"],"current":{"revision":2}}'), null);
 });
+
+test('autosave drains newer typing after a slow write and retains failed drafts for retry', async () => {
+  const { createDraftSaver } = await import('../src/dock/draft-saver.js');
+  const values = []; let release, fail = false;
+  const saver = createDraftSaver(async (value) => {
+    if (fail) return false;
+    values.push(value);
+    if (value === 'first') await new Promise((resolve) => { release = resolve; });
+    return true;
+  }, () => {}, 10000);
+  saver.change('first'); const first = saver.flush();
+  saver.change('newer'); release(); assert.equal(await first, true);
+  assert.deepEqual(values, ['first', 'newer']);
+  fail = true; saver.change('retry me'); assert.equal(await saver.flush(), false);
+  fail = false; assert.equal(await saver.flush(), true);
+  assert.equal(values.at(-1), 'retry me'); saver.cancelTimer();
+});

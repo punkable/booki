@@ -185,6 +185,7 @@ fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
 fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
+        CLIP_STORAGE_FAILED.store(false, Ordering::Relaxed);
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(clip_legacy_history_path());
         return;

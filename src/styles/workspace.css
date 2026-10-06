@@ -162,3 +162,35 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .library-web .web-add { margin-top: 12px; }
 @media (max-width: 1050px) { .widgets-workspace { grid-template-columns: minmax(0, 1fr); } .widget-inspector { order: -1; } }
 .library-bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Notes share the compact inspector language and expose durable save state. */
+.note-editor.note-workspace {
+  width: min(320px, calc(100vw - 16px));
+  height: auto;
+  padding: 12px;
+  border-color: var(--stroke);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.note-workspace .note-input {
+  width: 100%;
+  min-height: 130px;
+  max-height: min(240px, 45vh);
+  padding: 8px;
+  resize: vertical;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+}
+.note-save-state { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--text-sm); color: var(--muted); }
+.note-save-state [hidden] { display: none; }
+.icon-picker { display: flex; flex-direction: column; gap: 12px; }
+.icon-picker-preview { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px; border-radius: 12px; background: var(--hover); }
+.icon-picker-preview img, .icon-picker-preview > svg { width: 48px; height: 48px; object-fit: contain; }
+.icon-picker .icon-grid { max-height: 260px; overflow-y: auto; padding: 4px; }
+.icon-picker .icon-cell[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.icon-picker .s-actions { flex-wrap: wrap; }

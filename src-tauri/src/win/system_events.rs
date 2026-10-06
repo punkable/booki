@@ -146,11 +146,7 @@ unsafe extern "system" fn window_event(
             && child == 0
             && matches!(
                 event,
-                EVENT_OBJECT_CREATE
-                    | EVENT_OBJECT_DESTROY
-                    | EVENT_OBJECT_SHOW
-                    | EVENT_OBJECT_HIDE
-                    | EVENT_OBJECT_NAMECHANGE
+                EVENT_OBJECT_CREATE | EVENT_OBJECT_DESTROY | EVENT_OBJECT_SHOW | EVENT_OBJECT_HIDE
             ))
     {
         signal("windows");
@@ -170,7 +166,7 @@ fn watch_windows() {
         );
         let objects = SetWinEventHook(
             EVENT_OBJECT_CREATE,
-            EVENT_OBJECT_NAMECHANGE,
+            EVENT_OBJECT_HIDE,
             HMODULE::default(),
             Some(window_event),
             0,

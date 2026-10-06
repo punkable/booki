@@ -10,7 +10,6 @@ import {
   dock as dockApi,
   pickAppFile,
   pickFolder,
-  pickImageFile,
   pickSavePath,
   emitConfigChanged,
   onConfigChanged,
@@ -26,6 +25,7 @@ import { isTextEditor } from "./dock/context-menu.js";
 import { currentRelease, previousReleases } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
+import { IconPickerModal } from "./settings/icon-picker.jsx";
 import { LibraryWorkspace } from "./settings/library-workspace.jsx";
 import { GroupCreator } from "./settings/group-creator.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
@@ -172,16 +172,7 @@ function PinName({ value, editing, onEdit, onChange, onDone, className = "", tit
     </button>
   );
 }
-import {
-  ICON_LIBRARY,
-  ICON_STYLES,
-  isLibIcon,
-  parseLibIcon,
-  libToken,
-  libIconDataUri,
-  resolveLibIcon,
-  currentAccentColors,
-} from "./icon-library.js";
+import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 
 window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
 window.addEventListener("unhandledrejection", (e) =>
@@ -921,57 +912,6 @@ function ShortcutsPage({ cfg, set }) {
 
 // Modal to choose a pin's icon: built-in library (with styles), upload an image,
 // or reset to the app's real icon.
-function IconPickerModal({ item, onPick, onClose }) {
-  useModalControls(onClose);
-  const [style, setStyle] = useState(isLibIcon(item.icon) ? parseLibIcon(item.icon).style : "badge");
-  const colors = currentAccentColors();
-  const upload = async () => {
-    const path = await pickImageFile();
-    if (!path) return;
-    const uri = (await dockApi.imageDataUri(path)) || path;
-    onPick(uri);
-  };
-  return createPortal((
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={t("icon.title")} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <strong>{t("icon.title")}</strong>
-          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
-        </div>
-        <div className="icon-styles">
-          {ICON_STYLES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={"seg-mini" + (style === s ? " active" : "")}
-              onClick={() => setStyle(s)}
-            >
-              {t("icon.style." + s)}
-            </button>
-          ))}
-        </div>
-        <div className="icon-grid">
-          {ICON_LIBRARY.map((name) => (
-            <button
-              key={name}
-              type="button"
-              className="icon-cell"
-              title={name}
-              onClick={() => onPick(libToken(name, style))}
-            >
-              <img src={libIconDataUri(name, style, colors)} alt={name} />
-            </button>
-          ))}
-        </div>
-        <div className="s-actions" style={{ marginTop: 14 }}>
-          <button className="s-btn s-btn-soft" onClick={upload}>{t("icon.upload")}</button>
-          <button className="s-btn s-btn-soft" onClick={() => onPick(null)}>{t("icon.reset")}</button>
-        </div>
-      </div>
-    </div>
-  ), document.body);
-}
-
 function ClipboardSettingsPanel({ cfg, set }) {
   const [storageFailed, setStorageFailed] = useState(false);
   useEffect(() => {

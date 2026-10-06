@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { serveDist, launchBrowser, openPage, makeConfig } from './harness.mjs';
+import { previousReleases } from '../src/release-notes.js';
 import { WIDGET_ORDER } from '../src/widgets-meta.js';
 
 const { srv, port } = await serveDist();
@@ -33,11 +34,14 @@ test('the current changelog renders every section icon as SVG', async () => {
   await page.getByRole('button', { name: "What's new", exact: true }).click();
   await page.locator('.cl-section-title').first().waitFor();
   await page.locator('.cl-history > summary').click();
-  await page.locator('.cl-history-entry').nth(0).locator('summary').click();
-  await page.locator('.cl-history-entry').nth(1).locator('summary').click();
-  await page.locator('.cl-history-entry').first().locator('.cl-section-title').first().waitFor();
-  await page.locator('.cl-history-entry').nth(1).locator('.cl-section-title').first().waitFor();
-  assert.equal(await page.locator('.cl-section-title .cl-ico svg').count(), 7);
+  const history = page.locator('.cl-history-entry');
+  for (let i = 0; i < previousReleases().length; i++) {
+    await history.nth(i).locator('summary').click();
+    await history.nth(i).locator('.cl-section-title').first().waitFor();
+  }
+  const titles = page.locator('.cl-section-title');
+  assert.ok(await titles.count() > 0);
+  assert.equal(await titles.locator('.cl-ico svg').count(), await titles.count());
   assert.equal(await page.locator('.cl-section-title .cl-ico').allTextContents().then((texts) => texts.join('')), '');
   assert.deepEqual(errors, []);
   await page.close();

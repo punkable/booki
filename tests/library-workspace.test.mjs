@@ -116,3 +116,69 @@ test('overlapping settings edits offer explicit recovery without losing unrelate
   assert.equal(await page.getByRole('button', { name: 'Keep my changes', exact: true }).count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('notes autosave while editing and Ctrl+Enter closes after durable saving', async () => {
+  const note = { id: 'note', kind: 'widget', widget: 'notes', name: 'Notes', style: { note: 'old' } };
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [note] }), viewport: { width: 1200, height: 800 } });
+  await page.locator('.tile[data-id="note"]').click();
+  await page.getByRole('textbox', { name: 'Note', exact: true }).fill('A saved draft');
+  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'A saved draft');
+  assert.equal(await page.locator('.note-workspace').isVisible(), true);
+  await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Final edit');
+  await page.keyboard.press('Control+Enter');
+  await page.locator('.note-workspace').waitFor({ state: 'detached' });
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note), 'Final edit');
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('icon picker previews changes, cancellation preserves the pin and Apply commits the choice', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [app] }), viewport: { width: 1200, height: 800 } });
+  await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true }).click();
+  await page.getByRole('button', { name: /Change icon/, exact: false }).click();
+  const dialog = page.getByRole('dialog', { name: 'Choose icon', exact: true });
+  await dialog.getByRole('searchbox', { name: 'Search icons', exact: true }).fill('coffee');
+  await dialog.getByRole('button', { name: 'coffee', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].icon), undefined);
+  await page.getByRole('button', { name: /Change icon/, exact: false }).click();
+  await dialog.getByRole('button', { name: 'coffee', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].icon === 'lib:coffee:badge');
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('failed note autosave keeps the draft open and retry saves it before closing', async () => {
+  const note = { id: 'note', kind: 'widget', widget: 'notes', name: 'Notes', style: { note: 'old' } };
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [note] }), viewport: { width: 1200, height: 800 } });
+  await page.evaluate(() => { const old = window.__TAURI__.core.invoke; window.failNoteSave = true; window.__TAURI__.core.invoke = (command, args) => command === 'save_config' && window.failNoteSave ? Promise.reject('disk full') : old(command, args); });
+  await page.locator('.tile[data-id="note"]').click();
+  await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Keep this draft');
+  await page.locator('.note-workspace').getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  await page.locator('.note-workspace').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.getByRole('textbox', { name: 'Note', exact: true }).inputValue(), 'Keep this draft');
+  await page.evaluate(() => { window.failNoteSave = false; });
+  await page.locator('.note-workspace').getByRole('button', { name: 'Retry', exact: true }).click();
+  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'Keep this draft');
+  await page.locator('.note-workspace').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.note-workspace').waitFor({ state: 'detached' });
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('a failed dock removal restores the pin and retains a retry instead of offering a false undo', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [app] }) });
+  await page.evaluate(() => { const old = window.__TAURI__.core.invoke; window.failDockSave = true; window.__TAURI__.core.invoke = (command, args) => command === 'save_config' && window.failDockSave ? Promise.reject('disk full') : old(command, args); });
+  await page.locator('.tile[data-id="editor"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Remove from dock', exact: true }).click();
+  await page.locator('#undo-toast').getByRole('button', { name: 'Retry', exact: true }).waitFor();
+  assert.equal(await page.locator('.tile[data-id="editor"]').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Undo', exact: true }).count(), 0);
+  await page.locator('#undo-toast').getByRole('button', { name: 'Retry', exact: true }).click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator('#undo-toast').getByRole('button', { name: 'Retry', exact: true }).isEnabled(), true);
+  await page.evaluate(() => { window.failDockSave = false; });
+  await page.locator('#undo-toast').getByRole('button', { name: 'Retry', exact: true }).click();
+  await page.locator('.tile[data-id="editor"]').waitFor({ state: 'detached' });
+  assert.deepEqual(errors, []); await page.close();
+});

@@ -23,6 +23,7 @@ import {
 } from "./api.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
 import { buildProductivityPanel } from "./dock/productivity-panel.js";
+import { createDraftSaver } from "./dock/draft-saver.js";
 import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
@@ -129,7 +130,7 @@ async function undoLastRemoval() {
   hideUndoToast();
   if (cfg.pinned.some((entry) => entry.id === item.id)) return;
   cfg.pinned.splice(Math.min(index, cfg.pinned.length), 0, item);
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
 }
@@ -165,8 +166,9 @@ async function boot() {
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
     onConfigChanged(() => reloadConfig());
     observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!hiddenState) appPollTick?.(false); } }, (support) => {
+      const windowsChanged = !!nativeSupport.windows !== !!support.windows;
       nativeSupport = support;
-      if (!hiddenState) startRunningPoll();
+      if (windowsChanged && !hiddenState) startRunningPoll();
     });
     onOcclusion(onOcclusionSignal);
     onDesktop(onDesktopSignal);
@@ -374,12 +376,12 @@ function applyAll() {
 }
 
 let persistQueue = Promise.resolve();
-function persist(patch = {}) {
-  const pending = persistQueue.then(() => performPersist(patch));
+function persist(patch = {}, { showError = true } = {}) {
+  const pending = persistQueue.then(() => performPersist(patch, showError));
   persistQueue = pending.catch(() => {});
   return pending;
 }
-async function performPersist(patch) {
+async function performPersist(patch, showError) {
   // Keep dissolve rules consistent with Settings (empty / 1-child groups).
   cfg.pinned = normalizeGroups(cfg.pinned);
   const changes = { pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch };
@@ -393,19 +395,24 @@ async function performPersist(patch) {
     const conflict = parseConfigConflict(error);
     // Restore the persisted view; retain the proposed edit for explicit retry.
     await reloadConfig().catch(() => {});
-    if (undoToast) {
+    if (undoToast && showError) {
       hideUndoToast();
       undoToast.innerHTML = `<span>${esc(t(conflict ? "workspace.conflict" : "status.saveError"))}</span><button type="button">${esc(t(conflict ? "workspace.keepMine" : "focus.retry"))}</button>`;
       undoToast.classList.remove("hidden");
-      undoToast.querySelector("button")?.addEventListener("click", async () => {
-        hideUndoToast();
+      const retryButton = undoToast.querySelector("button");
+      retryButton?.addEventListener("click", async () => {
+        retryButton.disabled = true;
         try {
           await configApi.get(); // Retry is an explicit decision against the latest snapshot.
           await configApi.patch(changes);
           await emitConfigChanged();
           await reloadConfig();
-        } catch (retryError) { logMessage("error", `dock retry failed: ${retryError}`); }
-      }, { once: true });
+          if (undoToast.contains(retryButton)) hideUndoToast();
+        } catch (retryError) {
+          logMessage("error", `dock retry failed: ${retryError}`);
+          retryButton.disabled = false;
+        }
+      });
     }
     return false;
   }
@@ -871,7 +878,7 @@ function closeProductivityPanel() {
 }
 function openProductivity(item, tile) {
   closeProductivityPanel();
-  const panel = buildProductivityPanel(item, { save: async () => { await persist(); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
+  const panel = buildProductivityPanel(item, { save: async () => { if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved"); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
   const place = () => {
@@ -882,7 +889,7 @@ function openProductivity(item, tile) {
   const dispose = panel.dispose;
   const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.querySelector("button")?.focus(); });
+  requestAnimationFrame(() => { place(); panel.querySelector(["tasks", "weather"].includes(item.widget) ? "input" : "button")?.focus(); });
 }
 
 // Recent total throughput for the network sparkline (one sample per poll).
@@ -1109,13 +1116,13 @@ function startPolls() {
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
-function refreshMedia() { pollDue.media = 0; if (!hiddenState) pollMedia(); }
-function refreshVolume() { pollDue.volume = 0; if (!hiddenState) pollVolume(); }
+function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(nativeSupport, "media", 3000); if (!hiddenState) pollMedia(); }
+function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(nativeSupport, "volume", 4000); if (!hiddenState) pollVolume(); }
 function refreshClipboard() { pollDue.clipboard = 0; if (!hiddenState) pollClipboard(); }
 
 async function addWidget(type) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
 }
@@ -1154,54 +1161,67 @@ async function resolveIcon(item) {
   return uri;
 }
 
-// Notes widget: click it to jot a note in a small editor that saves as you go.
+// Notes use a serialized autosave and keep their draft visible on failure.
 let noteEditor = null;
-function closeNoteEditor() {
-  if (noteEditor) noteEditor.remove();
-  noteEditor = null;
-  reframe();
+async function closeNoteEditor() {
+  const editor = noteEditor;
+  if (!editor) return true;
+  if (!(await editor.flush())) return false;
+  if (noteEditor !== editor) return true;
+  editor.dispose(); editor.remove(); noteEditor = null;
+  pinnedReveal = false; reframe(); scheduleHide();
+  return true;
 }
-function editNote(item) {
+async function editNote(item) {
+  if (!(await closeNoteEditor())) return;
   closeProductivityPanel();
-  closeNoteEditor();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
-  const ta = document.createElement("textarea");
-  ta.className = "note-editor";
-  ta.value = (item.style && item.style.note) || "";
-  ta.placeholder = t("w.notesEmpty");
-  document.body.appendChild(ta);
-  noteEditor = ta;
-  pinnedReveal = true; // keep the dock open while writing
-  applyFrame(); // grow the window so the editor isn't clipped
-  const place = () => {
-    // Anchored to the note's own tile, not the whole bar.
-    const { left, top } = placeBesideBar({
-      bar: tile.getBoundingClientRect(),
-      box: { width: ta.offsetWidth, height: ta.offsetHeight },
-      edge: cfg.edge,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      pad: 6,
-    });
-    ta.style.left = `${left}px`;
-    ta.style.top = `${top}px`;
-  };
-  place();
-  setTimeout(() => { place(); ta.focus(); ta.select(); }, 80);
-  const save = async () => {
-    item.style = { ...(item.style || {}), note: ta.value };
+  const panel = document.createElement("section");
+  panel.className = "note-editor note-workspace";
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
+  const head = document.createElement("div"); head.className = "productivity-head";
+  const title = document.createElement("strong"); title.textContent = t("w.notes");
+  const close = document.createElement("button"); close.type = "button"; close.textContent = t("stack.close"); close.className = "productivity-button";
+  close.addEventListener("click", closeNoteEditor); head.append(title, close);
+  const ta = document.createElement("textarea"); ta.className = "note-input";
+  ta.value = item.style?.note || ""; ta.placeholder = t("w.notesEmpty"); ta.setAttribute("aria-label", t("w.notes")); ta.maxLength = 20000;
+  const footer = document.createElement("div"); footer.className = "note-save-state";
+  const status = document.createElement("span"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.textContent = t("status.saved");
+  const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
+  const saver = createDraftSaver(async (text) => {
+    const current = findWidgetPin(item.id);
+    if (!current) return false;
+    current.style = { ...(current.style || {}), note: text };
+    if (!(await persist({}, { showError: false }))) return false;
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
-      setPreviewSubText(el, ta.value || t("w.notesEmpty"), !ta.value);
-      el.title = ta.value ? `${t("w.notes")} — ${ta.value}` : widgetLabel("notes");
+      setPreviewSubText(el, text || t("w.notesEmpty"), !text);
+      el.title = text ? `${t("w.notes")} — ${text}` : widgetLabel("notes");
     });
-    await persist();
-  };
-  ta.addEventListener("keydown", async (e) => {
-    e.stopPropagation();
-    if (e.key === "Escape") { await save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); }
+    return true;
+  }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; });
+  panel.flush = saver.flush; panel.dispose = saver.cancelTimer;
+  retry.addEventListener("click", () => { ta.focus(); saver.flush(); }); footer.append(status, retry); panel.append(head, ta, footer);
+  ta.addEventListener("input", () => saver.change(ta.value));
+  panel.addEventListener("keydown", async (event) => {
+    event.stopPropagation();
+    if (event.key === "Escape" || ((event.ctrlKey || event.metaKey) && event.key === "Enter")) { event.preventDefault(); await closeNoteEditor(); }
   });
-  ta.addEventListener("blur", async () => { await save(); closeNoteEditor(); pinnedReveal = false; scheduleHide(); });
+  panel.addEventListener("focusout", (event) => {
+    if (event.relatedTarget && panel.contains(event.relatedTarget)) return;
+    // Only close after focus has really moved out; a native dialog can blur it.
+    requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
+  });
+  document.body.appendChild(panel); noteEditor = panel; pinnedReveal = true; applyFrame();
+  const place = () => {
+    if (!panel.isConnected) return;
+    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
+    panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
+  };
+  const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
+  panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };
+  requestAnimationFrame(() => { place(); ta.focus(); });
 }
 
 // ─────────────────────────── Launch ───────────────────────────
@@ -1290,7 +1310,7 @@ async function addPaths(paths, forceKind, atIndex = null) {
   // Land exactly where the insertion gap showed during the drag (null = end).
   if (atIndex == null || atIndex >= cfg.pinned.length) cfg.pinned.push(...items);
   else cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
 }
@@ -1478,7 +1498,7 @@ async function checkChangelog() {
     const v = await dockApi.appVersion();
     if (v && cfg.seenVersion !== v) {
       cfg.seenVersion = v;
-      await persist();
+      if (!(await persist())) return;
       dockApi.openChangelog();
     }
   } catch (_) {}
@@ -2022,7 +2042,7 @@ async function onPressUp() {
     } else {
       const idToIndex = new Map([...dockEl.querySelectorAll(".tile[data-id]")].map((t, i) => [t.dataset.id, i]));
       cfg.pinned.sort((a, b) => (idToIndex.get(a.id) ?? 0) - (idToIndex.get(b.id) ?? 0));
-      await persist();
+      if (!(await persist())) return;
       await render();
       reframe();
     }
@@ -2096,7 +2116,7 @@ async function createGroup(draggedId, targetId) {
   if (next === cfg.pinned) return;
   cfg.pinned = next;
   exitEdit();
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
 }
@@ -2201,7 +2221,7 @@ async function ungroup(group) {
   if (gi < 0) return;
   const rest = cfg.pinned[gi].children || [];
   cfg.pinned.splice(gi, 1, ...rest);
-  await persist();
+  if (!(await persist())) return;
   closeStack();
   await render();
   reframe();
@@ -2212,7 +2232,7 @@ async function ungroup(group) {
 async function takeOutChild(group, childId) {
   const { pinned, reopenId } = takeOutOfGroup(cfg.pinned, group.id, childId);
   cfg.pinned = pinned;
-  await persist();
+  if (!(await persist())) return;
   closeStack();
   await render();
   reframe();
@@ -2237,7 +2257,7 @@ async function reorderGroupChild(group, childId, beforeId) {
   cfg.pinned[gi].children = kids;
   // Keep flyout open across persist so smart-hide can't tuck mid-reorder.
   pinnedReveal = true;
-  await persist();
+  if (!(await persist())) return;
   closeStack();
   await render();
   reframe();
@@ -2613,7 +2633,7 @@ function openBackgroundMenu(e) {
   add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
     const item = findWidgetPin(el.dataset.id);
-    if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; await persist(); await render(); reframe(); });
+    if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; if (!(await persist())) return; await render(); reframe(); });
   }
   placeMenu(e);
   dockApi.profileList().then((profiles) => {
@@ -2745,20 +2765,20 @@ async function changeIcon(item) {
   const uri = (await dockApi.imageDataUri(path)) || path;
   item.icon = uri;
   iconCache.delete(item.path);
-  await persist();
+  if (!(await persist())) return;
   await render();
 }
 async function clearIcon(item) {
   item.icon = null;
   iconCache.delete(item.path);
-  await persist();
+  if (!(await persist())) return;
   await render();
 }
 async function addSeparatorAfter(id) {
   const i = cfg.pinned.findIndex((a) => a.id === id);
   const at = i < 0 ? cfg.pinned.length : i + 1;
   cfg.pinned.splice(at, 0, { id: uid(), name: "", path: "", args: [], kind: "separator" });
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
 }
@@ -2773,7 +2793,7 @@ async function removeItem(id) {
     await new Promise((r) => setTimeout(r, 170));
   }
   cfg.pinned = cfg.pinned.filter((a) => a.id !== id);
-  await persist();
+  if (!(await persist())) return;
   await render();
   reframe();
   showUndoToast(removed, index);
@@ -3952,7 +3972,7 @@ function setupFileDrop() {
             kind: "app",
           });
         }
-        await persist();
+        if (!(await persist())) return;
         await render();
         reframe();
         return;
@@ -4777,7 +4797,7 @@ async function addToFolderFromDock(group, preferKind = "app") {
     ...(cfg.pinned[gi].children || []),
     { id: uid(), name: baseName(path), path, args: [], kind },
   ];
-  await persist();
+  if (!(await persist())) return;
   closeStack();
   await render();
   reframe();

@@ -50,11 +50,11 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   useEffect(() => { load(); return () => { generation.current++; }; }, [cfg.usageRecommendationsEnabled]);
   const reload = useRef(load); reload.current = load;
   useEffect(() => {
-    let disposed = false, unlisten;
-    dock.onSystemChange('catalog', () => { if (!disposed) reload.current(true); }).then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
+    let disposed = false, unlisten, catalogTimer;
+    dock.onSystemChange('catalog', () => { clearTimeout(catalogTimer); catalogTimer = setTimeout(() => { if (!disposed) reload.current(true); }, 500); }).then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
     const onFocus = () => reload.current();
     window.addEventListener('focus', onFocus);
-    return () => { disposed = true; unlisten?.(); window.removeEventListener('focus', onFocus); };
+    return () => { disposed = true; clearTimeout(catalogTimer); unlisten?.(); window.removeEventListener('focus', onFocus); };
   }, []);
   const keys = useMemo(() => pinnedKeys(cfg.pinned, data.identities), [cfg.pinned, data.identities]);
   const sections = useMemo(() => candidateSections({ ...data, used: (cfg.usageRecommendationsEnabled === false ? [] : data.used).filter((u) => !(cfg.ignoredAppSuggestions || []).includes(pathKey(u.path))) }, keys, query, data.identities), [data, keys, query, cfg.ignoredAppSuggestions, cfg.usageRecommendationsEnabled]);
