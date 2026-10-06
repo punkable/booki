@@ -67,3 +67,16 @@ test('an external Settings change immediately after a dock edit is not discarded
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('a failed folder page preserves the visible entries and offers retry', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [{ id:'folder',name:'Files',kind:'folder',path:'C:/Files' }] }) });
+  await page.evaluate(() => { const old=window.__TAURI__.core.invoke;window.__failNext=true;window.__TAURI__.core.invoke=(c,a)=>{ if(c==='list_dir'){if(a.offset>0 && window.__failNext){window.__failNext=false;return Promise.reject(new Error('unavailable'));}return Promise.resolve(Array.from({length:25},(_,i)=>({name:`File ${a.offset+i}`,path:`C:/Files/${a.offset+i}.txt`,is_dir:false})));}return old(c,a);}; });
+  await page.locator('.tile[data-id="folder"]').click();
+  await page.locator('.stack-pager').getByRole('button', { name:'Next', exact:true }).click();
+  await page.locator('.stack-load-error').getByRole('alert').waitFor();
+  assert.equal(await page.locator('.stack-item').filter({hasText:'File 0'}).count(),1);
+  await page.locator('.stack-load-error').getByRole('button').click();
+  await page.locator('.stack-item').filter({hasText:'File 24'}).waitFor();
+  assert.equal(await page.locator('.stack-load-error').count(),0);
+  assert.deepEqual(errors,[]);await page.close();
+});

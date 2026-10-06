@@ -1115,7 +1115,10 @@ async function resolveIcon(item) {
   }
   // Only cache a real icon — never a failed/empty result, so a transient
   // extraction failure retries on the next render instead of sticking forever.
-  if (uri) iconCache.set(item.path, uri);
+  if (uri) {
+    iconCache.set(item.path, uri);
+    while (iconCache.size > 256) iconCache.delete(iconCache.keys().next().value);
+  }
   return uri;
 }
 
@@ -4363,7 +4366,11 @@ async function openStack(tileEl, item) {
       } catch (_) {
         if (seq !== stackSeq || !stackOpen || current !== request) return;
         buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
-        grid.replaceChildren();
+        const retainPage = pager.isConnected;
+        if (!retainPage) grid.replaceChildren();
+        grid.querySelector('.stack-load-error')?.remove();
+        const failure = document.createElement("div");
+        failure.className = "stack-load-error";
         const message = document.createElement("p");
         message.className = "stack-empty";
         message.setAttribute("role", "alert");
@@ -4372,7 +4379,8 @@ async function openStack(tileEl, item) {
         retry.className = "stack-more";
         retry.textContent = t("apps.refresh");
         retry.addEventListener("click", () => loadPage(nextPage));
-        grid.append(message, retry);
+        failure.append(message, retry);
+        grid.prepend(failure);
         applyFrame();
       }
     };
