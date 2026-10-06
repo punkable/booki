@@ -74,9 +74,19 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-> Download the latest published version using the release badge above. Booki checks the same release channel for updates; existing clients keep their current update interface for the first upgrade to 0.70.
+> Download the latest published version using the release badge above. Booki checks the same release channel for updates; updates preserve the existing installation and configuration.
 
-### New in 0.70
+### New in 0.71
+
+- A persistent dock editor beside the app library: select to inspect, use **+** or drag to add, arrange groups and undo edits.
+- Unified dock behavior settings, curated finishes and a widget gallery with a configuration inspector.
+- Booki context menus with Settings throughout, optional movable Settings pins and internal subfolder navigation.
+- Complete profiles, protected saves and conflict recovery; notes autosave retains failed drafts for retry.
+- Native Windows notifications for media, volume, running windows and app catalog changes, with blocking queries moved off the interface thread.
+
+See the [complete 0.71 release notes](docs/releases/v0.71.0.md).
+
+### Previous 0.70 improvements
 
 - New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
 - Four new widgets: timer, tasks, calendar and optional city weather (Open-Meteo).
