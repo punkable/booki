@@ -160,6 +160,9 @@ fn default_hide_in_fullscreen() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    /// Monotonic persisted revision, independent of the application version.
+    #[serde(default)]
+    pub revision: u64,
     #[serde(default = "default_true")]
     pub usage_recommendations_enabled: bool,
     #[serde(default)]
@@ -372,6 +375,7 @@ fn default_overflow() -> String {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            revision: 0,
             usage_recommendations_enabled: true,
             ignored_app_suggestions: Vec::new(),
             pinned: Vec::new(),
@@ -520,29 +524,13 @@ fn load_from_disk() -> Config {
         // No config yet → maybe a backup survived a wipe; otherwise defaults.
         read_config(&backup_path()).unwrap_or_default()
     };
-    // Migration: now that smart-hide is stable (measured against a fixed home
-    // rect, with a visible animated notch), make it the default for existing
-    // installs too — visible on the desktop, hides when a window covers it.
-    if cfg.settings_rev < 2 {
-        cfg.auto_hide_mode = "smart".into();
-        cfg.settings_rev = 2;
-        let _ = save_locked(&cfg);
-    }
-    // rev 3: Windows-native default — icons no longer magnify on hover by default
-    // (a subtle highlight is used instead). Users can re-enable it in settings.
-    if cfg.settings_rev < 3 {
-        cfg.magnification = false;
-        cfg.settings_rev = 3;
-        let _ = save_locked(&cfg);
-    }
-    // rev 4: the default icon size dropped 48 → 36. Only migrate installs still
-    // on the old default (a hand-picked 48 was never distinguishable from it).
-    if cfg.settings_rev < 4 {
-        if cfg.icon_size == 48 {
-            cfg.icon_size = 36;
+    // Record historical default changes without overwriting user preferences.
+    // New installs receive current defaults; existing choices remain intact.
+    for revision in [2, 3, 4] {
+        if cfg.settings_rev < revision {
+            cfg.settings_rev = revision;
+            let _ = save_locked(&cfg);
         }
-        cfg.settings_rev = 4;
-        let _ = save_locked(&cfg);
     }
     // rev 5: the notch follows the dock again. Older builds could leave an
     // explicit notch_edge behind (e.g. "bottom"), and moving the dock from
@@ -619,6 +607,7 @@ fn load_from_disk() -> Config {
         cfg.settings_intro_seen = true;
         let _ = save_locked(&cfg);
     }
+    cfg.revision = read_config(&path).map_or(cfg.revision, |saved| saved.revision);
     cfg
 }
 
@@ -661,19 +650,19 @@ pub fn save(config: &Config) -> Result<(), String> {
 
 /// Merge only edited top-level keys while holding the same lock as all writes.
 pub fn patch(patch: serde_json::Value) -> Result<Config, String> {
+    patch_checked(patch, None, None)
+}
+pub fn patch_checked(
+    patch: serde_json::Value,
+    base: Option<&serde_json::Value>,
+    expected: Option<u64>,
+) -> Result<Config, String> {
     let _guard = WRITE_LOCK
         .lock()
         .map_err(|_| "config lock failed".to_string())?;
-    let mut current = serde_json::to_value(load_locked()).map_err(|e| e.to_string())?;
-    let object = current.as_object_mut().ok_or("invalid config")?;
-    let fields = patch.as_object().ok_or("invalid config patch")?;
-    for (key, value) in fields {
-        if !object.contains_key(key) {
-            return Err(format!("unknown config field: {key}"));
-        }
-        object.insert(key.clone(), value.clone());
-    }
-    let updated: Config = serde_json::from_value(current).map_err(|e| e.to_string())?;
+    let current = serde_json::to_value(load_locked()).map_err(|e| e.to_string())?;
+    let merged = crate::config_transaction::merge(current, &patch, base, expected)?;
+    let updated: Config = serde_json::from_value(merged).map_err(|e| e.to_string())?;
     save_locked(&updated)?;
     Ok(load_locked())
 }
@@ -721,6 +710,9 @@ fn save_locked(config: &Config) -> Result<(), String> {
         .ok()
         .and_then(|g| g.clone())
         .or_else(|| read_config(&config_path()));
+    to_write.revision = existing
+        .as_ref()
+        .map_or(1, |saved| saved.revision.saturating_add(1));
     if let Some(existing) = existing {
         if existing.onboarded {
             to_write.onboarded = true;

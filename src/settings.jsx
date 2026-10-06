@@ -20,6 +20,7 @@ import {
   onCloseRequest,
   logMessage,
 } from "./api.js";
+import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { showBookiMenu } from "./native-context-menu.js";
 import { isTextEditor } from "./dock/context-menu.js";
 import { currentRelease, previousReleases } from "./release-notes.js";
@@ -236,9 +237,11 @@ function widgetDisplayName(widget) {
 // Scan the Start Menu once per settings session, then reuse — the scan +
 // icon extraction is costly and the Apps panel remounts on every tab switch.
 let _installedApps = null;
+let _installedAt = 0;
 function installedAppsOnce(force = false) {
-  if (force || !_installedApps) {
-    _installedApps = dockApi.listInstalledApps().catch((error) => {
+  if (force || !_installedApps || Date.now() - _installedAt > 60000) {
+    _installedAt = Date.now();
+    _installedApps = dockApi.listInstalledApps(force).catch((error) => {
       _installedApps = null;
       throw error;
     });
@@ -970,8 +973,16 @@ function IconPickerModal({ item, onPick, onClose }) {
 }
 
 function ClipboardSettingsPanel({ cfg, set }) {
+  const [storageFailed, setStorageFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => dockApi.clipboardStorageFailed().then((failed) => { if (active) setStorageFailed(!!failed); }).catch(() => {});
+    refresh(); window.addEventListener("focus", refresh);
+    return () => { active = false; window.removeEventListener("focus", refresh); };
+  }, [cfg.clipboardPersist]);
   return (
     <div className="clip-policy clip-policy-embedded">
+      {storageFailed && <p role="alert">{t("clip.storageFailed")}</p>}
       <div className="clip-policy-head">
         <span className="clip-policy-icon" dangerouslySetInnerHTML={{ __html: icon("shield") }} />
         <div>
@@ -2486,6 +2497,8 @@ function App() {
   const saveTimer = useRef(null);
   const cfgRef = useRef(null);
   const dirtyKeys = useRef(new Set());
+  const dirtyBase = useRef(new Map());
+  const [configConflict, setConfigConflict] = useState(null);
   const savingKeys = useRef(new Set());
   const closing = useRef(false);
   const afterSaveCb = useRef(null);
@@ -2503,6 +2516,8 @@ function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = null;
     const keys = [...dirtyKeys.current];
+    const base = Object.fromEntries(keys.map((key) => [key, dirtyBase.current.get(key)]));
+    for (const key of keys) dirtyBase.current.delete(key);
     dirtyKeys.current.clear();
     savingKeys.current = new Set(keys);
     const cb = afterSaveCb.current;
@@ -2515,7 +2530,7 @@ function App() {
       const patch = {};
       for (const key of keys) if (key in snap) patch[key] = snap[key];
       if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
-      const toSave = await configApi.patch(patch) || { ...snap, ...patch };
+      const toSave = await configApi.patch(patch, { base, expectedRevision: snap.revision }) || { ...snap, ...patch };
       await emitConfigChanged();
       if (!dirtyKeys.current.size) cfgRef.current = toSave;
       setCfg((prev) => {
@@ -2525,10 +2540,13 @@ function App() {
         return { ...prev, ...toSave };
       });
       setSaveState("saved");
+      setConfigConflict(null);
       if (typeof cb === "function") cb(toSave);
-    } catch (_) {
-      // Re-queue failed keys so the next edit (or close) retries.
-      for (const k of keys) dirtyKeys.current.add(k);
+    } catch (error) {
+      const conflict = parseConfigConflict(error);
+      if (conflict) setConfigConflict(conflict);
+      // Preserve the original baseline even if another edit arrived in flight.
+      for (const k of keys) { dirtyKeys.current.add(k); dirtyBase.current.set(k, base[k]); }
       setSaveState("error");
     } finally {
       savingKeys.current.clear();
@@ -2572,7 +2590,7 @@ function App() {
     // Suppress native HTML5 image drag: the pinned-app icons are <img>, and
     // dragging one out of the window let the OS save a stray .png. Our reorder
     // dragging is pointer-event based, so this has no downside.
-    const noDrag = (e) => e.preventDefault();
+    const noDrag = (e) => { if (!e.target.closest('[draggable="true"]')) e.preventDefault(); };
     window.addEventListener("dragstart", noDrag);
     return () => {
       un && un();
@@ -2666,7 +2684,10 @@ function App() {
     if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
     // Record the draft synchronously: a native close can arrive before React
     // renders the edit, and must still wait for those keys to reach disk.
-    for (const k of Object.keys(patch)) dirtyKeys.current.add(k);
+    for (const k of Object.keys(patch)) {
+      if (!dirtyKeys.current.has(k)) dirtyBase.current.set(k, structuredClone(prev?.[k]));
+      dirtyKeys.current.add(k);
+    }
     cfgRef.current = next;
     setCfg(next);
     if (prev && prev.language !== next.language) {
@@ -2691,6 +2712,30 @@ function App() {
     try { await closeSelf({ keepAlive }); }
     catch (_) { setCloseError(true); }
     finally { closing.current = false; }
+  };
+
+  const resolveConfigConflict = async (keepMine) => {
+    if (!configConflict) return;
+    clearTimeout(saveTimer.current);
+    const next = { ...cfgRef.current };
+    for (const key of configConflict.keys) {
+      if (keepMine) dirtyBase.current.set(key, structuredClone(configConflict.current[key]));
+      else {
+        dirtyKeys.current.delete(key);
+        dirtyBase.current.delete(key);
+        next[key] = configConflict.current[key];
+      }
+    }
+    next.revision = configConflict.current.revision;
+    cfgRef.current = next;
+    setCfg(next);
+    applyTheme(next);
+    applySurfaceVars(next);
+    await ensureLang(next.language);
+    setLang(next.language);
+    setConfigConflict(null);
+    setSaveState("idle");
+    await flushSave();
   };
 
   const prepareConfigOperation = async () => { await flushSave(); if (dirtyKeys.current.size) throw new Error("pending settings could not be saved"); };
@@ -2859,6 +2904,7 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
+            {configConflict && <div className="settings-close-error" role="alert"><span>{t("workspace.conflict")}</span><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(true)}>{t("workspace.keepMine")}</button><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(false)}>{t("workspace.useOther")}</button></div>}
             {closeError && <div className="settings-close-error" role="alert"><span>{t("workspace.closeFailed")}</span><button className="s-btn s-btn-soft" onClick={async () => { await flushSave(); if (!dirtyKeys.current.size) finishClose(); }}>{t("focus.retry")}</button></div>}
             <SettingsBoundary key={tab} onHome={() => setTab("home")}>
             {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}

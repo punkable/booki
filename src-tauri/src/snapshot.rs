@@ -3,6 +3,10 @@ use std::{fs, io::Write, path::Path, sync::Mutex};
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn write(path: &Path, text: &str) -> Result<(), String> {
+    write_bytes(path, text.as_bytes())
+}
+
+pub fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let _guard = WRITE_LOCK.lock().map_err(|e| e.to_string())?;
     let parent = path.parent().ok_or("snapshot has no parent")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -13,7 +17,7 @@ pub fn write(path: &Path, text: &str) -> Result<(), String> {
     let temp = parent.join(format!("{name}.{}.tmp", std::process::id()));
     let result = (|| {
         let mut file = fs::File::create(&temp).map_err(|e| e.to_string())?;
-        file.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+        file.write_all(bytes).map_err(|e| e.to_string())?;
         file.sync_all().map_err(|e| e.to_string())?;
         drop(file);
         fs::rename(&temp, path).map_err(|e| e.to_string())

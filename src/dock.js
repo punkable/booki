@@ -23,6 +23,8 @@ import {
 } from "./api.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
 import { buildProductivityPanel } from "./dock/productivity-panel.js";
+import { parseConfigConflict } from "./settings/config-conflicts.js";
+import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { resolveNotchMode } from "./notch-mode.js";
@@ -98,6 +100,8 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 let cfg = null;
+let nativeSupport = {};
+let appPollTick = null;
 let undoRemoval = null;
 let undoRemovalTimer = null;
 
@@ -160,6 +164,10 @@ async function boot() {
     document.body.classList.add("boot-animate");
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
     onConfigChanged(() => reloadConfig());
+    observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!hiddenState) appPollTick?.(false); } }, (support) => {
+      nativeSupport = support;
+      if (!hiddenState) startRunningPoll();
+    });
     onOcclusion(onOcclusionSignal);
     onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
@@ -374,9 +382,33 @@ function persist(patch = {}) {
 async function performPersist(patch) {
   // Keep dissolve rules consistent with Settings (empty / 1-child groups).
   cfg.pinned = normalizeGroups(cfg.pinned);
-  await configApi.patch({ pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch });
-  maybeSyncCtxMenu();
-  await emitConfigChanged();
+  const changes = { pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch };
+  try {
+    await configApi.patch(changes);
+    maybeSyncCtxMenu();
+    await emitConfigChanged();
+    return true;
+  } catch (error) {
+    logMessage("error", `dock save failed: ${error}`);
+    const conflict = parseConfigConflict(error);
+    // Restore the persisted view; retain the proposed edit for explicit retry.
+    await reloadConfig().catch(() => {});
+    if (undoToast) {
+      hideUndoToast();
+      undoToast.innerHTML = `<span>${esc(t(conflict ? "workspace.conflict" : "status.saveError"))}</span><button type="button">${esc(t(conflict ? "workspace.keepMine" : "focus.retry"))}</button>`;
+      undoToast.classList.remove("hidden");
+      undoToast.querySelector("button")?.addEventListener("click", async () => {
+        hideUndoToast();
+        try {
+          await configApi.get(); // Retry is an explicit decision against the latest snapshot.
+          await configApi.patch(changes);
+          await emitConfigChanged();
+          await reloadConfig();
+        } catch (retryError) { logMessage("error", `dock retry failed: ${retryError}`); }
+      }, { once: true });
+    }
+    return false;
+  }
 }
 
 // ──────────────────────────── Render ────────────────────────────
@@ -1071,8 +1103,8 @@ function startPolls() {
     const now = Date.now();
     if (hasClock || hasLocal) tickClocks();
     if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
-    if (hasMedia && now >= pollDue.media) { pollDue.media = now + 3000; pollMedia(); }
-    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + 4000; pollVolume(); }
+    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000); pollMedia(); }
+    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000); pollVolume(); }
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000; pollClipboard(); }
   }, base);
 }
@@ -3967,13 +3999,13 @@ function startRunningPoll() {
   if (!isTauri) return;
   clearInterval(pollTimer); // never stack two running-app polls
   pollTimer = null;
-  const tick = async () => {
+  const tick = singleFlight(async (refreshTrash = true) => {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
     if (hiddenState) return;
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
-    if (dockEl.querySelector(".tile.trash")) refreshTrashState();
+    if (refreshTrash && dockEl.querySelector(".tile.trash")) refreshTrashState();
     if (cfg.showIndicators === false) {
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => (t.dataset.running = "false"));
       return;
@@ -4016,9 +4048,10 @@ function startRunningPoll() {
     } catch (_) {
       /* ignore */
     }
-  };
+  });
+  appPollTick = tick;
   tick();
-  pollTimer = setInterval(tick, 5000);
+  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000));
 }
 
 // ─────────────────── Folder stacks (flyout) ───────────────────

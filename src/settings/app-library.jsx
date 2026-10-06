@@ -48,6 +48,14 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
     setData({ ...next, identities }); setFailed(result.map((r, i) => r.status === 'rejected' ? i : -1).filter((i) => i >= 0)); setLoading(false);
   };
   useEffect(() => { load(); return () => { generation.current++; }; }, [cfg.usageRecommendationsEnabled]);
+  const reload = useRef(load); reload.current = load;
+  useEffect(() => {
+    let disposed = false, unlisten;
+    dock.onSystemChange('catalog', () => { if (!disposed) reload.current(true); }).then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
+    const onFocus = () => reload.current();
+    window.addEventListener('focus', onFocus);
+    return () => { disposed = true; unlisten?.(); window.removeEventListener('focus', onFocus); };
+  }, []);
   const keys = useMemo(() => pinnedKeys(cfg.pinned, data.identities), [cfg.pinned, data.identities]);
   const sections = useMemo(() => candidateSections({ ...data, used: (cfg.usageRecommendationsEnabled === false ? [] : data.used).filter((u) => !(cfg.ignoredAppSuggestions || []).includes(pathKey(u.path))) }, keys, query, data.identities), [data, keys, query, cfg.ignoredAppSuggestions, cfg.usageRecommendationsEnabled]);
   const add = (candidates) => {

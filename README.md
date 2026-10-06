@@ -40,11 +40,11 @@
 
 <p align="center">A countdown timer, a task list, a monthly calendar and optional city weather.<br/>Your tasks stay on your PC. Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><img src="docs/presentation/apps-en.jpg" width="1000" alt="Booki app library with most-used suggestions, open apps and all installed apps" /></p>
+<p align="center"><img src="docs/presentation/library-workspace-en.png" width="1000" alt="Booki library with a persistent dock editor, app suggestions and an item inspector" /></p>
 
 <h2 align="center">Find any app. Fast.</h2>
 
-<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
+<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Keep your dock in view while you search. Select an app to inspect it, then add it with + or drag it into a position or group.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
 
 <p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with a live dock preview and behavior scenarios" /></p>
 
@@ -64,7 +64,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. See the <a href="docs/releases/v0.70.2.md">0.70.2 surface and usability fixes</a>.</sub></p>
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. The library screenshot shows the 0.71 workspace. See the <a href="docs/releases/v0.71.0.md">0.71 library, settings and system update</a>.</sub></p>
 
 ## Get started
 

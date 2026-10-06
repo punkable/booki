@@ -80,3 +80,39 @@ test('a failed folder page preserves the visible entries and offers retry', asyn
   assert.equal(await page.locator('.stack-load-error').count(),0);
   assert.deepEqual(errors,[]);await page.close();
 });
+
+test('native HTML dragging reorders the persistent dock editor', async () => {
+  const beta = { ...app, id: 'beta', name: 'Beta', path: 'C:/beta.exe' };
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [app, beta] }), viewport: { width: 1200, height: 800 } });
+  await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.locator('.library-pin').filter({ hasText: 'Beta' }).dragTo(page.locator('.library-pin').filter({ hasText: 'Editor' }));
+  await page.waitForTimeout(250);
+  assert.deepEqual(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.map((p) => p.id)), ['beta', 'editor']);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('overlapping settings edits offer explicit recovery without losing unrelated changes', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.conflictedOnce = false;
+    window.__TAURI__.core.invoke = async (command, args) => {
+      if (command === 'save_config' && args.patch?.reduceTransparency !== undefined && !window.conflictedOnce) {
+        window.conflictedOnce = true;
+        await old('save_config', { patch: { edge: 'top' } });
+        const current = await old('get_config');
+        throw 'BOOKI_CONFIG_CONFLICT:' + JSON.stringify({ keys: ['reduceTransparency'], current: { ...current, revision: 2, reduceTransparency: false, edge: 'top' } });
+      }
+      return old(command, args);
+    };
+  });
+  await page.getByRole('combobox').fill('Reduce transparency');
+  await page.getByRole('option').filter({ hasText: 'Reduce transparency' }).click();
+  await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep my changes', exact: true }).click();
+  await page.waitForTimeout(250);
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).reduceTransparency), true);
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).edge), 'top');
+  assert.equal(await page.getByRole('button', { name: 'Keep my changes', exact: true }).count(), 0);
+  assert.deepEqual(errors, []); await page.close();
+});

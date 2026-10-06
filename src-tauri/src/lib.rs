@@ -4,7 +4,9 @@
 //! persistence, app launching and (on Windows) native window management.
 
 mod apps;
+mod clipboard_storage;
 mod config;
+mod config_transaction;
 mod shortcuts;
 mod snapshot;
 mod surface_geometry;
@@ -104,6 +106,7 @@ const CLIP_HISTORY_MAX: usize = 60;
 const CLIP_HISTORY_HARD_MAX: usize = 200;
 const CLIP_TEXT_MAX: usize = 8000; // guard against pasting a huge document
 const CLIP_DPAPI_MAGIC: &[u8] = b"booki-dpapi-v1\n";
+static CLIP_STORAGE_FAILED: AtomicBool = AtomicBool::new(false);
 const CLIP_JSON_MAGIC: &[u8] = b"booki-json-v1\n";
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -195,15 +198,15 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
         .cloned()
         .collect();
     if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
-        let payload = if let Some(protected) = win::protect_data(&text) {
-            [CLIP_DPAPI_MAGIC, protected.as_slice()].concat()
-        } else {
-            [CLIP_JSON_MAGIC, text.as_slice()].concat()
-        };
-        let tmp = path.with_extension("json.tmp");
-        if fs::write(&tmp, payload).is_ok() {
-            let _ = fs::rename(tmp, path);
-            let _ = fs::remove_file(clip_legacy_history_path());
+        let result = clipboard_storage::payload(&text, win::protect_data(&text), cfg!(windows))
+            .map_err(str::to_string)
+            .and_then(|payload| snapshot::write_bytes(&path, &payload));
+        CLIP_STORAGE_FAILED.store(result.is_err(), Ordering::Relaxed);
+        match result {
+            Ok(()) => {
+                let _ = fs::remove_file(clip_legacy_history_path());
+            }
+            Err(error) => log::warn!("Clipboard history could not be saved: {error}"),
         }
     }
 }
@@ -395,9 +398,11 @@ fn save_config(
     app: AppHandle,
     config: Option<Config>,
     patch: Option<serde_json::Value>,
+    base: Option<serde_json::Value>,
+    expected_revision: Option<u64>,
 ) -> Result<Config, String> {
     let config = if let Some(patch) = patch {
-        config::patch(patch)?
+        config::patch_checked(patch, base.as_ref(), expected_revision)?
     } else if let Some(config) = config {
         config::save(&config)?;
         config::load()
@@ -1857,6 +1862,7 @@ fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String>
     let payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"), "os": std::env::consts::OS,
         "architecture": std::env::consts::ARCH, "displays": displays,
+        "configRevision": cfg.revision, "clipboardStorageFailed": CLIP_STORAGE_FAILED.load(Ordering::Relaxed),
         "dock": { "edge": cfg.edge, "autoHideMode": cfg.auto_hide_mode,
             "hideInFullscreen": cfg.hide_in_fullscreen, "notchTrigger": cfg.notch_trigger,
             "iconSize": cfg.icon_size, "overflowMode": cfg.overflow_mode,
@@ -1923,6 +1929,11 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
 }
 
 /// Clipboard history for the widget flyout (newest first).
+#[tauri::command]
+fn clipboard_storage_failed() -> bool {
+    CLIP_STORAGE_FAILED.load(Ordering::Relaxed)
+}
+
 #[tauri::command]
 fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
     clip_enforce_current_policy();
@@ -2130,7 +2141,7 @@ async fn empty_trash() -> Result<(), String> {
     result
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct DirItem {
     name: String,
     path: String,
@@ -2175,17 +2186,52 @@ fn is_dir(path: String) -> bool {
 /// Scan the Windows Start Menu for installed apps (.lnk shortcuts) so the
 /// settings UI can suggest things to pin without browsing the filesystem.
 /// Returns deduped, alphabetically-sorted shortcuts. Empty off-Windows.
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct AppGroup {
     name: String,
     items: Vec<DirItem>,
 }
 
+static CATALOG_GENERATION: AtomicU64 = AtomicU64::new(0);
+type CatalogSnapshot = (u64, std::time::Instant, Vec<AppGroup>);
+static CATALOG_CACHE: Mutex<Option<CatalogSnapshot>> = Mutex::new(None);
+
 #[tauri::command]
-async fn list_installed_apps() -> Vec<AppGroup> {
-    tauri::async_runtime::spawn_blocking(scan_installed_apps)
-        .await
-        .unwrap_or_default()
+async fn list_installed_apps(refresh: Option<bool>) -> Vec<AppGroup> {
+    if refresh.unwrap_or(false) {
+        CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let Ok(mut cache) = CATALOG_CACHE.lock() else {
+            return scan_installed_apps();
+        };
+        let generation = CATALOG_GENERATION.load(Ordering::Relaxed);
+        if let Some((cached_generation, created, groups)) = cache.as_ref() {
+            if *cached_generation == generation
+                && created.elapsed() < std::time::Duration::from_secs(60)
+            {
+                return groups.clone();
+            }
+        }
+        let groups = scan_installed_apps();
+        *cache = Some((generation, std::time::Instant::now(), groups.clone()));
+        groups
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+fn system_events_support() -> serde_json::Value {
+    #[cfg(windows)]
+    {
+        use win::system_events;
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed) })
+    }
+    #[cfg(not(windows))]
+    {
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false })
+    }
 }
 
 fn scan_installed_apps() -> Vec<AppGroup> {
@@ -2737,6 +2783,7 @@ pub fn run() {
             recent_files,
             recent_files_for,
             clipboard_history,
+            clipboard_storage_failed,
             clipboard_count,
             clipboard_summary,
             clipboard_copy,
@@ -2753,11 +2800,22 @@ pub fn run() {
             list_dir,
             is_dir,
             list_installed_apps,
+            system_events_support,
             quit,
             frontend_log,
         ])
         .setup(|app| {
             log::info!("Booki backend started");
+            #[cfg(windows)]
+            {
+                let handle = app.handle().clone();
+                win::system_events::start(std::sync::Arc::new(move |kind| {
+                    if kind == "catalog" {
+                        CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
+                    }
+                    let _ = handle.emit(&format!("booki://{kind}-changed"), ());
+                }));
+            }
             clip_load_from_disk();
             // Cold start from the Explorer context menu ("Add to Booki" while
             // Booki wasn't running): apply the pin args of THIS process before
