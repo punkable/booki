@@ -4,8 +4,11 @@
 //! persistence, app launching and (on Windows) native window management.
 
 mod apps;
+mod clipboard_storage;
 mod config;
+mod config_transaction;
 mod shortcuts;
+mod snapshot;
 mod surface_geometry;
 mod update_backup;
 mod usage;
@@ -103,6 +106,7 @@ const CLIP_HISTORY_MAX: usize = 60;
 const CLIP_HISTORY_HARD_MAX: usize = 200;
 const CLIP_TEXT_MAX: usize = 8000; // guard against pasting a huge document
 const CLIP_DPAPI_MAGIC: &[u8] = b"booki-dpapi-v1\n";
+static CLIP_STORAGE_FAILED: AtomicBool = AtomicBool::new(false);
 const CLIP_JSON_MAGIC: &[u8] = b"booki-json-v1\n";
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -181,6 +185,7 @@ fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool {
 fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
+        CLIP_STORAGE_FAILED.store(false, Ordering::Relaxed);
         let _ = fs::remove_file(path);
         let _ = fs::remove_file(clip_legacy_history_path());
         return;
@@ -194,15 +199,15 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
         .cloned()
         .collect();
     if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
-        let payload = if let Some(protected) = win::protect_data(&text) {
-            [CLIP_DPAPI_MAGIC, protected.as_slice()].concat()
-        } else {
-            [CLIP_JSON_MAGIC, text.as_slice()].concat()
-        };
-        let tmp = path.with_extension("json.tmp");
-        if fs::write(&tmp, payload).is_ok() {
-            let _ = fs::rename(tmp, path);
-            let _ = fs::remove_file(clip_legacy_history_path());
+        let result = clipboard_storage::payload(&text, win::protect_data(&text), cfg!(windows))
+            .map_err(str::to_string)
+            .and_then(|payload| snapshot::write_bytes(&path, &payload));
+        CLIP_STORAGE_FAILED.store(result.is_err(), Ordering::Relaxed);
+        match result {
+            Ok(()) => {
+                let _ = fs::remove_file(clip_legacy_history_path());
+            }
+            Err(error) => log::warn!("Clipboard history could not be saved: {error}"),
         }
     }
 }
@@ -394,9 +399,11 @@ fn save_config(
     app: AppHandle,
     config: Option<Config>,
     patch: Option<serde_json::Value>,
+    base: Option<serde_json::Value>,
+    expected_revision: Option<u64>,
 ) -> Result<Config, String> {
     let config = if let Some(patch) = patch {
-        config::patch(patch)?
+        config::patch_checked(patch, base.as_ref(), expected_revision)?
     } else if let Some(config) = config {
         config::save(&config)?;
         config::load()
@@ -533,8 +540,10 @@ async fn app_identities(paths: Vec<String>) -> std::collections::HashMap<String,
 }
 
 #[tauri::command]
-fn list_windows() -> Vec<win::WindowInfo> {
-    win::list_windows()
+async fn list_windows() -> Vec<win::WindowInfo> {
+    tauri::async_runtime::spawn_blocking(win::list_windows)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -935,7 +944,13 @@ struct SystemStats {
 /// deltas are measured between calls (the dock polls this every couple seconds,
 /// and only while it's visible — so idle cost stays near zero).
 #[tauri::command]
-fn system_stats() -> SystemStats {
+async fn system_stats() -> Result<SystemStats, String> {
+    tauri::async_runtime::spawn_blocking(collect_system_stats)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn collect_system_stats() -> SystemStats {
     let mut guard = SYS.lock().unwrap();
     let sys = guard.get_or_insert_with(sysinfo::System::new);
     sys.refresh_cpu_usage();
@@ -1253,6 +1268,7 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
         .unwrap_or_else(|| path.clone());
     let kind = if p.is_dir() { "folder" } else { "app" };
     let item = config::PinnedApp {
+        action: None,
         id: format!(
             "cm{}",
             std::time::SystemTime::now()
@@ -1429,7 +1445,17 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
     let mut cfg = config::load();
     cfg.last_profile = name.trim().to_string();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| e.to_string())?;
+    let backup = path.with_extension("bak");
+    let previous = std::fs::read_to_string(&path)
+        .ok()
+        .filter(|value| serde_json::from_str::<Config>(value).is_ok());
+    // A corrupt snapshot must never replace a valid recovery copy.
+    if let Some(previous) = previous {
+        snapshot::write(&backup, &previous)?;
+    } else if !backup.exists() {
+        snapshot::write(&backup, &text)?;
+    }
+    snapshot::write(&path, &text)?;
     config::patch(serde_json::json!({ "lastProfile": cfg.last_profile }))?;
     let _ = app.emit("booki://config-changed", ());
     Ok(())
@@ -1440,10 +1466,56 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
 #[tauri::command]
 fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
     let path = profile_file(&name)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let parse = |file: &std::path::Path| -> Result<Config, String> {
+        let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())
+    };
+    let mut cfg = parse(&path).or_else(|primary_error| {
+        let recovered = parse(&path.with_extension("bak")).map_err(|_| primary_error)?;
+        log::warn!("Recovering profile from its last valid snapshot");
+        Ok::<Config, String>(recovered)
+    })?;
     cfg.last_profile = name.trim().to_string();
-    config::save(&cfg)?;
+    // Apply general preferences as well as the visual layout. A failed OS
+    // operation leaves the previous persisted profile active.
+    let previous = config::load();
+    let previous_autostart = get_autostart();
+    if let Err(error) = hotkeys_apply(
+        &app,
+        &cfg.hotkey,
+        cfg.position_hotkeys,
+        &cfg.hotkey_modifier,
+    ) {
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    if let Err(error) = set_autostart(cfg.autostart) {
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    if let Err(error) = config::save(&cfg) {
+        let _ = set_autostart(previous_autostart);
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    clip_apply_config(&cfg);
+    apply_always_on_top(&app);
+    apply_capture_policy(&app, cfg.capture_visible);
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
     }
@@ -1460,15 +1532,22 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
 #[tauri::command]
 fn profile_delete(name: String) -> Result<(), String> {
     let path = profile_file(&name)?;
-    std::fs::remove_file(path).map_err(|e| e.to_string())
+    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    let backup = path.with_extension("bak");
+    if backup.exists() {
+        std::fs::remove_file(backup).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 // ─────────────────────────── System volume ───────────────────────────
 
 /// Master volume as (percent, muted); None when unavailable.
 #[tauri::command]
-fn volume_info() -> Option<(u32, bool)> {
-    win::volume_get().ok()
+async fn volume_info() -> Option<(u32, bool)> {
+    tauri::async_runtime::spawn_blocking(|| win::volume_get().ok())
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1794,6 +1873,7 @@ fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String>
     let payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"), "os": std::env::consts::OS,
         "architecture": std::env::consts::ARCH, "displays": displays,
+        "configRevision": cfg.revision, "clipboardStorageFailed": CLIP_STORAGE_FAILED.load(Ordering::Relaxed),
         "dock": { "edge": cfg.edge, "autoHideMode": cfg.auto_hide_mode,
             "hideInFullscreen": cfg.hide_in_fullscreen, "notchTrigger": cfg.notch_trigger,
             "iconSize": cfg.icon_size, "overflowMode": cfg.overflow_mode,
@@ -1860,6 +1940,11 @@ fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
 }
 
 /// Clipboard history for the widget flyout (newest first).
+#[tauri::command]
+fn clipboard_storage_failed() -> bool {
+    CLIP_STORAGE_FAILED.load(Ordering::Relaxed)
+}
+
 #[tauri::command]
 fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
     clip_enforce_current_policy();
@@ -2033,27 +2118,37 @@ struct MediaInfo {
 /// What the system media session is playing (async: WinRT calls block briefly).
 #[tauri::command]
 async fn media_info() -> Option<MediaInfo> {
-    win::media_now_playing().map(|m| MediaInfo {
-        title: m.title,
-        artist: m.artist,
-        playing: m.playing,
-        thumb: m.thumb,
+    tauri::async_runtime::spawn_blocking(|| {
+        win::media_now_playing().map(|m| MediaInfo {
+            title: m.title,
+            artist: m.artist,
+            playing: m.playing,
+            thumb: m.thumb,
+        })
     })
+    .await
+    .unwrap_or_default()
 }
 
 #[tauri::command]
 async fn media_toggle() -> bool {
-    win::media_toggle()
+    tauri::async_runtime::spawn_blocking(win::media_toggle)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
 async fn media_next() -> bool {
-    win::media_next()
+    tauri::async_runtime::spawn_blocking(win::media_next)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
 async fn media_prev() -> bool {
-    win::media_prev()
+    tauri::async_runtime::spawn_blocking(win::media_prev)
+        .await
+        .unwrap_or(false)
 }
 
 // async: emptying the Recycle Bin can take a while (many/large files), and a sync
@@ -2067,7 +2162,7 @@ async fn empty_trash() -> Result<(), String> {
     result
 }
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct DirItem {
     name: String,
     path: String,
@@ -2112,17 +2207,52 @@ fn is_dir(path: String) -> bool {
 /// Scan the Windows Start Menu for installed apps (.lnk shortcuts) so the
 /// settings UI can suggest things to pin without browsing the filesystem.
 /// Returns deduped, alphabetically-sorted shortcuts. Empty off-Windows.
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct AppGroup {
     name: String,
     items: Vec<DirItem>,
 }
 
+static CATALOG_GENERATION: AtomicU64 = AtomicU64::new(0);
+type CatalogSnapshot = (u64, std::time::Instant, Vec<AppGroup>);
+static CATALOG_CACHE: Mutex<Option<CatalogSnapshot>> = Mutex::new(None);
+
 #[tauri::command]
-async fn list_installed_apps() -> Vec<AppGroup> {
-    tauri::async_runtime::spawn_blocking(scan_installed_apps)
-        .await
-        .unwrap_or_default()
+async fn list_installed_apps(refresh: Option<bool>) -> Vec<AppGroup> {
+    if refresh.unwrap_or(false) {
+        CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let Ok(mut cache) = CATALOG_CACHE.lock() else {
+            return scan_installed_apps();
+        };
+        let generation = CATALOG_GENERATION.load(Ordering::Relaxed);
+        if let Some((cached_generation, created, groups)) = cache.as_ref() {
+            if *cached_generation == generation
+                && created.elapsed() < std::time::Duration::from_secs(60)
+            {
+                return groups.clone();
+            }
+        }
+        let groups = scan_installed_apps();
+        *cache = Some((generation, std::time::Instant::now(), groups.clone()));
+        groups
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+fn system_events_support() -> serde_json::Value {
+    #[cfg(windows)]
+    {
+        use win::system_events;
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed) })
+    }
+    #[cfg(not(windows))]
+    {
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false })
+    }
 }
 
 fn scan_installed_apps() -> Vec<AppGroup> {
@@ -2674,6 +2804,7 @@ pub fn run() {
             recent_files,
             recent_files_for,
             clipboard_history,
+            clipboard_storage_failed,
             clipboard_count,
             clipboard_summary,
             clipboard_copy,
@@ -2690,11 +2821,22 @@ pub fn run() {
             list_dir,
             is_dir,
             list_installed_apps,
+            system_events_support,
             quit,
             frontend_log,
         ])
         .setup(|app| {
             log::info!("Booki backend started");
+            #[cfg(windows)]
+            {
+                let handle = app.handle().clone();
+                win::system_events::start(std::sync::Arc::new(move |kind| {
+                    if kind == "catalog" {
+                        CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
+                    }
+                    let _ = handle.emit(&format!("booki://{kind}-changed"), ());
+                }));
+            }
             clip_load_from_disk();
             // Cold start from the Explorer context menu ("Add to Booki" while
             // Booki wasn't running): apply the pin args of THIS process before

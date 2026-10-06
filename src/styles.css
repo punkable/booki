@@ -4050,3 +4050,6 @@ body.native-material .dock-tip {
 /* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
 body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.notch-body.smart.smart-focus .notch-pill, body.notch-body.smart.smart-busy .notch-pill { box-shadow: 0 4px 14px #0003; }
+
+.tile .action-icon { display: flex; align-items: center; justify-content: center; width: 82%; height: 82%; pointer-events: none; }
+.tile .action-icon svg { width: 76%; height: 76%; }

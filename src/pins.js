@@ -3,7 +3,66 @@
 
 /** True when a pin can be drop-merged into a group with another pin. */
 export function canMergeKind(kind) {
-  return kind === "app" || kind === "widget" || kind === "folder";
+  return kind === "app" || kind === "widget" || kind === "folder" || kind === "action";
+}
+
+export function findPin(items, id) {
+  for (const item of items || []) {
+    if (item.id === id) return item;
+    const child = findPin(item.children, id);
+    if (child) return child;
+  }
+  return null;
+}
+
+export function updatePin(items, id, patch) {
+  return items.map((item) => item.id === id ? { ...item, ...patch } : item.kind === 'group' ? { ...item, children: updatePin(item.children || [], id, patch) } : item);
+}
+
+export function removePin(items, id) {
+  return normalizeGroups(items.filter((item) => item.id !== id).map((item) => item.kind === 'group' ? { ...item, children: removePin(item.children || [], id) } : item));
+}
+
+/** One committed edit for either adding a candidate or moving a saved pin. */
+export function placePin(items, pin, { beforeId, groupId } = {}) {
+  if (beforeId === pin.id || groupId === pin.id) return items;
+  if (groupId && (pin.kind === 'group' || !canMergeKind(pin.kind))) return items;
+  const destination = groupId && findPin(items, groupId);
+  if (groupId && destination?.kind !== 'group') return items;
+  // Keep the destination intact while removing a child from its own group.
+  const strip = (rows) => rows.filter((item) => item.id !== pin.id).map((item) => item.kind === 'group' ? { ...item, children: strip(item.children || []) } : item);
+  let next = strip(items);
+  if (groupId) next = updatePin(next, groupId, { children: [...(findPin(next, groupId)?.children || []), pin] });
+  else {
+    const at = next.findIndex((item) => item.id === beforeId);
+    next.splice(at < 0 ? next.length : at, 0, pin);
+  }
+  return normalizeGroups(next);
+}
+
+export function settingsPin() {
+  return { id: crypto.randomUUID(), kind: 'action', action: 'settings', name: 'Booki', path: '', args: [] };
+}
+
+export const PIN_DRAG_TYPE = 'application/x-booki-pin';
+export function readPinDrop(dataTransfer) {
+  try {
+    const raw = dataTransfer.getData(PIN_DRAG_TYPE);
+    if (!raw || raw.length > 16384) return null;
+    const item = JSON.parse(raw);
+    const valid = (pin, depth = 0) => {
+      if (!pin || typeof pin.id !== 'string' || !pin.id || pin.id.length > 128 || typeof pin.name !== 'string' || pin.name.length > 1024) return false;
+      if (!['app', 'folder', 'widget', 'action', 'group', 'separator', 'trash'].includes(pin.kind)) return false;
+      if (pin.args !== undefined && (!Array.isArray(pin.args) || pin.args.length > 64 || pin.args.some((arg) => typeof arg !== 'string' || arg.includes('\0')))) return false;
+      if (pin.kind === 'action' && pin.action !== 'settings') return false;
+      if (['app', 'folder'].includes(pin.kind) && (typeof pin.path !== 'string' || !pin.path || pin.path.includes('\0'))) return false;
+      if (pin.kind === 'widget' && (typeof pin.widget !== 'string' || !pin.widget || pin.widget.length > 64)) return false;
+      if (pin.kind === 'group' && (depth > 0 || !Array.isArray(pin.children) || pin.children.length > 100 || !pin.children.every((child) => valid(child, depth + 1)))) return false;
+      return true;
+    };
+    if (!valid(item)) return null;
+    return item;
+  } catch (_) { return null; }
 }
 
 /** Detect pin kind for a filesystem path (dir → folder, else app). */

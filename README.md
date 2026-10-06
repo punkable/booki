@@ -40,11 +40,11 @@
 
 <p align="center">A countdown timer, a task list, a monthly calendar and optional city weather.<br/>Your tasks stay on your PC. Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><img src="docs/presentation/apps-en.jpg" width="1000" alt="Booki app library with most-used suggestions, open apps and all installed apps" /></p>
+<p align="center"><img src="docs/presentation/library-workspace-en.png" width="1000" alt="Booki library with a persistent dock editor, app suggestions and an item inspector" /></p>
 
 <h2 align="center">Find any app. Fast.</h2>
 
-<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
+<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Keep your dock in view while you search. Select an app to inspect it, then add it with + or drag it into a position or group.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
 
 <p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with a live dock preview and behavior scenarios" /></p>
 
@@ -64,7 +64,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. See the <a href="docs/releases/v0.70.2.md">0.70.2 surface and usability fixes</a>.</sub></p>
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. The library screenshot shows the 0.71 workspace. See the <a href="docs/releases/v0.71.0.md">0.71 library, settings and system update</a>.</sub></p>
 
 ## Get started
 
@@ -74,9 +74,19 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-> Download the latest published version using the release badge above. Booki checks the same release channel for updates; existing clients keep their current update interface for the first upgrade to 0.70.
+> Download the latest published version using the release badge above. Booki checks the same release channel for updates; updates preserve the existing installation and configuration.
 
-### New in 0.70
+### New in 0.71
+
+- A persistent dock editor beside the app library: select to inspect, use **+** or drag to add, arrange groups and undo edits.
+- Unified dock behavior settings, curated finishes and a widget gallery with a configuration inspector.
+- Booki context menus with Settings throughout, optional movable Settings pins and internal subfolder navigation.
+- Complete profiles, protected saves and conflict recovery; notes autosave retains failed drafts for retry.
+- Native Windows notifications for media, volume, running windows and app catalog changes, with blocking queries moved off the interface thread.
+
+See the [complete 0.71 release notes](docs/releases/v0.71.0.md).
+
+### Previous 0.70 improvements
 
 - New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
 - Four new widgets: timer, tasks, calendar and optional city weather (Open-Meteo).

@@ -15,10 +15,18 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [stabilityRelease(), overhaulRelease()]; }
-export function currentRelease() {
+export function previousReleases() { return [surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
     { icon: "undo", title: t("surfaces.function"), notes: [t("surfaces.close"), t("surfaces.group"), t("surfaces.library")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.71.0", date: "2026-10-06", headline: t("nextRelease.headline"), sections: [
+    { icon: "search", title: t("nextRelease.library"), notes: [t("nextRelease.editing"), t("nextRelease.discovery")] },
+    { icon: "sparkles", title: t("nextRelease.settings"), notes: [t("nextRelease.widgets"), t("nextRelease.menus")] },
+    { icon: "performance", title: t("nextRelease.system"), notes: [t("nextRelease.events"), t("nextRelease.storage")] },
   ] };
 }

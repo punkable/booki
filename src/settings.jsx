@@ -10,7 +10,6 @@ import {
   dock as dockApi,
   pickAppFile,
   pickFolder,
-  pickImageFile,
   pickSavePath,
   emitConfigChanged,
   onConfigChanged,
@@ -20,9 +19,14 @@ import {
   onCloseRequest,
   logMessage,
 } from "./api.js";
+import { parseConfigConflict } from "./settings/config-conflicts.js";
+import { showBookiMenu } from "./native-context-menu.js";
+import { isTextEditor } from "./dock/context-menu.js";
 import { currentRelease, previousReleases } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
+import { IconPickerModal } from "./settings/icon-picker.jsx";
+import { LibraryWorkspace } from "./settings/library-workspace.jsx";
 import { GroupCreator } from "./settings/group-creator.jsx";
 import { AppLibrary } from "./settings/app-library.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
@@ -106,7 +110,7 @@ import {
   resolveSurfaceStyle,
   applySurfaceVars,
 } from "./surface.js";
-import { canMergeKind, mergePins, mkPin, normalizeGroups as normalizePinned } from "./pins.js";
+import { canMergeKind, mergePins, mkPin, findPin, updatePin, removePin, normalizeGroups as normalizePinned } from "./pins.js";
 import { UpdatesCard } from "./settings/updates.jsx";
 import { updates } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
@@ -168,16 +172,7 @@ function PinName({ value, editing, onEdit, onChange, onDone, className = "", tit
     </button>
   );
 }
-import {
-  ICON_LIBRARY,
-  ICON_STYLES,
-  isLibIcon,
-  parseLibIcon,
-  libToken,
-  libIconDataUri,
-  resolveLibIcon,
-  currentAccentColors,
-} from "./icon-library.js";
+import { isLibIcon, resolveLibIcon } from "./icon-library.js";
 
 window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
 window.addEventListener("unhandledrejection", (e) =>
@@ -233,9 +228,11 @@ function widgetDisplayName(widget) {
 // Scan the Start Menu once per settings session, then reuse — the scan +
 // icon extraction is costly and the Apps panel remounts on every tab switch.
 let _installedApps = null;
+let _installedAt = 0;
 function installedAppsOnce(force = false) {
-  if (force || !_installedApps) {
-    _installedApps = dockApi.listInstalledApps().catch((error) => {
+  if (force || !_installedApps || Date.now() - _installedAt > 60000) {
+    _installedAt = Date.now();
+    _installedApps = dockApi.listInstalledApps(force).catch((error) => {
       _installedApps = null;
       throw error;
     });
@@ -596,6 +593,7 @@ function Appearance({ cfg, set }) {
       <SettingsSection title={t("premium.finishes")} hint={t("premium.finishesHint")}>
         <FinishPicker cfg={cfg} set={flushSurface} />
         <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => flushSurface({ reduceTransparency: v })} />
+        <CollapsibleSection title={t("next.advanced")} defaultOpen={false}>
         {(!solidSurface && !cfg.reduceTransparency) && <Toggle
           checked={cfg.nativeMaterial !== false}
           onChange={(v) => flushSurface({ nativeMaterial: v })}
@@ -620,6 +618,7 @@ function Appearance({ cfg, set }) {
             onChange={(v) => flushSurface({ materialStrength: v })}
           />
         </Row>}
+        </CollapsibleSection>
 
       </SettingsSection>
 
@@ -663,6 +662,7 @@ function DockPage({ cfg, set }) {
   return (
     <>
       <PageHeader title={t("tab.dock")}>{t("gp.dockHint")}</PageHeader>
+      <MiniDockPreview cfg={cfg} />
       <SettingsSection title={t("overhaul.scenarios")} hint={t("overhaul.scenariosHint")}><ScenarioPicker cfg={cfg} set={set} /></SettingsSection>
 
       <SettingsSection title={t("be.position")} hint={t("be.positionHint")}>
@@ -686,7 +686,8 @@ function DockPage({ cfg, set }) {
         </Row>
       </SettingsSection>
 
-      <SettingsSection title={t("gp.interaction")}>
+      <CollapsibleSection title={t("gp.interaction")} defaultOpen={false}>
+      <SettingsSection>
         <Row label={t("overhaul.overflow")}><SegmentedControl value={cfg.overflowMode || "adapt"} onChange={(v) => set({ overflowMode: v })} options={[{ value: "adapt", label: t("overhaul.adapt") }, { value: "scroll", label: t("overhaul.scroll") }]} /></Row>
         <Toggle label={t("be.magnify")} checked={cfg.magnification} onChange={(v) => set({ magnification: v })} />
         {cfg.magnification && (
@@ -732,15 +733,16 @@ function DockPage({ cfg, set }) {
           }}
         />
       </SettingsSection>
+      </CollapsibleSection>
     </>
   );
 }
 
-function AutoHidePage({ cfg, set }) {
+function AutoHidePage({ cfg, set, embedded = false }) {
   const hideOn = cfg.autoHideMode !== "off";
   return (
     <>
-      <PageHeader title={t("tab.autohide")}>{t("be.autoHideHint")}</PageHeader>
+      {!embedded && <PageHeader title={t("tab.autohide")}>{t("be.autoHideHint")}</PageHeader>}
 
       <SettingsSection>
         <Row label={t("be.autoHide")}>
@@ -779,6 +781,7 @@ function AutoHidePage({ cfg, set }) {
         />
       </SettingsSection>
 
+      <CollapsibleSection title={t("gp.taskbar")} defaultOpen={false}>
       <SettingsSection title={t("gp.taskbar")} hint={cfg.taskbarFollow !== false ? t("be.taskbarWindhawkTip") : null}>
         <Toggle
           label={t("be.taskbarFollow")}
@@ -807,16 +810,17 @@ function AutoHidePage({ cfg, set }) {
           </>
         )}
       </SettingsSection>
+      </CollapsibleSection>
     </>
   );
 }
 
-function NotchPage({ cfg, set }) {
+function NotchPage({ cfg, set, embedded = false }) {
   const hideOn = cfg.autoHideMode !== "off";
   const mode = resolveNotchMode(cfg);
   return (
     <>
-      <PageHeader title={t("tab.notch")}>{t("gp.notchHint")}</PageHeader>
+      {!embedded && <PageHeader title={t("tab.notch")}>{t("gp.notchHint")}</PageHeader>}
 
       <SettingsSection
         hint={mode === "floating" ? t("be.notchModeFloatingHint") : mode === "smart" ? t("be.notchModeSmartHint") : t("be.notchModeAttachedHint")}
@@ -856,6 +860,7 @@ function NotchPage({ cfg, set }) {
         </Row>
       </SettingsSection>
 
+      <CollapsibleSection title={t("gp.advancedNotch")} defaultOpen={false}>
       <SettingsSection hint={!hideOn ? t("be.notchNeedsHide") : cfg.notchAlwaysVisible ? t("be.notchClearanceTip") : null}>
         {hideOn && (
           <>
@@ -878,6 +883,7 @@ function NotchPage({ cfg, set }) {
           </>
         )}
       </SettingsSection>
+      </CollapsibleSection>
     </>
   );
 }
@@ -906,60 +912,17 @@ function ShortcutsPage({ cfg, set }) {
 
 // Modal to choose a pin's icon: built-in library (with styles), upload an image,
 // or reset to the app's real icon.
-function IconPickerModal({ item, onPick, onClose }) {
-  useModalControls(onClose);
-  const [style, setStyle] = useState(isLibIcon(item.icon) ? parseLibIcon(item.icon).style : "badge");
-  const colors = currentAccentColors();
-  const upload = async () => {
-    const path = await pickImageFile();
-    if (!path) return;
-    const uri = (await dockApi.imageDataUri(path)) || path;
-    onPick(uri);
-  };
-  return createPortal((
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={t("icon.title")} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <strong>{t("icon.title")}</strong>
-          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
-        </div>
-        <div className="icon-styles">
-          {ICON_STYLES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={"seg-mini" + (style === s ? " active" : "")}
-              onClick={() => setStyle(s)}
-            >
-              {t("icon.style." + s)}
-            </button>
-          ))}
-        </div>
-        <div className="icon-grid">
-          {ICON_LIBRARY.map((name) => (
-            <button
-              key={name}
-              type="button"
-              className="icon-cell"
-              title={name}
-              onClick={() => onPick(libToken(name, style))}
-            >
-              <img src={libIconDataUri(name, style, colors)} alt={name} />
-            </button>
-          ))}
-        </div>
-        <div className="s-actions" style={{ marginTop: 14 }}>
-          <button className="s-btn s-btn-soft" onClick={upload}>{t("icon.upload")}</button>
-          <button className="s-btn s-btn-soft" onClick={() => onPick(null)}>{t("icon.reset")}</button>
-        </div>
-      </div>
-    </div>
-  ), document.body);
-}
-
 function ClipboardSettingsPanel({ cfg, set }) {
+  const [storageFailed, setStorageFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () => dockApi.clipboardStorageFailed().then((failed) => { if (active) setStorageFailed(!!failed); }).catch(() => {});
+    refresh(); window.addEventListener("focus", refresh);
+    return () => { active = false; window.removeEventListener("focus", refresh); };
+  }, [cfg.clipboardPersist]);
   return (
     <div className="clip-policy clip-policy-embedded">
+      {storageFailed && <p role="alert">{t("clip.storageFailed")}</p>}
       <div className="clip-policy-head">
         <span className="clip-policy-icon" dangerouslySetInnerHTML={{ __html: icon("shield") }} />
         <div>
@@ -1015,19 +978,12 @@ function ClipboardSettingsPanel({ cfg, set }) {
 }
 
 // Visually edit a widget's look: variant, accent color, motion and icon.
-function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
-  useModalControls(onClose);
+function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
   const st = item.style || {};
   const variant = st.variant || "glass";
   const meta = WIDGET_META[item.widget] || { emoji: "puzzle", accent, desc: "widget.defaultDesc" };
   const set1 = (patch) => onChange({ ...st, ...patch });
-  return createPortal((
-    <div className="modal-scrim modal-scrim-locked">
-      <div className="modal widget-modal" role="dialog" aria-modal="true" aria-label={t("w.styleTitle")} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <strong>{t("w.styleTitle")}</strong>
-          <button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} />
-        </div>
+  return (
         <div className="widget-modal-body">
         <div className="widget-modal-hero" style={{ "--widget-accent": meta.accent || accent }}>
           <span className="widget-store-ico">
@@ -1095,15 +1051,19 @@ function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
         <Toggle label={t("w.animated")} checked={!!st.animated} onChange={(v) => set1({ animated: v })} />
         <Toggle label={t("w.showIcon")} checked={st.icon !== false} onChange={(v) => set1({ icon: v })} />
         </div>
-        <div className="widget-modal-footer">
-          <button className="s-btn" onClick={onClose}>{t("w.done")}</button>
-        </div>
-      </div>
-    </div>
-  ), document.body);
+  );
 }
 
-function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
+function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
+  useModalControls(onClose);
+  return createPortal(<div className="modal-scrim modal-scrim-locked"><div className="modal widget-modal" role="dialog" aria-modal="true" aria-label={t("w.styleTitle")}>
+    <div className="modal-head"><strong>{t("w.styleTitle")}</strong><button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} /></div>
+    <WidgetStyleFields item={item} accent={accent} cfg={cfg} set={set} onChange={onChange} />
+    <div className="widget-modal-footer"><button className="s-btn" onClick={onClose}>{t("w.done")}</button></div>
+  </div></div>, document.body);
+}
+
+function WidgetStoreCard({ widget, label, refs, onAdd, onEdit, inspect = false, selected = false }) {
   const meta = WIDGET_META[widget] || { emoji: "puzzle", accent: "var(--accent)", desc: "widget.defaultDesc", caps: [] };
   const pinned = refs.length > 0;
   return (
@@ -1122,11 +1082,13 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit }) {
       </div>
       <button
         type="button"
-        className={"s-btn widget-store-btn" + (pinned ? " s-btn-soft" : "")}
+        className={"s-btn widget-store-btn" + (pinned || inspect ? " s-btn-soft" : "")}
+        aria-label={inspect ? `${t("next.inspector")}: ${label}` : undefined}
+        aria-pressed={inspect ? selected : undefined}
         onClick={pinned ? onEdit : onAdd}
       >
-        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned ? "sliders" : "plus") }} />
-        <span>{pinned ? t("widget.edit") : t("widget.add")}</span>
+        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned || inspect ? "sliders" : "plus") }} />
+        <span>{inspect || pinned ? t("widget.edit") : t("widget.add")}</span>
       </button>
     </article>
   );
@@ -1153,7 +1115,39 @@ function bindRafMove(onFrame) {
   return { onMove, detach };
 }
 
-function Apps({ cfg, set, section = "apps", focusedPin }) {
+function WidgetsWorkspace({ cfg, set, focusedPin }) {
+  const [selectedId, selectId] = useState(focusedPin || null);
+  const [draft, setDraft] = useState(null);
+  const saved = findPin(cfg.pinned, selectedId);
+  const selected = saved?.kind === "widget" ? saved : draft;
+  const inspect = (widget) => {
+    const ref = widgetRefs(cfg.pinned, widget)[0];
+    selectId(ref?.id || null);
+    setDraft(ref ? null : { id: crypto.randomUUID(), kind: "widget", widget, name: widgetDisplayName(widget), path: "", args: [], style: {} });
+  };
+  const change = (style) => {
+    if (saved) set({ pinned: updatePin(cfg.pinned, saved.id, { style }) });
+    else setDraft((item) => ({ ...item, style }));
+  };
+  return <>
+    <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
+    <div className="widgets-workspace">
+      <div className="widget-store-grid">{WIDGET_ORDER.map((widget) => <WidgetStoreCard key={widget} widget={widget} label={widgetDisplayName(widget)} refs={widgetRefs(cfg.pinned, widget)} inspect selected={selected?.widget === widget} onAdd={() => inspect(widget)} onEdit={() => inspect(widget)} />)}</div>
+      <aside className="widget-inspector" aria-label={t("next.inspector")}>
+        {selected ? <>
+          <WidgetStyleFields item={selected} accent={cfg.accent} cfg={cfg} set={set} onChange={change} />
+          {saved ? <button className="s-btn s-btn-soft" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button> : <button className="s-btn" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
+        </> : <p className="muted">{t("apps.widgetsHint")}</p>}
+      </aside>
+    </div>
+  </>;
+}
+
+function Apps(props) {
+  return props.section === "apps" ? <LibraryWorkspace {...props} listInstalled={installedAppsOnce} iconPicker={IconPickerModal} /> : props.section === "widgets" ? <WidgetsWorkspace {...props} /> : <LegacyApps {...props} />;
+}
+
+function LegacyApps({ cfg, set, section = "apps", focusedPin }) {
   const [creatingGroup, setCreatingGroup] = useState(false);
   const listRef = useRef(null);
   const gridRef = useRef(null);
@@ -2443,6 +2437,8 @@ function App() {
   const saveTimer = useRef(null);
   const cfgRef = useRef(null);
   const dirtyKeys = useRef(new Set());
+  const dirtyBase = useRef(new Map());
+  const [configConflict, setConfigConflict] = useState(null);
   const savingKeys = useRef(new Set());
   const closing = useRef(false);
   const afterSaveCb = useRef(null);
@@ -2460,6 +2456,8 @@ function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = null;
     const keys = [...dirtyKeys.current];
+    const base = Object.fromEntries(keys.map((key) => [key, dirtyBase.current.get(key)]));
+    for (const key of keys) dirtyBase.current.delete(key);
     dirtyKeys.current.clear();
     savingKeys.current = new Set(keys);
     const cb = afterSaveCb.current;
@@ -2472,7 +2470,7 @@ function App() {
       const patch = {};
       for (const key of keys) if (key in snap) patch[key] = snap[key];
       if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
-      const toSave = await configApi.patch(patch) || { ...snap, ...patch };
+      const toSave = await configApi.patch(patch, { base, expectedRevision: snap.revision }) || { ...snap, ...patch };
       await emitConfigChanged();
       if (!dirtyKeys.current.size) cfgRef.current = toSave;
       setCfg((prev) => {
@@ -2482,10 +2480,13 @@ function App() {
         return { ...prev, ...toSave };
       });
       setSaveState("saved");
+      setConfigConflict(null);
       if (typeof cb === "function") cb(toSave);
-    } catch (_) {
-      // Re-queue failed keys so the next edit (or close) retries.
-      for (const k of keys) dirtyKeys.current.add(k);
+    } catch (error) {
+      const conflict = parseConfigConflict(error);
+      if (conflict) setConfigConflict(conflict);
+      // Preserve the original baseline even if another edit arrived in flight.
+      for (const k of keys) { dirtyKeys.current.add(k); dirtyBase.current.set(k, base[k]); }
       setSaveState("error");
     } finally {
       savingKeys.current.clear();
@@ -2529,7 +2530,7 @@ function App() {
     // Suppress native HTML5 image drag: the pinned-app icons are <img>, and
     // dragging one out of the window let the OS save a stray .png. Our reorder
     // dragging is pointer-event based, so this has no downside.
-    const noDrag = (e) => e.preventDefault();
+    const noDrag = (e) => { if (!e.target.closest('[draggable="true"]')) e.preventDefault(); };
     window.addEventListener("dragstart", noDrag);
     return () => {
       un && un();
@@ -2623,7 +2624,10 @@ function App() {
     if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
     // Record the draft synchronously: a native close can arrive before React
     // renders the edit, and must still wait for those keys to reach disk.
-    for (const k of Object.keys(patch)) dirtyKeys.current.add(k);
+    for (const k of Object.keys(patch)) {
+      if (!dirtyKeys.current.has(k)) dirtyBase.current.set(k, structuredClone(prev?.[k]));
+      dirtyKeys.current.add(k);
+    }
     cfgRef.current = next;
     setCfg(next);
     if (prev && prev.language !== next.language) {
@@ -2648,6 +2652,30 @@ function App() {
     try { await closeSelf({ keepAlive }); }
     catch (_) { setCloseError(true); }
     finally { closing.current = false; }
+  };
+
+  const resolveConfigConflict = async (keepMine) => {
+    if (!configConflict) return;
+    clearTimeout(saveTimer.current);
+    const next = { ...cfgRef.current };
+    for (const key of configConflict.keys) {
+      if (keepMine) dirtyBase.current.set(key, structuredClone(configConflict.current[key]));
+      else {
+        dirtyKeys.current.delete(key);
+        dirtyBase.current.delete(key);
+        next[key] = configConflict.current[key];
+      }
+    }
+    next.revision = configConflict.current.revision;
+    cfgRef.current = next;
+    setCfg(next);
+    applyTheme(next);
+    applySurfaceVars(next);
+    await ensureLang(next.language);
+    setLang(next.language);
+    setConfigConflict(null);
+    setSaveState("idle");
+    await flushSave();
   };
 
   const prepareConfigOperation = async () => { await flushSave(); if (dirtyKeys.current.size) throw new Error("pending settings could not be saved"); };
@@ -2816,11 +2844,12 @@ function App() {
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
+            {configConflict && <div className="settings-close-error" role="alert"><span>{t("workspace.conflict")}</span><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(true)}>{t("workspace.keepMine")}</button><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(false)}>{t("workspace.useOther")}</button></div>}
             {closeError && <div className="settings-close-error" role="alert"><span>{t("workspace.closeFailed")}</span><button className="s-btn s-btn-soft" onClick={async () => { await flushSave(); if (!dirtyKeys.current.size) finishClose(); }}>{t("focus.retry")}</button></div>}
             <SettingsBoundary key={tab} onHome={() => setTab("home")}>
             {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}
-            {tab === "dock" && <><DockPage cfg={cfg} set={set} /><CollapsibleSection title={t("tab.autohide")} defaultOpen={false}><AutoHidePage cfg={cfg} set={set} /></CollapsibleSection><CollapsibleSection title={t("tab.notch")} defaultOpen={false}><NotchPage cfg={cfg} set={set} /></CollapsibleSection></>}
+            {tab === "dock" && <><DockPage cfg={cfg} set={set} /><AutoHidePage cfg={cfg} set={set} embedded /><NotchPage cfg={cfg} set={set} embedded /></>}
             {tab === "autohide" && <AutoHidePage cfg={cfg} set={set} />}
             {tab === "notch" && <NotchPage cfg={cfg} set={set} />}
             {tab === "apps" && <Apps cfg={cfg} set={set} section="apps" focusedPin={focusedPin} />}
@@ -2938,3 +2967,6 @@ if (import.meta.hot) {
     data.settingsRoot = settingsRoot;
   });
 }
+
+// Text fields retain editing commands; Booki surfaces use app actions.
+document.addEventListener("contextmenu", (event) => { if (!isTextEditor(event.target)) showBookiMenu(event); });

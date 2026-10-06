@@ -8,7 +8,10 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
+import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
+import { singleFlight } from "./dock/async-cache.js";
+import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
+import { showBookiMenu } from "./native-context-menu.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
@@ -252,9 +255,11 @@ function paintCard() {
   }
 }
 
+let nativeSupport = {};
+
 // Media is polled only while it can be shown, and slower when nothing plays:
 // the WinRT session query is cheap but not free.
-async function pollMedia() {
+const pollMedia = singleFlight(async () => {
   clearTimeout(mediaTimer);
   if (!canPeek || !inTauri) {
     media = null;
@@ -267,8 +272,10 @@ async function pollMedia() {
     media = null;
   }
   paintMedia();
-  mediaTimer = setTimeout(pollMedia, media && media.playing ? 2500 : 6000);
-}
+  mediaTimer = setTimeout(pollMedia, recoveryInterval(nativeSupport, "media", media && media.playing ? 2500 : 6000));
+});
+
+observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); } }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 420) {
@@ -476,3 +483,6 @@ function tweenNotch(from, to, ms, done) {
 
 // First paint: report an empty/through state until layout settles, then the pill.
 scheduleHitReport();
+
+// Never expose WebView navigation commands over Booki chrome.
+document.addEventListener("contextmenu", showBookiMenu);

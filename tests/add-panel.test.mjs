@@ -56,3 +56,12 @@ test("installed apps are flattened, deduplicated and sorted", () => {
   );
   assert.deepEqual(list.map((c) => c.name), ["atom", "Atom", "Mail", "Zed"]);
 });
+
+test('search accepts reordered terms, initials and a single typing error', () => {
+  assert.equal(matchScore('Visual Studio Code', 'code visual'), 2);
+  assert.equal(matchScore('Visual Studio Code', 'vsc'), 2);
+  assert.equal(matchScore('Calculator', 'calclator'), .5);
+  assert.equal(matchScore('Spotify', 'spotfiy'), .5);
+  assert.equal(matchScore('Calculator', 'ca'), 3);
+  assert.equal(matchScore('Calculator', 'zzzz'), 0);
+});

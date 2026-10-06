@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.70.2"
+version = "0.71.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -49,6 +49,11 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.58"
 features = [
+    "implement",
+    "ApplicationModel",
+    "Win32_UI_Accessibility",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_System_WinRT",
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
@@ -71,6 +76,9 @@ features = [
     "Foundation_Collections",
     "Storage_Streams",
 ]
+
+[target.'cfg(windows)'.dependencies.windows-core]
+version = "0.58"
 
 [profile.release]
 panic = "abort"

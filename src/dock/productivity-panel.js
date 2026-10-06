@@ -49,15 +49,24 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       for (const task of list) {
         const row = document.createElement("div"); row.className = "focus-task";
         const label = document.createElement("label"); const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = !!task.done;
-        checkbox.addEventListener("change", () => update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, done: checkbox.checked } : entry) })));
+        checkbox.setAttribute("aria-label", task.text);
+        checkbox.addEventListener("change", () => { const done = checkbox.checked; update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, done } : entry) })); });
         const text = document.createElement("button"); text.type = "button"; text.className = "task-edit"; text.textContent = task.text; text.setAttribute("aria-label", `${t("apps.rename")}: ${task.text}`);
         text.addEventListener("click", (event) => { event.preventDefault(); const input = document.createElement("input"); input.value = task.text; input.maxLength = 200; input.setAttribute("aria-label", t("apps.rename")); text.replaceWith(input); input.focus(); let done = false; const commit = () => { if (done) return; done = true; if (!input.value.trim()) return draw(); update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, text: input.value.trim() } : entry) })); }; input.addEventListener("blur", commit); input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { done = true; draw(); } }); }); label.append(checkbox, text); row.appendChild(label);
         const remove = button("×", () => update((current) => ({ tasks: (current.tasks || []).filter((entry) => entry.id !== task.id) })), row); remove.setAttribute("aria-label", t("apps.remove")); body.appendChild(row);
       }
       const form = document.createElement("form"); form.className = "focus-actions";
-      const input = document.createElement("input"); input.placeholder = t("focus.newTask"); input.setAttribute("aria-label", t("focus.newTask")); input.maxLength = 200; form.appendChild(input);
+      const input = document.createElement("input"); input.className = "focus-new-task"; input.placeholder = t("focus.newTask"); input.setAttribute("aria-label", t("focus.newTask")); input.maxLength = 200; form.appendChild(input);
       const add = button("+", () => {}, form); add.type = "submit"; add.setAttribute("aria-label", t("focus.newTask"));
-      form.addEventListener("submit", (event) => { event.preventDefault(); if (input.value.trim() && list.length < 100) update((current) => ({ tasks: [...(current.tasks || []), { id: crypto.randomUUID(), text: input.value.trim(), done: false }] })); }); body.appendChild(form);
+      form.addEventListener("submit", (event) => {
+        event.preventDefault(); const text = input.value.trim();
+        if (!text || input.disabled || list.length >= 100) return;
+        input.disabled = true; add.disabled = true;
+        update((current) => ({ tasks: [...(current.tasks || []), { id: crypto.randomUUID(), text, done: false }] })).finally(() => {
+          input.disabled = false; add.disabled = false;
+          if (panel.isConnected) body.querySelector(".focus-new-task")?.focus();
+        });
+      }); body.appendChild(form);
     } else if (item.widget === "calendar") {
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
@@ -65,7 +74,7 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       button(t("premium.previousMonth"), () => { monthOffset--; draw(); }, nav);
       button(t("focus.today"), () => { monthOffset = 0; draw(); }, nav);
       button(t("premium.nextMonth"), () => { monthOffset++; draw(); }, nav);
-      const label = document.createElement("p"); label.textContent = date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }); body.appendChild(label);
+      const label = document.createElement("p"); label.textContent = date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }); label.setAttribute("aria-live", "polite"); body.appendChild(label);
       const grid = document.createElement("div"); grid.className = "focus-calendar";
       for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, i + 1).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
       for (const day of calendarMonth(date)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
@@ -88,6 +97,12 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       }); body.appendChild(results);
     }
   }
+  panel.addEventListener("keydown", (event) => {
+    if (item.widget !== "calendar" || !["PageUp", "PageDown", "Home"].includes(event.key)) return;
+    event.preventDefault();
+    monthOffset = event.key === "Home" ? 0 : monthOffset + (event.key === "PageDown" ? 1 : -1);
+    draw();
+  });
   draw();
   return panel;
 }

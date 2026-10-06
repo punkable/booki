@@ -35,7 +35,7 @@ test("adding apps displays local usage in order and reaches installed apps beyon
   await page.getByRole("button", { name: "Apps & folders", exact: true }).click();
   await page.locator(".app-library-card").first().waitFor();
   assert.deepEqual((await page.locator(".app-library-card > span:nth-child(2)").allTextContents()).slice(0, 2), ["Zed", "Atom"]);
-  await page.locator(".app-library-card").filter({ hasText: "Zed" }).click();
+  await page.getByRole("button", { name: "Add app: Zed", exact: true }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.equal(saved.pinned[0].name, "Zed");
   await page.getByRole("button", { name: "Next", exact: true }).click();

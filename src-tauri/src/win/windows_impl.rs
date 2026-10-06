@@ -1394,6 +1394,24 @@ pub struct MediaSnapshot {
     pub thumb: Option<String>,
 }
 
+// Each query owns only its initialization reference; borrowed apartments remain intact.
+struct MediaRuntime(bool);
+impl MediaRuntime {
+    fn new() -> Self {
+        use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
+        Self(unsafe { RoInitialize(RO_INIT_MULTITHREADED).is_ok() })
+    }
+}
+impl Drop for MediaRuntime {
+    fn drop(&mut self) {
+        if self.0 {
+            unsafe {
+                windows::Win32::System::WinRT::RoUninitialize();
+            }
+        }
+    }
+}
+
 fn media_session() -> Option<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
     use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
     let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
@@ -1404,6 +1422,7 @@ fn media_session() -> Option<windows::Media::Control::GlobalSystemMediaTransport
 }
 
 pub fn media_now_playing() -> Option<MediaSnapshot> {
+    let _runtime = MediaRuntime::new();
     use windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status;
     use windows::Storage::Streams::DataReader;
     let session = media_session()?;
@@ -1455,6 +1474,7 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
 
 /// Toggle play/pause on the current system media session.
 pub fn media_toggle() -> bool {
+    let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TryTogglePlayPauseAsync().ok())
         .and_then(|op| op.get().ok())
@@ -1463,6 +1483,7 @@ pub fn media_toggle() -> bool {
 
 /// Skip to the next track on the current system media session.
 pub fn media_next() -> bool {
+    let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TrySkipNextAsync().ok())
         .and_then(|op| op.get().ok())
@@ -1471,6 +1492,7 @@ pub fn media_next() -> bool {
 
 /// Skip to the previous track on the current system media session.
 pub fn media_prev() -> bool {
+    let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TrySkipPreviousAsync().ok())
         .and_then(|op| op.get().ok())
@@ -1514,11 +1536,25 @@ pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
 
 // ──────────────────────── System volume (Core Audio) ────────────────────────
 
-/// Default render endpoint's volume control. COM may already be initialized on
-/// this thread (the call is harmless then — the error is ignored).
+struct AudioRuntime(bool);
+impl AudioRuntime {
+    fn new() -> Self {
+        Self(unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() })
+    }
+}
+impl Drop for AudioRuntime {
+    fn drop(&mut self) {
+        if self.0 {
+            unsafe {
+                windows::Win32::System::Com::CoUninitialize();
+            }
+        }
+    }
+}
+
+/// Default render endpoint. The caller keeps AudioRuntime alive through the operation.
 fn endpoint_volume() -> Result<IAudioEndpointVolume, String> {
     unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
         let enumerator: IMMDeviceEnumerator =
             CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
         let device = enumerator
@@ -1532,6 +1568,7 @@ fn endpoint_volume() -> Result<IAudioEndpointVolume, String> {
 
 /// Master volume as (percent 0–100, muted).
 pub fn volume_get() -> Result<(u32, bool), String> {
+    let _runtime = AudioRuntime::new();
     unsafe {
         let vol = endpoint_volume()?;
         let level = vol
@@ -1543,6 +1580,7 @@ pub fn volume_get() -> Result<(u32, bool), String> {
 }
 
 pub fn volume_set(pct: u32) -> Result<(), String> {
+    let _runtime = AudioRuntime::new();
     unsafe {
         let vol = endpoint_volume()?;
         vol.SetMasterVolumeLevelScalar(pct.min(100) as f32 / 100.0, std::ptr::null())
@@ -1557,6 +1595,7 @@ pub fn volume_set(pct: u32) -> Result<(), String> {
 
 /// Toggle mute; returns the NEW muted state.
 pub fn volume_mute_toggle() -> Result<bool, String> {
+    let _runtime = AudioRuntime::new();
     unsafe {
         let vol = endpoint_volume()?;
         let muted = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
@@ -1595,5 +1634,40 @@ pub fn cursor_at_edge(edge: &str) -> bool {
             "right" => p.x >= r.right - 2 && in_y,
             _ => p.y >= r.bottom - 2 && in_x,
         }
+    }
+}
+
+#[cfg(test)]
+mod apartment_tests {
+    use super::*;
+    use windows::Win32::System::Com::{CoUninitialize, COINIT_MULTITHREADED};
+
+    #[test]
+    fn scoped_audio_and_media_queries_release_owned_references_and_keep_borrowed_apartments() {
+        std::thread::spawn(|| unsafe {
+            {
+                let _audio = AudioRuntime::new();
+            }
+            assert!(CoInitializeEx(None, COINIT_MULTITHREADED).is_ok());
+            CoUninitialize();
+            {
+                let _media = MediaRuntime::new();
+            }
+            assert!(CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok());
+            CoUninitialize();
+            assert!(CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok());
+            for _ in 0..10 {
+                let _audio = AudioRuntime::new();
+                let _media = MediaRuntime::new();
+            }
+            // The caller's STA must still exist after both borrowed scopes end.
+            assert!(CoInitializeEx(None, COINIT_MULTITHREADED).is_err());
+            CoUninitialize();
+            // No leaked initialization references prevent switching afterward.
+            assert!(CoInitializeEx(None, COINIT_MULTITHREADED).is_ok());
+            CoUninitialize();
+        })
+        .join()
+        .unwrap();
     }
 }

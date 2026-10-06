@@ -371,15 +371,19 @@ export async function onCloseRequest(cb) {
   return current?.onCloseRequested ? current.onCloseRequested(cb) : () => {};
 }
 
+// Each WebView has its own origin. Ignore only its actual echoed events;
+// a time window would also drop concurrent edits from another Booki window.
+const CONFIG_EVENT_ORIGIN = crypto.randomUUID();
+
 /** Broadcast that the config changed so other windows can live-refresh. */
 export async function emitConfigChanged() {
-  if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed");
+  if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed", { origin: CONFIG_EVENT_ORIGIN });
 }
 
 /** Listen for config changes from another window. */
 export async function onConfigChanged(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
-  return T.event.listen("booki://config-changed", () => cb());
+  return T.event.listen("booki://config-changed", (event) => { if (event.payload?.origin !== CONFIG_EVENT_ORIGIN) cb(event.payload); });
 }
 
 /** Subscribe to OS file-drop events (dragging items from the desktop). The
@@ -396,11 +400,16 @@ export async function onFileDrop({ onEnter, onOver, onLeave, onDrop } = {}) {
   return () => unsubs.forEach((u) => u());
 }
 
+let configSnapshot = null;
+const rememberConfig = (value) => { if (value) configSnapshot = structuredClone(value); return value; };
 export const config = {
-  get: () => invoke("get_config"),
-  save: (config) => invoke("save_config", { config }),
-  patch: (patch) => invoke("save_config", { patch }),
-  reset: () => invoke("reset_config"),
+  get: () => invoke("get_config").then(rememberConfig),
+  save: (config) => invoke("save_config", { config }).then(rememberConfig),
+  patch: (patch, options = {}) => {
+    const base = options.base || (configSnapshot && Object.fromEntries(Object.keys(patch).map((key) => [key, configSnapshot[key]])));
+    return invoke("save_config", { patch, base, expectedRevision: options.expectedRevision ?? configSnapshot?.revision }).then(rememberConfig);
+  },
+  reset: () => invoke("reset_config").then(rememberConfig),
 };
 
 const icons = createAsyncCache((path) => invoke("app_icon", { path }));
@@ -445,6 +454,7 @@ export const dock = {
   // copy-back/edit (bumps to front), delete one, clear all.
   clipboardCount: () => invoke("clipboard_count"),
   clipboardSummary: () => invoke("clipboard_summary"),
+  clipboardStorageFailed: () => invoke("clipboard_storage_failed"),
   clipboardHistory: (limit = 60) => invoke("clipboard_history", { limit }),
   clipboardCopy: (text) => invoke("clipboard_copy", { text }),
   clipboardDelete: (id) => invoke("clipboard_delete", { id }),
@@ -530,7 +540,12 @@ export const dock = {
   listDir: (path, offset = 0, limit = 80) => invoke("list_dir", { path, offset, limit }),
   relocateShortcut: (id, toDesktop) => invoke("relocate_shortcut", { id, toDesktop }),
   isDir: (path) => invoke("is_dir", { path }),
-  listInstalledApps: () => invoke("list_installed_apps"),
+  listInstalledApps: (refresh = false) => invoke("list_installed_apps", { refresh }),
+  systemEventsSupport: () => invoke("system_events_support"),
+  onSystemChange: (kind, callback) => {
+    if (!(T && T.event && T.event.listen)) return Promise.resolve(() => {});
+    return T.event.listen(`booki://${kind}-changed`, callback);
+  },
   frequentApps: (limit = 12) => invoke("frequent_apps", { limit }),
 };
 

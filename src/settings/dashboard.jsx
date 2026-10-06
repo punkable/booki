@@ -38,7 +38,7 @@ export function Dashboard({ cfg, set, navigate, version, onProfile, listProfiles
     </section>
     <div className="dashboard-actions">
       {[["apps", "plus", "premium.addApps"], ["widgets", "zap", "overhaul.addWidget"], ["profiles", "copy", "tab.profiles"]].map(([tab, glyph, label]) =>
-        <button className="dashboard-action" key={tab} onClick={() => navigate(tab)}><span dangerouslySetInnerHTML={{ __html: icon(glyph) }} /><strong>{t(label)}</strong><span aria-hidden="true">↗</span></button>)}
+        <button className="dashboard-action" key={tab} onClick={() => navigate(tab)}><span dangerouslySetInnerHTML={{ __html: icon(glyph) }} /><strong>{t(label)}</strong><span aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("chevron-right") }} /></button>)}
     </div>
     <SettingsSection title={t("overhaul.scenarios")} hint={t("overhaul.scenariosHint")}><ScenarioPicker cfg={cfg} set={set} /></SettingsSection>
     <div className="dashboard-tip"><span dangerouslySetInnerHTML={{ __html: icon("info") }} /><p>{t("overhaul.tip")}</p>
