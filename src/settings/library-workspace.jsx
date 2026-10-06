@@ -1,5 +1,15 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { t } from '../i18n.js';
+import { widgetDisplayName } from '../widgets-meta.js';
+
+function pinLabel(item) {
+  if (item.name && !(item.kind === 'action' && item.name === 'Booki')) return item.name;
+  if (item.kind === 'action') return t('m.settings');
+  if (item.kind === 'widget') return widgetDisplayName(item.widget, t);
+  if (item.kind === 'group') return t('group.new');
+  return item.kind === 'separator' ? t('m.separator') : item.path?.split(/[\\/]/).pop() || t('workspace.addApp');
+}
+
 import { pickAppFile, pickFolder } from '../api.js';
 import { findPin, updatePin, removePin, placePin, mkPin, settingsPin, PIN_DRAG_TYPE, readPinDrop, canMergeKind } from '../pins.js';
 import { appKey, pinnedKeys } from '../dock/app-candidates.js';
@@ -78,7 +88,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
       <div className="library-pin-strip">{cfg.pinned.map((item) => <div key={item.id} className={'library-pin' + (selectedId === item.id ? ' selected' : '')}
         draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item)); }}
         onDragOver={dragOver} onDrop={(event) => drop(event, { beforeId: item.id })}>
-        <button type="button" aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><Icon name={item.kind === 'group' ? 'folder' : item.kind === 'widget' ? 'sparkles' : item.kind === 'action' ? 'settings' : 'app'} />{item.kind === 'action' ? t('m.settings') : item.name || t('m.separator')}</button>
+        <button type="button" aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><Icon name={item.kind === 'group' ? 'folder' : item.kind === 'widget' ? 'sparkles' : item.kind === 'action' ? 'settings' : 'app'} />{pinLabel(item)}</button>
         {canMergeKind(item.kind) && <input type="checkbox" aria-label={`${t('premium.selectApp')}: ${item.name}`} checked={chosenIds.includes(item.id)} onChange={(event) => chooseIds((ids) => event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id))} />}
         {item.kind === 'group' && <button className="library-group-drop" onDragOver={dragOver} onDrop={(event) => drop(event, { groupId: item.id })} onClick={() => { inspect(item); setTargetGroup(item.id); }}>{t('apps.addToFolder')}</button>}
       </div>)}</div>
@@ -101,13 +111,13 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
       </div>
       <aside className="library-inspector" aria-label={t('next.inspector')}>
         {selected ? <>
-          <h2>{selected.kind === 'action' ? t('m.settings') : selected.name}</h2>
+          <h2>{pinLabel(selected)}</h2>
           {candidate ? <><p className="muted">{selected.path}</p><button className="s-btn" disabled={!!candidatePinned} onClick={() => add([candidate])}><Icon name="plus" />{t('workspace.addApp')}</button></> : <>
             <label>{t('apps.rename')}<input value={selected.name || ''} onChange={(event) => set({ pinned: updatePin(latest.current.pinned, selected.id, { name: event.target.value }) })} /></label>
             {selected.kind !== 'separator' && selected.kind !== 'widget' && <button className="s-btn s-btn-soft" onClick={() => pickIcon(selected)}><Icon name="palette" />{t('apps.changeIcon')}</button>}
             {selected.path && <p className="muted">{selected.path}</p>}
             {selected.kind === 'group' && <div className="library-group-members">{(selected.children || []).map((child) => <div key={child.id} draggable onDragStart={(event) => event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(child))}>
-              <button className="s-btn s-btn-soft" onClick={() => inspect(child)}>{child.name || t('m.settings')}</button>
+              <button className="s-btn s-btn-soft" onClick={() => inspect(child)}>{pinLabel(child)}</button>
               <button className="pin-btn" aria-label={`${t('group.takeOut')}: ${child.name}`} onClick={() => commit(placePin(latest.current.pinned, child))}><Icon name="take-out" /></button>
             </div>)}</div>}
             <button className="s-btn s-btn-soft" onClick={() => { commit(removePin(latest.current.pinned, selected.id)); selectId(null); }}><Icon name="trash" />{t('apps.remove')}</button>

@@ -532,9 +532,16 @@ function fitDock() {
 
 function actionTile(item) {
   const el = document.createElement("button"); el.className = "tile action-tile";
-  el.dataset.id = item.id; el.title = t("m.settings"); el.setAttribute("aria-label", t("m.settings"));
-  el.style.setProperty("--size", `${baseSize()}px`); el.innerHTML = `<span class="badge">${icon("settings")}</span>`;
-  el.addEventListener("click", () => launch(el, item)); el.addEventListener("contextmenu", (e) => openMenu(e, item));
+  const label = item.name && item.name !== "Booki" ? item.name : t("m.settings");
+  el.dataset.id = item.id; el.title = label; el.setAttribute("aria-label", label);
+  el.style.setProperty("--size", `${baseSize()}px`);
+  const fallback = () => { const glyph = document.createElement("span"); glyph.className = "action-icon"; glyph.innerHTML = icon("settings"); el.appendChild(glyph); };
+  if (item.icon) {
+    const img = document.createElement("img"); img.alt = "";
+    img.addEventListener("error", () => { img.remove(); fallback(); }, { once: true });
+    img.src = isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon; el.appendChild(img);
+  } else fallback();
+  el.addEventListener("contextmenu", (e) => openMenu(e, item));
   const rm = document.createElement("span"); rm.className = "rm"; rm.innerHTML = icon("x"); rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
   rm.addEventListener("click", (e) => { e.stopPropagation(); removeItem(item.id); }); el.appendChild(rm);

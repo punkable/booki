@@ -182,3 +182,16 @@ test('a failed dock removal restores the pin and retains a retry instead of offe
   await page.locator('.tile[data-id="editor"]').waitFor({ state: 'detached' });
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('optional Settings pin opens once per pointer or keyboard activation and uses a centered icon', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [{ id: 'settings', kind: 'action', action: 'settings', name: 'Preferences', path: '', args: [] }] }) });
+  await page.evaluate(() => { window.settingsOpens = 0; const invoke = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (command, args) => { if (command === 'open_settings') window.settingsOpens++; return invoke(command, args); }; });
+  const tile = page.getByRole('button', { name: 'Preferences', exact: true });
+  assert.equal(await tile.locator('.action-icon').count(), 1);
+  assert.equal(await tile.locator('.badge').count(), 0);
+  await tile.click();
+  assert.equal(await page.evaluate(() => window.settingsOpens), 1);
+  await tile.focus(); await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => window.settingsOpens), 2);
+  assert.deepEqual(errors, []); await page.close();
+});

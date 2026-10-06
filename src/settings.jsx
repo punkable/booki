@@ -1082,13 +1082,13 @@ function WidgetStoreCard({ widget, label, refs, onAdd, onEdit, inspect = false, 
       </div>
       <button
         type="button"
-        className={"s-btn widget-store-btn" + (pinned ? " s-btn-soft" : "")}
+        className={"s-btn widget-store-btn" + (pinned || inspect ? " s-btn-soft" : "")}
         aria-label={inspect ? `${t("next.inspector")}: ${label}` : undefined}
         aria-pressed={inspect ? selected : undefined}
         onClick={pinned ? onEdit : onAdd}
       >
-        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned ? "sliders" : "plus") }} />
-        <span>{inspect ? t("next.inspector") : pinned ? t("widget.edit") : t("widget.add")}</span>
+        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned || inspect ? "sliders" : "plus") }} />
+        <span>{inspect || pinned ? t("widget.edit") : t("widget.add")}</span>
       </button>
     </article>
   );
@@ -1130,14 +1130,14 @@ function WidgetsWorkspace({ cfg, set, focusedPin }) {
     else setDraft((item) => ({ ...item, style }));
   };
   return <>
-    <PageHeader title={t("tab.widgets")}>{t("next.inspectEmpty")}</PageHeader>
+    <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
     <div className="widgets-workspace">
       <div className="widget-store-grid">{WIDGET_ORDER.map((widget) => <WidgetStoreCard key={widget} widget={widget} label={widgetDisplayName(widget)} refs={widgetRefs(cfg.pinned, widget)} inspect selected={selected?.widget === widget} onAdd={() => inspect(widget)} onEdit={() => inspect(widget)} />)}</div>
       <aside className="widget-inspector" aria-label={t("next.inspector")}>
         {selected ? <>
           <WidgetStyleFields item={selected} accent={cfg.accent} cfg={cfg} set={set} onChange={change} />
           {saved ? <button className="s-btn s-btn-soft" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button> : <button className="s-btn" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
-        </> : <p className="muted">{t("next.inspectEmpty")}</p>}
+        </> : <p className="muted">{t("apps.widgetsHint")}</p>}
       </aside>
     </div>
   </>;
