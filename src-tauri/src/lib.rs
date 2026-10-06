@@ -540,8 +540,10 @@ async fn app_identities(paths: Vec<String>) -> std::collections::HashMap<String,
 }
 
 #[tauri::command]
-fn list_windows() -> Vec<win::WindowInfo> {
-    win::list_windows()
+async fn list_windows() -> Vec<win::WindowInfo> {
+    tauri::async_runtime::spawn_blocking(win::list_windows)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -942,7 +944,13 @@ struct SystemStats {
 /// deltas are measured between calls (the dock polls this every couple seconds,
 /// and only while it's visible — so idle cost stays near zero).
 #[tauri::command]
-fn system_stats() -> SystemStats {
+async fn system_stats() -> Result<SystemStats, String> {
+    tauri::async_runtime::spawn_blocking(collect_system_stats)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn collect_system_stats() -> SystemStats {
     let mut guard = SYS.lock().unwrap();
     let sys = guard.get_or_insert_with(sysinfo::System::new);
     sys.refresh_cpu_usage();
@@ -1536,8 +1544,10 @@ fn profile_delete(name: String) -> Result<(), String> {
 
 /// Master volume as (percent, muted); None when unavailable.
 #[tauri::command]
-fn volume_info() -> Option<(u32, bool)> {
-    win::volume_get().ok()
+async fn volume_info() -> Option<(u32, bool)> {
+    tauri::async_runtime::spawn_blocking(|| win::volume_get().ok())
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -2108,27 +2118,37 @@ struct MediaInfo {
 /// What the system media session is playing (async: WinRT calls block briefly).
 #[tauri::command]
 async fn media_info() -> Option<MediaInfo> {
-    win::media_now_playing().map(|m| MediaInfo {
-        title: m.title,
-        artist: m.artist,
-        playing: m.playing,
-        thumb: m.thumb,
+    tauri::async_runtime::spawn_blocking(|| {
+        win::media_now_playing().map(|m| MediaInfo {
+            title: m.title,
+            artist: m.artist,
+            playing: m.playing,
+            thumb: m.thumb,
+        })
     })
+    .await
+    .unwrap_or_default()
 }
 
 #[tauri::command]
 async fn media_toggle() -> bool {
-    win::media_toggle()
+    tauri::async_runtime::spawn_blocking(win::media_toggle)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
 async fn media_next() -> bool {
-    win::media_next()
+    tauri::async_runtime::spawn_blocking(win::media_next)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
 async fn media_prev() -> bool {
-    win::media_prev()
+    tauri::async_runtime::spawn_blocking(win::media_prev)
+        .await
+        .unwrap_or(false)
 }
 
 // async: emptying the Recycle Bin can take a while (many/large files), and a sync
