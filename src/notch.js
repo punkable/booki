@@ -9,6 +9,7 @@
    ignore_cursor_events — same contract as the dock stage. */
 
 import { config as configApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
+import { showBookiMenu } from "./native-context-menu.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
@@ -476,3 +477,6 @@ function tweenNotch(from, to, ms, done) {
 
 // First paint: report an empty/through state until layout settles, then the pill.
 scheduleHitReport();
+
+// Never expose WebView navigation commands over Booki chrome.
+document.addEventListener("contextmenu", showBookiMenu);

@@ -371,15 +371,19 @@ export async function onCloseRequest(cb) {
   return current?.onCloseRequested ? current.onCloseRequested(cb) : () => {};
 }
 
+// Each WebView has its own origin. Ignore only its actual echoed events;
+// a time window would also drop concurrent edits from another Booki window.
+const CONFIG_EVENT_ORIGIN = crypto.randomUUID();
+
 /** Broadcast that the config changed so other windows can live-refresh. */
 export async function emitConfigChanged() {
-  if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed");
+  if (T && T.event && T.event.emit) await T.event.emit("booki://config-changed", { origin: CONFIG_EVENT_ORIGIN });
 }
 
 /** Listen for config changes from another window. */
 export async function onConfigChanged(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
-  return T.event.listen("booki://config-changed", () => cb());
+  return T.event.listen("booki://config-changed", (event) => { if (event.payload?.origin !== CONFIG_EVENT_ORIGIN) cb(event.payload); });
 }
 
 /** Subscribe to OS file-drop events (dragging items from the desktop). The

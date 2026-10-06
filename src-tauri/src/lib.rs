@@ -6,6 +6,7 @@
 mod apps;
 mod config;
 mod shortcuts;
+mod snapshot;
 mod surface_geometry;
 mod update_backup;
 mod usage;
@@ -1253,6 +1254,7 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
         .unwrap_or_else(|| path.clone());
     let kind = if p.is_dir() { "folder" } else { "app" };
     let item = config::PinnedApp {
+        action: None,
         id: format!(
             "cm{}",
             std::time::SystemTime::now()
@@ -1429,7 +1431,17 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
     let mut cfg = config::load();
     cfg.last_profile = name.trim().to_string();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(path, text).map_err(|e| e.to_string())?;
+    let backup = path.with_extension("bak");
+    let previous = std::fs::read_to_string(&path)
+        .ok()
+        .filter(|value| serde_json::from_str::<Config>(value).is_ok());
+    // A corrupt snapshot must never replace a valid recovery copy.
+    if let Some(previous) = previous {
+        snapshot::write(&backup, &previous)?;
+    } else if !backup.exists() {
+        snapshot::write(&backup, &text)?;
+    }
+    snapshot::write(&path, &text)?;
     config::patch(serde_json::json!({ "lastProfile": cfg.last_profile }))?;
     let _ = app.emit("booki://config-changed", ());
     Ok(())
@@ -1440,10 +1452,56 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
 #[tauri::command]
 fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
     let path = profile_file(&name)?;
-    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let parse = |file: &std::path::Path| -> Result<Config, String> {
+        let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
+        serde_json::from_str(&text).map_err(|e| e.to_string())
+    };
+    let mut cfg = parse(&path).or_else(|primary_error| {
+        let recovered = parse(&path.with_extension("bak")).map_err(|_| primary_error)?;
+        log::warn!("Recovering profile from its last valid snapshot");
+        Ok::<Config, String>(recovered)
+    })?;
     cfg.last_profile = name.trim().to_string();
-    config::save(&cfg)?;
+    // Apply general preferences as well as the visual layout. A failed OS
+    // operation leaves the previous persisted profile active.
+    let previous = config::load();
+    let previous_autostart = get_autostart();
+    if let Err(error) = hotkeys_apply(
+        &app,
+        &cfg.hotkey,
+        cfg.position_hotkeys,
+        &cfg.hotkey_modifier,
+    ) {
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    if let Err(error) = set_autostart(cfg.autostart) {
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    if let Err(error) = config::save(&cfg) {
+        let _ = set_autostart(previous_autostart);
+        let _ = hotkeys_apply(
+            &app,
+            &previous.hotkey,
+            previous.position_hotkeys,
+            &previous.hotkey_modifier,
+        );
+        return Err(error);
+    }
+    clip_apply_config(&cfg);
+    apply_always_on_top(&app);
+    apply_capture_policy(&app, cfg.capture_visible);
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
     }
@@ -1460,7 +1518,12 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
 #[tauri::command]
 fn profile_delete(name: String) -> Result<(), String> {
     let path = profile_file(&name)?;
-    std::fs::remove_file(path).map_err(|e| e.to_string())
+    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    let backup = path.with_extension("bak");
+    if backup.exists() {
+        std::fs::remove_file(backup).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 // ─────────────────────────── System volume ───────────────────────────

@@ -9,7 +9,7 @@ export const iconPlus = () => S(`<path d="M12 5v14M5 12h14"/>`);
 export const iconTrash = () =>
   S(`<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`);
 export const iconSettings = () =>
-  S(`<circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>`);
+  S(`<circle cx="12" cy="12" r="3"/><path d="m9.5 3-.6 2.4-2.2 1.3-2.4-.7-2.5 4.3 1.8 1.7v2.6l-1.8 1.7 2.5 4.3 2.4-.7 2.2 1.3.6 2.4h5l.6-2.4 2.2-1.3 2.4.7 2.5-4.3-1.8-1.7v-2.6l1.8-1.7L19.7 6l-2.4.7-2.2-1.3L14.5 3Z"/>`);
 export const iconX = () => S(`<path d="M18 6 6 18M6 6l12 12"/>`);
 export const iconGrid = () =>
   S(`<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>`);
@@ -101,6 +101,7 @@ const iconMap = {
   plus: iconPlus,
   trash: iconTrash,
   settings: iconSettings,
+  undo: () => S(`<path d="M9 4 4 9l5 5"/><path d="M4 9h9a7 7 0 0 1 0 14"/>`),
   x: iconX,
   grid: iconGrid,
   list: iconList,

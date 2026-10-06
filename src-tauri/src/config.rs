@@ -40,6 +40,9 @@ pub struct PinnedApp {
     /// "app" | "separator" | "folder" | "group" | "widget".
     #[serde(default = "default_kind")]
     pub kind: String,
+    /// Built-in Booki command, never an executable path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
     /// For kind == "widget": which widget ("clock" | "cpu" | "ram" | "net").
     #[serde(default)]
     pub widget: Option<String>,
@@ -752,7 +755,9 @@ fn save_locked(config: &Config) -> Result<(), String> {
     }
     // Keep a redundant last-good copy so a later corruption of config.json can be
     // healed on the next load without losing the user's setup. Best-effort.
-    let _ = fs::copy(&final_path, backup_path());
+    if let Err(error) = crate::snapshot::write(&backup_path(), &text) {
+        log::warn!("Configuration saved; recovery snapshot could not be refreshed: {error}");
+    }
     Ok(())
 }
 

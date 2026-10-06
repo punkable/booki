@@ -65,6 +65,8 @@ import {
 } from "./dock/widget-view.js";
 import { applySurfaceVars, dockRadius, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
+import { createFolderNavigation } from "./dock/folder-navigation.js";
+import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
 
@@ -127,15 +129,8 @@ async function undoLastRemoval() {
   await render();
   reframe();
 }
-// Tauri's event.emit echoes back to the sender. When the DOCK changes config it
-// already has the new state, so it must ignore its own echoed config-changed
-// event (otherwise: redundant reloadConfig → re-render → reframe = flicker). We
-// mark a short window after any self-emit during which echoes are ignored.
-let selfChangeUntil = 0;
-function emitConfigChanged() {
-  selfChangeUntil = Date.now() + 400;
-  return emitConfigChangedRaw();
-}
+// The shared bridge filters this WebView's own echo by origin.
+function emitConfigChanged() { return emitConfigChangedRaw(); }
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
 const isVertical = () => cfg.edge === "left" || cfg.edge === "right";
@@ -164,12 +159,7 @@ async function boot() {
     document.body.classList.remove("booting");
     document.body.classList.add("boot-animate");
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
-    // Only react to config changes made by OTHER windows (Settings). Tauri's
-    // emit echoes back to the sender, so without this guard every dock reorder /
-    // removal / grouping would trigger a redundant reloadConfig → re-render →
-    // reframe (visible flicker + the window grow/shrink churn). selfChangeUntil
-    // is bumped whenever the dock itself emits.
-    onConfigChanged(() => { if (Date.now() < selfChangeUntil) return; reloadConfig(); });
+    onConfigChanged(() => reloadConfig());
     onOcclusion(onOcclusionSignal);
     onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
@@ -423,6 +413,7 @@ async function render() {
       if (item.kind === "group") return groupTile(item);
       if (item.kind === "widget") return widgetTile(item);
       if (item.kind === "trash") return trashTile(item);
+      if (item.kind === "action") return actionTile(item);
       return appTile(item);
     })
   );
@@ -498,6 +489,17 @@ function fitDock() {
   dockEl.style.maxWidth = overflow && !vertical ? `${usable}px` : "";
   dockEl.style.maxHeight = overflow && vertical ? `${usable}px` : "";
   invalidateMag(); // tile sizes/positions just changed → re-measure lazily
+}
+
+function actionTile(item) {
+  const el = document.createElement("button"); el.className = "tile action-tile";
+  el.dataset.id = item.id; el.title = t("m.settings"); el.setAttribute("aria-label", t("m.settings"));
+  el.style.setProperty("--size", `${baseSize()}px`); el.innerHTML = `<span class="badge">${icon("settings")}</span>`;
+  el.addEventListener("click", () => launch(el, item)); el.addEventListener("contextmenu", (e) => openMenu(e, item));
+  const rm = document.createElement("span"); rm.className = "rm"; rm.innerHTML = icon("x"); rm.title = t("apps.remove");
+  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
+  rm.addEventListener("click", (e) => { e.stopPropagation(); removeItem(item.id); }); el.appendChild(rm);
+  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item)); return el;
 }
 
 function appTile(item) {
@@ -1170,6 +1172,7 @@ function editNote(item) {
 // ─────────────────────────── Launch ───────────────────────────
 
 function launch(el, item) {
+  if (item.kind === "action") { if (item.action === "settings") dockApi.openSettings(); return; }
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
   if (item.kind === "widget") {
@@ -2381,11 +2384,13 @@ function menuPinTitle(item) {
   if (item.kind === "separator") return t("m.separator");
   if (item.kind === "trash") return t("trash.name");
   if (item.kind === "widget") return widgetLabel(item.widget);
+  if (item.kind === "action" && item.name === "Booki") return t("m.settings");
   return item.name || baseName(item.path || "") || t("m.pin");
 }
 
 function menuKindLabel(item) {
   if (!item) return t("m.system");
+  if (item.kind === "action") return t("m.settings");
   if (item.kind === "widget") return t("m.widgets");
   if (item.kind === "folder") return t("m.folder");
   if (item.kind === "group") return t("m.group");
@@ -2401,35 +2406,12 @@ function addMenuHead(title, subtitle) {
   ctxMenu.appendChild(head);
 }
 
-function addMenuLabel(text) {
-  const label = document.createElement("div");
-  label.className = "menu-label";
-  label.textContent = text;
-  ctxMenu.appendChild(label);
-}
-
 function openMenu(e, item) {
   e.preventDefault();
   e.stopPropagation();
   ctxMenu.innerHTML = "";
-  const add = (iconName, text, fn, tone = "") => {
-    const b = document.createElement("button");
-    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
-    // ARIA, and a screen reader announces "button" with no sense of the list.
-    b.setAttribute("role", "menuitem");
-    if (tone) b.classList.add(tone);
-    b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
-    b.addEventListener("click", async () => {
-      closeMenu();
-      await fn();
-    });
-    ctxMenu.appendChild(b);
-  };
-  const sep = () => {
-    const s = document.createElement("div");
-    s.className = "sep";
-    ctxMenu.appendChild(s);
-  };
+  const { add, sep } = menuActions(ctxMenu, closeMenu);
+  const generation = ++menuGeneration;
   addMenuHead(menuPinTitle(item), menuKindLabel(item));
 
   // Like the macOS dock: an app's open windows come first (the likeliest
@@ -2444,6 +2426,7 @@ function openMenu(e, item) {
     sep();
   }
 
+  if (item.kind === "action") add("settings", t("m.open"), () => dockApi.openSettings());
   if (item.kind === "app") {
     if (wins.length) add("plus", t("m.newWindow"), () => dockApi.launch(item.path, item.args || []));
     else add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
@@ -2498,6 +2481,8 @@ function openMenu(e, item) {
   add("plus", t("add.open"), () => openAddPanel(dockEl));
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
   sep();
+  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
+  sep();
   add(
     "trash",
     t("m.remove"),
@@ -2509,7 +2494,7 @@ function openMenu(e, item) {
   );
 
   placeMenu(e);
-  if (recentsSlot) fillRecentFiles(recentsSlot, e, item);
+  if (recentsSlot) fillRecentFiles(recentsSlot, e, item, generation);
 }
 
 /** Two-step confirm before deleting a whole group (children would go with it). */
@@ -2547,14 +2532,14 @@ function confirmRemoveGroup(item) {
 // Recent files for THIS app only (matched by file association in the backend)
 // dropped into the pin's context menu. Runs after the menu is already on
 // screen; re-places it once the items are in. Nothing relevant -> no section.
-async function fillRecentFiles(slot, e, item) {
+async function fillRecentFiles(slot, e, item, generation) {
   let recents = [];
   try {
     recents = await dockApi.recentFilesFor(item.path, 6);
   } catch (_) {
     return;
   }
-  if (!recents || !recents.length || !slot.isConnected) return;
+  if (!recents?.length || !slot.isConnected || generation !== menuGeneration || ctxMenu.classList.contains("hidden")) return;
   const head = document.createElement("div");
   head.className = "menu-label";
   head.textContent = t("m.recent");
@@ -2563,6 +2548,8 @@ async function fillRecentFiles(slot, e, item) {
     const b = document.createElement("button");
     b.innerHTML = `${icon("external")}<span>${esc(r.name)}</span>`;
     b.title = r.name;
+    b.setAttribute("role", "menuitem");
+    b.tabIndex = -1;
     b.addEventListener("click", async () => {
       closeMenu();
       await dockApi.launch(r.path, []);
@@ -2572,75 +2559,62 @@ async function fillRecentFiles(slot, e, item) {
   const s = document.createElement("div");
   s.className = "sep";
   slot.appendChild(s);
-  placeMenu(e); // re-measure now that the menu is taller
+  placeMenu(e, false); // preserve keyboard selection while recents arrive
 }
 
 // Right-click on empty dock area / hint → add + profiles + settings.
-async function openBackgroundMenu(e) {
+function openBackgroundMenu(e) {
   e.preventDefault();
   e.stopPropagation();
-  ctxMenu.innerHTML = "";
-  const add = (iconName, text, fn, tone = "") => {
-    const b = document.createElement("button");
-    // #ctx-menu is role="menu"; a menu whose children have no role is invalid
-    // ARIA, and a screen reader announces "button" with no sense of the list.
-    b.setAttribute("role", "menuitem");
-    if (tone) b.classList.add(tone);
-    b.innerHTML = `${icon(iconName)}<span>${esc(text)}</span>`;
-    b.addEventListener("click", async () => {
-      closeMenu();
-      await fn();
-    });
-    ctxMenu.appendChild(b);
-  };
-  const sep = () => {
-    const s = document.createElement("div");
-    s.className = "sep";
-    ctxMenu.appendChild(s);
-  };
+  const generation = ++menuGeneration;
+  ctxMenu.replaceChildren();
+  const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead("Booki", t("m.dockMenu"));
-  addMenuLabel(t("m.add"));
-  // Apps, folders, files and widgets all live in the add panel now.
   add("plus", t("add.open"), () => openAddPanel(dockEl));
-  const hiddenWidgets = [...dockEl.querySelectorAll(".conditionally-hidden")];
-  if (hiddenWidgets.length) {
-    sep(); addMenuLabel(t("overhaul.hiddenWidgets"));
-    for (const el of hiddenWidgets) {
-      const item = findWidgetPin(el.dataset.id);
-      if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; await persist(); await render(); reframe(); });
-    }
-  }
-  // Saved profiles → one-click switch, right from the dock. The active one
-  // (last applied/saved) is marked with a check.
-  const profiles = await dockApi.profileList().catch(() => []);
-  if (Array.isArray(profiles) && profiles.length) {
-    sep();
-    addMenuLabel(t("m.profiles"));
-    for (const name of profiles.slice(0, 6)) {
-      const active = name === (cfg.lastProfile || "");
-      add(active ? "check" : "sparkles", name, async () => {
-        const fresh = await dockApi.profileApply(name).catch(() => null);
-        if (fresh) {
-          cfg = fresh;
-          await ensureLang(cfg.language);
-          maybeSyncCtxMenu();
-          applyAll();
-          await render();
-          reframe();
-        }
-      });
-    }
-  }
+  const profilesSlot = document.createElement("div");
+  ctxMenu.append(profilesSlot);
   sep();
-  addMenuLabel(t("m.system"));
   add("grid", t("overhaul.editing"), enterEdit);
-  add("settings", t("m.settings"), () => dockApi.openSettings());
+  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
+  for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
+    const item = findWidgetPin(el.dataset.id);
+    if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; await persist(); await render(); reframe(); });
+  }
+  placeMenu(e);
+  dockApi.profileList().then((profiles) => {
+    if (!Array.isArray(profiles) || !profiles.length || generation !== menuGeneration || ctxMenu.classList.contains("hidden")) return;
+    const actions = menuActions(profilesSlot, closeMenu);
+    actions.sep();
+    for (const name of profiles.slice(0, 6)) actions.add(name === cfg.lastProfile ? "check" : "sparkles", name, async () => {
+      const fresh = await dockApi.profileApply(name);
+      cfg = fresh; await ensureLang(cfg.language); maybeSyncCtxMenu(); applyAll(); await render(); reframe();
+    });
+    placeMenu(e, false);
+  }).catch(() => {});
+}
+
+function openFileMenu(e, item, parent, openFolder) {
+  e.preventDefault(); e.stopPropagation(); ++menuGeneration;
+  ctxMenu.replaceChildren();
+  addMenuHead(item.name, item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
+  const { add, sep } = menuActions(ctxMenu, closeMenu);
+  add("external", t("m.open"), () => { if (item.is_dir && openFolder) return openFolder(); if (item.kind === "action") return dockApi.openSettings(); return dockApi.launch(item.path, item.args || []); });
+  if (item.path) {
+    add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));
+    add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));
+    if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
+  }
+  if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
+  sep(); add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   placeMenu(e);
 }
 
+let menuGeneration = 0;
+let menuReturnFocus = null;
 // The context menu lives beside the bar (like the folder flyout): the window is
 // grown to fit it, so it can never be cut off by the dock window's bounds.
-function placeMenu(e) {
+function placeMenu(e, focus = true) {
+  if (focus) menuReturnFocus = document.activeElement;
   const cx = e.clientX;
   const cy = e.clientY;
   // Measure invisibly, grow the window FIRST, then reveal in its final spot —
@@ -2673,14 +2647,17 @@ function placeMenu(e) {
     requestAnimationFrame(() => {
       put();
       ctxMenu.classList.remove("measuring");
+      if (focus && !ctxMenu.classList.contains("hidden")) menuItems(ctxMenu)[0]?.focus();
     });
   });
 }
 function closeMenu() {
+  ++menuGeneration;
   if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
   document.body.classList.remove("menu-open");
   pendingReplace = null;
+  if (ctxMenu.contains(document.activeElement)) menuReturnFocus?.focus?.();
   reframe();
 }
 
@@ -2689,6 +2666,17 @@ function closeMenu() {
 let pendingReplace = null;
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
+document.addEventListener("contextmenu", (e) => {
+  if (isTextEditor(e.target)) return;
+  e.preventDefault();
+  if (closestSel(e.target, "#ctx-menu")) return;
+  const item = closestSel(e.target, "#stack") && findPinnedById(stackItemId);
+  if (item) openMenu(e, item); else openBackgroundMenu(e);
+});
+ctxMenu.addEventListener("keydown", (e) => {
+  if (moveMenuFocus(e, ctxMenu)) e.stopPropagation();
+  if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); e.stopPropagation(); closeMenu(); }
+});
 window.addEventListener("click", closeMenu);
 window.addEventListener("blur", () => {
   closeMenu();
@@ -3998,7 +3986,7 @@ function startRunningPoll() {
       const matchWins = (pin) => windowsFor(pin, wins);
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
-        if (!app || app.kind === "separator" || app.kind === "trash") return;
+        if (!app || app.kind === "separator" || app.kind === "trash" || app.kind === "action") return;
         const matches = matchWins(app);
         const badge = t.querySelector(".badge");
         if (matches.length) {
@@ -4098,6 +4086,10 @@ async function openStack(tileEl, item) {
   if (stackOpen && stackItemId === item.id) return;
   if (stackOpen) closeStack();
   const isGroup = item.kind === "group";
+  const folderNavigation = createFolderNavigation({ path: item.path, name: item.name });
+  let navigateFolder = null;
+  let folderTitle = null;
+  let backButton = null;
   const seq = ++stackSeq;
   stackItemId = item.id;
   stackEl.innerHTML = "";
@@ -4134,6 +4126,15 @@ async function openStack(tileEl, item) {
     const name = document.createElement("span");
     name.className = "stack-title";
     name.textContent = item.name;
+    folderTitle = name;
+    backButton = document.createElement("button");
+    backButton.className = "stack-close stack-back";
+    backButton.title = t("next.backFolder");
+    backButton.setAttribute("aria-label", t("next.backFolder"));
+    backButton.innerHTML = icon("take-out");
+    backButton.disabled = true;
+    backButton.addEventListener("click", () => navigateFolder?.(folderNavigation.back(), false));
+    head.appendChild(backButton);
     head.appendChild(name);
   }
   if (!isGroup) {
@@ -4144,7 +4145,7 @@ async function openStack(tileEl, item) {
     openDir.title = t("stack.openExplorer");
     openDir.innerHTML = icon("external");
     openDir.addEventListener("click", () => {
-      dockApi.launch(item.path, []);
+      dockApi.launch(folderNavigation.current.path, []);
       closeStack();
     });
     head.appendChild(openDir);
@@ -4187,6 +4188,7 @@ async function openStack(tileEl, item) {
       if (isGroup && it.id) cell.dataset.childId = it.id;
       cell.style.setProperty("--i", Math.min(cellIdx++, 6)); // staggered entry (capped)
       cell.title = it.name;
+      cell.addEventListener("contextmenu", (e) => openFileMenu(e, it, isGroup ? item : null, () => navigateFolder?.({ path: it.path, name: it.name })));
       const isDir = isGroup ? it.kind === "folder" || it.kind === "group" : it.is_dir;
       const fallbackGlyph = () => (isDir ? emo("folder", 26) : esc((it.name[0] || "?").toUpperCase()));
       // Show whatever icon we already have instantly; otherwise a shimmer skeleton
@@ -4231,7 +4233,9 @@ async function openStack(tileEl, item) {
       }
       cell.addEventListener("click", () => {
         if (cell._suppressClick) return; // a drag just happened → don't also launch
-        if (it.path) dockApi.launch(it.path, it.args || []);
+        if (!isGroup && it.is_dir) { navigateFolder?.({ path: it.path, name: it.name }); return; }
+        if (it.kind === "action") dockApi.openSettings();
+        else if (it.path) dockApi.launch(it.path, it.args || []);
         closeStack();
       });
       if (isGroup) {
@@ -4305,7 +4309,7 @@ async function openStack(tileEl, item) {
       more.className = "stack-more";
       more.textContent = t("stack.more");
       more.addEventListener("click", () => {
-        dockApi.launch(item.path, []);
+        dockApi.launch(folderNavigation.current.path, []);
         closeStack();
       });
       grid.appendChild(more);
@@ -4333,7 +4337,7 @@ async function openStack(tileEl, item) {
       const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.disabled]);
       buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
-        const rows = await dockApi.listDir(item.path, nextPage * pageSize, pageSize + 1);
+        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1);
         if (seq !== stackSeq || !stackOpen || current !== request) return;
         page = nextPage;
         fillGrid((rows || []).slice(0, pageSize));
@@ -4359,8 +4363,32 @@ async function openStack(tileEl, item) {
       } catch (_) {
         if (seq !== stackSeq || !stackOpen || current !== request) return;
         buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
-        if (!pager.isConnected) { fillGrid([]); applyFrame(); }
+        grid.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "stack-empty";
+        message.setAttribute("role", "alert");
+        message.textContent = t("overhaul.failed");
+        const retry = document.createElement("button");
+        retry.className = "stack-more";
+        retry.textContent = t("apps.refresh");
+        retry.addEventListener("click", () => loadPage(nextPage));
+        grid.append(message, retry);
+        applyFrame();
       }
+    };
+    navigateFolder = (entry, push = true) => {
+      if (!entry) return;
+      if (push) folderNavigation.enter(entry);
+      folderTitle.textContent = folderNavigation.current.name;
+      folderTitle.title = folderNavigation.current.path;
+      backButton.disabled = !folderNavigation.canGoBack;
+      grid.replaceChildren();
+      const loading = document.createElement("p");
+      loading.className = "stack-empty";
+      loading.setAttribute("role", "status");
+      loading.textContent = t("overhaul.loading");
+      grid.appendChild(loading);
+      loadPage(0);
     };
     loadPage(0);
   }

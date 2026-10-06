@@ -5,10 +5,10 @@ import { t } from '../i18n.js';
 import { useModalControls, Icon } from './ui.jsx';
 
 /** A group enters the saved dock only after it has at least two members. */
-export function GroupCreator({ pinned, onCreate, onClose }) {
+export function GroupCreator({ pinned, initialIds = [], onCreate, onClose }) {
   useModalControls(onClose);
   const [name, setName] = useState(t('group.new'));
-  const [selected, setSelected] = useState([]);
+  const [selected, setSelected] = useState(initialIds);
   const candidates = pinned.filter((item) => canMergeKind(item.kind));
   const chosen = candidates.filter((item) => selected.includes(item.id));
   const create = () => {

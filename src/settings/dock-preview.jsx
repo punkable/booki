@@ -60,11 +60,11 @@ function PreviewPin({ item, size, gap }) {
   return <span className="live-preview-app" title={item.name} style={{ width: size, height: size }}>
     {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.name?.charAt(0) || "•"}</span>)}</span>
       : src ? <img src={src} alt="" />
-        : item.kind === "folder" || item.kind === "trash" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : "folder") }} />
+        : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
           : <span>{item.name?.charAt(0)?.toUpperCase() || "•"}</span>}
   </span>;
 }
-export function DockPreview({ cfg, large = false, onSelect }) {
+export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin, onDragOver }) {
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const size = large ? Math.max(32, Math.min(56, cfg.iconSize || 48)) : 32;
@@ -74,7 +74,7 @@ export function DockPreview({ cfg, large = false, onSelect }) {
   return <div className={"live-preview-scene" + (large ? " large" : "")}>
     <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
       background: `color-mix(in srgb, ${fill} ${Math.round((transparencyReduced(cfg) ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
-      {items.length ? items.map((item) => onSelect && item.kind !== "separator" ? <button key={item.id} className="preview-edit-pin" type="button" aria-label={`${t("apps.rename")}: ${item.name || widgetDisplayName(item.widget, t)}`} onClick={() => onSelect(item)}><PreviewPin item={item} size={size} gap={gap} /></button> : <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
+      {items.length ? items.map((item) => onSelect && item.kind !== "separator" ? <button key={item.id} className="preview-edit-pin" type="button" aria-label={`${t("apps.rename")}: ${item.name || widgetDisplayName(item.widget, t)}`} onClick={() => onSelect(item)} draggable={!!onDragPin} onDragStart={onDragPin ? (event) => onDragPin(event, item) : undefined} onDragOver={onDragOver} onDrop={onDropPin ? (event) => onDropPin(event, item) : undefined}><PreviewPin item={item} size={size} gap={gap} /></button> : <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
     </div>
     <span className="live-preview-caption">{onSelect ? t("premium.editPreview") : t("overhaul.previewHint")}</span>
   </div>;

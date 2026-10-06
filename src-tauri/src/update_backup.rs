@@ -23,7 +23,10 @@ pub fn snapshot(root: &Path) -> Result<PathBuf, String> {
             for entry in fs::read_dir(profiles)? {
                 let entry = entry?;
                 if entry.file_type()?.is_file()
-                    && entry.path().extension().is_some_and(|ext| ext == "json")
+                    && entry
+                        .path()
+                        .extension()
+                        .is_some_and(|ext| ext == "json" || ext == "bak")
                 {
                     fs::copy(
                         entry.path(),
@@ -67,6 +70,7 @@ mod tests {
         fs::write(root.join("config.json"), "original settings").unwrap();
         fs::write(root.join("config.bak.json"), "last-good settings").unwrap();
         fs::write(root.join("profiles/work.json"), "work profile").unwrap();
+        fs::write(root.join("profiles/work.bak"), "recovery profile").unwrap();
         fs::write(root.join("clipboard.json"), "private history").unwrap();
         for _ in 0..5 {
             let snapshot = snapshot(&root).unwrap();
@@ -77,6 +81,10 @@ mod tests {
             assert_eq!(
                 fs::read_to_string(snapshot.join("profiles/work.json")).unwrap(),
                 "work profile"
+            );
+            assert_eq!(
+                fs::read_to_string(snapshot.join("profiles/work.bak")).unwrap(),
+                "recovery profile"
             );
             assert_eq!(
                 fs::read_to_string(snapshot.join("config.bak.json")).unwrap(),

@@ -6,6 +6,14 @@
 
 export const DICT = {
   es: {
+    "next.addSettings": "Añadir icono de Ajustes",
+    "next.backFolder": "Volver a la carpeta anterior",
+    "next.advanced": "Personalización avanzada",
+    "next.selectionHint": "Selecciona una app para verla. Usa + o arrástrala al dock para añadirla.",
+    "next.dropHint": "Arrastra para ordenar. Suelta sobre un grupo para añadir elementos.",
+    "next.destination": "Añadir a",
+    "next.inspector": "Detalles del elemento",
+    "next.inspectEmpty": "Selecciona una app o un elemento del dock para editarlo.",
     "workspace.groupHint": "Selecciona al menos dos apps, carpetas o widgets de tu dock.",
     "workspace.groupEmpty": "Ancla dos elementos antes de crear un grupo.",
     "workspace.createGroup": "Crear grupo",
@@ -711,6 +719,14 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "next.addSettings": "Add Settings icon",
+    "next.backFolder": "Back to previous folder",
+    "next.advanced": "Advanced customization",
+    "next.selectionHint": "Click an app to inspect it. Use + or drag it into your dock.",
+    "next.dropHint": "Drag to reorder. Drop onto a group to add to it.",
+    "next.destination": "Add to",
+    "next.inspector": "Item details",
+    "next.inspectEmpty": "Select an app or an item in your dock to edit it.",
     "workspace.groupHint": "Select at least two apps, folders or widgets from your dock.",
     "workspace.groupEmpty": "Pin two items before creating a group.",
     "workspace.createGroup": "Create group",
