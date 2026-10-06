@@ -64,7 +64,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. The library screenshot shows the 0.71 workspace in development. See the <a href="docs/releases/v0.71.0.md">0.71 library, settings and system update</a>.</sub></p>
+<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. The library screenshot shows the 0.71 workspace. See the <a href="docs/releases/v0.71.0.md">0.71 library, settings and system update</a>.</sub></p>
 
 ## Get started
 
