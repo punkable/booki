@@ -99,6 +99,7 @@ export const iconNote = () =>
 
 const iconMap = {
   plus: iconPlus,
+  minus: () => S(`<path d="M5 12h14"/>`),
   trash: iconTrash,
   settings: iconSettings,
   undo: () => S(`<path d="M9 4 4 9l5 5"/><path d="M4 9h9a7 7 0 0 1 0 14"/>`),
@@ -113,6 +114,8 @@ const iconMap = {
   palette: iconPalette,
   "chevron-down": iconChevronDown,
   "chevron-right": iconChevronRight,
+  "arrow-left": () => S(`<path d="m10 5-7 7 7 7M3 12h18"/>`),
+  "arrow-right": () => S(`<path d="m14 5 7 7-7 7M3 12h18"/>`),
   check: iconCheck,
   grip: iconGrip,
   folder: iconFolder,

@@ -4153,6 +4153,22 @@ async function openStack(tileEl, item) {
   let navigateFolder = null;
   let folderTitle = null;
   let backButton = null;
+  let breadcrumbs = null;
+  const renderBreadcrumbs = () => {
+    if (!breadcrumbs) return;
+    breadcrumbs.replaceChildren();
+    const trail = folderNavigation.trail;
+    trail.forEach((entry, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = entry.name || entry.path;
+      button.title = entry.path;
+      if (index === trail.length - 1) button.setAttribute("aria-current", "location");
+      else button.addEventListener("click", () => navigateFolder?.(folderNavigation.goTo(index), false));
+      breadcrumbs.appendChild(button);
+    });
+    breadcrumbs.lastElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
   const seq = ++stackSeq;
   stackItemId = item.id;
   stackEl.innerHTML = "";
@@ -4206,6 +4222,7 @@ async function openStack(tileEl, item) {
     const openDir = document.createElement("button");
     openDir.className = "stack-close stack-opendir";
     openDir.title = t("stack.openExplorer");
+    openDir.setAttribute("aria-label", t("stack.openExplorer"));
     openDir.innerHTML = icon("external");
     openDir.addEventListener("click", () => {
       dockApi.launch(folderNavigation.current.path, []);
@@ -4216,10 +4233,18 @@ async function openStack(tileEl, item) {
   const close = document.createElement("button");
   close.className = "stack-close";
   close.title = t("stack.close");
+  close.setAttribute("aria-label", t("stack.close"));
   close.innerHTML = icon("x");
   close.addEventListener("click", closeStack);
   head.appendChild(close);
   stackEl.appendChild(head);
+  if (!isGroup) {
+    breadcrumbs = document.createElement("nav");
+    breadcrumbs.className = "stack-breadcrumbs";
+    breadcrumbs.setAttribute("aria-label", t("m.folder"));
+    stackEl.appendChild(breadcrumbs);
+    renderBreadcrumbs();
+  }
   const grid = document.createElement("div");
   grid.className = "stack-grid";
   const fillGrid = (items) => {
@@ -4450,6 +4475,7 @@ async function openStack(tileEl, item) {
       folderTitle.textContent = folderNavigation.current.name;
       folderTitle.title = folderNavigation.current.path;
       backButton.disabled = !folderNavigation.canGoBack;
+      renderBreadcrumbs();
       grid.replaceChildren();
       const loading = document.createElement("p");
       loading.className = "stack-empty";

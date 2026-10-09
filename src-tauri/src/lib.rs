@@ -7,6 +7,7 @@ mod apps;
 mod clipboard_storage;
 mod config;
 mod config_transaction;
+mod recovery;
 mod shortcuts;
 mod snapshot;
 mod surface_geometry;
@@ -641,6 +642,87 @@ fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
 /// (`[x, y, w, h, tl, tr, br, bl]`, window-relative CSS px). `tint` is `#RRGGBBAA`.
 /// Returns false where there is no native material (the page keeps its CSS
 /// fallback then). An empty list hides it.
+#[tauri::command]
+fn platform_capabilities() -> serde_json::Value {
+    #[cfg(windows)]
+    {
+        serde_json::to_value(win::platform::capabilities()).unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true })
+    }
+}
+
+#[tauri::command]
+async fn settings_backdrop(
+    app: AppHandle,
+    window: WebviewWindow,
+    enabled: bool,
+    dark: Option<bool>,
+) -> bool {
+    if window.label() != "settings" {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let native_window = window.clone();
+        let hwnd = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+        let (tx, rx) = std::sync::mpsc::channel();
+        if app
+            .run_on_main_thread(move || {
+                let applied =
+                    win::platform::settings_backdrop(hwnd, enabled, dark.unwrap_or(false));
+                let color = if applied {
+                    tauri::window::Color(0, 0, 0, 0)
+                } else if dark.unwrap_or(false) {
+                    tauri::window::Color(23, 25, 29, 255)
+                } else {
+                    tauri::window::Color(251, 251, 253, 255)
+                };
+                let painted = native_window.set_background_color(Some(color)).is_ok();
+                if !painted && applied {
+                    win::platform::settings_backdrop(hwnd, false, dark.unwrap_or(false));
+                }
+                let _ = tx.send(applied && painted);
+            })
+            .is_err()
+        {
+            return false;
+        }
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(false))
+            .await
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, enabled, dark);
+        false
+    }
+}
+
+#[tauri::command]
+fn config_recovery_status() -> recovery::RecoveryReport {
+    config::recovery_status()
+}
+
+#[tauri::command]
+fn acknowledge_config_recovery() -> Result<(), String> {
+    if config::recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_REQUIRED".into());
+    }
+    config::acknowledge_recovery();
+    Ok(())
+}
+
+#[tauri::command]
+fn start_fresh_config(app: AppHandle) -> Result<Config, String> {
+    if !config::recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_NOT_REQUIRED".into());
+    }
+    apply_config_snapshot(&app, Config::default())
+}
+
 #[tauri::command]
 async fn set_material(
     app: AppHandle,
@@ -1371,30 +1453,49 @@ fn take_pending_tab() -> Option<String> {
 fn export_config(path: String) -> Result<(), String> {
     let cfg = config::load();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(&path, text).map_err(|e| e.to_string())
+    snapshot::write(std::path::Path::new(&path), &text)
 }
 
-/// Import config from a JSON file, replacing the current one. Returns the new config.
+fn read_import(path: &str) -> Result<Config, String> {
+    use std::io::Read;
+    let file = std::path::Path::new(path);
+    const LIMIT: u64 = 16 * 1024 * 1024;
+    let source = std::fs::File::open(file).map_err(|e| e.to_string())?;
+    if source.metadata().map_err(|e| e.to_string())?.len() > LIMIT {
+        return Err("BOOKI_IMPORT_TOO_LARGE".into());
+    }
+    let mut bytes = Vec::new();
+    source
+        .take(LIMIT + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > LIMIT {
+        return Err("BOOKI_IMPORT_TOO_LARGE".into());
+    }
+    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    if !value.as_object().is_some_and(|v| v.contains_key("pinned")) {
+        return Err("BOOKI_IMPORT_INVALID".into());
+    }
+    serde_json::from_value(value).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
-fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
-    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    // Machine-specific bits don't travel: the monitor layout of the exporting
-    // PC rarely matches this one (paths DO travel — settings flags the ones
-    // that don't exist here and offers to reassign them).
+fn preview_config_import(path: String) -> Result<Config, String> {
+    read_import(&path)
+}
+
+/// Apply only the snapshot the user reviewed; files may change while a dialog is open.
+#[tauri::command]
+fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Result<Config, String> {
+    let mut cfg = read_import(&path)?;
+    if expected.is_some_and(|snapshot| {
+        serde_json::to_value(snapshot).ok() != serde_json::to_value(&cfg).ok()
+    }) {
+        return Err("BOOKI_IMPORT_CHANGED".into());
+    }
     cfg.monitor = -1;
     cfg.monitor_name.clear();
-    config::save(&cfg)?;
-    clip_apply_config(&cfg);
-    apply_always_on_top(&app);
-    apply_capture_policy(&app, cfg.capture_visible);
-    let _ = app.emit("booki://config-changed", ());
-    // Return the migrated/healed config — raw import JSON skips load() revs.
-    // save() leaves its own value cached, and that value has NOT been through
-    // load()'s migrations or group normalization, so the cache has to be dropped
-    // for this read or the import would come back unhealed.
-    config::invalidate_cache();
-    Ok(config::load())
+    apply_config_snapshot(&app, cfg)
 }
 
 // ─────────────────────────── Dock profiles ───────────────────────────
@@ -1476,18 +1577,19 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         Ok::<Config, String>(recovered)
     })?;
     cfg.last_profile = name.trim().to_string();
+    apply_config_snapshot(&app, cfg)
+}
+
+fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String> {
     // Apply general preferences as well as the visual layout. A failed OS
     // operation leaves the previous persisted profile active.
+    config::backup_for_update()?;
     let previous = config::load();
     let previous_autostart = get_autostart();
-    if let Err(error) = hotkeys_apply(
-        &app,
-        &cfg.hotkey,
-        cfg.position_hotkeys,
-        &cfg.hotkey_modifier,
-    ) {
+    if let Err(error) = hotkeys_apply(app, &cfg.hotkey, cfg.position_hotkeys, &cfg.hotkey_modifier)
+    {
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
@@ -1496,17 +1598,17 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
     }
     if let Err(error) = set_autostart(cfg.autostart) {
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
         );
         return Err(error);
     }
-    if let Err(error) = config::save(&cfg) {
+    if let Err(error) = config::save_replacement(&cfg) {
         let _ = set_autostart(previous_autostart);
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
@@ -1514,8 +1616,8 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         return Err(error);
     }
     clip_apply_config(&cfg);
-    apply_always_on_top(&app);
-    apply_capture_policy(&app, cfg.capture_visible);
+    apply_always_on_top(app);
+    apply_capture_policy(app, cfg.capture_visible);
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
     }
@@ -2247,7 +2349,7 @@ fn system_events_support() -> serde_json::Value {
     #[cfg(windows)]
     {
         use win::system_events;
-        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed) })
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
     }
     #[cfg(not(windows))]
     {
@@ -2776,6 +2878,7 @@ pub fn run() {
             weather_search,
             weather_current,
             import_config,
+            preview_config_import,
             paths_exist,
             image_data_uri,
             set_always_on_top,
@@ -2792,6 +2895,11 @@ pub fn run() {
             move_paths,
             list_monitors,
             set_material,
+            config_recovery_status,
+            platform_capabilities,
+            settings_backdrop,
+            acknowledge_config_recovery,
+            start_fresh_config,
             system_accent,
             system_stats,
             fetch_favicon,
@@ -2831,6 +2939,39 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 win::system_events::start(std::sync::Arc::new(move |kind| {
+                    if kind == "clipboard" && clipboard_feature_active(&config::load()) {
+                        // The writing app may still hold OpenClipboard when the
+                        // notification arrives. Retry briefly on this worker,
+                        // never on the message pump or UI thread.
+                        for delay in [0, 20, 60] {
+                            if delay > 0 {
+                                std::thread::sleep(std::time::Duration::from_millis(delay));
+                            }
+                            if let Some(text) = win::clipboard_get_text() {
+                                if clipboard_feature_active(&config::load()) {
+                                    clip_remember(&text);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if kind == "display" || kind == "resume" {
+                        let app = handle.clone();
+                        let _ = handle.run_on_main_thread(move || {
+                            let cfg = config::load();
+                            if let Some(dock) = app.get_webview_window("dock") {
+                                let _ = position_dock(&dock, &cfg.edge);
+                            }
+                            if let Some(notch) = app.get_webview_window("notch") {
+                                let _ = position_notch(&notch, &cfg.edge);
+                            }
+                        });
+                    }
+                    if kind == "resume" {
+                        for source in ["media", "volume", "windows"] {
+                            let _ = handle.emit(&format!("booki://{source}-changed"), ());
+                        }
+                    }
                     if kind == "catalog" {
                         CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
                     }
@@ -3028,14 +3169,9 @@ pub fn run() {
                     });
                 }
 
-                // Clipboard watcher: samples the OS clipboard's plain text every
-                // ~1000 ms when the feature is active and remembers it if it changed.
-                // Polling (vs. the native
-                // WM_CLIPBOARDUPDATE listener) keeps this on the same simple
-                // thread-per-concern pattern as the rest of the watchers and needs
-                // no message-only window; this cadence is imperceptible for a paste
-                // history. Windows-only — clipboard_get_text stubs to None
-                // elsewhere, so the loop would just spin doing nothing.
+                // Recovery sampling complements WM_CLIPBOARDUPDATE. Use a slow
+                // cadence when Windows registered the listener, and a one-second
+                // fallback if registration failed. No polling on other platforms.
                 #[cfg(windows)]
                 {
                     std::thread::spawn(move || {
@@ -3047,12 +3183,24 @@ pub fn run() {
                             // re-read config every few ticks — avoids disk I/O every
                             // second for users who never enable the feature.
                             std::thread::sleep(std::time::Duration::from_millis(if active {
-                                1000
+                                if win::system_events::CLIPBOARD.load(Ordering::Relaxed) {
+                                    30000
+                                } else {
+                                    1000
+                                }
                             } else {
                                 2500
                             }));
                             since_cfg = since_cfg.saturating_add(1);
-                            let cfg_every = if active { 3 } else { 2 }; // ~3s on / ~5s off
+                            let event_driven =
+                                win::system_events::CLIPBOARD.load(Ordering::Relaxed);
+                            let cfg_every = if active && !event_driven {
+                                3
+                            } else if active {
+                                1
+                            } else {
+                                2
+                            };
                             if since_cfg >= cfg_every {
                                 since_cfg = 0;
                                 active = clipboard_feature_active(&config::load());

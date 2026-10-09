@@ -5,3 +5,4 @@
 @import "./styles/settings.css" layer(booki-settings);
 @import "./styles/overhaul.css" layer(booki-overhaul);
 @import "./styles/workspace.css" layer(booki-workspace);
+@import "./styles/design-tokens.css" layer(booki-workspace);

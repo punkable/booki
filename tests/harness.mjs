@@ -206,7 +206,7 @@ function bridgeSource(cfg, { stats = {} } = {}) {
 }
 
 /** Open a Booki page with the fake backend and collect any JS error. */
-export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats } = {}) {
+export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats, initScript = '' } = {}) {
   const page = await browser.newPage({
     viewport: viewport || { width: 1600, height: 400 },
   });
@@ -219,7 +219,9 @@ export async function openPage(browser, port, page_ = "index.html", { cfg, viewp
     if (text.includes("favicon") || text.includes("404")) return;
     errors.push(`console: ${text}`);
   });
-  await page.addInitScript(bridgeSource(cfg || makeConfig(), { stats }));
+  // Append in the same script so command overrides run after the fake bridge
+  // and before application boot, without depending on init-script ordering.
+  await page.addInitScript(bridgeSource(cfg || makeConfig(), { stats }) + '\n' + initScript);
   await page.goto(`http://127.0.0.1:${port}/${page_}`);
   await page.waitForTimeout(1200); // boot + first widget paint
   return { page, errors };

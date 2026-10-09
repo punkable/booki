@@ -1,6 +1,7 @@
 /* Profile and backup UI; snapshot operations share the root save barrier. */
 import React, { useEffect, useState } from "react";
 import { dock as dockApi, pickSavePath, pickJsonFile } from "../api.js";
+import { SnapshotReview } from "./snapshot-review.jsx";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import { Button, Row, PageHeader, SettingsSection, CollapsibleSection } from "./ui.jsx";
@@ -32,7 +33,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
       icon="copy"
       hint={t("prof.hint")}
       count={profiles.length || null}
-      defaultOpen={false}
+      defaultOpen={true}
       className="profiles-section"
     >
       {error && <p role="alert">{error}</p>}
@@ -93,6 +94,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
 
 export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport }) {
   const [backupMsg, setBackupMsg] = useState("");
+  const [review, setReview] = useState(null);
   const flash = (msg) => {
     setBackupMsg(msg);
     clearTimeout(flash._t);
@@ -100,6 +102,7 @@ export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport }) {
   };
   return (
     <>
+      {review && <SnapshotReview current={cfg} snapshot={review.snapshot} onClose={() => setReview(null)} onConfirm={async () => { await onImport(review.path,review.snapshot);flash(t("ap.backupImported")); }} />}
       <PageHeader title={t("tab.profiles")}>{t("ap.backupHint")}</PageHeader>
       <ProfilesCard cfg={cfg} onApply={onApply} beforeSnapshot={beforeSnapshot} />
       <SettingsSection title={t("ap.backup")} hint={backupMsg || t("ap.backupKeep")}>
@@ -126,13 +129,9 @@ export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport }) {
               try {
                 const p = await pickJsonFile();
                 if (!p) return;
-                if (!window.confirm(t("ap.backupImportConfirm"))) return;
-                const fresh = await onImport(p);
-                if (fresh) {
-                  flash(t("ap.backupImported"));
-                } else {
-                  flash(t("ap.backupError"));
-                }
+                const snapshot = await dockApi.previewImport(p);
+                if (!snapshot || !Array.isArray(snapshot.pinned)) throw new Error('Invalid import');
+                setReview({ path:p,snapshot });
               } catch (_) {
                 flash(t("ap.backupError"));
               }

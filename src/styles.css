@@ -1776,6 +1776,10 @@ body.edge-right .stack.open { transform: none; }
 .stack-head-icon svg { width: 15px; height: 15px; }
 .stack-head-icon img.emo { width: 15px; height: 15px; }
 .stack-title { flex: 1; min-width: 0; font-size: var(--text-md); font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
+.stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: 8px; font: inherit; font-size: var(--text-sm); color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
+.stack-breadcrumbs button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .stack-rename {
   flex: 1; min-width: 0; font: inherit; font-size: var(--text-md); font-weight: 700;
   color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 8px;

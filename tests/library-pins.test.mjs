@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { placePin, removePin, updatePin, readPinDrop, PIN_DRAG_TYPE } from '../src/pins.js';
+import { placePin, removePin, updatePin, movePinBy, ungroupPin, readPinDrop, PIN_DRAG_TYPE } from '../src/pins.js';
 const app = (id) => ({ id, name: id, path: `C:/${id}.exe`, kind: 'app', args: [] });
 const group = { id: 'g', name: 'Work', kind: 'group', children: [app('a'), app('b')] };
 test('moving a child to a dock position preserves its data and dissolves its previous group', () => {
@@ -41,4 +41,26 @@ test('folder sessions preserve the root pin and keep independent back histories'
   assert.equal(first.back().name, 'Projects'); assert.equal(first.canGoBack, true);
   assert.deepEqual(first.back(), root); assert.equal(first.canGoBack, false);
   assert.deepEqual(second.current, root); assert.deepEqual(root, { path:'C:/Files', name:'Files' });
+});
+
+test('keyboard reordering preserves groups, members and immutable boundary edits', () => {
+  const source = [group, app('c')];
+  assert.equal(movePinBy(source, 'g', -1), source);
+  assert.deepEqual(movePinBy(source, 'g', 1).map(item => item.id), ['c', 'g']);
+  assert.deepEqual(movePinBy(source, 'b', -1)[0].children.map(item => item.id), ['b', 'a']);
+  assert.deepEqual(group.children.map(item => item.id), ['a', 'b']);
+  assert.deepEqual(ungroupPin(source, 'g').map(item => item.id), ['a', 'b', 'c']);
+});
+
+test('folder breadcrumbs jump to ancestors, truncate history and never mutate the root pin', async () => {
+  const { createFolderNavigation } = await import('../src/dock/folder-navigation.js');
+  const root = { path: 'C:/Files', name: 'Files' };
+  const nav = createFolderNavigation(root);
+  nav.enter({ path: 'C:/Files/One', name: 'One' }); nav.enter({ path: 'C:/Files/One/Two', name: 'Two' });
+  const trail = nav.trail; trail[0].name = 'Changed';
+  assert.equal(nav.trail[0].name, 'Files');
+  assert.equal(nav.goTo(1).name, 'One'); assert.equal(nav.trail.length, 2);
+  assert.equal(nav.goTo(-1).name, 'One');
+  assert.deepEqual(nav.goTo(0), root); assert.equal(nav.canGoBack, false);
+  assert.deepEqual(root, { path: 'C:/Files', name: 'Files' });
 });

@@ -29,6 +29,7 @@ static QUEUE: OnceLock<SyncSender<&'static str>> = OnceLock::new();
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
 pub static VOLUME: AtomicBool = AtomicBool::new(false);
 pub static WINDOWS: AtomicBool = AtomicBool::new(false);
+pub static CLIPBOARD: AtomicBool = AtomicBool::new(false);
 pub static CATALOG: AtomicBool = AtomicBool::new(false);
 fn signal(kind: &'static str) {
     if let Some(queue) = QUEUE.get() {
@@ -152,8 +153,58 @@ unsafe extern "system" fn window_event(
         signal("windows");
     }
 }
+unsafe extern "system" fn platform_message(
+    hwnd: HWND,
+    message: u32,
+    wp: windows::Win32::Foundation::WPARAM,
+    lp: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::LRESULT {
+    match message {
+        WM_CLIPBOARDUPDATE => signal("clipboard"),
+        WM_SETTINGCHANGE | WM_THEMECHANGED => signal("preferences"),
+        WM_DISPLAYCHANGE => signal("display"),
+        WM_POWERBROADCAST
+            if wp.0 == PBT_APMRESUMEAUTOMATIC as usize || wp.0 == PBT_APMRESUMESUSPEND as usize =>
+        {
+            signal("resume");
+        }
+        _ => {}
+    }
+    DefWindowProcW(hwnd, message, wp, lp)
+}
+
 fn watch_windows() {
     std::thread::spawn(|| unsafe {
+        use windows::core::w;
+        use windows::Win32::System::DataExchange::{
+            AddClipboardFormatListener, RemoveClipboardFormatListener,
+        };
+        use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+        let instance = GetModuleHandleW(None).ok();
+        let class = WNDCLASSW {
+            lpfnWndProc: Some(platform_message),
+            hInstance: instance.unwrap_or_default().into(),
+            lpszClassName: w!("BookiPlatformEvents"),
+            ..Default::default()
+        };
+        RegisterClassW(&class);
+        let observer = CreateWindowExW(
+            WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+            w!("BookiPlatformEvents"),
+            w!(""),
+            WS_POPUP,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            instance.unwrap_or_default(),
+            None,
+        )
+        .ok();
+        let registered = observer.is_some_and(|hwnd| AddClipboardFormatListener(hwnd).is_ok());
+        CLIPBOARD.store(registered, Ordering::Relaxed);
         let flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
         let foreground = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
@@ -183,6 +234,11 @@ fn watch_windows() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
+        if let Some(hwnd) = observer {
+            let _ = RemoveClipboardFormatListener(hwnd);
+            let _ = DestroyWindow(hwnd);
+        }
+        CLIPBOARD.store(false, Ordering::Relaxed);
         WINDOWS.store(false, Ordering::Relaxed);
         signal("ready");
         let _ = UnhookWinEvent(foreground);

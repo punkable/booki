@@ -6,6 +6,16 @@
 
 export const DICT = {
   es: {
+    "integral.reviewSnapshot": "Revisar configuración",
+    "integral.currentDock": "Tu dock actual",
+    "integral.replacementDock": "Configuración que aplicarás",
+    "integral.importChanged": "El archivo cambió mientras lo revisabas. Vuelve a importarlo.",
+    "integral.recoveryBlocked": "No pudimos leer tu configuración ni su copia.",
+    "integral.recoveryRestored": "Recuperamos tu configuración desde una copia.",
+    "integral.recoveryKeep": "Los archivos originales se conservan. Importa un respaldo desde Perfiles o elige empezar de nuevo. No se guardarán cambios hasta que elijas.",
+    "integral.recoveryBackup": "Tu configuración está disponible. Conservamos el archivo dañado para su recuperación.",
+    "integral.startFresh": "Empezar con una configuración nueva",
+    "integral.startFreshConfirm": "Confirmar configuración nueva",
     "next.addSettings": "Añadir icono de Ajustes",
     "next.backFolder": "Volver a la carpeta anterior",
     "next.advanced": "Personalización avanzada",
@@ -735,6 +745,16 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "integral.reviewSnapshot": "Review configuration",
+    "integral.currentDock": "Your current dock",
+    "integral.replacementDock": "Configuration to apply",
+    "integral.importChanged": "The file changed while you reviewed it. Import it again.",
+    "integral.recoveryBlocked": "Your configuration and its backup could not be read.",
+    "integral.recoveryRestored": "Your configuration was restored from a backup.",
+    "integral.recoveryKeep": "Original files are preserved. Import a backup from Profiles or choose to start fresh. Changes stay unsaved until you choose.",
+    "integral.recoveryBackup": "Your configuration is available. The damaged file was preserved for recovery.",
+    "integral.startFresh": "Start with a fresh configuration",
+    "integral.startFreshConfirm": "Confirm fresh configuration",
     "next.addSettings": "Add Settings icon",
     "next.backFolder": "Back to previous folder",
     "next.advanced": "Advanced customization",

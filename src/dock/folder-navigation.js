@@ -5,10 +5,15 @@ export function createFolderNavigation(root) {
   return {
     get current() { return current; },
     get canGoBack() { return history.length > 0; },
+    get trail() { return [...history, current].map(entry => ({ ...entry })); },
     enter(entry) {
       if (!entry?.path || entry.path === current.path) return current;
       history.push(current); current = { ...entry }; return current;
     },
     back() { if (history.length) current = history.pop(); return current; },
+    goTo(index) {
+      if (!Number.isInteger(index) || index < 0 || index >= history.length) return current;
+      current = history[index]; history.splice(index); return current;
+    },
   };
 }

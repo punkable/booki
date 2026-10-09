@@ -57,7 +57,7 @@ export function CollapsibleSection({ title, hint, count, defaultOpen = false, ch
           {count != null ? <span className="ui-count">{count}</span> : null}
           <Icon name="chevron-right" className="ui-chev" />
         </button>
-        {open ? <div className="ui-disclosed">{children}</div> : null}
+        <div className="ui-disclosed" hidden={!open}>{children}</div>
       </div>
     </section>
   );

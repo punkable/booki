@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from '../i18n.js';
 import { widgetDisplayName } from '../widgets-meta.js';
 
@@ -7,15 +7,17 @@ function pinLabel(item) {
   if (item.kind === 'action') return t('m.settings');
   if (item.kind === 'widget') return widgetDisplayName(item.widget, t);
   if (item.kind === 'group') return t('group.new');
+  if (item.kind === 'trash') return t('trash.name');
   return item.kind === 'separator' ? t('m.separator') : item.path?.split(/[\\/]/).pop() || t('workspace.addApp');
 }
 
-import { pickAppFile, pickFolder } from '../api.js';
-import { findPin, updatePin, removePin, placePin, mkPin, settingsPin, PIN_DRAG_TYPE, readPinDrop, canMergeKind } from '../pins.js';
+import { dock, pickAppFile, pickFolder } from '../api.js';
+import { findPin, updatePin, removePin, placePin, movePinBy, ungroupPin, mkPin, settingsPin, PIN_DRAG_TYPE, readPinDrop, canMergeKind } from '../pins.js';
 import { appKey, pinnedKeys } from '../dock/app-candidates.js';
 import { AppLibrary } from './app-library.jsx';
 import { DockPreview } from './dock-preview.jsx';
 import { GroupCreator } from './group-creator.jsx';
+import { Inspector } from './inspector.jsx';
 import { Icon, PageHeader } from './ui.jsx';
 
 /** Catalog, destination and inspector share one committed pin model. */
@@ -29,9 +31,13 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const [undo, setUndo] = useState(null);
   const [pickingIcon, pickIcon] = useState(null);
   const [webUrl, setWebUrl] = useState('');
+  const [webName, setWebName] = useState('');
+  const [webBusy, setWebBusy] = useState(false);
+  const [pathMissing, setPathMissing] = useState(false);
   const [identities, setIdentities] = useState({});
   const latest = useRef(cfg); latest.current = cfg;
   const editorRef = useRef(null);
+  const inspectorOrigin = useRef(null);
   useLayoutEffect(() => {
     const editor = editorRef.current;
     const scroller = editor?.closest('.s-content');
@@ -41,6 +47,15 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     return () => { observer.disconnect(); scroller.style.removeProperty('--library-editor-height'); };
   }, []);
   const selected = candidate || findPin(cfg.pinned, selectedId);
+  const selectedPath = selected?.path;
+  const selectedKind = selected?.kind;
+  useEffect(() => {
+    let alive = true; setPathMissing(false);
+    if (selectedPath && ['app', 'folder'].includes(selectedKind)) {
+      dock.pathsExist([selectedPath]).then(flags => { if (alive) setPathMissing(flags?.[0] === false); }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [selectedPath, selectedKind]);
   const candidatePinned = candidate && pinnedKeys(cfg.pinned, identities).has(appKey(candidate, identities));
   const groups = cfg.pinned.filter((item) => item.kind === 'group');
   const destination = groups.some((item) => item.id === targetGroup) ? targetGroup : '';
@@ -54,7 +69,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     const keys = pinnedKeys(next, identities);
     for (const app of apps) {
       const key = appKey(app, identities); if (keys.has(key)) continue; keys.add(key);
-      const pin = { id: crypto.randomUUID(), kind: 'app', name: app.name, path: app.path, args: app.args || [] };
+      const pin = { id: crypto.randomUUID(), kind: 'app', name: app.name, path: app.path, args: app.args || [], ...(app.icon ? { icon: app.icon } : {}) };
       next = placePin(next, pin, { groupId: destination || undefined });
     }
     commit(next);
@@ -68,7 +83,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     commit(placePin(latest.current.pinned, current || payload, options));
   };
   const dragOver = (event) => { if ([...event.dataTransfer.types].includes(PIN_DRAG_TYPE)) event.preventDefault(); };
-  const inspect = (item) => { inspectCandidate(null); selectId(item.id); };
+  const inspect = (item) => { inspectorOrigin.current = document.activeElement; inspectCandidate(null); selectId(item.id); };
   const browse = async (folder) => {
     try {
       const path = await (folder ? pickFolder() : pickAppFile());
@@ -82,6 +97,8 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
       <div className="library-dock-head"><strong>{t('workspace.pinned')}</strong><div className="library-dock-actions">
         <button className="s-btn s-btn-soft" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
         <button className="s-btn s-btn-soft" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...cfg.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
+        <button className="s-btn s-btn-soft" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
+        <button className="s-btn s-btn-soft" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
         {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="s-btn s-btn-soft" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
       </div></div>
       <DockPreview cfg={cfg} onSelect={inspect} onDragPin={(event, item) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item)); }} onDragOver={dragOver} onDropPin={(event, item) => drop(event, item.kind === 'group' ? { groupId: item.id } : { beforeId: item.id })} />
@@ -107,27 +124,48 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     {error && <p role="alert">{error}</p>}
     <div className="library-workspace">
       <div className="library-catalog"><label className="library-destination">{t('next.destination')}<select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label>
-        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectCandidate(app); selectId(null); }} />
+        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }} />
       </div>
-      <aside className="library-inspector" aria-label={t('next.inspector')}>
+      <Inspector className="library-inspector" selectionKey={selected?.id || candidate?.path} origin={inspectorOrigin} onBack={() => { inspectCandidate(null); selectId(null); }}>
         {selected ? <>
           <h2>{pinLabel(selected)}</h2>
           {candidate ? <><p className="muted">{selected.path}</p><button className="s-btn" disabled={!!candidatePinned} onClick={() => add([candidate])}><Icon name="plus" />{t('workspace.addApp')}</button></> : <>
             <label>{t('apps.rename')}<input value={selected.name || ''} onChange={(event) => set({ pinned: updatePin(latest.current.pinned, selected.id, { name: event.target.value }) })} /></label>
-            {selected.kind !== 'separator' && selected.kind !== 'widget' && <button className="s-btn s-btn-soft" onClick={() => pickIcon(selected)}><Icon name="palette" />{t('apps.changeIcon')}</button>}
+            {selected.kind !== 'separator' && selected.kind !== 'widget' && selected.kind !== 'trash' && <button className="s-btn s-btn-soft" onClick={() => pickIcon(selected)}><Icon name="palette" />{t('apps.changeIcon')}</button>}
+            <div className="library-dock-actions">
+              <button className="s-btn s-btn-soft" disabled={movePinBy(cfg.pinned, selected.id, -1) === cfg.pinned} onClick={() => commit(movePinBy(latest.current.pinned, selected.id, -1))}><Icon name="arrow-left" />{t('stack.previous')}</button>
+              <button className="s-btn s-btn-soft" disabled={movePinBy(cfg.pinned, selected.id, 1) === cfg.pinned} onClick={() => commit(movePinBy(latest.current.pinned, selected.id, 1))}>{t('stack.next')}<Icon name="arrow-right" /></button>
+            </div>
             {selected.path && <p className="muted">{selected.path}</p>}
+            {pathMissing && <p role="status">{t('apps.missing')}</p>}
+            {['app','folder'].includes(selected.kind) && <div className="workspace-actions">
+              <button className="s-btn s-btn-soft" onClick={async () => { try { await dock.openLocation(selected.path); } catch { setError(t('overhaul.failed')); } }}><Icon name="external" />{t('apps.openLoc')}</button>
+              <button className="s-btn s-btn-soft" onClick={async () => {
+                const id = selected.id;
+                try { const path = await (selected.kind === 'folder' ? pickFolder() : pickAppFile()); if (path && findPin(latest.current.pinned, id)) commit(updatePin(latest.current.pinned, id, { path, icon: null })); }
+                catch { setError(t('overhaul.failed')); }
+              }}><Icon name="folder" />{t('apps.reassign')}</button>
+            </div>}
             {selected.kind === 'group' && <div className="library-group-members">{(selected.children || []).map((child) => <div key={child.id} draggable onDragStart={(event) => event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(child))}>
               <button className="s-btn s-btn-soft" onClick={() => inspect(child)}>{pinLabel(child)}</button>
               <button className="pin-btn" aria-label={`${t('group.takeOut')}: ${child.name}`} onClick={() => commit(placePin(latest.current.pinned, child))}><Icon name="take-out" /></button>
             </div>)}</div>}
+            {selected.kind === 'group' && <button className="s-btn s-btn-soft" onClick={() => { commit(ungroupPin(latest.current.pinned, selected.id)); selectId(null); }}><Icon name="take-out" />{t('group.ungroup')}</button>}
             <button className="s-btn s-btn-soft" onClick={() => { commit(removePin(latest.current.pinned, selected.id)); selectId(null); }}><Icon name="trash" />{t('apps.remove')}</button>
           </>}
         </> : <p className="muted">{t('next.inspectEmpty')}</p>}
-      </aside>
+      </Inspector>
     </div>
-    <details className="library-web"><summary>{t('apps.web')}</summary><div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><button className="s-btn" onClick={() => {
-      try { const url = new URL(webUrl.trim()); if (!['https:', 'http:'].includes(url.protocol)) throw new Error('unsupported'); add([{ name: url.hostname, path: url.href }]); setWebUrl(''); } catch (_) { setError(t('overhaul.failed')); }
-    }}>{t('apps.webAdd')}</button></div></details>
+    <details className="library-web"><summary>{t('apps.web')}</summary><div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="s-btn" disabled={webBusy || !webUrl.trim()} onClick={async () => {
+      if (webBusy) return;
+      try {
+        const raw = webUrl.trim(); const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(raw) ? raw : 'https://' + raw);
+        if (!['https:', 'http:'].includes(url.protocol) || !url.hostname) throw new Error('unsupported');
+        setWebBusy(true); const name = webName.trim() || url.hostname; let favicon = null;
+        try { favicon = await dock.fetchFavicon(url.href); } catch { /* A favicon never prevents adding a website. */ }
+        add([{ name, path: url.href, icon: favicon }]); setWebUrl(''); setWebName('');
+      } catch { setError(t('overhaul.failed')); } finally { setWebBusy(false); }
+    }}>{t(webBusy ? 'overhaul.loading' : 'apps.webAdd')}</button></div></details>
     {pickingIcon && IconPicker && <IconPicker item={pickingIcon} onClose={() => pickIcon(null)} onPick={(value) => { commit(updatePin(latest.current.pinned, pickingIcon.id, { icon: value })); pickIcon(null); }} />}
     {creatingGroup && <GroupCreator pinned={cfg.pinned} initialIds={chosenIds} onClose={() => createGroup(false)} onCreate={(next) => { commit(next); createGroup(false); chooseIds([]); }} />}
   </>;

@@ -1,0 +1,49 @@
+/* Booki's shared component rhythm. Platform materials do not own component geometry. */
+:root {
+  --selection-strength: 8%; --selection-hover-strength: 10%;
+  --selection-fill: color-mix(in srgb, var(--ink) var(--selection-strength), transparent);
+  --selection-hover-fill: color-mix(in srgb, var(--ink) var(--selection-hover-strength), transparent);
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  --radius-control: 10px; --radius-card: 16px; --radius-panel: 22px;
+  --motion-feedback: 120ms; --motion-panel: 180ms;
+  --focus-width: 2px; --control-height: 36px;
+}
+:root[data-theme="light"] { --selection-strength: 5%; --selection-hover-strength: 6%; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --selection-strength: 5%; --selection-hover-strength: 6%; } }
+.s-navitem:hover { background: var(--selection-hover-fill); }
+.s-navitem.active { background: var(--selection-fill); color: var(--ink); box-shadow: inset 0 0 0 1px var(--set-line); }
+.s-navicon { background: transparent !important; color: var(--ink-2); box-shadow: none; }
+.s-navitem.active .s-navicon { color: var(--accent); }
+.s-btn { min-height: var(--control-height); border-radius: var(--radius-control); display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.ui-group, .workspace-inspector { border-radius: var(--radius-card); }
+.settings-body :is(button, input, select, textarea):focus-visible { outline-width: var(--focus-width); }
+.s-navitem { white-space: normal; overflow-wrap: anywhere; }
+.s-navlabel { min-width: 0; white-space: normal; line-height: 1.3; }
+.ui-disclosed[hidden] { display: none; }
+.workspace-inspector:focus-visible { outline: var(--focus-width) solid var(--accent); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { :root { --motion-feedback: 0ms; --motion-panel: 0ms; } }
+@media (forced-colors: active) {
+  .workspace-inspector, .s-btn, .ui-group { border: 1px solid CanvasText; }
+  .s-navitem.active { outline: 2px solid Highlight; }
+}
+.recovery-notice { border: 1px solid var(--set-line); border-left: 3px solid var(--accent); background: var(--set-card); padding: var(--space-4); border-radius: var(--radius-card); margin-bottom: var(--space-5); }
+.recovery-notice p { color: var(--ink-2); line-height: 1.5; }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+/* Only activated after the Windows compositor and WebView background accept Mica. */
+body.settings-body.settings-mica { --set-bg: transparent; background: transparent; }
+body.settings-mica .s-sidebar { background: color-mix(in srgb, var(--set-side) 75%, transparent); }
+.s-content { container-type: inline-size; container-name: booki-settings; }
+@container booki-settings (max-width: 560px) {
+  .ui-row:not(.ui-toggle-row) { flex-wrap: wrap; gap: 12px; }
+  .ui-row-control { max-width: 100%; flex-wrap: wrap; justify-content: flex-start; }
+  .ui-row:not(.ui-toggle-row) > .ui-row-text { flex-basis: 100%; }
+}
+:root[data-reduce-motion] *, :root[data-reduce-motion] *::before, :root[data-reduce-motion] *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+.snapshot-review { width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px); display: flex; flex-direction: column; }
+.snapshot-review-body { padding: 16px; overflow: auto; min-height: 0; }
+.snapshot-previews { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.snapshot-previews h3 { font-size: 14px; margin-inline: 16px; }
+.snapshot-changes { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; }
+.snapshot-changes li { background: var(--set-field); border-radius: 8px; padding: 8px; }
+.snapshot-review-footer { padding: 16px; border-top: 1px solid var(--set-line); }
+@media (max-width: 680px) { .snapshot-previews { grid-template-columns: minmax(0,1fr); } }

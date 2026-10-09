@@ -23,6 +23,31 @@ export function removePin(items, id) {
   return normalizeGroups(items.filter((item) => item.id !== id).map((item) => item.kind === 'group' ? { ...item, children: removePin(item.children || [], id) } : item));
 }
 
+/** Move within the same row without dissolving a group or losing its children. */
+export function movePinBy(items, id, delta) {
+  if (delta !== -1 && delta !== 1) return items;
+  const index = items.findIndex(item => item.id === id);
+  if (index >= 0) {
+    const target = index + delta;
+    if (target < 0 || target >= items.length) return items;
+    const next = [...items]; [next[index], next[target]] = [next[target], next[index]]; return next;
+  }
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.kind !== 'group') continue;
+    const children = movePinBy(item.children || [], id, delta);
+    if (children !== item.children) { const next = [...items]; next[i] = { ...item, children }; return next; }
+  }
+  return items;
+}
+
+/** Replace a group with its members at the same position in a single edit. */
+export function ungroupPin(items, id) {
+  const index = items.findIndex(item => item.id === id && item.kind === 'group');
+  if (index < 0) return items;
+  return [...items.slice(0, index), ...(items[index].children || []), ...items.slice(index + 1)];
+}
+
 /** One committed edit for either adding a candidate or moving a saved pin. */
 export function placePin(items, pin, { beforeId, groupId } = {}) {
   if (beforeId === pin.id || groupId === pin.id) return items;

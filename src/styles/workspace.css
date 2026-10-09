@@ -201,3 +201,10 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
   .widget-inspector { position: sticky; top: 12px; max-height: calc(100vh - 130px); overflow-y: auto; }
 }
 .library-dock-actions .s-btn, .app-library-tools .s-btn, .library-inspector .s-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+.workspace-inspector { scroll-margin-top: calc(var(--library-editor-height, 0px) + 12px); }
+.inspector-back { display: none; }
+@media (max-width: 1050px) {
+  .workspace-inspector[data-empty="true"] { display: none; }
+  .workspace-inspector .inspector-back { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; }
+}

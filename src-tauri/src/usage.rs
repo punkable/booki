@@ -73,9 +73,8 @@ pub fn record_launch(path: &str) {
     }
     let entries = rank(entries, 200);
     if let Ok(bytes) = serde_json::to_vec(&entries) {
-        let temporary = file.with_extension("json.tmp");
-        if std::fs::write(&temporary, bytes).is_ok() {
-            let _ = std::fs::rename(temporary, file);
+        if let Err(error) = crate::snapshot::write_bytes(&file, &bytes) {
+            log::warn!("Could not save local app usage: {error}");
         }
     }
 }

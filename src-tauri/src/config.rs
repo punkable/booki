@@ -499,6 +499,36 @@ pub fn invalidate_cache() {
     }
 }
 
+static RECOVERY: Mutex<Option<crate::recovery::RecoveryReport>> = Mutex::new(None);
+pub fn recovery_status() -> crate::recovery::RecoveryReport {
+    RECOVERY
+        .lock()
+        .ok()
+        .and_then(|value| value.clone())
+        .unwrap_or_default()
+}
+pub fn acknowledge_recovery() {
+    if let Ok(mut value) = RECOVERY.lock() {
+        *value = None;
+    }
+}
+
+/// An explicitly reviewed import may replace damaged data; retain the block on failure.
+pub fn save_replacement(cfg: &Config) -> Result<(), String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    let previous = recovery_status();
+    acknowledge_recovery();
+    let result = save_locked(cfg);
+    if result.is_err() {
+        if let Ok(mut status) = RECOVERY.lock() {
+            *status = Some(previous);
+        }
+    }
+    result
+}
+
 fn load_from_disk() -> Config {
     let path = config_path();
     // Sweep leftover temp files from an interrupted atomic save. The name
@@ -512,18 +542,15 @@ fn load_from_disk() -> Config {
             }
         }
     }
-    let mut cfg = if let Some(c) = read_config(&path) {
-        c
-    } else if path.exists() {
-        // The file is there but unreadable/corrupt → keep a copy to debug, then
-        // fall back to the backup, then to defaults as a last resort.
-        log::error!("config.json is corrupt; recovering from backup");
-        let _ = fs::copy(&path, config_dir().join("config.corrupt.json"));
-        read_config(&backup_path()).unwrap_or_default()
-    } else {
-        // No config yet → maybe a backup survived a wipe; otherwise defaults.
-        read_config(&backup_path()).unwrap_or_default()
-    };
+    let (mut cfg, report) = crate::recovery::read::<Config>(&path, &backup_path());
+    let blocked = report.blocked;
+    if let Ok(mut status) = RECOVERY.lock() {
+        *status = Some(report);
+    }
+    // Do not let migrations overwrite evidence when neither copy can be read.
+    if blocked {
+        return cfg;
+    }
     // Record historical default changes without overwriting user preferences.
     // New installs receive current defaults; existing choices remain intact.
     for revision in [2, 3, 4] {
@@ -679,6 +706,10 @@ pub fn update(edit: impl FnOnce(&mut Config) -> Result<(), String>) -> Result<Co
 }
 
 fn save_locked(config: &Config) -> Result<(), String> {
+    if recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_REQUIRED".into());
+    }
+
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     // Do not dissolve groups here — Settings may temporarily save an empty
