@@ -58,6 +58,7 @@ import {
 } from "./widgets-meta.js";
 
 const CHANGELOG_ICONS = {
+  settings: () => <span dangerouslySetInnerHTML={{ __html: icon("settings") }} />,
   sparkles: () => <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />,
   search: Search24Regular,
   undo: ArrowUndo24Regular,

@@ -15,7 +15,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -23,10 +23,18 @@ function surfaceRelease() {
   ] };
 }
 
-export function currentRelease() {
+function libraryRelease() {
   return { version: "0.71.0", date: "2026-10-06", headline: t("nextRelease.headline"), sections: [
     { icon: "search", title: t("nextRelease.library"), notes: [t("nextRelease.editing"), t("nextRelease.discovery")] },
     { icon: "sparkles", title: t("nextRelease.settings"), notes: [t("nextRelease.widgets"), t("nextRelease.menus")] },
     { icon: "performance", title: t("nextRelease.system"), notes: [t("nextRelease.events"), t("nextRelease.storage")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.72.0", date: "2026-10-09", headline: t("release72.headline"), sections: [
+    { icon: "search", title: t("nextRelease.library"), notes: [t("release72.library")] },
+    { icon: "settings", title: t("nextRelease.settings"), notes: [t("release72.interface")] },
+    { icon: "undo", title: t("nextRelease.system"), notes: [t("release72.recovery")] },
   ] };
 }
