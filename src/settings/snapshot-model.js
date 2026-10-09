@@ -8,3 +8,29 @@ const labels = {
 };
 /** @param {string} key @param {(key:string)=>string} t */
 export function snapshotFieldLabel(key,t) { return t(labels[/** @type {keyof typeof labels} */ (key)] || 'overhaul.system'); }
+
+/** Group related changes once instead of repeating generic labels for every field.
+ * @param {Record<string, unknown>} current
+ * @param {Record<string, unknown>} snapshot
+ * @param {(key:string)=>string} t
+ */
+export function snapshotChangeGroups(current, snapshot, t) {
+  /** @type {Map<string, {label:string, fields:string[]}>} */
+  const groups = new Map();
+  for (const field of changedSnapshotFields(current, snapshot)) {
+    const label = snapshotFieldLabel(field, t);
+    const group = groups.get(label) || { label, fields: [] };
+    group.fields.push(field); groups.set(label, group);
+  }
+  return [...groups.values()];
+}
+/** Compact comparable values; documents and arrays remain in the dock previews.
+ * @param {unknown} value
+ * @param {(key:string)=>string} t
+ */
+export function snapshotScalar(value, t) {
+  if (typeof value === 'boolean') return t(value ? 'integral.enabled' : 'integral.disabled');
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return value || '—';
+  return null;
+}

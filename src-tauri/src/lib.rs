@@ -6,7 +6,9 @@
 mod apps;
 mod clipboard_storage;
 mod config;
+mod config_document;
 mod config_transaction;
+mod profile_store;
 mod recovery;
 mod shortcuts;
 mod snapshot;
@@ -1457,26 +1459,7 @@ fn export_config(path: String) -> Result<(), String> {
 }
 
 fn read_import(path: &str) -> Result<Config, String> {
-    use std::io::Read;
-    let file = std::path::Path::new(path);
-    const LIMIT: u64 = 16 * 1024 * 1024;
-    let source = std::fs::File::open(file).map_err(|e| e.to_string())?;
-    if source.metadata().map_err(|e| e.to_string())?.len() > LIMIT {
-        return Err("BOOKI_IMPORT_TOO_LARGE".into());
-    }
-    let mut bytes = Vec::new();
-    source
-        .take(LIMIT + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() as u64 > LIMIT {
-        return Err("BOOKI_IMPORT_TOO_LARGE".into());
-    }
-    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-    if !value.as_object().is_some_and(|v| v.contains_key("pinned")) {
-        return Err("BOOKI_IMPORT_INVALID".into());
-    }
-    serde_json::from_value(value).map_err(|e| e.to_string())
+    config_document::read(std::path::Path::new(path))
 }
 
 #[tauri::command]
@@ -1513,16 +1496,7 @@ fn profiles_dir() -> std::path::PathBuf {
 
 /// Sanitized file path for a profile name (no separators/dots → no traversal).
 fn profile_file(name: &str) -> Result<std::path::PathBuf, String> {
-    let safe: String = name
-        .trim()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
-        .collect();
-    let safe = safe.trim().to_string();
-    if safe.is_empty() || safe.len() > 40 {
-        return Err("invalid profile name".into());
-    }
-    Ok(profiles_dir().join(format!("{safe}.json")))
+    profile_store::path(&profiles_dir(), name)
 }
 
 #[tauri::command]
@@ -1531,7 +1505,7 @@ fn profile_list() -> Vec<String> {
     if let Ok(entries) = std::fs::read_dir(profiles_dir()) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
+            if path.is_file() && path.extension().is_some_and(|e| e == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     names.push(stem.to_string());
                 }
@@ -1545,16 +1519,20 @@ fn profile_list() -> Vec<String> {
 /// Snapshot the CURRENT config under the given name (overwrites), and mark it
 /// as the active profile.
 #[tauri::command]
-fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
+fn profile_save(app: AppHandle, name: String, overwrite: Option<bool>) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
     let path = profile_file(&name)?;
+    if (path.exists() || path.with_extension("bak").exists()) && overwrite != Some(true) {
+        return Err("BOOKI_PROFILE_EXISTS".into());
+    }
     std::fs::create_dir_all(profiles_dir()).map_err(|e| e.to_string())?;
     let mut cfg = config::load();
     cfg.last_profile = name.trim().to_string();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     let backup = path.with_extension("bak");
-    let previous = std::fs::read_to_string(&path)
+    let previous = config_document::read(&path)
         .ok()
-        .filter(|value| serde_json::from_str::<Config>(value).is_ok());
+        .and_then(|value| serde_json::to_string_pretty(&value).ok());
     // A corrupt snapshot must never replace a valid recovery copy.
     if let Some(previous) = previous {
         snapshot::write(&backup, &previous)?;
@@ -1570,19 +1548,64 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
 /// Make the named profile the active config; repositions windows and tells
 /// every surface to re-read. Returns the applied config.
 #[tauri::command]
-fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
-    let path = profile_file(&name)?;
-    let parse = |file: &std::path::Path| -> Result<Config, String> {
-        let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
-        serde_json::from_str(&text).map_err(|e| e.to_string())
-    };
-    let mut cfg = parse(&path).or_else(|primary_error| {
-        let recovered = parse(&path.with_extension("bak")).map_err(|_| primary_error)?;
-        log::warn!("Recovering profile from its last valid snapshot");
-        Ok::<Config, String>(recovered)
-    })?;
+fn profile_apply(app: AppHandle, name: String, expected: Option<Config>) -> Result<Config, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    let mut cfg = profile_store::preview(&profiles_dir(), &name)?.config;
+    if expected.is_some_and(|reviewed| {
+        serde_json::to_value(reviewed).ok() != serde_json::to_value(&cfg).ok()
+    }) {
+        return Err("BOOKI_PROFILE_CHANGED".into());
+    }
     cfg.last_profile = name.trim().to_string();
     apply_config_snapshot(&app, cfg)
+}
+
+#[tauri::command]
+fn profile_preview(name: String) -> Result<profile_store::Preview, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::preview(&profiles_dir(), &name)
+}
+
+#[tauri::command]
+fn profile_duplicate(name: String, new_name: String) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::copy(&profiles_dir(), &name, &new_name)
+}
+
+#[tauri::command]
+fn profile_rename(app: AppHandle, name: String, new_name: String) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    let root = profiles_dir();
+    profile_store::copy(&root, &name, &new_name)?;
+    let active = config::load().last_profile == name.trim();
+    if active {
+        if let Err(error) = config::patch(serde_json::json!({ "lastProfile": new_name.trim() })) {
+            let _ = profile_store::delete(&root, &new_name);
+            return Err(error);
+        }
+    }
+    if let Err(error) = profile_store::delete(&root, &name) {
+        if active {
+            let _ = config::patch(serde_json::json!({ "lastProfile": name.trim() }));
+        }
+        // Keep both complete documents if rollback fails; never remove a
+        // document that the live configuration may still reference.
+        let _ = app.emit("booki://config-changed", ());
+        return Err(error);
+    }
+    let _ = app.emit("booki://config-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn profile_deleted() -> Vec<profile_store::Deleted> {
+    profile_store::deleted(&profiles_dir())
+}
+
+#[tauri::command]
+fn profile_restore(token: String) -> Result<String, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::restore(&profiles_dir(), &token)
 }
 
 fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String> {
@@ -1637,14 +1660,9 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
 }
 
 #[tauri::command]
-fn profile_delete(name: String) -> Result<(), String> {
-    let path = profile_file(&name)?;
-    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-    let backup = path.with_extension("bak");
-    if backup.exists() {
-        std::fs::remove_file(backup).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+fn profile_delete(name: String) -> Result<String, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::delete(&profiles_dir(), &name)
 }
 
 // ─────────────────────────── System volume ───────────────────────────
@@ -2870,6 +2888,11 @@ pub fn run() {
             profile_save,
             profile_apply,
             profile_delete,
+            profile_preview,
+            profile_duplicate,
+            profile_rename,
+            profile_deleted,
+            profile_restore,
             volume_info,
             volume_set,
             volume_mute,

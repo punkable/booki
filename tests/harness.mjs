@@ -170,7 +170,7 @@ function bridgeSource(cfg, { stats = {} } = {}) {
             case "app_icon": case "image_data_uri": case "file_thumbnail": return Promise.resolve("");
             case "list_monitors":
               return Promise.resolve([{ index: 0, name: "D1", x: 0, y: 0, w: 1920, h: 1080, primary: true }]);
-            case "list_installed_apps": case "profile_list": case "recent_files": return Promise.resolve([]);
+            case "list_installed_apps": case "profile_list": case "profile_deleted": case "recent_files": return Promise.resolve([]);
             case "recent_files_for": return Promise.resolve(null);
             case "get_autostart": return Promise.resolve(false);
             case "take_pending_tab": return Promise.resolve(null);

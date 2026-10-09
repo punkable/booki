@@ -64,6 +64,7 @@ export function CollapsibleSection({ title, hint, count, defaultOpen = false, ch
 }
 
 /** Label (+ hint) on the left, one control on the right. */
+const RowLabel = createContext(undefined);
 export function Row({ label, hint, children, stack = false }) {
   return (
     <div data-setting-label={typeof label === "string" ? label : undefined} className={"ui-row" + (stack ? " ui-row-stack" : "")}>
@@ -71,7 +72,7 @@ export function Row({ label, hint, children, stack = false }) {
         <span className="ui-row-label">{label}</span>
         {hint ? <span className="ui-row-hint">{hint}</span> : null}
       </div>
-      <div className="ui-row-control">{children}</div>
+      <div className="ui-row-control"><RowLabel.Provider value={typeof label === 'string' ? label : undefined}>{children}</RowLabel.Provider></div>
     </div>
   );
 }
@@ -111,12 +112,14 @@ export function Toggle({ checked, onChange, label, hint }) {
 
 /** Range slider with its value shown beside it. */
 export function Slider({ value, min, max, step, onChange, fmt }) {
+  const label = useContext(RowLabel);
   const v = Number(value ?? min);
   const pct = ((v - min) / Math.max(1e-9, max - min)) * 100;
   return (
     <div className="ui-slider">
       <input
         type="range"
+        aria-label={label}
         min={min}
         max={max}
         step={step}
@@ -131,16 +134,30 @@ export function Slider({ value, min, max, step, onChange, fmt }) {
 
 /** Segmented control. options: [{ value, label, icon? }] */
 export function SegmentedControl({ value, options, onChange }) {
+  const label = useContext(RowLabel);
   const idx = Math.max(0, options.findIndex((o) => o.value === value));
+  const navigate = (event) => {
+    if (!options.length) return;
+    const index = options.findIndex(option => option.value === value);
+    let next;
+    if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = options.length - 1;
+    else if (['ArrowRight','ArrowDown'].includes(event.key)) next = (Math.max(0,index) + 1) % options.length;
+    else if (['ArrowLeft','ArrowUp'].includes(event.key)) next = (Math.max(0,index) + options.length - 1) % options.length;
+    else return;
+    event.preventDefault(); event.stopPropagation(); onChange(options[next].value);
+    event.currentTarget.querySelectorAll('[role="radio"]')[next]?.focus();
+  };
   return (
-    <div className="ui-seg" role="radiogroup" style={{ "--n": options.length, "--i": idx }}>
+    <div className="ui-seg" role="radiogroup" aria-label={label} onKeyDown={navigate} style={{ "--n": options.length, "--i": idx }}>
       <span className="ui-seg-thumb" aria-hidden="true" />
-      {options.map((o) => (
+      {options.map((o,index) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={o.value === value}
+          tabIndex={index === idx ? 0 : -1}
           className={"ui-seg-item" + (o.value === value ? " on" : "")}
           onClick={() => onChange(o.value)}
           title={o.label}

@@ -1555,7 +1555,7 @@ function App() {
     await emitConfigChanged();
     return fresh;
   };
-  const applyProfile = (name) => applySnapshot(() => dockApi.profileApply(name));
+  const applyProfile = (name, expected) => applySnapshot(() => dockApi.profileApply(name, expected));
   const importProfile = (path, expected) => applySnapshot(() => dockApi.importConfig(path, expected));
 
   const reset = async () => {
@@ -1677,7 +1677,7 @@ function App() {
                   onClick={() => setTab(entry[0])}
                 >
                   <span className="s-navicon" style={{ background: entry[3] }} dangerouslySetInnerHTML={{ __html: icon(entry[2]) }} />
-                  <span>{t(entry[1])}</span>
+                  <span className="s-navlabel">{t(entry[1])}</span>
                 </button>
               ) : (
                 <span key={"gap" + i} className="s-nav-gap" aria-hidden="true" />
