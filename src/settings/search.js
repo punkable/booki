@@ -5,61 +5,45 @@
    which had grown to 3600 lines with this buried in the middle. */
 import { t } from "../i18n.js";
 
-// Searchable option index: i18n key → tab that hosts it (settings search).
+// Searchable option index: the i18n key a setting is labelled with → the page
+// that hosts it. The label must match the row's data-setting-label so the
+// result can scroll to it.
 const SEARCH_INDEX = [
-  ["premium.finishes", "appearance"], ["workspace.library", "apps"], ["overhaul.reduceTransparency", "appearance"],
-  ["overhaul.overflow", "dock"], ["premium.suggestionSettings", "apps"],
-  ["ap.theme", "appearance"], ["ap.accent", "appearance"],
-  ["ap.solidity", "appearance"], ["ap.surfaceTint", "appearance"],
-  ["ap.iconSize", "appearance"], ["ap.spacing", "appearance"], ["ap.radius", "appearance"],
-  ["ap.compact", "appearance"], ["ap.nativeMaterial", "appearance"],
-  ["ap.language", "general"], ["ap.backup", "profiles"],
-  ["be.position", "dock"], ["be.autoHide", "autohide"], ["be.hideDelay", "autohide"], ["be.hideInFullscreen", "autohide"], ["be.edgeGap", "dock"],
-  ["be.taskbarFollow", "autohide"], ["be.taskbarSettle", "autohide"], ["be.taskbarHoldHover", "autohide"],
-  ["be.notchMode", "notch"], ["ap.notchSize", "notch"],
-  ["be.reveal", "notch"], ["be.notchAlwaysVisible", "notch"], ["prof.title", "profiles"],
-  ["apps.newFolder", "apps"], ["group.ungroup", "apps"], ["group.takeOut", "apps"],
-  ["be.magnify", "dock"],
-  ["be.zoom", "dock"], ["be.anim", "dock"], ["be.monitor", "dock"],
-  ["be.showLabels", "dock"], ["be.showIndicators", "dock"],
-  ["be.autostart", "general"],
-  ["apps.title", "apps"], ["apps.widgets", "widgets"], ["apps.web", "apps"],
-  ["w.mediaScrollVolume", "widgets"],
-  ["clip.memory", "clipboard"], ["clip.retention", "clipboard"], ["clip.limit", "clipboard"],
-  ["clip.sensitive", "clipboard"], ["clip.compact", "clipboard"],
-  ["gen.captureVisible", "general"],
-  ["apps.addTrash", "apps"], ["apps.suggest", "apps"], ["trash.name", "apps"],
-  ["sc.title", "shortcuts"], ["sc.global", "shortcuts"], ["sc.positions", "shortcuts"],
-  ["faq.title", "faq"], ["faq.q.data", "faq"], ["faq.q.updates", "faq"],
-  ["faq.q.smartscreen", "faq"], ["faq.q.uninstall", "faq"], ["faq.transparency", "faq"],
-  ["ab.updates", "general"], ["ab.whatsNew", "general"],
+  ["dock.behavior", "dock"], ["be.reveal", "dock"], ["be.notchMode", "dock"], ["be.hideDelay", "dock"], ["be.hideInFullscreen", "dock"],
+  ["be.position", "dock"], ["be.monitor", "dock"], ["be.edgeGap", "dock"],
+  ["tab.appearance", "dock"], ["ap.theme", "dock"], ["ap.accent", "dock"], ["dock.intensity", "dock"], ["ap.surfaceTint", "dock"], ["overhaul.reduceTransparency", "dock"],
+  ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"], ["ap.compact", "dock"],
+  ["gp.interaction", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
+  ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
+  ["be.taskbarFollow", "dock"], ["be.taskbarSettle", "dock"], ["be.taskbarHoldHover", "dock"], ["ap.nativeMaterial", "dock"],
+  ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
+  ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.positions", "system"],
+  ["ab.updates", "system"], ["tab.profiles", "system"], ["gen.captureVisible", "system"], ["gen.ctxMenu", "system"],
+  ["overhaul.diagnostics", "system"], ["faq.title", "system"], ["ab.title", "system"], ["act.reset", "system"],
 ];
+
+const PAGE_LABELS = { home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
 
 const SEARCH_ALIASES = {
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper",
-  "premium.finishes": "acabado surface fondo background mica acrylic acrilico tintado tinted solido solid material cristal glass windhawk taskbar barra",
-  "ap.solidity": "solidez opacity opacidad translucidez translucency cristal",
+  "tab.appearance": "acabado finish surface fondo background mica acrylic acrilico tintado tinted solido solid material cristal vidrio glass",
+  "dock.intensity": "intensidad solidez opacity opacidad translucidez translucency cristal vidrio glass",
   "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
   "ap.translucency": "transparencia translucidez opacity material strength",
-  "be.autoHide": "ocultar esconder auto hide hidden smart inteligente",
+  "dock.behavior": "ocultar esconder auto hide hidden smart inteligente comportamiento behavior siempre visible",
   "be.hideInFullscreen": "pantalla completa fullscreen juego pelicula movie presentation ocultar",
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
-  "be.notchMode": "notch estilo pegado flotante inteligente iphone attached floating smart punto dot",
+  "be.notchMode": "notch pildora pill pestana tab pegado flotante attached floating",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
-  "ap.notchSize": "notch pastilla tamano size pill",
-  "be.notchPeek": "notch peek asomar pegado attached",
   "be.reveal": "revelar reveal hover click notch",
-  "apps.title": "aplicaciones programas pinned apps ancladas grupo group carpeta folder",
-  "apps.newFolder": "grupo group carpeta folder merge fusionar",
-  "apps.widgets": "widget reloj cpu ram bateria media musica",
-  "clip.memory": "portapapeles clipboard privacidad privacy historial history",
-  "sc.title": "atajo shortcut hotkey teclado keyboard",
-  "prof.title": "perfil profile configuracion setup",
-  "ap.backup": "respaldo backup exportar importar export import",
+  "overhaul.appsFolders": "aplicaciones programas pinned apps ancladas grupo group carpeta folder web sitio papelera trash",
+  "tab.widgets": "widget reloj clock cpu ram disco red sistema bateria media musica volumen nota portapapeles clipboard enfoque focus temporizador timer tareas tasks calendario clima weather",
+  "sc.toggle": "atajo shortcut hotkey teclado keyboard",
+  "tab.profiles": "perfil profile configuracion setup respaldo backup exportar importar export import",
 };
 
 function normalizeSearchText(value) {
@@ -89,7 +73,7 @@ export function findSettings(query) {
   return SEARCH_INDEX
     .map(([key, tab]) => {
       const label = t(key);
-      const tabLabel = t(`tab.${tab}`);
+      const tabLabel = t(PAGE_LABELS[tab]);
       const normalizedLabel = normalizeSearchText(label);
       const searchable = `${normalizedLabel} ${normalizeSearchText(tabLabel)} ${normalizeSearchText(SEARCH_ALIASES[key])}`;
       let score = normalizedLabel === normalizedQuery ? 200 : normalizedLabel.startsWith(normalizedQuery) ? 140 : 0;

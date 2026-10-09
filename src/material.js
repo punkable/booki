@@ -6,9 +6,9 @@
  * Reports are deduplicated, so callers can report from
  * every frame of an animation without flooding IPC.
  */
-import { physicalMaterialShapes } from "./material-geometry.js";
+import { physicalMaterialShapes, containedShape } from "./material-geometry.js";
 import { invoke, isTauri } from "./api.js";
-import { resolveGlassTint, surfaceAlpha } from "./surface.js";
+import { applySurfaceVars, effectiveSurface, nativeBlurWanted, resolveGlassTint, setWallpaperTint, surfaceAlpha } from "./surface.js";
 
 let lastSig = "";
 let generation = 0;
@@ -124,7 +124,7 @@ function pumpMaterial() {
 /** Coalesce reports to the latest geometry with at most one IPC in flight. */
 export function reportMaterial(shapes) {
   if (!isTauri) return;
-  const list = enabled && document.visibilityState !== "hidden" ? shapes.filter(Boolean) : [];
+  const list = enabled && document.visibilityState !== "hidden" ? shapes.filter(Boolean).map(containedShape).filter(Boolean) : [];
   const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, physicalMaterialShapes(list, devicePixelRatio)]);
   if (desired?.sig !== sig) desired = { list, sig, revision: ++generation, color: tint };
   else if (desired.revision !== generation) desired = { ...desired, revision: generation, color: tint };
@@ -152,4 +152,19 @@ export function followFrames(report, ms = 460) {
     else followers.delete(report);
   };
   requestAnimationFrame(step);
+}
+
+/** Apply a config's finish to this window: CSS variables, the native blur
+ * (glass only) and, for mica, the wallpaper tint. One entry point for the
+ * dock, the notch and theme changes. */
+let wallpaperAsked = 0;
+export function applyMaterial(cfg) {
+  applySurfaceVars(cfg);
+  setMaterialTint(materialTint(cfg));
+  setMaterialEnabled(nativeBlurWanted(cfg));
+  // The wallpaper rarely changes; refresh at most once a minute.
+  if (effectiveSurface(cfg) === "mica" && isTauri && Date.now() - wallpaperAsked > 60000) {
+    wallpaperAsked = Date.now();
+    invoke("wallpaper_accent").then((hex) => setWallpaperTint(hex)).catch(() => setWallpaperTint(""));
+  }
 }

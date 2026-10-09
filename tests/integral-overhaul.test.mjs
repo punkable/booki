@@ -72,16 +72,16 @@ test('an accepted native backdrop follows system appearance and returns to solid
 test('widget inspector options stay readable and support radio-group keyboard navigation', async () => {
   const {page,errors} = await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
-  await page.getByRole('button',{name:'Item details: Timer',exact:true}).click();
+  await page.getByRole('button',{name:'Item details: Focus',exact:true}).click();
   const group = page.getByRole('radiogroup',{name:'Look',exact:true});
-  assert.equal(await group.getByRole('radio',{name:'Gradient',exact:true}).locator('span').evaluate(el=>el.scrollWidth <= el.clientWidth + 1),true);
+  assert.equal(await group.getByRole('radio',{name:'Minimal',exact:true}).locator('span').evaluate(el=>el.scrollWidth <= el.clientWidth + 1),true);
   await group.getByRole('radio',{name:'Glass',exact:true}).focus(); await page.keyboard.press('ArrowRight');
   await page.waitForFunction(()=>document.activeElement?.textContent === 'Solid');
   assert.equal(await group.getByRole('radio',{name:'Solid',exact:true}).getAttribute('aria-checked'),'true');
   await page.keyboard.press('End');
   assert.equal(await group.getByRole('radio',{name:'Minimal',exact:true}).getAttribute('aria-checked'),'true');
   await page.setViewportSize({width:520,height:720});
-  assert.equal(await group.getByRole('radio',{name:'Gradient',exact:true}).locator('span').evaluate(el=>el.scrollWidth <= el.clientWidth + 1),true);
+  assert.equal(await group.getByRole('radio',{name:'Minimal',exact:true}).locator('span').evaluate(el=>el.scrollWidth <= el.clientWidth + 1),true);
   assert.deepEqual(errors,[]); await page.close();
 });
 
@@ -100,8 +100,7 @@ test('profiles select before applying, reject stale previews and recover deleted
       if(command === 'profile_restore') {window.__profiles.Work=${JSON.stringify(candidate)};window.__deleted=[];return 'Work';}
       return original(command,args);
     }`});
-  await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).click();
-  assert.equal(await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).locator('.s-navlabel').evaluate(el=>getComputedStyle(el).whiteSpace), 'normal');
+  await page.getByRole('navigation').getByRole('button',{name:'System',exact:true}).click();
   await page.getByRole('button',{name:'Work',exact:true}).click();
   await page.getByText('This profile was recovered from its backup. Review it before applying.',{exact:true}).waitFor();
   assert.deepEqual(await page.evaluate(()=>window.__profileCalls),[]);
@@ -130,7 +129,7 @@ test('a late profile preview never replaces the latest selection', async () => {
       if(c==='profile_preview') return Promise.resolve({config:${JSON.stringify(cfg)},recovered:false});
       return original(c,a);
     };`});
-  await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).click();
+  await page.getByRole('navigation').getByRole('button',{name:'System',exact:true}).click();
   await page.getByRole('button',{name:'First',exact:true}).click();
   await page.waitForFunction(()=>typeof window.__finishFirst==='function');
   await page.getByRole('button',{name:'Second',exact:true}).click();
@@ -151,7 +150,7 @@ test('a partial profile operation refreshes recoverable documents and retains it
       if(command==='profile_rename'){window.__profileNames.push(args.newName);return Promise.reject(new Error('original could not be archived'));}
       return original(command,args);
     };`});
-  await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).click();
+  await page.getByRole('navigation').getByRole('button',{name:'System',exact:true}).click();
   await page.getByRole('button',{name:'Work',exact:true}).click();
   const panel=page.locator('.profile-inspector');
   await panel.locator('.profile-manage summary').click();

@@ -7,7 +7,7 @@ const browser = await launchBrowser();
 test.after(async () => { await browser.close(); srv.close(); });
 const app = { id: 'editor', kind: 'app', name: 'Editor', path: 'C:/editor.exe', args: [] };
 
-test('Home distinguishes a profile load failure and retries without changing the dock', async () => {
+test('Profiles report a load failure and retry without changing the dock', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html', {
     cfg: makeConfig({ pinned: [app], lastProfile: 'Removed profile' }),
     initScript: `const invoke = window.__TAURI__.core.invoke;
@@ -16,11 +16,11 @@ test('Home distinguishes a profile load failure and retries without changing the
         ? (++window.profileAttempts === 1 ? Promise.reject(new Error('offline')) : Promise.resolve(['Work']))
         : invoke(command, args);`,
   });
-  await page.getByRole('navigation').getByRole('button', { name: 'Home', exact: true }).click();
-  await page.getByRole('alert').filter({ hasText: 'Your profiles could not be loaded.' }).waitFor();
-  await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Profiles & backup', exact: true }).waitFor();
-  assert.equal(await page.getByRole('combobox', { name: 'Profiles & backup', exact: true }).inputValue(), '');
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  const failure = page.locator('.profile-error[role="alert"]');
+  await failure.waitFor();
+  await failure.getByRole('button', { name: 'Refresh list', exact: true }).click();
+  await page.locator('.profile-choice').filter({ hasText: 'Work' }).waitFor();
   assert.equal(await page.evaluate(() => window.profileAttempts), 2);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].id), 'editor');
   assert.deepEqual(errors, []);

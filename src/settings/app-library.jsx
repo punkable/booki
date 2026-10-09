@@ -83,14 +83,14 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const showAll = searching || filter === 'all';
   return <section aria-label={t('workspace.library')} className="app-library-section">
     <div className="app-library-tools"><span className="app-library-search"><Icon name="search" /><input type="search" aria-label={t('apps.search')} placeholder={t('apps.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} /></span>
-      <button type="button" className="s-btn s-btn-soft library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
-      {browseFile && <button type="button" className="s-btn s-btn-soft" onClick={browseFile}><Icon name="app" />{t('add.browse')}</button>}
+      <button type="button" className="button library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
+      {browseFile && <button type="button" className="button" onClick={browseFile}><Icon name="app" />{t('add.browse')}</button>}
     </div>
     <div className="app-library-filters" role="group" aria-label={t('workspace.sources')}>
       {[['all', 'add.all'], ['frequent', 'add.frequent'], ['running', 'add.running']].map(([value, key]) => <button type="button" key={value} aria-pressed={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
     </div>
     <div role="status" aria-live="polite">{message}</div>
-    {chosen.length > 0 && <div className="app-library-selection"><button className="s-btn" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="s-btn s-btn-soft" onClick={() => setSelected({})}>{t('trash.cancel')}</button></div>}
+    {chosen.length > 0 && <div className="app-library-selection"><button className="button button-accent" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="button" onClick={() => setSelected({})}>{t('trash.cancel')}</button></div>}
     {loading && <p className="muted" role="status">{t('overhaul.loading')}</p>}
     <>
       {failed.length > 0 && <p role="alert">{t('overhaul.partialApps')}</p>}
@@ -102,17 +102,17 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
         <h3 className="app-library-heading">{t('add.all')} <span>{installed.length}</span></h3>
         {cards(installed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))}
         {!installed.length && !sections.utilities.length && !sections.frequent.length && !sections.running.length && !loading && !failed.includes(0) && <p className="muted">{t('add.none')}</p>}
-        {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="s-btn s-btn-soft" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="s-btn s-btn-soft" disabled={(page + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
+        {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="button" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="button" disabled={(page + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
       </>}
       {showAll && sections.utilities.length > 0 && <details key={searching ? "search-tools" : "tools"} open={searching || undefined} className="app-library-utilities"><summary>{t('design.systemApps')} <span>{sections.utilities.length}</span></summary>{cards(sections.utilities)}</details>}
-      {!searching && <details className="app-library-folders-wrap"><summary>{t('workspace.folders')}</summary><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="s-btn s-btn-soft" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" />{t(`kf.${key}`)}</button>)}
-        {browseFolder && <button type="button" className="s-btn s-btn-soft" onClick={browseFolder}><Icon name="folder-plus" />{t('apps.addFolder')}</button>}
+      {!searching && <details className="app-library-folders-wrap"><summary>{t('workspace.folders')}</summary><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="button" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" />{t(`kf.${key}`)}</button>)}
+        {browseFolder && <button type="button" className="button" onClick={browseFolder}><Icon name="folder-plus" />{t('apps.addFolder')}</button>}
       </div></details>}
     </>
     <details className="app-library-privacy"><summary>{t('premium.suggestionSettings')}</summary>
       <label><input type="checkbox" checked={cfg.usageRecommendationsEnabled !== false} onChange={(e) => set({ usageRecommendationsEnabled: e.target.checked })} />{t('premium.localRecommendations')}</label>
-      <button className="s-btn s-btn-soft" onClick={() => set({ ignoredAppSuggestions: [] })}>{t('premium.restoreSuggestions')}</button>
-      <button className="s-btn s-btn-soft" onClick={async () => { try { await dock.clearUsage(); await load(); setMessage(t('premium.historyCleared')); } catch (_) { setMessage(t('overhaul.failed')); } }}>{t('premium.clearHistory')}</button>
+      <button className="button" onClick={() => set({ ignoredAppSuggestions: [] })}>{t('premium.restoreSuggestions')}</button>
+      <button className="button" onClick={async () => { try { await dock.clearUsage(); await load(); setMessage(t('premium.historyCleared')); } catch (_) { setMessage(t('overhaul.failed')); } }}>{t('premium.clearHistory')}</button>
     </details>
   </section>;
 }

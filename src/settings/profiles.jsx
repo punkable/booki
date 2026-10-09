@@ -55,14 +55,14 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
   return <section className="profiles-section" aria-label={t("prof.title")}>
     {review && <SnapshotReview current={cfg} snapshot={review.config} onClose={() => setReview(null)} onConfirm={() => onApply(review.name, review.config)} />}
     <div className="profiles-toolbar"><h2>{t("prof.title")} <span>{profiles.length}</span></h2>
-      <div className="prof-new"><input className="sugg-search" aria-label={t("prof.name")} placeholder={t("prof.name")} value={name} maxLength={40} onChange={e => { setName(e.target.value); setOverwrite(""); }} />
-        <button className="s-btn" disabled={busy || !name.trim()} onClick={() => {
+      <div className="prof-new"><input className="text-field" aria-label={t("prof.name")} placeholder={t("prof.name")} value={name} maxLength={40} onChange={e => { setName(e.target.value); setOverwrite(""); }} />
+        <button className="button button-accent" disabled={busy || !name.trim()} onClick={() => {
           if (profiles.some(n => n.toLowerCase() === name.trim().toLowerCase()) && overwrite !== name.trim()) { setOverwrite(name.trim()); return; }
           action(async () => { await beforeSnapshot(); await dockApi.profileSave(name.trim(), overwrite === name.trim()); setName(""); setOverwrite(""); await refresh(); });
         }}>{t(overwrite === name.trim() && name.trim() ? "integral.overwriteProfile" : "prof.save")}</button>
       </div>
     </div>
-    {error && <div className="profile-error" role="alert"><span>{error}</span><button className="s-btn s-btn-soft" disabled={busy} onClick={() => action(refresh)}>{t("apps.refresh")}</button></div>}
+    {error && <div className="profile-error" role="alert"><span>{error}</span><button className="button" disabled={busy} onClick={() => action(refresh)}>{t("apps.refresh")}</button></div>}
     <div className="profile-list" aria-label={t("prof.title")}>
       {!profiles.length && <p className="profile-empty">{t("design.profileEmpty")}</p>}
       {profiles.map(n => <div className={"profile-record" + (n === selected ? " selected" : "")} key={n}>
@@ -74,13 +74,13 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
           {loading && <p role="status">{t("overhaul.loading")}</p>}
           {preview && <><div className="profile-preview-line"><DockPreview cfg={preview.config} />
             <div className="profile-summary"><span>{counts.apps} {t("overhaul.apps")} · {counts.widgets} {t("tab.widgets")} · {counts.groups} {t("overhaul.groups")}</span><span>{t(`edge.${preview.config.edge || "bottom"}`)} · {t(`theme.${preview.config.theme || "system"}`)}</span><small>{t("design.profileScope")}</small></div>
-            <div className="workspace-actions"><button className="s-btn" disabled={busy || loading} onClick={() => setReview({ ...preview, name:selected })}>{t("prof.apply")}</button>
-              <button className="s-btn s-btn-soft" disabled={busy} onClick={() => action(async () => { await dockApi.profileDelete(selected); setSelected(""); await refresh(); })}>{t("apps.remove")}</button></div>
+            <div className="workspace-actions"><button className="button button-accent" disabled={busy || loading} onClick={() => setReview({ ...preview, name:selected })}>{t("prof.apply")}</button>
+              <button className="button" disabled={busy} onClick={() => action(async () => { await dockApi.profileDelete(selected); setSelected(""); await refresh(); })}>{t("apps.remove")}</button></div>
           </div>{preview.recovered && <p role="status">{t("integral.profileRecovered")}</p>}
             <details className="profile-manage" open={manageOpen} onToggle={event => setManageOpen(event.currentTarget.open)}><summary>{t("design.manageProfile")}</summary>
-              <div className="profile-manage-controls"><input className="sugg-search" aria-label={t("integral.renameProfile")} placeholder={t("prof.name")} value={targetName} maxLength={40} onChange={e => setTargetName(e.target.value)} />
-                <button className="s-btn s-btn-soft" disabled={busy || !targetName.trim()} onClick={() => action(async () => { await dockApi.profileDuplicate(selected, targetName.trim()); setTargetName(""); await refresh(); })}>{t("integral.duplicateProfile")}</button>
-                <button className="s-btn s-btn-soft" disabled={busy || !targetName.trim() || targetName.trim() === selected} onClick={() => action(async () => { const target = targetName.trim(); await dockApi.profileRename(selected, target); setTargetName(""); setSelected(target); await refresh(); })}>{t("integral.renameProfile")}</button>
+              <div className="profile-manage-controls"><input className="text-field" aria-label={t("integral.renameProfile")} placeholder={t("prof.name")} value={targetName} maxLength={40} onChange={e => setTargetName(e.target.value)} />
+                <button className="button" disabled={busy || !targetName.trim()} onClick={() => action(async () => { await dockApi.profileDuplicate(selected, targetName.trim()); setTargetName(""); await refresh(); })}>{t("integral.duplicateProfile")}</button>
+                <button className="button" disabled={busy || !targetName.trim() || targetName.trim() === selected} onClick={() => action(async () => { const target = targetName.trim(); await dockApi.profileRename(selected, target); setTargetName(""); setSelected(target); await refresh(); })}>{t("integral.renameProfile")}</button>
               </div>
             </details>
           </>}
@@ -88,13 +88,13 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
       </div>)}
     </div>
     {deleted.length > 0 && <CollapsibleSection title={t("integral.deletedProfiles")} icon="copy" count={deleted.length}>
-      {deleted.map(entry => <div className="prof-row" key={entry.token}><span className="prof-name">{entry.name}</span><button className="s-btn s-btn-soft" disabled={busy} onClick={() => action(async () => { await dockApi.profileRestore(entry.token); await refresh(); })}>{t("integral.restoreProfile")}</button></div>)}
+      {deleted.map(entry => <div className="prof-row" key={entry.token}><span className="prof-name">{entry.name}</span><button className="button" disabled={busy} onClick={() => action(async () => { await dockApi.profileRestore(entry.token); await refresh(); })}>{t("integral.restoreProfile")}</button></div>)}
     </CollapsibleSection>}
   </section>;
 
 }
 
-export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport }) {
+export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport, embedded = false }) {
   const [backupMsg, setBackupMsg] = useState("");
   const [review, setReview] = useState(null);
   const flashTimer = useRef(null);
@@ -107,7 +107,7 @@ export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport }) {
   return (
     <>
       {review && <SnapshotReview current={cfg} snapshot={review.snapshot} onClose={() => setReview(null)} onConfirm={async () => { await onImport(review.path,review.snapshot);flash(t("ap.backupImported")); }} />}
-      <PageHeader title={t("tab.profiles")}>{t("prof.hint")}</PageHeader>
+      {embedded ? <h2 className="ui-group-title" data-setting-label={t("tab.profiles")}>{t("tab.profiles")}</h2> : <PageHeader title={t("tab.profiles")}>{t("prof.hint")}</PageHeader>}
       <ProfilesCard cfg={cfg} onApply={onApply} beforeSnapshot={beforeSnapshot} />
       <section className="profile-backup"><div><h2>{t("ap.backup")}</h2><p role="status">{backupMsg || t("design.backupHint")}</p></div><div className="workspace-actions">
 

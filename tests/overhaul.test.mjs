@@ -9,16 +9,18 @@ const pin = (widget, style = {}) => ({ id: `w-${widget}`, kind: "widget", widget
 test("dashboard applies scenarios without replacing pins and stays inside a small window", async () => {
   const cfg = makeConfig({ pinned: [pin("clock")] });
   const { page, errors } = await openPage(browser, port, "settings.html", { cfg, viewport: { width: 520, height: 650 } });
-  const navigation = await page.locator(".s-navitem").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().toJSON()));
+  const navigation = await page.locator(".nav-item").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().toJSON()));
   assert.ok(navigation.every((rect) => rect.y >= 0 && rect.bottom <= 650), "navigation stays on screen");
-  await page.getByRole("button", { name: /^Smart Moves/ }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Dock", exact: true }).click();
+  await page.getByRole("radio", { name: /^Smart Moves/ }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
   assert.equal(saved.autoHideMode, "smart"); assert.deepEqual(saved.pinned, cfg.pinned);
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
-  await page.getByRole("button", { name: "Add widget", exact: true }).click();
-  assert.equal(await page.locator(".widget-store-card").count(), 15);
-  assert.equal(await page.locator(".widget-store-preview .w-card").count(), 15);
+  await page.getByRole("navigation").getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("button", { name: /^Add widget/ }).click();
+  assert.equal(await page.locator(".catalog-card").count(), 10);
+  assert.equal(await page.locator(".catalog-preview .w-card").count(), 10);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -45,19 +47,19 @@ test("adding apps displays local usage in order and reaches installed apps beyon
 });
 
 test("local timer and task panel persist and Escape closes the panel", async () => {
-  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("timer"), pin("tasks"), pin("calendar")] }), viewport: { width: 1200, height: 600 } });
-  await page.locator('#dock > [data-widget="timer"]').click();
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("focus"), pin("calendar")] }), viewport: { width: 1200, height: 600 } });
+  await page.locator('#dock > [data-widget="focus"]').click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.waitForTimeout(250);
   let saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.ok(saved.pinned[0].style.endsAt > Date.now());
   await page.keyboard.press("Escape"); assert.equal(await page.locator(".productivity-panel").count(), 0);
-  await page.locator('#dock > [data-widget="tasks"]').click();
+  await page.locator('#dock > [data-widget="focus"]').click();
   await page.getByRole("textbox", { name: "Add task" }).fill('<img src=x onerror=alert(1)>');
   await page.getByRole("button", { name: "Add task" }).click();
   await page.waitForTimeout(250);
   assert.equal(await page.locator(".focus-task img").count(), 0);
   await page.locator('.focus-task input[type="checkbox"]').check(); await page.waitForTimeout(250);
-  saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.equal(saved.pinned[1].style.tasks[0].done, true);
+  saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.equal(saved.pinned[0].style.tasks[0].done, true);
   await page.keyboard.press("Escape");
   await page.locator('#dock > [data-widget="calendar"]').click(); assert.ok(await page.locator(".focus-calendar .today").count());
   assert.deepEqual(errors, []); await page.close();
@@ -90,7 +92,7 @@ test("scroll overflow keeps chosen icon size and new widgets work vertically", a
   assert.equal(await page.locator("body.dock-overflow").count(), 1);
   assert.equal(await page.locator("#dock > .tile").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--size")), "48px");
   assert.deepEqual(errors, []); await page.close();
-  const vertical = await openPage(browser, port, "index.html", { cfg: makeConfig({ edge: "left", pinned: [pin("timer"), pin("tasks"), pin("calendar"), pin("weather")] }), viewport: { width: 500, height: 900 } });
+  const vertical = await openPage(browser, port, "index.html", { cfg: makeConfig({ edge: "left", pinned: [pin("focus"), pin("clock"), pin("calendar"), pin("weather")] }), viewport: { width: 500, height: 900 } });
   const widths = await vertical.page.locator("#dock > .tile.widget").evaluateAll((tiles) => tiles.map((tile) => tile.getBoundingClientRect().width));
   assert.ok(widths.every((width) => Math.abs(width - widths[0]) < 1)); assert.deepEqual(vertical.errors, []); await vertical.page.close();
 });
@@ -106,9 +108,10 @@ test("settings preserve edits during a delayed save and an external dock update"
       return old(cmd, args);
     };
   });
-  await page.getByRole("button", { name: /^Smart Moves/ }).click();
+  await page.getByRole("navigation").getByRole("button", { name: "Dock", exact: true }).click();
+  await page.getByRole("radio", { name: /^Smart Moves/ }).click();
   await page.waitForFunction(() => window.__saving);
-  await page.getByRole("button", { name: /^Reveal at the edge/ }).click();
+  await page.getByRole("radio", { name: /^Reveal at the edge/ }).click();
   await page.evaluate(async () => {
     await window.__TAURI__.core.invoke("save_config", { patch: { pinned: [{ id: "external", kind: "app", name: "External", path: "C:/external.exe" }] } });
     for (const cb of window.__listeners["booki://config-changed"] || []) cb({ payload: null });
@@ -117,7 +120,7 @@ test("settings preserve edits during a delayed save and an external dock update"
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
   assert.equal(saved.autoHideMode, "edge"); assert.equal(saved.notchTrigger, "hover");
   assert.equal(saved.pinned[0].name, "External");
-  assert.equal(await page.getByRole("button", { name: /^Reveal at the edge/ }).getAttribute("aria-pressed"), "true");
+  assert.equal(await page.getByRole("radio", { name: /^Reveal at the edge/ }).getAttribute("aria-checked"), "true");
   assert.deepEqual(errors, []); await page.close();
 });
 

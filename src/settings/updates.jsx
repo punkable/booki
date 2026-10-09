@@ -15,7 +15,7 @@ export function UpdatesCard({ onWhatsNew, beforeApply }) {
   const { phase, update, pct, error } = state;
   const busy = phase === 'downloading' || phase === 'installing';
   return <>
-    {error && <p className="update-error" role="alert">{t(phase === 'ready' ? 'premium.updateApplyError' : phase === 'available' ? 'premium.updateDownloadError' : 'ab.error')}</p>}
+    {error && phase !== 'error' && <p className="update-error" role="alert">{t(phase === 'ready' ? 'premium.updateApplyError' : phase === 'available' ? 'premium.updateDownloadError' : 'ab.error')}</p>}
     {phase === 'available' || phase === 'ready' ? <Row label={<>{t('ab.newVersion')} <strong>v{update.version}</strong> {t('ab.available')}</>} hint={managed === false ? t('premium.manualUpdateHint') : phase === 'ready' ? t('premium.updateReady') : t('premium.updateDownloadHint')}>
       <Button appearance="primary" disabled={managed === null} onClick={() => (managed === false ? dock.launch("https://github.com/punkable/booki/releases/latest") : phase === 'ready' ? updates.apply(beforeApply) : updates.download()).catch(() => {})}>{t(managed === false ? 'premium.manualUpdate' : phase === 'ready' ? 'premium.updateApply' : 'premium.updateDownload')}</Button>
     </Row> : busy ? <Row label={phase === 'installing' ? t('ab.installing') : `${t('ab.downloading')} ${pct == null ? '…' : Math.round(pct * 100) + '%'}`}>

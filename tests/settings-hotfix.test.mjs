@@ -13,7 +13,7 @@ const nativePins = WIDGET_ORDER.map((widget) => ({ id: widget, name: widget, pat
 test('Home and every Settings section accept unstyled native widget records', async () => {
   const cfg = makeConfig({ pinned: nativePins });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 960, height: 760 } });
-  assert.equal(await page.locator('.dashboard-hero').count(), 1);
+  assert.equal(await page.locator('.hero').count(), 1);
   assert.equal(await page.locator('.live-preview-bar .widget').count(), WIDGET_ORDER.length);
   const nav = page.getByRole('navigation');
   const names = await nav.locator('button').allTextContents();
@@ -21,7 +21,7 @@ test('Home and every Settings section accept unstyled native widget records', as
     await nav.getByRole('button', { name: name.trim(), exact: true }).click();
     await page.waitForTimeout(100);
     assert.equal(await page.locator('.settings-recovery').count(), 0, name);
-    assert.ok(await page.locator('.s-content').innerText(), name);
+    assert.ok(await page.locator('.settings-main').innerText(), name);
   }
   assert.deepEqual((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).pinned, nativePins);
   assert.deepEqual(errors, []);
@@ -30,19 +30,19 @@ test('Home and every Settings section accept unstyled native widget records', as
 
 test('the current changelog renders every section icon as SVG', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
-  await page.getByRole('navigation').getByRole('button', { name: 'About', exact: true }).click();
-  await page.getByRole('button', { name: "What's new", exact: true }).click();
-  await page.locator('.cl-section-title').first().waitFor();
-  await page.locator('.cl-history > summary').click();
-  const history = page.locator('.cl-history-entry');
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.locator('.about').getByRole('button', { name: "What's new", exact: true }).click();
+  await page.locator('.release-section h3').first().waitFor();
+  await page.locator('.release-history > summary').click();
+  const history = page.locator('.release-history-entry');
   for (let i = 0; i < previousReleases().length; i++) {
     await history.nth(i).locator('summary').click();
-    await history.nth(i).locator('.cl-section-title').first().waitFor();
+    await history.nth(i).locator('.release-section h3').first().waitFor();
   }
-  const titles = page.locator('.cl-section-title');
+  const titles = page.locator('.release-section h3');
   assert.ok(await titles.count() > 0);
-  assert.equal(await titles.locator('.cl-ico svg').count(), await titles.count());
-  assert.equal(await page.locator('.cl-section-title .cl-ico').allTextContents().then((texts) => texts.join('')), '');
+  assert.equal(await titles.locator('.release-icon svg').count(), await titles.count());
+  assert.equal(await page.locator('.release-section h3 .release-icon').allTextContents().then((texts) => texts.join('')), '');
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -98,7 +98,8 @@ test('a late material reply cannot re-enable glass after the user disables it', 
 });
 
 test('an injected Home render failure preserves navigation without rewriting settings', async () => {
-  const cfg = makeConfig({ lastProfile: { invalidLabel: true }, pinned: nativePins });
+  // A pinned list that is not a list makes Home's summary throw while rendering.
+  const cfg = makeConfig({ pinned: { invalid: true } });
   const { page } = await openPage(browser, port, 'settings.html', { cfg });
   await page.locator('.settings-recovery').waitFor();
   await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();

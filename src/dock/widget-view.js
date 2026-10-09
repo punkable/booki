@@ -15,7 +15,7 @@
  */
 import { icon } from "../icons.js";
 import { emo } from "../emoji.js";
-import { WIDGET_ICONS, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS } from "../widgets-meta.js";
+import { WIDGET_ICONS, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, RING_DEFAULTS, systemMetrics } from "../widgets-meta.js";
 import { reduceMotion } from "./motion.js";
 
 export const RING_R = 15.5; // SVG viewBox 0 0 36 36
@@ -84,7 +84,7 @@ export function clockParts(now, lang) {
    and "polite" means it waits for a pause rather than interrupting. The clock
    is deliberately not on this list: announcing the time every minute, forever,
    is noise, not information. */
-export const LIVE_WIDGETS = ["cpu", "ram", "disk", "net", "battery", "media", "volume", "clipboard"];
+export const LIVE_WIDGETS = ["system", "battery", "media", "volume", "clipboard"];
 
 /** A cell's icon: a quiet line glyph, falling back to the Fluent emoji for any
     widget that has no glyph yet. */
@@ -93,8 +93,19 @@ function widgetGlyph(type, size) {
   return glyph ? icon(glyph) : emo(WIDGET_ICONS[type] || "puzzle", size);
 }
 
-/** Inner markup of `.w-card` for a widget type. Ring, preview or plain. */
-export function widgetCardHTML(type) {
+const ringSVG = () =>
+  `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
+  `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>`;
+
+/** Inner markup of `.w-card` for a widget. `style` matters only for the
+ *  system widget, whose cells are the metrics it shows. */
+export function widgetCardHTML(type, style = {}) {
+  if (type === "system") {
+    return `<span class="w-label w-sr"></span>` + systemMetrics(style).map((metric) => metric === "net"
+      ? `<span class="w-sys-cell w-sys-net" data-metric="net"><span class="w-sys-rate" data-dir="down"></span><span class="w-sys-rate" data-dir="up"></span></span>`
+      : `<span class="w-sys-cell w-ring" data-metric="${metric}" style="--w-accent:${RING_DEFAULTS[metric]}">${ringSVG()}` +
+        `<span class="w-ring-ico">${icon(WIDGET_GLYPHS[metric])}</span><span class="w-ring-num"></span></span>`).join("");
+  }
   if (PREVIEW_WIDGETS.includes(type)) {
     return (
       `<span class="w-pv-ico">${widgetGlyph(type, 22)}<span class="w-pv-count"></span></span>` +
@@ -104,26 +115,38 @@ export function widgetCardHTML(type) {
   }
   const isRing = RING_WIDGETS.includes(type);
   const art = isRing
-    ? `<span class="w-ring">` +
-      `<svg viewBox="0 0 36 36"><circle class="w-ring-track" cx="18" cy="18" r="${RING_R}"/>` +
-      `<circle class="w-ring-fill" cx="18" cy="18" r="${RING_R}" style="stroke-dasharray:${RING_C.toFixed(2)};stroke-dashoffset:${RING_C.toFixed(2)}"/></svg>` +
-      `<span class="w-ring-ico">${widgetGlyph(type, 14)}</span>` +
-      `<span class="w-ring-num"></span></span>`
+    ? `<span class="w-ring">${ringSVG()}<span class="w-ring-ico">${widgetGlyph(type, 14)}</span><span class="w-ring-num"></span></span>`
     : `<span class="w-ico">${widgetGlyph(type, 20)}</span>`;
-  // Network gets a live throughput graph under its reading.
-  const spark =
-    type === "net"
-      ? `<svg class="w-spark" viewBox="0 0 ${SPARK_W} ${SPARK_H}" preserveAspectRatio="none" aria-hidden="true">` +
-        `<path class="w-spark-fill"/><path class="w-spark-line"/></svg>`
-      : "";
   return (
     art +
     `<span class="w-main">` +
     `<span class="w-label"></span>` +
     (isRing ? "" : `<span class="w-value">…</span><span class="w-bar"><i></i></span>`) +
-    `</span>` +
-    spark
+    `</span>`
   );
+}
+
+/** Paint a system widget from one stats snapshot (see system_stats). Ring
+ *  cells show a percentage; the network cell shows down/up rates. */
+export function setSystem(el, stats, labels) {
+  const values = { cpu: stats.cpu, ram: stats.mem, disk: stats.disk };
+  const titles = [];
+  for (const cell of el.querySelectorAll(".w-sys-cell")) {
+    const metric = cell.dataset.metric;
+    if (metric === "net") {
+      cell.querySelector('[data-dir="down"]').textContent = `↓ ${fmtRate(stats.net_down_kbps || 0)}`;
+      cell.querySelector('[data-dir="up"]').textContent = `↑ ${fmtRate(stats.net_up_kbps || 0)}`;
+      titles.push(`${labels.net}: ↓ ${fmtRate(stats.net_down_kbps || 0)} · ↑ ${fmtRate(stats.net_up_kbps || 0)}`);
+      continue;
+    }
+    const value = Math.round(Math.min(100, Math.max(0, Number(values[metric]) || 0)));
+    tweenNumber(cell.querySelector(".w-ring-num"), value, (n) => `${n}`);
+    cell.querySelector(".w-ring-fill").style.strokeDashoffset = `${(RING_C * (1 - value / 100)).toFixed(2)}`;
+    titles.push(`${labels[metric]} ${value}%`);
+  }
+  const summary = titles.join(" · ");
+  el.querySelector(".w-label").textContent = summary;
+  el.title = summary;
 }
 
 export const SPARK_W = 100;

@@ -1,3 +1,4 @@
-/* Explicit layers keep production CSS chunks from reviving legacy styles. */
-@layer booki-base, booki-widgets, booki-menus, booki-settings, booki-overhaul, booki-workspace;
-@import "./styles.css" layer(booki-base);
+/* Notch window styles: the same tokens and surface rules as the dock. */
+@layer tokens, dock;
+@import "./styles/tokens.css" layer(tokens);
+@import "./styles.css" layer(dock);

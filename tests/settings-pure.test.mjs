@@ -54,20 +54,20 @@ test("search returns nothing for gibberish", () => {
 
 const pinned = [
   { id: "a", kind: "app", name: "One" },
-  { id: "w1", kind: "widget", widget: "cpu", style: { variant: "glass" } },
+  { id: "w1", kind: "widget", widget: "clock", style: { variant: "glass" } },
   {
     id: "g1",
     kind: "group",
     name: "Group",
     children: [
       { id: "k1", kind: "app", name: "Kid" },
-      { id: "w2", kind: "widget", widget: "cpu", style: { variant: "solid" } },
+      { id: "w2", kind: "widget", widget: "clock", style: { variant: "solid" } },
     ],
   },
 ];
 
 test("widgetRefs finds the same widget on the bar and inside a group", () => {
-  const refs = widgetRefs(pinned, "cpu");
+  const refs = widgetRefs(pinned, "clock");
   assert.equal(refs.length, 2);
   assert.equal(refs[0].type, "top");
   assert.equal(refs[0].id, "w1");
@@ -77,13 +77,13 @@ test("widgetRefs finds the same widget on the bar and inside a group", () => {
 });
 
 test("widgetRefs copes with an empty or missing list", () => {
-  assert.deepEqual(widgetRefs([], "cpu"), []);
-  assert.deepEqual(widgetRefs(null, "cpu"), []);
-  assert.deepEqual(widgetRefs(pinned, "ram"), []);
+  assert.deepEqual(widgetRefs([], "clock"), []);
+  assert.deepEqual(widgetRefs(null, "clock"), []);
+  assert.deepEqual(widgetRefs(pinned, "battery"), []);
 });
 
 test("itemForWidgetRef resolves both kinds of reference", () => {
-  const [top, child] = widgetRefs(pinned, "cpu");
+  const [top, child] = widgetRefs(pinned, "clock");
   assert.equal(itemForWidgetRef(pinned, top).id, "w1");
   assert.equal(itemForWidgetRef(pinned, child).id, "w2");
   assert.equal(itemForWidgetRef(pinned, null), null);
@@ -91,15 +91,21 @@ test("itemForWidgetRef resolves both kinds of reference", () => {
 });
 
 test("updateWidgetStyleForRef edits without mutating the original", () => {
-  const [top] = widgetRefs(pinned, "cpu");
+  const [top] = widgetRefs(pinned, "clock");
   const next = updateWidgetStyleForRef(pinned, top, { variant: "outline" });
   assert.equal(next.find((i) => i.id === "w1").style.variant, "outline");
   // The caller keeps the old tree for undo/diffing, so it must be untouched.
   assert.equal(pinned.find((i) => i.id === "w1").style.variant, "glass");
 });
 
+test("widgetRefs finds a widget saved under a name it replaced", () => {
+  const legacy = [{ id: "old", kind: "widget", widget: "cpu" }, { id: "t", kind: "widget", widget: "tasks" }];
+  assert.deepEqual(widgetRefs(legacy, "system").map((ref) => ref.id), ["old"]);
+  assert.deepEqual(widgetRefs(legacy, "focus").map((ref) => ref.id), ["t"]);
+});
+
 test("updateWidgetStyleForRef reaches a widget nested in a group", () => {
-  const [, child] = widgetRefs(pinned, "cpu");
+  const [, child] = widgetRefs(pinned, "clock");
   const next = updateWidgetStyleForRef(pinned, child, { variant: "minimal" });
   const group = next.find((i) => i.id === "g1");
   assert.equal(group.children.find((c) => c.id === "w2").style.variant, "minimal");

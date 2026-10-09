@@ -38,12 +38,20 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
     });
     return queue;
   };
+  const SECTIONS = { timer: ["timer"], tasks: ["tasks"], focus: ["timer", "tasks"], calendar: ["calendar"], clock: ["calendar"], weather: ["weather"] };
   function draw() {
     if (disposed) return;
     clearInterval(timer);
     body.replaceChildren();
     const st = item.style || {};
-    if (item.widget === "timer") {
+    for (const name of SECTIONS[item.widget] || []) {
+      const section = document.createElement("section"); section.className = `productivity-section productivity-${name}`;
+      body.appendChild(section);
+      DRAW[name](section, st);
+    }
+  }
+  const DRAW = {
+    timer(body, st) {
       const value = document.createElement("div"); value.className = "focus-countdown";
       value.setAttribute("role", "timer");
       value.textContent = formatTimer(timerSeconds(st)); body.appendChild(value);
@@ -55,7 +63,8 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       const input = document.createElement("input"); input.type = "number"; input.min = "1"; input.max = "180"; input.value = String(st.minutes || 25);
       input.addEventListener("change", () => update({ minutes: Math.max(1, Math.min(180, Number(input.value) || 25)), endsAt: null, remaining: null }));
       label.appendChild(input); body.appendChild(label);
-    } else if (item.widget === "tasks") {
+    },
+    tasks(body, st) {
       const list = Array.isArray(st.tasks) ? st.tasks : [];
       for (const task of list) {
         const row = document.createElement("div"); row.className = "focus-task";
@@ -75,10 +84,11 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
         input.disabled = true; add.disabled = true;
         update((current) => ({ tasks: [...(current.tasks || []), { id: crypto.randomUUID(), text, done: false }] })).finally(() => {
           input.disabled = false; add.disabled = false;
-          if (panel.isConnected) body.querySelector(".focus-new-task")?.focus();
+          if (panel.isConnected) panel.querySelector(".focus-new-task")?.focus();
         });
       }); body.appendChild(form);
-    } else if (item.widget === "calendar") {
+    },
+    calendar(body) {
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
       const nav = document.createElement("div"); nav.className = "focus-actions"; body.appendChild(nav);
@@ -90,7 +100,8 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       const weekStart = calendarWeekStart(navigator.language || curLang());
       for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
       for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
-    } else if (item.widget === "weather") {
+    },
+    weather(body, st) {
       const help = document.createElement("p"); help.textContent = t("focus.cityHint"); body.appendChild(help);
       const input = document.createElement("input"); input.placeholder = t("focus.city"); input.setAttribute("aria-label", t("focus.city")); input.value = st.city || ""; input.maxLength = 100; body.appendChild(input);
       const units = document.createElement("select"); units.setAttribute("aria-label", t("w.weather"));
@@ -106,11 +117,11 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
           for (const city of cities) button([city.name, city.admin1, city.country].filter(Boolean).join(", "), () => update({ city: city.name, latitude: city.latitude, longitude: city.longitude }), results);
         } catch (_) { results.textContent = t("focus.weatherError"); }
         finally { search.disabled = false; }
-      }); body.appendChild(results);
-    }
-  }
+      }, body); body.appendChild(results);
+    },
+  };
   panel.addEventListener("keydown", (event) => {
-    if (item.widget !== "calendar" || !["PageUp", "PageDown", "Home"].includes(event.key)) return;
+    if (!(SECTIONS[item.widget] || []).includes("calendar") || !["PageUp", "PageDown", "Home"].includes(event.key)) return;
     event.preventDefault();
     monthOffset = event.key === "Home" ? 0 : monthOffset + (event.key === "PageDown" ? 1 : -1);
     draw();

@@ -29,7 +29,6 @@ import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
-import { resolveNotchMode } from "./notch-mode.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
@@ -46,6 +45,7 @@ import {
   RING_DEFAULTS,
   WIDGET_META,
   widgetDisplayName,
+  canonicalWidget,
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
 import { availW, availH, rectFromElement, pointInRect, hitSignature } from "./dock/geometry.js";
@@ -53,8 +53,6 @@ import { placeBesideBar, transformOrigin } from "./dock/placement.js";
 import {
   MEDIA_SVG,
   BATTERY_LOW,
-  fmtRate,
-  fmtUptime,
   dockPreviewSnippet,
   clockParts,
   volumeStep,
@@ -65,14 +63,14 @@ import {
   setPreviewSubText,
   refreshPreviewMarquees,
   LIVE_WIDGETS,
-  sparkPaths,
+  setSystem,
 } from "./dock/widget-view.js";
-import { applySurfaceVars, dockRadius, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
+import { dockRadius } from "./surface.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
-import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
+import { reportMaterial, shapeOf, materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -255,16 +253,6 @@ async function reloadConfig() {
   if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
   if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
-  // Notch visibility / style changes the stacked clearance for the dock bar.
-  if (
-    prev &&
-    (prev.notchAlwaysVisible !== cfg.notchAlwaysVisible ||
-      prev.notchMode !== cfg.notchMode ||
-      prev.notchScale !== cfg.notchScale ||
-      prev.notchPeek !== cfg.notchPeek)
-  ) {
-    lastFull = null;
-  }
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -293,7 +281,7 @@ async function reloadConfig() {
     !prev ||
     prev.edge !== cfg.edge ||
     (prev.autoHideMode || "") !== (cfg.autoHideMode || "") ||
-    prev.notchPeek !== cfg.notchPeek ||
+    prev.notchMode !== cfg.notchMode ||
     prev.notchPosition !== cfg.notchPosition;
   if (hideChanged) setupAutoHide();
   if (edgeSwapped) {
@@ -351,9 +339,7 @@ function applyAll() {
   const root = document.documentElement;
   // CSS materials on a transparent window (native DWM vibrancy left a gray box).
   // Solidity + optional glass tint drive dock/notch fill together.
-  applySurfaceVars(cfg);
-  setMaterialTint(materialTint(cfg));
-  setMaterialEnabled(cfg.nativeMaterial !== false && !transparencyReduced(cfg) && resolveSurfaceStyle(cfg) !== "solid");
+  applyMaterial(cfg);
   if (cfg.accent) {
     root.style.setProperty("--accent", cfg.accent);
   }
@@ -361,13 +347,7 @@ function applyAll() {
   // How close the bar sits to its screen edge (user-tunable). The transparent
   // pad on the anchored side shrinks down to the requested gap; anything past
   // the stage pad is handled by the window's own margin (backend dock_xy).
-  // When the notch stays painted with the dock, add the notch's painted depth
-  // so the bar stacks inward (edge → notch → dock) — mirrors Rust
-  // notch_stack_depth_css. The Settings value itself still goes to 0.
-  let userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
-  let edgeGap = cfg.notchAlwaysVisible
-    ? Math.min(140, userGap + notchStackDepthCss(cfg))
-    : userGap;
+  const edgeGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
   document.body.classList.toggle("tight-edge", edgeGap < 24);
@@ -764,7 +744,7 @@ function widgetLabel(type) {
 }
 
 function widgetTile(item, { inFlyout = false } = {}) {
-  const type = item.widget || "clock";
+  const type = canonicalWidget(item.widget || "clock") || "clock";
   const st = item.style || {};
   const el = document.createElement("button");
   el.className = "tile widget" + (inFlyout ? " in-flyout" : "");
@@ -790,7 +770,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   const card = document.createElement("span");
   card.className = "w-card";
   if (PREVIEW_WIDGETS.includes(type)) el.classList.add("preview");
-  card.innerHTML = widgetCardHTML(type);
+  card.innerHTML = widgetCardHTML(type, st);
   el.appendChild(card);
 
   // On the bar the widget is a full dock tile (removable, draggable, right-click
@@ -843,7 +823,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
     mkCtl(t("w.next"), MEDIA_SVG.next, () => dockApi.mediaNext());
     card.appendChild(controls);
   }
-  if (["clock", "timer", "calendar", "tasks", "weather"].includes(type)) tickClocks();
+  if (["clock", "focus", "calendar", "weather"].includes(type)) tickClocks();
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
     setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
@@ -883,20 +863,22 @@ function findWidgetPin(id, items = cfg.pinned) {
 }
 const weatherCache = new Map();
 function tickProductivity() {
-  eachWidget("timer", (el) => {
+  // Focus shows the running (or just finished) timer, otherwise the next task.
+  eachWidget("focus", (el) => {
     const item = findWidgetPin(el.dataset.id); if (!item) return;
-    const seconds = timerSeconds(item.style);
-    setText(el, item.style?.endsAt && !seconds ? t("focus.finished") : t("w.timer"), formatTimer(seconds));
-    el.classList.toggle("focus-finished", !!item.style?.endsAt && seconds === 0);
+    const style = item.style || {};
+    const seconds = timerSeconds(style);
+    const finished = !!style.endsAt && seconds === 0;
+    const summary = tasksSummary(style.tasks);
+    if (style.endsAt) setText(el, finished ? t("focus.finished") : summary.next || t("w.focus"), formatTimer(seconds));
+    else if (summary.total) setText(el, summary.next || t("focus.allDone"), `${summary.done}/${summary.total}`);
+    else setText(el, t("w.focus"), formatTimer(seconds));
+    el.classList.toggle("focus-finished", finished);
   });
   eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
-  eachWidget("tasks", (el) => {
-    const item = findWidgetPin(el.dataset.id); const summary = tasksSummary(item?.style?.tasks);
-    setText(el, summary.next || t("focus.noTasks"), `${summary.done} / ${summary.total}`);
-  });
   eachWidget("weather", (el) => {
     const style = findWidgetPin(el.dataset.id)?.style || {};
-    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("w.weather"), t("focus.noCity")); return; }
+    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("focus.noCity"), "—"); return; }
     const key = `${style.latitude},${style.longitude}`;
     let cached = weatherCache.get(key);
     if (!cached || (!cached.pending && Date.now() >= cached.expires)) {
@@ -944,14 +926,11 @@ function openProductivity(item, tile) {
   const dispose = panel.dispose;
   const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.querySelector(["tasks", "weather"].includes(item.widget) ? "input" : "button")?.focus(); });
+  requestAnimationFrame(() => { place(); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
 }
 
-// Recent total throughput for the network sparkline (one sample per poll).
-const NET_HISTORY = 30;
-const netHistory = [];
 
-// System stats (CPU/RAM/disk/net/uptime/battery) — one snapshot fans out to
+// System stats (system + battery widgets) — one snapshot fans out to
 // every stat card on the bar (from the cached element map).
 const pollStats = singleFlight(async () => {
   let s;
@@ -961,20 +940,8 @@ const pollStats = singleFlight(async () => {
     return;
   }
   if (!s) return;
-  eachWidget("cpu", (el) => setMetric(el, "CPU", Math.round(s.cpu)));
-  eachWidget("ram", (el) =>
-    setMetric(el, "RAM", Math.round(s.mem), `${(s.mem_used_mb / 1024).toFixed(1)} / ${(s.mem_total_mb / 1024).toFixed(0)} GB`));
-  eachWidget("disk", (el) =>
-    setMetric(el, t("w.disk"), Math.round(s.disk), `${s.disk_used_gb} / ${s.disk_total_gb} GB`));
-  netHistory.push((s.net_down_kbps || 0) + (s.net_up_kbps || 0));
-  if (netHistory.length > NET_HISTORY) netHistory.shift();
-  const { line, fill } = sparkPaths(netHistory);
-  eachWidget("net", (el) => {
-    setText(el, `↑ ${fmtRate(s.net_up_kbps)}`, `↓ ${fmtRate(s.net_down_kbps)}`, t("w.net"));
-    el.querySelector(".w-spark-line")?.setAttribute("d", line);
-    el.querySelector(".w-spark-fill")?.setAttribute("d", fill);
-  });
-  eachWidget("uptime", (el) => setText(el, t("w.uptime"), fmtUptime(s.uptime_secs)));
+  const labels = { cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net") };
+  eachWidget("system", (el) => setSystem(el, s, labels));
   eachWidget("battery", (el) => {
     setWidgetAvailable(el, s.battery >= 0);
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
@@ -1136,8 +1103,8 @@ function startPolls() {
   widgetPollTimer = null;
   if (hiddenState) return; // tucked away → stay idle until revealed
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const hasClock = widgetPresent(["clock", "timer"]);
-  const hasLocal = widgetPresent(["tasks", "calendar", "weather"]);
+  const hasClock = widgetPresent(["clock", "focus"]);
+  const hasLocal = widgetPresent(["calendar", "weather"]);
   const hasStats = widgetPresent(STAT_WIDGETS);
   const hasMedia = widgetPresent("media");
   const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
@@ -1326,7 +1293,7 @@ function launch(el, item) {
     if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
-    if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
+    if (["clock", "focus", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
     return;
   }
   // The trash pin opens the Recycle Bin.
@@ -1418,7 +1385,7 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
-    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, { span: Number(t.dataset.span) })}px`);
+    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, findWidgetPin(t.dataset.id)?.style || {})}px`);
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
@@ -2586,7 +2553,7 @@ function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
-  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["timer", "tasks", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
+  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
   if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
     add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
@@ -2926,14 +2893,6 @@ function reframe() {
 // smaller and clicks just outside the painted dock reach the app underneath.
 const SHADOW_PAD = 18;
 
-/** Painted notch depth + air gap (CSS px) — keep in sync with Rust `notch_stack_depth_css`. */
-function notchStackDepthCss(c) {
-  const scale = Math.min(1.5, Math.max(0.7, Number(c.notchScale) || 1));
-  const mode = resolveNotchMode(c);
-  const painted = mode === "smart" ? 28 : mode === "floating" ? 26 : 14;
-  return Math.ceil(painted * scale + 8);
-}
-
 // Fixed headroom past the bar for everything that opens around it — group
 // flyouts, context menu, popovers, tooltips, the update pill, magnify and the
 // soft shadow. Reserving it permanently is THE anti-flicker design: opening a
@@ -2946,11 +2905,7 @@ const PANEL_ROOM = 420;
 
 let lastFull = null;
 function edgePadCss() {
-  const userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
-  const gap = cfg.notchAlwaysVisible
-    ? Math.min(140, userGap + notchStackDepthCss(cfg))
-    : userGap;
-  return Math.min(SHADOW_PAD, gap);
+  return Math.min(SHADOW_PAD, Math.max(0, Math.min(96, cfg.edgeGap ?? 12)));
 }
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;

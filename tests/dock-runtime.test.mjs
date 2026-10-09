@@ -153,13 +153,13 @@ test("Settings mounts and every tab renders", async () => {
     viewport: { width: 1100, height: 850 },
   });
 
-  const tabs = await page.$$(".s-navitem");
-  assert.ok(tabs.length >= 5, `expected the full tab list, got ${tabs.length}`);
+  const tabs = await page.$$(".nav .nav-item");
+  assert.equal(tabs.length, 5, `expected five pages, got ${tabs.length}`);
   for (let i = 0; i < tabs.length; i++) {
     await tabs[i].click();
     await page.waitForTimeout(350);
     const filled = await page.evaluate(
-      () => (document.querySelector(".s-content")?.textContent || "").trim().length
+      () => (document.querySelector(".settings-main")?.textContent || "").trim().length
     );
     assert.ok(filled > 40, `tab ${i} rendered an empty panel`);
   }

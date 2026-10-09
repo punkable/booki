@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { invoke } from '../api.js';
 import { observePlatformPreferences } from '../platform-preferences.js';
 import { createLatestTask } from '../latest-task.js';
-import { resolveSurfaceStyle, transparencyReduced } from '../surface.js';
+import { transparencyReduced } from '../surface.js';
 
-/** Turn on the native backdrop after the page can paint; solid remains the fallback. */
+/** Settings sits on Windows 11 Mica like the system Settings app, whatever
+ *  finish the dock uses; the solid page background remains the fallback. */
 export function NativeBackdrop({ cfg }) {
   const [preferences, setPreferences] = useState(null);
   useEffect(() => observePlatformPreferences(setPreferences), []);
-  const enabled = resolveSurfaceStyle(cfg) === 'mica' && cfg.nativeMaterial !== false && !transparencyReduced(cfg) && preferences?.systemBackdrop === true;
+  const enabled = cfg.nativeMaterial !== false && !transparencyReduced(cfg) && preferences?.systemBackdrop === true;
   const [worker] = useState(() => createLatestTask(
     ({ enabled, dark }) => invoke('settings_backdrop', { enabled, dark }),
     (applied, request) => document.body.classList.toggle('settings-mica', request.enabled && applied === true),

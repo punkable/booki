@@ -1,8 +1,8 @@
 /* Applies accent color, theme and dock edge to the document. */
 
 import { observePlatformPreferences } from "./platform-preferences.js";
-import { applySurfaceVars, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
-import { setMaterialEnabled } from "./material.js";
+import { applySurfaceVars } from "./surface.js";
+import { applyMaterial } from "./material.js";
 import { applyAccent } from "./util-color.js";
 
 /** "auto" theme → light during the day (7:00–19:00), dark at night. */
@@ -16,8 +16,8 @@ let autoTimer = null;
 let latestConfig = null;
 observePlatformPreferences(() => {
   if (!latestConfig) return;
-  applySurfaceVars(latestConfig);
-  if (!document.body.classList.contains("settings-body")) setMaterialEnabled(latestConfig.nativeMaterial !== false && !transparencyReduced(latestConfig) && resolveSurfaceStyle(latestConfig) !== "solid");
+  if (document.body.classList.contains("settings-body")) applySurfaceVars(latestConfig);
+  else applyMaterial(latestConfig);
 });
 
 export function applyTheme(cfg) {

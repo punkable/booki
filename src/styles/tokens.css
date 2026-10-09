@@ -1,0 +1,112 @@
+/* Shared design tokens for the dock, the notch and Settings.
+
+   Windows 11 / Fluent: Segoe UI Variable, 4px controls and 8px cards, quiet
+   strokes, one accent. The theme comes from data-theme on <html> ("light" or
+   "dark"); without it the system preference decides. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Booki brand (capybara). The accent is user-overridable. */
+  --booki-tan: #dfaa75;
+  --accent: var(--booki-tan);
+  --accent-contrast: #2a2118;
+  --danger: #c42b1c;
+
+  /* Neutrals: light */
+  --bg: #f3f3f3;
+  --layer: rgba(255, 255, 255, 0.7);
+  --layer-strong: rgba(255, 255, 255, 0.9);
+  --stroke: rgba(0, 0, 0, 0.0578);
+  --stroke-strong: rgba(0, 0, 0, 0.1622);
+  --stroke-light: rgba(255, 255, 255, 0.7);
+  --ink: #1b1b1b;
+  --ink-2: #5d5d5d;
+  --ink-3: #8a8a8a;
+  --hover: rgba(0, 0, 0, 0.0373);
+  --pressed: rgba(0, 0, 0, 0.0241);
+  --track: rgba(0, 0, 0, 0.12);
+  --shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --surface-tint: #f4f4f7;
+
+  /* Geometry */
+  --r-control: 4px;
+  --r-card: 8px;
+  --r-overlay: 8px;
+  --r-pill: 999px;
+  --tile-r: 12px;
+
+  /* Type */
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Motion: strong ease-out, five durations by how much of the screen moves. */
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.25, 0.5, 1);
+  --dur-1: 0.12s;
+  --dur-2: 0.15s;
+  --dur-3: 0.18s;
+  --dur-4: 0.22s;
+  --dur-5: 0.28s;
+}
+
+/* Dark values, for the system preference and for an explicit choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #202020;
+    --layer: rgba(255, 255, 255, 0.0512);
+    --layer-strong: rgba(44, 44, 44, 0.96);
+    --stroke: rgba(255, 255, 255, 0.0698);
+    --stroke-strong: rgba(255, 255, 255, 0.1395);
+    --stroke-light: rgba(255, 255, 255, 0.12);
+    --ink: #ffffff;
+    --ink-2: #c5c5c5;
+    --ink-3: #9a9a9a;
+    --hover: rgba(255, 255, 255, 0.0605);
+    --pressed: rgba(255, 255, 255, 0.0419);
+    --track: rgba(255, 255, 255, 0.16);
+    --shadow: 0 8px 16px rgba(0, 0, 0, 0.26);
+    --surface-tint: #202024;
+  }
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #202020;
+  --layer: rgba(255, 255, 255, 0.0512);
+  --layer-strong: rgba(44, 44, 44, 0.96);
+  --stroke: rgba(255, 255, 255, 0.0698);
+  --stroke-strong: rgba(255, 255, 255, 0.1395);
+  --stroke-light: rgba(255, 255, 255, 0.12);
+  --ink: #ffffff;
+  --ink-2: #c5c5c5;
+  --ink-3: #9a9a9a;
+  --hover: rgba(255, 255, 255, 0.0605);
+  --pressed: rgba(255, 255, 255, 0.0419);
+  --track: rgba(255, 255, 255, 0.16);
+  --shadow: 0 8px 16px rgba(0, 0, 0, 0.26);
+  --surface-tint: #202024;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -19,17 +19,15 @@ async function patch(page, value) {
 test('one finish selector preserves layout/theme and shows the selected custom finish', async () => {
   const cfg = makeConfig({ theme: 'light', iconSize: 60, spacing: 3, cornerRadius: 4, nativeMaterial: false, pinned: pins });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 520, height: 700 } });
-  await page.getByRole('navigation').getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
   assert.equal(await page.locator('.finish-card').count(), 4);
-  assert.equal(await page.locator('h1').evaluate((el) => getComputedStyle(el).fontSize), '25px');
-  assert.equal(await page.locator('body').evaluate((el) => getComputedStyle(el).getPropertyValue('--set-bg').trim()), '#fff');
-  assert.equal(await page.locator('.surface-chip').count(), 0);
-  await page.getByRole('button', { name: 'Tinted Glass', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.finish-tinted')?.getAttribute('aria-pressed') === 'true');
+  assert.equal(await page.locator('h1').evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true);
+  await page.getByRole('radio', { name: /^Dark glass/ }).click();
+  await page.waitForFunction(() => document.querySelector('.finish-darkGlass')?.getAttribute('aria-checked') === 'true');
   await page.waitForTimeout(200);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
   for (const key of ['theme', 'iconSize', 'spacing', 'cornerRadius', 'nativeMaterial', 'pinned']) assert.deepEqual(saved[key], cfg[key]);
-  assert.equal(await page.locator('.finish-card[aria-pressed="true"]').count(), 1);
+  assert.equal(await page.locator('.finish-card[aria-checked="true"]').count(), 1);
   assert.equal(await page.locator('.live-preview-bar').evaluate((el) => getComputedStyle(el).borderRadius), '12px');
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
   const slider = page.getByText('Opacity', { exact: true }).locator('..').locator('..').locator('input[type="range"]');
@@ -40,7 +38,7 @@ test('one finish selector preserves layout/theme and shows the selected custom f
 
 test('every material uses the canonical opacity once and tracks radius changes', async () => {
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: pins }) });
-  for (const surfaceStyle of ['mica', 'acrylic', 'tinted', 'solid']) {
+  for (const surfaceStyle of ['glass', 'mica', 'solid']) {
     for (const materialStrength of [0, 38, 65, 100]) {
       await patch(page, { surfaceStyle, materialStrength, surfaceTint: '#223344', cornerRadius: materialStrength % 25 });
       await page.waitForFunction(({ style, alpha }) => document.body.classList.contains(`surface-${style}`) && Math.abs(parseFloat(getComputedStyle(document.body).getPropertyValue('--glass-alpha')) - alpha) < .00001, { style: surfaceStyle, alpha: surfaceAlpha({ surfaceStyle, materialStrength }) });
@@ -128,14 +126,14 @@ test('closing Settings waits for the final edit and uses the Settings-only destr
       return old(cmd, args);
     };
   });
-  await page.getByRole('navigation').getByRole('button', { name: 'Appearance', exact: true }).click();
-  await page.getByRole('button', { name: 'Tinted Glass', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
+  await page.getByRole('radio', { name: /^Dark glass/ }).click();
   await page.evaluate(() => window.__nativeCloseRequested({ preventDefault() {} }));
   await page.waitForFunction(() => !!window.__finishSave);
   assert.equal(await page.evaluate(() => window.__closed), 0);
   await page.evaluate(() => window.__finishSave());
   await page.waitForFunction(() => window.__closed === 1);
-  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).surfaceStyle, 'tinted');
+  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).surfaceTint, '#000000');
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -148,10 +146,10 @@ test('a failed window close explains the failure and can be retried', async () =
     window.__TAURI__.core.invoke = (cmd, args) => cmd === 'plugin:window|destroy' ? (++window.__attempts === 1 ? Promise.reject(new Error('permission denied')) : Promise.resolve()) : old(cmd, args);
     window.__nativeCloseRequested({ preventDefault() {} });
   });
-  await page.locator('.settings-close-error').waitFor();
-  await page.locator('.settings-close-error').getByRole('button', { name: 'Retry' }).click();
+  await page.locator('.close-error').waitFor();
+  await page.locator('.close-error').getByRole('button', { name: 'Retry' }).click();
   await page.waitForFunction(() => window.__attempts === 2);
-  assert.equal(await page.locator('.settings-close-error').count(), 0);
+  assert.equal(await page.locator('.close-error').count(), 0);
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -219,7 +217,7 @@ test('the dock app panel retries failed sources and supports keyboard tabs', asy
   await tabs.getByRole('tab', { name: 'Apps', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await tabs.getByRole('tab', { name: 'Widgets', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('.add-wcell').count(), 15);
+  assert.equal(await page.locator('.add-wcell').count(), 10);
   await page.locator('.add-head').getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await page.locator('#stack.open').count(), 0);
   assert.deepEqual(errors, []);
