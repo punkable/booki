@@ -18,17 +18,28 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
   let timer = null;
   let monthOffset = 0;
   let queue = Promise.resolve();
-  panel.dispose = () => clearInterval(timer);
+  let disposed = false;
+  panel.dispose = () => { disposed = true; clearInterval(timer); };
   const update = (patch) => {
     queue = queue.then(async () => {
       const old = item.style;
       item.style = { ...(old || {}), ...(typeof patch === "function" ? patch(old || {}) : patch) };
-      try { await save(item); draw(); }
-      catch (_) { item.style = old; const error = document.createElement("p"); error.textContent = t("overhaul.failed"); error.setAttribute("role", "alert"); body.appendChild(error); }
+      body.querySelector(".productivity-save-error")?.remove();
+      try { await save(item, old); if (!disposed) draw(); }
+      catch (failure) {
+        item.style = old;
+        if (disposed) return;
+        const error = document.createElement("div"); error.className = "productivity-save-error"; error.setAttribute("role", "alert");
+        const unavailable = failure?.code === "WIDGET_UNAVAILABLE";
+        const message = document.createElement("p"); message.textContent = t(unavailable ? "focus.widgetUnavailable" : "overhaul.failed"); error.append(message);
+        if (!unavailable) button(t("focus.retry"), () => update(patch), error);
+        body.appendChild(error);
+      }
     });
     return queue;
   };
   function draw() {
+    if (disposed) return;
     clearInterval(timer);
     body.replaceChildren();
     const st = item.style || {};

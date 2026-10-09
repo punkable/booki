@@ -6,6 +6,7 @@
 
 export const DICT = {
   es: {
+    "focus.widgetUnavailable": "Este widget cambió o se eliminó. Copia el texto que quieras conservar antes de cerrar.",
     "hint.groupSingle": "1 elemento · abrir grupo",
     "hint.launch": "Abrir aplicación",
     "hint.running": "En ejecución · abrir aplicación",
@@ -779,6 +780,7 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "focus.widgetUnavailable": "This widget changed or was removed. Copy any text you want to keep before closing.",
     "hint.groupSingle": "1 item · open group",
     "hint.launch": "Open app",
     "hint.running": "Running · open app",

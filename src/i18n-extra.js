@@ -1,6 +1,7 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "focus.widgetUnavailable": "Este widget mudou ou foi removido. Copie o texto que deseja manter antes de fechar.",
     "hint.groupSingle": "1 item · abrir grupo",
     "hint.launch": "Abrir aplicativo",
     "hint.running": "Em execução · abrir aplicativo",
@@ -766,6 +767,7 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "focus.widgetUnavailable": "Ce widget a changé ou a été supprimé. Copiez le texte à conserver avant de fermer.",
     "hint.groupSingle": "1 élément · ouvrir le groupe",
     "hint.launch": "Ouvrir l’application",
     "hint.running": "En cours · ouvrir l’application",
@@ -1531,6 +1533,7 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "focus.widgetUnavailable": "Dieses Widget wurde geändert oder entfernt. Kopiere den Text, den du behalten möchtest, bevor du schließt.",
     "hint.groupSingle": "1 Element · Gruppe öffnen",
     "hint.launch": "App öffnen",
     "hint.running": "Wird ausgeführt · App öffnen",

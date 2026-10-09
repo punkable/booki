@@ -917,7 +917,23 @@ function closeProductivityPanel() {
 }
 function openProductivity(item, tile) {
   closeProductivityPanel();
-  const panel = buildProductivityPanel(item, { save: async () => { if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved"); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
+  const panel = buildProductivityPanel(item, {
+    save: async (draft, previous) => {
+      // Recovery replaces cfg objects. Resolve the live pin by stable id on
+      // every edit, retaining unrelated appearance changes from Settings.
+      const live = findPinnedById(draft.id);
+      if (!live || live.kind !== "widget" || live.widget !== draft.widget) throw Object.assign(new Error("widget no longer exists"), { code: "WIDGET_UNAVAILABLE" });
+      const next = { ...(live.style || {}) };
+      for (const key of new Set([...Object.keys(previous || {}), ...Object.keys(draft.style || {})])) {
+        if (JSON.stringify(previous?.[key]) === JSON.stringify(draft.style?.[key])) continue;
+        if (draft.style?.[key] === undefined) delete next[key]; else next[key] = structuredClone(draft.style[key]);
+      }
+      live.style = next;
+      if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved");
+      draft.style = structuredClone(findPinnedById(draft.id)?.style || next);
+      tickProductivity();
+    }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
+  });
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
   const place = () => {

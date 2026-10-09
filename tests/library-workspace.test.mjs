@@ -438,3 +438,47 @@ test('durable empty groups remain recognizable and custom group icons have a use
   assert.deepEqual((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned,pins);
   assert.deepEqual(errors,[]);await page.close();
 });
+
+
+test('tasks retry against the recovered live widget and preserve later appearance changes', async () => {
+  const task={id:'task',text:'Prepare release',done:false};
+  const pin={id:'tasks',kind:'widget',widget:'tasks',name:'Tasks',style:{variant:'soft',color:'#223344',tasks:[task]}};
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[pin]})});
+  await page.evaluate(()=>{const old=window.__TAURI__.core.invoke;window.failTasks=true;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='save_config'&&window.failTasks?Promise.reject('disk full'):old(cmd,args);});
+  await page.locator('.tile[data-id="tasks"]').click();
+  const panel=page.getByRole('dialog',{name:'Tasks',exact:true});
+  await panel.getByRole('checkbox',{name:'Prepare release',exact:true}).check();
+  await panel.locator('.productivity-save-error').waitFor();
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned[0].style.tasks[0].done,false);
+  await page.evaluate(async()=>{window.failTasks=false;const cfg=await window.__TAURI__.core.invoke('get_config');cfg.pinned[0].style.color='#abcdef';await window.__TAURI__.core.invoke('save_config',{patch:{pinned:cfg.pinned}});for(const cb of window.__listeners['booki://config-changed']||[])cb({payload:{}});});
+  await panel.getByRole('button',{name:'Retry',exact:true}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.tasks[0].done);
+  const saved=await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'));
+  assert.equal(saved.pinned[0].style.color,'#abcdef');
+  assert.equal(await panel.locator('.productivity-save-error').count(),0);
+  await panel.getByRole('button',{name:'Rename: Prepare release',exact:true}).click();
+  const rename=panel.getByRole('textbox',{name:'Rename',exact:true});
+  await rename.fill('Review release');await page.evaluate(()=>{window.failTasks=true;});
+  await rename.press('Enter');await panel.locator('.productivity-save-error').waitFor();
+  assert.equal(await rename.inputValue(),'Review release');
+  await page.evaluate(()=>{window.failTasks=false;});
+  await panel.getByRole('button',{name:'Retry',exact:true}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.tasks[0].text==='Review release');
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+
+test('a removed productivity widget keeps its task input and cannot be resurrected by a stale panel', async () => {
+  const pin={id:'tasks',kind:'widget',widget:'tasks',name:'Tasks',style:{tasks:[]}};
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[pin]})});
+  await page.locator('.tile[data-id="tasks"]').click();
+  const panel=page.getByRole('dialog',{name:'Tasks',exact:true});
+  const input=panel.locator('.focus-new-task');await input.fill('Keep this draft');
+  await page.evaluate(async()=>{await window.__TAURI__.core.invoke('save_config',{patch:{pinned:[]}});for(const cb of window.__listeners['booki://config-changed']||[])cb({payload:{}});});
+  await page.locator('.tile.hint').waitFor();
+  await input.press('Enter');await panel.locator('.productivity-save-error').waitFor();
+  assert.equal(await input.inputValue(),'Keep this draft');
+  assert.equal(await panel.getByRole('button',{name:'Retry',exact:true}).count(),0);
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned.length,0);
+  assert.deepEqual(errors,[]);await page.close();
+});
