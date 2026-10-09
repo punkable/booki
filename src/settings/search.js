@@ -36,7 +36,7 @@ const SEARCH_ALIASES = {
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
-  "be.notchMode": "notch pildora pill pestana tab pegado flotante attached floating",
+  "be.notchMode": "notch pildora pill pestana tab pegado flotante attached floating isla island smart inteligente",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
   "be.reveal": "revelar reveal hover click notch",

@@ -13,7 +13,7 @@ const nativePins = WIDGET_ORDER.map((widget) => ({ id: widget, name: widget, pat
 test('Home and every Settings section accept unstyled native widget records', async () => {
   const cfg = makeConfig({ pinned: nativePins });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 960, height: 760 } });
-  assert.equal(await page.locator('.hero').count(), 1);
+  assert.equal(await page.locator('.home-hero').count(), 1);
   assert.equal(await page.locator('.live-preview-bar .widget').count(), WIDGET_ORDER.length);
   const nav = page.getByRole('navigation');
   const names = await nav.locator('button').allTextContents();

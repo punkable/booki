@@ -1,10 +1,11 @@
+import { groupAppearance } from "../group-style.js";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { widgetCardHTML, setText, setMetric, setSystem, clockParts } from "../dock/widget-view.js";
 import { widgetWidth } from "../dock/layout-model.js";
 import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName, canonicalWidget } from "../widgets-meta.js";
 import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
-import { isLibIcon, resolveLibIcon } from "../icon-library.js";
+import { isLibIcon, libGlyphSVG, resolveLibIcon } from "../icon-library.js";
 import { icon } from "../icons.js";
 import { resolveSurfaceStyle, glassFillColor, surfaceAlpha, dockRadius, surfaceForeground, transparencyReduced } from "../surface.js";
 
@@ -56,7 +57,11 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
   if (item.kind === "widget" && canonicalWidget(item.widget) === null) return null; // retired widget in an old profile
   if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} gap={gap} />;
   if (item.kind === "separator") return <span className="live-preview-separator" />;
-  return <span className="live-preview-app" title={item.name} style={{ width: size, height: size }}>
+  const look = item.kind === "group" ? groupAppearance(item) : null;
+  if (look?.glyph) return <span className="live-preview-app live-preview-badge" title={item.name}
+    style={{ width: size, height: size, "--group-color": look.color || "var(--accent)", "--group-ink": look.ink || "var(--accent-contrast)" }}
+    dangerouslySetInnerHTML={{ __html: libGlyphSVG(look.glyph) }} />;
+  return <span className="live-preview-app" title={item.name} style={{ width: size, height: size, ...(look?.color ? { background: `color-mix(in srgb, ${look.color} 30%, transparent)` } : {}) }}>
     {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[canonicalWidget(child.widget)] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
       : src ? <img src={src} alt="" />
         : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
@@ -87,7 +92,7 @@ function useFitScale(maxHeight) {
   }, [maxHeight]);
   return { frame, bar, fit };
 }
-export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin, onDragOver }) {
+export function DockPreview({ cfg, large = false, stage = false, onSelect, onDragPin, onDropPin, onDragOver }) {
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const size = large ? Math.max(32, Math.min(56, cfg.iconSize || 48)) : 32;
@@ -95,7 +100,8 @@ export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin
   const fill = glassFillColor(cfg);
   const items = cfg.pinned || [];
   const { frame, bar, fit } = useFitScale(vertical ? 300 : 140);
-  return <div className={"live-preview-scene" + (large ? " large" : "")}>
+  // `stage` sets the dock on a small desktop scene, on its own edge.
+  return <div className={"live-preview-scene" + (large ? " large" : "") + (stage ? ` stage at-${cfg.edge || "bottom"}` : "")}>
     <div ref={frame} className="live-preview-fit" style={{ height: fit.height || undefined }}>
     <div ref={bar} className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} data-ink={surfaceForeground(cfg) ? (surfaceForeground(cfg) === "#1b1b1b" ? "dark" : "light") : undefined} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
       transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,

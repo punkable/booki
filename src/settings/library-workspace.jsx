@@ -16,6 +16,7 @@ import { findPin, updatePin, removePin, placePin, movePinBy, ungroupPin, mkPin, 
 import { appKey, pinnedKeys } from '../dock/app-candidates.js';
 import { AppLibrary } from './app-library.jsx';
 import { PreviewPin } from './dock-preview.jsx';
+import { GroupLook } from './group-look.jsx';
 import { GroupCreator } from './group-creator.jsx';
 import { Inspector } from './inspector.jsx';
 import { Icon, PageHeader } from './ui.jsx';
@@ -85,21 +86,24 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   return <>
     <PageHeader title={t('overhaul.appsFolders')}>{t('next.selectionHint')}</PageHeader>
     <section className="library-dock-editor" aria-label={t('workspace.pinned')} onDragOver={dragOver} onDrop={(event) => drop(event)}>
-      <div className="library-dock-head"><strong>{t('workspace.pinned')}</strong><label className="library-destination">{t('next.destination')}<select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label><div className="library-dock-actions">
-        <button className="button" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
-        <button className="button" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...latest.current.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
-        <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
-        <button className="button" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
-        {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
-      </div></div>
+      <div className="library-dock-head">
+        <strong>{t('apps.inDock')}<span className="library-count">{cfg.pinned.filter((item) => item.kind !== 'widget').length}</span></strong>
+        <div className="library-dock-actions">
+          {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
+          <button className="button button-accent" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
+          <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
+          <button className="button" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...latest.current.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
+          <button className="button" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
+        </div>
+      </div>
 
-      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")}>{cfg.pinned.map((item) => <div key={item.id} className={'library-pin' + (selectedId === item.id ? ' selected' : '')}
+      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")}>{cfg.pinned.filter((item) => item.kind !== 'widget').map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '')}
         draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item)); }}
         onDragOver={dragOver} onDrop={(event) => drop(event, { beforeId: item.id })}>
-        <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><PreviewPin item={item} size={36} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
+        <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><PreviewPin item={item} size={40} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
         {canMergeKind(item.kind) && <input type="checkbox" aria-label={`${t('premium.selectApp')}: ${pinLabel(item)}`} checked={chosenIds.includes(item.id)} onChange={(event) => chooseIds((ids) => event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id))} />}
         {item.kind === 'group' && <button className="library-group-drop" onDragOver={dragOver} onDrop={(event) => drop(event, { groupId: item.id })} onClick={() => { inspect(item); setTargetGroup(item.id); }} aria-label={t('apps.addToFolder')} title={t('apps.addToFolder')}><Icon name="plus" /><span>{item.children?.length || 0}</span></button>}
-      </div>)}</div>
+      </div>)}{!cfg.pinned.some((item) => item.kind !== 'widget') && <p className="library-empty">{t('add.none')}</p>}</div>
       {chosenIds.length > 0 && <div className="library-bulk-actions" role="group" aria-label={t('premium.addSelected')}>
         <span>{chosenIds.length}</span>
         <button className="button" onClick={() => { commit(chosenIds.reduce((items, id) => removePin(items, id), latest.current.pinned)); chooseIds([]); }}><Icon name="trash" />{t('apps.remove')}</button>
@@ -110,13 +114,14 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         }}><Icon name="folder" />{t('apps.addToFolder')}</button>}
         <button className="button" onClick={() => chooseIds([])}>{t('trash.cancel')}</button>
       </div>}
-      <p className="library-drop-hint">{t('next.dropHint')}</p>
+      <p className="library-drop-hint">{t('next.dropHint')}{cfg.pinned.some((item) => item.kind === 'widget') && <> · {t('apps.widgetsElsewhere')}</>}</p>
     </section>
     {error && <p role="alert">{error}</p>}
     <div className="library-workspace">
       <div className="library-catalog">
-        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }} />
-    <details className="library-web"><summary>{t('apps.web')}</summary><div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="button button-accent" disabled={webBusy || !webUrl.trim()} onClick={async () => {
+        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }}
+          destination={<label className="library-destination">{t('next.destination')}<select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label>}
+          webPanel={<div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="button button-accent" disabled={webBusy || !webUrl.trim()} onClick={async () => {
       if (webBusy) return;
       try {
         const raw = webUrl.trim(); const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(raw) ? raw : 'https://' + raw);
@@ -125,14 +130,15 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         try { favicon = await dock.fetchFavicon(url.href); } catch { /* A favicon never prevents adding a website. */ }
         add([{ name, path: url.href, icon: favicon }]); setWebUrl(''); setWebName('');
       } catch { setError(t('overhaul.failed')); } finally { setWebBusy(false); }
-    }}>{t(webBusy ? 'overhaul.loading' : 'apps.webAdd')}</button></div></details>
+    }}>{t(webBusy ? 'overhaul.loading' : 'apps.webAdd')}</button></div>} />
       </div>
       <Inspector dismissible={!!candidate} className={"library-inspector" + (candidate ? " library-candidate-inspector" : "")} selectionKey={selected?.id || candidate?.path} origin={inspectorOrigin} onBack={() => { inspectCandidate(null); selectId(null); }}>
         {selected ? <>
-          <div className="library-inspector-title"><PreviewPin item={selected} size={32} gap={6} /><h2>{pinLabel(selected)}</h2></div>
+          <div className="library-inspector-title"><PreviewPin item={selected} size={44} gap={6} /><h2>{pinLabel(selected)}</h2></div>
           {candidate ? <><p className="muted">{selected.path}</p><button className="button button-accent" disabled={!!candidatePinned} onClick={() => add([candidate])}><Icon name="plus" />{t('workspace.addApp')}</button></> : <>
             <label>{t('apps.rename')}<input value={selected.name || ''} onChange={(event) => set({ pinned: updatePin(latest.current.pinned, selected.id, { name: event.target.value }) })} /></label>
-            {selected.kind !== 'separator' && selected.kind !== 'widget' && selected.kind !== 'trash' && <button className="button" onClick={() => pickIcon(selected)}><Icon name="palette" />{t('apps.changeIcon')}</button>}
+            {selected.kind === 'group' && <GroupLook key={selected.id} item={selected} onChange={(style) => commit(updatePin(latest.current.pinned, selected.id, { style }))} />}
+            {selected.kind !== 'separator' && selected.kind !== 'widget' && selected.kind !== 'trash' && !(selected.kind === 'group' && selected.style?.glyph) && <button className="button" onClick={() => pickIcon(selected)}><Icon name="palette" />{t('apps.changeIcon')}</button>}
             <div className="library-dock-actions">
               <button className="button" disabled={movePinBy(cfg.pinned, selected.id, -1) === cfg.pinned} onClick={() => commit(movePinBy(latest.current.pinned, selected.id, -1))}><Icon name="arrow-left" />{t('stack.previous')}</button>
               <button className="button" disabled={movePinBy(cfg.pinned, selected.id, 1) === cfg.pinned} onClick={() => commit(movePinBy(latest.current.pinned, selected.id, 1))}>{t('stack.next')}<Icon name="arrow-right" /></button>

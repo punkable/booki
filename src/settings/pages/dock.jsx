@@ -31,9 +31,9 @@ export function DockPage({ cfg, set }) {
         <SegmentedControl value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
           options={[{ value: "click", label: t("be.revealClick") }, { value: "hover", label: t("be.revealHover") }]} />
       </Row>}
-      {hides && <Row label={t("be.notchMode")} hint={resolveNotchMode(cfg) === "floating" ? t("be.notchModeFloatingHint") : t("be.notchModeAttachedHint")}>
+      {hides && <Row label={t("be.notchMode")} hint={t({ floating: "be.notchModeFloatingHint", smart: "be.notchModeSmartHint" }[resolveNotchMode(cfg)] || "be.notchModeAttachedHint")}>
         <SegmentedControl value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
-          options={[{ value: "attached", label: t("be.notchModeAttached") }, { value: "floating", label: t("be.notchModeFloating") }]} />
+          options={[{ value: "attached", label: t("be.notchModeAttached") }, { value: "floating", label: t("be.notchModeFloating") }, { value: "smart", label: t("be.notchModeSmart") }]} />
       </Row>}
       {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />

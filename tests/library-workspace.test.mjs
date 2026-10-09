@@ -352,7 +352,7 @@ test('Windows known folders use the selected group and participate in undo', asy
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[{id:'group',kind:'group',name:'Work',children:[]}]}),initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='known_folders'?Promise.resolve([['documents','C:/Users/Owner/Documents']]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   await page.locator('.library-destination select').selectOption('group');
-  await page.locator('.app-library-folders-wrap summary').click();
+  await page.getByRole('button',{name:'Folders',exact:true}).click();
   await page.getByRole('button',{name:'Documents',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1&&cfg.pinned[0].id==='group'&&cfg.pinned[0].name==='Work'&&cfg.pinned[0].children?.[0]?.kind==='folder'&&cfg.pinned[0].children[0].path==='C:/Users/Owner/Documents';});
   await page.getByRole('button',{name:'Undo',exact:true}).click();

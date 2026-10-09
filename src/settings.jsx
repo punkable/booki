@@ -19,12 +19,13 @@ import { WidgetsPage } from "./settings/pages/widgets.jsx";
 import { AppsPage } from "./settings/pages/apps.jsx";
 import { SystemPage } from "./settings/pages/system.jsx";
 
+// [id, label, glyph, tile colour]
 const PAGES = [
-  ["home", "overhaul.home", "grid"],
-  ["dock", "tab.dock", "app"],
-  ["widgets", "tab.widgets", "zap"],
-  ["apps", "overhaul.appsFolders", "folder"],
-  ["system", "overhaul.system", "settings"],
+  ["home", "overhaul.home", "grid", "var(--accent)"],
+  ["dock", "tab.dock", "app", "#5e7bff"],
+  ["widgets", "tab.widgets", "zap", "#ff4f7b"],
+  ["apps", "overhaul.appsFolders", "folder", "#ff9a2e"],
+  ["system", "overhaul.system", "settings", "#8d8a93"],
 ];
 const PAGE_IDS = PAGES.map(([id]) => id);
 /** Pages from older builds (the dock, saved state, search) → where they live now. */
@@ -147,17 +148,20 @@ function App() {
         <img src="/brand/svg/isotype.svg" alt="" />
         <img className="brand-word only-light" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
         <img className="brand-word only-dark" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
+        {version && <span className="brand-version">v{version}</span>}
       </div>
       <Search onChoose={(result) => { navigate(result.tab); setSearchTarget(result); }} />
       <nav className="nav" aria-label={t("nav.label")}>
-        {PAGES.map(([id, label, glyph]) => <button key={id} type="button" className="nav-item" aria-current={page === id ? "page" : undefined} onClick={() => navigate(id)}>
-          <span className="nav-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(glyph) }} />
+        {PAGES.map(([id, label, glyph, hue]) => <button key={id} type="button" className="nav-item" aria-current={page === id ? "page" : undefined} onClick={() => navigate(id)}>
+          <span className="nav-icon" style={{ "--hue": hue }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(glyph) }} />
           <span>{t(label)}</span>
         </button>)}
       </nav>
-      <button type="button" className="nav-item nav-quit" onClick={async () => { if (await store.settled()) dockApi.quit(); }}>
-        <span className="nav-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("x") }} /><span>{t("act.quit")}</span>
-      </button>
+      <div className="sidebar-foot">
+        <button type="button" className="nav-item nav-quit" onClick={async () => { if (await store.settled()) dockApi.quit(); }}>
+          <span className="nav-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("x") }} /><span>{t("act.quit")}</span>
+        </button>
+      </div>
     </aside>
     <main ref={main} className="settings-main">
       <div className={"page page-" + page}>
@@ -172,7 +176,7 @@ function App() {
         <NativeBackdrop cfg={cfg} />
         <RecoveryNotice revision={cfg.revision} onProfiles={() => navigate("system")} onStartFresh={store.startFresh} />
         <SettingsBoundary key={page} onHome={() => navigate("home")}>
-          {page === "home" && <HomePage cfg={cfg} navigate={navigate} onSelect={select} />}
+          {page === "home" && <HomePage cfg={cfg} navigate={navigate} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
           {page === "dock" && <DockPage {...pageProps} />}
           {page === "widgets" && <WidgetsPage {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}

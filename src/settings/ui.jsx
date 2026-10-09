@@ -32,11 +32,13 @@ export function PageHeader({ title, children, meta }) {
   );
 }
 
-/** A titled inset group of rows. `hint` sits under the group as its footer. */
-export function SettingsSection({ title, hint, children, className = "" }) {
+/** A titled group of rows. `icon` draws the page-coloured section glyph,
+ *  `desc` a line under the title, `hint` a footer under the group. */
+export function SettingsSection({ title, icon: glyph, desc, hint, children, className = "" }) {
   return (
     <section data-setting-label={typeof title === "string" ? title : undefined} className={"ui-group-wrap " + className}>
-      {title ? <h2 className="ui-group-title">{title}</h2> : null}
+      {title ? <h2 className="ui-group-title">{glyph ? <Icon name={glyph} className="section-icon" /> : null}{title}</h2> : null}
+      {desc ? <p className="ui-group-desc">{desc}</p> : null}
       <div className="ui-group">{children}</div>
       {hint ? <p className="ui-group-foot">{hint}</p> : null}
     </section>
