@@ -140,3 +140,25 @@ test('a late profile preview never replaces the latest selection', async () => {
   assert.equal(await page.getByText('This profile was recovered from its backup. Review it before applying.',{exact:true}).count(),0);
   assert.deepEqual(errors,[]);await page.close();
 });
+
+test('a partial profile operation refreshes recoverable documents and retains its error', async () => {
+  const cfg=makeConfig();
+  const {page,errors}=await openPage(browser,port,'settings.html',{initScript:`
+    const original=window.__TAURI__.core.invoke;window.__profileNames=['Work'];
+    window.__TAURI__.core.invoke=(command,args)=>{
+      if(command==='profile_list')return Promise.resolve(window.__profileNames);
+      if(command==='profile_preview')return Promise.resolve({config:${JSON.stringify(cfg)},recovered:false});
+      if(command==='profile_rename'){window.__profileNames.push(args.newName);return Promise.reject(new Error('original could not be archived'));}
+      return original(command,args);
+    };`});
+  await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).click();
+  await page.getByRole('button',{name:'Work',exact:true}).click();
+  const panel=page.locator('.profile-inspector');
+  await panel.getByRole('textbox',{name:'Rename profile',exact:true}).fill('Recovered');
+  await panel.getByRole('button',{name:'Rename profile',exact:true}).click();
+  await page.getByRole('button',{name:'Recovered',exact:true}).waitFor();
+  await page.getByRole('alert').waitFor();
+  assert.equal(await panel.getByRole('textbox',{name:'Rename profile',exact:true}).inputValue(),'Recovered');
+  assert.equal(await panel.locator('h3').textContent(),'Work');
+  assert.deepEqual(errors,[]);await page.close();
+});

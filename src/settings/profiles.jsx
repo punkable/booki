@@ -24,7 +24,12 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
   };
   const action = async (fn) => {
     if (actionBusy.current) return; actionBusy.current = true; setBusy(true); setError("");
-    try { await fn(); } catch (e) { if (alive.current) setError(t(String(e).includes("BOOKI_PROFILE_EXISTS") ? "integral.profileExists" : String(e).includes("BOOKI_PROFILE_NAME_INVALID") ? "integral.profileNameInvalid" : "overhaul.failed")); }
+    try { await fn(); } catch (e) {
+      if (alive.current) setError(t(String(e).includes("BOOKI_PROFILE_EXISTS") ? "integral.profileExists" : String(e).includes("BOOKI_PROFILE_NAME_INVALID") ? "integral.profileNameInvalid" : "overhaul.failed"));
+      // A failed multi-document operation can leave a complete recovery copy.
+      // Reflect the actual files while retaining the error and the entered name.
+      await refresh().catch(() => {});
+    }
     finally { actionBusy.current = false; if (alive.current) setBusy(false); }
   };
   useEffect(() => {
@@ -34,7 +39,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
   useEffect(() => {
     let cancelled = false; setPreview(null);
     if (!selected) { setLoading(false); return; }
-    setLoading(true); setError("");
+    setLoading(true);
     dockApi.profilePreview(selected).then(value => { if (!cancelled) setPreview(value); })
       .catch(() => { if (!cancelled) setError(t("overhaul.failed")); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -46,7 +51,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
     {error && <p role="alert">{error}</p>}
     <div className="profile-workspace">
       <div className="profile-list" aria-label={t("prof.title")}>
-        {profiles.map(n => <button key={n} className={"s-btn s-btn-soft profile-choice" + (n === selected ? " selected" : "")} aria-pressed={n === selected} disabled={busy} onClick={event => { origin.current = event.currentTarget; setSelected(n); }}><span>{n}</span>{n === active && <span dangerouslySetInnerHTML={{ __html: icon("check") }} />}</button>)}
+        {profiles.map(n => <button key={n} className={"s-btn s-btn-soft profile-choice" + (n === selected ? " selected" : "")} aria-pressed={n === selected} disabled={busy} onClick={event => { origin.current = event.currentTarget; setError(""); setSelected(n); }}><span>{n}</span>{n === active && <span dangerouslySetInnerHTML={{ __html: icon("check") }} />}</button>)}
       </div>
       {selected && <Inspector className="profile-inspector" selectionKey={selected} origin={origin} onBack={() => setSelected("")}>
         <h3>{selected}</h3>
