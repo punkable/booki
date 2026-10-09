@@ -150,12 +150,16 @@ function bridgeSource(cfg, { stats = {} } = {}) {
   };
   return `
     let storedConfig = ${JSON.stringify(cfg)};
+    const noteDrafts = JSON.parse(sessionStorage.getItem("mock-note-drafts") || "{}");
     window.__bookiErrors = [];
     window.__listeners = {};
     window.__TAURI__ = {
       core: {
         invoke: (cmd, args = {}) => {
           switch (cmd) {
+            case "read_note_draft": return Promise.resolve(noteDrafts[args.id] ?? null);
+            case "write_note_draft": noteDrafts[args.id] = args.text; sessionStorage.setItem("mock-note-drafts", JSON.stringify(noteDrafts)); return Promise.resolve();
+            case "clear_note_draft": if (noteDrafts[args.id] === args.expected) delete noteDrafts[args.id]; sessionStorage.setItem("mock-note-drafts", JSON.stringify(noteDrafts)); return Promise.resolve();
             case "app_version": return Promise.resolve(${JSON.stringify(APP_VERSION)});
             case "get_config": return Promise.resolve(structuredClone(storedConfig));
             case "save_config": storedConfig = structuredClone(args.patch ? { ...storedConfig, ...args.patch } : args.config); return Promise.resolve(structuredClone(storedConfig));

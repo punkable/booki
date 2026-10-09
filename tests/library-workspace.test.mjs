@@ -482,3 +482,51 @@ test('a removed productivity widget keeps its task input and cannot be resurrect
   assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned.length,0);
   assert.deepEqual(errors,[]);await page.close();
 });
+
+test('note recovery survives a WebView restart after failed config saving and restores only explicitly', async () => {
+  const note={id:'note',kind:'widget',widget:'notes',name:'Notes',style:{note:'Stored note'}};
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[note]}),viewport:{width:520,height:400}});
+  await page.evaluate(()=>{const original=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='save_config'?Promise.reject('disk full'):original(cmd,args);});
+  await page.locator('.tile[data-id="note"]').click();
+  await page.getByRole('textbox',{name:'Note',exact:true}).fill('Recover this private draft');
+  await page.locator('.note-workspace').getByRole('button',{name:'Retry',exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.__TAURI__.core.invoke('read_note_draft',{id:'note'})),'Recover this private draft');
+  await page.reload();await page.locator('.tile[data-id="note"]').click();
+  const input=page.getByRole('textbox',{name:'Note',exact:true});
+  await page.getByRole('button',{name:'Restore draft',exact:true}).waitFor();
+  assert.equal(await input.inputValue(),'Stored note');assert.equal(await input.isDisabled(),true);
+  const box=await page.locator('.note-workspace').boundingBox();assert.ok(box.x>=0&&box.y>=0&&box.x+box.width<=520&&box.y+box.height<=400);
+  assert.equal(await page.locator('.note-recovery-preview').textContent(),'Recover this private draft');
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned[0].style.note,'Stored note');
+  await page.getByRole('button',{name:'Restore draft',exact:true}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note==='Recover this private draft');
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('read_note_draft',{id:'note'}))===null);
+  assert.equal(await input.isEnabled(),true);assert.deepEqual(errors,[]);await page.close();
+});
+
+test('discarding note recovery preserves the saved note, including an empty pending draft', async () => {
+  const note={id:'note',kind:'widget',widget:'notes',name:'Notes',style:{note:'Stored note'}};
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[note]})});
+  await page.evaluate(()=>window.__TAURI__.core.invoke('write_note_draft',{id:'note',text:''}));
+  await page.locator('.tile[data-id="note"]').click();
+  await page.getByRole('button',{name:'Discard draft',exact:true}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('read_note_draft',{id:'note'}))===null);
+  assert.equal(await page.getByRole('textbox',{name:'Note',exact:true}).inputValue(),'Stored note');
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned[0].style.note,'Stored note');
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('note journal failures prevent overwriting unread recovery and stop config commits until retry', async () => {
+  const note={id:'note',kind:'widget',widget:'notes',name:'Notes',style:{note:'Stored note'}};
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[note]})});
+  await page.evaluate(()=>{const original=window.__TAURI__.core.invoke;window.failRead=true;window.failJournal=false;window.__TAURI__.core.invoke=(cmd,args)=>((cmd==='read_note_draft'&&window.failRead)||(cmd==='write_note_draft'&&window.failJournal))?Promise.reject('encryption unavailable'):original(cmd,args);});
+  await page.locator('.tile[data-id="note"]').click();
+  const input=page.getByRole('textbox',{name:'Note',exact:true});const retry=page.locator('.note-workspace').getByRole('button',{name:'Retry',exact:true});
+  await retry.waitFor();assert.equal(await input.isDisabled(),true);
+  await page.evaluate(()=>{window.failRead=false;window.failJournal=true;});await retry.click();
+  await input.fill('Protected draft');await retry.waitFor();
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned[0].style.note,'Stored note');
+  await page.evaluate(()=>{window.failJournal=false;});await retry.click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note==='Protected draft');
+  assert.deepEqual(errors,[]);await page.close();
+});

@@ -9,6 +9,7 @@ mod config;
 mod config_document;
 mod config_transaction;
 mod directory;
+mod note_journal;
 mod profile_store;
 mod recovery;
 mod shortcuts;
@@ -115,6 +116,48 @@ static CLIP_STORAGE_FAILED: AtomicBool = AtomicBool::new(false);
 const CLIP_JSON_MAGIC: &[u8] = b"booki-json-v1\n";
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+#[tauri::command]
+async fn read_note_draft(id: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::read(
+            &config::config_dir(),
+            &id,
+            win::unprotect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn write_note_draft(id: String, text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::write(
+            &config::config_dir(),
+            &id,
+            &text,
+            win::protect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn clear_note_draft(id: String, expected: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::clear(
+            &config::config_dir(),
+            &id,
+            &expected,
+            win::unprotect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 fn clip_history_path() -> std::path::PathBuf {
     config::config_dir().join("clipboard-history.dat")
@@ -2845,6 +2888,9 @@ pub fn run() {
             acquire_update_lock,
             release_update_lock,
             prepare_update,
+            read_note_draft,
+            write_note_draft,
+            clear_note_draft,
             get_config,
             save_config,
             launch_app,

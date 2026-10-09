@@ -1230,7 +1230,7 @@ async function editNote(item) {
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
   const panel = document.createElement("section");
-  panel.className = "note-editor note-workspace";
+  panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
   const head = document.createElement("div"); head.className = "productivity-head";
   const title = document.createElement("strong"); title.textContent = t("w.notes");
@@ -1241,9 +1241,14 @@ async function editNote(item) {
   const footer = document.createElement("div"); footer.className = "note-save-state";
   const status = document.createElement("span"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.textContent = t("status.saved");
   const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
+  let recoveryPending = true;
+  let retryLoad = null;
   const saver = createDraftSaver(async (text) => {
+    // Journal first: a failed configuration write still leaves a recoverable
+    // encrypted local copy. Clear only the matching text after durable save.
+    await dockApi.writeNoteDraft(item.id, text);
     const current = findWidgetPin(item.id);
-    if (!current) return false;
+    if (!current || current.widget !== "notes") return false;
     current.style = { ...(current.style || {}), note: text };
     if (!(await persist({}, { showError: false }))) return false;
     eachWidget("notes", (el) => {
@@ -1251,10 +1256,43 @@ async function editNote(item) {
       setPreviewSubText(el, text || t("w.notesEmpty"), !text);
       setTileLabel(el, widgetLabel("notes"));
     });
+    await dockApi.clearNoteDraft(item.id, text);
     return true;
   }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; });
-  panel.flush = saver.flush; panel.dispose = saver.cancelTimer;
-  retry.addEventListener("click", () => { ta.focus(); saver.flush(); }); footer.append(status, retry); panel.append(head, ta, footer);
+  panel.flush = () => recoveryPending ? Promise.resolve(true) : saver.flush(); panel.dispose = saver.cancelTimer;
+  retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } }); footer.append(status, retry); panel.append(head, ta, footer);
+  ta.disabled = true;
+  const loadRecovery = async () => {
+    retry.hidden = true; status.textContent = t("overhaul.loading");
+    try {
+      const recovered = await dockApi.readNoteDraft(item.id);
+      if (noteEditor !== panel) return;
+      if (recovered != null && recovered !== ta.value) {
+        const recovery = document.createElement("div"); recovery.className = "note-recovery";
+        recovery.setAttribute("role", "status");
+        const message = document.createElement("p"); message.textContent = t("notes.recoveryFound"); recovery.append(message);
+        const preview = document.createElement("div"); preview.className = "note-recovery-preview"; preview.textContent = recovered || t("w.notesEmpty"); recovery.append(preview);
+        const restore = document.createElement("button"); restore.type = "button"; restore.className = "productivity-button"; restore.textContent = t("notes.restoreDraft");
+        const discard = document.createElement("button"); discard.type = "button"; discard.className = "productivity-button"; discard.textContent = t("notes.discardDraft");
+        const resume = () => { recovery.remove(); recoveryPending = false; retryLoad = null; ta.disabled = false; ta.focus(); status.textContent = t("status.saved"); };
+        restore.addEventListener("click", () => { ta.value = recovered; resume(); saver.change(recovered); });
+        discard.addEventListener("click", async () => {
+          restore.disabled = discard.disabled = true;
+          try { await dockApi.clearNoteDraft(item.id, recovered); if (noteEditor === panel) resume(); }
+          catch { status.textContent = t("status.saveError"); restore.disabled = discard.disabled = false; }
+        });
+        recovery.append(restore, discard); panel.insertBefore(recovery, ta);
+        status.textContent = t("notes.recoveryFound"); retryLoad = null; restore.focus();
+      } else {
+        if (recovered != null) await dockApi.clearNoteDraft(item.id, recovered);
+        if (noteEditor !== panel) return;
+        recoveryPending = false; retryLoad = null; ta.disabled = false; status.textContent = t("status.saved"); ta.focus();
+      }
+    } catch {
+      if (noteEditor !== panel) return;
+      status.textContent = t("status.saveError"); retry.hidden = false; retryLoad = loadRecovery;
+    }
+  };
   ta.addEventListener("input", () => saver.change(ta.value));
   panel.addEventListener("keydown", async (event) => {
     event.stopPropagation();
@@ -1266,6 +1304,7 @@ async function editNote(item) {
     requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
   });
   document.body.appendChild(panel); noteEditor = panel; pinnedReveal = true; applyFrame();
+  loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
     const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
@@ -1273,7 +1312,7 @@ async function editNote(item) {
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); ta.focus(); });
+  requestAnimationFrame(() => { place(); if (ta.disabled) panel.focus(); else ta.focus(); });
 }
 
 // ─────────────────────────── Launch ───────────────────────────

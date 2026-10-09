@@ -91,8 +91,13 @@ let demoClipboard = [
 const demoDeletedProfiles = {};
 let demoProfiles = { Trabajo: structuredClone(DEMO_CONFIG) };
 
+const mockNoteDrafts = new Map();
 async function mockInvoke(cmd, args) {
   switch (cmd) {
+    case "read_note_draft": return mockNoteDrafts.get(args.id) ?? null;
+    case "write_note_draft": mockNoteDrafts.set(args.id, args.text); return null;
+    case "clear_note_draft": if (mockNoteDrafts.get(args.id) === args.expected) mockNoteDrafts.delete(args.id); return null;
+
     case "get_config":
       return structuredClone(demoConfig);
     case "save_config":
@@ -453,6 +458,9 @@ export const dock = {
   launch: (path, args = []) => invoke("launch_app", { path, args }),
   appIcon: (path) => icons.get(path),
   invalidateIcons: () => icons.clear(),
+  readNoteDraft: (id) => invoke("read_note_draft", { id }),
+  writeNoteDraft: (id, text) => invoke("write_note_draft", { id, text }),
+  clearNoteDraft: (id, expected) => invoke("clear_note_draft", { id, expected }),
   quietUpdateSupported: () => invoke("quiet_update_supported"),
   clearUsage: () => invoke("clear_app_usage"),
   appIdentities: (paths) => invoke("app_identities", { paths }),

@@ -158,6 +158,9 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .library-bulk-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 /* Notes share the compact inspector language and expose durable save state. */
 .note-editor.note-workspace {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
   width: min(320px, calc(100vw - 16px));
   height: auto;
   padding: 12px;
@@ -271,3 +274,9 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .app-library-monogram { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--set-field)); color: var(--ink); font-size: 13px; font-weight: 600; }
 
 .library-candidate-inspector .inspector-dismiss { display: inline-flex; order: 3; width: 30px; height: 30px; min-height: 30px; padding: 4px; margin-top: 0; }
+
+.note-recovery { padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--hover); }
+.note-recovery p { margin: 0 0 10px; font-size: var(--text-sm); line-height: 1.5; }
+.note-recovery button { margin: 0 6px 6px 0; max-width: 100%; white-space: normal; }
+
+.note-recovery-preview { max-height: 80px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 10px; font-size: var(--text-sm); color: var(--muted); }

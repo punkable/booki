@@ -1,6 +1,9 @@
 /* Booki i18n — extra languages, loaded on demand (keeps the base bundle small). */
 export const EXTRA = {
   pt: {
+    "notes.recoveryFound": "Foi encontrado um rascunho não salvo. Escolha se deseja recuperá-lo antes de editar.",
+    "notes.restoreDraft": "Recuperar rascunho",
+    "notes.discardDraft": "Descartar rascunho",
     "focus.widgetUnavailable": "Este widget mudou ou foi removido. Copie o texto que deseja manter antes de fechar.",
     "hint.groupSingle": "1 item · abrir grupo",
     "hint.launch": "Abrir aplicativo",
@@ -767,6 +770,9 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Este widget usa comportamento automático e só oferece opções visuais.",
 },
   fr: {
+    "notes.recoveryFound": "Un brouillon non enregistré a été retrouvé. Choisissez de le récupérer ou non avant de modifier.",
+    "notes.restoreDraft": "Restaurer le brouillon",
+    "notes.discardDraft": "Supprimer le brouillon",
     "focus.widgetUnavailable": "Ce widget a changé ou a été supprimé. Copiez le texte à conserver avant de fermer.",
     "hint.groupSingle": "1 élément · ouvrir le groupe",
     "hint.launch": "Ouvrir l’application",
@@ -1533,6 +1539,9 @@ export const EXTRA = {
     "w.smartDefaultsHint": "Ce widget fonctionne automatiquement et n'expose que des options visuelles.",
 },
   de: {
+    "notes.recoveryFound": "Ein ungespeicherter Entwurf wurde gefunden. Entscheide vor dem Bearbeiten, ob du ihn wiederherstellen möchtest.",
+    "notes.restoreDraft": "Entwurf wiederherstellen",
+    "notes.discardDraft": "Entwurf verwerfen",
     "focus.widgetUnavailable": "Dieses Widget wurde geändert oder entfernt. Kopiere den Text, den du behalten möchtest, bevor du schließt.",
     "hint.groupSingle": "1 Element · Gruppe öffnen",
     "hint.launch": "App öffnen",

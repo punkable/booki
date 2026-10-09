@@ -6,6 +6,9 @@
 
 export const DICT = {
   es: {
+    "notes.recoveryFound": "Se encontró un borrador sin guardar. Decide si quieres recuperarlo antes de editar.",
+    "notes.restoreDraft": "Recuperar borrador",
+    "notes.discardDraft": "Descartar borrador",
     "focus.widgetUnavailable": "Este widget cambió o se eliminó. Copia el texto que quieras conservar antes de cerrar.",
     "hint.groupSingle": "1 elemento · abrir grupo",
     "hint.launch": "Abrir aplicación",
@@ -780,6 +783,9 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "notes.recoveryFound": "An unsaved draft was found. Choose whether to recover it before editing.",
+    "notes.restoreDraft": "Restore draft",
+    "notes.discardDraft": "Discard draft",
     "focus.widgetUnavailable": "This widget changed or was removed. Copy any text you want to keep before closing.",
     "hint.groupSingle": "1 item · open group",
     "hint.launch": "Open app",
