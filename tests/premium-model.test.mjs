@@ -101,3 +101,19 @@ test('removed packaged apps are excluded when discovery succeeds but recommendat
   assert.equal(candidateSections({ used, groups }, new Set()).frequent.length, 0);
   assert.equal(candidateSections({ used, groups: [] }, new Set()).frequent.length, 1);
 });
+
+test('Windows utilities are folded by launch identity, stay searchable and become suggestions with meaningful use', () => {
+  const shell = {name:'Localized capture tool',path:'shell:AppsFolder\\Microsoft.ScreenSketch_8wekyb3d8bbwe!App'};
+  const terminal = {name:'Terminal shortcut',path:'C:/Start/Console.lnk'};
+  const editor = {name:'Useful app',path:'C:/Apps/editor.exe'};
+  const identities = {[terminal.path]:JSON.stringify(['C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe','-NoProfile','C:/Work']),[shell.path]:JSON.stringify([shell.path,'',''])};
+  const groups = [{items:[shell,terminal,editor]}];
+  const ordinary = candidateSections({groups,used:[{...shell,runs:1,focus_ms:0}]},new Set(),'',identities);
+  assert.equal(ordinary.installed.length,3,'The full catalog remains available to the dock quick-add surface');
+  assert.equal(ordinary.utilities.length,2);
+  assert.equal(ordinary.frequent.length,0);
+  assert.equal(candidateSections({groups},new Set(),'capture',identities).utilities[0].path,shell.path);
+  const frequent = candidateSections({groups,used:[{...shell,runs:8}]},new Set(),'',identities);
+  assert.equal(frequent.frequent[0].path,shell.path);
+  assert.equal(frequent.utilities.length,1);
+});

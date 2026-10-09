@@ -67,7 +67,7 @@ test('failed profile save keeps the name and explains the failure for retry', as
     window.__TAURI__.core.invoke = (command, args) => command === 'profile_save' ? Promise.reject(new Error('disk full')) : old(command, args);
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Profiles & backup', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: /^Dock profiles/ }).getAttribute('aria-expanded'), 'true');
+  await page.getByRole('heading', { name: /^Dock profiles/ }).waitFor();
   await page.getByPlaceholder('Name (e.g. Work)').fill('Work');
   await page.getByRole('button', { name: 'Save current', exact: true }).click();
   await page.getByRole('alert').waitFor();

@@ -243,3 +243,124 @@ test('an inaccessible folder offers retry instead of claiming it is empty', asyn
   assert.equal(await page.locator('.stack-item').count(),0);
   assert.deepEqual(errors,[]);await page.close();
 });
+
+test('library keeps one compact editable dock and gives an unselected catalog the available width', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:850}});
+  await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
+  const editor=page.getByRole('region',{name:'In your dock',exact:true});
+  await editor.getByRole('button',{name:'Editor',exact:true}).waitFor();
+  const geometry=await page.evaluate(()=>{
+    const editor=document.querySelector('.library-dock-editor'),catalog=document.querySelector('.library-catalog'),workspace=document.querySelector('.library-workspace');
+    return {height:editor.getBoundingClientRect().height,catalogWidth:catalog.getBoundingClientRect().width,workspaceWidth:workspace.getBoundingClientRect().width,previewCount:editor.querySelectorAll('.live-preview-scene').length};
+  });
+  assert.ok(geometry.height<=180,`The persistent editor occupies ${geometry.height}px`);
+  assert.ok(geometry.catalogWidth>=geometry.workspaceWidth*.95,'No width reserved for an empty inspector');
+  assert.equal(geometry.previewCount,0,'The editable dock must not be duplicated by a second preview');
+  await editor.getByRole('button',{name:'Editor',exact:true}).click();
+  await page.locator('.library-inspector').getByRole('textbox',{name:'Rename',exact:true}).waitFor();
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('widget filtering preserves a customized draft and leaves the heading visible when the gallery scrolls', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
+  await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
+  const search=page.getByRole('searchbox',{name:'Search widgets',exact:true});
+  await search.fill('timer');
+  assert.equal(await page.locator('.widget-store-choice').count(),1);
+  await page.getByRole('button',{name:'Item details: Timer',exact:true}).click();
+  await page.locator('.widget-inspector').getByRole('radio',{name:'Solid',exact:true}).click();
+  await search.fill('not-a-widget');
+  await page.getByRole('status').filter({hasText:'No results'}).waitFor();
+  assert.equal(await page.locator('.widget-inspector').getByRole('radio',{name:'Solid',exact:true}).getAttribute('aria-checked'),'true');
+  await search.fill('');
+  await page.locator('.widget-store-grid').evaluate(element=>element.scrollTop=element.scrollHeight);
+  const heading=await page.getByRole('heading',{name:'Widgets',exact:true}).boundingBox();
+  assert.ok(heading.y>=0 && heading.y<150,'Scrolling the gallery must leave the page heading accessible');
+  await page.locator('.widget-inspector').getByRole('button',{name:'Add',exact:true}).click();
+  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='timer' && item.style.variant==='solid');});
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('the editable dock reserves space while a populated library scrolls without covering its apps', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:720},initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:Array.from({length:70},(_,i)=>({name:'App '+i,path:'C:/Apps/app'+i+'.exe'}))}]):old(cmd,args);`});
+  await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
+  await page.locator('.app-library-card').first().waitFor();
+  const editor=page.locator('.library-dock-editor');const before=await editor.boundingBox();
+  await page.locator('.library-workspace').evaluate(element=>element.scrollTop=element.scrollHeight);
+  const after=await editor.boundingBox();const catalog=await page.locator('.library-workspace').boundingBox();
+  assert.equal(after.y,before.y);
+  assert.ok(after.y+after.height<=catalog.y,'The dock and catalog must occupy separate layout areas');
+  assert.ok(await page.locator('.library-workspace').evaluate(element=>element.scrollTop>0));
+  await page.getByRole('button',{name:'Item details: App 0',exact:true}).click();
+  const populatedInspector=await page.locator('.library-candidate-inspector').boundingBox();
+  const populatedTools=await page.locator('.app-library-tools').boundingBox();
+  assert.ok(populatedInspector.y+populatedInspector.height<=populatedTools.y, 'A tall catalog must not shrink the selected app row into its search tools');
+  await page.locator('.library-candidate-inspector').getByRole('button',{name:'Close',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
+  await page.getByRole('button',{name:'Item details: App 69',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Item details: App 69',exact:true}).click();
+  const inspector=await page.locator('.library-candidate-inspector').boundingBox();
+  const tools=await page.locator('.app-library-tools').boundingBox();
+  assert.ok(inspector.y+inspector.height<=tools.y, 'The selected app and search tools must not overlap');
+  assert.ok(inspector.y>=catalog.y, 'Selection must be visible within the catalog scroll area');
+
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('a delayed config reply cannot replace the newer dock or replay its appearance', async () => {
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[app]})});
+  await page.locator('.tile[data-id="editor"]').waitFor();
+  await page.evaluate(async()=>{
+    const old=window.__TAURI__.core.invoke;const snapshot=await old('get_config');let calls=0;
+    window.__TAURI__.core.invoke=(cmd,args)=>cmd==='get_config'?(++calls===1?new Promise(resolve=>{window.releaseOldConfig=()=>resolve(snapshot);}):Promise.resolve({...snapshot,theme:'light',pinned:[{id:'newer',kind:'app',name:'Newer app',path:'C:/newer.exe',args:[]}]})):old(cmd,args);
+    const listeners=window.__listeners['booki://config-changed']||[];
+    listeners.forEach(callback=>callback({payload:{origin:'external-first'}}));
+    listeners.forEach(callback=>callback({payload:{origin:'external-second'}}));
+  });
+  await page.locator('.tile[data-id="newer"]').waitFor();
+  await page.evaluate(()=>window.releaseOldConfig());
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator('.tile[data-id="newer"]').count(),1);
+  assert.equal(await page.locator('.tile[data-id="editor"]').count(),0);
+  assert.equal(await page.locator('html').getAttribute('data-theme'),'light');
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('native icon refresh retries extraction while utilities remain searchable in a folded section', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{initScript:`const old=window.__TAURI__.core.invoke;window.iconReady=false;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'},{name:'PowerShell',path:'C:/Windows/powershell.exe'}]}]):cmd==='app_icon'?Promise.resolve(window.iconReady?'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>':null):old(cmd,args);`});
+  await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
+  await page.getByRole('button',{name:'Item details: Editor',exact:true}).waitFor();
+  const tools=page.locator('.app-library-utilities');
+  assert.equal(await tools.getAttribute('open'),null);
+  assert.equal(await page.getByRole('button',{name:'Item details: PowerShell',exact:true}).isVisible(),false);
+  await page.evaluate(()=>window.iconReady=true);
+  await page.getByRole('button',{name:'Refresh list',exact:true}).click();
+  await page.getByRole('button',{name:'Item details: Editor',exact:true}).locator('img').waitFor();
+  await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('powershell');
+  await page.getByRole('button',{name:'Item details: PowerShell',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Add app: PowerShell',exact:true}).click();
+  await page.waitForFunction(async()=>(await window.__TAURI__.core.invoke('get_config')).pinned.some(item=>item.name==='PowerShell'));
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('dock position exposes labelled edges and alignment even when auto-hide is off', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({autoHideMode:'off'}),viewport:{width:520,height:780}});
+  await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
+  await page.getByRole('button',{name:'Move the dock here: Left',exact:true}).click();
+  await page.locator('.position-notch').getByRole('radio',{name:'End',exact:true}).click();
+  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
+  assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('Windows known folders use the selected group and participate in undo', async () => {
+  const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[{id:'group',kind:'group',name:'Work',children:[]}]}),initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='known_folders'?Promise.resolve([['documents','C:/Users/Owner/Documents']]):old(cmd,args);`});
+  await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
+  await page.locator('.library-destination select').selectOption('group');
+  await page.locator('.app-library-folders-wrap summary').click();
+  await page.getByRole('button',{name:'Documents',exact:true}).click();
+  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1&&cfg.pinned[0].children[0]?.kind==='folder';});
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1 && cfg.pinned[0].id==='group' && (cfg.pinned[0].children || []).length===0;});
+  assert.deepEqual(errors,[]);await page.close();
+});

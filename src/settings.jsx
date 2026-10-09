@@ -33,7 +33,6 @@ import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
 import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
 import { resolveNotchMode } from "./notch-mode.js";
 import { findSettings } from "./settings/search.js";
-import { emoSrc } from "./emoji.js";
 import {
   Dropdown,
   Option,
@@ -42,6 +41,7 @@ import {
   Slider,
   SegmentedControl,
   PageHeader,
+  Icon,
   SettingsSection,
   CollapsibleSection,
   SectionTitle,
@@ -53,6 +53,7 @@ import {
 } from "./settings/ui.jsx";
 import {
   WIDGET_META,
+  WIDGET_GLYPHS,
   widgetDisplayName as widgetDisplayNameShared,
 } from "./widgets-meta.js";
 
@@ -162,62 +163,26 @@ function installedAppsOnce(force = false) {
 function PositionPicker({ cfg, set }) {
   const dockEdge = cfg.edge || "bottom";
   const pos = cfg.notchPosition || "center";
-  const showNotch = (cfg.autoHideMode || "smart") !== "off";
-  // A notch tab sets the dock's edge AND the notch's along-position at once.
-  const pickNotch = (edge, position) => {
-    const moved = edge !== dockEdge;
-    set({ edge, notchPosition: position, notchEdge: "auto" });
-    // Same edge → the dock won't move, so flash the notch to show the new spot.
-    // Different edge → reloadConfig already previews the dock on its new edge.
-    if (!moved) dockApi.notchPreview();
-  };
-  const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter((p) => p.kind !== "separator").length || 5));
-  const posLabel = (s) => t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`);
-  return (
-    <div className="pospick">
-      <div className="pospick-screen">
-        {["top", "bottom", "left", "right"].map((e) => (
-          <button
-            key={e}
-            type="button"
-            className={`pospick-edge pp-${e}` + (dockEdge === e ? " active" : "")}
-            onClick={() => set({ edge: e, notchEdge: "auto" })}
-            title={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
-            aria-label={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
-          />
-        ))}
-        {/* The dock itself, in miniature, living on its edge. */}
-        <span key={dockEdge} className={`pospick-bar ppb-${dockEdge}`} aria-hidden="true">
-          {Array.from({ length: tiles }).map((_, i) => <i key={i} />)}
-        </span>
-        {showNotch &&
-          ["top", "bottom", "left", "right"].flatMap((edge) =>
-            ["start", "center", "end"].map((s) => (
-              <button
-                key={`${edge}-${s}`}
-                type="button"
-                className={
-                  `notchpick-slot npe-${edge} nps-${s}` +
-                  (dockEdge === edge && pos === s ? " active" : "")
-                }
-                onClick={() => pickNotch(edge, s)}
-                title={`${t("be.moveDock")}: ${t(`edge.${edge}`)} · ${posLabel(s)}`}
-              >
-                <span className="notchpick-tab" />
-              </button>
-            ))
-          )}
-      </div>
-      <p className="pospick-caption">
-        {t("be.dockLabel")}: <strong>{t(`edge.${dockEdge}`)}</strong>
-        {showNotch && (
-          <>
-            {" · "}{t("be.notchLabel")}: <strong>{posLabel(pos)}</strong>
-          </>
-        )}
-      </p>
+  const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter(p => p.kind !== "separator").length || 5));
+  const posLabel = value => t(`be.notch${value[0].toUpperCase()}${value.slice(1)}`);
+  return <div className="position-workspace">
+    <div className="pospick-screen" aria-hidden="true">
+      <span key={dockEdge} className={`pospick-bar ppb-${dockEdge}`}>
+        {Array.from({ length: tiles }).map((_, index) => <i key={index} />)}
+      </span>
     </div>
-  );
+    <div className="position-controls">
+      <div className="position-edges" role="group" aria-label={t("be.dockLabel")}>
+        {["top", "bottom", "left", "right"].map(edge => <button key={edge} type="button"
+          aria-label={`${t("be.moveDock")}: ${t(`edge.${edge}`)}`} aria-pressed={dockEdge === edge}
+          onClick={() => set({ edge, notchEdge: "auto" })}>{t(`edge.${edge}`)}</button>)}
+      </div>
+      <label className="position-notch"><span>{t("design.alignment")}</span>
+        <SegmentedControl value={pos} options={["start","center","end"].map(value => ({value,label:posLabel(value)}))}
+          onChange={value => set({notchPosition:value,notchEdge:"auto"}, {flush:true,afterSave:()=>dockApi.notchPreview()})} />
+      </label>
+    </div>
+  </div>;
 }
 
 /** Color of the frosted glass fill (dock + notch), separate from accent. */
@@ -393,7 +358,7 @@ function AccentPicker({ value, onChange }) {
             if (hex) onChange(hex);
           }}
         >
-          <img className="emo" src={emoSrc("picture")} alt="" width="15" height="15" />
+          <Icon name="image" />
           {t("ap.wallpaperShort")}
         </button>
       </div>
@@ -858,16 +823,14 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
   return (
         <div className="widget-modal-body">
         <div className="widget-modal-hero" style={{ "--widget-accent": meta.accent || accent }}>
-          <span className="widget-store-ico">
-            <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
-          </span>
+          <span className="widget-store-ico" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[item.widget] || "sparkles") }} />
           <div>
             <strong>{item.name || widgetDisplayName(item.widget)}</strong>
             <p>{t(meta.desc)}</p>
           </div>
         </div>
         <div className="widget-editor-preview"><WidgetPreview widget={item.widget} style={st} size={56} /></div>
-        <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>
+        {["notes","media","clipboard"].includes(item.widget) && <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>}
         {["timer", "tasks", "calendar", "weather"].includes(item.widget) && <p className="muted">{t("overhaul.utilityHint")}</p>}
         {item.widget === "notes" && (
           <Row label={t("w.note")}>
@@ -889,14 +852,6 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
           />
         ) : item.widget === "clipboard" ? (
           <ClipboardSettingsPanel cfg={cfg} set={set} />
-        ) : !["notes", "timer", "tasks", "calendar", "weather"].includes(item.widget) ? (
-          <div className="widget-no-extra">
-            <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
-            <div>
-              <strong>{t("w.smartDefaults")}</strong>
-              <p>{t("w.smartDefaultsHint")}</p>
-            </div>
-          </div>
         ) : null}
         {["media", "battery"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!st.hideWhenUnavailable} onChange={(value) => set1({ hideWhenUnavailable: value })} />}
         <SectionTitle name="palette">{t("w.appearance")}</SectionTitle>
@@ -917,11 +872,13 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
           <SegmentedControl value={String(st.span || "auto")} onChange={(v) => set1({ span: v === "auto" ? null : Number(v) })}
             options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: `${n}×` }))]} />
         </Row>
+        <CollapsibleSection title={t("next.advanced")} defaultOpen={false}>
         <Row label={t("w.color")}>
           <AccentPicker value={st.color || accent} onChange={(v) => set1({ color: v })} />
         </Row>
         <Toggle label={t("w.animated")} checked={!!st.animated} onChange={(v) => set1({ animated: v })} />
         <Toggle label={t("w.showIcon")} checked={st.icon !== false} onChange={(v) => set1({ icon: v })} />
+        </CollapsibleSection>
         </div>
   );
 }
@@ -1707,7 +1664,7 @@ function App() {
               switching tabs unmounts one and mounts the other on its own. The
               key additionally remounted this wrapper and the save-status line,
               which threw away the "saved" indicator mid-flight. */}
-          <div>
+          <div className={"settings-page" + (tab === "apps" ? " library-page" : "")}>
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>

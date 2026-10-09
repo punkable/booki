@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { widgetCardHTML, setText, setMetric, clockParts, sparkPaths } from "../dock/widget-view.js";
 import { widgetWidth } from "../dock/layout-model.js";
-import { WIDGET_META, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName } from "../widgets-meta.js";
+import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName } from "../widgets-meta.js";
 import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
 import { isLibIcon, resolveLibIcon } from "../icon-library.js";
@@ -45,7 +45,7 @@ export function WidgetPreview({ widget, style: rawStyle, size = 48, gap = 6 }) {
     <span className="w-card" />
   </span>;
 }
-function PreviewPin({ item, size, gap }) {
+export function PreviewPin({ item, size = 40, gap = 6 }) {
   const [src, setSrc] = useState(() => isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
   useEffect(() => {
     let alive = true;
@@ -58,10 +58,10 @@ function PreviewPin({ item, size, gap }) {
   if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} gap={gap} />;
   if (item.kind === "separator") return <span className="live-preview-separator" />;
   return <span className="live-preview-app" title={item.name} style={{ width: size, height: size }}>
-    {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.name?.charAt(0) || "•"}</span>)}</span>
+    {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[child.widget] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
       : src ? <img src={src} alt="" />
         : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
-          : <span>{item.name?.charAt(0)?.toUpperCase() || "•"}</span>}
+          : <span dangerouslySetInnerHTML={{ __html: icon("app") }} />}
   </span>;
 }
 export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin, onDragOver }) {

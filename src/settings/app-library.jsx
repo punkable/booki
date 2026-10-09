@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { dock } from '../api.js';
 import { t } from '../i18n.js';
-import { candidateSections, pinnedKeys, pathKey, appKey } from '../dock/app-candidates.js';
+import { candidateSections, pinnedKeys, pathKey, appKey, appCategory } from '../dock/app-candidates.js';
 import { PIN_DRAG_TYPE } from '../pins.js';
-import { SettingsSection, Icon } from './ui.jsx';
+import { Icon } from './ui.jsx';
 
-function AppIcon({ path, name }) {
+function AppIcon({ path, name, revision }) {
   const [src, setSrc] = useState(null); const ref = useRef(null);
   useEffect(() => {
     let alive = true; setSrc(null);
@@ -15,8 +15,8 @@ function AppIcon({ path, name }) {
     });
     if (ref.current) observer.observe(ref.current);
     return () => { alive = false; observer.disconnect(); };
-  }, [path]);
-  return <span className="app-library-icon" ref={ref}>{src ? <img src={src} alt="" /> : name.charAt(0).toUpperCase()}</span>;
+  }, [path, revision]);
+  return <span className="app-library-icon" ref={ref}>{src ? <img src={src} alt="" onError={() => setSrc(null)} /> : <span className="app-library-monogram" aria-hidden="true">{(name || "?").trim().charAt(0).toUpperCase()}</span>}</span>;
 }
 const walkPaths = (items) => items.flatMap((i) => [i.path, ...walkPaths(i.children || [])]).filter(Boolean);
 export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, addCandidates, onInspect, onIdentities }) {
@@ -26,9 +26,10 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const [failed, setFailed] = useState([]); const [page, setPage] = useState(0);
   const [selected, setSelected] = useState({}); const [message, setMessage] = useState('');
   const generation = useRef(0);
+  const [iconRevision, setIconRevision] = useState(0);
   const load = async (refresh = false) => {
     const seq = ++generation.current; setLoading(true); setFailed([]); setPage(0);
-    if (refresh) dock.invalidateIcons();
+    if (refresh) { dock.invalidateIcons(); setIconRevision(value => value + 1); }
     const sourceNames = ['groups', 'running', 'used', 'folders'];
     const deadline = (promise) => {
       let timer;
@@ -58,18 +59,19 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   }, []);
   const keys = useMemo(() => pinnedKeys(cfg.pinned, data.identities), [cfg.pinned, data.identities]);
   const sections = useMemo(() => candidateSections({ ...data, used: (cfg.usageRecommendationsEnabled === false ? [] : data.used).filter((u) => !(cfg.ignoredAppSuggestions || []).includes(pathKey(u.path))) }, keys, query, data.identities), [data, keys, query, cfg.ignoredAppSuggestions, cfg.usageRecommendationsEnabled]);
+  const installed = sections.installed.filter(item => appCategory(item, data.identities) === 'apps');
   const add = (candidates) => {
     const addedKeys = pinnedKeys(cfg.pinned, data.identities);
     const fresh = candidates.filter((c) => { const key = appKey(c, data.identities); if (addedKeys.has(key)) return false; addedKeys.add(key); return true; });
     if (!fresh.length) return;
     if (addCandidates) { addCandidates(fresh); setSelected({}); setMessage(t('add.added')); return; }
-    set({ pinned: [...cfg.pinned, ...fresh.map((c) => ({ id: crypto.randomUUID(), kind: 'app', name: c.name, path: c.path, args: c.args || [] }))] });
+    set({ pinned: [...cfg.pinned, ...fresh.map((c) => ({ id: crypto.randomUUID(), kind: c.kind === 'folder' ? 'folder' : 'app', name: c.name, path: c.path, args: c.args || [] }))] });
     setSelected({}); setMessage(t('add.added'));
   };
   const cards = (candidates, suggestions = false) => <div className="app-library-grid">{candidates.map((c) => <div className="app-library-choice" key={appKey(c, data.identities)}>
     <button type="button" aria-label={`${t("next.inspector")}: ${c.name}`} className={'app-library-card' + (c.pinned ? ' pinned' : '')} onClick={() => onInspect?.(c)} title={c.path}
       draggable={!c.pinned} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify({ id: crypto.randomUUID(), kind: 'app', name: c.name, path: c.path, args: c.args || [] })); }}>
-      <AppIcon path={c.path} name={c.name} /><span>{c.name}</span>
+      <AppIcon path={c.path} name={c.name} revision={iconRevision} /><span>{c.name}</span>
     </button>
     <button type="button" className="app-library-add-action" disabled={c.pinned} aria-label={`${c.pinned ? t("add.added") : t("workspace.addApp")}: ${c.name}`} onClick={() => add([c])}><Icon name={c.pinned ? 'check' : 'plus'} /></button>
     {!c.pinned && <input type="checkbox" aria-label={`${t('premium.selectApp')}: ${c.name}`} checked={!!selected[appKey(c, data.identities)]} onChange={(e) => setSelected((prev) => ({ ...prev, [appKey(c, data.identities)]: e.target.checked ? c : null }))} />}
@@ -79,7 +81,7 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const PAGE_SIZE = 36;
   const searching = !!query.trim();
   const showAll = searching || filter === 'all';
-  return <SettingsSection title={t('workspace.library')} hint={t('overhaul.suggestionsHint')} className="app-library-section">
+  return <section aria-label={t('workspace.library')} className="app-library-section">
     <div className="app-library-tools"><span className="app-library-search"><Icon name="search" /><input type="search" aria-label={t('apps.search')} placeholder={t('apps.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} /></span>
       <button type="button" className="s-btn s-btn-soft library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
       {browseFile && <button type="button" className="s-btn s-btn-soft" onClick={browseFile}><Icon name="app" />{t('add.browse')}</button>}
@@ -97,12 +99,13 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
       {(showAll || filter === 'running') && sections.running.length > 0 && <><h3 className="app-library-heading">{t('add.running')}</h3>{cards(sections.running)}</>}
       {!searching && filter === 'running' && !sections.running.length && <p className="muted">{t('add.none')}</p>}
       {showAll && <>
-        <h3 className="app-library-heading">{t('add.all')} <span>{sections.installed.length}</span></h3>
-        {cards(sections.installed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))}
-        {!sections.installed.length && !sections.frequent.length && !sections.running.length && !loading && !failed.includes(0) && <p className="muted">{t('add.none')}</p>}
-        {sections.installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="s-btn s-btn-soft" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(sections.installed.length / PAGE_SIZE)}</span><button className="s-btn s-btn-soft" disabled={(page + 1) * PAGE_SIZE >= sections.installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
+        <h3 className="app-library-heading">{t('add.all')} <span>{installed.length}</span></h3>
+        {cards(installed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))}
+        {!installed.length && !sections.utilities.length && !sections.frequent.length && !sections.running.length && !loading && !failed.includes(0) && <p className="muted">{t('add.none')}</p>}
+        {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="s-btn s-btn-soft" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="s-btn s-btn-soft" disabled={(page + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
       </>}
-      {!searching && <details className="app-library-folders-wrap"><summary>{t('workspace.folders')}</summary><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="s-btn s-btn-soft" onClick={() => set({ pinned: [...cfg.pinned, { id: crypto.randomUUID(), kind: 'folder', name: t(`kf.${key}`), path, args: [] }] })}><Icon name="folder" />{t(`kf.${key}`)}</button>)}
+      {showAll && sections.utilities.length > 0 && <details key={searching ? "search-tools" : "tools"} open={searching || undefined} className="app-library-utilities"><summary>{t('design.systemApps')} <span>{sections.utilities.length}</span></summary>{cards(sections.utilities)}</details>}
+      {!searching && <details className="app-library-folders-wrap"><summary>{t('workspace.folders')}</summary><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="s-btn s-btn-soft" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" />{t(`kf.${key}`)}</button>)}
         {browseFolder && <button type="button" className="s-btn s-btn-soft" onClick={browseFolder}><Icon name="folder-plus" />{t('apps.addFolder')}</button>}
       </div></details>}
     </>
@@ -111,5 +114,5 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
       <button className="s-btn s-btn-soft" onClick={() => set({ ignoredAppSuggestions: [] })}>{t('premium.restoreSuggestions')}</button>
       <button className="s-btn s-btn-soft" onClick={async () => { try { await dock.clearUsage(); await load(); setMessage(t('premium.historyCleared')); } catch (_) { setMessage(t('overhaul.failed')); } }}>{t('premium.clearHistory')}</button>
     </details>
-  </SettingsSection>;
+  </section>;
 }

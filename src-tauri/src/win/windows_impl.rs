@@ -41,8 +41,12 @@ use super::WindowInfo;
 
 /// Extract the large icon for a file/exe and return it as a base64 PNG data URI.
 pub fn app_icon_data_uri(path: &str) -> Option<String> {
-    let png = if path.to_ascii_lowercase().starts_with("shell:appsfolder\\") {
-        unsafe { shell_image_png(path, 64, windows::Win32::UI::Shell::SIIGBF_ICONONLY) }
+    let shell_path = path.replace('/', "\\");
+    let png = if shell_path
+        .to_ascii_lowercase()
+        .starts_with("shell:appsfolder\\")
+    {
+        unsafe { shell_image_png(&shell_path, 64, windows::Win32::UI::Shell::SIIGBF_ICONONLY) }
     } else {
         unsafe { extract_icon_png(path) }
     }?;
@@ -95,14 +99,15 @@ unsafe fn icon_png_from(path: &str) -> Option<Vec<u8>> {
 }
 
 unsafe fn extract_icon_png(path: &str) -> Option<Vec<u8>> {
-    // For .lnk shortcuts, prefer the TARGET's icon so the shell's shortcut-arrow
-    // overlay badge doesn't appear on the dock tile. But some installers (Discord
-    // and other Squirrel apps) point the shortcut at an icon-less Update.exe stub,
-    // so if the target has no usable icon, fall back to the shortcut itself —
-    // which carries the app's real IconLocation — and finally the original path.
-    // A correct icon with an overlay beats a blank tile.
+    // Shortcuts may declare their own icon while pointing at a launcher stub.
+    // Preserve that shell identity before falling back to the target executable.
     let is_lnk = path.to_ascii_lowercase().ends_with(".lnk");
     if is_lnk {
+        // Ask the shell for the shortcut's declared icon first. The executable
+        // target may be an installer/launcher stub or a folder for packaged apps.
+        if let Some(png) = shell_image_png(path, 64, windows::Win32::UI::Shell::SIIGBF_ICONONLY) {
+            return Some(png);
+        }
         if let Some(t) = resolve_shortcut_target(path) {
             if !t.is_empty() {
                 if let Some(png) = icon_png_from(&t) {

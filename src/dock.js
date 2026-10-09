@@ -231,11 +231,16 @@ function maybeSyncCtxMenu() {
   if (cfg && ctxGroupsSig(cfg) !== lastCtxSig) syncCtxMenu();
 }
 
+let configReloadGeneration = 0;
 async function reloadConfig() {
+  const request = ++configReloadGeneration;
+  const next = await configApi.get();
+  if (request !== configReloadGeneration) return;
   const prev = cfg;
-  cfg = await configApi.get();
+  cfg = next;
   // If the language changed, make sure its dictionary is loaded before re-render.
   if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
+  if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
   if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
   // Notch visibility / style changes the stacked clearance for the dock bar.
@@ -442,12 +447,15 @@ function cacheWidgetEls() {
 // Remember which ids were on the bar last render, so only genuinely NEW tiles
 // animate in (not every tile on an unrelated re-render).
 let lastRenderIds = new Set();
+let renderGeneration = 0;
 
 async function render() {
+  const generation = ++renderGeneration;
+  const snapshot = cfg;
   // Build every tile in parallel and swap the whole bar in ONE DOM operation —
   // no icons popping in one by one, no empty-bar flash between renders.
   const tiles = await Promise.all(
-    cfg.pinned.map((item) => {
+    snapshot.pinned.map((item) => {
       if (item.kind === "separator") return separatorTile(item);
       if (item.kind === "group") return groupTile(item);
       if (item.kind === "widget") return widgetTile(item);
@@ -456,6 +464,7 @@ async function render() {
       return appTile(item);
     })
   );
+  if (generation !== renderGeneration || cfg !== snapshot) return;
   // Fade+scale in only the tiles that weren't on the bar before.
   const prevIds = lastRenderIds;
   for (const el of tiles) {

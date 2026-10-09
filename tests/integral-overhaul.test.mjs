@@ -15,10 +15,10 @@ test('a narrow library inspector reveals its controls and returns focus to the s
   await inspector.waitFor({state:'visible'});
   assert.equal(await inspector.evaluate(e=>e===document.activeElement),true);
   const rect = await inspector.boundingBox(); assert.ok(rect.y >= 0 && rect.y < 600);
-  await inspector.getByRole('button', {name:'Previous',exact:true}).click();
+  await inspector.getByRole('button', {name:'Close',exact:true}).click();
   assert.equal(await card.evaluate(e=>e===document.activeElement),true);
   await page.setViewportSize({width:1280,height:850}); await card.click();
-  assert.equal(await inspector.locator('.inspector-back').isHidden(),true);
+  assert.equal(await inspector.getByRole('button', {name:'Close',exact:true}).isVisible(),true);
   assert.deepEqual(errors,[]); await page.close();
 });
 
@@ -154,6 +154,7 @@ test('a partial profile operation refreshes recoverable documents and retains it
   await page.getByRole('navigation').getByRole('button',{name:'Profiles & backup',exact:true}).click();
   await page.getByRole('button',{name:'Work',exact:true}).click();
   const panel=page.locator('.profile-inspector');
+  await panel.locator('.profile-manage summary').click();
   await panel.getByRole('textbox',{name:'Rename profile',exact:true}).fill('Recovered');
   await panel.getByRole('button',{name:'Rename profile',exact:true}).click();
   await page.getByRole('button',{name:'Recovered',exact:true}).waitFor();
