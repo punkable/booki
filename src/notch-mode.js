@@ -1,7 +1,7 @@
-/** The notch is a tab attached to the edge or a floating pill. Older
- *  configs ("smart", notchPeek) read as their closest shape. */
+/** Notch shapes: a tab attached to the edge, a floating pill, or the smart
+ *  circular dot that reacts to fullscreen apps and focus. */
 export function resolveNotchMode(cfg) {
-  if (cfg?.notchMode === "floating") return "floating";
+  if (["floating", "smart"].includes(cfg?.notchMode)) return cfg.notchMode;
   if (cfg?.notchMode == null && cfg?.notchPeek === false) return "floating";
   return "attached";
 }

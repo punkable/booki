@@ -2,6 +2,9 @@
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
   es: {
+    "notch.batteryLow": "Batería baja · conecta el cargador",
+    "be.notchModeSmart": "Isla",
+    "be.notchModeSmartHint": "Un punto discreto que se convierte en cápsula con el temporizador, la música o la batería baja.",
     "release80.headline": "Booki, rehecho de arriba abajo: más simple, más claro y nativo de Windows 11.",
     "release80.settingsTitle": "Ajustes",
     "release80.settings": "Cinco secciones en lugar de nueve, con el estilo de Configuración de Windows 11 y Mica. La vista previa del dock ya no tiene barras de desplazamiento internas.",
@@ -50,6 +53,9 @@ export const STRINGS = {
     "tint.white": "Blanco",
   },
   en: {
+    "notch.batteryLow": "Battery low · plug in the charger",
+    "be.notchModeSmart": "Island",
+    "be.notchModeSmartHint": "A quiet dot that becomes a capsule for the timer, music or a low battery.",
     "release80.headline": "Booki, rebuilt top to bottom: simpler, clearer and native to Windows 11.",
     "release80.settingsTitle": "Settings",
     "release80.settings": "Five sections instead of nine, in the style of Windows 11 Settings, on Mica. The dock preview no longer has inner scrollbars.",
@@ -98,6 +104,9 @@ export const STRINGS = {
     "tint.white": "White",
   },
   pt: {
+    "notch.batteryLow": "Bateria fraca · ligue o carregador",
+    "be.notchModeSmart": "Ilha",
+    "be.notchModeSmartHint": "Um ponto discreto que vira cápsula com o temporizador, a música ou a bateria fraca.",
     "release80.headline": "Booki, refeito de cima a baixo: mais simples, mais claro e nativo do Windows 11.",
     "release80.settingsTitle": "Definições",
     "release80.settings": "Cinco secções em vez de nove, ao estilo das Definições do Windows 11, sobre Mica. A pré-visualização do dock já não tem barras de deslocamento internas.",
@@ -146,6 +155,9 @@ export const STRINGS = {
     "tint.white": "Branco",
   },
   fr: {
+    "notch.batteryLow": "Batterie faible · branchez le chargeur",
+    "be.notchModeSmart": "Îlot",
+    "be.notchModeSmartHint": "Un point discret qui devient une capsule pour le minuteur, la musique ou une batterie faible.",
     "release80.headline": "Booki, reconstruit de fond en comble : plus simple, plus clair et natif de Windows 11.",
     "release80.settingsTitle": "Paramètres",
     "release80.settings": "Cinq sections au lieu de neuf, dans le style des Paramètres de Windows 11, sur Mica. L’aperçu du dock n’a plus de barres de défilement internes.",
@@ -194,6 +206,9 @@ export const STRINGS = {
     "tint.white": "Blanc",
   },
   de: {
+    "notch.batteryLow": "Akku schwach · Ladegerät anschließen",
+    "be.notchModeSmart": "Insel",
+    "be.notchModeSmartHint": "Ein dezenter Punkt, der für Timer, Musik oder schwachen Akku zur Kapsel wird.",
     "release80.headline": "Booki, von Grund auf neu gebaut: einfacher, klarer und nativ für Windows 11.",
     "release80.settingsTitle": "Einstellungen",
     "release80.settings": "Fünf statt neun Bereiche, im Stil der Windows-11-Einstellungen, auf Mica. Die Dock-Vorschau hat keine inneren Bildlaufleisten mehr.",

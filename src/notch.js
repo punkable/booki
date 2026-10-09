@@ -51,10 +51,13 @@ async function applyLook() {
     hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
-    const floating = resolveNotchMode(cfg) === "floating";
+    const shape = resolveNotchMode(cfg);
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
-    document.body.classList.toggle("peek", !floating);
-    document.body.classList.toggle("floating", floating);
+    // Shapes are exclusive; the smart dot reuses the floating placement.
+    document.body.classList.toggle("peek", shape === "attached");
+    document.body.classList.toggle("floating", shape === "floating");
+    document.body.classList.toggle("smart", shape === "smart");
+    focusTimers = focusTimersOf(cfg.pinned);
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     // Stacked under a visible dock the card would grow over the bar.
@@ -62,6 +65,8 @@ async function applyLook() {
     document.body.classList.toggle("peekable", canPeek);
     if (!canPeek) closeCard();
     pollMedia();
+    pollBattery();
+    paintActivity();
     applyMaterial(cfg);
     scheduleHitReport();
   } catch (_) {
@@ -181,9 +186,72 @@ let mediaTimer = null;
 let cardTimer = null;
 let cardOpen = false;
 
+// ─── Activities ──────────────────────────────────────────────────────────
+// The tab shows the one thing worth a glance, in this order: a running focus
+// timer, music that is playing, a battery running out. Nothing else; at rest
+// it stays a quiet tab or dot.
+let focusTimers = [];
+let battery = null; // { level, charging } or null on a desktop
+let activityTick = null;
+const ringEl = document.getElementById("nl-ring");
+const lText = document.getElementById("nl-text");
+
+function focusTimersOf(items = []) {
+  const out = [];
+  for (const item of items) {
+    if (item.kind === "group") out.push(...focusTimersOf(item.children || []));
+    else if (item.kind === "widget" && ["focus", "timer"].includes(item.widget) && item.style?.endsAt) out.push(item.style);
+  }
+  return out;
+}
+
+function currentActivity(now = Date.now()) {
+  const timer = focusTimers.find((style) => Number(style.endsAt) > now);
+  if (timer) {
+    const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
+    const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
+    return { kind: "timer", left, progress: Math.min(1, left / total) };
+  }
+  if (media?.playing) return { kind: "media" };
+  if (battery && !battery.charging && battery.level >= 0 && battery.level <= 15) return { kind: "battery", level: battery.level };
+  return null;
+}
+
+const mmss = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+function paintActivity() {
+  const activity = canPeek ? currentActivity() : null;
+  const kind = activity?.kind || "";
+  document.body.classList.toggle("live", !!activity);
+  for (const name of ["timer", "media", "battery"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  if (kind === "timer") {
+    lText.textContent = mmss(activity.left);
+    ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
+  } else if (kind === "battery") {
+    lText.textContent = `${activity.level}%`;
+  }
+  // Tick once a second only while a timer is visible.
+  clearInterval(activityTick);
+  activityTick = kind === "timer" ? setInterval(() => { paintActivity(); if (cardOpen) paintCard(); }, 1000) : null;
+  paintCard();
+}
+
+const pollBattery = singleFlight(async () => {
+  clearTimeout(batteryTimer);
+  if (!canPeek || !inTauri) return;
+  try {
+    const stats = await invoke("system_stats");
+    battery = stats && stats.battery >= 0 ? { level: Math.round(stats.battery), charging: !!stats.charging } : null;
+  } catch (_) {
+    battery = null;
+  }
+  paintActivity();
+  // A desktop has no battery: stop asking.
+  if (battery) batteryTimer = setTimeout(pollBattery, 60000);
+});
+let batteryTimer = null;
+
 function paintMedia() {
-  const live = !!(media && media.playing && canPeek);
-  document.body.classList.toggle("live", live);
   const art = (media && media.thumb) || "";
   for (const img of [lArt, cArt]) {
     if (img.getAttribute("src") !== art) {
@@ -192,10 +260,25 @@ function paintMedia() {
     }
   }
   document.body.classList.toggle("has-art", !!art);
-  paintCard();
+  paintActivity();
 }
 
 function paintCard() {
+  const activity = currentActivity();
+  if (activity?.kind === "timer") {
+    cTitle.textContent = mmss(activity.left);
+    cSub.textContent = t("w.focus");
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+    return;
+  }
+  if (activity?.kind === "battery") {
+    cTitle.textContent = `${activity.level}%`;
+    cSub.textContent = t("notch.batteryLow");
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+    return;
+  }
   if (media && (media.title || media.artist)) {
     cTitle.textContent = media.title || media.artist;
     cSub.textContent = media.title ? media.artist : "";
