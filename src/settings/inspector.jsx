@@ -23,7 +23,11 @@ export function Inspector({ selectionKey, origin, onBack, className, children, d
     if (target?.isConnected) { target.scrollIntoView({ block: 'nearest' }); target.focus({ preventScroll: true }); }
   };
   return <aside ref={ref} tabIndex={-1} className={`workspace-inspector ${className || ''}`}
-    data-empty={!selectionKey} aria-label={t('next.inspector')}>
+    data-empty={!selectionKey} aria-label={t('next.inspector')} onKeyDown={(event) => {
+      if (event.key === 'Escape' && selectionKey && !event.defaultPrevented) {
+        event.preventDefault(); event.stopPropagation(); back();
+      }
+    }}>
     {selectionKey && <button type="button" className={"s-btn s-btn-soft " + (dismissible ? "inspector-dismiss" : "inspector-back")} aria-label={dismissible ? t('stack.close') : undefined} title={dismissible ? t('stack.close') : undefined} onClick={back}><Icon name={dismissible ? "x" : "arrow-left"} />{!dismissible && t('stack.previous')}</button>}
     {children}
   </aside>;

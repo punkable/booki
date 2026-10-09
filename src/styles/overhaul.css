@@ -33,13 +33,13 @@ body.settings-body { --set-bg: #171819; --set-side: #1d1e20; --set-card: #232426
 .dashboard-summary strong { color: var(--ink); font-size: 18px; }
 .dashboard-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
 .dashboard-action { display: flex; align-items: center; gap: 10px; border: 1px solid var(--set-line); background: var(--set-card); color: var(--ink); border-radius: 14px; padding: 16px; text-align: left; cursor: pointer; }
-.dashboard-action svg { width: 20px; height: 20px; color: var(--accent); }
+.dashboard-action svg { width: 20px; height: 20px; color: var(--ink-2); }
 .dashboard-action strong { flex: 1; font-size: 12px; font-weight: 550; }
 .dashboard-action > span:last-child { color: var(--ink-2); }
 .scenario-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; }
 .scenario-card { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; text-align: left; border: 1px solid var(--set-line); background: transparent; color: var(--ink); border-radius: 12px; padding: 16px; cursor: pointer; }
 .scenario-card.selected { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: color-mix(in srgb, var(--accent) 65%, transparent); }
-.scenario-icon svg { width: 22px; height: 22px; color: var(--accent); }
+.scenario-icon svg { width: 22px; height: 22px; color: var(--ink-2); }
 .scenario-card > span:last-child { color: var(--ink-2); font-size: 12px; line-height: 1.5; }
 .scenario-card strong { font-size: 13px; }
 .dashboard-tip { display: flex; align-items: center; gap: 12px; color: var(--ink-2); margin-top: 22px; }
