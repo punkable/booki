@@ -1,5 +1,5 @@
 import { t, curLang } from "../i18n.js";
-import { calendarMonth, toggleTimer, timerSeconds, formatTimer } from "./productivity.js";
+import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer } from "./productivity.js";
 
 /* Build with textContent: task text and remote city names never become HTML. */
 export function buildProductivityPanel(item, { save, weatherSearch, close }) {
@@ -76,8 +76,9 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       button(t("premium.nextMonth"), () => { monthOffset++; draw(); }, nav);
       const label = document.createElement("p"); label.textContent = date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }); label.setAttribute("aria-live", "polite"); body.appendChild(label);
       const grid = document.createElement("div"); grid.className = "focus-calendar";
-      for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, i + 1).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
-      for (const day of calendarMonth(date)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
+      const weekStart = calendarWeekStart(navigator.language || curLang());
+      for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
+      for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
     } else if (item.widget === "weather") {
       const help = document.createElement("p"); help.textContent = t("focus.cityHint"); body.appendChild(help);
       const input = document.createElement("input"); input.placeholder = t("focus.city"); input.setAttribute("aria-label", t("focus.city")); input.value = st.city || ""; input.maxLength = 100; body.appendChild(input);

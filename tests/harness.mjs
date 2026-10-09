@@ -213,6 +213,9 @@ export async function openPage(browser, port, page_ = "index.html", { cfg, viewp
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.stack || e)));
   page.on("console", (m) => {
+    if (m.type() === 'warning' && m.text().startsWith('[booki] unknown icon:')) {
+      errors.push(m.text()); return;
+    }
     if (m.type() !== "error") return;
     const text = m.text();
     // A missing favicon is not a product defect and would drown the signal.

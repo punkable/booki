@@ -12,10 +12,19 @@ export function toggleTimer(style = {}, now = Date.now()) {
 export function formatTimer(seconds) {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
 }
-export function calendarMonth(date) {
+/** Regional first day (0 = Sunday), using the locale exposed by Windows/WebView2. */
+export function calendarWeekStart(locale) {
+  try {
+    const region = new Intl.Locale(locale).maximize();
+    const info = typeof region.getWeekInfo === 'function' ? region.getWeekInfo() : region.weekInfo;
+    return info && Number.isInteger(info.firstDay) ? info.firstDay % 7 : 1;
+  } catch { return 1; }
+}
+export function calendarMonth(date, weekStartsOn = 1) {
   const year = date.getFullYear(), month = date.getMonth();
   const first = new Date(year, month, 1);
-  const offset = (first.getDay() + 6) % 7;
+  const start = Number.isInteger(weekStartsOn) && weekStartsOn >= 0 && weekStartsOn <= 6 ? weekStartsOn : 1;
+  const offset = (first.getDay() - start + 7) % 7;
   const days = new Date(year, month + 1, 0).getDate();
   return Array.from({ length: Math.ceil((offset + days) / 7) * 7 }, (_, i) => i < offset || i >= offset + days ? null : i - offset + 1);
 }

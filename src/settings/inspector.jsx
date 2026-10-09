@@ -24,7 +24,7 @@ export function Inspector({ selectionKey, origin, onBack, className, children })
   };
   return <aside ref={ref} tabIndex={-1} className={`workspace-inspector ${className || ''}`}
     data-empty={!selectionKey} aria-label={t('next.inspector')}>
-    {selectionKey && <button type="button" className="s-btn s-btn-soft inspector-back" onClick={back}><Icon name="chevron-left" />{t('stack.previous')}</button>}
+    {selectionKey && <button type="button" className="s-btn s-btn-soft inspector-back" onClick={back}><Icon name="arrow-left" />{t('stack.previous')}</button>}
     {children}
   </aside>;
 }

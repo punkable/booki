@@ -20,8 +20,9 @@ function walk(dir, out = []) {
 }
 
 const iconsSrc = read("src/icons.js");
+const iconMap = iconsSrc.match(/const iconMap = \{([\s\S]*?)^\};/m)?.[1] || '';
 const iconKeys = new Set();
-for (const m of iconsSrc.matchAll(/^\s*(?:["']([a-z0-9-]+)["']|([a-z0-9]+))\s*:\s*icon/gim)) {
+for (const m of iconMap.matchAll(/^\s*(?:["']([a-z0-9-]+)["']|([a-z0-9]+))\s*:/gim)) {
   iconKeys.add(m[1] || m[2]);
 }
 
@@ -48,6 +49,9 @@ for (const file of files) {
     if (!iconKeys.has(m[1])) {
       errors.push(`${path.relative(ROOT, file)}: unknown icon("${m[1]}")`);
     }
+  }
+  for (const m of text.matchAll(/<Icon\b[^>]*\bname=["']([a-z0-9-]+)["']/g)) {
+    if (!iconKeys.has(m[1])) errors.push(`${path.relative(ROOT, file)}: unknown JSX icon ${m[1]}`);
   }
 }
 

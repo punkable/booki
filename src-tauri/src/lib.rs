@@ -1487,15 +1487,20 @@ fn preview_config_import(path: String) -> Result<Config, String> {
 /// Apply only the snapshot the user reviewed; files may change while a dialog is open.
 #[tauri::command]
 fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Result<Config, String> {
-    let mut cfg = read_import(&path)?;
+    let mut cfg = read_reviewed_import(&path, expected.as_ref())?;
+    cfg.monitor = -1;
+    cfg.monitor_name.clear();
+    apply_config_snapshot(&app, cfg)
+}
+
+fn read_reviewed_import(path: &str, expected: Option<&Config>) -> Result<Config, String> {
+    let cfg = read_import(path)?;
     if expected.is_some_and(|snapshot| {
         serde_json::to_value(snapshot).ok() != serde_json::to_value(&cfg).ok()
     }) {
         return Err("BOOKI_IMPORT_CHANGED".into());
     }
-    cfg.monitor = -1;
-    cfg.monitor_name.clear();
-    apply_config_snapshot(&app, cfg)
+    Ok(cfg)
 }
 
 // ─────────────────────────── Dock profiles ───────────────────────────
@@ -3533,6 +3538,38 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Booki dock");
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+    #[test]
+    fn reviewed_import_rejects_changed_invalid_and_oversized_files() {
+        let root = std::env::temp_dir().join(format!("booki-import-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("config.json");
+        let name = path.to_string_lossy().to_string();
+        let mut source = Config::default();
+        fs::write(&path, serde_json::to_vec(&source).unwrap()).unwrap();
+        let reviewed = read_import(&name).unwrap();
+        assert!(read_reviewed_import(&name, Some(&reviewed)).is_ok());
+        source.theme = "light".into();
+        if source.theme == reviewed.theme {
+            source.theme = "dark".into();
+        }
+        fs::write(&path, serde_json::to_vec(&source).unwrap()).unwrap();
+        assert!(
+            matches!(read_reviewed_import(&name, Some(&reviewed)), Err(error) if error == "BOOKI_IMPORT_CHANGED")
+        );
+        fs::write(&path, "{}").unwrap();
+        assert!(matches!(read_import(&name), Err(error) if error == "BOOKI_IMPORT_INVALID"));
+        fs::File::create(&path)
+            .unwrap()
+            .set_len(16 * 1024 * 1024 + 1)
+            .unwrap();
+        assert!(matches!(read_import(&name), Err(error) if error == "BOOKI_IMPORT_TOO_LARGE"));
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 #[cfg(test)]

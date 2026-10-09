@@ -17,6 +17,8 @@ test('a narrow library inspector reveals its controls and returns focus to the s
   const rect = await inspector.boundingBox(); assert.ok(rect.y >= 0 && rect.y < 600);
   await inspector.getByRole('button', {name:'Previous',exact:true}).click();
   assert.equal(await card.evaluate(e=>e===document.activeElement),true);
+  await page.setViewportSize({width:1280,height:850}); await card.click();
+  assert.equal(await inspector.locator('.inspector-back').isHidden(),true);
   assert.deepEqual(errors,[]); await page.close();
 });
 
@@ -41,5 +43,28 @@ test('failed explicit recovery never acknowledges damaged data or hides the reco
   await notice.getByRole('button',{name:'Confirm fresh configuration',exact:true}).click();
   await notice.waitFor({state:'hidden'});
   assert.deepEqual(await page.evaluate(()=>window.__recoveryCalls),['start_fresh_config','start_fresh_config']);
+  assert.deepEqual(errors,[]); await page.close();
+});
+
+test('an accepted native backdrop follows system appearance and returns to solid when transparency is disabled', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', {
+    viewport:{width:1000,height:720}, cfg:makeConfig({theme:'system',surfaceStyle:'mica'}),
+    initScript: `
+      const originalInvoke = window.__TAURI__.core.invoke;
+      window.__backdropCalls = []; window.__preferences = {systemBackdrop:true,transparency:true,animations:true,highContrast:false};
+      window.__TAURI__.core.invoke = async (command,args) => {
+        if(command === 'platform_capabilities') return structuredClone(window.__preferences);
+        if(command === 'settings_backdrop') { window.__backdropCalls.push(args); return args.enabled; }
+        return originalInvoke(command,args);
+      };`
+  });
+  await page.waitForFunction(()=>document.body.classList.contains('settings-mica'));
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.waitForFunction(()=>window.__backdropCalls.at(-1)?.enabled && window.__backdropCalls.at(-1)?.dark);
+  await page.emulateMedia({colorScheme:'light'});
+  await page.waitForFunction(()=>window.__backdropCalls.at(-1)?.enabled && window.__backdropCalls.at(-1)?.dark === false);
+  await page.evaluate(()=> { window.__preferences.transparency=false; for(const cb of window.__listeners['booki://preferences-changed'] || []) cb({payload:null}); });
+  await page.waitForFunction(()=>!document.body.classList.contains('settings-mica') && document.documentElement.hasAttribute('data-reduce-transparency'));
+  assert.equal(await page.evaluate(()=>window.__backdropCalls.at(-1).enabled),false);
   assert.deepEqual(errors,[]); await page.close();
 });

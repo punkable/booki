@@ -15,10 +15,18 @@ export function NativeBackdrop({ cfg }) {
     () => document.body.classList.remove('settings-mica')
   ));
   useEffect(() => {
-    const theme = document.documentElement.getAttribute('data-theme');
-    const dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    worker.request({ enabled, dark });
-    return () => worker.request({ enabled: false, dark });
+    const root = document.documentElement;
+    const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+    const request = () => {
+      const theme = root.getAttribute('data-theme');
+      worker.request({ enabled, dark: theme ? theme === 'dark' : systemTheme.matches });
+    };
+    // Theme changes can also come from the system or scheduled day/night
+    // appearance, without changing the saved configuration.
+    const observer = new MutationObserver(request);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    systemTheme.addEventListener('change', request); request();
+    return () => { observer.disconnect(); systemTheme.removeEventListener('change', request); worker.request({ enabled: false, dark: systemTheme.matches }); };
   }, [enabled, cfg.theme, preferences, worker]);
   return null;
 }
