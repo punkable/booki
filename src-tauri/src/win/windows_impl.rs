@@ -6,7 +6,7 @@ use std::ffi::c_void;
 use std::path::Path;
 
 use base64::Engine;
-use windows::core::{Interface, PCWSTR, PWSTR};
+use windows::core::{Interface, PCWSTR};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
@@ -22,9 +22,6 @@ use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, IPersistFile, CLSCTX_ALL, CLSCTX_INPROC_SERVER,
     COINIT_APARTMENTTHREADED, STGM_READ,
-};
-use windows::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
@@ -760,41 +757,6 @@ unsafe fn apply_tray_inset(work: &mut RECT, monitor: &RECT, hmon: HMONITOR, tray
         } else {
             work.right = work.right.min(ol);
         }
-    }
-}
-
-/// Lowercased executable name (without .exe) of the currently foreground window.
-pub fn foreground_app_name() -> Option<String> {
-    unsafe {
-        let hwnd = GetForegroundWindow();
-        if hwnd.0.is_null() {
-            return None;
-        }
-        let mut pid: u32 = 0;
-        GetWindowThreadProcessId(hwnd, Some(&mut pid));
-        if pid == 0 {
-            return None;
-        }
-        use windows::Win32::Foundation::CloseHandle;
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
-        let mut buf = [0u16; 512];
-        let mut size = buf.len() as u32;
-        // Close the handle on EVERY path. The `?` on QueryFullProcessImageNameW
-        // used to return early and leak it, once per call — and this runs from
-        // the foreground watcher, so the process slowly bled handles.
-        // process_image_path below already does it this way.
-        let queried = QueryFullProcessImageNameW(
-            handle,
-            PROCESS_NAME_WIN32,
-            PWSTR(buf.as_mut_ptr()),
-            &mut size,
-        );
-        let _ = CloseHandle(handle);
-        queried.ok()?;
-        let path = String::from_utf16_lossy(&buf[..size as usize]);
-        Path::new(&path)
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_lowercase())
     }
 }
 

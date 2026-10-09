@@ -28,52 +28,23 @@ nativo, DWM, ventanas Win32) se revisó en el código y no se probó en un equip
 | 6 | Sistema | "Update failed." aparecía dos veces y había textos sueltos fuera de las filas. | El error se muestra una vez y los textos quedan alineados con las filas. |
 | 7 | Sistema | "Exportar diagnóstico" era un botón suelto dentro de una tarjeta vacía. | Ahora es una fila normal con su descripción. |
 
-### Pendiente (por prioridad)
+### Resuelto en 0.80 (overhaul)
 
-**P1. Verificar el blur nativo en Windows 10 y 11.** Si el inset no basta, la alternativa
-robusta es dejar de recortar con región y pintar la tinta solo en CSS con un blur sin
-región, o usar `DWMWA_SYSTEMBACKDROP_TYPE` sobre una ventana del tamaño exacto, con
-`DWMWCP_ROUND`.
+| Pendiente de 0.72 | Qué se hizo |
+|---|---|
+| CSS en capas que se pisan | Ajustes tiene su propia hoja (`settings.css`) y ya no carga el CSS del dock. Los tokens se comparten en `tokens.css`. Se borraron `workspace.css`, `overhaul.css` y `design-tokens.css`. |
+| CSS muerto | Se quitaron unas 1.150 líneas de `styles.css` que solo daban estilo a la Ajustes antigua, y una sección "premium polish" que volvía a dibujar un segundo borde en el dock. |
+| Ajustes repetitivo | Pasó de 9 secciones a 5: Inicio, Dock, Widgets, Apps y Sistema. Nada aparece dos veces. |
+| `settings.jsx` monolítico | De 1.800 líneas a un shell de unas 200: el estado vive en `store.js`, los controles en `controls.jsx` y hay una página por sección. |
+| Mica ≈ Acrylic | Tres acabados reales: Vidrio (desenfoque nativo, intensidad, color), Mica (opaco, teñido por el fondo de pantalla) y Sólido. "Vidrio oscuro" reemplaza a Tinted. |
+| Detalles visuales | Las placas de los widgets siguen el acabado. La línea de red se sustituyó por lecturas. El texto del clima ya no queda cortado. |
+| Notch | Ahora es solo pestaña o píldora, con disparador y posición. Se retiraron el punto inteligente, la escala y el notch siempre visible, junto con su sondeo de 4 Hz. |
+| Widgets | Pasaron de 15 a 10, con migración automática (config rev 9) en Rust. Esa migración también se aplica a perfiles y copias. |
+| Traducciones | Se borraron 199 claves sin uso en los 5 idiomas. Los textos nuevos están en `src/strings.js`. |
 
-**P1. CSS en capas que se pisan.** Hay siete hojas (`styles.css` 4.074 líneas,
-`overhaul.css`, `workspace.css`, `design-tokens.css`…) y cada una redefine los mismos
-selectores: `.live-preview-bar` en 9 bloques, `.tile` en 84, `.s-content` en 8. Además hay
-32 `!important`. Cada "overhaul" anterior añadió una capa encima en lugar de reemplazar
-la de abajo. Propuesta: fusionar Ajustes en una sola hoja por componente y borrar las
-reglas vencidas.
+### Sigue pendiente
 
-**P1. CSS muerto.** `.pin-card`, `.pin-item` y `.pin-kid-menu` (unos 40 bloques) no se
-usan en ningún JS/JSX.
-
-**P2. Ajustes repetitivos y difíciles de entender.**
-- "Cómo se comporta tu dock" aparece completo en Inicio **y** en Dock.
-- "Perfiles y copia" aparece como acceso directo en Inicio y como sección propia.
-- Inicio tiene tres tarjetas de acción, tres tarjetas de escenario, un resumen
-  numérico y un enlace "Configurar dock" que repite el menú lateral.
-- Propuesta: Inicio = preview editable + 3 accesos. Fusionar Dock y Apariencia en "Dock"
-  (posición, comportamiento, aspecto). Pasar "Ayuda" y "Acerca de" al pie de Sistema.
-  Resultado: de 9 secciones a 5.
-
-**P2. `settings.jsx` monolítico.** 1.800 líneas y 22 `useState` en un componente. Hay que
-partirlo en una página por sección (ya existe el patrón en `src/settings/`).
-
-**P2. Mica vs Acrylic casi idénticos.** En CSS solo cambian el blur (20 vs 36 px) y la
-opacidad. Mica en Windows no es blur de lo que hay detrás sino el tinte del fondo de
-pantalla. O se diferencia de verdad o se fusionan en un solo acabado "Vidrio" con
-intensidad.
-
-**P2. Detalles visuales del dock.**
-- El separador desaparece sobre "Tinted" en tema claro, porque usa el color del tema
-  y no la tinta de la superficie.
-- El grupo vacío muestra un cuadrado gris claro sobre fondos oscuros personalizados.
-- La línea de la gráfica de red toca el borde inferior de su placa.
-
-**P3. `dock.js` (4.951 líneas) y `lib.rs` (3.656 líneas).** Funcionan, pero cualquier
-cambio es caro. Conviene extraer módulos cuando se toquen, no en una reescritura aparte.
-
-**P3. Pruebas visuales.** Añadir capturas de referencia (Playwright `toHaveScreenshot`) del
-dock en los cuatro acabados y de cada página de Ajustes. Así los defectos de este
-informe no vuelven a pasar CI sin que nadie los vea.
-
-**P3. Node.** `package.json` exige Node ≥ 24.18. Es correcto para CI, pero bloquea
-`check:all` en entornos con Node 22, aunque todo lo demás funciona.
+- **Verificar en Windows 11:** la contención del blur, el tinte Mica y la geometría del notch.
+  El código nativo compila y pasa clippy contra `x86_64-pc-windows-msvc`, pero no se ejecutó en Windows.
+- **Archivos grandes:** `dock.js` (~4.900 líneas) y `lib.rs` (~3.600). Conviene partirlos al tocarlos.
+- **Pruebas visuales:** añadir capturas de referencia de los acabados y de las páginas de Ajustes.

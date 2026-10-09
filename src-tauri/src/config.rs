@@ -345,7 +345,6 @@ fn default_notch_trigger() -> String {
     "click".into()
 }
 
-
 fn default_overflow() -> String {
     "adapt".into()
 }
@@ -569,7 +568,8 @@ pub fn migrate(cfg: &mut Config) -> bool {
     // rev 7–8: explicit notch modes from the older peek / multi-notch toggles.
     if cfg.settings_rev < 8 {
         let mode = cfg.notch_mode.trim().to_ascii_lowercase();
-        let valid = cfg.settings_rev >= 7 && matches!(mode.as_str(), "attached" | "floating" | "smart");
+        let valid =
+            cfg.settings_rev >= 7 && matches!(mode.as_str(), "attached" | "floating" | "smart");
         cfg.notch_mode = if cfg.settings_rev < 7 && cfg.legacy.multi_notch_enabled {
             "smart".into()
         } else if valid {

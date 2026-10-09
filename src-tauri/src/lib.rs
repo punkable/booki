@@ -916,13 +916,6 @@ fn notch_floating(cfg: &Config) -> bool {
     cfg.notch_mode == "floating"
 }
 
-/// Current foreground app (kept for UI/debug; smart notch no longer keys off it).
-#[tauri::command]
-fn current_foreground_app() -> serde_json::Value {
-    let app = win::foreground_app_name().unwrap_or_default();
-    serde_json::json!({ "app": app, "dot": false })
-}
-
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.
 #[tauri::command]
 fn reset_config(app: AppHandle) -> Result<Config, String> {
@@ -2892,7 +2885,6 @@ pub fn run() {
             image_data_uri,
             set_always_on_top,
             app_version,
-            current_foreground_app,
             reset_config,
             open_settings,
             open_location,
