@@ -1217,6 +1217,21 @@ body.edit .dock { cursor: grab; }
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
 
+/* A coloured group tints its grid; a group with a glyph is a solid badge. */
+.tile.group.tinted .group-grid {
+  background: color-mix(in srgb, var(--group-color) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--group-color) 45%, transparent);
+}
+.tile.group.badge-group .group-grid {
+  padding: 0;
+  color: var(--group-ink, var(--accent-contrast));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--group-color, var(--accent)) 100%, #fff 12%), color-mix(in srgb, var(--group-color, var(--accent)) 82%, #000));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.tile.group.badge-group .group-grid > svg { width: 52%; height: 52%; color: inherit; }
+.stack.tinted .stack-head-icon { color: var(--group-color); background: color-mix(in srgb, var(--group-color) 20%, transparent); }
+.stack.tinted { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--group-color) 70%, transparent), var(--shadow); }
+
 /* Folder-create (merge) target highlight while dragging one tile onto another */
 .tile.merge-target { transform: scale(1.1); background: color-mix(in srgb, var(--accent) 20%, transparent); }
 /* Highlight an icon when a file is dragged over it (drop-to-open). */

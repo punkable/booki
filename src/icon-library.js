@@ -51,6 +51,11 @@ const P = {
 
 export const ICON_LIBRARY = Object.keys(P);
 
+/** A library glyph as inline SVG in currentColor, for live tiles. */
+export function libGlyphSVG(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || P.folder}</svg>`;
+}
+
 export function isLibIcon(value) {
   return typeof value === "string" && value.startsWith("lib:");
 }
