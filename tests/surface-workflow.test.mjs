@@ -40,7 +40,7 @@ test('one finish selector preserves layout/theme and shows the selected custom f
 
 test('every material uses the canonical opacity once and tracks radius changes', async () => {
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: pins }) });
-  for (const surfaceStyle of ['mica', 'acrylic', 'tinted', 'solid']) {
+  for (const surfaceStyle of ['glass', 'mica', 'solid']) {
     for (const materialStrength of [0, 38, 65, 100]) {
       await patch(page, { surfaceStyle, materialStrength, surfaceTint: '#223344', cornerRadius: materialStrength % 25 });
       await page.waitForFunction(({ style, alpha }) => document.body.classList.contains(`surface-${style}`) && Math.abs(parseFloat(getComputedStyle(document.body).getPropertyValue('--glass-alpha')) - alpha) < .00001, { style: surfaceStyle, alpha: surfaceAlpha({ surfaceStyle, materialStrength }) });
@@ -219,7 +219,7 @@ test('the dock app panel retries failed sources and supports keyboard tabs', asy
   await tabs.getByRole('tab', { name: 'Apps', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await tabs.getByRole('tab', { name: 'Widgets', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('.add-wcell').count(), 15);
+  assert.equal(await page.locator('.add-wcell').count(), 10);
   await page.locator('.add-head').getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await page.locator('#stack.open').count(), 0);
   assert.deepEqual(errors, []);

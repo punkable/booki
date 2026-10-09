@@ -1,9 +1,14 @@
 /* Geometry shared by the live bar and its Settings previews. */
-export function widgetSpan(type, style = {}) {
+import { canonicalWidget, systemMetrics } from "../widgets-meta.js";
+
+/** Cells a widget spans. The system widget is one cell per metric. */
+export function widgetSpan(widget, style = {}) {
+  const type = canonicalWidget(widget);
+  if (type === "system") return systemMetrics(style).length;
   const requested = Number(style?.span);
   if ([1, 2, 3].includes(requested)) return requested;
-  if (["media", "notes", "clipboard", "tasks"].includes(type)) return 3;
-  return ["clock", "net", "uptime", "timer", "calendar", "weather"].includes(type) ? 2 : 1;
+  if (["media", "notes", "clipboard"].includes(type)) return 3;
+  return ["clock", "focus", "calendar", "weather"].includes(type) ? 2 : 1;
 }
 export function widgetWidth(type, size, gap, style = {}) {
   const span = widgetSpan(type, style);

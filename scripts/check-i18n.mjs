@@ -20,7 +20,10 @@ const REFERENCE = "en"; // the language t() ultimately falls back to
 const { DICT } = await import(pathToFileURL(path.join(ROOT, "src/i18n.js")).href);
 const { EXTRA } = await import(pathToFileURL(path.join(ROOT, "src/i18n-extra.js")).href);
 
-const dicts = { ...DICT, ...EXTRA };
+const { STRINGS } = await import(pathToFileURL(path.join(ROOT, "src/strings.js")).href);
+// Mirror the runtime merge in i18n.js: overhaul strings win over older packs.
+const dicts = { ...DICT };
+for (const [l, strings] of Object.entries(EXTRA)) dicts[l] = { ...strings, ...STRINGS[l] };
 const langs = Object.keys(dicts).sort();
 if (!dicts[REFERENCE]) {
   console.error(`i18n check failed: no "${REFERENCE}" dictionary`);
@@ -52,7 +55,7 @@ function walk(dir, out = []) {
 const refKeys = new Set(Object.keys(dicts[REFERENCE]));
 const unknown = [];
 for (const file of walk(path.join(ROOT, "src"))) {
-  if (/i18n(-extra)?\.js$/.test(file)) continue;
+  if (/(i18n(-extra)?|strings)\.js$/.test(file)) continue;
   const src = fs.readFileSync(file, "utf8");
   const lines = src.split("\n");
   lines.forEach((line, i) => {

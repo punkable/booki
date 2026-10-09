@@ -15,12 +15,12 @@ import { showBookiMenu } from "./native-context-menu.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
-import { applySurfaceVars, resolveSurfaceStyle, transparencyReduced } from "./surface.js";
+
 import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
-import { reportMaterial, shapeOf, materialTint, setMaterialTint, setMaterialEnabled, followFrames } from "./material.js";
+import { reportMaterial, shapeOf, applyMaterial, followFrames } from "./material.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -75,9 +75,7 @@ async function applyLook() {
     document.body.classList.toggle("peekable", canPeek);
     if (!canPeek) closeCard();
     pollMedia();
-    applySurfaceVars(cfg);
-    setMaterialTint(materialTint(cfg));
-    setMaterialEnabled(cfg.nativeMaterial !== false && !transparencyReduced(cfg) && resolveSurfaceStyle(cfg) !== "solid");
+    applyMaterial(cfg);
     // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
     // body.notch-body, which shadowed any value set on <html>.
     const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));

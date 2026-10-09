@@ -36,18 +36,9 @@
 [data-theme] [data-ink="light"] .tile.widget, [data-ink="light"] .tile.widget { --w-tile: color-mix(in srgb, var(--w-ink) 9%, transparent); --w-edge: color-mix(in srgb, var(--w-ink) 8%, transparent); }
 .tile.widget:hover { background: transparent; }
 
-/* Widths: 2×1 and 3×1 span the gaps they replace, so a wide tile occupies
-   exactly the room of two or three icons. */
-.tile.widget[data-widget="clock"],
-.tile.widget[data-widget="uptime"],
-.tile.widget[data-widget="net"] {
-  width: calc(var(--size) * 2 + var(--gap, 6px));
-}
-.tile.widget.preview,
-.tile.widget[data-widget="media"] {
-  width: calc(var(--size) * 3 + var(--gap, 6px) * 2);
-}
-
+/* Width comes from the shared layout model (--widget-width, see
+   layout-model.js): 1×1 gauges, 2×1 readouts, 3×1 cards, and one cell per
+   metric for the system widget. */
 .w-card {
   position: relative;
   display: flex;
@@ -107,20 +98,12 @@
 }
 .w-bar { display: none; }
 
-/* Network: figures over a live throughput graph. */
-.tile.widget[data-widget="net"] .w-value { font-size: calc(var(--size) * 0.3); }
-.tile.widget[data-widget="net"] .w-main { position: relative; z-index: 1; }
-.w-spark {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 58%;
-  pointer-events: none;
-}
-.w-spark-line { fill: none; stroke: var(--w-accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
-.w-spark-fill { fill: color-mix(in srgb, var(--w-accent) 14%, transparent); stroke: none; }
+/* ── System (n×1): one gauge per metric, network as two rates ───────── */
+.tile.widget[data-widget="system"] .w-card { gap: var(--gap, 6px); padding: calc(var(--size) * 0.1); justify-content: space-between; }
+.w-sys-cell { position: relative; flex: 1 1 0; min-width: 0; height: 100%; display: grid; place-items: center; }
+.w-sys-net { display: flex; flex-direction: column; justify-content: center; gap: 2px; font-size: calc(var(--size) * 0.17); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.w-sys-rate[data-dir="up"] { color: var(--w-ink-2); }
+.w-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ── Gauge (1×1): thick ring, glyph above, number inside ───────────────── */
 .w-ring {
@@ -278,19 +261,8 @@
 
 /* ── Variants (per-widget style in Settings) ───────────────────────────── */
 .tile.widget[data-variant="solid"] .w-card { --w-ink: #fff; --w-ink-2: rgba(255, 255, 255, 0.78); --w-track: rgba(255, 255, 255, 0.28); background: var(--w-accent); }
-.tile.widget[data-variant="gradient"] .w-card {
-  --w-ink: #fff;
-  --w-ink-2: rgba(255, 255, 255, 0.78);
-  --w-track: rgba(255, 255, 255, 0.28);
-  background: linear-gradient(145deg, color-mix(in srgb, var(--w-accent) 88%, #fff), color-mix(in srgb, var(--w-accent) 70%, #000));
-}
-.tile.widget[data-variant="solid"] .w-ring-fill,
-.tile.widget[data-variant="gradient"] .w-ring-fill,
-.tile.widget[data-variant="solid"] .w-spark-line,
-.tile.widget[data-variant="gradient"] .w-spark-line { stroke: #fff; }
-.tile.widget[data-variant="solid"] .w-ring-ico,
-.tile.widget[data-variant="gradient"] .w-ring-ico { color: #fff; }
-.tile.widget[data-variant="outline"] .w-card { background: transparent; box-shadow: inset 0 0 0 1.5px var(--w-accent); }
+.tile.widget[data-variant="solid"] .w-ring-fill { stroke: #fff; }
+.tile.widget[data-variant="solid"] .w-ring-ico { color: #fff; }
 .tile.widget[data-variant="minimal"] .w-card { background: transparent; box-shadow: none; }
 
 /* ── Vertical dock: every widget is a 1×1 tile ─────────────────────────── */
@@ -299,15 +271,13 @@ body.edge-right .tile.widget { width: var(--size); }
 body.edge-left .w-card,
 body.edge-right .w-card { justify-content: center; padding: calc(var(--size) * 0.08); }
 body.edge-left .w-label, body.edge-right .w-label,
-body.edge-left .w-spark, body.edge-right .w-spark,
+body.edge-left .w-sys-cell ~ .w-sys-cell, body.edge-right .w-sys-cell ~ .w-sys-cell,
 body.edge-left .w-pv-main, body.edge-right .w-pv-main,
 body.edge-left .w-pv-badge, body.edge-right .w-pv-badge,
 body.edge-left .tile.widget.media .w-main, body.edge-right .tile.widget.media .w-main,
 body.edge-left .tile.widget.media .w-controls, body.edge-right .tile.widget.media .w-controls { display: none; }
 /* The clock keeps its time, smaller; other readouts show their figure. */
 body.edge-left .w-value, body.edge-right .w-value { font-size: calc(var(--size) * 0.26); }
-body.edge-left .tile.widget[data-widget="net"] .w-value,
-body.edge-right .tile.widget[data-widget="net"] .w-value { font-size: calc(var(--size) * 0.2); }
 
 /* A widget grouped into a folder is shown live inside the flyout at full width. */
 .stack-widget .tile.widget.in-flyout { width: 100%; }
@@ -329,6 +299,7 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
 .focus-calendar > * { font-size: 11px; padding: 6px 0; }
 .focus-calendar .today { background: var(--accent); color: #161618; border-radius: 8px; font-weight: 700; }
+.productivity-section + .productivity-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .focus-finished .w-card { box-shadow: inset 0 0 0 2px var(--w-accent); }
 .reduce-transparency .dock, .reduce-transparency .w-card, .reduce-transparency .live-preview-bar { backdrop-filter: none !important; }
 .tile.widget.conditionally-hidden { display: none; }

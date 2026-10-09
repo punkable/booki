@@ -4,6 +4,8 @@
    language defines the same keys and that no t("…") call references a key that
    does not exist. */
 
+import { STRINGS } from "./strings.js";
+
 export const DICT = {
   es: {
     "notes.recoveryFound": "Se encontró un borrador sin guardar. Decide si quieres recuperarlo antes de editar.",
@@ -1570,6 +1572,7 @@ export const DICT = {
     "w.v.minimal": "Minimal",
   }
 };
+for (const l of ["es", "en"]) Object.assign(DICT[l], STRINGS[l]);
 let lang = "en";
 const SUPPORTED = ["es", "en", "pt", "fr", "de"];
 let extraLoaded = false;
@@ -1590,7 +1593,7 @@ export async function ensureLang(value) {
   if (!extraLoaded && (l === "pt" || l === "fr" || l === "de")) {
     try {
       const m = await import("./i18n-extra.js");
-      Object.assign(DICT, m.EXTRA);
+      for (const [l, strings] of Object.entries(m.EXTRA)) DICT[l] = { ...strings, ...STRINGS[l] };
       extraLoaded = true;
     } catch (_) { /* fall back to English */ }
   }

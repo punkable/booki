@@ -89,8 +89,8 @@ fn default_monitor() -> i32 {
     -1
 }
 fn default_material() -> u32 {
-    // Higher default so tinted/acrylic glass reads solid (taskbar-like), not clear.
-    80
+    // Glass intensity: frosted enough to read over any wallpaper.
+    60
 }
 fn default_surface_tint() -> String {
     // Empty = auto (black for tinted). User can pick any hex in Appearance.
@@ -122,8 +122,8 @@ fn default_notch_mode() -> String {
     "attached".into()
 }
 fn default_surface_style() -> String {
-    // Unified dock + notch finish. Default tinted = taskbar / Windhawk glass.
-    "tinted".into()
+    // One finish for dock + notch: "glass", "mica" or "solid".
+    "glass".into()
 }
 fn default_anim() -> String {
     "spring".into()
@@ -558,76 +558,7 @@ fn load_from_disk() -> Config {
     if blocked {
         return cfg;
     }
-    // Record historical default changes without overwriting user preferences.
-    // New installs receive current defaults; existing choices remain intact.
-    for revision in [2, 3, 4] {
-        if cfg.settings_rev < revision {
-            cfg.settings_rev = revision;
-            let _ = save_locked(&cfg);
-        }
-    }
-    // rev 5: the notch follows the dock again. Older builds could leave an
-    // explicit notch_edge behind (e.g. "bottom"), and moving the dock from
-    // settings didn't clear it — so the dock kept tucking toward the stale
-    // edge. One-time heal; the unified position picker re-sets it explicitly.
-    if cfg.settings_rev < 5 {
-        cfg.notch_edge = "auto".into();
-        cfg.settings_rev = 5;
-        let _ = save_locked(&cfg);
-    }
-    // rev 6: one surface finish for dock + notch. Derive from the old notchStyle
-    // when the new key is still at its default and the legacy value differs.
-    if cfg.settings_rev < 6 {
-        let mapped = match cfg.notch_style.as_str() {
-            "mica" => "mica",
-            "liquid" => "tinted",
-            "windows" => "solid",
-            "acrylic" | "island" => "acrylic",
-            _ => "acrylic",
-        };
-        cfg.surface_style = mapped.into();
-        cfg.notch_style = match mapped {
-            "mica" => "mica",
-            "tinted" => "liquid",
-            "solid" => "windows",
-            _ => "acrylic",
-        }
-        .into();
-        cfg.settings_rev = 6;
-        let _ = save_locked(&cfg);
-    }
-    // rev 7: explicit notch modes (attached / floating / smart). Derive from the
-    // older peek + multi-notch toggles so existing installs keep their look.
-    if cfg.settings_rev < 7 {
-        cfg.notch_mode = if cfg.multi_notch_enabled {
-            "smart".into()
-        } else if cfg.notch_peek {
-            "attached".into()
-        } else {
-            "floating".into()
-        };
-        cfg.notch_peek = cfg.notch_mode != "floating";
-        // Smart no longer keys off an app list — keep the legacy fields empty.
-        cfg.multi_notch_enabled = false;
-        cfg.multi_notch_apps.clear();
-        cfg.settings_rev = 7;
-        let _ = save_locked(&cfg);
-    }
-    // rev 8: smart is always circular (ambient behaviours only). Clear any leftover
-    // multi-notch app list so the old whitelist cannot resurrect in Settings.
-    if cfg.settings_rev < 8 {
-        let mode = cfg.notch_mode.trim().to_ascii_lowercase();
-        if mode != "attached" && mode != "floating" && mode != "smart" {
-            cfg.notch_mode = if cfg.notch_peek {
-                "attached".into()
-            } else {
-                "floating".into()
-            };
-        }
-        cfg.notch_peek = cfg.notch_mode != "floating";
-        cfg.multi_notch_enabled = false;
-        cfg.multi_notch_apps.clear();
-        cfg.settings_rev = 8;
+    if migrate(&mut cfg) {
         let _ = save_locked(&cfg);
     }
     // Named groups are durable containers, including empty and single-item
@@ -642,6 +573,160 @@ fn load_from_disk() -> Config {
     }
     cfg.revision = read_config(&path).map_or(cfg.revision, |saved| saved.revision);
     cfg
+}
+
+/// Latest config schema revision written by this build.
+pub const SETTINGS_REV: u32 = 9;
+
+/// Bring a config from any older build up to `SETTINGS_REV`. Pure, so the
+/// same steps run on load and on restored profiles and backups. Returns
+/// whether anything changed.
+pub fn migrate(cfg: &mut Config) -> bool {
+    if cfg.settings_rev >= SETTINGS_REV {
+        return false;
+    }
+    // rev 5: the notch follows the dock again.
+    if cfg.settings_rev < 5 {
+        cfg.notch_edge = "auto".into();
+    }
+    // rev 6: one surface finish for dock + notch, derived from notchStyle.
+    if cfg.settings_rev < 6 {
+        cfg.surface_style = match cfg.notch_style.as_str() {
+            "mica" => "mica",
+            "liquid" => "tinted",
+            "windows" => "solid",
+            _ => "acrylic",
+        }
+        .into();
+    }
+    // rev 7–8: explicit notch modes from the older peek / multi-notch toggles.
+    if cfg.settings_rev < 8 {
+        let mode = cfg.notch_mode.trim().to_ascii_lowercase();
+        cfg.notch_mode = if cfg.settings_rev < 7 && cfg.multi_notch_enabled {
+            "smart".into()
+        } else if matches!(mode.as_str(), "attached" | "floating" | "smart")
+            && cfg.settings_rev >= 7
+        {
+            mode
+        } else if cfg.notch_peek {
+            "attached".into()
+        } else {
+            "floating".into()
+        };
+        cfg.multi_notch_enabled = false;
+        cfg.multi_notch_apps.clear();
+    }
+    // rev 9: three real finishes and the consolidated widget set.
+    if cfg.settings_rev < 9 {
+        migrate_surface_v9(cfg);
+        cfg.pinned = migrate_widgets_v9(std::mem::take(&mut cfg.pinned));
+    }
+    cfg.notch_peek = cfg.notch_mode != "floating";
+    cfg.settings_rev = SETTINGS_REV;
+    true
+}
+
+/// acrylic → glass; tinted → glass with its colour (black when it had none);
+/// mica and solid stay.
+fn migrate_surface_v9(cfg: &mut Config) {
+    let style = cfg.surface_style.trim().to_ascii_lowercase();
+    cfg.surface_style = match style.as_str() {
+        "mica" => "mica",
+        "solid" => "solid",
+        "tinted" => {
+            if cfg.surface_tint.trim().is_empty() {
+                cfg.surface_tint = "#000000".into();
+            }
+            "glass"
+        }
+        _ => "glass",
+    }
+    .into();
+}
+
+/// CPU, RAM, disk and network become one "system" widget showing exactly
+/// the metrics that were pinned; timer and tasks become "focus" (keeping the
+/// timer and task data); uptime is retired. The first widget of a merged
+/// family keeps its place and style, later ones are dropped. Groups are walked
+/// so a widget inside a group migrates too.
+pub fn migrate_widgets_v9(items: Vec<PinnedApp>) -> Vec<PinnedApp> {
+    fn family(widget: &str) -> Option<Option<&'static str>> {
+        match widget {
+            "cpu" | "ram" | "disk" | "net" => Some(Some("system")),
+            "timer" | "tasks" => Some(Some("focus")),
+            "uptime" => Some(None),
+            _ => None,
+        }
+    }
+    fn collect(
+        items: &[PinnedApp],
+        metrics: &mut Vec<String>,
+        focus: &mut serde_json::Map<String, serde_json::Value>,
+    ) {
+        for item in items {
+            collect(&item.children, metrics, focus);
+            let widget = item.widget.as_deref().unwrap_or("");
+            if item.kind != "widget" {
+                continue;
+            }
+            if matches!(widget, "cpu" | "ram" | "disk" | "net")
+                && !metrics.iter().any(|m| m == widget)
+            {
+                metrics.push(widget.to_string());
+            }
+            if matches!(widget, "timer" | "tasks") {
+                if let Some(serde_json::Value::Object(style)) = &item.style {
+                    for (key, value) in style {
+                        focus.entry(key.clone()).or_insert_with(|| value.clone());
+                    }
+                }
+            }
+        }
+    }
+    fn walk(
+        items: Vec<PinnedApp>,
+        seen: &mut std::collections::HashSet<&'static str>,
+        metrics: &[String],
+        focus: &serde_json::Map<String, serde_json::Value>,
+    ) -> Vec<PinnedApp> {
+        let mut out = Vec::with_capacity(items.len());
+        for mut item in items {
+            item.children = walk(std::mem::take(&mut item.children), seen, metrics, focus);
+            let mapped = if item.kind == "widget" {
+                family(item.widget.as_deref().unwrap_or(""))
+            } else {
+                None
+            };
+            let Some(target) = mapped else {
+                out.push(item);
+                continue;
+            };
+            let Some(target) = target else { continue };
+            if !seen.insert(target) {
+                continue;
+            }
+            let mut style = match item.style.take() {
+                Some(serde_json::Value::Object(map)) => map,
+                _ => serde_json::Map::new(),
+            };
+            if target == "system" {
+                style.insert("metrics".into(), serde_json::json!(metrics));
+            } else {
+                for (key, value) in focus {
+                    style.entry(key.clone()).or_insert_with(|| value.clone());
+                }
+            }
+            item.widget = Some(target.to_string());
+            item.style = Some(serde_json::Value::Object(style));
+            out.push(item);
+        }
+        out
+    }
+    let mut metrics = Vec::new();
+    let mut focus = serde_json::Map::new();
+    collect(&items, &mut metrics, &mut focus);
+    let mut seen = std::collections::HashSet::new();
+    walk(items, &mut seen, &metrics, &focus)
 }
 
 /// Persist config to disk, creating the directory if needed.
@@ -821,5 +906,88 @@ mod tests {
         let _ = std::fs::remove_dir_all(root);
         assert!(status.success());
         assert!(saved, "the isolated regression test must actually execute");
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    fn widget(id: &str, w: &str) -> PinnedApp {
+        serde_json::from_value(serde_json::json!({"id": id, "kind": "widget", "widget": w}))
+            .unwrap()
+    }
+    fn names(items: &[PinnedApp]) -> Vec<String> {
+        items
+            .iter()
+            .map(|i| i.widget.clone().unwrap_or_else(|| i.kind.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn widgets_merge_into_system_and_focus_in_place() {
+        let mut group: PinnedApp =
+            serde_json::from_value(serde_json::json!({"id": "g", "kind": "group"})).unwrap();
+        group.children = vec![widget("t", "tasks"), widget("k", "clock")];
+        let mut timer = widget("m", "timer");
+        timer.style = Some(serde_json::json!({"minutes": 25}));
+        let mut tasks = group.children.remove(0);
+        tasks.style = Some(serde_json::json!({"tasks": [{"text": "a"}]}));
+        group.children.insert(0, tasks);
+        let items = vec![
+            widget("a", "cpu"),
+            widget("b", "ram"),
+            widget("u", "uptime"),
+            widget("n", "net"),
+            timer,
+            group,
+        ];
+        let out = migrate_widgets_v9(items);
+        assert_eq!(names(&out), ["system", "focus", "group"]);
+        let focus = out[1].style.as_ref().unwrap();
+        assert_eq!(
+            (focus["minutes"].clone(), focus["tasks"][0]["text"].clone()),
+            (serde_json::json!(25), serde_json::json!("a"))
+        );
+        assert_eq!(out[0].id, "a");
+        assert_eq!(
+            out[0].style.as_ref().unwrap()["metrics"],
+            serde_json::json!(["cpu", "ram", "net"])
+        );
+        assert_eq!(names(&out[2].children), ["clock"]);
+    }
+
+    #[test]
+    fn finishes_map_to_glass_mica_solid() {
+        for (old, tint, want, want_tint) in [
+            ("acrylic", "", "glass", ""),
+            ("tinted", "", "glass", "#000000"),
+            ("tinted", "#0b1a2a", "glass", "#0b1a2a"),
+            ("mica", "", "mica", ""),
+            ("solid", "", "solid", ""),
+        ] {
+            let mut cfg = Config {
+                settings_rev: 8,
+                surface_style: old.into(),
+                surface_tint: tint.into(),
+                ..Config::default()
+            };
+            assert!(migrate(&mut cfg));
+            assert_eq!(
+                (cfg.surface_style.as_str(), cfg.surface_tint.as_str()),
+                (want, want_tint),
+                "{old}"
+            );
+            assert_eq!(cfg.settings_rev, SETTINGS_REV);
+            assert!(!migrate(&mut cfg));
+        }
+    }
+
+    #[test]
+    fn fresh_defaults_are_already_current() {
+        let mut cfg = Config::default();
+        migrate(&mut cfg);
+        assert_eq!(cfg.surface_style, "glass");
+        assert!(cfg.surface_tint.is_empty());
     }
 }

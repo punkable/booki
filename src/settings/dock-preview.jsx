@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { widgetCardHTML, setText, setMetric, clockParts, sparkPaths } from "../dock/widget-view.js";
+import { widgetCardHTML, setText, setMetric, setSystem, clockParts } from "../dock/widget-view.js";
 import { widgetWidth } from "../dock/layout-model.js";
-import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName } from "../widgets-meta.js";
+import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName, canonicalWidget } from "../widgets-meta.js";
 import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
 import { isLibIcon, resolveLibIcon } from "../icon-library.js";
@@ -10,38 +10,36 @@ import { resolveSurfaceStyle, glassFillColor, surfaceAlpha, dockRadius, surfaceF
 
 /* The real widget markup/styles, with safe example data. Private notes and
    clipboard contents never appear in a preview or diagnostic screenshot. */
-export function WidgetPreview({ widget, style: rawStyle, size = 48, gap = 6 }) {
+const SAMPLE_STATS = { cpu: 28, mem: 62, disk: 41, net_down_kbps: 2458, net_up_kbps: 128 };
+export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, gap = 6 }) {
   const style = rawStyle && typeof rawStyle === "object" && !Array.isArray(rawStyle) ? rawStyle : {};
+  const widget = canonicalWidget(rawWidget) || "clock";
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     // Write the markup here, not via dangerouslySetInnerHTML: React re-applies
     // that on later renders and wipes the example values filled in below.
-    el.querySelector(".w-card").innerHTML = widgetCardHTML(widget);
-    if (PREVIEW_WIDGETS.includes(widget)) {
+    el.querySelector(".w-card").innerHTML = widgetCardHTML(widget, style);
+    if (widget === "system") {
+      setSystem(el, SAMPLE_STATS, { cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net") });
+    } else if (PREVIEW_WIDGETS.includes(widget)) {
       el.querySelector(".w-pv-title").textContent = widgetDisplayName(widget, t);
       el.querySelector(".w-pv-sub").textContent = t("overhaul.sample");
     } else if (RING_WIDGETS.includes(widget)) {
-      const values = { cpu: 28, ram: 62, disk: 41, battery: 78, volume: 55 };
-      setMetric(el, widgetDisplayName(widget, t), values[widget] || 0);
+      setMetric(el, widgetDisplayName(widget, t), { battery: 78, volume: 55 }[widget] || 0);
     } else if (widget === "clock") {
       const parts = clockParts(new Date(), curLang());
       setText(el, parts.date, parts.time);
     } else {
-      const examples = { media: [t("w.media"), t("overhaul.sample")], net: ["↑ 128 KB/s", "↓ 2.4 MB/s"], uptime: [t("w.uptime"), "2h 15m"], timer: [t("w.timer"), "25:00"], calendar: [t("w.calendar"), new Date().getDate().toString()], tasks: [t("w.tasks"), "0 / 3"], weather: [t("w.weather"), "21°"] };
-      const values = examples[widget] || [widgetDisplayName(widget, t), "—"];
-      setText(el, ...values);
-      if (widget === "net") {
-        const paths = sparkPaths([2, 5, 3, 8, 4, 6, 3, 5]);
-        el.querySelector(".w-spark-line")?.setAttribute("d", paths.line);
-        el.querySelector(".w-spark-fill")?.setAttribute("d", paths.fill);
-      }
+      const examples = { media: [t("w.media"), t("overhaul.sample")], focus: [t("w.focus"), "25:00"], calendar: [new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())], weather: [t("w.weather"), "21°"] };
+      setText(el, ...(examples[widget] || [widgetDisplayName(widget, t), "—"]));
     }
   }, [widget, style, size]);
+  const width = widgetWidth(widget, size, gap, style);
   return <span ref={ref} className={"tile widget preview-static" + (PREVIEW_WIDGETS.includes(widget) ? " preview" : "") + (style.icon === false ? " no-ico" : "")}
     data-widget={widget} data-variant={style.variant || "glass"} aria-label={widgetDisplayName(widget, t)}
-    style={{ "--size": `${size}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, "--widget-width": `${widgetWidth(widget, size, gap, style)}px`, width: widgetWidth(widget, size, gap, style) }}>
+    style={{ "--size": `${size}px`, "--gap": `${gap}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, "--widget-width": `${width}px`, width }}>
     <span className="w-card" />
   </span>;
 }
@@ -55,10 +53,11 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
     if (item.kind === "app" && item.path) dock.appIcon(item.path).then((uri) => { if (alive) setSrc(uri); }).catch(() => {});
     return () => { alive = false; };
   }, [item.icon, item.path, item.kind]);
+  if (item.kind === "widget" && canonicalWidget(item.widget) === null) return null; // retired widget in an old profile
   if (item.kind === "widget") return <WidgetPreview widget={item.widget} style={item.style} size={size} gap={gap} />;
   if (item.kind === "separator") return <span className="live-preview-separator" />;
   return <span className="live-preview-app" title={item.name} style={{ width: size, height: size }}>
-    {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[child.widget] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
+    {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[canonicalWidget(child.widget)] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
       : src ? <img src={src} alt="" />
         : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
           : <span dangerouslySetInnerHTML={{ __html: icon("app") }} />}

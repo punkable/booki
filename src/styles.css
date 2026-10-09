@@ -250,102 +250,45 @@ body.edge-bottom.slot-end, body.edge-top.slot-end { justify-content: flex-end; p
 body.edge-left.slot-start, body.edge-right.slot-start { align-items: flex-start; padding-top: 12%; }
 body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; padding-bottom: 12%; }
 
-/* Surface tokens live on body so dock, notch, flyouts and menus share one finish. */
+/* Surface tokens live on body so dock, notch, flyouts and menus share one
+   finish. surface.js sets the class and --glass-alpha / --glass-tint /
+   --wall-tint; nothing else decides how a surface is filled. */
 body {
-  --surf-blur: 28px;
-  --surf-sat: 140%;
-  --surf-fill: color-mix(in srgb, var(--surface-tint) calc(var(--material, 0.55) * 100%), transparent);
-  --surf-stroke: color-mix(in srgb, var(--stroke-light) 55%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.22);
-  --surf-inset-shade: rgba(0, 0, 0, 0.05);
-  --surf-sheen: 0.55;
+  --surf-fill: var(--surface-tint);
+  --surf-blur: 0px;
+  --surf-sat: 100%;
+  --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.08);
+  --surf-inset-shade: rgba(0, 0, 0, 0.06);
+  --surf-sheen: 0;
   --surf-sheen-dir: 180deg;
-  --panel-blur: calc(var(--surf-blur) * 0.85);
-  --panel-sat: var(--surf-sat);
-  --panel-fill: var(--layer-strong);
+  --panel-blur: 0px;
+  --panel-sat: 100%;
+  --panel-fill: var(--surf-fill);
   --panel-radius: 8px;
   --lit-x: 0; --lit-y: 1px;
   --shade-x: 0; --shade-y: -1px;
 }
-/* Glass fill uses --glass-tint when the user picks a color in Appearance;
-   otherwise falls back to the theme's --surface-tint (light/dark). */
-body.surface-mica {
-  --surf-blur: 20px;
-  --surf-sat: 110%;
-  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.84) * 100%), transparent);
-  --surf-stroke: color-mix(in srgb, var(--stroke) 70%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.14);
-  --surf-inset-shade: rgba(0, 0, 0, 0.04);
-  --surf-sheen: 0.28;
-  --panel-blur: 18px;
-  --panel-sat: 115%;
-  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 82%, var(--layer-strong));
-}
-body.surface-acrylic {
-  --surf-blur: 36px;
-  --surf-sat: 165%;
-  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.64) * 100%), transparent);
-  --surf-stroke: color-mix(in srgb, var(--stroke-light) 62%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.26);
-  --surf-sheen: 0.62;
+/* Glass: Windows blurs what is behind (material.js); the page adds the
+   translucent fill and a CSS blur only as a fallback before that lands. */
+body.surface-glass {
+  --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.6) * 100%), transparent);
+  --surf-blur: 30px;
+  --surf-sat: 150%;
+  --surf-stroke: color-mix(in srgb, var(--stroke-light) 60%, transparent);
+  --surf-inset-lit: rgba(255, 255, 255, 0.2);
+  --surf-sheen: 0.4;
   --panel-blur: 30px;
-  --panel-sat: 170%;
-  --panel-fill: color-mix(in srgb, var(--layer-strong) 72%, var(--glass-tint, var(--surface-tint)));
+  --panel-sat: 150%;
+  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(min(1, var(--glass-alpha, 0.6) + 0.18) * 100%), transparent);
 }
-/* Tinted glass — taskbar / Windhawk style: blur 18, solid frosted tint.
-   --glass-tint + --glass-alpha come from Settings (color + solidity). */
-body.surface-tinted {
-  --surf-blur: 18px;
-  --surf-sat: 115%;
-  --surf-fill: color-mix(
-    in srgb,
-    var(--glass-tint, #000000) calc(var(--glass-alpha, 0.88) * 100%),
-    transparent
-  );
-  --surf-stroke: rgba(255, 255, 255, 0.10);
-  --surf-inset-lit: rgba(255, 255, 255, 0.08);
-  --surf-inset-shade: rgba(0, 0, 0, 0.20);
-  --surf-sheen: 0.06;
-  --panel-blur: 18px;
-  --panel-sat: 115%;
-  --panel-fill: color-mix(
-    in srgb,
-    var(--glass-tint, #000000) calc(var(--glass-alpha, 0.88) * 100%),
-    transparent
-  );
-  --panel-radius: 14px;
-}
-body.surface-solid {
-  --surf-blur: 0px;
-  --surf-sat: 100%;
-  --surf-fill: var(--glass-tint, var(--surface-tint));
-  --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
+body.surface-glass.native-material { --surf-blur: 0px; --panel-blur: 0px; }
+/* Mica: opaque, lightly tinted by the wallpaper like Windows 11 windows. */
+body.surface-mica {
+  --surf-fill: color-mix(in srgb, var(--wall-tint, var(--surface-tint)) 14%, var(--surface-tint));
   --surf-inset-lit: rgba(255, 255, 255, 0.1);
-  --surf-inset-shade: rgba(0, 0, 0, 0.08);
-  --surf-sheen: 0.12;
-  --panel-blur: 0px;
-  --panel-sat: 100%;
-  --panel-fill: var(--glass-tint, var(--surface-tint));
 }
-html[data-theme="dark"] body.surface-tinted,
-html[data-theme="light"] body.surface-tinted {
-  /* Tint color is user-chosen; only stroke/sheen adapt lightly for contrast. */
-  --surf-stroke: color-mix(in srgb, #fff 12%, transparent);
-}
-html[data-theme="light"] body.surface-tinted {
-  --surf-stroke: color-mix(in srgb, #000 10%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.35);
-  --surf-inset-shade: rgba(0, 0, 0, 0.06);
-  --surf-sheen: 0.14;
-}
-@media (prefers-reduced-transparency: reduce) {
-  body {
-    --surf-blur: 0px;
-    --panel-blur: 0px;
-    --surf-fill: var(--glass-tint, var(--surface-tint));
-    --panel-fill: var(--layer-strong);
-  }
-}
+/* Solid needs no rule: it is the body default. */
 
 :root { --surface-ink: var(--ink); }
 .dock, .notch-pill {
@@ -383,7 +326,7 @@ html[data-theme="light"] body.surface-tinted {
     backdrop-filter var(--dur-4) var(--ease-out);
   isolation: isolate;
 }
-body.surface-solid .dock {
+body:not(.surface-glass) .dock {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -938,7 +881,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
 }
-body.surface-tinted .rename-pop-input {
+body[data-ink="light"] .rename-pop-input {
   background: rgba(0, 0, 0, 0.35);
   border-color: rgba(255, 255, 255, 0.16);
 }
@@ -1747,7 +1690,7 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   filter: none;
   transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-4) var(--ease-out), filter var(--dur-2) var(--ease-out);
 }
-body.surface-solid .stack {
+body:not(.surface-glass) .stack {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }

@@ -1654,6 +1654,9 @@ fn profile_restore(token: String) -> Result<String, String> {
 }
 
 fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String> {
+    // Profiles and backups from older builds use the current schema too.
+    let mut cfg = cfg;
+    config::migrate(&mut cfg);
     // Apply general preferences as well as the visual layout. A failed OS
     // operation leaves the previous persisted profile active.
     config::backup_for_update()?;

@@ -45,19 +45,19 @@ test("adding apps displays local usage in order and reaches installed apps beyon
 });
 
 test("local timer and task panel persist and Escape closes the panel", async () => {
-  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("timer"), pin("tasks"), pin("calendar")] }), viewport: { width: 1200, height: 600 } });
-  await page.locator('#dock > [data-widget="timer"]').click();
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("focus"), pin("calendar")] }), viewport: { width: 1200, height: 600 } });
+  await page.locator('#dock > [data-widget="focus"]').click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.waitForTimeout(250);
   let saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.ok(saved.pinned[0].style.endsAt > Date.now());
   await page.keyboard.press("Escape"); assert.equal(await page.locator(".productivity-panel").count(), 0);
-  await page.locator('#dock > [data-widget="tasks"]').click();
+  await page.locator('#dock > [data-widget="focus"]').click();
   await page.getByRole("textbox", { name: "Add task" }).fill('<img src=x onerror=alert(1)>');
   await page.getByRole("button", { name: "Add task" }).click();
   await page.waitForTimeout(250);
   assert.equal(await page.locator(".focus-task img").count(), 0);
   await page.locator('.focus-task input[type="checkbox"]').check(); await page.waitForTimeout(250);
-  saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.equal(saved.pinned[1].style.tasks[0].done, true);
+  saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.equal(saved.pinned[0].style.tasks[0].done, true);
   await page.keyboard.press("Escape");
   await page.locator('#dock > [data-widget="calendar"]').click(); assert.ok(await page.locator(".focus-calendar .today").count());
   assert.deepEqual(errors, []); await page.close();
@@ -90,7 +90,7 @@ test("scroll overflow keeps chosen icon size and new widgets work vertically", a
   assert.equal(await page.locator("body.dock-overflow").count(), 1);
   assert.equal(await page.locator("#dock > .tile").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--size")), "48px");
   assert.deepEqual(errors, []); await page.close();
-  const vertical = await openPage(browser, port, "index.html", { cfg: makeConfig({ edge: "left", pinned: [pin("timer"), pin("tasks"), pin("calendar"), pin("weather")] }), viewport: { width: 500, height: 900 } });
+  const vertical = await openPage(browser, port, "index.html", { cfg: makeConfig({ edge: "left", pinned: [pin("focus"), pin("clock"), pin("calendar"), pin("weather")] }), viewport: { width: 500, height: 900 } });
   const widths = await vertical.page.locator("#dock > .tile.widget").evaluateAll((tiles) => tiles.map((tile) => tile.getBoundingClientRect().width));
   assert.ok(widths.every((width) => Math.abs(width - widths[0]) < 1)); assert.deepEqual(vertical.errors, []); await vertical.page.close();
 });

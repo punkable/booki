@@ -30,7 +30,7 @@
   scrollbar-width: thin;
   transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
-body.surface-solid .menu { -webkit-backdrop-filter: none; backdrop-filter: none; }
+body:not(.surface-glass) .menu { -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* Title of what was clicked, and what kind of thing it is. */
 .menu-head {

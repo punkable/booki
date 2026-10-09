@@ -98,16 +98,15 @@ export function makeConfig(overrides = {}) {
 /** One tile of every kind, so a geometry regression anywhere shows up. */
 export const ALL_WIDGETS = [
   "clock",
-  "cpu",
-  "ram",
-  "disk",
-  "net",
-  "uptime",
+  "calendar",
+  "weather",
+  "system",
   "battery",
-  "notes",
   "media",
   "volume",
+  "notes",
   "clipboard",
+  "focus",
 ];
 
 export function everyKindPinned() {
@@ -125,7 +124,7 @@ export function everyKindPinned() {
       id: `w-${w}`,
       kind: "widget",
       widget: w,
-      ...(w === "notes" ? { style: { note: "a note" } } : {}),
+      ...(w === "notes" ? { style: { note: "a note" } } : w === "system" ? { style: { metrics: ["cpu", "ram", "disk", "net"] } } : {}),
     })),
   ];
 }

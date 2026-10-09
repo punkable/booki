@@ -10,8 +10,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DICT, resolveLang } from "../src/i18n.js";
 import { EXTRA } from "../src/i18n-extra.js";
+import { STRINGS } from "../src/strings.js";
 
-const all = { ...DICT, ...EXTRA };
+// Same merge as ensureLang(): the lazy pack plus the overhaul strings.
+const all = { ...DICT };
+for (const [lang, strings] of Object.entries(EXTRA)) all[lang] = { ...strings, ...STRINGS[lang] };
 const LANGS = ["es", "en", "pt", "fr", "de"];
 const reference = Object.keys(all.en);
 
