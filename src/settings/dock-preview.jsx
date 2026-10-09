@@ -64,6 +64,30 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
           : <span dangerouslySetInnerHTML={{ __html: icon("app") }} />}
   </span>;
 }
+/* The preview always shows the whole dock: it scales down to fit its column
+   instead of scrolling, so the bar never grows an inner scrollbar. */
+function useFitScale(maxHeight) {
+  const frame = useRef(null);
+  const bar = useRef(null);
+  const [fit, setFit] = useState({ scale: 1, height: 0 });
+  useLayoutEffect(() => {
+    const outer = frame.current, inner = bar.current;
+    if (!outer || !inner) return;
+    const measure = () => {
+      const width = inner.offsetWidth, height = inner.offsetHeight;
+      if (!width || !height) return;
+      const scale = Math.min(1, outer.clientWidth / width, maxHeight / height);
+      setFit((prev) => Math.abs(prev.scale - scale) < 0.005 && prev.height === Math.ceil(height * scale) ? prev : { scale, height: Math.ceil(height * scale) });
+    };
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(outer);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [maxHeight]);
+  return { frame, bar, fit };
+}
 export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin, onDragOver }) {
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
@@ -71,10 +95,14 @@ export function DockPreview({ cfg, large = false, onSelect, onDragPin, onDropPin
   const surface = transparencyReduced(cfg) ? "solid" : resolveSurfaceStyle(cfg);
   const fill = glassFillColor(cfg);
   const items = cfg.pinned || [];
+  const { frame, bar, fit } = useFitScale(vertical ? 300 : 140);
   return <div className={"live-preview-scene" + (large ? " large" : "")}>
-    <div className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
+    <div ref={frame} className="live-preview-fit" style={{ height: fit.height || undefined }}>
+    <div ref={bar} className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} data-ink={surfaceForeground(cfg) ? (surfaceForeground(cfg) === "#1b1b1b" ? "dark" : "light") : undefined} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
+      transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,
       background: `color-mix(in srgb, ${fill} ${Math.round((transparencyReduced(cfg) ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>
       {items.length ? items.map((item) => onSelect && item.kind !== "separator" ? <button key={item.id} className="preview-edit-pin" type="button" aria-label={`${t("apps.rename")}: ${item.name || widgetDisplayName(item.widget, t)}`} onClick={() => onSelect(item)} draggable={!!onDragPin} onDragStart={onDragPin ? (event) => onDragPin(event, item) : undefined} onDragOver={onDragOver} onDrop={onDropPin ? (event) => onDropPin(event, item) : undefined}><PreviewPin item={item} size={size} gap={gap} /></button> : <PreviewPin key={item.id} item={item} size={size} gap={gap} />) : <span className="muted">{t("overhaul.empty")}</span>}
+    </div>
     </div>
     <span className="live-preview-caption">{onSelect ? t("premium.editPreview") : t("overhaul.previewHint")}</span>
   </div>;

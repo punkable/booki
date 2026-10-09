@@ -2,19 +2,22 @@
  *
  * Every widget is a tile the height of an app icon (--size) in one of three
  * widths — 1×1 gauges, 2×1 readouts, 3×1 cards — so a row of widgets lines up
- * with the apps beside it. Tiles are solid (near-black in dark, white in
- * light) on top of the bar's blurred material; colour comes from each
+ * with the apps beside it. Tiles are a light plate of the surface's own ink
+ * over the bar's material, so they follow every finish and custom tint
+ * instead of painting a fixed black or white box; colour comes from each
  * widget's accent (--w-accent, the iOS system palette by default).
  *
  * Markup comes from widgetCardHTML() in src/dock/widget-view.js.
  */
 
 .tile.widget {
-  --w-tile: #161618;
-  --w-ink: #f5f5f7;
-  --w-ink-2: rgba(235, 235, 245, 0.6);
-  --w-track: rgba(255, 255, 255, 0.1);
-  --w-edge: rgba(255, 255, 255, 0.06);
+  /* --ink is the surface ink inside the dock/notch (custom tints included)
+     and the theme ink in Settings previews. */
+  --w-ink: var(--ink, #f5f5f7);
+  --w-ink-2: color-mix(in srgb, var(--w-ink) 62%, transparent);
+  --w-tile: color-mix(in srgb, var(--w-ink) 9%, transparent);
+  --w-track: color-mix(in srgb, var(--w-ink) 12%, transparent);
+  --w-edge: color-mix(in srgb, var(--w-ink) 8%, transparent);
   --w-accent: var(--accent);
   --w-r: calc(var(--size) * 0.27);
   --w-pad: calc(var(--size) * 0.12);
@@ -23,22 +26,14 @@
   height: var(--size);
   background: transparent;
 }
-[data-theme="light"] .tile.widget {
-  --w-tile: #ffffff;
-  --w-ink: #1d1d1f;
-  --w-ink-2: rgba(60, 60, 67, 0.6);
-  --w-track: rgba(0, 0, 0, 0.08);
-  --w-edge: rgba(0, 0, 0, 0.06);
-}
+/* Dark ink reads best on a frosted white plate; light ink on a faint ink
+   plate. The theme decides by default, a forced surface ink overrides it. */
+[data-theme="light"] .tile.widget,
+[data-ink="dark"] .tile.widget { --w-tile: color-mix(in srgb, #fff 58%, transparent); --w-edge: color-mix(in srgb, #000 6%, transparent); }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .tile.widget {
-    --w-tile: #ffffff;
-    --w-ink: #1d1d1f;
-    --w-ink-2: rgba(60, 60, 67, 0.6);
-    --w-track: rgba(0, 0, 0, 0.08);
-    --w-edge: rgba(0, 0, 0, 0.06);
-  }
+  :root:not([data-theme]) .tile.widget { --w-tile: color-mix(in srgb, #fff 58%, transparent); --w-edge: color-mix(in srgb, #000 6%, transparent); }
 }
+[data-theme] [data-ink="light"] .tile.widget, [data-ink="light"] .tile.widget { --w-tile: color-mix(in srgb, var(--w-ink) 9%, transparent); --w-edge: color-mix(in srgb, var(--w-ink) 8%, transparent); }
 .tile.widget:hover { background: transparent; }
 
 /* Widths: 2×1 and 3×1 span the gaps they replace, so a wide tile occupies
@@ -66,7 +61,7 @@
   text-align: left;
   background: var(--w-tile);
   border-radius: var(--w-r);
-  box-shadow: inset 0 0 0 1px var(--w-edge), 0 1px 2px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 0 0 1px var(--w-edge);
   transition: filter var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
 }
 @supports (corner-shape: squircle) {
@@ -200,7 +195,7 @@
   font: 800 9.5px var(--font);
   color: #fff;
   background: #ff453a;
-  border: 2px solid var(--w-tile);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, #000 25%, transparent);
   border-radius: 999px;
 }
 .w-pv-count:not(:empty) { display: flex; }

@@ -100,7 +100,7 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .library-dock-head, .library-dock-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .library-dock-head strong { font-size: 13px; font-weight: 600; }
 .library-dock-editor > .muted { margin: 10px 0 0; font-size: 12px; }
-.library-pin-strip { display: flex; gap: 6px; overflow-x: auto; padding: 10px 0 6px; }
+.library-pin-strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 6px; }
 .library-pin { display: flex; align-items: center; position: relative; flex: 0 0 auto; gap: 4px; border: 1px solid transparent; border-radius: 10px; padding: 4px; }
 .library-pin.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--set-card)); }
 .library-pin > button { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 56px; max-width: 112px; background: transparent; border: 0; color: var(--ink); font: inherit; font-size: 11px; cursor: pointer; }
@@ -235,8 +235,6 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .widget-inspector .widget-modal-hero p { font-size: 12px; margin: 3px 0 0; line-height: 1.4; }
 .widget-inspector .s-section-title { margin-top: 12px; }
 @media (min-width: 1051px) {
-  .widgets-workspace { max-height: calc(100dvh - 190px); }
-  .widgets-workspace > .widget-store-grid { max-height: calc(100dvh - 190px); overflow-y: auto; padding: 2px 4px 4px 2px; scrollbar-width: thin; }
   .widget-inspector { position: sticky; top: 0; max-height: calc(100dvh - 190px); overflow-y: auto; scrollbar-width: thin; }
 }
 
@@ -279,3 +277,18 @@ body:not(.settings-body) .dock { box-shadow: 0 12px 30px #1018201c; }
 .note-recovery button { margin: 0 6px 6px 0; max-width: 100%; white-space: normal; }
 
 .note-recovery-preview { max-height: 80px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 10px; font-size: var(--text-sm); color: var(--muted); }
+
+/* Dock preview: one quiet stage, no nested scrollers. The bar keeps its
+   natural size and is scaled to fit (see useFitScale in dock-preview.jsx). */
+.live-preview-scene, .live-preview-scene.large { overflow: visible; background: none; }
+.live-preview-fit { position: relative; display: flex; justify-content: center; align-items: flex-start; width: 100%; min-width: 0; overflow: hidden; }
+.live-preview-bar, .live-preview-bar.vertical { flex: none; width: max-content; max-width: none; max-height: none; overflow: visible; transform-origin: top center; }
+
+/* Multi-select stays out of the way until it is used: the checkbox sits on
+   the pin's corner and appears on hover, keyboard focus or once a selection exists. */
+.library-pin input { position: absolute; top: 2px; right: 2px; margin: 0; opacity: 0; transition: opacity 120ms var(--ease); }
+.library-pin:hover input, .library-pin input:focus-visible, .library-pin input:checked, .library-pin-strip.selecting .library-pin input { opacity: 1; }
+
+/* Loose paragraphs inside a settings group align with the rows around them. */
+.ui-group > .update-error, .ui-group > .update-explanation, .update-error, .update-explanation { margin: 0; padding: 10px 14px; font-size: 12px; line-height: 1.5; }
+.update-error { color: var(--danger, #e5484d); }

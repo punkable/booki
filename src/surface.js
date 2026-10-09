@@ -145,6 +145,10 @@ export function applySurfaceVars(cfg, roots = [document.documentElement, documen
     if (foreground) el.style.setProperty("--surface-ink", foreground);
     else el.style.removeProperty("--surface-ink");
   }
+  // A custom fill can force the opposite ink of the theme; widget plates
+  // follow the ink, not the theme (see widgets.css).
+  if (foreground) document.body.dataset.ink = foreground === "#1b1b1b" ? "dark" : "light";
+  else delete document.body.dataset.ink;
   applySurfaceClass(cfg);
   return alpha;
 }

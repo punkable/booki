@@ -93,7 +93,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="s-btn s-btn-soft" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
       </div></div>
 
-      <div className="library-pin-strip">{cfg.pinned.map((item) => <div key={item.id} className={'library-pin' + (selectedId === item.id ? ' selected' : '')}
+      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")}>{cfg.pinned.map((item) => <div key={item.id} className={'library-pin' + (selectedId === item.id ? ' selected' : '')}
         draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item)); }}
         onDragOver={dragOver} onDrop={(event) => drop(event, { beforeId: item.id })}>
         <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><PreviewPin item={item} size={36} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>

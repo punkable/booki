@@ -1085,7 +1085,7 @@ function DiagnosticsCard() {
     } catch (_) { setStatus(t("overhaul.failed")); }
     finally { setBusy(false); }
   };
-  return <SettingsSection title={t("overhaul.diagnostics")} hint={t("overhaul.diagnosticsHint")}><div className="diagnostics-row"><button className="s-btn s-btn-soft" disabled={busy} onClick={save}>{t("overhaul.diagnostics")}</button><span role="status">{status}</span></div></SettingsSection>;
+  return <SettingsSection><Row label={t("overhaul.diagnostics")} hint={<span role="status">{status || t("overhaul.diagnosticsHint")}</span>}><button className="s-btn s-btn-soft" disabled={busy} onClick={save}>{t("ap.export")}</button></Row></SettingsSection>;
 }
 
 function General({ cfg, set, onWhatsNew, beforeApply }) {
