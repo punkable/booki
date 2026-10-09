@@ -16,7 +16,7 @@ export function RecoveryNotice({ revision, onProfiles, onStartFresh }) {
     <strong>{t(report.blocked ? 'integral.recoveryBlocked' : 'integral.recoveryRestored')}</strong>
     <p>{t(report.blocked ? 'integral.recoveryKeep' : 'integral.recoveryBackup')}</p>
     {error && <p>{t('overhaul.failed')}</p>}
-    <div className="workspace-actions"><button className="s-btn s-btn-soft" onClick={onProfiles}>{t('tab.profiles')}</button>
-      <button className="s-btn s-btn-soft" onClick={accept}>{t(report.blocked ? armed ? 'integral.startFreshConfirm' : 'integral.startFresh' : 'w.done')}</button></div>
+    <div className="workspace-actions"><button className="button" onClick={onProfiles}>{t('tab.profiles')}</button>
+      <button className="button" onClick={accept}>{t(report.blocked ? armed ? 'integral.startFreshConfirm' : 'integral.startFresh' : 'w.done')}</button></div>
   </section>;
 }

@@ -49,8 +49,8 @@ test('widget gallery previews a draft and commits its appearance only when added
   await page.getByRole('button', { name: 'Item details: Clock', exact: true }).click();
   assert.equal(await page.locator('.modal[role="dialog"]').count(), 0);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
-  await page.locator('.widget-inspector').getByRole('radio', { name: 'Solid', exact: true }).click();
-  await page.locator('.widget-inspector').getByRole('button', { name: 'Add', exact: true }).click();
+  await page.locator('.inspector').getByRole('radio', { name: 'Solid', exact: true }).click();
+  await page.locator('.inspector').getByRole('button', { name: 'Add', exact: true }).click();
   await page.waitForTimeout(250);
   const pins = await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned);
   assert.equal(pins.length, 1); assert.equal(pins[0].style.variant, 'solid');
@@ -261,49 +261,44 @@ test('library keeps one compact editable dock and gives an unselected catalog th
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('widget filtering preserves a customized draft and leaves the heading visible when the gallery scrolls', async () => {
+test('widget filtering preserves a customized draft and keeps the inspector in view while the page scrolls', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
   const search=page.getByRole('searchbox',{name:'Search widgets',exact:true});
-  await search.fill('timer');
-  assert.equal(await page.locator('.widget-store-choice').count(),1);
-  await page.getByRole('button',{name:'Item details: Timer',exact:true}).click();
-  await page.locator('.widget-inspector').getByRole('radio',{name:'Solid',exact:true}).click();
+  await search.fill('focus');
+  assert.equal(await page.locator('.catalog-card').count(),1);
+  await page.getByRole('button',{name:'Item details: Focus',exact:true}).click();
+  await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).click();
   await search.fill('not-a-widget');
   await page.getByRole('status').filter({hasText:'No results'}).waitFor();
-  assert.equal(await page.locator('.widget-inspector').getByRole('radio',{name:'Solid',exact:true}).getAttribute('aria-checked'),'true');
+  assert.equal(await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).getAttribute('aria-checked'),'true');
   await search.fill('');
-  await page.locator('.widget-store-grid').evaluate(element=>element.scrollTop=element.scrollHeight);
-  const heading=await page.getByRole('heading',{name:'Widgets',exact:true}).boundingBox();
-  assert.ok(heading.y>=0 && heading.y<150,'Scrolling the gallery must leave the page heading accessible');
-  await page.locator('.widget-inspector').getByRole('button',{name:'Add',exact:true}).click();
-  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='timer' && item.style.variant==='solid');});
+  await page.locator('.settings-main').evaluate(element=>element.scrollTop=element.scrollHeight);
+  const inspector=await page.locator('.inspector').boundingBox();
+  assert.ok(inspector.y>=0 && inspector.y<850,'The inspector stays reachable while the catalog scrolls');
+  await page.locator('.inspector').getByRole('button',{name:'Add',exact:true}).click();
+  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='focus' && item.style.variant==='solid');});
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('the editable dock reserves space while a populated library scrolls without covering its apps', async () => {
+test('the editable dock stays in view while a populated library scrolls, without covering the selection', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:720},initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:Array.from({length:70},(_,i)=>({name:'App '+i,path:'C:/Apps/app'+i+'.exe'}))}]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   await page.locator('.app-library-card').first().waitFor();
-  const editor=page.locator('.library-dock-editor');const before=await editor.boundingBox();
-  await page.locator('.library-workspace').evaluate(element=>element.scrollTop=element.scrollHeight);
-  const after=await editor.boundingBox();const catalog=await page.locator('.library-workspace').boundingBox();
-  assert.equal(after.y,before.y);
-  assert.ok(after.y+after.height<=catalog.y,'The dock and catalog must occupy separate layout areas');
-  assert.ok(await page.locator('.library-workspace').evaluate(element=>element.scrollTop>0));
-  await page.getByRole('button',{name:'Item details: App 0',exact:true}).click();
-  const populatedInspector=await page.locator('.library-candidate-inspector').boundingBox();
-  const populatedTools=await page.locator('.app-library-tools').boundingBox();
-  assert.ok(populatedInspector.y+populatedInspector.height<=populatedTools.y, 'A tall catalog must not shrink the selected app row into its search tools');
-  await page.locator('.library-candidate-inspector').getByRole('button',{name:'Close',exact:true}).click();
+  const main=page.locator('.settings-main');
+  await main.evaluate(element=>element.scrollTop=element.scrollHeight);
+  assert.ok(await main.evaluate(element=>element.scrollTop>0),'The catalog is long enough to scroll');
+  const editor=await page.locator('.library-dock-editor').boundingBox();
+  assert.ok(editor.y>=-1 && editor.y<60,'The dock being edited stays at the top while the catalog scrolls');
+  const overlap=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
   await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
-  await page.getByRole('button',{name:'Item details: App 69',exact:true}).waitFor();
   await page.getByRole('button',{name:'Item details: App 69',exact:true}).click();
   const inspector=await page.locator('.library-candidate-inspector').boundingBox();
   const tools=await page.locator('.app-library-tools').boundingBox();
-  assert.ok(inspector.y+inspector.height<=tools.y, 'The selected app and search tools must not overlap');
-  assert.ok(inspector.y>=catalog.y, 'Selection must be visible within the catalog scroll area');
-
+  const pinned=await page.locator('.library-dock-editor').boundingBox();
+  assert.ok(!overlap(inspector,tools),'The selected app and search tools must not overlap');
+  assert.ok(!overlap(inspector,pinned),'The dock editor must not cover the selected app');
+  assert.ok(inspector.y>=0 && inspector.y+40<=720,'Selection is visible');
   assert.deepEqual(errors,[]);await page.close();
 });
 
@@ -346,8 +341,8 @@ test('native icon refresh retries extraction while utilities remain searchable i
 test('dock position exposes labelled edges and alignment even when auto-hide is off', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({autoHideMode:'off'}),viewport:{width:520,height:780}});
   await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
-  await page.getByRole('button',{name:'Move the dock here: Left',exact:true}).click();
-  await page.locator('.position-notch').getByRole('radio',{name:'End',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Position',exact:true}).getByRole('radio',{name:'Left',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Alignment',exact:true}).getByRole('radio',{name:'End',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);await page.close();

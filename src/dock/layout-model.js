@@ -1,10 +1,11 @@
 /* Geometry shared by the live bar and its Settings previews. */
 import { canonicalWidget, systemMetrics } from "../widgets-meta.js";
 
-/** Cells a widget spans. The system widget is one cell per metric. */
+/** Cells a widget spans. */
 export function widgetSpan(widget, style = {}) {
   const type = canonicalWidget(widget);
-  if (type === "system") return systemMetrics(style).length;
+  // A gauge is one cell; the network reading needs two for its rates.
+  if (type === "system") return systemMetrics(style).reduce((cells, metric) => cells + (metric === "net" ? 2 : 1), 0);
   const requested = Number(style?.span);
   if ([1, 2, 3].includes(requested)) return requested;
   if (["media", "notes", "clipboard"].includes(type)) return 3;

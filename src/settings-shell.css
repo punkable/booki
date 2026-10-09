@@ -1,8 +1,6 @@
-/* Explicit layers keep production CSS chunks from reviving legacy styles. */
-@layer booki-base, booki-widgets, booki-menus, booki-settings, booki-overhaul, booki-workspace;
-@import "./styles.css" layer(booki-base);
-@import "./styles/widgets.css" layer(booki-widgets);
-@import "./styles/settings.css" layer(booki-settings);
-@import "./styles/overhaul.css" layer(booki-overhaul);
-@import "./styles/workspace.css" layer(booki-workspace);
-@import "./styles/design-tokens.css" layer(booki-workspace);
+/* Settings window styles: shared tokens, the widget tiles its previews use,
+   and the Settings stylesheet. None of the dock's own CSS is loaded here. */
+@layer tokens, widgets, settings;
+@import "./styles/tokens.css" layer(tokens);
+@import "./styles/widgets.css" layer(widgets);
+@import "./styles/settings.css" layer(settings);

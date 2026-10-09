@@ -1,6 +1,6 @@
-/* Explicit layers keep production CSS chunks from reviving legacy styles. */
-@layer booki-base, booki-widgets, booki-menus, booki-settings, booki-overhaul, booki-workspace;
-@import "./styles.css" layer(booki-base);
-@import "./styles/widgets.css" layer(booki-widgets);
-@import "./styles/menus.css" layer(booki-menus);
-@import "./styles/workspace.css" layer(booki-workspace);
+/* Dock window styles. Layers keep the cascade explicit. */
+@layer tokens, dock, widgets, menus;
+@import "./styles/tokens.css" layer(tokens);
+@import "./styles.css" layer(dock);
+@import "./styles/widgets.css" layer(widgets);
+@import "./styles/menus.css" layer(menus);

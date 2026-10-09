@@ -133,8 +133,9 @@ export function Slider({ value, min, max, step, onChange, fmt }) {
 }
 
 /** Segmented control. options: [{ value, label, icon? }] */
-export function SegmentedControl({ value, options, onChange }) {
-  const label = useContext(RowLabel);
+export function SegmentedControl({ value, options, onChange, label: ownLabel }) {
+  const rowLabel = useContext(RowLabel);
+  const label = ownLabel || rowLabel;
   const idx = Math.max(0, options.findIndex((o) => o.value === value));
   const navigate = (event) => {
     if (!options.length) return;
@@ -260,7 +261,7 @@ export function useModalControls(onClose) {
 
 /** appearance: "primary" | "subtle" | undefined; size: "small" | undefined. */
 export function Button({ appearance, size, icon: glyph, children, className = "", ...rest }) {
-  const cls = ["ui-btn", appearance ? `ui-btn-${appearance}` : "", size === "small" ? "ui-btn-sm" : "", !children ? "ui-btn-icon" : "", className]
+  const cls = [!children ? "icon-button" : "button", appearance === "primary" ? "button-accent" : appearance === "subtle" ? "button-subtle" : "", size === "small" ? "button-small" : "", className]
     .filter(Boolean)
     .join(" ");
   return (

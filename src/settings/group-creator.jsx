@@ -17,7 +17,7 @@ export function GroupCreator({ pinned, initialIds = [], onCreate, onClose }) {
   };
   return createPortal(<div className="modal-scrim modal-scrim-locked">
     <div className="modal group-creator" role="dialog" aria-modal="true" aria-label={t('apps.newFolder')}>
-      <div className="modal-head"><strong>{t('apps.newFolder')}</strong><button type="button" className="pin-btn ico" aria-label={t('stack.close')} onClick={onClose}><Icon name="x" /></button></div>
+      <div className="modal-head"><strong>{t('apps.newFolder')}</strong><button type="button" className="icon-button" aria-label={t('stack.close')} onClick={onClose}><Icon name="x" /></button></div>
       <div className="group-creator-body">
         <label>{t('apps.rename')}<input value={name} maxLength={100} onChange={(event) => setName(event.target.value)} /></label>
         <p className="muted">{t('workspace.groupHint')}</p>
@@ -27,7 +27,7 @@ export function GroupCreator({ pinned, initialIds = [], onCreate, onClose }) {
         </label>)}</div>
         {candidates.length < 2 && <p role="status" className="muted">{t('workspace.groupEmpty')}</p>}
       </div>
-      <div className="group-creator-actions"><button type="button" className="s-btn s-btn-soft" onClick={onClose}>{t('trash.cancel')}</button><button type="button" className="s-btn" disabled={chosen.length < 2} onClick={create}>{t('workspace.createGroup')} ({chosen.length})</button></div>
+      <div className="group-creator-actions"><button type="button" className="button" onClick={onClose}>{t('trash.cancel')}</button><button type="button" className="button button-accent" disabled={chosen.length < 2} onClick={create}>{t('workspace.createGroup')} ({chosen.length})</button></div>
     </div>
   </div>, document.body);
 }

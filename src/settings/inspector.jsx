@@ -10,7 +10,7 @@ export function Inspector({ selectionKey, origin, onBack, className, children, d
     const panel = ref.current;
     if (!panel) return;
     panel.focus({ preventScroll: true });
-    const scroller = panel.closest('.library-workspace') || panel.closest('.s-content');
+    const scroller = panel.closest('.settings-main');
     const bounds = panel.getBoundingClientRect();
     const viewport = scroller?.getBoundingClientRect();
     if (viewport && (bounds.top < viewport.top || bounds.top > viewport.bottom - 80)) {
@@ -28,7 +28,7 @@ export function Inspector({ selectionKey, origin, onBack, className, children, d
         event.preventDefault(); event.stopPropagation(); back();
       }
     }}>
-    {selectionKey && <button type="button" className={"s-btn s-btn-soft " + (dismissible ? "inspector-dismiss" : "inspector-back")} aria-label={dismissible ? t('stack.close') : undefined} title={dismissible ? t('stack.close') : undefined} onClick={back}><Icon name={dismissible ? "x" : "arrow-left"} />{!dismissible && t('stack.previous')}</button>}
+    {selectionKey && <button type="button" className={"button " + (dismissible ? "inspector-dismiss" : "inspector-back")} aria-label={dismissible ? t('stack.close') : undefined} title={dismissible ? t('stack.close') : undefined} onClick={back}><Icon name={dismissible ? "x" : "arrow-left"} />{!dismissible && t('stack.previous')}</button>}
     {children}
   </aside>;
 }

@@ -16,7 +16,7 @@ async function mockApps(page, fail = false) {
 }
 test('bulk selection retains apps across searches and adds them together', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
-  await mockApps(page); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await mockApps(page); await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Select app: Alpha', exact: true }).check();
   await page.locator('.app-library-tools input').fill('Beta');
   await page.getByRole('checkbox', { name: 'Select app: Beta', exact: true }).check();
@@ -41,12 +41,12 @@ test('partial discovery failure reports the problem while retaining usable recom
 test('finish presets preserve pins and the library fits a narrow Settings window', async () => {
   const cfg = makeConfig({ pinned: [{ id: 'editor', name: 'Editor', kind: 'app', path: 'C:/editor.exe' }] });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 520, height: 680 } });
-  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
-  await page.getByRole('button', { name: 'Tinted Glass', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
+  await page.getByRole('radio', { name: /^Dark glass/ }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
-  assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'tinted');
-  await mockApps(page); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'glass'); assert.equal(saved.surfaceTint, '#000000');
+  await mockApps(page); await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
   await page.locator('.app-library-card').first().waitFor();
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []); await page.close();
@@ -66,7 +66,7 @@ test('failed profile save keeps the name and explains the failure for retry', as
     const old = window.__TAURI__.core.invoke;
     window.__TAURI__.core.invoke = (command, args) => command === 'profile_save' ? Promise.reject(new Error('disk full')) : old(command, args);
   });
-  await page.getByRole('navigation').getByRole('button', { name: 'Profiles & backup', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
   await page.getByRole('heading', { name: /^Dock profiles/ }).waitFor();
   await page.getByPlaceholder('Name (e.g. Work)').fill('Work');
   await page.getByRole('button', { name: 'Save current', exact: true }).click();
