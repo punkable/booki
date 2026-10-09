@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import { LAYOUT_SCENARIOS, countContent } from "../dock/layout-model.js";
@@ -19,14 +19,29 @@ export function Dashboard({ cfg, set, navigate, version, onProfile, listProfiles
   const [profiles, setProfiles] = useState([]);
   const [switchingProfile, setSwitchingProfile] = useState(false);
   const [profileError, setProfileError] = useState("");
-  useEffect(() => { let alive = true; listProfiles().then((names) => { if (alive) setProfiles(names || []); }).catch(() => {}); return () => { alive = false; }; }, []);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
+  const [profileAttempt, retryProfiles] = useState(0);
+  const profileSource = useRef(listProfiles); profileSource.current = listProfiles;
+  useEffect(() => {
+    let alive = true;
+    setProfileLoading(true); setProfileLoadFailed(false);
+    Promise.resolve().then(() => profileSource.current()).then((names) => {
+      if (alive) setProfiles(names || []);
+    }).catch(() => {
+      if (alive) setProfileLoadFailed(true);
+    }).finally(() => { if (alive) setProfileLoading(false); });
+    return () => { alive = false; };
+  }, [profileAttempt]);
   const counts = countContent(cfg.pinned);
   return <>
     <PageHeader title={t("overhaul.home")}>{t("overhaul.welcome")}</PageHeader>
     <section className="dashboard-hero" aria-label={t("overhaul.preview")}>
       <div className="dashboard-hero-head"><div><span className="dashboard-eyebrow">Booki · {version ? `v${version}` : "…"}</span>
         <h2>{cfg.lastProfile || t("overhaul.yourDock")}</h2>
-        {profiles.length > 0 && <select disabled={switchingProfile} aria-label={t("tab.profiles")} value={cfg.lastProfile || ""} onChange={async (event) => { setSwitchingProfile(true); try { await onProfile(event.target.value); setProfileError(""); } catch (_) { setProfileError(t("overhaul.failed")); } finally { setSwitchingProfile(false); } }}><option value="" disabled>{t("tab.profiles")}</option>{profiles.map((name) => <option key={name}>{name}</option>)}</select>}
+        {profileLoading && <p className="dashboard-profile-state" role="status">{t("overhaul.loading")}</p>}
+        {profileLoadFailed && <div className="dashboard-profile-state" role="alert"><span>{t("next.profileLoadFailed")}</span><button className="s-btn s-btn-soft" onClick={() => retryProfiles((attempt) => attempt + 1)}>{t("focus.retry")}</button></div>}
+        {!profileLoading && !profileLoadFailed && profiles.length > 0 && <label className="dashboard-profile-choice">{t("tab.profiles")}<select disabled={switchingProfile} value={profiles.includes(cfg.lastProfile) ? cfg.lastProfile : ""} onChange={async (event) => { setSwitchingProfile(true); try { await onProfile(event.target.value); setProfileError(""); } catch (_) { setProfileError(t("overhaul.failed")); } finally { setSwitchingProfile(false); } }}><option value="" disabled>{t("overhaul.yourDock")}</option>{profiles.map((name) => <option key={name}>{name}</option>)}</select></label>}
         {profileError && <p role="alert">{profileError}</p>}</div>
         <button className="s-btn s-btn-soft" onClick={() => navigate("appearance")}>{t("overhaul.personalize")}</button></div>
       <DockPreview cfg={cfg} large onSelect={onSelect} />
@@ -37,7 +52,7 @@ export function Dashboard({ cfg, set, navigate, version, onProfile, listProfiles
       </div>
     </section>
     <div className="dashboard-actions">
-      {[["apps", "plus", "premium.addApps"], ["widgets", "zap", "overhaul.addWidget"], ["profiles", "copy", "tab.profiles"]].map(([tab, glyph, label]) =>
+      {[["apps", "plus", "premium.addApps"], ["widgets", "grid", "overhaul.addWidget"], ["profiles", "copy", "tab.profiles"]].map(([tab, glyph, label]) =>
         <button className="dashboard-action" key={tab} onClick={() => navigate(tab)}><span dangerouslySetInnerHTML={{ __html: icon(glyph) }} /><strong>{t(label)}</strong><span aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("chevron-right") }} /></button>)}
     </div>
     <SettingsSection title={t("overhaul.scenarios")} hint={t("overhaul.scenariosHint")}><ScenarioPicker cfg={cfg} set={set} /></SettingsSection>

@@ -18,7 +18,7 @@ import { WIDGET_ORDER, WIDGET_GLYPHS } from "../widgets-meta.js";
 /** Most rows drawn at once; typing narrows the list long before this matters. */
 const MAX_ROWS = 80;
 
-import { matchScore, appKey, pinnedKeys, candidateSections } from "./app-candidates.js";
+import { matchScore, appKey, pinnedKeys, candidateSections, appCategory } from "./app-candidates.js";
 export { norm, matchScore, baseTitle, pinnedKeys, runningCandidates, installedCandidates, frequentCandidates, rank } from "./app-candidates.js";
 
 
@@ -31,6 +31,7 @@ export { norm, matchScore, baseTitle, pinnedKeys, runningCandidates, installedCa
  * @param {() => Promise<object[]>} deps.listWindows
  * @param {() => Promise<object[]>} deps.listInstalled
  * @param {() => Promise<object[]>} deps.listFrequent   most used apps, most used first
+ * @param {() => void} [deps.invalidateIcons]     retry failed extraction on refresh
  * @param {(path: string) => Promise<string|null>} deps.appIcon
  * @param {(type: string) => string} deps.widgetLabel
  * @param {(type: string) => boolean} deps.widgetPresent
@@ -54,6 +55,8 @@ export function buildAddPanel(root, deps) {
   let identities = {};
   let failures = false;
   let rowLimit = MAX_ROWS;
+  let utilityLimit = MAX_ROWS;
+  let utilitiesOpen = false;
   let loadGeneration = 0;
 
   root.innerHTML = "";
@@ -76,7 +79,7 @@ export function buildAddPanel(root, deps) {
   refresh.title = t("apps.refresh");
   refresh.setAttribute("aria-label", t("apps.refresh"));
   refresh.innerHTML = icon("refresh");
-  refresh.addEventListener("click", () => load());
+  refresh.addEventListener("click", () => { deps.invalidateIcons?.(); load(); });
   head.append(searchWrap, refresh, close);
 
   const tabs = el("div", "add-tabs");
@@ -130,6 +133,7 @@ export function buildAddPanel(root, deps) {
   search.addEventListener("input", () => {
     query = search.value;
     rowLimit = MAX_ROWS;
+    utilityLimit = MAX_ROWS;
     draw();
   });
   search.addEventListener("keydown", (e) => {
@@ -147,10 +151,10 @@ export function buildAddPanel(root, deps) {
   });
 
   function moveActive(step) {
-    const rows = [...body.querySelectorAll(".add-row:not(.pinned), .add-wcell:not(.pinned)")];
+    const rows = [...body.querySelectorAll(".add-row:not(.pinned), .add-wcell:not(.pinned)")].filter(row => row.checkVisibility());
     if (!rows.length) return;
     const cur = rows.findIndex((r) => r.classList.contains("active"));
-    const next = rows[(cur + step + rows.length) % rows.length];
+    const next = rows[cur < 0 ? (step > 0 ? 0 : rows.length - 1) : (cur + step + rows.length) % rows.length];
     rows.forEach((r) => r.classList.remove("active"));
     next.classList.add("active");
     next.scrollIntoView({ block: "nearest" });
@@ -181,9 +185,11 @@ export function buildAddPanel(root, deps) {
       return;
     }
     const sections = candidateSections({ used: frequent, running, groups: installed }, pinnedKeys(deps.pinned(), identities), query, identities);
-    const top = sections.frequent, open = sections.running, all = sections.installed;
+    const top = sections.frequent, open = sections.running;
+    const all = sections.installed.filter(item => appCategory(item, identities) !== 'utilities');
+    const utilities = sections.utilities;
     if (failures) { const note = emptyNote(t("overhaul.partialApps")); note.setAttribute("role", "status"); body.appendChild(note); }
-    if (!top.length && !open.length && !all.length) {
+    if (!top.length && !open.length && !all.length && !utilities.length) {
       body.appendChild(emptyNote(t("add.none")));
       return;
     }
@@ -196,7 +202,7 @@ export function buildAddPanel(root, deps) {
     if (open.length) {
       body.appendChild(label(t("add.running")));
       for (const c of open.slice(0, budget)) body.appendChild(appRow(c));
-      budget -= open.length;
+      budget = Math.max(0, budget - open.length);
     }
     if (all.length && budget > 0) {
       body.appendChild(label(t("add.all")));
@@ -206,7 +212,31 @@ export function buildAddPanel(root, deps) {
       const more = el("button", "add-foot-btn"); more.type = "button"; more.textContent = t("overhaul.loadMore");
       more.addEventListener("click", () => { rowLimit += MAX_ROWS; draw(); }); body.appendChild(more);
     }
+    if (utilities.length) {
+      const fold = el("details", "add-utilities");
+      fold.open = utilitiesOpen || !!query.trim();
+      const summary = el("summary"); summary.textContent = `${t("design.systemApps")} · ${utilities.length}`;
+      fold.append(summary);
+      for (const candidate of utilities.slice(0, utilityLimit)) fold.append(appRow(candidate));
+      if (utilities.length > utilityLimit) {
+        const more = el("button", "add-foot-btn"); more.type = "button"; more.textContent = t("overhaul.loadMore");
+        more.addEventListener("click", () => { utilityLimit += MAX_ROWS; utilitiesOpen = true; draw(); }); fold.append(more);
+      }
+      fold.addEventListener("toggle", () => {
+        if (!fold.isConnected || disposed) return;
+        if (!query.trim()) utilitiesOpen = fold.open;
+        deps.relayout();
+      });
+      body.append(fold);
+    }
     loadIcons();
+  }
+
+  function showSaveError() {
+    if (disposed) return;
+    body.querySelector(".add-error")?.remove();
+    const error = emptyNote(t("overhaul.failed")); error.classList.add("add-error"); error.setAttribute("role", "alert"); body.prepend(error);
+    deps.relayout();
   }
 
   function drawWidgets() {
@@ -225,8 +255,10 @@ export function buildAddPanel(root, deps) {
       markState(cell, pinned);
       cell.addEventListener("click", async () => {
         if (cell.classList.contains("pinned")) return;
+        body.querySelector(".add-error")?.remove();
         cell.disabled = true;
-        try { await deps.addWidget(type); } catch (_) { cell.disabled = false; const error = emptyNote(t("overhaul.failed")); error.setAttribute("role", "alert"); body.prepend(error); return; }
+        try { await deps.addWidget(type); } catch (_) { cell.disabled = false; showSaveError(); return; }
+        if (disposed) return;
         cell.classList.add("pinned");
         markState(cell, true);
       });
@@ -248,8 +280,10 @@ export function buildAddPanel(root, deps) {
     markState(row, c.pinned);
     row.addEventListener("click", async () => {
       if (isAlreadyPinned(c)) return;
+      body.querySelector(".add-error")?.remove();
       row.disabled = true;
-      try { await deps.addPath(c.path); } catch (_) { row.disabled = false; const error = emptyNote(t("overhaul.failed")); error.setAttribute("role", "alert"); body.prepend(error); return; }
+      try { await deps.addPath(c.path); } catch (_) { row.disabled = false; showSaveError(); return; }
+      if (disposed) return;
       c.pinned = true;
       row.classList.add("pinned");
       row.classList.remove("active");
@@ -263,6 +297,7 @@ export function buildAddPanel(root, deps) {
     state.innerHTML = pinned ? `${icon("check")}<span></span>` : icon("plus");
     if (pinned) state.lastChild.textContent = t("add.added");
     node.setAttribute("aria-disabled", String(!!pinned));
+    if (node.classList.contains("add-row")) node.setAttribute("aria-label", `${t(pinned ? "add.added" : "workspace.addApp")}: ${node.querySelector(".add-name").textContent}`);
   }
 
   // Extract icons only for rows scrolled into view.
@@ -278,9 +313,9 @@ export function buildAddPanel(root, deps) {
           deps
             .appIcon(path)
             .then((uri) => {
-              if (!uri) return;
+              if (!uri || disposed || !e.target.isConnected) return;
               const ico = e.target.querySelector(".add-ico");
-              if (ico) ico.replaceChildren(img(uri));
+              if (ico) ico.replaceChildren(img(uri, () => { ico.textContent = (e.target.querySelector(".add-name").textContent[0] || "?").toUpperCase(); }));
             })
             .catch(() => {});
         }
@@ -315,6 +350,7 @@ export function buildAddPanel(root, deps) {
   load();
   return {
     focus: () => { if (!disposed) search.focus(); },
+    refreshPins: draw,
     dispose: () => { disposed = true; loadGeneration++; observer?.disconnect(); },
   };
 }
@@ -324,8 +360,9 @@ function el(tag, className) {
   if (className) node.className = className;
   return node;
 }
-function img(src) {
+function img(src, onError) {
   const i = document.createElement("img");
+  i.addEventListener("error", onError, { once: true });
   i.src = src;
   i.alt = "";
   i.draggable = false;

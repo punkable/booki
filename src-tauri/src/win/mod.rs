@@ -21,6 +21,8 @@ pub struct WindowInfo {
 #[cfg(windows)]
 pub mod material;
 #[cfg(windows)]
+pub mod platform;
+#[cfg(windows)]
 pub mod system_events;
 #[cfg(windows)]
 mod windows_impl;

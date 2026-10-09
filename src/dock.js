@@ -21,6 +21,7 @@ import {
   logMessage,
   isTauri,
 } from "./api.js";
+import { createDockTooltip, setTileLabel } from "./dock/tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
 import { buildProductivityPanel } from "./dock/productivity-panel.js";
 import { createDraftSaver } from "./dock/draft-saver.js";
@@ -114,12 +115,23 @@ function hideUndoToast() {
   if (undoToast) undoToast.innerHTML = "";
 }
 
+function placeUndoToast() {
+  if (!cfg || !undoToast || undoToast.classList.contains("hidden")) return;
+  const { left, top } = placeBesideBar({
+    bar: dockEl.getBoundingClientRect(),
+    box: { width: undoToast.offsetWidth, height: undoToast.offsetHeight },
+    edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12, pad: 8,
+  });
+  undoToast.style.left = `${left}px`; undoToast.style.top = `${top}px`;
+}
+
 function showUndoToast(item, index) {
   if (!undoToast) return;
   clearTimeout(undoRemovalTimer);
   undoRemoval = { item: structuredClone(item), index };
   undoToast.innerHTML = `<span>${esc(item.name || baseName(item.path || "Booki"))}</span><button type="button">${esc(t("act.undo"))}</button>`;
   undoToast.classList.remove("hidden");
+  placeUndoToast();
   undoToast.querySelector("button")?.addEventListener("click", undoLastRemoval, { once: true });
   undoRemovalTimer = setTimeout(hideUndoToast, 5000);
 }
@@ -231,11 +243,16 @@ function maybeSyncCtxMenu() {
   if (cfg && ctxGroupsSig(cfg) !== lastCtxSig) syncCtxMenu();
 }
 
+let configReloadGeneration = 0;
 async function reloadConfig() {
+  const request = ++configReloadGeneration;
+  const next = await configApi.get();
+  if (request !== configReloadGeneration) return;
   const prev = cfg;
-  cfg = await configApi.get();
+  cfg = next;
   // If the language changed, make sure its dictionary is loaded before re-render.
   if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
+  if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
   if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
   // Notch visibility / style changes the stacked clearance for the dock bar.
@@ -262,8 +279,10 @@ async function reloadConfig() {
   const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
   if (pinsChanged) {
     // Stale flyout handlers hold old children — close rather than lie.
-    if (stackOpen) closeStack();
+    const keepCatalog = stackOpen && stackItemId === "__add";
+    if (stackOpen && !keepCatalog) closeStack();
     await render();
+    if (keepCatalog) stackRefreshPins?.();
   } else {
     fitDock();
   }
@@ -323,6 +342,7 @@ function applyAll() {
   }
   applyTheme(cfg);
   applyEdge(cfg);
+  document.body.classList.toggle("hide-running-indicators", cfg.showIndicators === false);
   // The stage window spans the whole edge; the BAR aligns to the notch's
   // along-edge slot with CSS (the window itself no longer travels).
   const slot = cfg.notchPosition === "start" ? "start" : cfg.notchPosition === "end" ? "end" : "center";
@@ -382,7 +402,7 @@ function persist(patch = {}, { showError = true } = {}) {
   return pending;
 }
 async function performPersist(patch, showError) {
-  // Keep dissolve rules consistent with Settings (empty / 1-child groups).
+  // Keep named group containers intact, including empty and single-item groups.
   cfg.pinned = normalizeGroups(cfg.pinned);
   const changes = { pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch };
   try {
@@ -399,6 +419,7 @@ async function performPersist(patch, showError) {
       hideUndoToast();
       undoToast.innerHTML = `<span>${esc(t(conflict ? "workspace.conflict" : "status.saveError"))}</span><button type="button">${esc(t(conflict ? "workspace.keepMine" : "focus.retry"))}</button>`;
       undoToast.classList.remove("hidden");
+      placeUndoToast();
       const retryButton = undoToast.querySelector("button");
       retryButton?.addEventListener("click", async () => {
         retryButton.disabled = true;
@@ -442,12 +463,15 @@ function cacheWidgetEls() {
 // Remember which ids were on the bar last render, so only genuinely NEW tiles
 // animate in (not every tile on an unrelated re-render).
 let lastRenderIds = new Set();
+let renderGeneration = 0;
 
 async function render() {
+  const generation = ++renderGeneration;
+  const snapshot = cfg;
   // Build every tile in parallel and swap the whole bar in ONE DOM operation —
   // no icons popping in one by one, no empty-bar flash between renders.
   const tiles = await Promise.all(
-    cfg.pinned.map((item) => {
+    snapshot.pinned.map((item) => {
       if (item.kind === "separator") return separatorTile(item);
       if (item.kind === "group") return groupTile(item);
       if (item.kind === "widget") return widgetTile(item);
@@ -456,6 +480,7 @@ async function render() {
       return appTile(item);
     })
   );
+  if (generation !== renderGeneration || cfg !== snapshot) return;
   // Fade+scale in only the tiles that weren't on the bar before.
   const prevIds = lastRenderIds;
   for (const el of tiles) {
@@ -533,7 +558,7 @@ function fitDock() {
 function actionTile(item) {
   const el = document.createElement("button"); el.className = "tile action-tile";
   const label = item.name && item.name !== "Booki" ? item.name : t("m.settings");
-  el.dataset.id = item.id; el.title = label; el.setAttribute("aria-label", label);
+  el.dataset.id = item.id; setTileLabel(el, label);
   el.style.setProperty("--size", `${baseSize()}px`);
   const fallback = () => { const glyph = document.createElement("span"); glyph.className = "action-icon"; glyph.innerHTML = icon("settings"); el.appendChild(glyph); };
   if (item.icon) {
@@ -553,9 +578,8 @@ function appTile(item) {
   el.className = "tile";
   el.dataset.id = item.id;
   el.style.setProperty("--size", `${baseSize()}px`);
-  // Native OS tooltip — shows the name OUTSIDE the (bar-sized Mica) window with
-  // no clipping, the Windows-native way.
-  el.title = item.name;
+  // Accessible name is independent of the custom hover/focus hint.
+  setTileLabel(el, item.name);
 
   const label = document.createElement("span");
   label.className = "label";
@@ -624,7 +648,7 @@ function groupTile(item) {
   el.className = "tile group";
   el.dataset.id = item.id;
   el.style.setProperty("--size", `${baseSize()}px`);
-  el.title = item.name || "";
+  setTileLabel(el, item.name || t("group.new"));
 
   const grid = document.createElement("span");
   grid.className = "group-grid";
@@ -656,6 +680,14 @@ function groupTile(item) {
       }
     }
     grid.appendChild(mini);
+  }
+  if (!kids.length) grid.innerHTML = icon("grid");
+  if (item.icon) {
+    const fallback = [...grid.childNodes];
+    const cover = document.createElement("img"); cover.className = "group-cover"; cover.alt = "";
+    cover.addEventListener("error", () => grid.replaceChildren(...fallback), { once: true });
+    cover.src = isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon;
+    grid.replaceChildren(cover);
   }
   el.appendChild(grid);
 
@@ -691,7 +723,7 @@ function trashTile(item) {
   el.className = "tile trash";
   el.dataset.id = item.id;
   el.style.setProperty("--size", `${baseSize()}px`);
-  el.title = t("trash.name");
+  setTileLabel(el, t("trash.name"));
   el.innerHTML =
     `<span class="label">${t("trash.name")}</span>` +
     `<span class="badge trash-count"></span>` +
@@ -709,7 +741,7 @@ async function refreshTrashState(el) {
   tile.classList.toggle("full", count > 0);
   const badge = tile.querySelector(".trash-count");
   if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
-  tile.title = count > 0 ? `${t("trash.name")} · ${count}` : t("trash.name");
+  setTileLabel(tile, count > 0 ? `${t("trash.name")} · ${count}` : t("trash.name"));
 }
 
 function separatorTile(item) {
@@ -752,7 +784,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (st.animated) el.classList.add("animated");
   if (st.icon === false) el.classList.add("no-ico");
   el.style.setProperty("--size", `${baseSize()}px`);
-  el.title = widgetLabel(type);
+  setTileLabel(el, widgetLabel(type));
   if (LIVE_WIDGETS.includes(type)) el.setAttribute("aria-live", "polite");
 
   const card = document.createElement("span");
@@ -815,7 +847,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
     setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
-    el.title = st.note ? `${t("w.notes")} — ${st.note}` : widgetLabel("notes");
+    setTileLabel(el, widgetLabel("notes"));
   }
   if (type === "clipboard") {
     el.querySelector(".w-pv-title").textContent = t("w.clipboard");
@@ -875,7 +907,7 @@ function tickProductivity() {
       }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
     }
     setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(style.units === "fahrenheit" ? cached.value.temperature_2m * 9 / 5 + 32 : cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
-    el.title = `${style.city || t("w.weather")} · Open-Meteo`;
+    setTileLabel(el, `${style.city || t("w.weather")} · Open-Meteo`);
   });
 }
 let productivityPanel = null;
@@ -885,7 +917,23 @@ function closeProductivityPanel() {
 }
 function openProductivity(item, tile) {
   closeProductivityPanel();
-  const panel = buildProductivityPanel(item, { save: async () => { if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved"); tickProductivity(); }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel });
+  const panel = buildProductivityPanel(item, {
+    save: async (draft, previous) => {
+      // Recovery replaces cfg objects. Resolve the live pin by stable id on
+      // every edit, retaining unrelated appearance changes from Settings.
+      const live = findPinnedById(draft.id);
+      if (!live || live.kind !== "widget" || live.widget !== draft.widget) throw Object.assign(new Error("widget no longer exists"), { code: "WIDGET_UNAVAILABLE" });
+      const next = { ...(live.style || {}) };
+      for (const key of new Set([...Object.keys(previous || {}), ...Object.keys(draft.style || {})])) {
+        if (JSON.stringify(previous?.[key]) === JSON.stringify(draft.style?.[key])) continue;
+        if (draft.style?.[key] === undefined) delete next[key]; else next[key] = structuredClone(draft.style[key]);
+      }
+      live.style = next;
+      if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved");
+      draft.style = structuredClone(findPinnedById(draft.id)?.style || next);
+      tickProductivity();
+    }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
+  });
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
   const place = () => {
@@ -967,7 +1015,7 @@ const pollMedia = singleFlight(async () => {
       return;
     }
     setMediaText(el, m.artist || t("w.media"), m.title || "—");
-    el.title = `${m.title} — ${m.artist}`;
+    setTileLabel(el, `${m.title} — ${m.artist}`);
     el.classList.toggle("playing", !!m.playing);
     if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
     if (art && m.thumb) {
@@ -1049,11 +1097,7 @@ function renderClipboardSummary(count, preview) {
     setPreviewSubText(el, shown, !preview);
     const badge = el.querySelector(".w-pv-count");
     if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
-    // The tooltip carries the preview snippet too: in a vertical dock the card
-    // collapses to icon+badge, so el.title is the only glanceable content.
-    el.title = preview
-      ? `${t("clip.countHint").replace("{n}", count)} — ${dockPreviewSnippet(preview, 120)}`
-      : t("clip.empty");
+    setTileLabel(el, widgetLabel("clipboard"));
   });
 }
 const pollClipboard = singleFlight(async () => {
@@ -1127,11 +1171,12 @@ function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(nativeSu
 function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(nativeSupport, "volume", 4000); if (!hiddenState) pollVolume(); }
 function refreshClipboard() { pollDue.clipboard = 0; if (!hiddenState) pollClipboard(); }
 
-async function addWidget(type) {
+async function addWidget(type, { showError = true } = {}) {
   cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
-  if (!(await persist())) return;
+  if (!(await persist({}, { showError }))) return false;
   await render();
   reframe();
+  return true;
 }
 
 // Pinned pictures show their own thumbnail instead of a generic file icon.
@@ -1185,7 +1230,7 @@ async function editNote(item) {
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
   const panel = document.createElement("section");
-  panel.className = "note-editor note-workspace";
+  panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
   const head = document.createElement("div"); head.className = "productivity-head";
   const title = document.createElement("strong"); title.textContent = t("w.notes");
@@ -1196,20 +1241,58 @@ async function editNote(item) {
   const footer = document.createElement("div"); footer.className = "note-save-state";
   const status = document.createElement("span"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.textContent = t("status.saved");
   const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
+  let recoveryPending = true;
+  let retryLoad = null;
   const saver = createDraftSaver(async (text) => {
+    // Journal first: a failed configuration write still leaves a recoverable
+    // encrypted local copy. Clear only the matching text after durable save.
+    await dockApi.writeNoteDraft(item.id, text);
     const current = findWidgetPin(item.id);
-    if (!current) return false;
+    if (!current || current.widget !== "notes") return false;
     current.style = { ...(current.style || {}), note: text };
     if (!(await persist({}, { showError: false }))) return false;
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
       setPreviewSubText(el, text || t("w.notesEmpty"), !text);
-      el.title = text ? `${t("w.notes")} — ${text}` : widgetLabel("notes");
+      setTileLabel(el, widgetLabel("notes"));
     });
+    await dockApi.clearNoteDraft(item.id, text);
     return true;
   }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; });
-  panel.flush = saver.flush; panel.dispose = saver.cancelTimer;
-  retry.addEventListener("click", () => { ta.focus(); saver.flush(); }); footer.append(status, retry); panel.append(head, ta, footer);
+  panel.flush = () => recoveryPending ? Promise.resolve(true) : saver.flush(); panel.dispose = saver.cancelTimer;
+  retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } }); footer.append(status, retry); panel.append(head, ta, footer);
+  ta.disabled = true;
+  const loadRecovery = async () => {
+    retry.hidden = true; status.textContent = t("overhaul.loading");
+    try {
+      const recovered = await dockApi.readNoteDraft(item.id);
+      if (noteEditor !== panel) return;
+      if (recovered != null && recovered !== ta.value) {
+        const recovery = document.createElement("div"); recovery.className = "note-recovery";
+        recovery.setAttribute("role", "status");
+        const message = document.createElement("p"); message.textContent = t("notes.recoveryFound"); recovery.append(message);
+        const preview = document.createElement("div"); preview.className = "note-recovery-preview"; preview.textContent = recovered || t("w.notesEmpty"); recovery.append(preview);
+        const restore = document.createElement("button"); restore.type = "button"; restore.className = "productivity-button"; restore.textContent = t("notes.restoreDraft");
+        const discard = document.createElement("button"); discard.type = "button"; discard.className = "productivity-button"; discard.textContent = t("notes.discardDraft");
+        const resume = () => { recovery.remove(); recoveryPending = false; retryLoad = null; ta.disabled = false; ta.focus(); status.textContent = t("status.saved"); };
+        restore.addEventListener("click", () => { ta.value = recovered; resume(); saver.change(recovered); });
+        discard.addEventListener("click", async () => {
+          restore.disabled = discard.disabled = true;
+          try { await dockApi.clearNoteDraft(item.id, recovered); if (noteEditor === panel) resume(); }
+          catch { status.textContent = t("status.saveError"); restore.disabled = discard.disabled = false; }
+        });
+        recovery.append(restore, discard); panel.insertBefore(recovery, ta);
+        status.textContent = t("notes.recoveryFound"); retryLoad = null; restore.focus();
+      } else {
+        if (recovered != null) await dockApi.clearNoteDraft(item.id, recovered);
+        if (noteEditor !== panel) return;
+        recoveryPending = false; retryLoad = null; ta.disabled = false; status.textContent = t("status.saved"); ta.focus();
+      }
+    } catch {
+      if (noteEditor !== panel) return;
+      status.textContent = t("status.saveError"); retry.hidden = false; retryLoad = loadRecovery;
+    }
+  };
   ta.addEventListener("input", () => saver.change(ta.value));
   panel.addEventListener("keydown", async (event) => {
     event.stopPropagation();
@@ -1221,6 +1304,7 @@ async function editNote(item) {
     requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
   });
   document.body.appendChild(panel); noteEditor = panel; pinnedReveal = true; applyFrame();
+  loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
     const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
@@ -1228,7 +1312,7 @@ async function editNote(item) {
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); ta.focus(); });
+  requestAnimationFrame(() => { place(); if (ta.disabled) panel.focus(); else ta.focus(); });
 }
 
 // ─────────────────────────── Launch ───────────────────────────
@@ -1296,7 +1380,7 @@ function isRecycleBin(path) {
   );
 }
 
-async function addPaths(paths, forceKind, atIndex = null) {
+async function addPaths(paths, forceKind, atIndex = null, { showError = true } = {}) {
   const items = [];
   for (const path of paths) {
     if (isRecycleBin(path)) {
@@ -1317,9 +1401,10 @@ async function addPaths(paths, forceKind, atIndex = null) {
   // Land exactly where the insertion gap showed during the drag (null = end).
   if (atIndex == null || atIndex >= cfg.pinned.length) cfg.pinned.push(...items);
   else cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
-  if (!(await persist())) return;
+  if (!(await persist({}, { showError }))) return false;
   await render();
   reframe();
+  return true;
 }
 
 function baseName(path) {
@@ -2147,7 +2232,7 @@ function renamePinnedItem(item, name, { commit = false } = {}) {
   item.name = cfg.pinned[gi].name;
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (tile) {
-    tile.title = commit ? next : (name || fallback);
+    setTileLabel(tile, commit ? next : (name || fallback));
     const lab = tile.querySelector(".label");
     if (lab) lab.textContent = commit ? next : (name || fallback);
   }
@@ -2234,8 +2319,7 @@ async function ungroup(group) {
   reframe();
 }
 
-// Take one item out of a folder → back to the dock (auto-dissolves a folder that
-// would be left with a single item). Re-opens the folder if it survives.
+// Move one member back to the dock and reopen its preserved group.
 async function takeOutChild(group, childId) {
   const { pinned, reopenId } = takeOutOfGroup(cfg.pinned, group.id, childId);
   cfg.pinned = pinned;
@@ -2816,6 +2900,7 @@ if (typeof ResizeObserver !== "undefined") {
   let lastRoH = 0;
   new ResizeObserver(() => {
     placeUpdatePill();
+    placeUndoToast();
     const w = dockEl.offsetWidth;
     const h = dockEl.offsetHeight;
     // Ignore 1–3px widget text jitter — only reframe when the bar really grew.
@@ -3323,6 +3408,7 @@ new MutationObserver((mutations) => {
   attributeFilter: ["class", "style"],
 });
 window.addEventListener("resize", scheduleHitReport);
+window.addEventListener("resize", placeUndoToast);
 setInterval(() => {
   if (!hiddenState) reportHitRects();
 }, 5000);
@@ -3620,96 +3706,25 @@ function setDropTarget(el) {
   if (el) el.classList.add("drop-target");
 }
 
-// ─────────────────────── Custom tooltips ───────────────────────
-// A Booki-styled tooltip (acrylic, soft fade) shown on hover, replacing the OS
-// tooltip. Only when tile labels are hidden — otherwise the name is already
-// visible under the icon. We stash the native title while hovering so the OS
-// one never double-shows, and restore it (for accessibility) on leave.
-const tipEl = document.createElement("div");
-tipEl.className = "dock-tip";
-tipEl.setAttribute("role", "tooltip");
-document.body.appendChild(tipEl);
-let tipTile = null;
-let tipTimer = 0;
-
-function tipName(el) {
-  const label = el.querySelector(".label");
-  return (label && label.textContent) || el.getAttribute("title") || "";
-}
-
-function showTip(el) {
-  const name = tipName(el);
-  if (!name) return;
-  // Measure while still hidden (opacity:0, but laid out) so we can decide whether
-  // it fits BEFORE committing to it.
-  tipEl.textContent = name;
-  const r = el.getBoundingClientRect();
-  const gap = 10;
-  const tw = tipEl.offsetWidth;
-  const th = tipEl.offsetHeight;
-  let x, y;
-  if (cfg.edge === "left") {
-    x = r.right + gap;
-    y = r.top + r.height / 2 - th / 2;
-  } else if (cfg.edge === "right") {
-    x = r.left - gap - tw;
-    y = r.top + r.height / 2 - th / 2;
-  } else if (cfg.edge === "top") {
-    x = r.left + r.width / 2 - tw / 2;
-    y = r.bottom + gap;
-  } else {
-    x = r.left + r.width / 2 - tw / 2;
-    y = r.top - gap - th;
-  }
-  // The dock window is only the bar + a small shadow-pad margin, so a wide tip
-  // (long name, or a slim vertical bar) can't fit inside the webview and would be
-  // clipped. When it doesn't fit, bail and let the native OS tooltip show instead
-  // (its title is still on the tile), so the name is never cut off or invisible.
-  const m = 4;
-  const fits =
-    x >= m && y >= m && x + tw <= window.innerWidth - m && y + th <= window.innerHeight - m;
-  if (!fits) return;
-  // Committing: suppress the OS tooltip (stash its title) and show ours.
-  const nativeTitle = el.getAttribute("title");
-  if (nativeTitle != null) {
-    el._tip = nativeTitle;
-    el.removeAttribute("title");
-  }
-  tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-  tipEl.classList.add("show");
-}
-
-function hideTip() {
-  clearTimeout(tipTimer);
-  tipTimer = 0;
-  if (tipTile) {
-    // Restore the native title we stashed for screen readers.
-    if (tipTile._tip != null) {
-      tipTile.setAttribute("title", tipTile._tip);
-      tipTile._tip = null;
-    }
-    tipTile = null;
-  }
-  tipEl.classList.remove("show");
-}
-
-dockEl.addEventListener("pointerover", (e) => {
-  if (document.body.classList.contains("show-labels")) return; // name already shown
-  if (editMode || dragging) return;
-  const el = e.target.closest && e.target.closest(".tile[data-id]");
-  if (!el || el === tipTile) return;
-  if (el.classList.contains("separator")) return;
-  hideTip();
-  tipTile = el;
-  // Don't touch the native title yet — showTip removes it only if the custom tip
-  // actually fits, otherwise the OS tooltip stays as the reliable fallback.
-  tipTimer = setTimeout(() => showTip(el), 340);
+// ─────────────────────── Booki tooltips ───────────────────────
+const dockTooltip = createDockTooltip(dockEl, {
+  edge: () => cfg.edge,
+  blocked: () => editMode || !!dragging || hiddenState || stackOpen || !ctxMenu.classList.contains("hidden"),
+  describe: (el) => {
+    const pin = cfg.pinned.find(item => item.id === el.dataset.id);
+    if (!pin) return null;
+    let name = pin.name || el.getAttribute("aria-label");
+    let detail = t("hint.launch");
+    if (pin.kind === "group") detail = t((pin.children || []).length === 1 ? "hint.groupSingle" : "hint.group").replace("{n}", (pin.children || []).length);
+    else if (pin.kind === "folder") detail = t("hint.folder");
+    else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = t("hint.widget"); }
+    else if (pin.kind === "action") { name = el.getAttribute("aria-label"); detail = t("hint.settings"); }
+    else if (pin.kind === "trash") detail = t("hint.trash");
+    else if (el.dataset.running === "true") detail = t(cfg.focusIfRunning ? "hint.switch" : "hint.running");
+    return { name, detail };
+  },
 });
-dockEl.addEventListener("pointerout", (e) => {
-  const to = e.relatedTarget;
-  if (tipTile && (!to || !tipTile.contains(to))) hideTip();
-});
-dockEl.addEventListener("pointerdown", hideTip, true);
+function hideTip() { dockTooltip.hide(); }
 
 // ─────────────────────── Trash confirmation ───────────────────────
 // A small in-dock popover: nothing is ever deleted without an explicit yes.
@@ -4033,10 +4048,7 @@ function startRunningPoll() {
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
     if (refreshTrash && dockEl.querySelector(".tile.trash")) refreshTrashState();
-    if (cfg.showIndicators === false) {
-      dockEl.querySelectorAll(".tile[data-id]").forEach((t) => (t.dataset.running = "false"));
-      return;
-    }
+    // Running state powers switching and hints independently of visible dots.
     // Nothing that could be "running" is pinned (only widgets/trash/separators) →
     // skip enumerating every window (which now also resolves each process's exe).
     if (!cfg.pinned.some((p) => p.kind === "app" || p.kind === "folder" || p.kind === "group")) {
@@ -4153,6 +4165,22 @@ async function openStack(tileEl, item) {
   let navigateFolder = null;
   let folderTitle = null;
   let backButton = null;
+  let breadcrumbs = null;
+  const renderBreadcrumbs = () => {
+    if (!breadcrumbs) return;
+    breadcrumbs.replaceChildren();
+    const trail = folderNavigation.trail;
+    trail.forEach((entry, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = entry.name || entry.path;
+      button.title = entry.path;
+      if (index === trail.length - 1) button.setAttribute("aria-current", "location");
+      else button.addEventListener("click", () => navigateFolder?.(folderNavigation.goTo(index), false));
+      breadcrumbs.appendChild(button);
+    });
+    breadcrumbs.lastElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
   const seq = ++stackSeq;
   stackItemId = item.id;
   stackEl.innerHTML = "";
@@ -4206,6 +4234,7 @@ async function openStack(tileEl, item) {
     const openDir = document.createElement("button");
     openDir.className = "stack-close stack-opendir";
     openDir.title = t("stack.openExplorer");
+    openDir.setAttribute("aria-label", t("stack.openExplorer"));
     openDir.innerHTML = icon("external");
     openDir.addEventListener("click", () => {
       dockApi.launch(folderNavigation.current.path, []);
@@ -4216,10 +4245,18 @@ async function openStack(tileEl, item) {
   const close = document.createElement("button");
   close.className = "stack-close";
   close.title = t("stack.close");
+  close.setAttribute("aria-label", t("stack.close"));
   close.innerHTML = icon("x");
   close.addEventListener("click", closeStack);
   head.appendChild(close);
   stackEl.appendChild(head);
+  if (!isGroup) {
+    breadcrumbs = document.createElement("nav");
+    breadcrumbs.className = "stack-breadcrumbs";
+    breadcrumbs.setAttribute("aria-label", t("m.folder"));
+    stackEl.appendChild(breadcrumbs);
+    renderBreadcrumbs();
+  }
   const grid = document.createElement("div");
   grid.className = "stack-grid";
   const fillGrid = (items) => {
@@ -4393,23 +4430,42 @@ async function openStack(tileEl, item) {
     let page = 0;
     let request = 0;
     const pageSize = 24;
+    let queryTimer = null;
+    const toolbar = document.createElement("div"); toolbar.className = "stack-folder-tools";
+    const search = document.createElement("input"); search.type = "search"; search.maxLength = 256;
+    search.className = "stack-folder-search"; search.placeholder = t("integral.searchFolder"); search.setAttribute("aria-label", t("integral.searchFolder"));
+    const order = document.createElement("select"); order.className = "stack-folder-sort"; order.setAttribute("aria-label", t("integral.sortFolder"));
+    for (const [value,key] of [["name","integral.sortName"],["name-desc","integral.sortNameDescending"],["modified","integral.sortModified"]]) {
+      const option = document.createElement("option"); option.value = value; option.textContent = t(key); order.appendChild(option);
+    }
+    const refresh = document.createElement("button"); refresh.className = "stack-close"; refresh.innerHTML = icon("refresh"); refresh.setAttribute("aria-label",t("apps.refresh")); refresh.title = t("apps.refresh");
+    toolbar.append(search,order,refresh); stackEl.appendChild(toolbar);
+    const shortcut = event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); event.stopPropagation(); search.focus(); search.select(); }
+    };
+    stackEl.addEventListener("keydown",shortcut);
+    stackDispose = () => { clearTimeout(queryTimer); request++; stackEl.removeEventListener("keydown",shortcut); };
     const pager = document.createElement("div");
     pager.className = "stack-pager";
     const loadPage = async (nextPage) => {
+      if (seq !== stackSeq || !stackOpen) return;
       const current = ++request;
-      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.disabled]);
+      grid.setAttribute("aria-busy","true");
+      const previousFocus = pager.contains(document.activeElement) ? document.activeElement?.dataset.pageAction : null;
+      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.dataset.logicalDisabled === "true"]);
       buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
-        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1);
+        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1, search.value.trim(), order.value);
         if (seq !== stackSeq || !stackOpen || current !== request) return;
         page = nextPage;
         fillGrid((rows || []).slice(0, pageSize));
+        if (!rows?.length && search.value.trim()) grid.querySelector(".stack-empty").textContent = t("integral.noFolderMatches");
         pager.replaceChildren();
         const button = (key, next, disabled) => {
           const b = document.createElement("button");
           b.className = "stack-more";
           b.textContent = t(key);
-          b.disabled = disabled;
+          b.disabled = disabled; b.dataset.logicalDisabled = String(disabled); b.dataset.pageAction = key;
           b.addEventListener("click", () => loadPage(next));
           pager.appendChild(b);
         };
@@ -4420,6 +4476,10 @@ async function openStack(tileEl, item) {
         pager.appendChild(label);
         button("stack.next", page + 1, !rows || rows.length <= pageSize);
         grid.appendChild(pager);
+        if (previousFocus) {
+          const target = [...pager.querySelectorAll("button")].find(button => button.dataset.pageAction === previousFocus && !button.disabled) || pager.querySelector("button:not(:disabled)");
+          target?.focus({preventScroll:true});
+        }
         grid.parentElement.scrollTop = 0;
         applyFrame();
         if (pendingReplace) requestAnimationFrame(pendingReplace);
@@ -4442,14 +4502,24 @@ async function openStack(tileEl, item) {
         failure.append(message, retry);
         grid.prepend(failure);
         applyFrame();
+      } finally {
+        if (current === request && seq === stackSeq && stackOpen) grid.setAttribute("aria-busy","false");
       }
     };
+    search.addEventListener("input", () => { request++; clearTimeout(queryTimer); queryTimer = setTimeout(() => loadPage(0),150); });
+    search.addEventListener("keydown", event => {
+      if (event.key === "Escape" && search.value) { event.preventDefault(); event.stopPropagation(); search.value = ""; clearTimeout(queryTimer); loadPage(0); }
+    });
+    order.addEventListener("change", () => { clearTimeout(queryTimer); loadPage(0); });
+    refresh.addEventListener("click", () => { clearTimeout(queryTimer); loadPage(0); });
     navigateFolder = (entry, push = true) => {
       if (!entry) return;
+      clearTimeout(queryTimer); search.value = "";
       if (push) folderNavigation.enter(entry);
       folderTitle.textContent = folderNavigation.current.name;
       folderTitle.title = folderNavigation.current.path;
       backButton.disabled = !folderNavigation.canGoBack;
+      renderBreadcrumbs();
       grid.replaceChildren();
       const loading = document.createElement("p");
       loading.className = "stack-empty";
@@ -4458,7 +4528,7 @@ async function openStack(tileEl, item) {
       grid.appendChild(loading);
       loadPage(0);
     };
-    loadPage(0);
+    queueMicrotask(() => loadPage(0));
   }
   stackEl.appendChild(grid);
 
@@ -4526,7 +4596,7 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
   stackItemId = "__add";
   stackEl.classList.add("add-mode");
   stackEl.setAttribute("aria-label", t("add.title"));
-  const place = () => placeStackNear(anchorEl);
+  const place = () => placeStackNear(anchorEl?.isConnected ? anchorEl : dockEl);
   const panel = buildAddPanel(stackEl, {
     t,
     tab,
@@ -4536,16 +4606,18 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
     listFrequent: () => cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(50).then((apps) => apps.filter((a) => !(cfg.ignoredAppSuggestions || []).includes(a.path.replaceAll("\\", "/").toLowerCase()))),
     identities: (paths) => dockApi.appIdentities(paths),
     appIcon: (path) => dockApi.appIcon(path),
+    invalidateIcons: () => dockApi.invalidateIcons(),
     widgetLabel,
     widgetPresent,
-    addPath: (path) => addPaths([path]),
-    addWidget,
+    addPath: async (path) => { if (!(await addPaths([path], undefined, null, { showError: false }))) throw new Error("app save failed"); },
+    addWidget: async (type) => { if (!(await addWidget(type, { showError: false }))) throw new Error("widget save failed"); },
     browseFile: () => { closeStack(); onAddApp(); },
     browseFolder: () => { closeStack(); onAddFolder(); },
     close: closeStack,
     relayout: () => requestAnimationFrame(place),
   });
   stackDispose = panel.dispose;
+  stackRefreshPins = panel.refreshPins;
   stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
@@ -4563,11 +4635,13 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
 
 let stackCloseTimer = null;
 let stackDispose = null;
+let stackRefreshPins = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
   stackDispose?.();
   stackDispose = null;
+  stackRefreshPins = null;
   stackItemId = null;
   pendingReplace = null;
   document.body.classList.remove("stack-open");

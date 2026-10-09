@@ -1776,6 +1776,10 @@ body.edge-right .stack.open { transform: none; }
 .stack-head-icon svg { width: 15px; height: 15px; }
 .stack-head-icon img.emo { width: 15px; height: 15px; }
 .stack-title { flex: 1; min-width: 0; font-size: var(--text-md); font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
+.stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: 8px; font: inherit; font-size: var(--text-sm); color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
+.stack-breadcrumbs button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .stack-rename {
   flex: 1; min-width: 0; font: inherit; font-size: var(--text-md); font-weight: 700;
   color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-sm); padding: 4px 8px;
@@ -1997,6 +2001,10 @@ body.edge-right .stack.open { transform: none; }
   font: 600 var(--text-xs) var(--font);
   color: var(--ink-2);
 }
+.add-utilities { border-top: 1px solid var(--stroke); margin-top: 8px; }
+.add-utilities > summary { padding: 10px 6px; color: var(--ink-2); font: 600 var(--text-xs) var(--font); cursor: pointer; }
+.add-utilities > summary:hover { color: var(--ink); }
+.add-utilities > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-sm); }
 .add-row {
   width: 100%;
   display: flex;
@@ -2049,7 +2057,7 @@ body.edge-right .stack.open { transform: none; }
   color: var(--ink-2);
 }
 .add-state svg { width: 15px; height: 15px; }
-.add-row:not(.pinned) .add-state { opacity: 0; transition: opacity var(--dur-1) var(--ease); }
+.add-row:not(.pinned) .add-state { opacity: .6; transition: opacity var(--dur-1) var(--ease); }
 .add-row:not(.pinned):hover .add-state, .add-row.active .add-state { opacity: 1; color: var(--ink); }
 .add-skel { pointer-events: none; opacity: 0.5; }
 .add-skel::before {
@@ -2317,28 +2325,24 @@ body.edge-right .stack.open { transform: none; }
 /* Booki-styled hover tooltip (replaces the OS one). Positioned via transform
    from JS; fades in softly. */
 .dock-tip {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 60;
-  max-width: 260px;
-  padding: 5px 10px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
-  color: var(--ink);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-sm);
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
-  pointer-events: none;
-  opacity: 0;
+  position: fixed; top: 0; left: 0; z-index: 60;
+  display: flex; align-items: center; gap: 10px;
+  width: max-content; max-width: min(300px, calc(100vw - 16px));
+  padding: 10px 12px; font-size: var(--text-sm); line-height: 1.4;
+  color: var(--ink); background: var(--layer-strong);
+  border: 1px solid var(--stroke); border-radius: 12px;
+  box-shadow: 0 4px 16px rgb(0 0 0 / .1);
+  pointer-events: none; opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
+.dock-tip-content { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.dock-tip-content strong { font-weight: 600; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.dock-tip-detail { font-size: var(--text-xs); color: var(--ink-2); margin-top: 2px; }
+.dock-tip-mark { flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
+.dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
+.dock-tip-mark svg { width: 22px; height: 22px; }
 .dock-tip.show { opacity: 1; }
+body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; }
 @media (prefers-reduced-motion: reduce) { .dock-tip { transition: none; } }
 
 /* ───────────────────────── Context menu ───────────────────────── */
@@ -2385,13 +2389,13 @@ body.edge-right .stack.open { transform: none; }
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   backdrop-filter: blur(18px) saturate(150%);
   font: 600 var(--text-sm) var(--font);
-  transform: translate(-50%, 0);
-  left: 50%;
-  bottom: 18px;
+  transform: none;
+  left: 0;
+  top: 0;
   transition: opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease);
 }
 @starting-style {
-  .undo-toast { opacity: 0; transform: translate(-50%, 6px) scale(0.97); }
+  .undo-toast { opacity: 0; transform: translateY(6px) scale(0.97); }
 }
 
 .undo-toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4053,3 +4057,18 @@ body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.no
 
 .tile .action-icon { display: flex; align-items: center; justify-content: center; width: 82%; height: 82%; pointer-events: none; }
 .tile .action-icon svg { width: 76%; height: 76%; }
+
+.stack-folder-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.stack-folder-search { flex: 1 1 150px; min-width: 0; width: 100%; }
+.stack-folder-sort { flex: 0 1 130px; max-width: 100%; }
+.stack-folder-search, .stack-folder-sort { min-height: 34px; padding: 6px 9px; border: 1px solid var(--stroke); border-radius: 8px; font: inherit; font-size: var(--text-sm); color: var(--ink); background: var(--layer-strong); }
+.stack-folder-sort option { color: var(--ink); background: var(--bg); }
+.stack-folder-tools :is(input,select,button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stack-grid[aria-busy="true"] { opacity: .65; }
+
+/* Hiding the dots never disables the launcher/switcher or cached app hints. */
+body.hide-running-indicators .tile[data-running="true"]::after,
+body.hide-running-indicators .stack-item[data-running="true"]::after { display: none; }
+
+.tile.group .group-grid > svg { width: 58%; height: 58%; color: var(--ink-2); }
+.tile.group .group-cover { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }

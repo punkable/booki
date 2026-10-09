@@ -88,10 +88,16 @@ let demoClipboard = [
   { id: 2, text: "https://example.com/informe-final.pdf", ts: Date.now() - 60000 },
   { id: 1, text: "Reunión de equipo — jueves 10:00", ts: Date.now() - 300000 },
 ];
+const demoDeletedProfiles = {};
 let demoProfiles = { Trabajo: structuredClone(DEMO_CONFIG) };
 
+const mockNoteDrafts = new Map();
 async function mockInvoke(cmd, args) {
   switch (cmd) {
+    case "read_note_draft": return mockNoteDrafts.get(args.id) ?? null;
+    case "write_note_draft": mockNoteDrafts.set(args.id, args.text); return null;
+    case "clear_note_draft": if (mockNoteDrafts.get(args.id) === args.expected) mockNoteDrafts.delete(args.id); return null;
+
     case "get_config":
       return structuredClone(demoConfig);
     case "save_config":
@@ -157,12 +163,16 @@ async function mockInvoke(cmd, args) {
     case "clipboard_clear":
       demoClipboard = [];
       return null;
-    case "list_dir":
-      return [
+    case "list_dir": {
+      const terms = (args.query || "").toLowerCase().split(/\s+/).filter(Boolean);
+      const rows = [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
         { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
         { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
-      ];
+      ].filter(row => terms.every(term => row.name.toLowerCase().includes(term)));
+      rows.sort((a,b) => Number(b.is_dir)-Number(a.is_dir) || (args.order === "name-desc" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
+      return rows.slice(args.offset || 0, (args.offset || 0) + (args.limit || 80));
+    }
     case "frequent_apps":
       return [];
     case "list_installed_apps":
@@ -235,6 +245,7 @@ async function mockInvoke(cmd, args) {
     case "profile_list":
       return Object.keys(demoProfiles).sort();
     case "profile_save":
+      if (demoProfiles[args.name] && !args.overwrite) throw new Error("BOOKI_PROFILE_EXISTS");
       demoConfig.lastProfile = (args && args.name) || "Perfil";
       demoProfiles[demoConfig.lastProfile] = structuredClone(demoConfig);
       return null;
@@ -242,9 +253,38 @@ async function mockInvoke(cmd, args) {
       demoConfig = structuredClone(demoProfiles[(args && args.name) || ""] || demoConfig);
       demoConfig.lastProfile = (args && args.name) || "";
       return structuredClone(demoConfig);
-    case "profile_delete":
-      delete demoProfiles[(args && args.name) || ""];
+    case "profile_preview": {
+      const config = demoProfiles[args.name];
+      if (!config) throw new Error("Profile not found");
+      return { config: structuredClone(config), recovered: false };
+    }
+    case "profile_rename":
+      if (demoProfiles[args.newName]) throw new Error("BOOKI_PROFILE_EXISTS");
+      demoProfiles[args.newName] = { ...structuredClone(demoProfiles[args.name]), lastProfile: args.newName };
+      delete demoProfiles[args.name];
+      if (demoConfig.lastProfile === args.name) demoConfig.lastProfile = args.newName;
       return null;
+    case "profile_duplicate":
+      if (demoProfiles[args.newName]) throw new Error("BOOKI_PROFILE_EXISTS");
+      demoProfiles[args.newName] = { ...structuredClone(demoProfiles[args.name]), lastProfile: args.newName };
+      return null;
+    case "profile_deleted":
+      return Object.entries(demoDeletedProfiles).map(([token, record]) => ({ token, name: record.name }));
+    case "profile_restore": {
+      const record = demoDeletedProfiles[args.token];
+      if (!record) throw new Error("BOOKI_PROFILE_INVALID_RECOVERY");
+      if (demoProfiles[record.name]) throw new Error("BOOKI_PROFILE_EXISTS");
+      demoProfiles[record.name] = record.config;
+      delete demoDeletedProfiles[args.token];
+      return record.name;
+    }
+    case "profile_delete": {
+      const name = args.name, token = String(Date.now());
+      if (!demoProfiles[name]) throw new Error("Profile not found");
+      demoDeletedProfiles[token] = { name, config: demoProfiles[name] };
+      delete demoProfiles[name];
+      return token;
+    }
     case "open_location":
     case "set_hotkey":
     case "apply_hotkeys":
@@ -418,6 +458,9 @@ export const dock = {
   launch: (path, args = []) => invoke("launch_app", { path, args }),
   appIcon: (path) => icons.get(path),
   invalidateIcons: () => icons.clear(),
+  readNoteDraft: (id) => invoke("read_note_draft", { id }),
+  writeNoteDraft: (id, text) => invoke("write_note_draft", { id, text }),
+  clearNoteDraft: (id, expected) => invoke("clear_note_draft", { id, expected }),
   quietUpdateSupported: () => invoke("quiet_update_supported"),
   clearUsage: () => invoke("clear_app_usage"),
   appIdentities: (paths) => invoke("app_identities", { paths }),
@@ -526,18 +569,24 @@ export const dock = {
   volumeSet: (pct) => invoke("volume_set", { pct }),
   volumeMute: () => invoke("volume_mute"),
   profileList: () => invoke("profile_list"),
-  profileSave: (name) => invoke("profile_save", { name }),
-  profileApply: (name) => invoke("profile_apply", { name }),
+  profileSave: (name, overwrite = false) => invoke("profile_save", { name, overwrite }),
+  profileApply: (name, expected) => invoke("profile_apply", { name, expected }),
+  profilePreview: (name) => invoke("profile_preview", { name }),
+  profileDuplicate: (name, newName) => invoke("profile_duplicate", { name, newName }),
+  profileRename: (name, newName) => invoke("profile_rename", { name, newName }),
+  profileDeleted: () => invoke("profile_deleted"),
+  profileRestore: (token) => invoke("profile_restore", { token }),
   profileDelete: (name) => invoke("profile_delete", { name }),
   exportDiagnostics: (path) => invoke("export_diagnostics", { path }),
   weatherSearch: (city) => invoke("weather_search", { city }),
   weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
-  importConfig: (path) => invoke("import_config", { path }),
+  importConfig: (path, expected) => invoke("import_config", { path, expected }),
+  previewImport: (path) => invoke("preview_config_import", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
-  listDir: (path, offset = 0, limit = 80) => invoke("list_dir", { path, offset, limit }),
+  listDir: (path, offset = 0, limit = 80, query = "", order = "name") => invoke("list_dir", { path, offset, limit, query, order }),
   relocateShortcut: (id, toDesktop) => invoke("relocate_shortcut", { id, toDesktop }),
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: (refresh = false) => invoke("list_installed_apps", { refresh }),

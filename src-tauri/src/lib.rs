@@ -6,7 +6,12 @@
 mod apps;
 mod clipboard_storage;
 mod config;
+mod config_document;
 mod config_transaction;
+mod directory;
+mod note_journal;
+mod profile_store;
+mod recovery;
 mod shortcuts;
 mod snapshot;
 mod surface_geometry;
@@ -24,6 +29,7 @@ use tauri::{
 };
 
 use config::Config;
+use directory::DirItem;
 use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -110,6 +116,48 @@ static CLIP_STORAGE_FAILED: AtomicBool = AtomicBool::new(false);
 const CLIP_JSON_MAGIC: &[u8] = b"booki-json-v1\n";
 static CLIP_HISTORY: Mutex<Vec<ClipEntry>> = Mutex::new(Vec::new());
 static CLIP_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+#[tauri::command]
+async fn read_note_draft(id: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::read(
+            &config::config_dir(),
+            &id,
+            win::unprotect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn write_note_draft(id: String, text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::write(
+            &config::config_dir(),
+            &id,
+            &text,
+            win::protect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn clear_note_draft(id: String, expected: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        note_journal::clear(
+            &config::config_dir(),
+            &id,
+            &expected,
+            win::unprotect_data,
+            cfg!(windows),
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 fn clip_history_path() -> std::path::PathBuf {
     config::config_dir().join("clipboard-history.dat")
@@ -641,6 +689,87 @@ fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
 /// (`[x, y, w, h, tl, tr, br, bl]`, window-relative CSS px). `tint` is `#RRGGBBAA`.
 /// Returns false where there is no native material (the page keeps its CSS
 /// fallback then). An empty list hides it.
+#[tauri::command]
+fn platform_capabilities() -> serde_json::Value {
+    #[cfg(windows)]
+    {
+        serde_json::to_value(win::platform::capabilities()).unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true })
+    }
+}
+
+#[tauri::command]
+async fn settings_backdrop(
+    app: AppHandle,
+    window: WebviewWindow,
+    enabled: bool,
+    dark: Option<bool>,
+) -> bool {
+    if window.label() != "settings" {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        let native_window = window.clone();
+        let hwnd = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+        let (tx, rx) = std::sync::mpsc::channel();
+        if app
+            .run_on_main_thread(move || {
+                let applied =
+                    win::platform::settings_backdrop(hwnd, enabled, dark.unwrap_or(false));
+                let color = if applied {
+                    tauri::window::Color(0, 0, 0, 0)
+                } else if dark.unwrap_or(false) {
+                    tauri::window::Color(23, 25, 29, 255)
+                } else {
+                    tauri::window::Color(251, 251, 253, 255)
+                };
+                let painted = native_window.set_background_color(Some(color)).is_ok();
+                if !painted && applied {
+                    win::platform::settings_backdrop(hwnd, false, dark.unwrap_or(false));
+                }
+                let _ = tx.send(applied && painted);
+            })
+            .is_err()
+        {
+            return false;
+        }
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(false))
+            .await
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, enabled, dark);
+        false
+    }
+}
+
+#[tauri::command]
+fn config_recovery_status() -> recovery::RecoveryReport {
+    config::recovery_status()
+}
+
+#[tauri::command]
+fn acknowledge_config_recovery() -> Result<(), String> {
+    if config::recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_REQUIRED".into());
+    }
+    config::acknowledge_recovery();
+    Ok(())
+}
+
+#[tauri::command]
+fn start_fresh_config(app: AppHandle) -> Result<Config, String> {
+    if !config::recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_NOT_REQUIRED".into());
+    }
+    apply_config_snapshot(&app, Config::default())
+}
+
 #[tauri::command]
 async fn set_material(
     app: AppHandle,
@@ -1371,30 +1500,35 @@ fn take_pending_tab() -> Option<String> {
 fn export_config(path: String) -> Result<(), String> {
     let cfg = config::load();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
-    std::fs::write(&path, text).map_err(|e| e.to_string())
+    snapshot::write(std::path::Path::new(&path), &text)
 }
 
-/// Import config from a JSON file, replacing the current one. Returns the new config.
+fn read_import(path: &str) -> Result<Config, String> {
+    config_document::read(std::path::Path::new(path))
+}
+
 #[tauri::command]
-fn import_config(app: AppHandle, path: String) -> Result<Config, String> {
-    let text = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let mut cfg: Config = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    // Machine-specific bits don't travel: the monitor layout of the exporting
-    // PC rarely matches this one (paths DO travel — settings flags the ones
-    // that don't exist here and offers to reassign them).
+fn preview_config_import(path: String) -> Result<Config, String> {
+    read_import(&path)
+}
+
+/// Apply only the snapshot the user reviewed; files may change while a dialog is open.
+#[tauri::command]
+fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Result<Config, String> {
+    let mut cfg = read_reviewed_import(&path, expected.as_ref())?;
     cfg.monitor = -1;
     cfg.monitor_name.clear();
-    config::save(&cfg)?;
-    clip_apply_config(&cfg);
-    apply_always_on_top(&app);
-    apply_capture_policy(&app, cfg.capture_visible);
-    let _ = app.emit("booki://config-changed", ());
-    // Return the migrated/healed config — raw import JSON skips load() revs.
-    // save() leaves its own value cached, and that value has NOT been through
-    // load()'s migrations or group normalization, so the cache has to be dropped
-    // for this read or the import would come back unhealed.
-    config::invalidate_cache();
-    Ok(config::load())
+    apply_config_snapshot(&app, cfg)
+}
+
+fn read_reviewed_import(path: &str, expected: Option<&Config>) -> Result<Config, String> {
+    let cfg = read_import(path)?;
+    if expected.is_some_and(|snapshot| {
+        serde_json::to_value(snapshot).ok() != serde_json::to_value(&cfg).ok()
+    }) {
+        return Err("BOOKI_IMPORT_CHANGED".into());
+    }
+    Ok(cfg)
 }
 
 // ─────────────────────────── Dock profiles ───────────────────────────
@@ -1407,16 +1541,7 @@ fn profiles_dir() -> std::path::PathBuf {
 
 /// Sanitized file path for a profile name (no separators/dots → no traversal).
 fn profile_file(name: &str) -> Result<std::path::PathBuf, String> {
-    let safe: String = name
-        .trim()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
-        .collect();
-    let safe = safe.trim().to_string();
-    if safe.is_empty() || safe.len() > 40 {
-        return Err("invalid profile name".into());
-    }
-    Ok(profiles_dir().join(format!("{safe}.json")))
+    profile_store::path(&profiles_dir(), name)
 }
 
 #[tauri::command]
@@ -1425,7 +1550,7 @@ fn profile_list() -> Vec<String> {
     if let Ok(entries) = std::fs::read_dir(profiles_dir()) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
+            if path.is_file() && path.extension().is_some_and(|e| e == "json") {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     names.push(stem.to_string());
                 }
@@ -1439,16 +1564,20 @@ fn profile_list() -> Vec<String> {
 /// Snapshot the CURRENT config under the given name (overwrites), and mark it
 /// as the active profile.
 #[tauri::command]
-fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
+fn profile_save(app: AppHandle, name: String, overwrite: Option<bool>) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
     let path = profile_file(&name)?;
+    if (path.exists() || path.with_extension("bak").exists()) && overwrite != Some(true) {
+        return Err("BOOKI_PROFILE_EXISTS".into());
+    }
     std::fs::create_dir_all(profiles_dir()).map_err(|e| e.to_string())?;
     let mut cfg = config::load();
     cfg.last_profile = name.trim().to_string();
     let text = serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?;
     let backup = path.with_extension("bak");
-    let previous = std::fs::read_to_string(&path)
+    let previous = config_document::read(&path)
         .ok()
-        .filter(|value| serde_json::from_str::<Config>(value).is_ok());
+        .and_then(|value| serde_json::to_string_pretty(&value).ok());
     // A corrupt snapshot must never replace a valid recovery copy.
     if let Some(previous) = previous {
         snapshot::write(&backup, &previous)?;
@@ -1464,30 +1593,76 @@ fn profile_save(app: AppHandle, name: String) -> Result<(), String> {
 /// Make the named profile the active config; repositions windows and tells
 /// every surface to re-read. Returns the applied config.
 #[tauri::command]
-fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
-    let path = profile_file(&name)?;
-    let parse = |file: &std::path::Path| -> Result<Config, String> {
-        let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
-        serde_json::from_str(&text).map_err(|e| e.to_string())
-    };
-    let mut cfg = parse(&path).or_else(|primary_error| {
-        let recovered = parse(&path.with_extension("bak")).map_err(|_| primary_error)?;
-        log::warn!("Recovering profile from its last valid snapshot");
-        Ok::<Config, String>(recovered)
-    })?;
+fn profile_apply(app: AppHandle, name: String, expected: Option<Config>) -> Result<Config, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    let mut cfg = profile_store::preview(&profiles_dir(), &name)?.config;
+    if expected.is_some_and(|reviewed| {
+        serde_json::to_value(reviewed).ok() != serde_json::to_value(&cfg).ok()
+    }) {
+        return Err("BOOKI_PROFILE_CHANGED".into());
+    }
     cfg.last_profile = name.trim().to_string();
+    apply_config_snapshot(&app, cfg)
+}
+
+#[tauri::command]
+fn profile_preview(name: String) -> Result<profile_store::Preview, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::preview(&profiles_dir(), &name)
+}
+
+#[tauri::command]
+fn profile_duplicate(name: String, new_name: String) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::copy(&profiles_dir(), &name, &new_name)
+}
+
+#[tauri::command]
+fn profile_rename(app: AppHandle, name: String, new_name: String) -> Result<(), String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    let root = profiles_dir();
+    profile_store::copy(&root, &name, &new_name)?;
+    let active = config::load().last_profile == name.trim();
+    if active {
+        if let Err(error) = config::patch(serde_json::json!({ "lastProfile": new_name.trim() })) {
+            let _ = profile_store::delete(&root, &new_name);
+            return Err(error);
+        }
+    }
+    if let Err(error) = profile_store::delete(&root, &name) {
+        if active {
+            let _ = config::patch(serde_json::json!({ "lastProfile": name.trim() }));
+        }
+        // Keep both complete documents if rollback fails; never remove a
+        // document that the live configuration may still reference.
+        let _ = app.emit("booki://config-changed", ());
+        return Err(error);
+    }
+    let _ = app.emit("booki://config-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+fn profile_deleted() -> Vec<profile_store::Deleted> {
+    profile_store::deleted(&profiles_dir())
+}
+
+#[tauri::command]
+fn profile_restore(token: String) -> Result<String, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::restore(&profiles_dir(), &token)
+}
+
+fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String> {
     // Apply general preferences as well as the visual layout. A failed OS
     // operation leaves the previous persisted profile active.
+    config::backup_for_update()?;
     let previous = config::load();
     let previous_autostart = get_autostart();
-    if let Err(error) = hotkeys_apply(
-        &app,
-        &cfg.hotkey,
-        cfg.position_hotkeys,
-        &cfg.hotkey_modifier,
-    ) {
+    if let Err(error) = hotkeys_apply(app, &cfg.hotkey, cfg.position_hotkeys, &cfg.hotkey_modifier)
+    {
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
@@ -1496,17 +1671,17 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
     }
     if let Err(error) = set_autostart(cfg.autostart) {
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
         );
         return Err(error);
     }
-    if let Err(error) = config::save(&cfg) {
+    if let Err(error) = config::save_replacement(&cfg) {
         let _ = set_autostart(previous_autostart);
         let _ = hotkeys_apply(
-            &app,
+            app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
@@ -1514,8 +1689,8 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
         return Err(error);
     }
     clip_apply_config(&cfg);
-    apply_always_on_top(&app);
-    apply_capture_policy(&app, cfg.capture_visible);
+    apply_always_on_top(app);
+    apply_capture_policy(app, cfg.capture_visible);
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
     }
@@ -1530,14 +1705,9 @@ fn profile_apply(app: AppHandle, name: String) -> Result<Config, String> {
 }
 
 #[tauri::command]
-fn profile_delete(name: String) -> Result<(), String> {
-    let path = profile_file(&name)?;
-    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-    let backup = path.with_extension("bak");
-    if backup.exists() {
-        std::fs::remove_file(backup).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+fn profile_delete(name: String) -> Result<String, String> {
+    let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
+    profile_store::delete(&profiles_dir(), &name)
 }
 
 // ─────────────────────────── System volume ───────────────────────────
@@ -2162,41 +2332,26 @@ async fn empty_trash() -> Result<(), String> {
     result
 }
 
-#[derive(Clone, serde::Serialize)]
-struct DirItem {
-    name: String,
-    path: String,
-    is_dir: bool,
-}
-
-/// List a folder's contents for the "stack" flyout.
+/// Search and sort the entire directory before slicing the requested page.
 #[tauri::command]
-async fn list_dir(path: String, offset: Option<usize>, limit: Option<usize>) -> Vec<DirItem> {
+async fn list_dir(
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    query: Option<String>,
+    order: Option<String>,
+) -> Result<Vec<DirItem>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut out: Vec<DirItem> = Vec::new();
-        if let Ok(rd) = std::fs::read_dir(&path) {
-            for e in rd.flatten() {
-                let name = e.file_name().to_string_lossy().to_string();
-                if name.starts_with('.') {
-                    continue;
-                }
-                let p = e.path();
-                let is_dir = p.is_dir();
-                out.push(DirItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    is_dir,
-                });
-            }
-        }
-        out.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase(), item.name.clone()));
-        out.into_iter()
-            .skip(offset.unwrap_or(0))
-            .take(limit.unwrap_or(80).clamp(1, 81))
-            .collect()
+        directory::read(
+            std::path::Path::new(&path),
+            offset.unwrap_or(0),
+            limit.unwrap_or(80),
+            query.as_deref().unwrap_or(""),
+            order.as_deref().unwrap_or("name"),
+        )
     })
     .await
-    .unwrap_or_default()
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -2247,7 +2402,7 @@ fn system_events_support() -> serde_json::Value {
     #[cfg(windows)]
     {
         use win::system_events;
-        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed) })
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
     }
     #[cfg(not(windows))]
     {
@@ -2733,6 +2888,9 @@ pub fn run() {
             acquire_update_lock,
             release_update_lock,
             prepare_update,
+            read_note_draft,
+            write_note_draft,
+            clear_note_draft,
             get_config,
             save_config,
             launch_app,
@@ -2763,6 +2921,11 @@ pub fn run() {
             profile_save,
             profile_apply,
             profile_delete,
+            profile_preview,
+            profile_duplicate,
+            profile_rename,
+            profile_deleted,
+            profile_restore,
             volume_info,
             volume_set,
             volume_mute,
@@ -2776,6 +2939,7 @@ pub fn run() {
             weather_search,
             weather_current,
             import_config,
+            preview_config_import,
             paths_exist,
             image_data_uri,
             set_always_on_top,
@@ -2792,6 +2956,11 @@ pub fn run() {
             move_paths,
             list_monitors,
             set_material,
+            config_recovery_status,
+            platform_capabilities,
+            settings_backdrop,
+            acknowledge_config_recovery,
+            start_fresh_config,
             system_accent,
             system_stats,
             fetch_favicon,
@@ -2831,6 +3000,39 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 win::system_events::start(std::sync::Arc::new(move |kind| {
+                    if kind == "clipboard" && clipboard_feature_active(&config::load()) {
+                        // The writing app may still hold OpenClipboard when the
+                        // notification arrives. Retry briefly on this worker,
+                        // never on the message pump or UI thread.
+                        for delay in [0, 20, 60] {
+                            if delay > 0 {
+                                std::thread::sleep(std::time::Duration::from_millis(delay));
+                            }
+                            if let Some(text) = win::clipboard_get_text() {
+                                if clipboard_feature_active(&config::load()) {
+                                    clip_remember(&text);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if kind == "display" || kind == "resume" {
+                        let app = handle.clone();
+                        let _ = handle.run_on_main_thread(move || {
+                            let cfg = config::load();
+                            if let Some(dock) = app.get_webview_window("dock") {
+                                let _ = position_dock(&dock, &cfg.edge);
+                            }
+                            if let Some(notch) = app.get_webview_window("notch") {
+                                let _ = position_notch(&notch, &cfg.edge);
+                            }
+                        });
+                    }
+                    if kind == "resume" {
+                        for source in ["media", "volume", "windows"] {
+                            let _ = handle.emit(&format!("booki://{source}-changed"), ());
+                        }
+                    }
                     if kind == "catalog" {
                         CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
                     }
@@ -3028,14 +3230,9 @@ pub fn run() {
                     });
                 }
 
-                // Clipboard watcher: samples the OS clipboard's plain text every
-                // ~1000 ms when the feature is active and remembers it if it changed.
-                // Polling (vs. the native
-                // WM_CLIPBOARDUPDATE listener) keeps this on the same simple
-                // thread-per-concern pattern as the rest of the watchers and needs
-                // no message-only window; this cadence is imperceptible for a paste
-                // history. Windows-only — clipboard_get_text stubs to None
-                // elsewhere, so the loop would just spin doing nothing.
+                // Recovery sampling complements WM_CLIPBOARDUPDATE. Use a slow
+                // cadence when Windows registered the listener, and a one-second
+                // fallback if registration failed. No polling on other platforms.
                 #[cfg(windows)]
                 {
                     std::thread::spawn(move || {
@@ -3047,12 +3244,24 @@ pub fn run() {
                             // re-read config every few ticks — avoids disk I/O every
                             // second for users who never enable the feature.
                             std::thread::sleep(std::time::Duration::from_millis(if active {
-                                1000
+                                if win::system_events::CLIPBOARD.load(Ordering::Relaxed) {
+                                    30000
+                                } else {
+                                    1000
+                                }
                             } else {
                                 2500
                             }));
                             since_cfg = since_cfg.saturating_add(1);
-                            let cfg_every = if active { 3 } else { 2 }; // ~3s on / ~5s off
+                            let event_driven =
+                                win::system_events::CLIPBOARD.load(Ordering::Relaxed);
+                            let cfg_every = if active && !event_driven {
+                                3
+                            } else if active {
+                                1
+                            } else {
+                                2
+                            };
                             if since_cfg >= cfg_every {
                                 since_cfg = 0;
                                 active = clipboard_feature_active(&config::load());
@@ -3388,6 +3597,38 @@ pub fn run() {
 }
 
 #[cfg(test)]
+mod import_tests {
+    use super::*;
+    #[test]
+    fn reviewed_import_rejects_changed_invalid_and_oversized_files() {
+        let root = std::env::temp_dir().join(format!("booki-import-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("config.json");
+        let name = path.to_string_lossy().to_string();
+        let mut source = Config::default();
+        fs::write(&path, serde_json::to_vec(&source).unwrap()).unwrap();
+        let reviewed = read_import(&name).unwrap();
+        assert!(read_reviewed_import(&name, Some(&reviewed)).is_ok());
+        source.theme = "light".into();
+        if source.theme == reviewed.theme {
+            source.theme = "dark".into();
+        }
+        fs::write(&path, serde_json::to_vec(&source).unwrap()).unwrap();
+        assert!(
+            matches!(read_reviewed_import(&name, Some(&reviewed)), Err(error) if error == "BOOKI_IMPORT_CHANGED")
+        );
+        fs::write(&path, "{}").unwrap();
+        assert!(matches!(read_import(&name), Err(error) if error == "BOOKI_IMPORT_INVALID"));
+        fs::File::create(&path)
+            .unwrap()
+            .set_len(16 * 1024 * 1024 + 1)
+            .unwrap();
+        assert!(matches!(read_import(&name), Err(error) if error == "BOOKI_IMPORT_TOO_LARGE"));
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
 mod directory_tests {
     use super::*;
     #[test]
@@ -3399,11 +3640,14 @@ mod directory_tests {
         }
         fs::write(root.join(".hidden"), b"").unwrap();
         let path = root.to_string_lossy().to_string();
-        let first = tauri::async_runtime::block_on(list_dir(path.clone(), Some(0), Some(25)));
+        let first =
+            tauri::async_runtime::block_on(list_dir(path.clone(), Some(0), Some(25), None, None))
+                .unwrap();
         assert_eq!(first.len(), 25);
         assert_eq!(first[0].name, "Z folder");
         assert_eq!(first[1].name, "File 000.txt");
-        let last = tauri::async_runtime::block_on(list_dir(path, Some(96), Some(25)));
+        let last =
+            tauri::async_runtime::block_on(list_dir(path, Some(96), Some(25), None, None)).unwrap();
         assert_eq!(last.len(), 5);
         assert_eq!(last[0].name, "File 095.txt");
         assert_eq!(last[4].name, "File 099.txt");

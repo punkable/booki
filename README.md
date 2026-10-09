@@ -76,7 +76,16 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 > Download the latest published version using the release badge above. Booki checks the same release channel for updates; updates preserve the existing installation and configuration.
 
-### New in 0.71
+### New in 0.72
+
+- Clearer library actions and a dock editor that reserves space instead of covering apps.
+- Stronger keyboard focus, responsive details and Escape navigation.
+- Complete folder search and sorting, recoverable profiles and explicit retry states.
+- Encrypted note recovery with preview, Restore and Discard after interrupted saves.
+
+See the [complete 0.72 release notes](docs/releases/v0.72.0.md).
+
+### Previous 0.71 improvements
 
 - A persistent dock editor beside the app library: select to inspect, use **+** or drag to add, arrange groups and undo edits.
 - Unified dock behavior settings, curated finishes and a widget gallery with a configuration inspector.

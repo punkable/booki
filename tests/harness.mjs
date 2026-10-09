@@ -150,15 +150,19 @@ function bridgeSource(cfg, { stats = {} } = {}) {
   };
   return `
     let storedConfig = ${JSON.stringify(cfg)};
+    const noteDrafts = JSON.parse(sessionStorage.getItem("mock-note-drafts") || "{}");
     window.__bookiErrors = [];
     window.__listeners = {};
     window.__TAURI__ = {
       core: {
         invoke: (cmd, args = {}) => {
           switch (cmd) {
+            case "read_note_draft": return Promise.resolve(noteDrafts[args.id] ?? null);
+            case "write_note_draft": noteDrafts[args.id] = args.text; sessionStorage.setItem("mock-note-drafts", JSON.stringify(noteDrafts)); return Promise.resolve();
+            case "clear_note_draft": if (noteDrafts[args.id] === args.expected) delete noteDrafts[args.id]; sessionStorage.setItem("mock-note-drafts", JSON.stringify(noteDrafts)); return Promise.resolve();
             case "app_version": return Promise.resolve(${JSON.stringify(APP_VERSION)});
             case "get_config": return Promise.resolve(structuredClone(storedConfig));
-            case "save_config": storedConfig = args.patch ? { ...storedConfig, ...args.patch } : args.config; return Promise.resolve(structuredClone(storedConfig));
+            case "save_config": storedConfig = structuredClone(args.patch ? { ...storedConfig, ...args.patch } : args.config); return Promise.resolve(structuredClone(storedConfig));
             case "system_stats": return Promise.resolve(${JSON.stringify(sys)});
             case "volume_info": return Promise.resolve([40, false]);
             case "media_info": return Promise.resolve(null);
@@ -170,7 +174,7 @@ function bridgeSource(cfg, { stats = {} } = {}) {
             case "app_icon": case "image_data_uri": case "file_thumbnail": return Promise.resolve("");
             case "list_monitors":
               return Promise.resolve([{ index: 0, name: "D1", x: 0, y: 0, w: 1920, h: 1080, primary: true }]);
-            case "list_installed_apps": case "profile_list": case "recent_files": return Promise.resolve([]);
+            case "list_installed_apps": case "profile_list": case "profile_deleted": case "recent_files": return Promise.resolve([]);
             case "recent_files_for": return Promise.resolve(null);
             case "get_autostart": return Promise.resolve(false);
             case "take_pending_tab": return Promise.resolve(null);
@@ -206,20 +210,25 @@ function bridgeSource(cfg, { stats = {} } = {}) {
 }
 
 /** Open a Booki page with the fake backend and collect any JS error. */
-export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats } = {}) {
+export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats, initScript = '' } = {}) {
   const page = await browser.newPage({
     viewport: viewport || { width: 1600, height: 400 },
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.stack || e)));
   page.on("console", (m) => {
+    if (m.type() === 'warning' && m.text().startsWith('[booki] unknown icon:')) {
+      errors.push(m.text()); return;
+    }
     if (m.type() !== "error") return;
     const text = m.text();
     // A missing favicon is not a product defect and would drown the signal.
     if (text.includes("favicon") || text.includes("404")) return;
     errors.push(`console: ${text}`);
   });
-  await page.addInitScript(bridgeSource(cfg || makeConfig(), { stats }));
+  // Append in the same script so command overrides run after the fake bridge
+  // and before application boot, without depending on init-script ordering.
+  await page.addInitScript(bridgeSource(cfg || makeConfig(), { stats }) + '\n' + initScript);
   await page.goto(`http://127.0.0.1:${port}/${page_}`);
   await page.waitForTimeout(1200); // boot + first widget paint
   return { page, errors };
@@ -288,4 +297,15 @@ export async function measureArtOverflow(page) {
       })
       .filter(Boolean)
   );
+}
+
+/** Playwright's injected predicate poller treats a Promise as truthy. Await
+ * asynchronous native reads in Node instead, so persistence checks can fail. */
+export async function waitForAsyncCondition(page, predicate, argument, { timeout = 5000, polling = 50 } = {}) {
+  const deadline = performance.now() + timeout;
+  do {
+    if (await page.evaluate(predicate, argument)) return;
+    await page.waitForTimeout(polling);
+  } while (performance.now() < deadline);
+  throw new Error(`Asynchronous condition did not become true within ${timeout}ms`);
 }

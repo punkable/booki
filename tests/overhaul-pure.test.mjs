@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chooseFitSize, widgetWidth, countContent } from "../src/dock/layout-model.js";
-import { toggleTimer, timerSeconds, calendarMonth, tasksSummary } from "../src/dock/productivity.js";
+import { toggleTimer, timerSeconds, calendarMonth, calendarWeekStart, tasksSummary } from "../src/dock/productivity.js";
 import { singleFlight } from "../src/dock/async-cache.js";
 import { rank } from "../src/dock/add-panel.js";
 import { updateProgress } from "../src/update-state.js";
@@ -20,6 +20,15 @@ test("calendar handles leap years and Monday-first alignment", () => {
   assert.equal(feb.filter(Boolean).length, 29);
   assert.equal(feb.indexOf(1), 3);
   assert.equal(feb.length % 7, 0);
+});
+test('regional week starts align calendar headings and leap-year cells', () => {
+  assert.equal(calendarWeekStart('en-US'), 0);
+  assert.equal(calendarWeekStart('en-GB'), 1);
+  assert.equal(calendarWeekStart('es-ES'), 1);
+  const february = new Date(2024, 1, 1);
+  assert.equal(calendarMonth(february, calendarWeekStart('en-US')).indexOf(1), 4);
+  assert.equal(calendarMonth(february, calendarWeekStart('en-GB')).indexOf(1), 3);
+  assert.equal(calendarMonth(february, 0).filter(Boolean).length, 29);
 });
 test("tasks report the next open item", () => {
   assert.deepEqual(tasksSummary([{ done: true, text: "Done" }, { text: "Next" }]), { total: 2, done: 1, next: "Next" });

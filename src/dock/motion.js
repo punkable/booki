@@ -25,5 +25,5 @@ if (query) {
 
 /** True while the user asks for reduced motion. Call it, don't cache it. */
 export function reduceMotion() {
-  return reduced;
+  return reduced || (typeof document !== "undefined" && document.documentElement.hasAttribute("data-reduce-motion"));
 }

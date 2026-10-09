@@ -22,7 +22,7 @@ test('one finish selector preserves layout/theme and shows the selected custom f
   await page.getByRole('navigation').getByRole('button', { name: 'Appearance', exact: true }).click();
   assert.equal(await page.locator('.finish-card').count(), 4);
   assert.equal(await page.locator('h1').evaluate((el) => getComputedStyle(el).fontSize), '25px');
-  assert.equal(await page.locator('body').evaluate((el) => getComputedStyle(el).getPropertyValue('--set-bg').trim()), '#fbfbfd');
+  assert.equal(await page.locator('body').evaluate((el) => getComputedStyle(el).getPropertyValue('--set-bg').trim()), '#fff');
   assert.equal(await page.locator('.surface-chip').count(), 0);
   await page.getByRole('button', { name: 'Tinted Glass', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.finish-tinted')?.getAttribute('aria-pressed') === 'true');

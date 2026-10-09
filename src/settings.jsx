@@ -1,23 +1,21 @@
 /* Booki Dock — Settings (React). Modern sidebar + tabbed panels.
    Shares the config bridge in api.js; changes apply to the dock live. */
 
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import { createPortal } from "react-dom";
 import {
   config as configApi,
   dock as dockApi,
-  pickAppFile,
-  pickFolder,
   pickSavePath,
   emitConfigChanged,
   onConfigChanged,
   onShowChangelog,
   onShowTab,
   closeSelf,
+  invoke,
   onCloseRequest,
-  logMessage,
 } from "./api.js";
 import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { showBookiMenu } from "./native-context-menu.js";
@@ -26,23 +24,16 @@ import { currentRelease, previousReleases } from "./release-notes.js";
 import { FinishPicker } from "./settings/finish-picker.jsx";
 import { ProfilesPage } from "./settings/profiles.jsx";
 import { IconPickerModal } from "./settings/icon-picker.jsx";
+import { NativeBackdrop } from "./settings/native-backdrop.jsx";
+import { RecoveryNotice } from "./settings/recovery-notice.jsx";
+import { WidgetsWorkspace } from "./settings/widgets-workspace.jsx";
 import { LibraryWorkspace } from "./settings/library-workspace.jsx";
-import { GroupCreator } from "./settings/group-creator.jsx";
-import { AppLibrary } from "./settings/app-library.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
 import { Dashboard, ScenarioPicker } from "./settings/dashboard.jsx";
 import { DockPreview, WidgetPreview } from "./settings/dock-preview.jsx";
 import { resolveNotchMode } from "./notch-mode.js";
 import { findSettings } from "./settings/search.js";
-import { widgetRefs, itemForWidgetRef, updateWidgetStyleForRef } from "./settings/pin-model.js";
-import { emoSrc } from "./emoji.js";
 import {
-  Button,
-  Menu,
-  MenuTrigger,
-  MenuList,
-  MenuItem,
-  MenuPopover,
   Dropdown,
   Option,
   Row,
@@ -50,31 +41,24 @@ import {
   Slider,
   SegmentedControl,
   PageHeader,
+  Icon,
   SettingsSection,
   CollapsibleSection,
   SectionTitle,
   useModalControls,
-  AddRegular,
-  FolderRegular,
-  FolderAddRegular,
-  LineHorizontal3Regular,
-  DeleteRegular,
-  GridRegular,
-  ListRegular,
   ArrowUndo24Regular,
   Flash24Regular,
   Info24Regular,
   Search24Regular,
 } from "./settings/ui.jsx";
 import {
-  WIDGET_ORDER,
   WIDGET_META,
-  WIDGET_ICONS,
   WIDGET_GLYPHS,
   widgetDisplayName as widgetDisplayNameShared,
 } from "./widgets-meta.js";
 
 const CHANGELOG_ICONS = {
+  settings: () => <span dangerouslySetInnerHTML={{ __html: icon("settings") }} />,
   sparkles: () => <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />,
   search: Search24Regular,
   undo: ArrowUndo24Regular,
@@ -110,80 +94,13 @@ import {
   resolveSurfaceStyle,
   applySurfaceVars,
 } from "./surface.js";
-import { canMergeKind, mergePins, mkPin, findPin, updatePin, removePin, normalizeGroups as normalizePinned } from "./pins.js";
+import { normalizeGroups as normalizePinned } from "./pins.js";
 import { UpdatesCard } from "./settings/updates.jsx";
 import { updates } from "./update.js";
 import { t, setLang, ensureLang } from "./i18n.js";
 import { icon } from "./icons.js";
 
 // Small icon button used across the Apps list.
-function IconBtn({ name, title, onClick, danger, onPointerDown }) {
-  return (
-    <button
-      type="button"
-      className={"pin-btn ico" + (danger ? " del" : "")}
-      title={title}
-      aria-label={title}
-      data-action-label={title}
-      onClick={onClick}
-      onPointerDown={onPointerDown}
-    >
-      <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon(name) }} />
-    </button>
-  );
-}
-
-/** Click-to-rename label — calm read mode until the user asks to edit. */
-function PinName({ value, editing, onEdit, onChange, onDone, className = "", title }) {
-  if (editing) {
-    return (
-      <input
-        className={"pin-name-edit " + className}
-        value={value}
-        autoFocus
-        title={title || ""}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onDone}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.currentTarget.blur();
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            onDone();
-          }
-        }}
-      />
-    );
-  }
-  return (
-    <button
-      type="button"
-      className={"pin-name-btn " + className}
-      title={title || t("apps.renameHint")}
-      onClick={(e) => {
-        e.stopPropagation();
-        onEdit();
-      }}
-    >
-      {value}
-    </button>
-  );
-}
-import { isLibIcon, resolveLibIcon } from "./icon-library.js";
-
-window.addEventListener("error", (e) => logMessage("error", `settings: ${e.message}`));
-window.addEventListener("unhandledrejection", (e) =>
-  logMessage("error", `settings: unhandled ${e.reason}`)
-);
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-// Accent swatches. The names are the swatches' only label — they are the
-// tooltip and the accessible name — and they used to be written in Spanish
-// here, so four of the five languages showed "Ámbar" and "Naranja".
 const ACCENTS = [
   ["ac.tan", "#dfaa75"],
   ["ac.amber", "#ffbe0b"],
@@ -247,62 +164,26 @@ function installedAppsOnce(force = false) {
 function PositionPicker({ cfg, set }) {
   const dockEdge = cfg.edge || "bottom";
   const pos = cfg.notchPosition || "center";
-  const showNotch = (cfg.autoHideMode || "smart") !== "off";
-  // A notch tab sets the dock's edge AND the notch's along-position at once.
-  const pickNotch = (edge, position) => {
-    const moved = edge !== dockEdge;
-    set({ edge, notchPosition: position, notchEdge: "auto" });
-    // Same edge → the dock won't move, so flash the notch to show the new spot.
-    // Different edge → reloadConfig already previews the dock on its new edge.
-    if (!moved) dockApi.notchPreview();
-  };
-  const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter((p) => p.kind !== "separator").length || 5));
-  const posLabel = (s) => t(`be.notch${s[0].toUpperCase()}${s.slice(1)}`);
-  return (
-    <div className="pospick">
-      <div className="pospick-screen">
-        {["top", "bottom", "left", "right"].map((e) => (
-          <button
-            key={e}
-            type="button"
-            className={`pospick-edge pp-${e}` + (dockEdge === e ? " active" : "")}
-            onClick={() => set({ edge: e, notchEdge: "auto" })}
-            title={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
-            aria-label={`${t("be.moveDock")}: ${t(`edge.${e}`)}`}
-          />
-        ))}
-        {/* The dock itself, in miniature, living on its edge. */}
-        <span key={dockEdge} className={`pospick-bar ppb-${dockEdge}`} aria-hidden="true">
-          {Array.from({ length: tiles }).map((_, i) => <i key={i} />)}
-        </span>
-        {showNotch &&
-          ["top", "bottom", "left", "right"].flatMap((edge) =>
-            ["start", "center", "end"].map((s) => (
-              <button
-                key={`${edge}-${s}`}
-                type="button"
-                className={
-                  `notchpick-slot npe-${edge} nps-${s}` +
-                  (dockEdge === edge && pos === s ? " active" : "")
-                }
-                onClick={() => pickNotch(edge, s)}
-                title={`${t("be.moveDock")}: ${t(`edge.${edge}`)} · ${posLabel(s)}`}
-              >
-                <span className="notchpick-tab" />
-              </button>
-            ))
-          )}
-      </div>
-      <p className="pospick-caption">
-        {t("be.dockLabel")}: <strong>{t(`edge.${dockEdge}`)}</strong>
-        {showNotch && (
-          <>
-            {" · "}{t("be.notchLabel")}: <strong>{posLabel(pos)}</strong>
-          </>
-        )}
-      </p>
+  const tiles = Math.max(3, Math.min(6, (cfg.pinned || []).filter(p => p.kind !== "separator").length || 5));
+  const posLabel = value => t(`be.notch${value[0].toUpperCase()}${value.slice(1)}`);
+  return <div className="position-workspace">
+    <div className="pospick-screen" aria-hidden="true">
+      <span key={dockEdge} className={`pospick-bar ppb-${dockEdge}`}>
+        {Array.from({ length: tiles }).map((_, index) => <i key={index} />)}
+      </span>
     </div>
-  );
+    <div className="position-controls">
+      <div className="position-edges" role="group" aria-label={t("be.dockLabel")}>
+        {["top", "bottom", "left", "right"].map(edge => <button key={edge} type="button"
+          aria-label={`${t("be.moveDock")}: ${t(`edge.${edge}`)}`} aria-pressed={dockEdge === edge}
+          onClick={() => set({ edge, notchEdge: "auto" })}>{t(`edge.${edge}`)}</button>)}
+      </div>
+      <label className="position-notch"><span>{t("design.alignment")}</span>
+        <SegmentedControl value={pos} options={["start","center","end"].map(value => ({value,label:posLabel(value)}))}
+          onChange={value => set({notchPosition:value,notchEdge:"auto"}, {flush:true,afterSave:()=>dockApi.notchPreview()})} />
+      </label>
+    </div>
+  </div>;
 }
 
 /** Color of the frosted glass fill (dock + notch), separate from accent. */
@@ -478,7 +359,7 @@ function AccentPicker({ value, onChange }) {
             if (hex) onChange(hex);
           }}
         >
-          <img className="emo" src={emoSrc("picture")} alt="" width="15" height="15" />
+          <Icon name="image" />
           {t("ap.wallpaperShort")}
         </button>
       </div>
@@ -486,49 +367,6 @@ function AccentPicker({ value, onChange }) {
     </div>
   );
 }
-
-// One installed-app suggestion icon (native icon, falls back to a letter).
-function PinThumb({ item }) {
-  const [src, setSrc] = useState(isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
-  useEffect(() => {
-    let alive = true;
-    if (isLibIcon(item.icon)) {
-      setSrc(resolveLibIcon(item.icon));
-    } else if (item.icon) {
-      setSrc(item.icon);
-    } else if (item.path && /\.(png|jpe?g|gif|bmp|webp|ico)$/i.test(item.path)) {
-      // Pinned pictures preview their own thumbnail.
-      dockApi.imageDataUri(item.path).then((u) => alive && u && setSrc(u)).catch(() => {});
-    } else if (item.path) {
-      dockApi.appIcon(item.path).then((u) => alive && setSrc(u)).catch(() => {});
-    }
-    return () => {
-      alive = false;
-    };
-  }, [item.path, item.icon]);
-  if (item.kind === "group") {
-    return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("folder") }} />;
-  }
-  if (item.kind === "trash") {
-    return <span className="pin-thumb folder" dangerouslySetInnerHTML={{ __html: icon("trash") }} />;
-  }
-  if (item.kind === "widget") {
-    return (
-      <span className="pin-thumb widget">
-        {WIDGET_EMOJI[item.widget]
-          ? <img className="emo" src={emoSrc(WIDGET_EMOJI[item.widget])} alt="" width="18" height="18" />
-          : <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />}
-      </span>
-    );
-  }
-  return (
-    <span className="pin-thumb">
-      {src ? <img src={src} alt="" /> : (item.name || "?").trim().charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
-const WIDGET_EMOJI = WIDGET_ICONS;
 
 function HotkeyInput({ value, onChange }) {
   const capture = (e) => {
@@ -986,16 +824,14 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
   return (
         <div className="widget-modal-body">
         <div className="widget-modal-hero" style={{ "--widget-accent": meta.accent || accent }}>
-          <span className="widget-store-ico">
-            <img className="emo" src={emoSrc(meta.emoji)} alt="" width="30" height="30" />
-          </span>
+          <span className="widget-store-ico" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[item.widget] || "sparkles") }} />
           <div>
             <strong>{item.name || widgetDisplayName(item.widget)}</strong>
             <p>{t(meta.desc)}</p>
           </div>
         </div>
         <div className="widget-editor-preview"><WidgetPreview widget={item.widget} style={st} size={56} /></div>
-        <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>
+        {["notes","media","clipboard"].includes(item.widget) && <SectionTitle name="sparkles">{t("w.behavior")}</SectionTitle>}
         {["timer", "tasks", "calendar", "weather"].includes(item.widget) && <p className="muted">{t("overhaul.utilityHint")}</p>}
         {item.widget === "notes" && (
           <Row label={t("w.note")}>
@@ -1017,14 +853,6 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
           />
         ) : item.widget === "clipboard" ? (
           <ClipboardSettingsPanel cfg={cfg} set={set} />
-        ) : !["notes", "timer", "tasks", "calendar", "weather"].includes(item.widget) ? (
-          <div className="widget-no-extra">
-            <span dangerouslySetInnerHTML={{ __html: icon("sparkles") }} />
-            <div>
-              <strong>{t("w.smartDefaults")}</strong>
-              <p>{t("w.smartDefaultsHint")}</p>
-            </div>
-          </div>
         ) : null}
         {["media", "battery"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!st.hideWhenUnavailable} onChange={(value) => set1({ hideWhenUnavailable: value })} />}
         <SectionTitle name="palette">{t("w.appearance")}</SectionTitle>
@@ -1045,1028 +873,19 @@ function WidgetStyleFields({ item, accent, cfg, set, onChange }) {
           <SegmentedControl value={String(st.span || "auto")} onChange={(v) => set1({ span: v === "auto" ? null : Number(v) })}
             options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: `${n}×` }))]} />
         </Row>
+        <CollapsibleSection title={t("next.advanced")} defaultOpen={false}>
         <Row label={t("w.color")}>
           <AccentPicker value={st.color || accent} onChange={(v) => set1({ color: v })} />
         </Row>
         <Toggle label={t("w.animated")} checked={!!st.animated} onChange={(v) => set1({ animated: v })} />
         <Toggle label={t("w.showIcon")} checked={st.icon !== false} onChange={(v) => set1({ icon: v })} />
+        </CollapsibleSection>
         </div>
   );
-}
-
-function WidgetStyleModal({ item, accent, cfg, set, onChange, onClose }) {
-  useModalControls(onClose);
-  return createPortal(<div className="modal-scrim modal-scrim-locked"><div className="modal widget-modal" role="dialog" aria-modal="true" aria-label={t("w.styleTitle")}>
-    <div className="modal-head"><strong>{t("w.styleTitle")}</strong><button className="pin-btn ico" aria-label={t("stack.close")} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} /></div>
-    <WidgetStyleFields item={item} accent={accent} cfg={cfg} set={set} onChange={onChange} />
-    <div className="widget-modal-footer"><button className="s-btn" onClick={onClose}>{t("w.done")}</button></div>
-  </div></div>, document.body);
-}
-
-function WidgetStoreCard({ widget, label, refs, onAdd, onEdit, inspect = false, selected = false }) {
-  const meta = WIDGET_META[widget] || { emoji: "puzzle", accent: "var(--accent)", desc: "widget.defaultDesc", caps: [] };
-  const pinned = refs.length > 0;
-  return (
-    <article className={"widget-store-card" + (pinned ? " pinned" : "")} style={{ "--widget-accent": meta.accent }}>
-      <div className="widget-store-top">
-        <span className="widget-store-ico" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
-        <div className="widget-store-body">
-          <strong>{label}</strong>
-          <p>{t(meta.desc)}</p>
-        </div>
-        {pinned && <span className="widget-store-badge">{t("widget.pinned")}</span>}
-      </div>
-      <div className="widget-store-preview"><WidgetPreview widget={widget} /></div>
-      <div className="widget-store-caps">
-        {(meta.caps || []).map((cap) => <span key={cap}>{t(cap)}</span>)}
-      </div>
-      <button
-        type="button"
-        className={"s-btn widget-store-btn" + (pinned || inspect ? " s-btn-soft" : "")}
-        aria-label={inspect ? `${t("next.inspector")}: ${label}` : undefined}
-        aria-pressed={inspect ? selected : undefined}
-        onClick={pinned ? onEdit : onAdd}
-      >
-        <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon(pinned || inspect ? "sliders" : "plus") }} />
-        <span>{inspect || pinned ? t("widget.edit") : t("widget.add")}</span>
-      </button>
-    </article>
-  );
-}
-
-/** Coalesce pointer moves to one RAF tick; return detach(). */
-function bindRafMove(onFrame) {
-  let raf = 0;
-  let last = null;
-  const onMove = (ev) => {
-    last = ev;
-    if (raf) return;
-    raf = requestAnimationFrame(() => {
-      raf = 0;
-      if (last) onFrame(last);
-    });
-  };
-  const detach = () => {
-    cancelAnimationFrame(raf);
-    raf = 0;
-    window.removeEventListener("pointermove", onMove);
-  };
-  window.addEventListener("pointermove", onMove);
-  return { onMove, detach };
-}
-
-function WidgetsWorkspace({ cfg, set, focusedPin }) {
-  const [selectedId, selectId] = useState(focusedPin || null);
-  const [draft, setDraft] = useState(null);
-  const saved = findPin(cfg.pinned, selectedId);
-  const selected = saved?.kind === "widget" ? saved : draft;
-  const inspect = (widget) => {
-    const ref = widgetRefs(cfg.pinned, widget)[0];
-    selectId(ref?.id || null);
-    setDraft(ref ? null : { id: crypto.randomUUID(), kind: "widget", widget, name: widgetDisplayName(widget), path: "", args: [], style: {} });
-  };
-  const change = (style) => {
-    if (saved) set({ pinned: updatePin(cfg.pinned, saved.id, { style }) });
-    else setDraft((item) => ({ ...item, style }));
-  };
-  return <>
-    <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
-    <div className="widgets-workspace">
-      <div className="widget-store-grid">{WIDGET_ORDER.map((widget) => <WidgetStoreCard key={widget} widget={widget} label={widgetDisplayName(widget)} refs={widgetRefs(cfg.pinned, widget)} inspect selected={selected?.widget === widget} onAdd={() => inspect(widget)} onEdit={() => inspect(widget)} />)}</div>
-      <aside className="widget-inspector" aria-label={t("next.inspector")}>
-        {selected ? <>
-          <WidgetStyleFields item={selected} accent={cfg.accent} cfg={cfg} set={set} onChange={change} />
-          {saved ? <button className="s-btn s-btn-soft" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button> : <button className="s-btn" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
-        </> : <p className="muted">{t("apps.widgetsHint")}</p>}
-      </aside>
-    </div>
-  </>;
 }
 
 function Apps(props) {
-  return props.section === "apps" ? <LibraryWorkspace {...props} listInstalled={installedAppsOnce} iconPicker={IconPickerModal} /> : props.section === "widgets" ? <WidgetsWorkspace {...props} /> : <LegacyApps {...props} />;
-}
-
-function LegacyApps({ cfg, set, section = "apps", focusedPin }) {
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const listRef = useRef(null);
-  const gridRef = useRef(null);
-  const kidMenuRef = useRef(null);
-  // During a drag we mutate a local draft and only persist on pointerup —
-  // avoids config saves / Settings reloads on every pointer frame.
-  const [draftPinned, setDraftPinned] = useState(null);
-  const pinnedRef = useRef(cfg.pinned);
-  pinnedRef.current = draftPinned || cfg.pinned;
-  const displayPinned = draftPinned || cfg.pinned;
-  const drag = useRef(null);
-  const childDrag = useRef(null);
-  const mergeRef = useRef(-1);
-  const [mergeInto, setMergeInto] = useState(-1);
-  const [iconFor, setIconFor] = useState(-1);
-  const [styleFor, setStyleFor] = useState(null);
-  const [webUrl, setWebUrl] = useState("");
-  const [webName, setWebName] = useState("");
-  const [openIds, setOpenIds] = useState({});
-  const toggleOpen = (id) => setOpenIds((o) => ({ ...o, [id]: !o[id] }));
-  // List vs. grid layout for the pinned items (remembered across sessions).
-  const [view, setView] = useState(() => localStorage.getItem("booki.appsView") || "list");
-  const pickView = (v) => { setView(v); try { localStorage.setItem("booki.appsView", v); } catch (_) {} };
-  // Two-step "remove everything" so a stray click can't wipe the dock.
-  const [clearArm, setClearArm] = useState(false);
-  // Two-step remove for groups so a stray click can't wipe several pins.
-  const [removeArm, setRemoveArm] = useState(-1);
-  // Click-to-rename — keeps the list calm until the user edits a name.
-  const [renameKey, setRenameKey] = useState(null);
-  const [kidsHintDismissed, setKidsHintDismissed] = useState(() => {
-    try { return localStorage.getItem("booki.kidsHintDismissed") === "1"; } catch (_) { return false; }
-  });
-  const dismissKidsHint = () => {
-    setKidsHintDismissed(true);
-    try { localStorage.setItem("booki.kidsHintDismissed", "1"); } catch (_) {}
-  };
-  const setIcon = (i, value) =>
-    set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, icon: value } : p)) });
-  const setStyle = (ref, value) =>
-    set({ pinned: updateWidgetStyleForRef(cfg.pinned, ref, value) });
-  const widgetLabels = Object.fromEntries(WIDGET_ORDER.map((w) => [w, widgetDisplayName(w)]));
-  const openWidgetEditor = (widget) => {
-    const ref = widgetRefs(cfg.pinned, widget)[0];
-    if (ref) setStyleFor(ref);
-  };
-  useEffect(() => {
-    if (!focusedPin) return;
-    const find = (items) => { for (const item of items) { if (item.id === focusedPin) return item; const child = find(item.children || []); if (child) return child; } };
-    const item = find(cfg.pinned);
-    if (item?.kind === "widget") { const ref = widgetRefs(cfg.pinned, item.widget).find((r) => r.id === item.id); if (ref) setStyleFor(ref); }
-    const frame = requestAnimationFrame(() => { const el = document.querySelector(`[data-pin-id="${CSS.escape(focusedPin)}"]`); el?.scrollIntoView({ block: "center" }); el?.classList.add("setting-search-target"); });
-    return () => cancelAnimationFrame(frame);
-  }, [focusedPin]);
-  const addWebsite = async () => {
-    let url = webUrl.trim();
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-    const host = url.replace(/^https?:\/\//i, "").split("/")[0].replace(/^www\./, "");
-    // A friendlier default name from the domain (e.g. "youtube.com" → "Youtube"),
-    // but the optional name field wins if you typed one.
-    const nice = host.split(".")[0].replace(/^\w/, (c) => c.toUpperCase());
-    const name = webName.trim() || nice || host;
-    let icon = null;
-    try {
-      // Favicon is best-effort: if it can't be fetched the pin still works with
-      // its initial — never block or warn just because an icon didn't load.
-      icon = await dockApi.fetchFavicon(url);
-    } catch (_) {}
-    set({ pinned: [...cfg.pinned, { id: uid(), name, path: url, args: [], kind: "app", icon }] });
-    setWebUrl("");
-    setWebName("");
-  };
-  // Dissolve a folder, spilling its items back to the dock (no data loss).
-  const ungroup = (i) => {
-    const grp = cfg.pinned[i];
-    if (!grp || grp.kind !== "group") return;
-    set({ pinned: cfg.pinned.flatMap((p, k) => (k === i ? grp.children || [] : [p])) });
-  };
-
-  const startDrag = (i) => (e) => {
-    e.preventDefault();
-    drag.current = { from: i };
-    mergeRef.current = -1;
-    setMergeInto(-1);
-    setDraftPinned([...pinnedRef.current]);
-    const { detach } = bindRafMove((ev) => {
-      if (!listRef.current || !drag.current) return;
-      const lis = [...listRef.current.querySelectorAll(".pin-item:not(.pin-child)")];
-      const from = drag.current.from;
-      let over = -1;
-      for (let k = 0; k < lis.length; k++) {
-        const r = lis[k].getBoundingClientRect();
-        if (ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
-      }
-      if (over >= 0 && over !== from) {
-        const r = lis[over].getBoundingClientRect();
-        const center = ev.clientY > r.top + r.height * 0.3 && ev.clientY < r.bottom - r.height * 0.3;
-        const dragged = pinnedRef.current[from];
-        const target = pinnedRef.current[over];
-        const canMerge =
-          canMergeKind(dragged?.kind) && (canMergeKind(target?.kind) || target?.kind === "group");
-        if (center && canMerge) {
-          if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
-          return;
-        }
-      }
-      if (mergeRef.current !== -1) { mergeRef.current = -1; setMergeInto(-1); }
-      let to = lis.findIndex((li) => {
-        const r = li.getBoundingClientRect();
-        return ev.clientY < r.top + r.height / 2;
-      });
-      if (to === -1) to = pinnedRef.current.length - 1;
-      if (to >= 0 && to !== from) {
-        const p = [...pinnedRef.current];
-        const [m] = p.splice(from, 1);
-        p.splice(to, 0, m);
-        drag.current.from = to;
-        setDraftPinned(p);
-      }
-    });
-    const onUp = (ev) => {
-      detach();
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      const m = mergeRef.current;
-      const from = drag.current?.from;
-      let next = pinnedRef.current;
-      if (m >= 0 && from != null && m !== from) {
-        const dragged = next[from];
-        const target = next[m];
-        if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
-      }
-      if (ev.type !== "pointercancel") set({ pinned: next });
-      setDraftPinned(null);
-      mergeRef.current = -1;
-      setMergeInto(-1);
-      drag.current = null;
-    };
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-  // Drag a folder's child up/down to reorder it within that folder.
-  const startDragChild = (gi, ci) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    childDrag.current = { gi, from: ci };
-    setDraftPinned([...pinnedRef.current]);
-    const { detach } = bindRafMove((ev) => {
-      if (!listRef.current || !childDrag.current) return;
-      const rows = [...listRef.current.querySelectorAll(`.pin-child-item[data-folder="${gi}"]`)];
-      let to = rows.findIndex((r) => {
-        const b = r.getBoundingClientRect();
-        return ev.clientY < b.top + b.height / 2;
-      });
-      if (to === -1) to = rows.length - 1;
-      const from = childDrag.current.from;
-      if (to >= 0 && to !== from) {
-        const kids = [...(pinnedRef.current[gi].children || [])];
-        const [m] = kids.splice(from, 1);
-        kids.splice(to, 0, m);
-        childDrag.current.from = to;
-        setDraftPinned(pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: kids } : p)));
-      }
-    });
-    const onUp = (ev) => {
-      detach();
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      if (ev.type !== "pointercancel") set({ pinned: pinnedRef.current });
-      setDraftPinned(null);
-      childDrag.current = null;
-    };
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-  // Grid version of the drag: same reorder + drop-onto-center-to-group logic,
-  // but hit-tested in 2D (cards wrap onto multiple rows).
-  const startDragGrid = (i) => (e) => {
-    e.preventDefault();
-    drag.current = { from: i };
-    mergeRef.current = -1;
-    setMergeInto(-1);
-    setDraftPinned([...pinnedRef.current]);
-    const { detach } = bindRafMove((ev) => {
-      if (!gridRef.current || !drag.current) return;
-      const cards = [...gridRef.current.querySelectorAll(".pin-card")];
-      const from = drag.current.from;
-      let over = -1;
-      for (let k = 0; k < cards.length; k++) {
-        const r = cards[k].getBoundingClientRect();
-        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
-      }
-      if (over >= 0 && over !== from) {
-        const r = cards[over].getBoundingClientRect();
-        const center =
-          ev.clientX > r.left + r.width * 0.28 && ev.clientX < r.right - r.width * 0.28 &&
-          ev.clientY > r.top + r.height * 0.28 && ev.clientY < r.bottom - r.height * 0.28;
-        const dragged = pinnedRef.current[from];
-        const target = pinnedRef.current[over];
-        const canMerge =
-          canMergeKind(dragged?.kind) && (canMergeKind(target?.kind) || target?.kind === "group");
-        if (center && canMerge) {
-          if (mergeRef.current !== over) { mergeRef.current = over; setMergeInto(over); }
-          return;
-        }
-      }
-      if (mergeRef.current !== -1) { mergeRef.current = -1; setMergeInto(-1); }
-      if (over >= 0 && over !== from) {
-        const p = [...pinnedRef.current];
-        const [m] = p.splice(from, 1);
-        p.splice(over, 0, m);
-        drag.current.from = over;
-        setDraftPinned(p);
-      }
-    });
-    const onUp = (ev) => {
-      detach();
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      const m = mergeRef.current;
-      const from = drag.current?.from;
-      let next = pinnedRef.current;
-      if (m >= 0 && from != null && m !== from) {
-        const dragged = next[from];
-        const target = next[m];
-        if (dragged && target) next = mergePins(next, dragged.id, target.id, t("group.new"));
-      }
-      if (ev.type !== "pointercancel") set({ pinned: next });
-      setDraftPinned(null);
-      mergeRef.current = -1;
-      setMergeInto(-1);
-      drag.current = null;
-    };
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-  const remove = (i) => {
-    const item = cfg.pinned[i];
-    if (item?.kind === "group" && (item.children || []).length > 0 && removeArm !== i) {
-      setRemoveArm(i);
-      return;
-    }
-    setRemoveArm(-1);
-    set({ pinned: cfg.pinned.filter((_, k) => k !== i) });
-  };
-  const clearAll = () => { set({ pinned: [] }); setClearArm(false); setRemoveArm(-1); };
-
-  // Grid view: drag a group's child SQUARE to reorder it within the group, or
-  // drag it out of the group card to take it back onto the dock — no buttons.
-  const kidDrag = useRef(null);
-  const kidOutRef = useRef(-1);
-  const kidTargetRef = useRef(null); // another group id the child is hovering over → move it there
-  const [kidOut, setKidOut] = useState(-1);
-  const [kidMenu, setKidMenu] = useState(null); // right-click menu on a group child: {gi,id,x,y}
-  const openKidMenu = (e, gi, id) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Text scale and translated labels make fixed menu dimensions unreliable.
-    setKidMenu({ gi, id, x: e.clientX, y: e.clientY });
-  };
-  useLayoutEffect(() => {
-    if (!kidMenu || !kidMenuRef.current) return;
-    const place = () => {
-      const rect = kidMenuRef.current.getBoundingClientRect();
-      const pad = 8;
-      const x = Math.min(Math.max(pad, kidMenu.x), Math.max(pad, window.innerWidth - rect.width - pad));
-      const y = Math.min(Math.max(pad, kidMenu.y), Math.max(pad, window.innerHeight - rect.height - pad));
-      setKidMenu((current) => current && (current.x !== x || current.y !== y) ? { ...current, x, y } : current);
-    };
-    place();
-    window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [kidMenu]);
-  useEffect(() => {
-    if (!kidMenu) return;
-    kidMenuRef.current?.querySelector("button")?.focus();
-    const close = () => setKidMenu(null);
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-      }
-    };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", onKeyDown);
-    return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", onKeyDown); };
-  }, [kidMenu]);
-  // Move a child from one group to another (dissolving the source if it's left
-  // with fewer than 2). Keyed by id so it survives the array shifting.
-  const moveChildToGroupById = (fromGroupId, childId, toGroupId) => {
-    if (fromGroupId === toGroupId) return;
-    const arr = pinnedRef.current;
-    const from = arr.find((p) => p.id === fromGroupId);
-    if (!from) return;
-    const child = (from.children || []).find((c) => c.id === childId);
-    if (!child) return;
-    const srcKids = (from.children || []).filter((c) => c.id !== childId);
-    let next = arr.map((p) => (p.id === toGroupId ? { ...p, children: [...(p.children || []), child] } : p));
-    if (srcKids.length < 2) next = next.flatMap((p) => (p.id === fromGroupId ? srcKids : [p]));
-    else next = next.map((p) => (p.id === fromGroupId ? { ...p, children: srcKids } : p));
-    set({ pinned: next });
-  };
-  const startKidDrag = (gi, childId) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const card = e.currentTarget.closest(".pin-card");
-    const srcGroupId = pinnedRef.current[gi].id;
-    const startIndex = (pinnedRef.current[gi].children || []).findIndex((c) => c.id === childId);
-    kidDrag.current = { gi, id: childId, from: startIndex, srcGroupId };
-    kidOutRef.current = -1;
-    kidTargetRef.current = null;
-    setKidOut(-1);
-    setMergeInto(-1);
-    const onMove = (ev) => {
-      // Over ANOTHER group card → releasing moves the child into that group.
-      let overGroup = null;
-      for (const gc of gridRef.current.querySelectorAll(".pin-card.is-group")) {
-        const idx = +gc.dataset.idx;
-        const p = pinnedRef.current[idx];
-        if (!p || p.id === srcGroupId) continue;
-        const r = gc.getBoundingClientRect();
-        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { overGroup = p.id; break; }
-      }
-      if (overGroup) {
-        if (kidTargetRef.current !== overGroup) {
-          kidTargetRef.current = overGroup;
-          setMergeInto(pinnedRef.current.findIndex((p) => p.id === overGroup));
-        }
-        if (kidOutRef.current !== -1) { kidOutRef.current = -1; setKidOut(-1); }
-        return; // aiming at another group → don't reorder/takeout
-      }
-      if (kidTargetRef.current !== null) { kidTargetRef.current = null; setMergeInto(-1); }
-      const cr = card.getBoundingClientRect();
-      const out =
-        ev.clientX < cr.left - 8 || ev.clientX > cr.right + 8 ||
-        ev.clientY < cr.top - 8 || ev.clientY > cr.bottom + 8;
-      if (out) {
-        if (kidOutRef.current !== gi) { kidOutRef.current = gi; setKidOut(gi); }
-        return; // aiming outside → release will take it out
-      }
-      if (kidOutRef.current !== -1) { kidOutRef.current = -1; setKidOut(-1); }
-      const kids = [...card.querySelectorAll(".pin-kid:not(.pin-kid-add)")];
-      let over = -1;
-      for (let k = 0; k < kids.length; k++) {
-        const r = kids[k].getBoundingClientRect();
-        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) { over = k; break; }
-      }
-      const from = kidDrag.current.from;
-      if (over >= 0 && over !== from) {
-        const arr = [...(pinnedRef.current[gi].children || [])];
-        const [m] = arr.splice(from, 1);
-        arr.splice(over, 0, m);
-        kidDrag.current.from = over;
-        set({ pinned: pinnedRef.current.map((p, k) => (k === gi ? { ...p, children: arr } : p)) });
-      }
-    };
-    const onUp = (ev) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      if (ev.type !== "pointercancel" && kidTargetRef.current) moveChildToGroupById(srcGroupId, kidDrag.current.id, kidTargetRef.current);
-      else if (ev.type !== "pointercancel" && kidOutRef.current === gi) takeOutChild(gi, kidDrag.current.id);
-      kidTargetRef.current = null;
-      kidOutRef.current = -1;
-      setKidOut(-1);
-      setMergeInto(-1);
-      kidDrag.current = null;
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
-    window.addEventListener("pointercancel", onUp, { once: true });
-  };
-  // Flag pins whose target doesn't exist on THIS machine (moved, uninstalled,
-  // or config imported from another PC) and offer to reassign the path.
-  const [missing, setMissing] = useState({});
-  useEffect(() => {
-    const items = [];
-    for (const p of cfg.pinned) {
-      if (p.path && (p.kind === "app" || p.kind === "folder")) items.push([p.id, p.path]);
-      for (const c of p.children || []) if (c.path) items.push([c.id, c.path]);
-    }
-    if (!items.length) {
-      setMissing({});
-      return;
-    }
-    let alive = true;
-    dockApi
-      .pathsExist(items.map(([, pth]) => pth))
-      .then((flags) => {
-        if (!alive || !Array.isArray(flags)) return;
-        const m = {};
-        items.forEach(([id], i) => {
-          if (!flags[i]) m[id] = true;
-        });
-        setMissing(m);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [cfg.pinned]);
-  const reassign = async (i) => {
-    const item = cfg.pinned[i];
-    const pth = item.kind === "folder" ? await pickFolder() : await pickAppFile();
-    if (pth) set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, path: pth } : p)) });
-  };
-  const addApp = async () => {
-    const path = await pickAppFile();
-    if (path) set({ pinned: [...cfg.pinned, mkPin(path, "app")] });
-  };
-  const addFolder = async () => {
-    const path = await pickFolder();
-    if (path) set({ pinned: [...cfg.pinned, mkPin(path, "folder")] });
-  };
-  const addSep = () =>
-    set({ pinned: [...cfg.pinned, { id: uid(), name: "", path: "", args: [], kind: "separator" }] });
-  const hasTrash = cfg.pinned.some((p) => p.kind === "trash");
-  const addTrash = () =>
-    !hasTrash &&
-    set({ pinned: [...cfg.pinned, { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" }] });
-  const addWidget = (widget, label) =>
-    set({ pinned: [...cfg.pinned, { id: uid(), name: label, path: "", args: [], kind: "widget", widget }] });
-  const newFolder = () => setCreatingGroup(true);
-  // Edit a folder's contents (kind === "group", children[]). Auto-dissolves a
-  // folder left with fewer than 2 items, matching the dock's behavior.
-  const settleFolder = (gi, kids, extra = []) => {
-    if (kids.length < 2) set({ pinned: cfg.pinned.flatMap((p, k) => (k === gi ? [...kids, ...extra] : [p])) });
-    else set({ pinned: cfg.pinned.flatMap((p, k) => (k === gi ? [{ ...p, children: kids }, ...extra] : [p])) });
-  };
-  const removeChild = (gi, childId) =>
-    settleFolder(gi, (cfg.pinned[gi].children || []).filter((c) => c.id !== childId));
-  const takeOutChild = (gi, childId) => {
-    const grp = cfg.pinned[gi];
-    const child = (grp.children || []).find((c) => c.id === childId);
-    if (!child) return;
-    settleFolder(gi, (grp.children || []).filter((c) => c.id !== childId), [child]);
-  };
-  const addToFolder = async (gi, kind = "app") => {
-    const path = kind === "folder" ? await pickFolder() : await pickAppFile();
-    if (!path) return;
-    set({
-      pinned: cfg.pinned.map((p, k) =>
-        k === gi ? { ...p, children: [...(p.children || []), mkPin(path, kind === "folder" ? "folder" : "app")] } : p
-      ),
-    });
-  };
-  const renameChild = (gi, childId, name) =>
-    set({
-      pinned: cfg.pinned.map((p, k) =>
-        k === gi ? { ...p, children: (p.children || []).map((c) => (c.id === childId ? { ...c, name } : c)) } : p
-      ),
-    });
-  const styleTarget = itemForWidgetRef(cfg.pinned, styleFor);
-  const widgetPinnedCount = (cfg.pinned || []).reduce(
-    (n, item) => n + (item.kind === "widget" ? 1 : 0) + (item.children || []).filter((c) => c.kind === "widget").length,
-    0
-  );
-
-  return (
-    <>
-      <PageHeader
-        title={section === "widgets" ? t("tab.widgets") : t("overhaul.appsFolders")}
-        meta={(
-          <>
-            <span>{cfg.pinned.length}</span>
-            <span>{widgetPinnedCount} {t("apps.widgets")}</span>
-          </>
-        )}
-      >
-        {section === "widgets" ? t("apps.widgetsHint") : t("workspace.libraryHint")}
-      </PageHeader>
-
-      {section === "apps" && <AppLibrary cfg={cfg} set={set} listInstalled={installedAppsOnce} browseFile={addApp} browseFolder={addFolder} />}
-      {section === "apps" && (
-      <SettingsSection title={t("workspace.pinned")} className="apps-primary-section">
-        <div className="pin-board">
-          <div className="pin-toolbar">
-            <div className="pin-toolbar-main">
-              <div className="pin-quick-add" role="group" aria-label={t("apps.quickAdd")}>
-                <Button className="pin-add-main" appearance="primary" icon={<AddRegular />} onClick={() => { const input = document.querySelector(".app-library-tools input"); input?.scrollIntoView({ block: "center", behavior: "smooth" }); input?.focus({ preventScroll: true }); }}>
-                  {t("apps.addApp")}
-                </Button>
-                <Button appearance="subtle" icon={<FolderAddRegular />} onClick={addFolder} title={t("apps.addFolder")}>
-                  {t("apps.addFolderShort")}
-                </Button>
-                <Button appearance="subtle" icon={<FolderRegular />} onClick={newFolder} title={t("apps.newFolder")}>
-                  {t("apps.newFolderShort")}
-                </Button>
-                <Button appearance="subtle" icon={<LineHorizontal3Regular />} onClick={addSep} title={t("apps.addSep")}>
-                  {t("apps.addSepShort")}
-                </Button>
-                <Button
-                  appearance="subtle"
-                  icon={<DeleteRegular />}
-                  disabled={hasTrash}
-                  onClick={addTrash}
-                  title={t("apps.addTrash")}
-                >
-                  {t("apps.addTrashShort")}
-                </Button>
-              </div>
-            </div>
-            <div className="pin-toolbar-actions">
-              {cfg.pinned.length > 0 && (
-                <div className="pin-view-toggle" role="tablist" aria-label={t("apps.view")}>
-                  <Button
-                    appearance={view === "list" ? "primary" : "subtle"}
-                    icon={<ListRegular />}
-                    title={t("apps.viewList")}
-                    aria-label={t("apps.viewList")}
-                    aria-selected={view === "list"}
-                    onClick={() => pickView("list")}
-                  >
-                    {t("apps.viewList")}
-                  </Button>
-                  <Button
-                    appearance={view === "grid" ? "primary" : "subtle"}
-                    icon={<GridRegular />}
-                    title={t("apps.viewGrid")}
-                    aria-label={t("apps.viewGrid")}
-                    aria-selected={view === "grid"}
-                    onClick={() => pickView("grid")}
-                  >
-                    {t("apps.viewGrid")}
-                  </Button>
-                </div>
-              )}
-              {cfg.pinned.length > 0 && (
-                clearArm ? (
-                  <div className="pin-clear-confirm">
-                    <span>{t("apps.clearConfirm")}</span>
-                    <Button appearance="primary" size="small" onClick={clearAll}>{t("apps.clearYes")}</Button>
-                    <Button size="small" onClick={() => setClearArm(false)}>{t("apps.clearNo")}</Button>
-                  </div>
-                ) : (
-                  <Button
-                    className="pin-clear"
-                    appearance="subtle"
-                    icon={<DeleteRegular />}
-                    onClick={() => setClearArm(true)}
-                    title={t("apps.clearAll")}
-                  >
-                    {t("apps.clearAll")}
-                  </Button>
-                )
-              )}
-            </div>
-          </div>
-
-          {cfg.pinned.length > 0 && (
-            <p className="muted pin-howto">{t("apps.howto")}</p>
-          )}
-
-          {cfg.pinned.length === 0 && (
-            <div className="pin-empty-board">
-              <img className="empty-capy" src="/brand/svg/isotype.svg" alt="" />
-              <strong>{t("apps.empty")}</strong>
-              <p className="muted">{t("apps.emptyHint")}</p>
-              <div className="s-tips pin-empty-tips">
-                <div className="s-tip"><img className="emo" src={emoSrc("mouse")} alt="" width="18" height="18" />{t("apps.tips1")}</div>
-                <div className="s-tip"><img className="emo" src={emoSrc("star")} alt="" width="18" height="18" />{t("apps.tips2")}</div>
-                <div className="s-tip"><img className="emo" src={emoSrc("puzzle")} alt="" width="18" height="18" />{t("apps.tips3")}</div>
-              </div>
-              <Button appearance="primary" icon={<AddRegular />} onClick={addApp}>
-                {t("apps.addApp")}
-              </Button>
-            </div>
-          )}
-
-          {view === "grid" && displayPinned.length > 0 ? (
-        <div className="pin-grid" ref={gridRef}>
-          {displayPinned.map((item, i) => {
-            const isGroup = item.kind === "group";
-            const open = isGroup && openIds[item.id];
-            const topKey = "top:" + item.id;
-            return (
-              <div key={item.id} data-pin-id={item.id} data-idx={i}
-                className={"pin-card" + (isGroup ? " is-group" : "") + (item.kind === "separator" ? " is-sep" : "") +
-                  (mergeInto === i ? " merge-into" : "") + (open ? " open" : "")}>
-                <button className="pin-card-grip" title={t("apps.drag")} aria-label={t("apps.drag")}
-                  onPointerDown={startDragGrid(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
-                <div className={"pin-card-body" + (isGroup && !open ? " clickable" : "")}
-                  onClick={isGroup && !open ? () => toggleOpen(item.id) : undefined}
-                  title={isGroup ? t("apps.editFolder") : item.path || ""}>
-                  {item.kind !== "separator" && <PinThumb item={item} />}
-                  {item.kind === "separator" ? (
-                    <span className="pin-card-name">{t("apps.sep")}</span>
-                  ) : (
-                    <PinName
-                      className={isGroup || renameKey === topKey ? "pin-card-name-edit" : "pin-card-name"}
-                      value={item.name}
-                      editing={renameKey === topKey}
-                      title={item.path || t("apps.renameHint")}
-                      onEdit={() => setRenameKey(topKey)}
-                      onDone={() => setRenameKey(null)}
-                      onChange={(name) =>
-                        set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name } : p)) })
-                      }
-                    />
-                  )}
-                  {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
-                  {missing[item.id] && (
-                    <span
-                      className="pin-missing"
-                      title={t("apps.missing")}
-                      dangerouslySetInnerHTML={{ __html: icon("alert") }}
-                    />
-                  )}
-                </div>
-                <div className="pin-card-actions">
-                  {isGroup && (
-                    <IconBtn
-                      name={open ? "chevron-down" : "chevron-right"}
-                      title={t("apps.editFolder")}
-                      onClick={() => toggleOpen(item.id)}
-                    />
-                  )}
-                  <Menu>
-                    <MenuTrigger disableButtonEnhancement>
-                      <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                        <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
-                      </button>
-                    </MenuTrigger>
-                    <MenuPopover className="booki-menu-popover">
-                      <MenuList>
-                        {isGroup && <MenuItem onClick={() => setRenameKey(topKey)}>{t("apps.rename")}</MenuItem>}
-                        {isGroup && <MenuItem onClick={() => ungroup(i)}>{t("group.ungroup")}</MenuItem>}
-                        {item.kind === "widget" && (
-                          <MenuItem onClick={() => setStyleFor({ type: "top", id: item.id, i })}>{t("w.styleTitle")}</MenuItem>
-                        )}
-                        {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
-                          <MenuItem onClick={() => setIconFor(i)}>{t("apps.changeIcon")}</MenuItem>
-                        )}
-                        {(item.kind === "app" || item.kind === "folder") && (
-                          <MenuItem onClick={() => dockApi.openLocation(item.path)}>{t("apps.openLoc")}</MenuItem>
-                        )}
-                        {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
-                          <MenuItem onClick={() => reassign(i)}>{t("apps.reassign")}</MenuItem>
-                        )}
-                        <MenuItem onClick={() => remove(i)}>
-                          {removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
-                        </MenuItem>
-                      </MenuList>
-                    </MenuPopover>
-                  </Menu>
-                </div>
-                {open && (
-                  <div className={"pin-card-kids" + (kidOut === i ? " taking-out" : "")}>
-                    {(item.children || []).map((c) => {
-                      const childKey = "child:" + item.id + ":" + c.id;
-                      return (
-                        <div key={c.id} className="pin-kid" title={t("apps.dragKid")}
-                          onPointerDown={startKidDrag(i, c.id)}
-                          onContextMenu={(e) => openKidMenu(e, i, c.id)}>
-                          <PinThumb item={c} />
-                          <PinName
-                            className="pin-kid-rename"
-                            value={c.name}
-                            editing={renameKey === childKey}
-                            title={c.path || t("apps.renameHint")}
-                            onEdit={() => setRenameKey(childKey)}
-                            onDone={() => setRenameKey(null)}
-                            onChange={(name) => renameChild(i, c.id, name)}
-                          />
-                          <span className="pin-kid-acts" onPointerDown={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              className="pin-kid-edit"
-                              title={t("group.takeOut")}
-                              onClick={(e) => { e.stopPropagation(); takeOutChild(i, c.id); }}
-                              dangerouslySetInnerHTML={{ __html: icon("take-out") }}
-                            />
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <button type="button" className="pin-kid pin-kid-add" title={t("apps.addToFolder")}
-                      onClick={() => addToFolder(i, "app")}>
-                      <span dangerouslySetInnerHTML={{ __html: icon("plus") }} />
-                    </button>
-                    <button type="button" className="pin-kid pin-kid-add" title={t("m.addFolder")}
-                      onClick={() => addToFolder(i, "folder")}>
-                      <span dangerouslySetInnerHTML={{ __html: icon("folder") }} />
-                    </button>
-                    {!kidsHintDismissed && (
-                      <div className="pin-kids-hint">
-                        <span>{t("apps.kidsHint")}</span>
-                        <button type="button" className="pin-kids-hint-x" onClick={dismissKidsHint} aria-label={t("apps.dismissHint")}>×</button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-          ) : displayPinned.length > 0 ? (
-      <ul className="pin-list" ref={listRef}>
-        {displayPinned.flatMap((item, i) => {
-          const isGroup = item.kind === "group";
-          const open = isGroup && openIds[item.id];
-          const topKey = "top:" + item.id;
-          const rows = [
-            <li key={item.id} data-pin-id={item.id} className={"pin-item" + (item.kind === "separator" ? " sep" : "") + (isGroup ? " is-folder" : "") + (mergeInto === i ? " merge-into" : "")}>
-              <span className="pin-left">
-                <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
-                  onPointerDown={startDrag(i)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
-                {isGroup && (
-                  <IconBtn name={open ? "chevron-down" : "chevron-right"} title={t("apps.editFolder")}
-                    onClick={() => toggleOpen(item.id)} />
-                )}
-                {item.kind !== "separator" && <PinThumb item={item} />}
-                {item.kind === "separator" ? (
-                  <span className="pin-name">{t("apps.sep")}</span>
-                ) : (
-                  <PinName
-                    value={item.name}
-                    editing={renameKey === topKey}
-                    title={item.path || t("apps.renameHint")}
-                    onEdit={() => setRenameKey(topKey)}
-                    onDone={() => setRenameKey(null)}
-                    onChange={(name) =>
-                      set({ pinned: cfg.pinned.map((p, k) => (k === i ? { ...p, name } : p)) })
-                    }
-                  />
-                )}
-                {missing[item.id] && (
-                  <span className="pin-missing" title={t("apps.missing")}>
-                    <span dangerouslySetInnerHTML={{ __html: icon("alert") }} />
-                    {" "}{t("apps.missingShort")}
-                  </span>
-                )}
-                {isGroup && <span className="pin-count">{(item.children || []).length}</span>}
-              </span>
-              <span className="pin-actions">
-                <Menu>
-                  <MenuTrigger disableButtonEnhancement>
-                    <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                      <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
-                    </button>
-                  </MenuTrigger>
-                  <MenuPopover className="booki-menu-popover">
-                    <MenuList>
-                      {item.kind !== "separator" && (
-                        <MenuItem onClick={() => setRenameKey(topKey)}>{t("apps.rename")}</MenuItem>
-                      )}
-                      {isGroup && <MenuItem onClick={() => ungroup(i)}>{t("group.ungroup")}</MenuItem>}
-                      {item.kind === "widget" && (
-                        <MenuItem onClick={() => setStyleFor({ type: "top", id: item.id, i })}>{t("w.styleTitle")}</MenuItem>
-                      )}
-                      {item.kind !== "separator" && item.kind !== "widget" && item.kind !== "trash" && !isGroup && (
-                        <MenuItem onClick={() => setIconFor(i)}>{t("apps.changeIcon")}</MenuItem>
-                      )}
-                      {missing[item.id] && (item.kind === "app" || item.kind === "folder") && (
-                        <MenuItem onClick={() => reassign(i)}>{t("apps.reassign")}</MenuItem>
-                      )}
-                      {(item.kind === "app" || item.kind === "folder") && (
-                        <MenuItem onClick={() => dockApi.openLocation(item.path)}>{t("apps.openLoc")}</MenuItem>
-                      )}
-                      <MenuItem onClick={() => remove(i)}>
-                        {removeArm === i ? t("group.removeConfirm") : t("apps.remove")}
-                      </MenuItem>
-                    </MenuList>
-                  </MenuPopover>
-                </Menu>
-              </span>
-            </li>,
-          ];
-          if (open) {
-            (item.children || []).forEach((c, ci) => {
-              const childKey = "child:" + item.id + ":" + c.id;
-              rows.push(
-                <li key={item.id + ":" + c.id} className="pin-item pin-child pin-child-item" data-folder={i}>
-                  <span className="pin-left">
-                    <button className="pin-handle" title={t("apps.drag")} aria-label={t("apps.drag")}
-                      onPointerDown={startDragChild(i, ci)} dangerouslySetInnerHTML={{ __html: icon("grip") }} />
-                    <PinThumb item={c} />
-                    <PinName
-                      value={c.name}
-                      editing={renameKey === childKey}
-                      title={c.path || t("apps.renameHint")}
-                      onEdit={() => setRenameKey(childKey)}
-                      onDone={() => setRenameKey(null)}
-                      onChange={(name) => renameChild(i, c.id, name)}
-                    />
-                  </span>
-                  <span className="pin-actions">
-                    <Menu>
-                      <MenuTrigger disableButtonEnhancement>
-                        <button type="button" className="pin-btn ico" title={t("apps.itemActions")} aria-label={t("apps.itemActions")}>
-                          <span className="pin-btn-icon" dangerouslySetInnerHTML={{ __html: icon("more") }} />
-                        </button>
-                      </MenuTrigger>
-                      <MenuPopover className="booki-menu-popover">
-                        <MenuList>
-                          <MenuItem onClick={() => setRenameKey(childKey)}>{t("apps.rename")}</MenuItem>
-                          {c.kind === "widget" && (
-                            <MenuItem onClick={() => setStyleFor({ type: "child", groupId: item.id, gi: i, id: c.id })}>
-                              {t("w.styleTitle")}
-                            </MenuItem>
-                          )}
-                          <MenuItem onClick={() => takeOutChild(i, c.id)}>{t("group.takeOut")}</MenuItem>
-                          <MenuItem onClick={() => removeChild(i, c.id)}>{t("apps.remove")}</MenuItem>
-                        </MenuList>
-                      </MenuPopover>
-                    </Menu>
-                  </span>
-                </li>
-              );
-            });
-            rows.push(
-              <li key={item.id + ":add"} className="pin-item pin-child pin-add-row">
-                <button type="button" className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "app")}>
-                  <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("folder-plus") }} />
-                  <span>{t("apps.addToFolder")}</span>
-                </button>
-                <button type="button" className="s-btn s-btn-soft pin-add-btn" onClick={() => addToFolder(i, "folder")}>
-                  <span className="s-btn-glyph" dangerouslySetInnerHTML={{ __html: icon("folder") }} />
-                  <span>{t("m.addFolder")}</span>
-                </button>
-                {!kidsHintDismissed && (
-                  <span className="pin-kids-hint muted">
-                    {t("apps.kidsHint")}
-                    <button type="button" className="pin-kids-hint-x" onClick={dismissKidsHint} aria-label={t("apps.dismissHint")}>×</button>
-                  </span>
-                )}
-              </li>
-            );
-          }
-          return rows;
-        })}
-      </ul>
-          ) : null}
-        </div>
-      </SettingsSection>
-      )}
-      {section === "widgets" && (
-        <div className="widget-store-grid">
-          {WIDGET_ORDER.map((w) => {
-            const refs = widgetRefs(cfg.pinned, w);
-            return (
-              <WidgetStoreCard
-                key={w}
-                widget={w}
-                label={widgetLabels[w] || w}
-                refs={refs}
-                onAdd={() => addWidget(w, widgetLabels[w] || w)}
-                onEdit={() => openWidgetEditor(w)}
-              />
-            );
-          })}
-        </div>
-      )}
-      {section === "apps" && (
-      <CollapsibleSection
-        title={t("apps.web")}
-        icon="external"
-        hint={t("apps.webHint")}
-        defaultOpen={false}
-      >
-        <div className="web-add">
-          <input
-            className="r-hotkey-input web-url"
-            type="text"
-            placeholder={t("apps.webPlaceholder")}
-            value={webUrl}
-            onChange={(e) => setWebUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addWebsite()}
-          />
-          <input
-            className="r-hotkey-input web-name"
-            type="text"
-            placeholder={t("apps.webName")}
-            value={webName}
-            onChange={(e) => setWebName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addWebsite()}
-          />
-          <button className="s-btn" onClick={addWebsite}>{t("apps.webAdd")}</button>
-        </div>
-      </CollapsibleSection>
-      )}
-      {creatingGroup && <GroupCreator pinned={cfg.pinned} onClose={() => setCreatingGroup(false)} onCreate={(pinned) => { set({ pinned }); setCreatingGroup(false); }} />}
-      {iconFor >= 0 && cfg.pinned[iconFor] && (
-        <IconPickerModal
-          item={cfg.pinned[iconFor]}
-          onClose={() => setIconFor(-1)}
-          onPick={(value) => { setIcon(iconFor, value); setIconFor(-1); }}
-        />
-      )}
-      {styleTarget && (
-        <WidgetStyleModal
-          item={styleTarget}
-          accent={cfg.accent}
-          cfg={cfg}
-          set={set}
-          onChange={(value) => setStyle(styleFor, value)}
-          onClose={() => setStyleFor(null)}
-        />
-      )}
-      {kidMenu && (
-        <div ref={kidMenuRef} className="pin-kid-menu" role="menu" aria-label={t("apps.itemActions")} style={{ left: kidMenu.x, top: kidMenu.y }}
-          onPointerDown={(e) => e.stopPropagation()}>
-          <button role="menuitem" onClick={() => {
-            const g = cfg.pinned[kidMenu.gi];
-            if (g) setRenameKey("child:" + g.id + ":" + kidMenu.id);
-            setKidMenu(null);
-          }}>
-            <span dangerouslySetInnerHTML={{ __html: icon("pencil") }} />{t("apps.rename")}
-          </button>
-          <button role="menuitem" onClick={() => { takeOutChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
-            <span dangerouslySetInnerHTML={{ __html: icon("take-out") }} />{t("group.takeOut")}
-          </button>
-          <button role="menuitem" className="danger" onClick={() => { removeChild(kidMenu.gi, kidMenu.id); setKidMenu(null); }}>
-            <span dangerouslySetInnerHTML={{ __html: icon("trash") }} />{t("apps.remove")}
-          </button>
-        </div>
-      )}
-    </>
-  );
+  return props.section === "apps" ? <LibraryWorkspace {...props} listInstalled={installedAppsOnce} iconPicker={IconPickerModal} /> : props.section === "widgets" ? <WidgetsWorkspace {...props} styleFields={WidgetStyleFields} /> : null;
 }
 
 // Keyboard shortcuts — a SECTION of the General tab (it never warranted a whole
@@ -2469,7 +1288,7 @@ function App() {
     try {
       const patch = {};
       for (const key of keys) if (key in snap) patch[key] = snap[key];
-      if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
+      if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || []);
       const toSave = await configApi.patch(patch, { base, expectedRevision: snap.revision }) || { ...snap, ...patch };
       await emitConfigChanged();
       if (!dirtyKeys.current.size) cfgRef.current = toSave;
@@ -2573,7 +1392,11 @@ function App() {
     let frame, timer;
     frame = requestAnimationFrame(() => {
       let target = [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === searchTarget.label);
-      if (!target) document.querySelectorAll(".ui-disclosure[aria-expanded=false]").forEach((button) => button.click());
+      // Reveal only the target's ancestors, preserving unrelated sections.
+      for (let parent = target?.parentElement; parent; parent = parent.parentElement) {
+        if (parent.matches('details')) parent.open = true;
+        if (parent.classList.contains('ui-collapsible')) parent.querySelector(':scope > .ui-group > .ui-disclosure[aria-expanded="false"]')?.click();
+      }
       frame = requestAnimationFrame(() => {
         target = [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === searchTarget.label);
         if (!target) return;
@@ -2621,7 +1444,7 @@ function App() {
   const set = (patch, opts = {}) => {
     const prev = cfgRef.current;
     const next = { ...prev, ...patch };
-    if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
+    if (patch.pinned) next.pinned = normalizePinned(patch.pinned);
     // Record the draft synchronously: a native close can arrive before React
     // renders the edit, and must still wait for those keys to reach disk.
     for (const k of Object.keys(patch)) {
@@ -2680,16 +1503,18 @@ function App() {
 
   const prepareConfigOperation = async () => { await flushSave(); if (dirtyKeys.current.size) throw new Error("pending settings could not be saved"); };
   const applySnapshot = async (operation) => {
-    await prepareConfigOperation();
+    const recovery = await invoke('config_recovery_status');
+    if (!recovery?.blocked) await prepareConfigOperation();
     const fresh = await operation();
     if (!fresh) throw new Error("profile unavailable");
+    if (recovery?.blocked) { clearTimeout(saveTimer.current); dirtyKeys.current.clear(); dirtyBase.current.clear(); }
     await ensureLang(fresh.language);
     cfgRef.current = fresh; setCfg(fresh); applyTheme(fresh); applySurfaceVars(fresh);
     await emitConfigChanged();
     return fresh;
   };
-  const applyProfile = (name) => applySnapshot(() => dockApi.profileApply(name));
-  const importProfile = (path) => applySnapshot(() => dockApi.importConfig(path));
+  const applyProfile = (name, expected) => applySnapshot(() => dockApi.profileApply(name, expected));
+  const importProfile = (path, expected) => applySnapshot(() => dockApi.importConfig(path, expected));
 
   const reset = async () => {
     await flushSave();
@@ -2810,7 +1635,7 @@ function App() {
                   onClick={() => setTab(entry[0])}
                 >
                   <span className="s-navicon" style={{ background: entry[3] }} dangerouslySetInnerHTML={{ __html: icon(entry[2]) }} />
-                  <span>{t(entry[1])}</span>
+                  <span className="s-navlabel">{t(entry[1])}</span>
                 </button>
               ) : (
                 <span key={"gap" + i} className="s-nav-gap" aria-hidden="true" />
@@ -2840,12 +1665,14 @@ function App() {
               switching tabs unmounts one and mounts the other on its own. The
               key additionally remounted this wrapper and the save-status line,
               which threw away the "saved" indicator mid-flight. */}
-          <div>
+          <div className={"settings-page" + (tab === "apps" ? " library-page" : "")}>
             <div className={"s-save-status status-" + saveState} role="status" aria-live="polite">
               {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
             </div>
             {configConflict && <div className="settings-close-error" role="alert"><span>{t("workspace.conflict")}</span><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(true)}>{t("workspace.keepMine")}</button><button className="s-btn s-btn-soft" onClick={() => resolveConfigConflict(false)}>{t("workspace.useOther")}</button></div>}
             {closeError && <div className="settings-close-error" role="alert"><span>{t("workspace.closeFailed")}</span><button className="s-btn s-btn-soft" onClick={async () => { await flushSave(); if (!dirtyKeys.current.size) finishClose(); }}>{t("focus.retry")}</button></div>}
+            <NativeBackdrop cfg={cfg} />
+            <RecoveryNotice revision={cfg.revision} onProfiles={() => setTab("profiles")} onStartFresh={() => applySnapshot(() => invoke("start_fresh_config"))} />
             <SettingsBoundary key={tab} onHome={() => setTab("home")}>
             {tab === "home" && <Dashboard cfg={cfg} set={set} navigate={setTab} version={version} onProfile={applyProfile} listProfiles={dockApi.profileList} onSelect={(item) => { setTab(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); }} />}
             {tab === "appearance" && <Appearance cfg={cfg} set={set} />}

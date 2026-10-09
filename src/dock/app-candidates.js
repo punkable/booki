@@ -67,15 +67,33 @@ export function rank(list, query) {
   return list.map((c) => ({ c, s: Math.max(matchScore(c.name, query), Math.min(2, matchScore(baseTitle(c.path), query))) })).filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s || a.c.name.localeCompare(b.c.name)).map((x) => x.c);
 }
+/* Prefer native launch identities over translated display names. Utilities remain
+   searchable and pinnable; only the default catalog/suggestions are quieter. */
+export function appCategory(item, identities = {}) {
+  let launchPath = identities[item.path] || item.path;
+  // Windows identities encode target, arguments and working directory as a
+  // JSON tuple. Classification uses only its target; deduplication keeps all.
+  if (typeof launchPath === 'string' && launchPath.startsWith('[')) {
+    try { const identity = JSON.parse(launchPath); launchPath = Array.isArray(identity) && typeof identity[0] === 'string' ? identity[0] : item.path; }
+    catch { launchPath = item.path; }
+  }
+  const path = pathKey(launchPath);
+  const executable = baseTitle(path);
+  if (/^(powershell|pwsh|cmd|wt|snippingtool|wmplayer|unins\d*|uninstall)$/i.test(executable)) return 'utilities';
+  if (/^shell:appsfolder\/(microsoft\.(windowsterminal|powershell|screensketch|zunemusic|zunevideo|windowsmediaplayer))[_!]/i.test(path)) return 'utilities';
+  if (/\/(windows powershell|windows administrative tools|windows tools)\//i.test(path)) return 'utilities';
+  return 'apps';
+}
 export function candidateSections(data, keys, query = '', identities = {}) {
   const catalog = installedCandidates(data.groups, keys, identities);
   const names = new Map(catalog.map((c) => [appKey(c, identities), c.name]));
   const catalogIds = new Set(catalog.map((c) => appKey(c, identities)));
   const used = (data.used || []).filter((u) => !catalog.length || !pathKey(u.path).startsWith('shell:appsfolder/') || catalogIds.has(appKey(u, identities)));
-  const frequent = frequentCandidates(used, keys, 12, identities).map((c) => ({ ...c, name: names.get(appKey(c, identities)) || c.name }));
+  const preferred = used.filter(item => appCategory(item, identities) !== 'utilities' || Number(item.runs) >= 5 || Number(item.focus_ms) >= 600000);
+  const frequent = frequentCandidates(preferred, keys, 12, identities).map((c) => ({ ...c, name: names.get(appKey(c, identities)) || c.name }));
   const seen = new Set(frequent.map((c) => appKey(c, identities)));
   const running = runningCandidates(data.running, keys, identities).filter((c) => !seen.has(appKey(c, identities)));
   running.forEach((c) => seen.add(appKey(c, identities)));
   const installed = installedCandidates(data.groups, keys, identities).filter((c) => !seen.has(appKey(c, identities)));
-  return { frequent: rank(frequent, query), running: rank(running, query), installed: rank(installed, query) };
+  return { frequent: rank(frequent, query), running: rank(running, query), installed: rank(installed, query), utilities: rank(installed.filter(item => appCategory(item, identities) === 'utilities'), query) };
 }

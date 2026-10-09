@@ -28,13 +28,13 @@ export default [
       globals: { ...globals.browser },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    // Only for jsx-uses-vars: without it every component in settings.jsx looks
-    // unused, because core ESLint does not treat <Foo /> as a reference. This is
-    // not an opinion about React style — none of the plugin's other rules are on.
+    // JSX references must count as uses, and missing component imports must
+    // fail before a Settings panel reaches the runtime error boundary.
     plugins: { react },
     rules: {
       "react/jsx-uses-vars": "error",
       "react/jsx-uses-react": "error",
+      "react/jsx-no-undef": "error",
       // `catch (_) {}` is the established best-effort idiom here (pointer
       // capture, optional IPC). An empty block elsewhere is still an error.
       "no-empty": ["error", { allowEmptyCatch: true }],

@@ -1,0 +1,31 @@
+{
+  "source": "https://github.com/miqdadbadjuber/anti-slop",
+  "commit": "388cbe3b6c37d5175b9f460015bb092ef9e34894",
+  "version": "3.2.20",
+  "license": "MIT",
+  "skills": [
+    "antislop",
+    "antislop-ui",
+    "antislop-human",
+    "antislop-layoutmobile",
+    "antislop-copywriting",
+    "antislop-code"
+  ],
+  "sha256": {
+    "antislop/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop/SKILL.md": "64a1ff70bafbfb7a105083cdff0026a6f09baf7e19d3aa1bc3e880cf7233f90c",
+    "antislop/VERSION": "ce6ddda39d58fbf68b3810aa75fe22894936f20c1e62c901ae455e0bab5138df",
+    "antislop-ui/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop-ui/SKILL.md": "47d9892771253f544f7eb2e40af35fd5c31407dcd8c048183bbd1de5a00a4bbe",
+    "antislop-human/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop-human/SKILL.md": "5bc7c8e56cc79a5154eabf32469fd9f95621ac0b0faa73acd5816d56aafd5868",
+    "antislop-human/contrast-check.py": "619cdf3da8b27f87d8e4049b4acecfe1a559b234ab2aa9cf09447c28745c3075",
+    "antislop-human/contrast-mcp.py": "2dff74f119829d81b28dd593c6fd2289d56d9301cb8e47f1b49d7c6ef03a429f",
+    "antislop-layoutmobile/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop-layoutmobile/SKILL.md": "8613395a5109f637837f5c24f0ce5e58a96df1c2567a9f7666fcaecc47ff39cd",
+    "antislop-copywriting/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop-copywriting/SKILL.md": "2434a6fb0603dea1e62d4c1968382def47af779bd0e43b2130edd49df41ba444",
+    "antislop-code/LICENSE": "9fd83fb1fda52ca0094b96e2ed5a3d6c42a81b95a6c6326553f5bbe570f443de",
+    "antislop-code/SKILL.md": "004933009d352710dcbea7817101d5c188474a442e3ece26a6e0c18d3223898f"
+  }
+}

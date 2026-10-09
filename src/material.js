@@ -6,6 +6,7 @@
  * Reports are deduplicated, so callers can report from
  * every frame of an animation without flooding IPC.
  */
+import { physicalMaterialShapes } from "./material-geometry.js";
 import { invoke, isTauri } from "./api.js";
 import { resolveGlassTint, surfaceAlpha } from "./surface.js";
 
@@ -124,7 +125,7 @@ function pumpMaterial() {
 export function reportMaterial(shapes) {
   if (!isTauri) return;
   const list = enabled && document.visibilityState !== "hidden" ? shapes.filter(Boolean) : [];
-  const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, list]);
+  const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, physicalMaterialShapes(list, devicePixelRatio)]);
   if (desired?.sig !== sig) desired = { list, sig, revision: ++generation, color: tint };
   else if (desired.revision !== generation) desired = { ...desired, revision: generation, color: tint };
   pumpMaterial();

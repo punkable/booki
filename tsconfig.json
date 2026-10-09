@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowJs": true,
@@ -13,5 +17,12 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["src/dock/geometry.js", "src/dock/placement.js", "src/dock/visibility-policy.js", "src/update-controller.js", "src/update-state.js"]
+  "include": [
+    "src/dock/geometry.js",
+    "src/dock/placement.js",
+    "src/dock/visibility-policy.js",
+    "src/update-controller.js",
+    "src/update-state.js",
+    "src/settings/snapshot-model.js"
+  ]
 }

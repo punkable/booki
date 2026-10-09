@@ -443,6 +443,13 @@ impl Default for Config {
 
 /// Directory where Booki stores its data.
 pub fn config_dir() -> PathBuf {
+    // Windows resolves this through Known Folders, not APPDATA. Keep the
+    // subprocess regression isolated on every platform; production builds
+    // do not include this override.
+    #[cfg(test)]
+    if let Some(dir) = std::env::var_os("BOOKI_TEST_CONFIG_DIR") {
+        return PathBuf::from(dir);
+    }
     let mut dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
     dir.push("Booki");
     dir
@@ -499,6 +506,36 @@ pub fn invalidate_cache() {
     }
 }
 
+static RECOVERY: Mutex<Option<crate::recovery::RecoveryReport>> = Mutex::new(None);
+pub fn recovery_status() -> crate::recovery::RecoveryReport {
+    RECOVERY
+        .lock()
+        .ok()
+        .and_then(|value| value.clone())
+        .unwrap_or_default()
+}
+pub fn acknowledge_recovery() {
+    if let Ok(mut value) = RECOVERY.lock() {
+        *value = None;
+    }
+}
+
+/// An explicitly reviewed import may replace damaged data; retain the block on failure.
+pub fn save_replacement(cfg: &Config) -> Result<(), String> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|_| "config lock failed".to_string())?;
+    let previous = recovery_status();
+    acknowledge_recovery();
+    let result = save_locked(cfg);
+    if result.is_err() {
+        if let Ok(mut status) = RECOVERY.lock() {
+            *status = Some(previous);
+        }
+    }
+    result
+}
+
 fn load_from_disk() -> Config {
     let path = config_path();
     // Sweep leftover temp files from an interrupted atomic save. The name
@@ -512,18 +549,15 @@ fn load_from_disk() -> Config {
             }
         }
     }
-    let mut cfg = if let Some(c) = read_config(&path) {
-        c
-    } else if path.exists() {
-        // The file is there but unreadable/corrupt → keep a copy to debug, then
-        // fall back to the backup, then to defaults as a last resort.
-        log::error!("config.json is corrupt; recovering from backup");
-        let _ = fs::copy(&path, config_dir().join("config.corrupt.json"));
-        read_config(&backup_path()).unwrap_or_default()
-    } else {
-        // No config yet → maybe a backup survived a wipe; otherwise defaults.
-        read_config(&backup_path()).unwrap_or_default()
-    };
+    let (mut cfg, report) = crate::recovery::read::<Config>(&path, &backup_path());
+    let blocked = report.blocked;
+    if let Ok(mut status) = RECOVERY.lock() {
+        *status = Some(report);
+    }
+    // Do not let migrations overwrite evidence when neither copy can be read.
+    if blocked {
+        return cfg;
+    }
     // Record historical default changes without overwriting user preferences.
     // New installs receive current defaults; existing choices remain intact.
     for revision in [2, 3, 4] {
@@ -596,9 +630,8 @@ fn load_from_disk() -> Config {
         cfg.settings_rev = 8;
         let _ = save_locked(&cfg);
     }
-    // Promote 1-child groups; keep empty groups (Settings uses them as staging
-    // for "+ New group"). The dock frontend dissolves empties on its own persist.
-    cfg.pinned = normalize_pinned(cfg.pinned, true);
+    // Named groups are durable containers, including empty and single-item
+    // groups. Loading a profile or changing a preference never ungroups them.
     // Existing setups that lost the onboarded flag should skip tips only when
     // they already have pins — never key off seen_version alone (changelog
     // stamps that on first boot and would skip onboarding).
@@ -609,32 +642,6 @@ fn load_from_disk() -> Config {
     }
     cfg.revision = read_config(&path).map_or(cfg.revision, |saved| saved.revision);
     cfg
-}
-
-/// Normalize groups: promote a single leftover child; optionally keep empties.
-fn normalize_pinned(pinned: Vec<PinnedApp>, keep_empty: bool) -> Vec<PinnedApp> {
-    let mut out = Vec::with_capacity(pinned.len());
-    for p in pinned {
-        if p.kind != "group" {
-            out.push(p);
-            continue;
-        }
-        let mut kids = p.children;
-        if kids.len() >= 2 {
-            out.push(PinnedApp {
-                children: kids,
-                ..p
-            });
-        } else if kids.len() == 1 {
-            out.push(kids.remove(0));
-        } else if keep_empty {
-            out.push(PinnedApp {
-                children: Vec::new(),
-                ..p
-            });
-        }
-    }
-    out
 }
 
 /// Persist config to disk, creating the directory if needed.
@@ -679,10 +686,14 @@ pub fn update(edit: impl FnOnce(&mut Config) -> Result<(), String>) -> Result<Co
 }
 
 fn save_locked(config: &Config) -> Result<(), String> {
+    if recovery_status().blocked {
+        return Err("BOOKI_RECOVERY_REQUIRED".into());
+    }
+
     let dir = config_dir();
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    // Do not dissolve groups here — Settings may temporarily save an empty
-    // staging group ("+ New group"). The dock + load() heal empty/1-child groups.
+    // Preserve named group containers. Only an explicit frontend Ungroup or
+    // Remove operation changes their identity.
     //
     // Preserve one-way progress flags: Settings often holds a stale snapshot and
     // used to rewrite onboarded/seenVersion back to false/"" on every slider save.
@@ -757,4 +768,58 @@ fn save_locked(config: &Config) -> Result<(), String> {
 pub fn backup_for_update() -> Result<(), String> {
     let _guard = WRITE_LOCK.lock().map_err(|e| e.to_string())?;
     crate::update_backup::snapshot(&config_dir()).map(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn named_groups_survive_disk_reload_and_unrelated_preference_edits() {
+        // Run in a fresh process so Config's cache, recovery state and dirs
+        // cannot race with other tests or touch a real user's configuration.
+        const MARKER: &str = "BOOKI_GROUP_ROUNDTRIP_TEST";
+        if std::env::var_os(MARKER).is_some() {
+            let mut cfg = super::Config {
+                settings_rev: 8,
+                onboarded: true,
+                pinned: serde_json::from_value(serde_json::json!([
+                    {"id":"empty", "name":"Projects", "kind":"group", "children":[]},
+                    {"id":"single", "name":"Work", "kind":"group", "icon":"custom", "children":[
+                        {"id":"app", "name":"Editor", "path":"C:/editor.exe", "args":["--safe"]}
+                    ]}
+                ]))
+                .unwrap(),
+                ..super::Config::default()
+            };
+            let original = serde_json::to_value(&cfg.pinned).unwrap();
+            super::save(&cfg).unwrap();
+            super::invalidate_cache();
+            cfg = super::load();
+            assert_eq!(serde_json::to_value(&cfg.pinned).unwrap(), original);
+            cfg.theme = "light".into();
+            super::save(&cfg).unwrap();
+            super::invalidate_cache();
+            assert_eq!(
+                serde_json::to_value(super::load().pinned).unwrap(),
+                original
+            );
+            return;
+        }
+        let root =
+            std::env::temp_dir().join(format!("booki-group-roundtrip-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "config::tests::named_groups_survive_disk_reload_and_unrelated_preference_edits",
+                "--nocapture",
+            ])
+            .env(MARKER, "1")
+            .env("BOOKI_TEST_CONFIG_DIR", root.join("Booki"))
+            .status()
+            .unwrap();
+        let saved = root.join("Booki").join("config.json").exists();
+        let _ = std::fs::remove_dir_all(root);
+        assert!(status.success());
+        assert!(saved, "the isolated regression test must actually execute");
+    }
 }

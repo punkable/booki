@@ -118,7 +118,7 @@ const LEGACY_NOTCH_CLASSES = [
 
 /** System accessibility preferences apply without rewriting the saved finish. */
 export function transparencyReduced(cfg) {
-  return !!cfg?.reduceTransparency || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-transparency: reduce)").matches);
+  return !!cfg?.reduceTransparency || (typeof document !== "undefined" && document.documentElement.hasAttribute("data-reduce-transparency")) || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-transparency: reduce)").matches);
 }
 
 /** Apply body.surface-* on dock or notch documents. */
