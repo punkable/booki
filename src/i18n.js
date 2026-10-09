@@ -6,6 +6,15 @@
 
 export const DICT = {
   es: {
+    "hint.groupSingle": "1 elemento · abrir grupo",
+    "hint.launch": "Abrir aplicación",
+    "hint.running": "En ejecución · abrir aplicación",
+    "hint.switch": "En ejecución · cambiar a la ventana",
+    "hint.group": "{n} elementos · abrir grupo",
+    "hint.folder": "Explorar dentro de Booki",
+    "hint.widget": "Abrir widget",
+    "hint.settings": "Configurar Booki",
+    "hint.trash": "Abrir la Papelera de reciclaje",
     "integral.profileExists": "Ya existe un perfil con este nombre.",
     "integral.profileNameInvalid": "Usa hasta 40 letras, números, espacios, guiones o guiones bajos.",
     "integral.profileRecovered": "Este perfil se recuperó de su copia. Revísalo antes de aplicarlo.",
@@ -770,6 +779,15 @@ export const DICT = {
     "w.v.minimal": "Mínimo",
   },
   en: {
+    "hint.groupSingle": "1 item · open group",
+    "hint.launch": "Open app",
+    "hint.running": "Running · open app",
+    "hint.switch": "Running · switch to window",
+    "hint.group": "{n} items · open group",
+    "hint.folder": "Browse inside Booki",
+    "hint.widget": "Open widget",
+    "hint.settings": "Configure Booki",
+    "hint.trash": "Open Recycle Bin",
     "integral.profileExists": "A profile with this name already exists.",
     "integral.profileNameInvalid": "Choose a name of up to 40 letters, numbers, spaces, hyphens or underscores.",
     "integral.profileRecovered": "This profile was recovered from its backup. Review it before applying.",

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { placePin, removePin, updatePin, movePinBy, ungroupPin, readPinDrop, PIN_DRAG_TYPE } from '../src/pins.js';
+import { placePin, removePin, updatePin, movePinBy, ungroupPin, readPinDrop, PIN_DRAG_TYPE, takeOutOfGroup, normalizeGroups } from '../src/pins.js';
 const app = (id) => ({ id, name: id, path: `C:/${id}.exe`, kind: 'app', args: [] });
 const group = { id: 'g', name: 'Work', kind: 'group', children: [app('a'), app('b')] };
-test('moving a child to a dock position preserves its data and dissolves its previous group', () => {
+test('moving a child to a dock position preserves its data and its named group', () => {
   const source = [group, app('c')];
   const next = placePin(source, group.children[0], { beforeId: 'c' });
-  assert.deepEqual(next.map((item) => item.id), ['b', 'a', 'c']);
+  assert.deepEqual(next.map((item) => item.id), ['g', 'a', 'c']);
   assert.deepEqual(next[1], group.children[0]);
   assert.equal(source[0].children.length, 2);
 });
@@ -22,7 +22,8 @@ test('editing and removing group children preserve unrelated pins', () => {
   const changed = updatePin([group, app('c')], 'a', { name: 'Renamed' });
   assert.equal(changed[0].children[0].name, 'Renamed');
   assert.equal(group.children[0].name, 'a');
-  assert.deepEqual(removePin(changed, 'b').map((item) => item.id), ['a', 'c']);
+  assert.deepEqual(removePin(changed, 'b').map((item) => item.id), ['g', 'c']);
+  assert.deepEqual(removePin(changed, 'b')[0].children.map(item => item.id), ['a']);
 });
 test('pin drops reject malformed actions and oversized or unrelated data', () => {
   const read = (value) => readPinDrop({ getData: (type) => type === PIN_DRAG_TYPE ? value : '' });
@@ -63,4 +64,16 @@ test('folder breadcrumbs jump to ancestors, truncate history and never mutate th
   assert.equal(nav.goTo(-1).name, 'One');
   assert.deepEqual(nav.goTo(0), root); assert.equal(nav.canGoBack, false);
   assert.deepEqual(root, { path: 'C:/Files', name: 'Files' });
+});
+
+test('empty and single-item groups remain destinations through edits, reload normalization and removal', () => {
+  const empty = { ...group, icon: 'custom', children: [] };
+  const added = placePin([empty], app('a'), { groupId: 'g' });
+  assert.equal(added[0].id, 'g'); assert.equal(added[0].name, 'Work');
+  assert.equal(added[0].icon, 'custom'); assert.deepEqual(added[0].children, [app('a')]);
+  assert.deepEqual(normalizeGroups(added), added);
+  const moved = takeOutOfGroup(added, 'g', 'a');
+  assert.equal(moved.reopenId, 'g'); assert.deepEqual(moved.pinned, [empty, app('a')]);
+  assert.deepEqual(removePin(added, 'a'), [empty]);
+  assert.deepEqual(ungroupPin(added, 'g'), [app('a')]);
 });

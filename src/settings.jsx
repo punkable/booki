@@ -1287,7 +1287,7 @@ function App() {
     try {
       const patch = {};
       for (const key of keys) if (key in snap) patch[key] = snap[key];
-      if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || [], { keepEmpty: true });
+      if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || []);
       const toSave = await configApi.patch(patch, { base, expectedRevision: snap.revision }) || { ...snap, ...patch };
       await emitConfigChanged();
       if (!dirtyKeys.current.size) cfgRef.current = toSave;
@@ -1443,7 +1443,7 @@ function App() {
   const set = (patch, opts = {}) => {
     const prev = cfgRef.current;
     const next = { ...prev, ...patch };
-    if (patch.pinned) next.pinned = normalizePinned(patch.pinned, { keepEmpty: true });
+    if (patch.pinned) next.pinned = normalizePinned(patch.pinned);
     // Record the draft synchronously: a native close can arrive before React
     // renders the edit, and must still wait for those keys to reach disk.
     for (const k of Object.keys(patch)) {

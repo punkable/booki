@@ -33,10 +33,11 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, GetWindowRect, IsWindow, IsWindowVisible, RegisterClassW,
-    SetWindowPos, ShowWindow, HTTRANSPARENT, MA_NOACTIVATE, SWP_ASYNCWINDOWPOS, SWP_HIDEWINDOW,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, WM_MOUSEACTIVATE,
-    WM_NCHITTEST, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, GetWindow, GetWindowRect, IsWindow, IsWindowVisible,
+    RegisterClassW, SetWindowPos, ShowWindow, GW_HWNDPREV, HTTRANSPARENT, MA_NOACTIVATE,
+    SWP_ASYNCWINDOWPOS, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SW_HIDE, WM_MOUSEACTIVATE, WM_NCHITTEST, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_POPUP,
 };
 
 /// Most shapes one surface can show at once (bar + flyout + menu + popovers).
@@ -224,7 +225,7 @@ pub fn apply(
             }
             piece.blurred = true;
         }
-        if piece.placed == Some(rect) {
+        if piece.placed == Some(rect) && unsafe { IsWindowVisible(hwnd).as_bool() } {
             continue;
         }
         unsafe {
@@ -282,30 +283,44 @@ pub fn sync() {
         for surface in map.values_mut() {
             let owner = HWND(surface.owner as *mut c_void);
             let visible = unsafe { IsWindow(owner).as_bool() && IsWindowVisible(owner).as_bool() };
-            for piece in surface.pieces.iter_mut().filter(|p| p.placed.is_some()) {
-                if !visible {
-                    piece.placed = None;
-                }
-                work.push((piece.hwnd, surface.owner, visible));
+            // apply() inserts each piece below the owner, leaving the last
+            // piece closest to it. Preserve that order instead of making all
+            // pieces fight for the same Z position on every watcher tick.
+            let mut predecessor = surface.owner;
+            for piece in surface
+                .pieces
+                .iter_mut()
+                .rev()
+                .filter(|p| p.placed.is_some())
+            {
+                // Owner visibility is temporary; retain geometry so showing
+                // the owner can restore the material without a new JS report.
+                // Explicit hide()/empty reports still clear placed entirely.
+                work.push((piece.hwnd, predecessor, visible));
+                predecessor = piece.hwnd;
             }
         }
     }
-    for (hwnd, owner, visible) in work {
+    for (hwnd, predecessor, visible) in work {
+        let window = HWND(hwnd as *mut c_void);
+        let after = HWND(predecessor as *mut c_void);
+        // Repeated asynchronous SetWindowPos calls wake the compositor even
+        // at rest. Repair only a real order change (for example after another
+        // topmost window appeared); an already correct stack needs no write.
+        let shown = unsafe { IsWindowVisible(window).as_bool() };
+        if visible && shown && unsafe { GetWindow(window, GW_HWNDPREV).ok() } == Some(after) {
+            continue;
+        }
+        if !visible && !shown {
+            continue;
+        }
         let flags = if visible {
-            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_ASYNCWINDOWPOS
+            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_ASYNCWINDOWPOS | SWP_SHOWWINDOW
         } else {
             SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_ASYNCWINDOWPOS | SWP_HIDEWINDOW
         };
         unsafe {
-            let _ = SetWindowPos(
-                HWND(hwnd as *mut c_void),
-                HWND(owner as *mut c_void),
-                0,
-                0,
-                0,
-                0,
-                flags,
-            );
+            let _ = SetWindowPos(window, after, 0, 0, 0, 0, flags);
         }
     }
 }

@@ -1,4 +1,4 @@
-/* Shared pin / group helpers — keep dock.js and settings.jsx dissolve rules
+/* Shared pin / group helpers — keep dock.js and settings.jsx group rules
    and merge/kind detection from drifting apart. */
 
 /** True when a pin can be drop-merged into a group with another pin. */
@@ -101,31 +101,13 @@ export async function kindForPath(path, isDirFn) {
   return "app";
 }
 
-/**
- * Dissolve groups that have fewer than 2 children.
- * Empty groups are removed (unless keepEmpty); a single leftover child is
- * promoted to the dock. keepEmpty retains legacy placeholders while editing existing layouts.
- * New groups are created with all selected members in one edit.
- */
-export function normalizeGroups(pinned, { keepEmpty = false } = {}) {
-  const out = [];
-  for (const p of pinned || []) {
-    if (p.kind !== "group") {
-      out.push(p);
-      continue;
-    }
-    const kids = [...(p.children || [])];
-    const name = String(p.name || "").trim() || undefined;
-    if (kids.length >= 2) {
-      out.push({ ...p, children: kids, name });
-    } else if (kids.length === 1) {
-      out.push(kids[0]);
-    } else if (keepEmpty) {
-      out.push({ ...p, children: [], name });
-    }
-    // length 0 without keepEmpty → drop empty group
-  }
-  return out;
+/** Named containers keep their identity until the user explicitly ungroups
+ * or removes them. Adding the first app and unrelated saves must not erase a
+ * group's name, position, icon or future destination. */
+export function normalizeGroups(pinned) {
+  return (pinned || []).map((pin) => pin.kind === "group"
+    ? { ...pin, children: [...(pin.children || [])] }
+    : pin);
 }
 
 /** Build a pin from a filesystem path. */
@@ -183,7 +165,7 @@ export function groupSelected(pinned, ids, name, id) {
   return pinned.flatMap((item) => item.id === children[0].id ? [group] : members.has(item.id) ? [] : [item]);
 }
 
-/** Pull child out of group onto the dock; dissolve if < 2 remain. */
+/** Pull a child onto the dock, preserving the named container. */
 export function takeOutOfGroup(pinned, groupId, childId) {
   const list = pinned.map((p) =>
     p.kind === "group" ? { ...p, children: [...(p.children || [])] } : p
@@ -195,10 +177,5 @@ export function takeOutOfGroup(pinned, groupId, childId) {
   if (ci < 0) return { pinned: list, reopenId: null };
   const [child] = grp.children.splice(ci, 1);
   list.splice(gi + 1, 0, child);
-  let reopenId = grp.id;
-  if (grp.children.length < 2) {
-    list.splice(gi, 1, ...grp.children);
-    reopenId = null;
-  }
-  return { pinned: list, reopenId };
+  return { pinned: list, reopenId: grp.id };
 }

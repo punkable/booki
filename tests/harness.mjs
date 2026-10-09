@@ -158,7 +158,7 @@ function bridgeSource(cfg, { stats = {} } = {}) {
           switch (cmd) {
             case "app_version": return Promise.resolve(${JSON.stringify(APP_VERSION)});
             case "get_config": return Promise.resolve(structuredClone(storedConfig));
-            case "save_config": storedConfig = args.patch ? { ...storedConfig, ...args.patch } : args.config; return Promise.resolve(structuredClone(storedConfig));
+            case "save_config": storedConfig = structuredClone(args.patch ? { ...storedConfig, ...args.patch } : args.config); return Promise.resolve(structuredClone(storedConfig));
             case "system_stats": return Promise.resolve(${JSON.stringify(sys)});
             case "volume_info": return Promise.resolve([40, false]);
             case "media_info": return Promise.resolve(null);
@@ -293,4 +293,15 @@ export async function measureArtOverflow(page) {
       })
       .filter(Boolean)
   );
+}
+
+/** Playwright's injected predicate poller treats a Promise as truthy. Await
+ * asynchronous native reads in Node instead, so persistence checks can fail. */
+export async function waitForAsyncCondition(page, predicate, argument, { timeout = 5000, polling = 50 } = {}) {
+  const deadline = performance.now() + timeout;
+  do {
+    if (await page.evaluate(predicate, argument)) return;
+    await page.waitForTimeout(polling);
+  } while (performance.now() < deadline);
+  throw new Error(`Asynchronous condition did not become true within ${timeout}ms`);
 }

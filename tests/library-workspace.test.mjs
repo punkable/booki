@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { serveDist, launchBrowser, openPage, makeConfig } from './harness.mjs';
+import { serveDist, launchBrowser, openPage, makeConfig, waitForAsyncCondition } from './harness.mjs';
 const { srv, port } = await serveDist();
 const browser = await launchBrowser();
 test.after(async () => { await browser.close(); srv.close(); });
@@ -122,7 +122,7 @@ test('notes autosave while editing and Ctrl+Enter closes after durable saving', 
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [note] }), viewport: { width: 1200, height: 800 } });
   await page.locator('.tile[data-id="note"]').click();
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('A saved draft');
-  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'A saved draft');
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'A saved draft');
   assert.equal(await page.locator('.note-workspace').isVisible(), true);
   await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Final edit');
   await page.keyboard.press('Control+Enter');
@@ -144,7 +144,7 @@ test('icon picker previews changes, cancellation preserves the pin and Apply com
   await page.getByRole('button', { name: /Change icon/, exact: false }).click();
   await dialog.getByRole('button', { name: 'coffee', exact: true }).click();
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].icon === 'lib:coffee:badge');
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].icon === 'lib:coffee:badge');
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -160,7 +160,7 @@ test('failed note autosave keeps the draft open and retry saves it before closin
   assert.equal(await page.getByRole('textbox', { name: 'Note', exact: true }).inputValue(), 'Keep this draft');
   await page.evaluate(() => { window.failNoteSave = false; });
   await page.locator('.note-workspace').getByRole('button', { name: 'Retry', exact: true }).click();
-  await page.waitForFunction(async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'Keep this draft');
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style.note === 'Keep this draft');
   await page.locator('.note-workspace').getByRole('button', { name: 'Close', exact: true }).click();
   await page.locator('.note-workspace').waitFor({ state: 'detached' });
   assert.deepEqual(errors, []); await page.close();
@@ -277,7 +277,7 @@ test('widget filtering preserves a customized draft and leaves the heading visib
   const heading=await page.getByRole('heading',{name:'Widgets',exact:true}).boundingBox();
   assert.ok(heading.y>=0 && heading.y<150,'Scrolling the gallery must leave the page heading accessible');
   await page.locator('.widget-inspector').getByRole('button',{name:'Add',exact:true}).click();
-  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='timer' && item.style.variant==='solid');});
+  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='timer' && item.style.variant==='solid');});
   assert.deepEqual(errors,[]);await page.close();
 });
 
@@ -327,7 +327,7 @@ test('a delayed config reply cannot replace the newer dock or replay its appeara
 });
 
 test('native icon refresh retries extraction while utilities remain searchable in a folded section', async () => {
-  const {page,errors}=await openPage(browser,port,'settings.html',{initScript:`const old=window.__TAURI__.core.invoke;window.iconReady=false;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'},{name:'PowerShell',path:'C:/Windows/powershell.exe'}]}]):cmd==='app_icon'?Promise.resolve(window.iconReady?'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>':null):old(cmd,args);`});
+  const {page,errors}=await openPage(browser,port,'settings.html',{initScript:`const old=window.__TAURI__.core.invoke;window.iconReady=false;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'},{name:'Browser',path:'C:/browser.exe'},{name:'PowerShell',path:'C:/Windows/powershell.exe'}]}]):cmd==='app_icon'?Promise.resolve(window.iconReady?'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>':null):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   await page.getByRole('button',{name:'Item details: Editor',exact:true}).waitFor();
   const tools=page.locator('.app-library-utilities');
@@ -339,7 +339,7 @@ test('native icon refresh retries extraction while utilities remain searchable i
   await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('powershell');
   await page.getByRole('button',{name:'Item details: PowerShell',exact:true}).waitFor();
   await page.getByRole('button',{name:'Add app: PowerShell',exact:true}).click();
-  await page.waitForFunction(async()=>(await window.__TAURI__.core.invoke('get_config')).pinned.some(item=>item.name==='PowerShell'));
+  await waitForAsyncCondition(page, async()=>(await window.__TAURI__.core.invoke('get_config')).pinned.some(item=>item.name==='PowerShell'));
   assert.deepEqual(errors,[]);await page.close();
 });
 
@@ -348,7 +348,7 @@ test('dock position exposes labelled edges and alignment even when auto-hide is 
   await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
   await page.getByRole('button',{name:'Move the dock here: Left',exact:true}).click();
   await page.locator('.position-notch').getByRole('radio',{name:'End',exact:true}).click();
-  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
+  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);await page.close();
 });
@@ -359,8 +359,82 @@ test('Windows known folders use the selected group and participate in undo', asy
   await page.locator('.library-destination select').selectOption('group');
   await page.locator('.app-library-folders-wrap summary').click();
   await page.getByRole('button',{name:'Documents',exact:true}).click();
-  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1&&cfg.pinned[0].children[0]?.kind==='folder';});
+  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1&&cfg.pinned[0].id==='group'&&cfg.pinned[0].name==='Work'&&cfg.pinned[0].children?.[0]?.kind==='folder'&&cfg.pinned[0].children[0].path==='C:/Users/Owner/Documents';});
   await page.getByRole('button',{name:'Undo',exact:true}).click();
-  await page.waitForFunction(async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1 && cfg.pinned[0].id==='group' && (cfg.pinned[0].children || []).length===0;});
+  await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1 && cfg.pinned[0].id==='group' && (cfg.pinned[0].children || []).length===0;});
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('the dock quick catalog folds utilities, skips hidden rows with the keyboard and searches across them', async () => {
+  const {page,errors}=await openPage(browser,port,'index.html',{initScript:`const old=window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'},{name:'Browser',path:'C:/browser.exe'},{name:'PowerShell',path:'C:/Windows/powershell.exe'}]}]):old(cmd,args);`});
+  await page.locator('.tile.hint').click();
+  const utility=page.locator('.add-utilities');
+  await utility.waitFor();
+  assert.equal(await utility.getAttribute('open'),null);
+  assert.equal(await page.getByRole('button',{name:'Add app: PowerShell',exact:true}).isVisible(),false);
+  const search=page.getByRole('searchbox',{name:'Search apps or widgets',exact:true});
+  await search.focus();await page.keyboard.press('ArrowUp');
+  assert.equal(await page.locator('.add-row.active .add-name').textContent(),'Editor');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await page.locator('.add-row.active .add-name').textContent(),'Browser');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await page.locator('.add-row.active .add-name').textContent(),'Editor');
+  await utility.locator('summary').click();
+  assert.equal(await page.getByRole('button',{name:'Add app: PowerShell',exact:true}).isVisible(),true);
+  await search.fill('powershell');
+  assert.equal(await page.locator('.add-row').count(),1);
+  assert.equal(await utility.getAttribute('open'),'');
+  await page.keyboard.press('Enter');
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned.some(pin=>pin.name==='powershell'));
+  assert.equal(await page.getByRole('button',{name:'In dock: PowerShell',exact:true}).getAttribute('aria-disabled'),'true');
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+
+test('quick add preserves search and never marks failed app or widget saves as pinned', async () => {
+  const {page,errors}=await openPage(browser,port,'index.html',{initScript:`const old=window.__TAURI__.core.invoke;window.failQuickSave=false;
+    window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'}]}]):cmd==='save_config'&&window.failQuickSave?Promise.reject('disk full'):old(cmd,args);`});
+  await page.locator('.tile.hint').click();
+  const search=page.getByRole('searchbox',{name:'Search apps or widgets',exact:true});
+  await search.fill('editor');
+  await page.evaluate(()=>{window.failQuickSave=true;});
+  await page.getByRole('button',{name:'Add app: Editor',exact:true}).click();
+  await page.locator('.add-error[role="alert"]').waitFor();
+  assert.equal(await page.locator('#stack.open').count(),1);
+  assert.equal(await search.inputValue(),'editor');
+  assert.equal(await page.getByRole('button',{name:'Add app: Editor',exact:true}).isEnabled(),true);
+  assert.equal((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned.length,0);
+  await page.evaluate(()=>{window.failQuickSave=false;});
+  await page.getByRole('button',{name:'Add app: Editor',exact:true}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned.length===1);
+  await page.getByRole('button',{name:'In dock: Editor',exact:true}).waitFor();
+  assert.equal(await page.locator('.add-error').count(),0);
+  await search.fill('');await page.getByRole('tab',{name:'Widgets',exact:true}).click();
+  await page.evaluate(()=>{window.failQuickSave=true;});
+  await page.locator('.add-wcell').filter({hasText:'Clock'}).click();
+  await page.locator('.add-error[role="alert"]').waitFor();
+  assert.equal(await page.locator('.add-wcell.pinned').count(),0);
+  assert.equal(await page.locator('#stack.open').count(),1);
+  await page.evaluate(()=>{window.failQuickSave=false;});
+  await page.locator('.add-wcell').filter({hasText:'Clock'}).click();
+  await waitForAsyncCondition(page,async()=> (await window.__TAURI__.core.invoke('get_config')).pinned.some(pin=>pin.widget==='clock'));
+  assert.equal(await page.locator('.add-error').count(),0);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+
+test('durable empty groups remain recognizable and custom group icons have a useful fallback', async () => {
+  const cover='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="blue"/></svg>');
+  const pins=[{id:'custom',kind:'group',name:'Work',children:[],icon:cover},{id:'empty',kind:'group',name:'Projects',children:[]}];
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:pins})});
+  const custom=page.locator('.tile[data-id="custom"] .group-grid');
+  assert.equal(await custom.locator('img.group-cover').getAttribute('src'),cover);
+  assert.equal(await page.locator('.tile[data-id="empty"] .group-grid > svg').count(),1);
+  await custom.locator('img').evaluate(img=>img.dispatchEvent(new Event('error')));
+  assert.equal(await custom.locator('svg').count(),1);
+  await page.locator('.tile[data-id="empty"]').click();await page.locator('#stack.open').waitFor();
+  assert.equal(await page.locator('.stack-add').count(),2);
+  assert.deepEqual((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned,pins);
   assert.deepEqual(errors,[]);await page.close();
 });
