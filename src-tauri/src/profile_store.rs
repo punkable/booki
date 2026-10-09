@@ -12,10 +12,16 @@ pub static LOCK: Mutex<()> = Mutex::new(());
 pub fn path(root: &Path, name: &str) -> Result<PathBuf, String> {
     let name = name.trim();
     let upper = name.to_ascii_uppercase();
+    let device_number = upper
+        .strip_prefix("COM")
+        .or_else(|| upper.strip_prefix("LPT"));
     let reserved = ["CON", "PRN", "AUX", "NUL"].contains(&upper.as_str())
-        || ((upper.starts_with("COM") || upper.starts_with("LPT"))
-            && upper.len() == 4
-            && matches!(upper.as_bytes()[3], b'1'..=b'9'));
+        || device_number.is_some_and(|number| {
+            matches!(
+                number,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        });
     if name.is_empty()
         || name.chars().count() > 40
         || reserved
@@ -194,6 +200,8 @@ mod tests {
         assert_eq!(preview(&root, "Work").unwrap().config.theme, "light");
         assert!(path(&root, "../Work").is_err());
         assert!(path(&root, "CON").is_err());
+        assert!(path(&root, "COM¹").is_err());
+        assert!(path(&root, "LPT²").is_err());
         assert!(path(&root, "É".repeat(40).as_str()).is_ok());
         fs::remove_dir_all(root).unwrap();
     }

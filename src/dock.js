@@ -4418,23 +4418,42 @@ async function openStack(tileEl, item) {
     let page = 0;
     let request = 0;
     const pageSize = 24;
+    let queryTimer = null;
+    const toolbar = document.createElement("div"); toolbar.className = "stack-folder-tools";
+    const search = document.createElement("input"); search.type = "search"; search.maxLength = 256;
+    search.className = "stack-folder-search"; search.placeholder = t("integral.searchFolder"); search.setAttribute("aria-label", t("integral.searchFolder"));
+    const order = document.createElement("select"); order.className = "stack-folder-sort"; order.setAttribute("aria-label", t("integral.sortFolder"));
+    for (const [value,key] of [["name","integral.sortName"],["name-desc","integral.sortNameDescending"],["modified","integral.sortModified"]]) {
+      const option = document.createElement("option"); option.value = value; option.textContent = t(key); order.appendChild(option);
+    }
+    const refresh = document.createElement("button"); refresh.className = "stack-close"; refresh.innerHTML = icon("refresh"); refresh.setAttribute("aria-label",t("apps.refresh")); refresh.title = t("apps.refresh");
+    toolbar.append(search,order,refresh); stackEl.appendChild(toolbar);
+    const shortcut = event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); event.stopPropagation(); search.focus(); search.select(); }
+    };
+    stackEl.addEventListener("keydown",shortcut);
+    stackDispose = () => { clearTimeout(queryTimer); request++; stackEl.removeEventListener("keydown",shortcut); };
     const pager = document.createElement("div");
     pager.className = "stack-pager";
     const loadPage = async (nextPage) => {
+      if (seq !== stackSeq || !stackOpen) return;
       const current = ++request;
-      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.disabled]);
+      grid.setAttribute("aria-busy","true");
+      const previousFocus = pager.contains(document.activeElement) ? document.activeElement?.dataset.pageAction : null;
+      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.dataset.logicalDisabled === "true"]);
       buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
-        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1);
+        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1, search.value.trim(), order.value);
         if (seq !== stackSeq || !stackOpen || current !== request) return;
         page = nextPage;
         fillGrid((rows || []).slice(0, pageSize));
+        if (!rows?.length && search.value.trim()) grid.querySelector(".stack-empty").textContent = t("integral.noFolderMatches");
         pager.replaceChildren();
         const button = (key, next, disabled) => {
           const b = document.createElement("button");
           b.className = "stack-more";
           b.textContent = t(key);
-          b.disabled = disabled;
+          b.disabled = disabled; b.dataset.logicalDisabled = String(disabled); b.dataset.pageAction = key;
           b.addEventListener("click", () => loadPage(next));
           pager.appendChild(b);
         };
@@ -4445,6 +4464,10 @@ async function openStack(tileEl, item) {
         pager.appendChild(label);
         button("stack.next", page + 1, !rows || rows.length <= pageSize);
         grid.appendChild(pager);
+        if (previousFocus) {
+          const target = [...pager.querySelectorAll("button")].find(button => button.dataset.pageAction === previousFocus && !button.disabled) || pager.querySelector("button:not(:disabled)");
+          target?.focus({preventScroll:true});
+        }
         grid.parentElement.scrollTop = 0;
         applyFrame();
         if (pendingReplace) requestAnimationFrame(pendingReplace);
@@ -4467,10 +4490,19 @@ async function openStack(tileEl, item) {
         failure.append(message, retry);
         grid.prepend(failure);
         applyFrame();
+      } finally {
+        if (current === request && seq === stackSeq && stackOpen) grid.setAttribute("aria-busy","false");
       }
     };
+    search.addEventListener("input", () => { request++; clearTimeout(queryTimer); queryTimer = setTimeout(() => loadPage(0),150); });
+    search.addEventListener("keydown", event => {
+      if (event.key === "Escape" && search.value) { event.preventDefault(); event.stopPropagation(); search.value = ""; clearTimeout(queryTimer); loadPage(0); }
+    });
+    order.addEventListener("change", () => { clearTimeout(queryTimer); loadPage(0); });
+    refresh.addEventListener("click", () => { clearTimeout(queryTimer); loadPage(0); });
     navigateFolder = (entry, push = true) => {
       if (!entry) return;
+      clearTimeout(queryTimer); search.value = "";
       if (push) folderNavigation.enter(entry);
       folderTitle.textContent = folderNavigation.current.name;
       folderTitle.title = folderNavigation.current.path;
@@ -4484,7 +4516,7 @@ async function openStack(tileEl, item) {
       grid.appendChild(loading);
       loadPage(0);
     };
-    loadPage(0);
+    queueMicrotask(() => loadPage(0));
   }
   stackEl.appendChild(grid);
 

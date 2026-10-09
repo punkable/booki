@@ -158,12 +158,16 @@ async function mockInvoke(cmd, args) {
     case "clipboard_clear":
       demoClipboard = [];
       return null;
-    case "list_dir":
-      return [
+    case "list_dir": {
+      const terms = (args.query || "").toLowerCase().split(/\s+/).filter(Boolean);
+      const rows = [
         { name: "Documentos", path: "C:/Users/Doc", is_dir: true },
         { name: "informe.pdf", path: "C:/Users/informe.pdf", is_dir: false },
         { name: "notas.txt", path: "C:/Users/notas.txt", is_dir: false },
-      ];
+      ].filter(row => terms.every(term => row.name.toLowerCase().includes(term)));
+      rows.sort((a,b) => Number(b.is_dir)-Number(a.is_dir) || (args.order === "name-desc" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
+      return rows.slice(args.offset || 0, (args.offset || 0) + (args.limit || 80));
+    }
     case "frequent_apps":
       return [];
     case "list_installed_apps":
@@ -574,7 +578,7 @@ export const dock = {
   pathsExist: (paths) => invoke("paths_exist", { paths }),
   setAutostart: (enabled) => invoke("set_autostart", { enabled }),
   getAutostart: () => invoke("get_autostart"),
-  listDir: (path, offset = 0, limit = 80) => invoke("list_dir", { path, offset, limit }),
+  listDir: (path, offset = 0, limit = 80, query = "", order = "name") => invoke("list_dir", { path, offset, limit, query, order }),
   relocateShortcut: (id, toDesktop) => invoke("relocate_shortcut", { id, toDesktop }),
   isDir: (path) => invoke("is_dir", { path }),
   listInstalledApps: (refresh = false) => invoke("list_installed_apps", { refresh }),

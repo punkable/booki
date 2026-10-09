@@ -4057,3 +4057,11 @@ body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.no
 
 .tile .action-icon { display: flex; align-items: center; justify-content: center; width: 82%; height: 82%; pointer-events: none; }
 .tile .action-icon svg { width: 76%; height: 76%; }
+
+.stack-folder-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.stack-folder-search { flex: 1 1 150px; min-width: 0; width: 100%; }
+.stack-folder-sort { flex: 0 1 130px; max-width: 100%; }
+.stack-folder-search, .stack-folder-sort { min-height: 34px; padding: 6px 9px; border: 1px solid var(--stroke); border-radius: 8px; font: inherit; font-size: var(--text-sm); color: var(--ink); background: var(--layer-strong); }
+.stack-folder-sort option { color: var(--ink); background: var(--bg); }
+.stack-folder-tools :is(input,select,button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stack-grid[aria-busy="true"] { opacity: .65; }

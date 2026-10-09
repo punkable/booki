@@ -8,6 +8,7 @@ mod clipboard_storage;
 mod config;
 mod config_document;
 mod config_transaction;
+mod directory;
 mod profile_store;
 mod recovery;
 mod shortcuts;
@@ -27,6 +28,7 @@ use tauri::{
 };
 
 use config::Config;
+use directory::DirItem;
 use std::fs;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -2287,41 +2289,26 @@ async fn empty_trash() -> Result<(), String> {
     result
 }
 
-#[derive(Clone, serde::Serialize)]
-struct DirItem {
-    name: String,
-    path: String,
-    is_dir: bool,
-}
-
-/// List a folder's contents for the "stack" flyout.
+/// Search and sort the entire directory before slicing the requested page.
 #[tauri::command]
-async fn list_dir(path: String, offset: Option<usize>, limit: Option<usize>) -> Vec<DirItem> {
+async fn list_dir(
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    query: Option<String>,
+    order: Option<String>,
+) -> Result<Vec<DirItem>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut out: Vec<DirItem> = Vec::new();
-        if let Ok(rd) = std::fs::read_dir(&path) {
-            for e in rd.flatten() {
-                let name = e.file_name().to_string_lossy().to_string();
-                if name.starts_with('.') {
-                    continue;
-                }
-                let p = e.path();
-                let is_dir = p.is_dir();
-                out.push(DirItem {
-                    name,
-                    path: p.to_string_lossy().to_string(),
-                    is_dir,
-                });
-            }
-        }
-        out.sort_by_cached_key(|item| (!item.is_dir, item.name.to_lowercase(), item.name.clone()));
-        out.into_iter()
-            .skip(offset.unwrap_or(0))
-            .take(limit.unwrap_or(80).clamp(1, 81))
-            .collect()
+        directory::read(
+            std::path::Path::new(&path),
+            offset.unwrap_or(0),
+            limit.unwrap_or(80),
+            query.as_deref().unwrap_or(""),
+            order.as_deref().unwrap_or("name"),
+        )
     })
     .await
-    .unwrap_or_default()
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -3607,11 +3594,14 @@ mod directory_tests {
         }
         fs::write(root.join(".hidden"), b"").unwrap();
         let path = root.to_string_lossy().to_string();
-        let first = tauri::async_runtime::block_on(list_dir(path.clone(), Some(0), Some(25)));
+        let first =
+            tauri::async_runtime::block_on(list_dir(path.clone(), Some(0), Some(25), None, None))
+                .unwrap();
         assert_eq!(first.len(), 25);
         assert_eq!(first[0].name, "Z folder");
         assert_eq!(first[1].name, "File 000.txt");
-        let last = tauri::async_runtime::block_on(list_dir(path, Some(96), Some(25)));
+        let last =
+            tauri::async_runtime::block_on(list_dir(path, Some(96), Some(25), None, None)).unwrap();
         assert_eq!(last.len(), 5);
         assert_eq!(last[0].name, "File 095.txt");
         assert_eq!(last[4].name, "File 099.txt");

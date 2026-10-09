@@ -195,3 +195,51 @@ test('optional Settings pin opens once per pointer or keyboard activation and us
   assert.equal(await page.evaluate(() => window.settingsOpens), 2);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('folder search covers every page, sorting resets pagination and Escape clears the query', async () => {
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[{id:'folder',name:'Files',kind:'folder',path:'C:/Files'}]}),initScript:`
+    const old=window.__TAURI__.core.invoke; window.__folderCalls=[];
+    window.__TAURI__.core.invoke=(command,args)=>{
+      if(command==='list_dir') {
+        window.__folderCalls.push(args);
+        const terms=(args.query||'').toLowerCase().split(/\\s+/).filter(Boolean);
+        let rows=Array.from({length:100},(_,i)=>({name:'File '+String(i).padStart(3,'0')+'.txt',path:'C:/Files/'+i+'.txt',is_dir:false})).filter(row=>terms.every(term=>row.name.toLowerCase().includes(term)));
+        if(args.order==='name-desc')rows.reverse();
+        return Promise.resolve(rows.slice(args.offset,args.offset+args.limit));
+      }
+      return old(command,args);
+    };`});
+  await page.locator('.tile[data-id="folder"]').click();
+  await page.locator('.stack-item').filter({hasText:'File 000.txt'}).waitFor();
+  const search=page.getByRole('searchbox',{name:'Search this folder',exact:true});
+  await search.fill('TXT 099');
+  await page.locator('.stack-item').filter({hasText:'File 099.txt'}).waitFor();
+  assert.equal(await page.locator('.stack-item').count(),1);
+  await search.press('Escape');
+  assert.equal(await page.locator('#stack').evaluate(el=>el.classList.contains('open')),true);
+  await page.locator('.stack-item').filter({hasText:'File 000.txt'}).waitFor();
+  await page.getByRole('combobox',{name:'Sort folder',exact:true}).selectOption('name-desc');
+  await page.locator('.stack-item').filter({hasText:'File 099.txt'}).waitFor();
+  assert.equal(await page.locator('.stack-item').first().textContent().then(text=>text.includes('File 099.txt')),true);
+  await page.locator('.stack-pager').getByRole('button',{name:'Next',exact:true}).click();
+  await page.locator('.stack-item').filter({hasText:'File 075.txt'}).waitFor();
+  assert.equal(await page.locator('.stack-pager').getByRole('button',{name:'Next',exact:true}).evaluate(el=>el===document.activeElement),true);
+  await search.fill('does-not-exist');
+  await page.getByText('No files match your search.',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.__folderCalls.at(-1).offset),0);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('an inaccessible folder offers retry instead of claiming it is empty', async () => {
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[{id:'folder',name:'Files',kind:'folder',path:'C:/Files'}]}),initScript:`
+    const old=window.__TAURI__.core.invoke;window.__folderUnavailable=true;
+    window.__TAURI__.core.invoke=(command,args)=>command==='list_dir'?(window.__folderUnavailable?Promise.reject(new Error('access denied')):Promise.resolve([])):old(command,args);`});
+  await page.locator('.tile[data-id="folder"]').click();
+  await page.locator('.stack-load-error').getByRole('alert').waitFor();
+  await page.evaluate(()=>window.__folderUnavailable=false);
+  await page.locator('.stack-load-error').getByRole('button').click();
+  await page.waitForFunction(()=>document.querySelector('.stack-grid')?.getAttribute('aria-busy')==='false');
+  assert.equal(await page.locator('.stack-load-error').count(),0);
+  assert.equal(await page.locator('.stack-item').count(),0);
+  assert.deepEqual(errors,[]);await page.close();
+});
