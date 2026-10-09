@@ -1,10 +1,7 @@
-/** Normalize notch mode from config (including legacy peek / multi-notch keys). */
+/** The notch is a tab attached to the edge or a floating pill. Older
+ *  configs ("smart", notchPeek) read as their closest shape. */
 export function resolveNotchMode(cfg) {
-  if (!cfg) return "attached";
-  if (cfg.notchMode === "attached" || cfg.notchMode === "floating" || cfg.notchMode === "smart") {
-    return cfg.notchMode;
-  }
-  if (cfg.notchPeek === false) return "floating";
-  if (cfg.multiNotchEnabled) return "smart";
+  if (cfg?.notchMode === "floating") return "floating";
+  if (cfg?.notchMode == null && cfg?.notchPeek === false) return "floating";
   return "attached";
 }

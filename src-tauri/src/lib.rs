@@ -469,13 +469,8 @@ fn save_config(
                 .get_webview_window("dock")
                 .map(|d| d.is_visible().unwrap_or(true))
                 .unwrap_or(true);
-            if config.notch_always_visible {
-                // Don't resurrect the notch over a fullscreen blackout.
-                if !FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
-                    let _ = notch.show();
-                }
-            } else if dock_visible {
-                // Dock is out → notch is off-duty unless always-visible.
+            if dock_visible {
+                // Dock is out → the notch is off duty.
                 let _ = notch.hide();
             }
         }
@@ -916,30 +911,9 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
-/// Place helpers for notch modes (attached / floating / smart).
-fn notch_mode_of(cfg: &Config) -> &str {
-    match cfg.notch_mode.as_str() {
-        "floating" | "smart" | "attached" => cfg.notch_mode.as_str(),
-        _ if cfg.multi_notch_enabled => "smart",
-        _ if !cfg.notch_peek => "floating",
-        _ => "attached",
-    }
-}
-
-/// Across-edge CSS depth the painted notch occupies from its outer margin
-/// (pill + inner pad), plus a small air gap — used to stack the dock inward
-/// when the notch stays visible with the bar.
-fn notch_stack_depth_css(cfg: &Config) -> u32 {
-    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
-    let painted = match notch_mode_of(cfg) {
-        // Smart circle ~20 + centering pad inside the ~36 window.
-        "smart" => 28.0 * scale,
-        // Floating capsule ~16 + soft pad.
-        "floating" => 26.0 * scale,
-        // Attached peek tab.
-        _ => 14.0 * scale,
-    };
-    (painted + 8.0).ceil() as u32
+/// The notch is either a tab attached to the screen edge or a floating pill.
+fn notch_floating(cfg: &Config) -> bool {
+    cfg.notch_mode == "floating"
 }
 
 /// Current foreground app (kept for UI/debug; smart notch no longer keys off it).
@@ -1257,13 +1231,7 @@ fn reveal_dock(app: AppHandle) {
     }
     let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        if cfg.notch_always_visible {
-            // Toast / preview may have resized the window — restore geometry.
-            let _ = position_notch(&notch, &cfg.edge);
-            let _ = notch.show();
-        } else {
-            let _ = notch.hide();
-        }
+        let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
         // Automatic/hover reveals must not steal keyboard focus from the app
@@ -1297,12 +1265,7 @@ fn notch_reveal(app: AppHandle) {
     }
     let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        if cfg.notch_always_visible {
-            let _ = position_notch(&notch, &cfg.edge);
-            let _ = notch.show();
-        } else {
-            let _ = notch.hide();
-        }
+        let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
@@ -1319,9 +1282,7 @@ fn notch_reveal(app: AppHandle) {
 fn reveal_running_dock(app: &AppHandle) {
     let cfg = config::load();
     if let Some(notch) = app.get_webview_window("notch") {
-        if !cfg.notch_always_visible {
-            let _ = notch.hide();
-        }
+        let _ = notch.hide();
     }
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
@@ -1785,39 +1746,26 @@ fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     )
     .unwrap_or((mpos.x, mpos.y, msize.width as i32, msize.height as i32));
 
-    // The notch can live on its own edge ("auto" = follow the dock).
-    let edge: &str = if cfg.notch_edge == "auto" {
-        edge
-    } else {
-        cfg.notch_edge.as_str()
-    };
+    // The notch always lives on the dock's edge.
     let vertical = edge == "left" || edge == "right";
-    let mode = notch_mode_of(&cfg);
-    let attached = mode == "attached";
-    let smart = mode == "smart";
-    // Smart is always a circle (no per-app whitelist).
-    let scale = (cfg.notch_scale as f64).clamp(0.7, 1.5);
+    let attached = !notch_floating(&cfg);
 
     // Window sized just large enough for the painted pill + a small hover/glow
     // pad. Transparent padding must stay click-through via NOTCH_HIT_RECTS —
     // never rely on CSS pointer-events alone (WebView2 still eats OS hits).
-    let (lw, lh): (f64, f64) = if smart {
-        // Circle ~20px + modest pad for soft shadow / hover grow.
-        let s = 36.0 * scale;
-        (s, s)
-    } else if vertical {
+    let (lw, lh): (f64, f64) = if vertical {
         if attached {
-            (28.0 * scale, 140.0 * scale)
+            (28.0, 140.0)
         } else {
-            (40.0 * scale, 156.0 * scale)
+            (40.0, 156.0)
         }
     } else {
         // Horizontal tabs open into a live card on hover (notch.js), so the
         // window holds the card's size. Only the painted pill takes clicks.
         if attached {
-            (320.0 * scale, 60.0 * scale)
+            (320.0, 60.0)
         } else {
-            (320.0 * scale, 68.0 * scale)
+            (320.0, 68.0)
         }
     };
     let ww = (lw * dpr).round() as i32;
@@ -1928,7 +1876,7 @@ fn notch_preview(app: AppHandle) {
             .get_webview_window("dock")
             .map(|d| d.is_visible().unwrap_or(true))
             .unwrap_or(true);
-        if dock_visible && !config::load().notch_always_visible {
+        if dock_visible {
             if let Some(notch) = app.get_webview_window("notch") {
                 let _ = notch.hide();
             }
@@ -2686,10 +2634,7 @@ fn dock_xy(window: &WebviewWindow, edge: &str, ww: i32, wh: i32) -> Result<(i32,
     // they stack (edge → notch → dock) instead of colliding. The slider still
     // goes to 0; clearance is additive, not a silent floor replacing the value.
     let dpr = window.scale_factor().unwrap_or(1.0);
-    let mut gap = cfg.edge_gap.min(96);
-    if cfg.notch_always_visible {
-        gap = gap.saturating_add(notch_stack_depth_css(&cfg)).min(140);
-    }
+    let gap = cfg.edge_gap.min(96);
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
     // Align the dock with the notch's along-edge slot so the two stay parallel:
@@ -3103,11 +3048,7 @@ pub fn run() {
             if let Some(notch) = app.get_webview_window("notch") {
                 let cfg = config::load();
                 let _ = position_notch(&notch, &cfg.edge);
-                if cfg.notch_always_visible {
-                    let _ = notch.show();
-                } else {
-                    let _ = notch.hide();
-                }
+                let _ = notch.hide();
                 #[cfg(windows)]
                 if let Ok(h) = notch.hwnd() {
                     win::set_capture_visible(h.0 as isize, cfg.capture_visible);
@@ -3200,9 +3141,7 @@ pub fn run() {
                             }
                             // foreground_occludes = "the user is in an app". Smart
                             // auto-hide and the smart notch both consume this.
-                            if cfg_cache.auto_hide_mode == "smart"
-                                || cfg_cache.notch_mode.eq_ignore_ascii_case("smart")
-                            {
+                            if cfg_cache.auto_hide_mode == "smart" {
                                 let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
                                 if let Some(v) = debounce(
                                     &mut occ,

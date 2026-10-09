@@ -29,7 +29,6 @@ import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
-import { resolveNotchMode } from "./notch-mode.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
@@ -254,16 +253,6 @@ async function reloadConfig() {
   if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
   if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
-  // Notch visibility / style changes the stacked clearance for the dock bar.
-  if (
-    prev &&
-    (prev.notchAlwaysVisible !== cfg.notchAlwaysVisible ||
-      prev.notchMode !== cfg.notchMode ||
-      prev.notchScale !== cfg.notchScale ||
-      prev.notchPeek !== cfg.notchPeek)
-  ) {
-    lastFull = null;
-  }
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -292,7 +281,7 @@ async function reloadConfig() {
     !prev ||
     prev.edge !== cfg.edge ||
     (prev.autoHideMode || "") !== (cfg.autoHideMode || "") ||
-    prev.notchPeek !== cfg.notchPeek ||
+    prev.notchMode !== cfg.notchMode ||
     prev.notchPosition !== cfg.notchPosition;
   if (hideChanged) setupAutoHide();
   if (edgeSwapped) {
@@ -358,13 +347,7 @@ function applyAll() {
   // How close the bar sits to its screen edge (user-tunable). The transparent
   // pad on the anchored side shrinks down to the requested gap; anything past
   // the stage pad is handled by the window's own margin (backend dock_xy).
-  // When the notch stays painted with the dock, add the notch's painted depth
-  // so the bar stacks inward (edge → notch → dock) — mirrors Rust
-  // notch_stack_depth_css. The Settings value itself still goes to 0.
-  let userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
-  let edgeGap = cfg.notchAlwaysVisible
-    ? Math.min(140, userGap + notchStackDepthCss(cfg))
-    : userGap;
+  const edgeGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
   document.body.classList.toggle("tight-edge", edgeGap < 24);
@@ -2910,14 +2893,6 @@ function reframe() {
 // smaller and clicks just outside the painted dock reach the app underneath.
 const SHADOW_PAD = 18;
 
-/** Painted notch depth + air gap (CSS px) — keep in sync with Rust `notch_stack_depth_css`. */
-function notchStackDepthCss(c) {
-  const scale = Math.min(1.5, Math.max(0.7, Number(c.notchScale) || 1));
-  const mode = resolveNotchMode(c);
-  const painted = mode === "smart" ? 28 : mode === "floating" ? 26 : 14;
-  return Math.ceil(painted * scale + 8);
-}
-
 // Fixed headroom past the bar for everything that opens around it — group
 // flyouts, context menu, popovers, tooltips, the update pill, magnify and the
 // soft shadow. Reserving it permanently is THE anti-flicker design: opening a
@@ -2930,11 +2905,7 @@ const PANEL_ROOM = 420;
 
 let lastFull = null;
 function edgePadCss() {
-  const userGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
-  const gap = cfg.notchAlwaysVisible
-    ? Math.min(140, userGap + notchStackDepthCss(cfg))
-    : userGap;
-  return Math.min(SHADOW_PAD, gap);
+  return Math.min(SHADOW_PAD, Math.max(0, Math.min(96, cfg.edgeGap ?? 12)));
 }
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;

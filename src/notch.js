@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onFullscreen, onNotchToast, onNotchToastOut, onOcclusion } from "./api.js";
+import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onNotchToast, onNotchToastOut } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { showBookiMenu } from "./native-context-menu.js";
@@ -27,9 +27,8 @@ const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TA
 const inTauri = !!winApi;
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
-let notchMode = "attached";
 // The live card only exists on a horizontal tab: a vertical one has no room
-// for a line of text, and the smart dot is deliberately a dot.
+// for a line of text.
 let canPeek = false;
 let draggingNotch = false;
 let lastHitSig = "";
@@ -52,35 +51,18 @@ async function applyLook() {
     hoverTrigger = cfg.notchTrigger === "hover";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
-    const mode = resolveNotchMode(cfg);
-    notchMode = mode;
-    const attached = mode === "attached";
-    const floating = mode === "floating";
-    const smart = mode === "smart";
+    const floating = resolveNotchMode(cfg) === "floating";
     document.body.classList.toggle("vertical", edge === "left" || edge === "right");
-    // Modes are mutually exclusive. Smart must NOT also get `floating` —
-    // floating's capsule rules (128×16) are more specific than `.notch-dot`
-    // and would keep a long pill inside a square window (looks clipped).
-    document.body.classList.toggle("peek", attached);
+    document.body.classList.toggle("peek", !floating);
     document.body.classList.toggle("floating", floating);
-    document.body.classList.toggle("smart", smart);
-    document.body.classList.toggle("notch-dot", smart);
-    if (!smart) {
-      document.body.classList.remove("smart-busy", "smart-focus");
-    }
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     // Stacked under a visible dock the card would grow over the bar.
-    canPeek = !smart && !hoverTrigger && !cfg.notchAlwaysVisible && (edge === "top" || edge === "bottom");
+    canPeek = !hoverTrigger && (edge === "top" || edge === "bottom");
     document.body.classList.toggle("peekable", canPeek);
     if (!canPeek) closeCard();
     pollMedia();
     applyMaterial(cfg);
-    // Set scale on <body> — styles.css used to hardcode --notch-scale: 1 on
-    // body.notch-body, which shadowed any value set on <html>.
-    const scale = Math.min(1.5, Math.max(0.7, Number(cfg.notchScale) || 1));
-    document.body.style.setProperty("--notch-scale", String(scale));
-    document.documentElement.style.setProperty("--notch-scale", String(scale));
     scheduleHitReport();
   } catch (_) {
     /* keep defaults */
@@ -90,16 +72,6 @@ async function applyLook() {
 applyLook();
 onConfigChanged(applyLook);
 matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", applyLook);
-
-// Smart ambient behaviours: stay circular always, but react to fullscreen /
-// occlusion so the dot feels alive — no app whitelist required.
-function setSmartState(name, on) {
-  if (notchMode !== "smart") return;
-  document.body.classList.toggle(name, !!on);
-  scheduleHitReport();
-}
-onFullscreen((v) => setSmartState("smart-busy", v));
-onOcclusion((v) => setSmartState("smart-focus", v));
 
 // ─── Hit-testing: only the painted pill (or toast) is clickable ───────────
 // Window-relative CSS px [x, y, w, h], matching the dock's set_hit_rects.
@@ -133,18 +105,8 @@ function scheduleHitReport() {
   });
 }
 
-// Keep hit rects fresh while the pill is animating (smart breathe/focus scales
-// it, and the rect has to follow or clicks land in the wrong place).
-//
-// KNOWN COST: this runs at 4Hz for the life of the app. The visibilityState
-// guard does not help, because a window the backend hid with ShowWindow still
-// reports "visible" here. Gating it properly needs a shown/hidden event from
-// Rust that does not exist yet — deliberately not half-wired: reportNotchHitRects
-// already dedupes by signature, so the waste is one getBoundingClientRect per
-// tick, not IPC.
-setInterval(() => {
-  if (document.visibilityState === "visible") reportNotchHitRects();
-}, 250);
+// The pill only changes shape through class/style changes and CSS
+// transitions, all observed below, so no polling timer is needed.
 window.addEventListener("resize", scheduleHitReport);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") scheduleHitReport();
