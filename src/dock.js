@@ -878,7 +878,7 @@ function tickProductivity() {
   eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
   eachWidget("weather", (el) => {
     const style = findWidgetPin(el.dataset.id)?.style || {};
-    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("w.weather"), t("focus.noCity")); return; }
+    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("focus.noCity"), "—"); return; }
     const key = `${style.latitude},${style.longitude}`;
     let cached = weatherCache.get(key);
     if (!cached || (!cached.pending && Date.now() >= cached.expires)) {
@@ -1385,7 +1385,7 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
-    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, { span: Number(t.dataset.span) })}px`);
+    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, findWidgetPin(t.dataset.id)?.style || {})}px`);
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
