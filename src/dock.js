@@ -15,6 +15,7 @@ import {
   onSoftReveal,
   onFullscreen,
   onToggleDock,
+  onLauncher,
   onLaunchIndex,
   onHotEdge,
   emitConfigChanged as emitConfigChangedRaw,
@@ -72,6 +73,7 @@ import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup }
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
+import { buildLauncher } from "./dock/launcher.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
@@ -191,6 +193,12 @@ async function boot() {
       if (fullscreen) return;
       if (hiddenState) pinOpen();
       else setHidden(true);
+    });
+    // Quick launcher shortcut: summon the dock if tucked, then open the search.
+    onLauncher(() => {
+      if (fullscreen) return;
+      if (hiddenState) pinOpen();
+      openLauncher();
     });
     // Position hotkeys (modifier+1…9): launch the Nth item on the bar.
     onLaunchIndex((i) => {
@@ -1337,8 +1345,10 @@ function launch(el, item) {
   // any pinned reveal so smart-hide can tuck it back into the notch.
   pinnedReveal = false;
   scheduleHide();
+  // The app's only window: bring it forward, or minimize it if it is
+  // already in front (a second click, as on the taskbar).
   if (switching) {
-    dockApi.focusWindow(Number(hwnd));
+    dockApi.toggleWindow(Number(hwnd));
     return;
   }
   markLaunching(el);
@@ -2739,6 +2749,7 @@ function openBackgroundMenu(e) {
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead("Booki", t("m.dockMenu"));
   add("plus", t("add.open"), () => openAddPanel(dockEl));
+  add("search", t("launcher.menu"), openLauncher);
   const profilesSlot = document.createElement("div");
   ctxMenu.append(profilesSlot);
   sep();
@@ -4656,6 +4667,50 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
   });
 }
 
+/** The quick launcher (global shortcut, or "Search apps" in the dock menu):
+   type to open an app, a pinned folder or switch to an open window. */
+function openLauncher() {
+  if (stackOpen && stackItemId === "__launcher") { closeStack(); return; }
+  if (stackOpen) closeStack();
+  closeMenu();
+  stackItemId = "__launcher";
+  stackEl.classList.add("add-mode", "launcher-mode");
+  stackEl.setAttribute("aria-label", t("launcher.title"));
+  const place = () => placeStackNear(dockEl);
+  const panel = buildLauncher(stackEl, {
+    t,
+    pinned: () => cfg.pinned,
+    switchesToOpen: cfg.focusIfRunning !== false,
+    listWindows: () => dockApi.listWindows(),
+    listInstalled: () => dockApi.listInstalledApps(),
+    listFrequent: () => cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(12),
+    appIcon: (path) => dockApi.appIcon(path),
+    open: (entry) => {
+      closeStack();
+      pinnedReveal = false;
+      scheduleHide();
+      if (entry.kind === "window" || (entry.hwnd && cfg.focusIfRunning !== false)) dockApi.focusWindow(Number(entry.hwnd));
+      else dockApi.launch(entry.path, entry.args || []);
+    },
+    close: closeStack,
+    relayout: () => requestAnimationFrame(place),
+  });
+  stackDispose = panel.dispose;
+  stackOpen = true;
+  document.body.classList.add("stack-open");
+  applyFrame();
+  pendingReplace = place;
+  requestAnimationFrame(() => {
+    place();
+    requestAnimationFrame(() => {
+      stackEl.classList.add("open", "just-opened");
+      clearTimeout(stackEl._justOpenedTimer);
+      stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
+      panel.focus();
+    });
+  });
+}
+
 let stackCloseTimer = null;
 let stackDispose = null;
 let stackRefreshPins = null;
@@ -4668,7 +4723,7 @@ function closeStack() {
   stackItemId = null;
   pendingReplace = null;
   document.body.classList.remove("stack-open");
-  stackEl.classList.remove("open", "just-opened", "add-mode");
+  stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode");
   cacheWidgetEls();
   startPolls();
   clearTimeout(stackCloseTimer);

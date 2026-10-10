@@ -17,7 +17,7 @@ const SEARCH_INDEX = [
   ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
   ["be.taskbarFollow", "dock"], ["be.taskbarSettle", "dock"], ["be.taskbarHoldHover", "dock"], ["ap.nativeMaterial", "dock"],
   ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
-  ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.positions", "system"],
+  ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.launcher", "system"], ["sc.positions", "system"],
   ["ab.updates", "system"], ["tab.profiles", "system"], ["gen.captureVisible", "system"], ["gen.ctxMenu", "system"],
   ["overhaul.diagnostics", "system"], ["faq.title", "system"], ["ab.title", "system"], ["act.reset", "system"],
 ];

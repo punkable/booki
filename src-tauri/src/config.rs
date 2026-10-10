@@ -142,6 +142,9 @@ fn default_clipboard_sensitive_guard() -> bool {
     true
 }
 
+fn default_launcher_hotkey() -> String {
+    "Ctrl+Alt+Space".into()
+}
 fn default_true() -> bool {
     true
 }
@@ -226,6 +229,9 @@ pub struct Config {
     /// Global hotkey accelerator to toggle the dock (e.g. "Alt+Space"); empty = none.
     #[serde(default)]
     pub hotkey: String,
+    /// Global shortcut that opens the quick app launcher; empty = none.
+    #[serde(default = "default_launcher_hotkey")]
+    pub launcher_hotkey: String,
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
@@ -378,6 +384,7 @@ impl Default for Config {
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),
+            launcher_hotkey: default_launcher_hotkey(),
             monitor: default_monitor(),
             monitor_name: String::new(),
             overflow_mode: default_overflow(),

@@ -594,6 +594,12 @@ fn focus_window(hwnd: i64) -> bool {
     win::focus_window(hwnd as isize)
 }
 
+/// Focus an app's window, or minimize it when it is already in front.
+#[tauri::command]
+fn toggle_window(hwnd: i64) -> bool {
+    win::toggle_window(hwnd as isize)
+}
+
 #[tauri::command]
 fn close_window(hwnd: i64) -> bool {
     win::close_window(hwnd as isize)
@@ -1617,13 +1623,19 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     config::backup_for_update()?;
     let previous = config::load();
     let previous_autostart = get_autostart();
-    if let Err(error) = hotkeys_apply(app, &cfg.hotkey, cfg.position_hotkeys, &cfg.hotkey_modifier)
-    {
+    if let Err(error) = hotkeys_apply(
+        app,
+        &cfg.hotkey,
+        cfg.position_hotkeys,
+        &cfg.hotkey_modifier,
+        &cfg.launcher_hotkey,
+    ) {
         let _ = hotkeys_apply(
             app,
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
+            &previous.launcher_hotkey,
         );
         return Err(error);
     }
@@ -1633,6 +1645,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
+            &previous.launcher_hotkey,
         );
         return Err(error);
     }
@@ -1643,6 +1656,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
             &previous.hotkey,
             previous.position_hotkeys,
             &previous.hotkey_modifier,
+            &previous.launcher_hotkey,
         );
         return Err(error);
     }
@@ -2527,6 +2541,7 @@ fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
         &accelerator,
         cfg.position_hotkeys,
         &cfg.hotkey_modifier,
+        &cfg.launcher_hotkey,
     )
 }
 
@@ -2537,12 +2552,21 @@ fn hotkeys_apply(
     toggle: &str,
     positions: bool,
     modifier: &str,
+    launcher: &str,
 ) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     if !toggle.trim().is_empty() {
         gs.register(toggle.trim()).map_err(|e| e.to_string())?;
+    }
+    // Best-effort, like the position keys: another app may own the combo.
+    let parsed = launcher.trim().parse::<Shortcut>().ok();
+    if let Some(shortcut) = parsed {
+        let _ = gs.register(shortcut);
+    }
+    if let Ok(mut slot) = LAUNCHER_SHORTCUT.lock() {
+        *slot = parsed;
     }
     if positions {
         for i in 1..=9 {
@@ -2560,8 +2584,10 @@ fn apply_hotkeys(
     toggle: String,
     positions: bool,
     modifier: String,
+    launcher: Option<String>,
 ) -> Result<(), String> {
-    hotkeys_apply(&app, &toggle, positions, &modifier)
+    let launcher = launcher.unwrap_or_else(|| config::load().launcher_hotkey);
+    hotkeys_apply(&app, &toggle, positions, &modifier, &launcher)
 }
 
 /// Lets the frontend write to the app log file (for diagnosing issues).
@@ -2697,6 +2723,23 @@ fn open_settings_url(app: &AppHandle, url: &str) {
     let _ = &built;
 }
 
+/// The quick launcher's shortcut, so the global handler can tell it apart
+/// from the show/hide toggle and the position keys.
+static LAUNCHER_SHORTCUT: std::sync::Mutex<Option<tauri_plugin_global_shortcut::Shortcut>> =
+    std::sync::Mutex::new(None);
+
+/// Open the quick launcher: the dock frontend reveals itself and shows the
+/// search box; the dock window takes keyboard focus so typing goes there.
+fn show_launcher(app: &AppHandle) {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.set_focus();
+    }
+    let _ = app.emit("booki://launcher", ());
+}
+
 fn toggle_dock(app: &AppHandle) {
     if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
         return;
@@ -2781,6 +2824,13 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
+                    let is_launcher = LAUNCHER_SHORTCUT
+                        .lock()
+                        .is_ok_and(|slot| slot.as_ref() == Some(shortcut));
+                    if is_launcher {
+                        show_launcher(app);
+                        return;
+                    }
                     // Digit shortcuts are only ever registered as position
                     // hotkeys (modifier+1…9 → launch the Nth dock item);
                     // anything else is the show/hide toggle.
@@ -2841,6 +2891,7 @@ pub fn run() {
             app_identities,
             list_windows,
             focus_window,
+            toggle_window,
             reposition_dock,
             set_dock_frame,
             set_hit_rects,
@@ -3068,6 +3119,7 @@ pub fn run() {
                     &cfg.hotkey,
                     cfg.position_hotkeys,
                     &cfg.hotkey_modifier,
+                    &cfg.launcher_hotkey,
                 );
 
                 // Smart auto-hide watcher: emit `booki://occlusion` when the user

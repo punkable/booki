@@ -52,6 +52,7 @@ const DEMO_CONFIG = {
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
+  launcherHotkey: "Ctrl+Alt+Space",
   monitor: -1,
   materialStrength: 60,
   autostart: false,
@@ -529,6 +530,7 @@ export const dock = {
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
+  toggleWindow: (hwnd) => invoke("toggle_window", { hwnd }),
   closeWindow: (hwnd) => invoke("close_window", { hwnd }),
   trashCount: () => invoke("trash_count"),
   recentFiles: (limit) => invoke("recent_files", { limit }),
@@ -537,8 +539,8 @@ export const dock = {
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
-  applyHotkeys: (toggle, positions, modifier) =>
-    invoke("apply_hotkeys", { toggle, positions, modifier }),
+  applyHotkeys: (toggle, positions, modifier, launcher) =>
+    invoke("apply_hotkeys", { toggle, positions, modifier, launcher }),
   movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (shapes, tint) => invoke("set_material", { shapes, tint }),
@@ -637,6 +639,12 @@ export async function onSoftReveal(cb) {
 export async function onShowChangelog(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://show-changelog", () => cb());
+}
+
+/** Listen for the quick launcher shortcut. */
+export async function onLauncher(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://launcher", () => cb());
 }
 
 /** Listen for tray / hotkey show-hide toggle. */

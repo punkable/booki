@@ -88,6 +88,9 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       <Row label={t("sc.toggle")} hint={t("sc.global")}>
         <HotkeyInput value={cfg.hotkey} onChange={(v) => { set({ hotkey: v }); dockApi.setHotkey(v); }} />
       </Row>
+      <Row label={t("sc.launcher")} hint={t("sc.launcherHint")}>
+        <HotkeyInput label={t("sc.launcher")} value={cfg.launcherHotkey ?? "Ctrl+Alt+Space"} onChange={(v) => { set({ launcherHotkey: v }); dockApi.applyHotkeys(cfg.hotkey || "", cfg.positionHotkeys !== false, cfg.hotkeyModifier || "Alt", v); }} />
+      </Row>
       <Toggle label={t("sc.positions")} checked={cfg.positionHotkeys !== false}
         onChange={(v) => { set({ positionHotkeys: v }); dockApi.applyHotkeys(cfg.hotkey || "", v, cfg.hotkeyModifier || "Alt"); }} />
       {cfg.positionHotkeys !== false && <Row label={t("sc.posMod")} hint={t("sc.posHint").replaceAll("{mod}", (cfg.hotkeyModifier || "Alt").replace("Super", "Win"))}>

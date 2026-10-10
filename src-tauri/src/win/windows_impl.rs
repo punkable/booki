@@ -26,10 +26,11 @@ use windows::Win32::System::Com::{
 use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DestroyIcon, EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow, GetIconInfo,
-    GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW,
+    DestroyIcon, EnumWindows, FindWindowW, GetAncestor, GetClassNameW, GetForegroundWindow,
+    GetIconInfo, GetWindow, GetWindowLongW, GetWindowRect, GetWindowTextLengthW, GetWindowTextW,
     GetWindowThreadProcessId, IsIconic, IsWindowVisible, PostMessageW, SetForegroundWindow,
-    ShowWindow, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_RESTORE, WM_CLOSE, WS_EX_TOOLWINDOW,
+    ShowWindow, GA_ROOTOWNER, GWL_EXSTYLE, GW_OWNER, HICON, ICONINFO, SW_MINIMIZE, SW_RESTORE,
+    WM_CLOSE, WS_EX_TOOLWINDOW,
 };
 
 use super::WindowInfo;
@@ -948,6 +949,27 @@ pub fn focus_window(hwnd: isize) -> bool {
         }
         SetForegroundWindow(handle).as_bool()
     }
+}
+
+/// A dock click on an app's only window: when that window is already the one
+/// in front (the last foreground window outside Booki, or a dialog it owns),
+/// minimize it like the taskbar does; otherwise bring it forward. Returns true
+/// when it minimized.
+pub fn toggle_window(hwnd: isize) -> bool {
+    use std::sync::atomic::Ordering;
+    let front = super::system_events::LAST_FOREGROUND.load(Ordering::Relaxed);
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let owner = GetAncestor(HWND(front as *mut c_void), GA_ROOTOWNER);
+        let in_front = front != 0 && (front == hwnd || owner.0 as isize == hwnd);
+        if in_front && IsWindowVisible(handle).as_bool() && !IsIconic(handle).as_bool() {
+            let _ = ShowWindow(handle, SW_MINIMIZE);
+            super::system_events::LAST_FOREGROUND.store(0, Ordering::Relaxed);
+            return true;
+        }
+    }
+    focus_window(hwnd);
+    false
 }
 
 // ──────────────────────────── Autostart ────────────────────────────

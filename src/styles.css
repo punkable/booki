@@ -1758,6 +1758,26 @@ body.edge-right .stack.open { transform: none; }
 .add-row:not(.pinned) .add-state { opacity: .6; transition: opacity var(--dur-1) var(--ease); }
 .add-row:not(.pinned):hover .add-state, .add-row.active .add-state { opacity: 1; color: var(--ink); }
 .add-skel { pointer-events: none; opacity: 0.5; }
+/* Quick launcher: the add panel's look, sized to its results. */
+.stack.add-mode.launcher-mode { height: auto; max-height: min(420px, calc(100vh - 16px)); }
+.launcher-body { flex: 0 1 auto; }
+.launcher-fallback { background: var(--fb-deep); color: var(--fb-ink); }
+.launcher-fallback svg { width: 16px; height: 16px; }
+.launcher-kind {
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.launcher-row.active .launcher-kind { opacity: 1; }
+.launcher-hint {
+  padding: 8px 6px 0;
+  margin-top: 6px;
+  border-top: 1px solid var(--stroke);
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+}
 .add-skel::before {
   content: "";
   width: 28px;
