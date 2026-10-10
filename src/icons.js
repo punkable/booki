@@ -69,6 +69,12 @@ export const iconSun = () =>
   S(`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>`);
 export const iconMoon = () =>
   S(`<path d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5Z"/>`);
+export const iconGlobe = () =>
+  S(`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>`);
+export const iconFile = () =>
+  S(`<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/>`);
+export const iconCalendar = () =>
+  S(`<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>`);
 export const iconClock = () =>
   S(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`);
 export const iconZap = () =>
@@ -150,6 +156,8 @@ const iconMap = {
   image: iconImage,
   copy: iconCopy,
   sparkles: iconSparkles,
+  globe: iconGlobe,
+  file: iconFile,
   star: iconStar,
   shield: iconShield,
   eye: iconEye,
@@ -158,6 +166,7 @@ const iconMap = {
   sun: iconSun,
   moon: iconMoon,
   clock: iconClock,
+  calendar: iconCalendar,
   zap: iconZap,
   alert: iconAlert,
   "alert-triangle": iconAlert,

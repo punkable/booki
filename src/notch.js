@@ -66,6 +66,7 @@ async function applyLook() {
     if (!canPeek) closeCard();
     pollMedia();
     pollBattery();
+    readVolume();
     paintActivity();
     applyMaterial(cfg);
     scheduleHitReport();
@@ -187,12 +188,17 @@ let cardTimer = null;
 let cardOpen = false;
 
 // ─── Activities ──────────────────────────────────────────────────────────
-// The tab shows the one thing worth a glance, in this order: a running focus
-// timer, music that is playing, a battery running out. Nothing else; at rest
-// it stays a quiet tab or dot.
+// The tab shows the one thing worth a glance, in this order: a volume change
+// (for two seconds), a running focus timer, a focus block that just ended
+// (for a minute, with the next task), music that is playing, a battery
+// running out. Nothing else; at rest it stays a quiet tab or dot.
 let focusTimers = [];
 let battery = null; // { level, charging } or null on a desktop
+let volumeFlash = null; // { level, muted, until } after a volume change
 let activityTick = null;
+let activityExpiry = null;
+const VOLUME_FLASH_MS = 2000;
+const FOCUS_DONE_MS = 60000;
 const ringEl = document.getElementById("nl-ring");
 const lText = document.getElementById("nl-text");
 
@@ -206,11 +212,17 @@ function focusTimersOf(items = []) {
 }
 
 function currentActivity(now = Date.now()) {
+  if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
+  }
+  const ended = focusTimers.find((style) => Number(style.endsAt) <= now && now - Number(style.endsAt) < FOCUS_DONE_MS);
+  if (ended) {
+    const next = (Array.isArray(ended.tasks) ? ended.tasks : []).find((task) => !task.done)?.text || "";
+    return { kind: "done", next, until: Number(ended.endsAt) + FOCUS_DONE_MS };
   }
   if (media?.playing) return { kind: "media" };
   if (battery && !battery.charging && battery.level >= 0 && battery.level <= 15) return { kind: "battery", level: battery.level };
@@ -223,16 +235,24 @@ function paintActivity() {
   const activity = canPeek ? currentActivity() : null;
   const kind = activity?.kind || "";
   document.body.classList.toggle("live", !!activity);
-  for (const name of ["timer", "media", "battery"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  for (const name of ["timer", "done", "volume", "media", "battery"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
     lText.textContent = mmss(activity.left);
     ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
+  } else if (kind === "volume") {
+    lText.textContent = activity.muted ? t("notch.muted") : `${activity.level}%`;
+    ringEl.style.strokeDashoffset = String(100 - (activity.muted ? 0 : activity.level));
+  } else if (kind === "done") {
+    lText.textContent = t("notch.focusDone");
   } else if (kind === "battery") {
     lText.textContent = `${activity.level}%`;
   }
-  // Tick once a second only while a timer is visible.
+  // Tick once a second only while a timer is visible; a passing state
+  // repaints once when it runs out.
   clearInterval(activityTick);
+  clearTimeout(activityExpiry);
   activityTick = kind === "timer" ? setInterval(() => { paintActivity(); if (cardOpen) paintCard(); }, 1000) : null;
+  activityExpiry = activity?.until ? setTimeout(paintActivity, Math.max(50, activity.until - Date.now() + 20)) : null;
   paintCard();
 }
 
@@ -268,6 +288,20 @@ function paintCard() {
   if (activity?.kind === "timer") {
     cTitle.textContent = mmss(activity.left);
     cSub.textContent = t("w.focus");
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+    return;
+  }
+  if (activity?.kind === "volume") {
+    cTitle.textContent = activity.muted ? t("notch.muted") : `${activity.level}%`;
+    cSub.textContent = t("w.volume");
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+    return;
+  }
+  if (activity?.kind === "done") {
+    cTitle.textContent = t("focus.finished");
+    cSub.textContent = activity.next ? t("notch.nextTask").replace("{task}", activity.next) : t("notch.takeBreak");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -318,7 +352,23 @@ const pollMedia = singleFlight(async () => {
   mediaTimer = setTimeout(pollMedia, recoveryInterval(nativeSupport, "media", media && media.playing ? 2500 : 6000));
 });
 
-observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); } }, (support) => { nativeSupport = support; });
+// A volume change (keys, mixer or the dock's wheel) flashes the level on the
+// tab while the dock is tucked away. The first reading only sets a baseline.
+let lastVolume = null;
+const readVolume = singleFlight(async () => {
+  if (!canPeek || !inTauri) return;
+  let info = null;
+  try { info = await invoke("volume_info"); } catch (_) {}
+  if (!Array.isArray(info)) return;
+  const [level, muted] = info;
+  const changed = lastVolume && (lastVolume.level !== level || lastVolume.muted !== muted);
+  lastVolume = { level, muted };
+  if (!changed) return;
+  volumeFlash = { level, muted, until: Date.now() + VOLUME_FLASH_MS };
+  paintActivity();
+});
+
+observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 420) {

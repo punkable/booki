@@ -309,6 +309,24 @@ pub(crate) fn set_dock_edge(app: AppHandle, edge: String) {
     let _ = app.emit("booki://config-changed", ());
 }
 
+/// The quick launcher's shortcut, so the global handler can tell it apart
+/// from the show/hide toggle and the position keys.
+pub(crate) static LAUNCHER_SHORTCUT: std::sync::Mutex<
+    Option<tauri_plugin_global_shortcut::Shortcut>,
+> = std::sync::Mutex::new(None);
+
+/// Open the quick launcher: the dock frontend reveals itself and shows the
+/// search box; the dock window takes keyboard focus so typing goes there.
+pub(crate) fn show_launcher(app: &AppHandle) {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Some(dock) = app.get_webview_window("dock") {
+        let _ = dock.set_focus();
+    }
+    let _ = app.emit("booki://launcher", ());
+}
+
 pub(crate) fn toggle_dock(app: &AppHandle) {
     if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
         return;

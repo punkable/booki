@@ -55,12 +55,15 @@ export function bridgePatch(icons) {
 }
 export const allIcons = () => Object.fromEntries(Object.keys(APP_NAMES).map((k) => [appPath(k), iconUri(k)]));
 /* Windows draws Booki in Segoe UI, which a Linux capture machine lacks; the
-   fallback is much wider and truncates labels. Inter is the closest open face. */
-export function studioPatch(fontPath, { clock = '2026-10-06T09:41:00' } = {}) {
+   fallback is much wider and truncates labels. Inter is the closest open face.
+   The clock starts at `clock` and runs on, which the film needs; `frozen`
+   stops it there, so every still reads the same minute. */
+export function studioPatch(fontPath, { clock = '2026-10-06T09:41:00', frozen = false } = {}) {
   const font = (globalThis.__bookiFont ||= Buffer.from(globalThis.__readFile(fontPath)).toString('base64'));
   return `(() => {
     const start = new Date(${literal(clock)}).getTime(), real = Date.now(), Real = Date;
-    class Fixed extends Real { constructor(...a) { super(...(a.length ? a : [start + (Real.now() - real)])); } static now() { return start + (Real.now() - real); } }
+    const now = ${frozen ? '() => start' : '() => start + (Real.now() - real)'};
+    class Fixed extends Real { constructor(...a) { super(...(a.length ? a : [now()])); } static now() { return now(); } }
     window.Date = Fixed;
     const css = "@font-face{font-family:BookiStudio;src:url(data:font/ttf;base64,${font}) format('truetype');font-weight:100 900}:root{--font:BookiStudio,sans-serif!important;--font-display:BookiStudio,sans-serif!important}body{font-feature-settings:'cv11','ss01'}";
     const add = () => { const s = document.createElement('style'); s.textContent = css; document.head.appendChild(s); };
