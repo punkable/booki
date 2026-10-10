@@ -1,5 +1,5 @@
 import { t, curLang } from "../i18n.js";
-import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer } from "./productivity.js";
+import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { dock as dockApi } from "../api.js";
 import { icon } from "../icons.js";
 import { weatherKind, formatDegrees, formatHour, formatWeekday } from "./weather-codes.js";
@@ -69,37 +69,72 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
   }
   const DRAW = {
     timer(body, st) {
-      const value = document.createElement("div"); value.className = "focus-countdown";
-      value.setAttribute("role", "timer");
-      value.textContent = formatTimer(timerSeconds(st)); body.appendChild(value);
-      if (st.endsAt && timerSeconds(st) > 0) timer = setInterval(() => { if (!panel.isConnected) { clearInterval(timer); return; } value.textContent = formatTimer(timerSeconds(st)); if (timerSeconds(st) === 0) draw(); }, 1000);
-      const row = document.createElement("div"); row.className = "focus-actions"; body.appendChild(row);
-      button(t(st.endsAt && timerSeconds(st) > 0 ? "focus.pause" : "focus.start"), () => update((current) => toggleTimer(current)), row);
-      button(t("focus.reset"), () => update({ endsAt: null, remaining: null }), row);
-      const label = document.createElement("label"); label.textContent = t("focus.duration");
-      const input = document.createElement("input"); input.type = "number"; input.min = "1"; input.max = "180"; input.value = String(st.minutes || 25);
-      input.addEventListener("change", () => update({ minutes: Math.max(1, Math.min(180, Number(input.value) || 25)), endsAt: null, remaining: null }));
-      label.appendChild(input); body.appendChild(label);
+      // Countdown inside a ring that empties as the block runs.
+      const total = Math.min(180, Math.max(1, Number(st.minutes) || 25)) * 60;
+      const running = !!st.endsAt && timerSeconds(st) > 0;
+      const dial = document.createElement("div"); dial.className = "focus-dial"; dial.classList.toggle("is-running", running);
+      const ring = 2 * Math.PI * 52;
+      dial.innerHTML = `<svg viewBox="0 0 120 120" aria-hidden="true"><circle class="focus-dial-track" cx="60" cy="60" r="52"/><circle class="focus-dial-progress" cx="60" cy="60" r="52" stroke-dasharray="${ring.toFixed(2)}"/></svg>`;
+      const progress = dial.querySelector(".focus-dial-progress");
+      const value = document.createElement("div"); value.className = "focus-countdown"; value.setAttribute("role", "timer");
+      dial.appendChild(value); body.appendChild(dial);
+      const paint = () => {
+        const left = timerSeconds(st);
+        value.textContent = formatTimer(left);
+        progress.style.strokeDashoffset = String((ring * (1 - Math.min(1, left / total))).toFixed(2));
+      };
+      paint();
+      if (running) timer = setInterval(() => { if (!panel.isConnected) { clearInterval(timer); return; } paint(); if (timerSeconds(st) === 0) draw(); }, 1000);
+      const row = document.createElement("div"); row.className = "focus-actions focus-timer-actions"; body.appendChild(row);
+      const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "focus-primary";
+      toggle.innerHTML = icon(running ? "pause" : "play"); toggle.append(text("span", "", t(running ? "focus.pause" : "focus.start")));
+      toggle.addEventListener("click", () => update((current) => toggleTimer(current))); row.appendChild(toggle);
+      const reset = document.createElement("button"); reset.type = "button"; reset.className = "stack-close focus-icon-button";
+      reset.innerHTML = icon("refresh"); reset.title = t("focus.reset"); reset.setAttribute("aria-label", t("focus.reset"));
+      reset.addEventListener("click", () => update({ endsAt: null, remaining: null })); row.appendChild(reset);
+      // Duration as a stepper; the field stays editable for any value from 1 to 180.
+      const minutes = Math.min(180, Math.max(1, Number(st.minutes) || 25));
+      const setMinutes = (next) => update({ minutes: Math.max(1, Math.min(180, Math.round(next) || 25)), endsAt: null, remaining: null });
+      const stepper = document.createElement("div"); stepper.className = "focus-stepper";
+      const label = text("span", "focus-stepper-label", t("focus.duration"));
+      const less = document.createElement("button"); less.type = "button"; less.innerHTML = icon("minus"); less.setAttribute("aria-label", `${t("focus.duration")} −5`); less.disabled = minutes <= 1;
+      less.addEventListener("click", () => setMinutes(minutes <= 5 ? 1 : Math.ceil(minutes / 5) * 5 - 5));
+      const input = document.createElement("input"); input.type = "number"; input.min = "1"; input.max = "180"; input.value = String(minutes); input.setAttribute("aria-label", t("focus.duration"));
+      input.addEventListener("change", () => setMinutes(Number(input.value)));
+      const more = document.createElement("button"); more.type = "button"; more.innerHTML = icon("plus"); more.setAttribute("aria-label", `${t("focus.duration")} +5`); more.disabled = minutes >= 180;
+      more.addEventListener("click", () => setMinutes(minutes < 5 ? 5 : Math.floor(minutes / 5) * 5 + 5));
+      const controls = document.createElement("div"); controls.className = "focus-stepper-controls"; controls.append(less, input, more);
+      stepper.append(label, controls); body.appendChild(stepper);
     },
     tasks(body, st) {
       const list = Array.isArray(st.tasks) ? st.tasks : [];
+      const summary = tasksSummary(list);
+      const heading = document.createElement("div"); heading.className = "focus-tasks-head";
+      heading.append(text("strong", "", t("w.tasks")));
+      if (summary.total) heading.append(text("span", "", `${summary.done}/${summary.total}`));
+      body.appendChild(heading);
+      const items = document.createElement("ul"); items.className = "focus-task-list"; body.appendChild(items);
       for (const task of list) {
-        const row = document.createElement("div"); row.className = "focus-task";
+        const row = document.createElement("li"); row.className = "focus-task";
         const label = document.createElement("label"); const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = !!task.done;
         checkbox.setAttribute("aria-label", task.text);
         checkbox.addEventListener("change", () => { const done = checkbox.checked; update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, done } : entry) })); });
-        const text = document.createElement("button"); text.type = "button"; text.className = "task-edit"; text.textContent = task.text; text.setAttribute("aria-label", `${t("apps.rename")}: ${task.text}`);
-        text.addEventListener("click", (event) => { event.preventDefault(); const input = document.createElement("input"); input.value = task.text; input.maxLength = 200; input.setAttribute("aria-label", t("apps.rename")); text.replaceWith(input); input.focus(); let done = false; const commit = () => { if (done) return; done = true; if (!input.value.trim()) return draw(); update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, text: input.value.trim() } : entry) })); }; input.addEventListener("blur", commit); input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { done = true; draw(); } }); }); label.append(checkbox, text); row.appendChild(label);
-        const remove = button("×", () => update((current) => ({ tasks: (current.tasks || []).filter((entry) => entry.id !== task.id) })), row); remove.setAttribute("aria-label", t("apps.remove")); body.appendChild(row);
+        const edit = document.createElement("button"); edit.type = "button"; edit.className = "task-edit"; edit.textContent = task.text; edit.setAttribute("aria-label", `${t("apps.rename")}: ${task.text}`);
+        edit.addEventListener("click", (event) => { event.preventDefault(); const input = document.createElement("input"); input.className = "task-rename"; input.value = task.text; input.maxLength = 200; input.setAttribute("aria-label", t("apps.rename")); edit.replaceWith(input); input.focus(); let done = false; const commit = () => { if (done) return; done = true; if (!input.value.trim()) return draw(); update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, text: input.value.trim() } : entry) })); }; input.addEventListener("blur", commit); input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { done = true; draw(); } }); }); label.append(checkbox, edit); row.appendChild(label);
+        const remove = document.createElement("button"); remove.type = "button"; remove.className = "stack-close focus-task-remove"; remove.innerHTML = icon("x");
+        remove.title = t("apps.remove"); remove.setAttribute("aria-label", `${t("apps.remove")}: ${task.text}`);
+        remove.addEventListener("click", () => update((current) => ({ tasks: (current.tasks || []).filter((entry) => entry.id !== task.id) }))); row.appendChild(remove);
+        items.appendChild(row);
       }
-      const form = document.createElement("form"); form.className = "focus-actions";
-      const input = document.createElement("input"); input.className = "focus-new-task"; input.placeholder = t("focus.newTask"); input.setAttribute("aria-label", t("focus.newTask")); input.maxLength = 200; form.appendChild(input);
-      const add = button("+", () => {}, form); add.type = "submit"; add.setAttribute("aria-label", t("focus.newTask"));
+      const form = document.createElement("form"); form.className = "focus-add-task";
+      const input = document.createElement("input"); input.className = "focus-new-task"; input.placeholder = t("focus.newTask"); input.setAttribute("aria-label", t("focus.newTask")); input.maxLength = 200; input.autocomplete = "off";
+      const add = document.createElement("button"); add.type = "submit"; add.className = "weather-search-go"; add.innerHTML = icon("plus"); add.title = t("focus.newTask"); add.setAttribute("aria-label", t("focus.newTask"));
+      form.append(input, add);
       form.addEventListener("submit", (event) => {
-        event.preventDefault(); const text = input.value.trim();
-        if (!text || input.disabled || list.length >= 100) return;
+        event.preventDefault(); const value = input.value.trim();
+        if (!value || input.disabled || list.length >= 100) return;
         input.disabled = true; add.disabled = true;
-        update((current) => ({ tasks: [...(current.tasks || []), { id: crypto.randomUUID(), text, done: false }] })).finally(() => {
+        update((current) => ({ tasks: [...(current.tasks || []), { id: crypto.randomUUID(), text: value, done: false }] })).finally(() => {
           input.disabled = false; add.disabled = false;
           if (panel.isConnected) panel.querySelector(".focus-new-task")?.focus();
         });
@@ -108,15 +143,17 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     calendar(body) {
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-      const nav = document.createElement("div"); nav.className = "focus-actions"; body.appendChild(nav);
-      button(t("premium.previousMonth"), () => { monthOffset--; draw(); }, nav);
-      button(t("focus.today"), () => { monthOffset = 0; draw(); }, nav);
-      button(t("premium.nextMonth"), () => { monthOffset++; draw(); }, nav);
-      const label = document.createElement("p"); label.textContent = date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }); label.setAttribute("aria-live", "polite"); body.appendChild(label);
+      const nav = document.createElement("div"); nav.className = "focus-month"; body.appendChild(nav);
+      const label = text("strong", "focus-month-title", date.toLocaleDateString(curLang(), { month: "long", year: "numeric" })); label.setAttribute("aria-live", "polite"); nav.appendChild(label);
+      if (monthOffset !== 0) { const today = document.createElement("button"); today.type = "button"; today.className = "focus-today"; today.textContent = t("focus.today"); today.addEventListener("click", () => { monthOffset = 0; draw(); }); nav.appendChild(today); }
+      for (const [name, step, key] of [["chevron-left", -1, "premium.previousMonth"], ["chevron-right", 1, "premium.nextMonth"]]) {
+        const go = document.createElement("button"); go.type = "button"; go.className = "stack-close"; go.innerHTML = icon(name); go.title = t(key); go.setAttribute("aria-label", t(key));
+        go.addEventListener("click", () => { monthOffset += step; draw(); }); nav.appendChild(go);
+      }
       const grid = document.createElement("div"); grid.className = "focus-calendar";
       const weekStart = calendarWeekStart(navigator.language || curLang());
-      for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "short" }); grid.appendChild(cell); }
-      for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
+      for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "narrow" }); grid.appendChild(cell); }
+      for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", `${t("focus.today")}, ${day}`); cell.setAttribute("aria-current", "date"); } grid.appendChild(cell); } body.appendChild(grid);
     },
     weather(body, st) {
       const hasCity = Number.isFinite(st.latitude) && Number.isFinite(st.longitude);

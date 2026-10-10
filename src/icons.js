@@ -97,6 +97,10 @@ export const iconVolume = () =>
   S(`<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>`);
 export const iconNote = () =>
   S(`<path d="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v6h6M7 13h8M7 17h5"/>`);
+// Timer and calendar controls for the dock's panels.
+export const iconPlay = () => S(`<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/>`);
+export const iconPause = () => S(`<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>`);
+export const iconChevronLeft = () => S(`<path d="m15 6-6 6 6 6"/>`);
 // Weather conditions for the forecast panel.
 export const iconCloud = () =>
   S(`<path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/>`);
@@ -168,6 +172,9 @@ const iconMap = {
   disk: iconDisk,
   battery: iconBattery,
   volume: iconVolume,
+  play: iconPlay,
+  pause: iconPause,
+  "chevron-left": iconChevronLeft,
   cloud: iconCloud,
   "cloud-sun": iconCloudSun,
   "cloud-rain": iconCloudRain,
