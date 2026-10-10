@@ -23,9 +23,9 @@ export function DockPage({ cfg, set }) {
 
   return <>
     <PageHeader title={t("tab.dock")}>{t("dock.pageHint")}</PageHeader>
-    <div className="sticky-preview"><DockPreview cfg={cfg} /></div>
+    <div className="sticky-preview"><DockPreview cfg={cfg} stage /></div>
 
-    <SettingsSection title={t("dock.behavior")}>
+    <SettingsSection icon="eye" title={t("dock.behavior")}>
       <div className="row-block"><ScenarioPicker cfg={cfg} set={set} /></div>
       {hides && <Row label={t("be.reveal")} hint={t("be.revealHint")}>
         <SegmentedControl value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
@@ -41,7 +41,7 @@ export function DockPage({ cfg, set }) {
       <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
     </SettingsSection>
 
-    <SettingsSection title={t("be.position")}>
+    <SettingsSection icon="app" title={t("be.position")}>
       <div className="row-block"><PositionPicker cfg={cfg} set={set} afterPlacement={afterPlacement} /></div>
       {monitors.length > 1 && <Row label={t("be.monitor")}>
         <MonitorPicker value={cfg.monitor ?? -1} monitors={monitors}
@@ -52,7 +52,7 @@ export function DockPage({ cfg, set }) {
       </Row>
     </SettingsSection>
 
-    <SettingsSection title={t("tab.appearance")}>
+    <SettingsSection icon="palette" title={t("tab.appearance")}>
       <Row label={t("ap.theme")}>
         <SegmentedControl value={cfg.theme || "system"} onChange={(v) => set({ theme: v })}
           options={["system", "light", "dark", "auto"].map((value) => ({ value, label: t(`theme.${value}`) }))} />
@@ -66,7 +66,7 @@ export function DockPage({ cfg, set }) {
       <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
     </SettingsSection>
 
-    <SettingsSection title={t("gp.size")}>
+    <SettingsSection icon="sliders" title={t("gp.size")}>
       <Row label={t("ap.iconSize")}><Slider value={cfg.iconSize ?? 48} min={28} max={80} step={4} fmt={(v) => `${v}px`} onChange={(v) => set({ iconSize: v })} /></Row>
       <Row label={t("ap.spacing")}><Slider value={cfg.spacing ?? 6} min={0} max={20} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ spacing: v })} /></Row>
       <Row label={t("ap.radius")} hint={t("ap.radiusHint")}><Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ cornerRadius: v })} /></Row>
