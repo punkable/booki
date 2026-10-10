@@ -1,64 +1,76 @@
 <p align="center">
-  <img src="assets/brand/svg/isotype.svg" alt="Capibara de Booki" height="72" />
+  <img src="assets/brand/svg/isotype.svg" alt="Capibara de Booki" height="84" />
 </p>
 
 <h1 align="center">Booki</h1>
 
-<h3 align="center">Una forma más tranquila de usar Windows.</h3>
+<h3 align="center">Tu escritorio, más en calma.</h3>
+
+<p align="center">Un dock precioso para Windows 11: apps, carpetas y widgets en vivo en una sola barra tranquila.<br/>Gratis, privado y de código abierto.</p>
 
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar</b></a> ·
-  <a href="docs/presentation/booki-070-es.mp4"><b>Ver el video</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar para Windows</b></a> ·
+  <a href="docs/releases/v0.81.0.md"><b>Novedades de 0.81</b></a> ·
   <a href="README.md">English</a>
 </p>
 
 <p align="center">
-  <a href="docs/presentation/booki-070-es.mp4"><img src="docs/presentation/hero-es.jpg" width="1000" alt="Dock de Booki en un escritorio suave: apps, reloj, clima, CPU, tareas y música" /></a>
+  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=versi%C3%B3n&style=flat-square&color=dfaa75" alt="Última versión" /></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?style=flat-square" alt="Windows 10 y 11" />
+  <img src="https://img.shields.io/badge/hecho%20con-Tauri%202%20%2B%20React-24c8db?style=flat-square" alt="Hecho con Tauri 2 y React" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-lightgrey?style=flat-square" alt="Licencia MIT" /></a>
 </p>
+
+<p align="center"><img src="docs/presentation/hero-es.jpg" width="1000" alt="Dock de Booki en un escritorio suave con apps, dos grupos de color, reloj, clima, sistema, temporizador y música, y la Isla del notch con el temporizador" /></p>
+
+<table align="center">
+<tr>
+<td align="center" width="25%"><b>⚡ Ligero</b><br/><sub>Núcleo nativo en Rust. Los widgets se pausan cuando el dock se oculta.</sub></td>
+<td align="center" width="25%"><b>🔒 Privado</b><br/><sub>Sin cuentas, sin telemetría, sin nube.</sub></td>
+<td align="center" width="25%"><b>🎨 Tuyo</b><br/><sub>Vidrio, Mica o sólido. Cualquier borde. Cinco idiomas.</sub></td>
+<td align="center" width="25%"><b>🧡 Abierto</b><br/><sub>Licencia MIT. Hecho a la vista de todos.</sub></td>
+</tr>
+</table>
 
 ---
 
-<h2 align="center">Todo lo que usas. En un solo dock.</h2>
+<h2 align="center">El notch que te cuenta cosas.</h2>
 
-<p align="center">Ancla apps, carpetas, archivos y sitios web. Un clic para abrir o volver a una ventana que ya está abierta.<br/>Los clics fuera de la barra pasan directo a lo que hay detrás.</p>
+<p align="center">Un punto discreto arriba de la pantalla que se abre en cápsula con tu temporizador, la canción que suena o la batería baja.<br/>Pasa el ratón para ver una tarjeta con más. ¿Prefieres algo más simple? Elige pestaña pegada o píldora flotante.</p>
 
-<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Primer plano de los widgets de Booki: reloj, clima, CPU y tareas" /></p>
+<p align="center"><img src="docs/presentation/island-es.jpg" width="1000" alt="La Isla del notch mostrando un temporizador sobre un dock oscuro de Booki" /></p>
 
-<h2 align="center">Todo, de un vistazo.</h2>
+<h2 align="center">Grupos con tu estilo.</h2>
 
-<p align="center">Hora, clima, CPU, memoria, red, batería, notas, portapapeles y música: mosaicos compactos en la barra que se pausan cuando el dock se oculta.</p>
+<p align="center">Ancla apps, carpetas, archivos y sitios web, y júntalos en grupos.<br/>Dale a cada grupo un color de una paleta cuidada y un icono de la librería: se ve en el dock y en Ajustes.</p>
 
-<p align="center"><img src="docs/presentation/focus-es.jpg" width="1000" alt="Widgets de temporizador, tareas, calendario y clima, con la lista de tareas abierta" /></p>
+<p align="center"><img src="docs/presentation/groups-es.jpg" width="1000" alt="Ajustes de Booki, Apps y carpetas: el dock como cuadrícula ordenada, biblioteca con iconos grandes e inspector de grupo con color e icono" /></p>
 
-<h2 align="center">Un poco más de enfoque.</h2>
+<h2 align="center">En vivo, de un vistazo.</h2>
 
-<p align="center">Temporizador, lista de tareas, calendario mensual y clima opcional por ciudad.<br/>Tus tareas se quedan en tu PC. El clima solo consulta la ciudad que eliges, nunca tu ubicación.</p>
+<p align="center">Reloj, calendario, clima, sistema (CPU, memoria, disco, red), batería, música, volumen, notas, portapapeles y enfoque (temporizador + tareas).<br/>Fichas compactas en la propia barra.</p>
 
-<p align="center"><img src="docs/presentation/apps-es.jpg" width="1000" alt="Biblioteca de apps con sugerencias, apps abiertas y todas las instaladas" /></p>
+<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Galería de widgets de Booki con vistas previas en vivo" /></p>
 
-<h2 align="center">Encuentra cualquier app.</h2>
+<h2 align="center">Ajustes que da gusto usar.</h2>
 
-<p align="center">Busca entre todo lo instalado, mira lo que está abierto y recibe sugerencias según tu propio uso.<br/>El uso se lee localmente de Windows y de lo que abres con Booki. Nada se sube.</p>
+<p align="center">Cinco páginas claras —Inicio, Dock, Widgets, Apps y Sistema— con una vista previa en vivo de tu dock y todo de un vistazo.</p>
 
-<p align="center"><img src="docs/presentation/settings-es.jpg" width="1000" alt="Inicio de Ajustes con vista previa del dock y escenarios de comportamiento" /></p>
+<p align="center"><img src="docs/presentation/settings-es.jpg" width="1000" alt="Inicio de Ajustes con el dock sobre un escritorio y fichas de resumen" /></p>
 
-<h2 align="center">Hazlo tuyo.</h2>
+<h2 align="center">Como en casa a oscuras.</h2>
 
-<p align="center">Vista previa en vivo de tu dock, tres comportamientos (siempre visible, inteligente o revelar en el borde), perfiles, cualquier borde de la pantalla, vidrio o sólido y cinco idiomas.</p>
+<p align="center">Sigue el tema y el color de Windows. Vidrio desenfoca lo que hay detrás, Mica se tiñe con tu fondo y Sólido se mantiene nítido.<br/>Cuando un juego o vídeo pasa a pantalla completa, Booki se aparta.</p>
 
-<p align="center"><img src="docs/presentation/dark-es.jpg" width="1000" alt="Booki en modo oscuro" /></p>
-
-<h2 align="center">Claro u oscuro. Se ve bien en ambos.</h2>
-
-<p align="center">Sigue el tema y el color de acento de Windows, con acrílico real detrás de la barra. Cuando un juego o video pasa a pantalla completa, Booki se aparta.</p>
+<p align="center"><img src="docs/presentation/dark-es.jpg" width="1000" alt="Ajustes del dock de Booki en modo oscuro" /></p>
 
 ---
 
 <h2 align="center">Privado por diseño.</h2>
 
-<p align="center">Sin cuentas. Sin telemetría. Sin nube. Código abierto con licencia MIT.</p>
+<p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
-<p align="center"><sub>Las imágenes y el video muestran la interfaz real de Booki con datos e iconos de ejemplo. La presentación muestra el rediseño de 0.70. Consulta las <a href="docs/releases/v0.70.2.md">correcciones de superficies y funcionamiento de 0.70.2</a>.</sub></p>
+<p align="center"><sub>Las imágenes muestran la interfaz real de Booki 0.81 con datos y app de ejemplo.</sub></p>
 
 ## Instalar y empezar
 
@@ -74,7 +86,7 @@ Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así q
 |---|---|
 | Clic en un acceso | Abrirlo o enfocar su ventana |
 | Arrastrar al dock | Anclarlo conservando el original |
-| Arrastrar fuera | Desanclar; 0.70 ofrece además devolver accesos directos al escritorio |
+| Arrastrar fuera | Desanclar, o devolver un acceso directo al escritorio |
 | Clic derecho | Añadir elementos, cambiar perfil o abrir Ajustes |
 | Clic central | Mostrar la ubicación en Explorer |
 | `Alt` + `1…9` | Abrir el acceso correspondiente; modificador configurable |
@@ -84,7 +96,7 @@ Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así q
 
 No hay cuentas, telemetría ni sincronización en la nube. La configuración y las recomendaciones de uso permanecen en tu equipo, en `%APPDATA%\Booki`. El portapapeles persistente está desactivado inicialmente y, al activarlo, se protege para tu usuario de Windows.
 
-Las consultas de red se usan para actualizaciones y favicons; 0.70 añade clima opcional mediante Open-Meteo al elegir una ciudad, sin pedir la ubicación del dispositivo. La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
+Las consultas de red se usan para actualizaciones y favicons, además del clima opcional mediante Open-Meteo al elegir una ciudad, sin pedir la ubicación del dispositivo. La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
 
 ## Desarrollo y soporte
 
