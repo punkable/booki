@@ -204,6 +204,14 @@ pub(crate) fn notch_reveal(app: AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// Is an app owning the screen right now (maximized or fullscreen)? Asked by
+/// the notch each time it is shown, so it can start out of the way instead of
+/// waiting for the next change event from the watcher.
+#[tauri::command]
+pub(crate) fn notch_screen_busy() -> bool {
+    win::foreground_maximized() || win::is_fullscreen()
+}
+
 /// Interactive regions of the notch window (window-relative CSS px). Same
 /// click-through contract as `set_hit_rects`, scoped to the notch.
 #[tauri::command]

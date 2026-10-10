@@ -303,7 +303,8 @@
 .screen-bar.at-left.slot-center, .screen-bar.at-right.slot-center { top: calc(50% - 22px); }
 .screen-bar.at-left.slot-start, .screen-bar.at-right.slot-start { top: 8px; }
 .screen-bar.at-left.slot-end, .screen-bar.at-right.slot-end { bottom: 8px; }
-.position-fields { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.position-fields { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: start; gap: 8px 14px; }
+.position-field-label { color: var(--ink-2); font-size: 12.5px; }
 
 .monitor-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .monitor-stage { position: relative; }
@@ -526,9 +527,22 @@
 .library-inspector .muted { font-size: 12px; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
 .library-inspector > .button { justify-content: center; }
 .library-inspector .library-dock-actions > .button { flex: 1; justify-content: center; }
-.library-group-members { display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--subtle-pressed); border-radius: 10px; }
-.library-group-members > div { display: flex; align-items: center; gap: 2px; }
-.library-group-members .button { flex: 1; justify-content: flex-start; min-height: 30px; background: transparent; border-color: transparent; }
+.library-group-members { display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--subtle-pressed); border: 1.5px dashed transparent; border-radius: 10px; transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease); }
+.library-group-members.drop-over { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.library-group-members-title { padding: 2px 6px 4px; color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.library-group-member { display: flex; align-items: center; gap: 2px; border-radius: 8px; cursor: grab; }
+.library-group-member:hover { background: var(--subtle-hover); }
+.library-group-members .button { flex: 1; min-width: 0; justify-content: flex-start; gap: 8px; min-height: 34px; padding: 0 6px; background: transparent; border-color: transparent; cursor: inherit; }
+.library-group-members .button > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-group-members .button .live-preview-app { width: 22px; height: 22px; }
+.library-group-members-hint { margin: 4px 6px 2px; color: var(--ink-2); font-size: 11.5px; line-height: 15px; }
+/* Drop feedback in the pin strip: a bar between pins to reorder, a ring
+   around a pin to file into it (or make a group with it). */
+.library-pin.drop-before::before, .library-pin.drop-after::after { content: ""; position: absolute; top: 8px; bottom: 8px; width: 3px; background: var(--accent); border-radius: 2px; pointer-events: none; }
+.library-pin.drop-before::before { left: -3px; }
+.library-pin.drop-after::after { right: -3px; }
+.library-pin.drop-into, .library-pin.drop-merge { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }
+.library-drop-label { position: absolute; left: 50%; top: 2px; z-index: 2; max-width: calc(100% + 24px); overflow: hidden; text-overflow: ellipsis; translate: -50% 0; padding: 3px 8px; color: var(--accent-contrast); font-size: 11.5px; font-weight: 600; white-space: nowrap; background: var(--accent); border-radius: 999px; pointer-events: none; }
 
 .group-look { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .look-picker { position: relative; min-width: 0; }
@@ -610,15 +624,15 @@
 .app-library-privacy p { color: var(--ink-2); font-size: 12px; }
 
 /* ── Profiles & backup ──────────────────────────────────────────────────── */
-.profiles-section { background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); }
-.profiles-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--divider); }
-.profiles-toolbar h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.profiles-section { background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
+.profiles-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 58px; padding: 12px 18px; border-bottom: 1px solid var(--divider); }
+.profiles-toolbar h2 { margin: 0; font-size: 14px; font-weight: 500; }
 .profiles-toolbar h2 span { color: var(--ink-2); font-weight: 400; }
 .prof-new { display: flex; gap: 8px; flex: 1 1 260px; justify-content: flex-end; }
 .prof-new .text-field { max-width: 240px; }
 .profile-list { display: flex; flex-direction: column; }
 .profile-record + .profile-record { border-top: 1px solid var(--divider); }
-.profile-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px; color: var(--ink); font: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.profile-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 18px; color: var(--ink); font: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
 .profile-choice:hover { background: var(--card-hover); }
 .profile-choice svg { width: 16px; height: 16px; }
 .prof-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -634,12 +648,12 @@
 .profile-manage summary { color: var(--ink-2); font-size: 12px; cursor: pointer; }
 .profile-manage-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .profile-manage-controls .text-field { flex: 1 1 160px; width: auto; }
-.profile-empty, .profile-error { margin: 0; padding: 14px 16px; color: var(--ink-2); }
+.profile-empty, .profile-error { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: 13px; }
 .profile-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); }
 .prof-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; border-top: 1px solid var(--divider); }
-.profile-backup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 12px 16px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); }
-.profile-backup h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.profile-backup p { margin: 2px 0 0; color: var(--ink-2); font-size: 12px; }
+.profile-backup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; margin-top: 10px; padding: 12px 18px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
+.profile-backup h2 { margin: 0; font-size: 14px; font-weight: 500; line-height: 20px; }
+.profile-backup p { margin: 2px 0 0; color: var(--ink-2); font-size: 12.5px; line-height: 17px; }
 
 /* ── Notices and recovery ───────────────────────────────────────────────── */
 .recovery-notice, .settings-recovery { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 16px; background: color-mix(in srgb, #fce100 14%, var(--card)); border: 1px solid color-mix(in srgb, #fce100 40%, transparent); border-radius: var(--r-card); }

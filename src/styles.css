@@ -662,6 +662,7 @@ body.notch-body.vertical { align-items: center; }
     background var(--dur-3) var(--ease-out),
     box-shadow var(--dur-3) var(--ease-out),
     opacity var(--dur-2) var(--ease-out),
+    translate var(--dur-3) var(--ease-out),
     border-color var(--dur-3) var(--ease-out);
 }
 .notch-pill.notch-enter {
@@ -674,6 +675,19 @@ body.notch-body.vertical { align-items: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .notch-pill.notch-enter { animation: none; }
+}
+/* Out of the way while an app owns the screen (notch.js presence): the tab
+   tucks into its edge and fades; the backend brings it back on approach. */
+body.notch-body.away .notch-pill {
+  opacity: 0;
+  translate: 0 70%;
+  transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out);
+}
+body.notch-body.away.edge-top .notch-pill { translate: 0 -70%; }
+body.notch-body.away.edge-left .notch-pill { translate: -70% 0; }
+body.notch-body.away.edge-right .notch-pill { translate: 70% 0; }
+@media (prefers-reduced-motion: reduce) {
+  body.notch-body.away .notch-pill { translate: none; }
 }
 @media (hover: hover) and (pointer: fine) {
   .notch-pill:hover {
@@ -915,8 +929,10 @@ body.notch-body.peekable .notch-pill {
     border-radius 0.4s var(--ease-out),
     background var(--dur-3) var(--ease-out),
     box-shadow var(--dur-3) var(--ease-out),
-    opacity var(--dur-2) var(--ease-out);
+    opacity var(--dur-2) var(--ease-out),
+    translate var(--dur-3) var(--ease-out);
 }
+body.notch-body.peekable.away .notch-pill { transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out); }
 @media (hover: hover) and (pointer: fine) {
   body.notch-body.peekable .notch-pill:hover { scale: none; }
 }

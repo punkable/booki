@@ -95,11 +95,11 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       </Row>}
     </SettingsSection>
 
-    <SettingsSection icon="refresh" title={t("ab.updates")} hint={t("ab.updatesHint")}>
-      <UpdatesCard onWhatsNew={onWhatsNew} beforeApply={store.prepareConfigOperation} />
+    <SettingsSection icon="refresh" title={t("ab.updates")} hint={t("premium.updateExplanation")}>
+      <UpdatesCard beforeApply={store.prepareConfigOperation} />
     </SettingsSection>
 
-    <section className="ui-group-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
+    <section className="ui-group-wrap profiles-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
 
     <SettingsSection icon="shield" title={t("system.privacy")} hint={t("faq.fact.net")}>
       <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")} checked={!!cfg.captureVisible} onChange={(v) => set({ captureVisible: v })} />
@@ -129,7 +129,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       </div>
     </SettingsSection>
 
-    <CollapsibleSection title={t("ab.free")} hint={t("ab.donateHint")}><Donate /></CollapsibleSection>
+    <CollapsibleSection title={t("ab.free")} hint={t("ab.donateHint").replace(/\s*[:：]\s*$/, "")}><Donate /></CollapsibleSection>
 
     <SettingsSection icon="alert-triangle" title={t("ab.danger")}>
       <Row label={t("act.reset")} hint={t("ab.resetHint")}><ResetButton onReset={store.reset} /></Row>

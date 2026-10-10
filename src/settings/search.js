@@ -9,7 +9,7 @@ import { t } from "../i18n.js";
 // that hosts it. The label must match the row's data-setting-label so the
 // result can scroll to it.
 const SEARCH_INDEX = [
-  ["dock.behavior", "dock"], ["be.reveal", "dock"], ["be.notchMode", "dock"], ["be.hideDelay", "dock"], ["be.hideInFullscreen", "dock"],
+  ["dock.behavior", "dock"], ["be.reveal", "dock"], ["be.notchMode", "dock"], ["be.notchPresence", "dock"], ["be.hideDelay", "dock"], ["be.hideInFullscreen", "dock"],
   ["be.position", "dock"], ["be.monitor", "dock"], ["be.edgeGap", "dock"],
   ["tab.appearance", "dock"], ["ap.theme", "dock"], ["ap.accent", "dock"], ["dock.intensity", "dock"], ["ap.surfaceTint", "dock"], ["overhaul.reduceTransparency", "dock"],
   ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"], ["ap.compact", "dock"],
@@ -37,6 +37,7 @@ const SEARCH_ALIASES = {
   "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
   "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
   "be.notchMode": "notch pildora pill pestana tab pegado flotante attached floating isla island smart inteligente",
+  "be.notchPresence": "notch punto isla ocultar esconder maximizada navegador trabajar molesta auto hide dot",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",
   "be.magnify": "zoom ampliar enlargement magnify",
   "be.reveal": "revelar reveal hover click notch",

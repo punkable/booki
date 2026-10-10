@@ -57,6 +57,7 @@ const DEMO_CONFIG = {
   autostart: false,
   language: "system",
   notchTrigger: "click",
+  notchVisibility: "auto",
   compact: false,
   onboarded: true,
   settingsIntroSeen: true,
@@ -649,6 +650,18 @@ export async function onToggleDock(cb) {
 export async function onFullscreen(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://fullscreen", (e) => cb(!!e.payload));
+}
+
+/** An app owns the screen (maximized or fullscreen): the smart notch steps aside. */
+export async function onScreenBusy(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://screen-busy", (e) => cb(!!e.payload));
+}
+
+/** The pointer came near the notch (or left), even while it is out of sight. */
+export async function onNotchNear(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-near", (e) => cb(!!e.payload));
 }
 
 /** Listen for a toast message to render on the notch window. */

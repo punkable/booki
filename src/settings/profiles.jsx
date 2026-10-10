@@ -107,7 +107,7 @@ export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport, embedded 
   return (
     <>
       {review && <SnapshotReview current={cfg} snapshot={review.snapshot} onClose={() => setReview(null)} onConfirm={async () => { await onImport(review.path,review.snapshot);flash(t("ap.backupImported")); }} />}
-      {embedded ? <h2 className="ui-group-title" data-setting-label={t("tab.profiles")}>{t("tab.profiles")}</h2> : <PageHeader title={t("tab.profiles")}>{t("prof.hint")}</PageHeader>}
+      {embedded ? <h2 className="ui-group-title" data-setting-label={t("tab.profiles")}><span className="ui-icon section-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("copy") }} />{t("tab.profiles")}</h2> : <PageHeader title={t("tab.profiles")}>{t("prof.hint")}</PageHeader>}
       <ProfilesCard cfg={cfg} onApply={onApply} beforeSnapshot={beforeSnapshot} />
       <section className="profile-backup"><div><h2>{t("ap.backup")}</h2><p role="status">{backupMsg || t("design.backupHint")}</p></div><div className="workspace-actions">
 

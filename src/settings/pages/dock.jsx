@@ -35,6 +35,10 @@ export function DockPage({ cfg, set }) {
         <SegmentedControl value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
           options={[{ value: "attached", label: t("be.notchModeAttached") }, { value: "floating", label: t("be.notchModeFloating") }, { value: "smart", label: t("be.notchModeSmart") }]} />
       </Row>}
+      {hides && <Row label={t("be.notchPresence")} hint={t({ always: "be.notchPresenceAlwaysHint", edge: "be.notchPresenceEdgeHint" }[cfg.notchVisibility] || "be.notchPresenceAutoHint")}>
+        <SegmentedControl value={["always", "edge"].includes(cfg.notchVisibility) ? cfg.notchVisibility : "auto"} onChange={(v) => set({ notchVisibility: v })}
+          options={[{ value: "always", label: t("be.notchPresenceAlways") }, { value: "auto", label: t("be.notchPresenceAuto") }, { value: "edge", label: t("be.notchPresenceEdge") }]} />
+      </Row>}
       {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}

@@ -289,6 +289,12 @@ pub struct Config {
     /// cursor against its screen edge, brings it out).
     #[serde(default = "default_notch_trigger")]
     pub notch_trigger: String,
+    /// When the tucked-away notch shows itself: "always"; "auto" (steps
+    /// aside while a maximized or fullscreen app is in front, and comes back
+    /// when the pointer nears it or something new happens); or "edge" (stays
+    /// out of sight until the pointer nears it or something new happens).
+    #[serde(default = "default_notch_visibility")]
+    pub notch_visibility: String,
     /// Compact density: tighter padding/gaps for small screens.
     #[serde(default)]
     pub compact: bool,
@@ -346,6 +352,10 @@ fn default_notch_trigger() -> String {
     "click".into()
 }
 
+fn default_notch_visibility() -> String {
+    "auto".into()
+}
+
 fn default_overflow() -> String {
     "adapt".into()
 }
@@ -398,6 +408,7 @@ impl Default for Config {
             settings_intro_seen: false,
             last_profile: String::new(),
             notch_trigger: default_notch_trigger(),
+            notch_visibility: default_notch_visibility(),
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
