@@ -62,3 +62,14 @@ nativo, DWM, ventanas Win32) se revisó en el código y no se probó en un equip
 - **Sigue pendiente:** todo lo de la lista anterior. La migración de `ureq` y `sysinfo` toca
   el clima, el favicon de los sitios y el widget Sistema, así que conviene revisarlos en un
   Windows real junto con el blur, Mica y el notch.
+
+### Avance posterior
+
+- **`lib.rs`:** de ~3.600 a ~1.900 líneas. Los comandos del portapapeles, métricas del
+  sistema, favicon, perfiles, ventana del notch, ventana del dock, multimedia y volumen,
+  archivos recientes, archivos y papelera, y catálogo de apps viven ahora en su propio módulo.
+  Solo se movió código; no cambia el comportamiento.
+- **Capturas de referencia:** `npm run capture:reference` genera los cuatro acabados del dock
+  y las cinco páginas de Ajustes en claro y oscuro en `docs/quality/reference/`.
+- **Pendiente:** partir `dock.js` (espera a que se fusione #93, que lo modifica) y verificar
+  en un Windows 11 real.
