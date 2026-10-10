@@ -206,8 +206,9 @@ pub struct Config {
     /// Notch placement along the anchored edge: "center" | "start" | "end".
     #[serde(default = "default_notch_position")]
     pub notch_position: String,
-    /// Notch shape: "attached" (a tab flush with the edge) or "floating"
-    /// (an inset pill). It always follows the dock's edge.
+    /// Notch shape: "attached" (a tab flush with the edge), "floating" (an
+    /// inset pill) or "smart" (a dot that becomes a capsule for live
+    /// activities). It always follows the dock's edge.
     #[serde(default = "default_notch_mode")]
     pub notch_mode: String,
     /// Unified dock + notch surface: "glass" | "mica" | "solid".
@@ -584,8 +585,7 @@ pub fn migrate(cfg: &mut Config) -> bool {
     if cfg.settings_rev < 9 {
         migrate_surface_v9(cfg);
         cfg.pinned = migrate_widgets_v9(std::mem::take(&mut cfg.pinned));
-        // The notch is a tab or a pill; the adaptive "smart" dot is retired.
-        if cfg.notch_mode != "floating" {
+        if !matches!(cfg.notch_mode.as_str(), "floating" | "smart") {
             cfg.notch_mode = "attached".into();
         }
     }
@@ -752,7 +752,7 @@ fn save_locked(config: &Config) -> Result<(), String> {
     // used to rewrite onboarded/seenVersion back to false/"" on every slider save.
     let mut to_write = config.clone();
     // Only canonical values reach disk, whatever an older frontend sent.
-    if to_write.notch_mode.trim() != "floating" {
+    if !matches!(to_write.notch_mode.trim(), "floating" | "smart") {
         to_write.notch_mode = "attached".into();
     }
     if !matches!(to_write.surface_style.as_str(), "glass" | "mica" | "solid") {

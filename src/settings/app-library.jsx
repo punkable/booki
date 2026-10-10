@@ -12,14 +12,14 @@ function AppIcon({ path, name, revision }) {
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect(); dock.appIcon(path).then((uri) => { if (alive) setSrc(uri); }).catch(() => {});
-    });
+    }, { root: ref.current?.closest('.settings-main') || null, rootMargin: '400px 0px' });
     if (ref.current) observer.observe(ref.current);
     return () => { alive = false; observer.disconnect(); };
   }, [path, revision]);
   return <span className="app-library-icon" ref={ref}>{src ? <img src={src} alt="" onError={() => setSrc(null)} /> : <span className="app-library-monogram" aria-hidden="true">{(name || "?").trim().charAt(0).toUpperCase()}</span>}</span>;
 }
 const walkPaths = (items) => items.flatMap((i) => [i.path, ...walkPaths(i.children || [])]).filter(Boolean);
-export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, addCandidates, onInspect, onIdentities }) {
+export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, addCandidates, onInspect, onIdentities, destination, webPanel }) {
   const [data, setData] = useState({ groups: [], running: [], used: [], folders: [], identities: {} });
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState(''); const [loading, setLoading] = useState(true);
@@ -81,13 +81,15 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const PAGE_SIZE = 36;
   const searching = !!query.trim();
   const showAll = searching || filter === 'all';
+  const panel = searching ? 'apps' : filter;
   return <section aria-label={t('workspace.library')} className="app-library-section">
     <div className="app-library-tools"><span className="app-library-search"><Icon name="search" /><input type="search" aria-label={t('apps.search')} placeholder={t('apps.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} /></span>
       <button type="button" className="button library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
       {browseFile && <button type="button" className="button" onClick={browseFile}><Icon name="app" />{t('add.browse')}</button>}
+      {destination}
     </div>
     <div className="app-library-filters" role="group" aria-label={t('workspace.sources')}>
-      {[['all', 'add.all'], ['frequent', 'add.frequent'], ['running', 'add.running']].map(([value, key]) => <button type="button" key={value} aria-pressed={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
+      {[['all', 'apps.tabApps'], ['frequent', 'add.frequent'], ['running', 'add.running'], ['folders', 'apps.tabFolders'], ...(webPanel ? [['web', 'apps.web']] : [])].map(([value, key]) => <button type="button" key={value} aria-pressed={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
     </div>
     <div role="status" aria-live="polite">{message}</div>
     {chosen.length > 0 && <div className="app-library-selection"><button className="button button-accent" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="button" onClick={() => setSelected({})}>{t('trash.cancel')}</button></div>}
@@ -105,9 +107,10 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
         {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="button" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="button" disabled={(page + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
       </>}
       {showAll && sections.utilities.length > 0 && <details key={searching ? "search-tools" : "tools"} open={searching || undefined} className="app-library-utilities"><summary>{t('design.systemApps')} <span>{sections.utilities.length}</span></summary>{cards(sections.utilities)}</details>}
-      {!searching && <details className="app-library-folders-wrap"><summary>{t('workspace.folders')}</summary><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="button" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" />{t(`kf.${key}`)}</button>)}
-        {browseFolder && <button type="button" className="button" onClick={browseFolder}><Icon name="folder-plus" />{t('apps.addFolder')}</button>}
-      </div></details>}
+      {panel === 'folders' && <div className="app-library-folders-wrap"><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="app-library-folder" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" /><span>{t(`kf.${key}`)}</span></button>)}
+        {browseFolder && <button type="button" className="app-library-folder browse" onClick={browseFolder}><Icon name="folder-plus" /><span>{t('apps.addFolder')}</span></button>}
+      </div></div>}
+      {panel === 'web' && <div className="app-library-web">{webPanel}</div>}
     </>
     <details className="app-library-privacy"><summary>{t('premium.suggestionSettings')}</summary>
       <label><input type="checkbox" checked={cfg.usageRecommendationsEnabled !== false} onChange={(e) => set({ usageRecommendationsEnabled: e.target.checked })} />{t('premium.localRecommendations')}</label>

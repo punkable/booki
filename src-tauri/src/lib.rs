@@ -911,9 +911,10 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
-/// The notch is either a tab attached to the screen edge or a floating pill.
+/// Only the attached tab sits flush with the edge; the floating pill and the
+/// smart dot share the inset placement and window size.
 fn notch_floating(cfg: &Config) -> bool {
-    cfg.notch_mode == "floating"
+    cfg.notch_mode != "attached"
 }
 
 /// Reset appearance/behavior to defaults, keeping the user's pinned items.

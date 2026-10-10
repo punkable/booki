@@ -76,7 +76,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
   return <>
     <PageHeader title={t("overhaul.system")}>{t("system.pageHint")}</PageHeader>
 
-    <SettingsSection title={t("gen.title")}>
+    <SettingsSection icon="settings" title={t("gen.title")}>
       <Row label={t("ap.language")} hint={t("gen.langHint")}>
         <Select label={t("ap.language")} value={cfg.language || "system"} onChange={(v) => set({ language: v })}
           options={LANG_OPTIONS.map((o) => ({ value: o.value, label: o.key ? t(o.key) : o.label }))} />
@@ -84,7 +84,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       <Autostart cfg={cfg} set={set} />
     </SettingsSection>
 
-    <SettingsSection title={t("tab.shortcuts")}>
+    <SettingsSection icon="keyboard" title={t("tab.shortcuts")}>
       <Row label={t("sc.toggle")} hint={t("sc.global")}>
         <HotkeyInput value={cfg.hotkey} onChange={(v) => { set({ hotkey: v }); dockApi.setHotkey(v); }} />
       </Row>
@@ -95,13 +95,13 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       </Row>}
     </SettingsSection>
 
-    <SettingsSection title={t("ab.updates")} hint={t("ab.updatesHint")}>
+    <SettingsSection icon="refresh" title={t("ab.updates")} hint={t("ab.updatesHint")}>
       <UpdatesCard onWhatsNew={onWhatsNew} beforeApply={store.prepareConfigOperation} />
     </SettingsSection>
 
     <section className="ui-group-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
 
-    <SettingsSection title={t("system.privacy")} hint={t("faq.fact.net")}>
+    <SettingsSection icon="shield" title={t("system.privacy")} hint={t("faq.fact.net")}>
       <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")} checked={!!cfg.captureVisible} onChange={(v) => set({ captureVisible: v })} />
       <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")} checked={cfg.contextMenu !== false} onChange={(v) => set({ contextMenu: v })} />
       <Row label={t("faq.link.data")} hint={<code>%APPDATA%\Booki</code>}><button type="button" className="button" onClick={() => dockApi.openDataDir().catch(() => {})}>{t("system.open")}</button></Row>
@@ -112,7 +112,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       {FAQ.map((key) => <details className="faq-item" key={key}><summary>{t(`faq.q.${key}`)}<Icon name="chevron-down" /></summary><p>{t(`faq.a.${key}`)}</p></details>)}
     </CollapsibleSection>
 
-    <SettingsSection title={t("ab.title")}>
+    <SettingsSection icon="info" title={t("ab.title")}>
       <div className="about">
         <img className="about-logo" src="/brand/svg/isotype.svg" alt="" />
         <div className="about-text">
@@ -131,7 +131,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
 
     <CollapsibleSection title={t("ab.free")} hint={t("ab.donateHint")}><Donate /></CollapsibleSection>
 
-    <SettingsSection title={t("ab.danger")}>
+    <SettingsSection icon="alert-triangle" title={t("ab.danger")}>
       <Row label={t("act.reset")} hint={t("ab.resetHint")}><ResetButton onReset={store.reset} /></Row>
     </SettingsSection>
   </>;

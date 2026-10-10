@@ -32,7 +32,7 @@ import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
-import { isLibIcon, resolveLibIcon } from "./icon-library.js";
+import { isLibIcon, resolveLibIcon, libGlyphSVG } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
@@ -66,6 +66,7 @@ import {
   setSystem,
 } from "./dock/widget-view.js";
 import { dockRadius } from "./surface.js";
+import { groupAppearance } from "./group-style.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
@@ -628,6 +629,8 @@ function groupTile(item) {
   el.className = "tile group";
   el.dataset.id = item.id;
   el.style.setProperty("--size", `${baseSize()}px`);
+  const look = groupAppearance(item);
+  if (look.color) { el.style.setProperty("--group-color", look.color); el.style.setProperty("--group-ink", look.ink); el.classList.add("tinted"); }
   setTileLabel(el, item.name || t("group.new"));
 
   const grid = document.createElement("span");
@@ -662,7 +665,11 @@ function groupTile(item) {
     grid.appendChild(mini);
   }
   if (!kids.length) grid.innerHTML = icon("grid");
-  if (item.icon) {
+  if (look.glyph) {
+    // A glyph makes the group a solid badge in its colour.
+    el.classList.add("badge-group");
+    grid.innerHTML = libGlyphSVG(look.glyph);
+  } else if (item.icon) {
     const fallback = [...grid.childNodes];
     const cover = document.createElement("img"); cover.className = "group-cover"; cover.alt = "";
     cover.addEventListener("error", () => grid.replaceChildren(...fallback), { once: true });
@@ -4146,6 +4153,15 @@ async function openStack(tileEl, item) {
   glyph.className = "stack-head-icon";
   glyph.innerHTML = icon("folder");
   head.appendChild(glyph);
+  if (isGroup) {
+    const look = groupAppearance(item);
+    if (look.glyph) glyph.innerHTML = libGlyphSVG(look.glyph);
+    stackEl.style.setProperty("--group-color", look.color || "");
+    stackEl.classList.toggle("tinted", !!look.color);
+  } else {
+    stackEl.style.removeProperty("--group-color");
+    stackEl.classList.remove("tinted");
+  }
   if (isGroup) {
     const prevName = item.name || t("group.new");
     const input = document.createElement("input");

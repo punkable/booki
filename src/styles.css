@@ -794,12 +794,12 @@ body.notch-body.peek.edge-right .notch-pill::before,
 body.notch-body.peek.edge-right .notch-pill::after { display: none; }
 
 /* Floating notch: inset capsule with soft depth — not glued to the edge. */
-body.notch-body.floating {
+body.notch-body.floating, body.notch-body.smart {
   padding: 6px;
 }
-body.notch-body.floating.edge-top { align-items: flex-start; }
-body.notch-body.floating.edge-left { justify-content: flex-start; }
-body.notch-body.floating.edge-right { justify-content: flex-end; }
+body.notch-body.floating.edge-top, body.notch-body.smart.edge-top { align-items: flex-start; }
+body.notch-body.floating.edge-left, body.notch-body.smart.edge-left { justify-content: flex-start; }
+body.notch-body.floating.edge-right, body.notch-body.smart.edge-right { justify-content: flex-end; }
 body.notch-body.floating .notch-pill {
   width: 128px;
   height: 16px;
@@ -951,6 +951,29 @@ body.notch-body.peekable.live:not(.card) .nl { opacity: 1; }
 .nl-eq i:nth-child(3) { animation-duration: 1.1s; animation-delay: -0.6s; }
 @keyframes nl-eq { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
 @media (prefers-reduced-motion: reduce) { .nl-eq i { animation: none; transform: scaleY(0.6); } }
+
+/* Each activity shows its own lead and trail inside the live tab. */
+.nl-ring, .nl-text { display: none; }
+.nl-ring { width: 12px; height: 12px; transform: rotate(-90deg); }
+.nl-ring-track, .nl-ring-fill { fill: none; stroke-width: 2.4; }
+.nl-ring-track { stroke: color-mix(in srgb, var(--ink) 18%, transparent); }
+.nl-ring-fill { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 1s linear; }
+.nl-text { font: 650 11px/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); }
+body.notch-body.act-timer .nl-art, body.notch-body.act-timer .nl-eq,
+body.notch-body.act-battery .nl-art, body.notch-body.act-battery .nl-eq { display: none; }
+body.notch-body.act-timer .nl-ring, body.notch-body.act-timer .nl-text,
+body.notch-body.act-battery .nl-text { display: block; }
+body.notch-body.act-battery .nl { justify-content: center; gap: 6px; }
+body.notch-body.act-battery .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+body.notch-body.act-battery .nl-text { color: var(--danger); }
+
+/* Smart notch: a quiet dot at rest that becomes a capsule for an activity
+   and a card on hover — the same morph as the tab, from a smaller start. */
+body.notch-body.smart .notch-pill { width: 18px; height: 18px; border-radius: 999px; }
+body.notch-body.smart .notch-pill::before,
+body.notch-body.smart .notch-pill::after { display: none; }
+body.notch-body.smart.peekable.live .notch-pill { width: 112px; height: 24px; }
+body.notch-body.smart.peekable.card .notch-pill { width: 300px; height: 54px; border-radius: 22px; }
 
 /* Card: the tab opens into a small glance of what is playing (or the time). */
 body.notch-body.peekable.card .notch-pill {
@@ -1193,6 +1216,21 @@ body.edit .dock { cursor: grab; }
   transition: border-radius var(--dur-3) var(--ease);
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
+
+/* A coloured group tints its grid; a group with a glyph is a solid badge. */
+.tile.group.tinted .group-grid {
+  background: color-mix(in srgb, var(--group-color) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--group-color) 45%, transparent);
+}
+.tile.group.badge-group .group-grid {
+  padding: 0;
+  color: var(--group-ink, var(--accent-contrast));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--group-color, var(--accent)) 100%, #fff 12%), color-mix(in srgb, var(--group-color, var(--accent)) 82%, #000));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.tile.group.badge-group .group-grid > svg { width: 52%; height: 52%; color: inherit; }
+.stack.tinted .stack-head-icon { color: var(--group-color); background: color-mix(in srgb, var(--group-color) 20%, transparent); }
+.stack.tinted { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--group-color) 70%, transparent), var(--shadow); }
 
 /* Folder-create (merge) target highlight while dragging one tile onto another */
 .tile.merge-target { transform: scale(1.1); background: color-mix(in srgb, var(--accent) 20%, transparent); }
@@ -2574,7 +2612,7 @@ body.native-material .dock-tip {
 
 /* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
-body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill, body.notch-body.smart.smart-focus .notch-pill, body.notch-body.smart.smart-busy .notch-pill { box-shadow: 0 4px 14px #0003; }
+body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill { box-shadow: 0 4px 14px #0003; }
 
 .tile .action-icon { display: flex; align-items: center; justify-content: center; width: 82%; height: 82%; pointer-events: none; }
 .tile .action-icon svg { width: 76%; height: 76%; }

@@ -7,12 +7,15 @@
     <link rel="stylesheet" href="./notch-shell.css" />
   </head>
   <body class="notch-body">
-    <!-- One element that morphs: a slim tab at rest, a live activity while
-         something plays, a small card on hover. Not a <button>, because the
+    <!-- One element that morphs: a slim tab (or a dot) at rest, a live
+         activity while a timer runs, music plays or the battery runs low,
+         and a small card on hover. Not a <button>, because the
          card holds its own play/pause button. -->
     <div class="notch-pill notch-enter" id="notch-pill" role="button" tabindex="0" title="Show Booki" aria-label="Show Booki">
       <div class="nl" aria-hidden="true">
         <span class="nl-art"><img id="nl-art-img" alt="" draggable="false" /></span>
+        <svg class="nl-ring" viewBox="0 0 14 14"><circle class="nl-ring-track" cx="7" cy="7" r="5.5"/><circle class="nl-ring-fill" id="nl-ring" cx="7" cy="7" r="5.5" pathLength="100"/></svg>
+        <span class="nl-text" id="nl-text"></span>
         <span class="nl-eq"><i></i><i></i><i></i></span>
       </div>
       <div class="nc" id="notch-card">
