@@ -89,6 +89,25 @@ function CatalogCard({ widget, pinned, selected, style, onInspect }) {
   </button>;
 }
 
+/** With nothing selected, the inspector lists the widgets already on the
+   dock, so their settings are one click away. */
+function InDock({ cfg, onInspect }) {
+  const onDock = WIDGET_ORDER.filter((widget) => widgetRefs(cfg.pinned, widget).length > 0);
+  return <div className="widgets-in-dock">
+    <h2>{t("apps.inDock")}</h2>
+    {onDock.length ? <ul>
+      {onDock.map((widget) => <li key={widget}>
+        <button type="button" className="widgets-in-dock-item" style={{ "--widget-accent": WIDGET_META[widget].accent }} onClick={(event) => onInspect(widget, event.currentTarget)}>
+          <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
+          <span>{name(widget)}</span>
+          <Icon name="chevron-right" />
+        </button>
+      </li>)}
+    </ul> : null}
+    <p className="empty">{t("widgets.pick")}</p>
+  </div>;
+}
+
 export function WidgetsPage({ cfg, set, focusedPin }) {
   const [selectedId, selectId] = useState(focusedPin || null);
   const [draft, setDraft] = useState(null);
@@ -140,7 +159,7 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
               ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button>
               : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
           </div>
-        </> : <p className="empty">{t("widgets.pick")}</p>}
+        </> : <InDock cfg={cfg} onInspect={inspect} />}
       </Inspector>
     </div>
   </>;

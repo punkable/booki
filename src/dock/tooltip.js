@@ -44,8 +44,11 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
     name.textContent = info.name; detail.textContent = info.detail || ''; detail.hidden = !info.detail;
     mark.replaceChildren();
     const source = anchor.querySelector('img');
+    const fallback = anchor.querySelector(':scope > .glyph.fallback');
     if (source?.src) {
       const img = document.createElement('img'); img.src = source.src; img.alt = ''; mark.append(img);
+    } else if (fallback) {
+      mark.append(fallback.cloneNode(true));
     } else {
       const svg = [...anchor.querySelectorAll('svg')].find(element => !element.closest('.rm, .w-controls, .w-media-controls'));
       if (svg) mark.append(svg.cloneNode(true)); else mark.textContent = info.name.slice(0, 1);

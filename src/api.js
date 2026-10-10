@@ -52,6 +52,7 @@ const DEMO_CONFIG = {
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
+  launcherHotkey: "Ctrl+Alt+Space",
   monitor: -1,
   materialStrength: 60,
   autostart: false,
@@ -61,11 +62,12 @@ const DEMO_CONFIG = {
   onboarded: true,
   settingsIntroSeen: true,
   lastProfile: "",
+  profileRules: { enabled: false, monitorProfile: "", scheduleProfile: "", scheduleFrom: "09:00", scheduleTo: "18:00", scheduleDays: [1, 2, 3, 4, 5], otherProfile: "" },
   edgeGap: 12,
   taskbarFollow: true,
   taskbarSettleMs: 1000,
   taskbarHoldWhileHover: true,
-  focusIfRunning: false,
+  focusIfRunning: true,
   notchMode: "attached",
   clipboardPersist: false,
   clipboardRetentionDays: 7,
@@ -242,10 +244,13 @@ async function mockInvoke(cmd, args) {
       demoConfig.lastProfile = (args && args.name) || "Perfil";
       demoProfiles[demoConfig.lastProfile] = structuredClone(demoConfig);
       return null;
-    case "profile_apply":
+    case "profile_apply": {
+      const rules = demoConfig.profileRules;
       demoConfig = structuredClone(demoProfiles[(args && args.name) || ""] || demoConfig);
       demoConfig.lastProfile = (args && args.name) || "";
+      demoConfig.profileRules = rules;
       return structuredClone(demoConfig);
+    }
     case "profile_preview": {
       const config = demoProfiles[args.name];
       if (!config) throw new Error("Profile not found");
@@ -287,6 +292,10 @@ async function mockInvoke(cmd, args) {
       return null;
     case "fetch_favicon":
       return null; // browser demo can't fetch; the UI falls back to a letter tile
+    // Booki's own usage is only measured in the app; the browser preview
+    // shows nothing rather than a made-up figure.
+    case "app_usage":
+      return null;
     case "system_stats": {
       const r = (a, b) => a + Math.random() * (b - a);
       return {
@@ -529,6 +538,7 @@ export const dock = {
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
+  toggleWindow: (hwnd) => invoke("toggle_window", { hwnd }),
   closeWindow: (hwnd) => invoke("close_window", { hwnd }),
   trashCount: () => invoke("trash_count"),
   recentFiles: (limit) => invoke("recent_files", { limit }),
@@ -537,13 +547,14 @@ export const dock = {
   appVersion: () => invoke("app_version"),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
-  applyHotkeys: (toggle, positions, modifier) =>
-    invoke("apply_hotkeys", { toggle, positions, modifier }),
+  applyHotkeys: (toggle, positions, modifier, launcher) =>
+    invoke("apply_hotkeys", { toggle, positions, modifier, launcher }),
   movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
   setMaterial: (shapes, tint) => invoke("set_material", { shapes, tint }),
   systemAccent: () => invoke("system_accent"),
   systemStats: () => invoke("system_stats"),
+  appUsage: () => invoke("app_usage"),
   fetchFavicon: (url) => invoke("fetch_favicon", { url }),
   openChangelog: () => invoke("open_changelog"),
   takePendingChangelog: () => invoke("take_pending_changelog"),
@@ -637,6 +648,12 @@ export async function onSoftReveal(cb) {
 export async function onShowChangelog(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://show-changelog", () => cb());
+}
+
+/** Listen for the quick launcher shortcut. */
+export async function onLauncher(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://launcher", () => cb());
 }
 
 /** Listen for tray / hotkey show-hide toggle. */

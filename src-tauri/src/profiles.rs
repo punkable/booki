@@ -78,6 +78,9 @@ pub(crate) fn profile_apply(
         return Err("BOOKI_PROFILE_CHANGED".into());
     }
     cfg.last_profile = name.trim().to_string();
+    // The switching rules are global: a profile saved before they changed
+    // must not bring back its old copy of them.
+    cfg.profile_rules = config::load().profile_rules;
     apply_config_snapshot(&app, cfg)
 }
 
