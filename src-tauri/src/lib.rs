@@ -1027,6 +1027,71 @@ static SYS: Mutex<Option<sysinfo::System>> = Mutex::new(None);
 static NETS: Mutex<Option<(sysinfo::Networks, std::time::Instant)>> = Mutex::new(None);
 static DISKS: Mutex<Option<sysinfo::Disks>> = Mutex::new(None);
 
+static OWN_PROCS: Mutex<Option<sysinfo::System>> = Mutex::new(None);
+
+/// What Booki itself costs right now: the app process plus every process it
+/// started (the WebView2 browser, renderer and GPU processes), so the figure
+/// matches what Task Manager shows grouped under Booki.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppUsage {
+    /// Working set of all Booki processes, in megabytes.
+    memory_mb: u64,
+    /// Share of the whole machine's CPU (0–100), averaged since the last call.
+    cpu: f32,
+    processes: usize,
+}
+
+#[tauri::command]
+async fn app_usage() -> Result<AppUsage, String> {
+    tauri::async_runtime::spawn_blocking(collect_app_usage)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+fn collect_app_usage() -> AppUsage {
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate};
+    let mut guard = OWN_PROCS.lock().unwrap();
+    let sys = guard.get_or_insert_with(sysinfo::System::new);
+    sys.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::new().with_cpu().with_memory(),
+    );
+    let own = Pid::from_u32(std::process::id());
+    let procs = sys.processes();
+    let mut family = std::collections::HashSet::from([own]);
+    // Parents can be listed after their children, so repeat until stable.
+    loop {
+        let before = family.len();
+        for (pid, proc_) in procs {
+            if proc_
+                .parent()
+                .is_some_and(|parent| family.contains(&parent))
+            {
+                family.insert(*pid);
+            }
+        }
+        if family.len() == before {
+            break;
+        }
+    }
+    let (mut memory, mut cpu, mut count) = (0u64, 0f32, 0usize);
+    for pid in &family {
+        if let Some(proc_) = procs.get(pid) {
+            memory += proc_.memory();
+            cpu += proc_.cpu_usage();
+            count += 1;
+        }
+    }
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get()) as f32;
+    AppUsage {
+        memory_mb: memory / 1024 / 1024,
+        cpu: (cpu / cores).clamp(0.0, 100.0),
+        processes: count,
+    }
+}
+
 #[derive(serde::Serialize)]
 struct SystemStats {
     cpu: f32,
@@ -1563,6 +1628,9 @@ fn profile_apply(app: AppHandle, name: String, expected: Option<Config>) -> Resu
         return Err("BOOKI_PROFILE_CHANGED".into());
     }
     cfg.last_profile = name.trim().to_string();
+    // The switching rules are global: a profile saved before they changed
+    // must not bring back its old copy of them.
+    cfg.profile_rules = config::load().profile_rules;
     apply_config_snapshot(&app, cfg)
 }
 
@@ -2955,6 +3023,7 @@ pub fn run() {
             start_fresh_config,
             system_accent,
             system_stats,
+            app_usage,
             fetch_favicon,
             set_autostart,
             get_autostart,

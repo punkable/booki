@@ -153,6 +153,25 @@ fn default_hide_in_fullscreen() -> bool {
     true
 }
 
+/// Automatic profile switching. The dock evaluates these (it already knows
+/// the clock and the monitors); an empty profile name means "no rule".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProfileRules {
+    pub enabled: bool,
+    /// Profile while an external monitor is connected (2+ displays).
+    pub monitor_profile: String,
+    /// Profile during the schedule below.
+    pub schedule_profile: String,
+    /// "HH:MM" local time.
+    pub schedule_from: String,
+    pub schedule_to: String,
+    /// Days the schedule applies, 0 = Sunday … 6 = Saturday.
+    pub schedule_days: Vec<u8>,
+    /// Profile when no rule above matches.
+    pub other_profile: String,
+}
+
 /// Full dock configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -290,6 +309,10 @@ pub struct Config {
     /// Name of the last dock profile applied/saved (shown with a check mark).
     #[serde(default)]
     pub last_profile: String,
+    /// Switch profiles on their own: by schedule or when an external monitor
+    /// is connected. Global, so applying a profile never changes them.
+    #[serde(default)]
+    pub profile_rules: ProfileRules,
     /// How the tucked-away dock comes back: "click" (only clicking the notch —
     /// nothing auto-reveals) or "hover" (hovering the notch, or pushing the
     /// cursor against its screen edge, brings it out).
@@ -404,6 +427,7 @@ impl Default for Config {
             onboarded: false,
             settings_intro_seen: false,
             last_profile: String::new(),
+            profile_rules: ProfileRules::default(),
             notch_trigger: default_notch_trigger(),
             compact: false,
             position_hotkeys: true,

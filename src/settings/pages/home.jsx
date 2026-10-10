@@ -2,7 +2,7 @@
    what changed in this version. Every tile leads to where it is changed. */
 import React, { useEffect, useState } from "react";
 import { dock as dockApi } from "../../api.js";
-import { t } from "../../i18n.js";
+import { curLang, t } from "../../i18n.js";
 import { pinnedKeys, pathKey } from "../../dock/app-candidates.js";
 import { countContent, LAYOUT_SCENARIOS } from "../../dock/layout-model.js";
 import { activeFinish } from "../../surface.js";
@@ -75,6 +75,36 @@ function SetupCard({ cfg, set, apps, navigate }) {
   </section>;
 }
 
+/* What Booki costs on this PC right now, measured from its own processes
+   (the app and its web view). Hidden where it can't be measured. */
+function UsageCard() {
+  const [usage, setUsage] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      dockApi.appUsage().then((u) => { if (alive) setUsage(u || null); }, () => {});
+    };
+    poll();
+    const timer = setInterval(poll, 4000);
+    return () => { alive = false; clearInterval(timer); };
+  }, []);
+  if (!usage) return null;
+  const fmt = (n) => n.toLocaleString(curLang(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const cpu = usage.cpu < 0.1 ? `< ${fmt(0.1)}` : fmt(usage.cpu);
+  return <section className="card home-usage" aria-live="off">
+    <Icon name="zap" className="home-usage-icon" />
+    <div className="home-usage-text">
+      <strong>{t("home.usageTitle")}</strong>
+      <span>{t("home.usageHint")}</span>
+    </div>
+    <div className="home-usage-figures">
+      <span><strong>{usage.memoryMb.toLocaleString(curLang())}</strong> MB {t("home.usageMemory")}</span>
+      <span><strong>{cpu}</strong> % {t("home.usageCpu")}</span>
+    </div>
+  </section>;
+}
+
 export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
   const counts = countContent(cfg.pinned);
   const scenario = LAYOUT_SCENARIOS.find((s) => s.id === (cfg.autoHideMode || "smart"));
@@ -110,6 +140,8 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
       <QuickTile glyph="sparkles" hue="#a35bff" label={t("be.notchMode")} value={t(NOTCH_LABELS[resolveNotchMode(cfg)])} onClick={toDock("be.notchMode")} />
       <QuickTile glyph="grid" hue="#34c759" label={t("ap.iconSize")} value={`${cfg.iconSize ?? 48} px`} onClick={toDock("ap.iconSize")} />
     </div>
+
+    <UsageCard />
 
     <section className="card whats-new">
       <span className="whats-new-badge">v{release.version}</span>

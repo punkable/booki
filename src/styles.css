@@ -963,6 +963,13 @@ body.notch-body.act-timer .nl-art, body.notch-body.act-timer .nl-eq,
 body.notch-body.act-battery .nl-art, body.notch-body.act-battery .nl-eq { display: none; }
 body.notch-body.act-timer .nl-ring, body.notch-body.act-timer .nl-text,
 body.notch-body.act-battery .nl-text { display: block; }
+body.notch-body.act-volume .nl-art, body.notch-body.act-volume .nl-eq,
+body.notch-body.act-done .nl-art, body.notch-body.act-done .nl-eq { display: none; }
+body.notch-body.act-volume .nl-ring, body.notch-body.act-volume .nl-text,
+body.notch-body.act-done .nl-text { display: block; }
+body.notch-body.act-volume .nl-ring-fill { transition: stroke-dashoffset var(--dur-2) var(--ease); }
+body.notch-body.act-done .nl { justify-content: center; gap: 6px; }
+body.notch-body.act-done .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 body.notch-body.act-battery .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-battery .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
 body.notch-body.act-battery .nl-text { color: var(--danger); }

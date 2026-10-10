@@ -1,4 +1,4 @@
-const internal = new Set(['revision','seenVersion','settingsRev','settingsIntroSeen','onboarded','lastProfile']);
+const internal = new Set(['revision','seenVersion','settingsRev','settingsIntroSeen','onboarded','lastProfile','profileRules']);
 /** @param {Record<string, unknown>} current @param {Record<string, unknown>} snapshot */
 export function changedSnapshotFields(current, snapshot) {
   return Object.keys(snapshot).filter(key=>!internal.has(key) && JSON.stringify(current[key])!==JSON.stringify(snapshot[key]));

@@ -6,6 +6,7 @@ import { dock as dockApi, pickSavePath } from "../../api.js";
 import { t } from "../../i18n.js";
 import { UpdatesCard } from "../updates.jsx";
 import { ProfilesPage } from "../profiles.jsx";
+import { AutoProfiles } from "../auto-profiles.jsx";
 import { HotkeyInput, LANG_OPTIONS, ModifierPicker } from "../controls.jsx";
 import { CollapsibleSection, Icon, PageHeader, Row, Select, SettingsSection, Toggle } from "../ui.jsx";
 
@@ -103,6 +104,8 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
     </SettingsSection>
 
     <section className="ui-group-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
+
+    <AutoProfiles cfg={cfg} set={set} />
 
     <SettingsSection icon="shield" title={t("system.privacy")} hint={t("faq.fact.net")}>
       <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")} checked={!!cfg.captureVisible} onChange={(v) => set({ captureVisible: v })} />

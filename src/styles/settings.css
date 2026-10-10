@@ -204,6 +204,9 @@
 .chip { min-height: 28px; padding: 0 10px; font-size: 13px; border-radius: var(--r-pill); }
 .chip[aria-pressed="true"] { color: var(--accent-contrast); background: var(--accent); border-color: transparent; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.auto-prof-hours { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.auto-prof-hours label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13px; }
+.auto-prof-hours input[type="time"] { width: auto; min-width: 104px; }
 .link { display: inline-flex; align-items: center; gap: 4px; padding: 0; color: var(--ink); font: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent); background: none; border: 0; cursor: pointer; }
 .link:hover { text-decoration-color: currentColor; }
 .link svg { width: 12px; height: 12px; }
@@ -365,6 +368,13 @@
 .home-hero { margin-bottom: 28px; overflow: hidden; }
 .home-hero-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
 .home-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--ink-2); font-size: 13px; }
+.home-usage { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin: 16px 0; }
+.home-usage-icon { flex: 0 0 auto; width: 18px; height: 18px; color: var(--accent); }
+.home-usage-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; font-size: 13px; color: var(--ink-2); }
+.home-usage-text strong { color: var(--ink); font-weight: 600; }
+.home-usage-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: 13px; }
+.home-usage-figures strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .home-usage { flex-wrap: wrap; } .home-usage-icon { display: none; } }
 .home-stats strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-right: 2px; }
 .home-actions { display: flex; gap: 8px; }
 .home-subtitle { margin-top: 4px; }

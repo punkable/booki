@@ -74,6 +74,7 @@ import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { buildLauncher } from "./dock/launcher.js";
+import { desiredProfile } from "./profile-rules.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
@@ -179,6 +180,7 @@ async function boot() {
     document.body.classList.add("boot-animate");
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
     onConfigChanged(() => reloadConfig());
+    checkAutoProfile();
     observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!hiddenState) appPollTick?.(false); } }, (support) => {
       const windowsChanged = !!nativeSupport.windows !== !!support.windows;
       nativeSupport = support;
@@ -252,6 +254,33 @@ function maybeSyncCtxMenu() {
 }
 
 let configReloadGeneration = 0;
+// Automatic profiles: re-check every minute (and when the displays change)
+// while rules are on, and apply only when the answer changes, so a profile
+// picked by hand stays until the next change of schedule or monitors.
+let autoProfileLast = null;
+let autoProfileTimer = null;
+const checkAutoProfile = singleFlight(async () => {
+  clearTimeout(autoProfileTimer);
+  const rules = cfg?.profileRules;
+  if (!rules?.enabled) { autoProfileLast = null; return; }
+  autoProfileTimer = setTimeout(checkAutoProfile, 60000);
+  try {
+    const [available, monitors] = await Promise.all([dockApi.profileList(), dockApi.listMonitors()]);
+    const want = desiredProfile(rules, { now: new Date(), monitors: Array.isArray(monitors) ? monitors.length : 1, available: available || [] });
+    if (want === autoProfileLast) return;
+    autoProfileLast = want;
+    if (want && want !== cfg.lastProfile) await dockApi.profileApply(want);
+  } catch (_) {
+    autoProfileLast = null; // try again on the next tick
+  }
+});
+let autoProfileResize = null;
+window.addEventListener("resize", () => {
+  if (!cfg?.profileRules?.enabled) return;
+  clearTimeout(autoProfileResize);
+  autoProfileResize = setTimeout(checkAutoProfile, 1500);
+});
+
 async function reloadConfig() {
   const request = ++configReloadGeneration;
   const next = await configApi.get();
@@ -270,6 +299,7 @@ async function reloadConfig() {
     document.body.classList.add("edge-swap");
   }
   applyAll();
+  if (JSON.stringify(prev?.profileRules) !== JSON.stringify(cfg.profileRules)) { autoProfileLast = null; checkAutoProfile(); }
   // Only rebuild the bar when the pinned items actually changed — sliders and
   // toggles in Settings shouldn't make the whole dock flash.
   const languageChanged = !!prev && prev.language !== cfg.language;
