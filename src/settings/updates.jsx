@@ -3,7 +3,7 @@ import { dock } from '../api.js';
 import { updates } from '../update.js';
 import { t } from '../i18n.js';
 import { Button, Row } from './ui.jsx';
-export function UpdatesCard({ onWhatsNew, beforeApply }) {
+export function UpdatesCard({ beforeApply }) {
   const [managed, setManaged] = useState(null);
   const [state, setState] = useState(updates.snapshot);
   useEffect(() => {
@@ -23,8 +23,6 @@ export function UpdatesCard({ onWhatsNew, beforeApply }) {
     </Row> : <Row label={phase === 'none' ? t('ab.upToDate') : phase === 'error' ? t('ab.error') : t('ab.check')} hint={t('ab.keeps')}>
       <Button disabled={phase === 'checking'} onClick={() => updates.check().catch(() => {})}>{t(phase === 'checking' ? 'ab.checking' : 'ab.check')}</Button>
     </Row>}
-    <p className="muted update-explanation">{t('premium.updateExplanation')}</p>
     {update?.body && <details className="update-notes"><summary>{t('overhaul.updateNotes')}</summary><pre>{update.body}</pre></details>}
-    <Row label={t('ab.whatsNew')}><Button onClick={onWhatsNew}>{t('ab.whatsNew')}</Button></Row>
   </>;
 }

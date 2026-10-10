@@ -176,6 +176,14 @@ pub fn desktop_foreground() -> bool {
     false
 }
 
+pub fn foreground_maximized() -> bool {
+    false
+}
+
+pub fn cursor_near_window(_hwnd: isize, _pad: i32) -> bool {
+    false
+}
+
 pub fn app_identity(path: &str) -> String {
     serde_json::json!([path.replace('\\', "/").to_lowercase(), "", ""]).to_string()
 }

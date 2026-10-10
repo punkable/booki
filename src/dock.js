@@ -70,7 +70,7 @@ import {
 import { dockRadius } from "./surface.js";
 import { groupAppearance } from "./group-style.js";
 import { pinFallback } from "./pin-fallback.js";
-import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
+import { canMergeKind, kindForPath, mergePins, normalizeGroups, placePin, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
@@ -1989,10 +1989,38 @@ let mergeArm = 0; // timestamp hovering the current target's center began
 let dragClone = null; // floating copy of the tile that follows the pointer
 let willUnpin = false; // pointer pulled far from the bar → release = unpin
 
+let mergeArmTimer = null;
+const MERGE_ARM_MS = 160;
+
 function clearMerge() {
+  clearTimeout(mergeArmTimer);
   if (mergeEl) mergeEl.classList.remove("merge-target");
   mergeEl = null;
   mergeArm = 0;
+}
+
+/* Which tile, if any, the pointer is asking to group with.
+ *
+ * The target is the tile's middle band along the bar, across the bar's whole
+ * thickness, so the pointer does not have to sit on a small bullseye. Groups
+ * take a wider band than apps because adding to one is the common intent.
+ * The armed tile keeps a wider band still, so the small wobble of a hand
+ * holding still does not drop it and reorder the bar under the pointer. */
+function mergeTargetAt(sibs, x, y) {
+  const vertical = isVertical();
+  for (const s of sibs) {
+    if (s.classList.contains("separator") || s.classList.contains("trash")) continue;
+    const r = s.getBoundingClientRect();
+    const along = vertical ? (y - r.top) / (r.height || 1) : (x - r.left) / (r.width || 1);
+    const across = vertical ? x : y;
+    const lo = vertical ? r.left : r.top;
+    const hi = vertical ? r.right : r.bottom;
+    if (along < 0 || along > 1 || across < lo - 18 || across > hi + 18) continue;
+    const isGroup = s.classList.contains("group") || cfg.pinned.find((p) => p.id === s.dataset.id)?.kind === "group";
+    const margin = s === mergeEl ? 0.1 : isGroup ? 0.18 : 0.26;
+    return along >= margin && along <= 1 - margin ? s : null;
+  }
+  return null;
 }
 
 function killClone() {
@@ -2072,27 +2100,10 @@ function processMove(e) {
 
   const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
 
-  // Hovering the CENTER of another tile → group (merge) intent. Apps and widgets
-  // can both be grouped now (widgets go live only inside the group). Separators,
-  // the trash tile and groups-into-groups never form a group.
-  const canMerge = canMergeKind(press.item.kind);
-  let centerTarget = null;
-  if (canMerge) {
-    for (const s of sibs) {
-      if (s.classList.contains("separator") || s.classList.contains("trash")) continue;
-      const r = s.getBoundingClientRect();
-      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        // Aim near the centre to group; anywhere else reorders. A roomy bullseye
-        // makes grouping easy without grouping by accident on a quick pass-over.
-        if (Math.hypot(e.clientX - cx, e.clientY - cy) < Math.min(r.width, r.height) * 0.34) {
-          centerTarget = s;
-        }
-        break;
-      }
-    }
-  }
+  // Hovering the middle of another tile → group (merge) intent. Apps and
+  // widgets can both be grouped (widgets go live only inside the group).
+  // Separators, the trash tile and groups-into-groups never form a group.
+  const centerTarget = canMergeKind(press.item.kind) ? mergeTargetAt(sibs, e.clientX, e.clientY) : null;
 
   if (centerTarget) {
     if (mergeEl !== centerTarget) {
@@ -2100,17 +2111,21 @@ function processMove(e) {
       mergeEl = centerTarget;
       mergeArm = Date.now();
     }
-    // Hold on the centre a moment longer before arming the merge — a quick pass
-    // over a tile while reordering should never fold things into a folder.
-    if (Date.now() - mergeArm > 260) {
+    // Dropping into an existing group is safe to arm at once; making a new
+    // group waits a beat so a quick pass while reordering never does it.
+    const into = cfg.pinned.find((p) => p.id === centerTarget.dataset.id);
+    if (into?.kind === "group" || Date.now() - mergeArm > MERGE_ARM_MS) {
       centerTarget.classList.add("merge-target");
-      const into = cfg.pinned.find((p) => p.id === centerTarget.dataset.id);
       placeHint(
         into?.kind === "group" ? t("drop.addTo").replace("{name}", menuPinTitle(into)) : t("drag.makeGroup"),
         centerTarget
       );
+    } else {
+      // Re-check once the hold time has passed even if the pointer rests.
+      clearTimeout(mergeArmTimer);
+      mergeArmTimer = setTimeout(() => { if (press && pressMoveEv && mergeEl === centerTarget) processMove(pressMoveEv); }, MERGE_ARM_MS + 20);
     }
-    return; // aiming at the bullseye → hold for a merge, don't reorder
+    return; // aiming at the middle → hold for a merge, don't reorder
   }
 
   clearMerge();
@@ -2424,6 +2439,47 @@ async function reorderGroupChild(group, childId, beforeId) {
   pinnedReveal = false;
 }
 
+/* Where a member dragged out of a group's panel would land on the bar: inside
+   another group whose tile is under the pointer, or before the tile under it.
+   Null when the pointer is nowhere near the bar (the member then goes back
+   right after its own group, as before). */
+function dockDropSlot(x, y, fromGroupId) {
+  const bar = dockEl.getBoundingClientRect();
+  const pad = 28;
+  if (x < bar.left - pad || x > bar.right + pad || y < bar.top - pad || y > bar.bottom + pad) return null;
+  const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
+  const target = mergeTargetAt(tiles, x, y);
+  if (target && target.dataset.id !== fromGroupId && cfg.pinned.find((p) => p.id === target.dataset.id)?.kind === "group") {
+    return { groupId: target.dataset.id };
+  }
+  const vertical = isVertical();
+  const pointer = vertical ? y : x;
+  const ref = tiles.find((tile) => {
+    const r = tile.getBoundingClientRect();
+    return pointer < (vertical ? r.top + r.height / 2 : r.left + r.width / 2);
+  });
+  return { beforeId: ref ? ref.dataset.id : null };
+}
+
+let outTargetEl = null;
+function markOutTarget(el) {
+  if (outTargetEl === el) return;
+  outTargetEl?.classList.remove("merge-target");
+  outTargetEl = el;
+  el?.classList.add("merge-target");
+}
+
+/** Move a member out of its group to a spot on the bar or into another group. */
+async function moveChildTo(group, child, slot) {
+  const next = placePin(cfg.pinned, child, slot.groupId ? { groupId: slot.groupId } : { beforeId: slot.beforeId || undefined });
+  if (next === cfg.pinned) return;
+  cfg.pinned = next;
+  if (!(await persist())) return;
+  closeStack();
+  await render();
+  reframe();
+}
+
 // Let a flyout child be dragged to reorder inside the panel, or dragged out to
 // return it to the dock. Pointer-based (no native drag → no stray files).
 function wireStackDragOut(cell, group, child) {
@@ -2468,8 +2524,15 @@ function wireStackDragOut(cell, group, child) {
     }
     if (out) {
       st.beforeId = undefined;
+      // Over the bar: land where the pointer is, or inside the group under it.
+      st.slot = dockDropSlot(e.clientX, e.clientY, group.id);
+      const into = st.slot?.groupId ? dockEl.querySelector(`.tile[data-id="${st.slot.groupId}"]`) : null;
+      markOutTarget(into);
+      st.clone.classList.toggle("will-unpin", !st.slot);
       return;
     }
+    st.slot = null;
+    markOutTarget(null);
     clearDropHint();
     st.beforeId = null;
     const sibs = [...stackEl.querySelectorAll(".stack-item[data-child-id]")].filter((n) => n !== cell);
@@ -2503,13 +2566,15 @@ function wireStackDragOut(cell, group, child) {
     if (!s.moved) return;
     cell._suppressClick = true;
     setTimeout(() => { cell._suppressClick = false; }, 0);
+    markOutTarget(null);
     if (s.out) {
       if (s.clone) {
         const c = s.clone;
         c.classList.add("poof");
         setTimeout(() => c.remove(), 280);
       }
-      await takeOutChild(group, child.id);
+      if (s.slot) await moveChildTo(group, child, s.slot);
+      else await takeOutChild(group, child.id);
     } else if ("beforeId" in s && s.beforeId !== child.id) {
       if (s.clone) s.clone.remove();
       const kids = group.children || [];
@@ -2525,6 +2590,7 @@ function wireStackDragOut(cell, group, child) {
   cell.addEventListener("pointerup", finish);
   cell.addEventListener("pointercancel", () => {
     if (!st) return;
+    markOutTarget(null);
     const cancelled = st;
     st = null;
     try { cell.releasePointerCapture(cancelled.pointerId); } catch (_) {}
@@ -3657,9 +3723,14 @@ function dropSpot(position) {
     const k = item && item.kind;
     if (k === "app" || k === "folder" || k === "group" || k === "trash") {
       const r = tile.getBoundingClientRect();
-      const inX = x > r.left + r.width * 0.24 && x < r.right - r.width * 0.24;
-      const inY = y > r.top + r.height * 0.24 && y < r.bottom - r.height * 0.24;
-      if (inX && inY) return { target: tile, index: null };
+      // A group takes most of its tile, across the whole bar: filing a file
+      // into a group is the common intent and should not need a bullseye.
+      const m = k === "group" ? 0.16 : 0.24;
+      const vertical = isVertical();
+      const along = vertical ? (y - r.top) / r.height : (x - r.left) / r.width;
+      const across = vertical ? (x - r.left) / r.width : (y - r.top) / r.height;
+      const crossM = k === "group" ? 0 : 0.24;
+      if (along > m && along < 1 - m && across > crossM && across < 1 - crossM) return { target: tile, index: null };
     }
   }
   const vertical = isVertical();

@@ -85,9 +85,38 @@ test('native HTML dragging reorders the persistent dock editor', async () => {
   const beta = { ...app, id: 'beta', name: 'Beta', path: 'C:/beta.exe' };
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [app, beta] }), viewport: { width: 1200, height: 800 } });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  await page.locator('.library-pin').filter({ hasText: 'Beta' }).dragTo(page.locator('.library-pin').filter({ hasText: 'Editor' }));
+  // The side of a pin reorders; its middle is for grouping.
+  await page.locator('.library-pin').filter({ hasText: 'Beta' }).dragTo(page.locator('.library-pin').filter({ hasText: 'Editor' }), { targetPosition: { x: 6, y: 30 } });
   await page.waitForTimeout(250);
   assert.deepEqual(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.map((p) => p.id)), ['beta', 'editor']);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('dragging in the dock editor makes groups, files apps into them and takes them out', async () => {
+  const beta = { ...app, id: 'beta', name: 'Beta', path: 'C:/beta.exe' };
+  const gamma = { ...app, id: 'gamma', name: 'Gamma', path: 'C:/gamma.exe' };
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [app, beta, gamma] }), viewport: { width: 1200, height: 800 } });
+  const pinned = () => page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned);
+  await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  // Middle of an app: a new group with both.
+  await page.locator('.library-pin').filter({ hasText: 'Beta' }).dragTo(page.locator('.library-pin').filter({ hasText: 'Editor' }));
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.some((p) => p.kind === 'group'));
+  let rows = await pinned();
+  const group = rows.find((p) => p.kind === 'group');
+  assert.deepEqual(group.children.map((c) => c.id), ['editor', 'beta']);
+  // Anywhere across the middle of a group files the app inside it.
+  const groupPin = page.locator('.library-pin').filter({ has: page.locator('.library-group-drop') });
+  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(groupPin, { targetPosition: { x: 30, y: 60 } });
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 1);
+  rows = await pinned();
+  assert.deepEqual(rows[0].children.map((c) => c.id), ['editor', 'beta', 'gamma']);
+  // Out again: drag a member from the group panel to the row.
+  await groupPin.locator('button').first().click();
+  await page.locator('.library-group-member').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-pin-strip'), { targetPosition: { x: 600, y: 40 } });
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 2);
+  rows = await pinned();
+  assert.deepEqual(rows.map((p) => p.id).slice(1), ['gamma']);
+  assert.deepEqual(rows[0].children.map((c) => c.id), ['editor', 'beta']);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -341,7 +370,7 @@ test('native icon refresh retries extraction while utilities remain searchable i
 test('dock position exposes labelled edges and alignment even when auto-hide is off', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({autoHideMode:'off'}),viewport:{width:520,height:780}});
   await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
-  await page.getByRole('radiogroup',{name:'Position',exact:true}).getByRole('radio',{name:'Left',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Edge',exact:true}).getByRole('radio',{name:'Left',exact:true}).click();
   await page.getByRole('radiogroup',{name:'Alignment',exact:true}).getByRole('radio',{name:'End',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);

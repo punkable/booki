@@ -81,8 +81,10 @@ export function PositionPicker({ cfg, set, afterPlacement }) {
   return <div className="position-picker">
     <div className="screen-mock" aria-hidden="true"><span className={`screen-bar at-${edge} slot-${slot}`} /></div>
     <div className="position-fields">
-      <SegmentedControl label={t("be.position")} value={edge} onChange={(value) => set({ edge: value }, afterPlacement)}
+      <span className="position-field-label" aria-hidden="true">{t("be.edgeSide")}</span>
+      <SegmentedControl label={t("be.edgeSide")} value={edge} onChange={(value) => set({ edge: value }, afterPlacement)}
         options={["top", "bottom", "left", "right"].map((value) => ({ value, label: t(`edge.${value}`) }))} />
+      <span className="position-field-label" aria-hidden="true">{t("design.alignment")}</span>
       <SegmentedControl label={t("design.alignment")} value={slot} onChange={(value) => set({ notchPosition: value }, afterPlacement)}
         options={["start", "center", "end"].map((value) => ({ value, label: t(`be.notch${value[0].toUpperCase()}${value.slice(1)}`) }))} />
     </div>

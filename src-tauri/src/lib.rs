@@ -1198,6 +1198,7 @@ pub fn run() {
             hide_dock,
             reveal_dock,
             notch_reveal,
+            notch_screen_busy,
             notch_toast,
             notch_toast_dismiss,
             notch_preview,
@@ -1430,6 +1431,14 @@ pub fn run() {
                         let mut occ = (false, false, 0u8);
                         let mut fs = (false, false, 0u8);
                         let mut desktop = (false, false, 0u8);
+                        // Smart notch: "an app owns the screen" (debounced like
+                        // the rest) and "the pointer is near the notch" (raw, so
+                        // the notch answers an approach within one tick).
+                        let mut busy = (false, false, 0u8);
+                        let mut near_last = false;
+                        fn n_scale(w: Option<&tauri::WebviewWindow>) -> f64 {
+                            w.and_then(|w| w.scale_factor().ok()).unwrap_or(1.0)
+                        }
                         // Debounce helper: returns Some(new) when the value has held
                         // for two polls (so momentary changes can't make it flap).
                         fn debounce(s: &mut (bool, bool, u8), v: bool) -> Option<bool> {
@@ -1494,6 +1503,40 @@ pub fn run() {
                             // Smart notch also softens the dot while fullscreen.
                             if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
                                 let _ = handle.emit("booki://fullscreen", v);
+                            }
+                            // The notch steps aside while an app owns the screen
+                            // and comes back when the pointer nears it. Only
+                            // measured while the notch window is on duty.
+                            if cfg_cache.notch_visibility != "always" {
+                                let notch = handle.get_webview_window("notch");
+                                let on_duty = notch
+                                    .as_ref()
+                                    .map(|n| n.is_visible().unwrap_or(false))
+                                    .unwrap_or(false);
+                                if !on_duty {
+                                    // The notch forgets the pointer when it hides.
+                                    near_last = false;
+                                } else {
+                                    if let Some(v) =
+                                        debounce(&mut busy, win::foreground_maximized())
+                                    {
+                                        let _ = handle.emit("booki://screen-busy", v);
+                                    }
+                                    let near = notch
+                                        .as_ref()
+                                        .and_then(|n| n.hwnd().ok())
+                                        .map(|h| {
+                                            let pad =
+                                                (40.0 * n_scale(notch.as_ref())).round() as i32;
+                                            win::cursor_near_window(h.0 as isize, pad)
+                                                || win::cursor_at_edge(&cfg_cache.edge)
+                                        })
+                                        .unwrap_or(false);
+                                    if near != near_last {
+                                        near_last = near;
+                                        let _ = handle.emit("booki://notch-near", near);
+                                    }
+                                }
                             }
                             // Cursor pressed against the dock's edge → reveal signal.
                             if cfg_cache.notch_trigger == "hover" {

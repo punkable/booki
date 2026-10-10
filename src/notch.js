@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onNotchToast, onNotchToastOut } from "./api.js";
+import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { showBookiMenu } from "./native-context-menu.js";
@@ -49,6 +49,7 @@ async function applyLook() {
     applyTheme(cfg);
     if (cfg.accent) applyAccent(root, cfg.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
+    presenceMode = ["always", "edge"].includes(cfg.notchVisibility) ? cfg.notchVisibility : "auto";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
     const shape = resolveNotchMode(cfg);
@@ -69,6 +70,7 @@ async function applyLook() {
     readVolume();
     paintActivity();
     applyMaterial(cfg);
+    paintPresence();
     scheduleHitReport();
   } catch (_) {
     /* keep defaults */
@@ -83,7 +85,10 @@ matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", 
 // Window-relative CSS px [x, y, w, h], matching the dock's set_hit_rects.
 function reportNotchHitRects() {
   const toasting = document.body.classList.contains("toast");
-  reportMaterial(document.visibilityState === "hidden" ? [] : [shapeOf(toasting ? toastEl : pill)]);
+  // Out of sight means out of the way: no blur, no clicks, the app behind
+  // gets the whole edge.
+  const away = !toasting && document.body.classList.contains("away");
+  reportMaterial(document.visibilityState === "hidden" || away ? [] : [shapeOf(toasting ? toastEl : pill)]);
   // During drag or toast, keep the whole notch window interactive so gestures
   // and the message aren't yanked out from under the cursor.
   const all = !!(draggingNotch || toasting);
@@ -91,7 +96,7 @@ function reportNotchHitRects() {
   if (toasting) {
     const toastRect = rectFromElement(toastEl, 2) || rectFromElement(pill, 2);
     if (toastRect) rects.push(toastRect);
-  } else {
+  } else if (!away) {
     // Tiny inflate (~1px) for aim comfort; never the full window padding.
     const pillRect = rectFromElement(pill, 1);
     if (pillRect) rects.push(pillRect);
@@ -172,6 +177,76 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") clearNotchToast();
 });
 
+// ─── Presence: out of the way while you work ──────────────────────────────
+// "always" keeps the tab on screen whenever the dock is tucked away. "auto"
+// (the default) lets it step aside while an app is maximized or fullscreen,
+// "edge" keeps it out of sight everywhere. Either way it comes back when the
+// pointer nears the edge, while its card is open or dragged, and for a few
+// seconds when something new happens (the next song, a timer ending).
+let presenceMode = "auto";
+let screenBusy = false;
+let pointerNear = false;
+let nearLinger = null;
+let nudgeUntil = 0;
+let nudgeTimer = null;
+const NEAR_LINGER_MS = 900;
+const NUDGE_MS = 4000;
+
+function wantsAway(now = Date.now()) {
+  if (presenceMode === "always" || pointerNear || cardOpen || drag || draggingNotch) return false;
+  if (document.body.classList.contains("toast") || now < nudgeUntil) return false;
+  return presenceMode === "edge" || screenBusy;
+}
+
+function paintPresence() {
+  const away = wantsAway();
+  if (document.body.classList.contains("away") === away) return;
+  document.body.classList.toggle("away", away);
+  scheduleHitReport();
+}
+
+/** Show the tab for a moment because something changed worth a glance. */
+function nudgePresence(ms = NUDGE_MS) {
+  if (presenceMode === "always") return;
+  nudgeUntil = Date.now() + ms;
+  clearTimeout(nudgeTimer);
+  nudgeTimer = setTimeout(paintPresence, ms + 20);
+  paintPresence();
+}
+
+onScreenBusy((value) => {
+  screenBusy = value;
+  paintPresence();
+});
+onNotchNear((value) => {
+  clearTimeout(nearLinger);
+  if (value) {
+    pointerNear = true;
+    paintPresence();
+    return;
+  }
+  // Leaving by a few pixels should not blink it away.
+  nearLinger = setTimeout(() => {
+    pointerNear = false;
+    paintPresence();
+  }, NEAR_LINGER_MS);
+});
+
+// Each time the notch is shown, ask where things stand so it starts out of
+// the way over a maximized app instead of flashing in and then leaving.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    clearTimeout(nearLinger);
+    pointerNear = false;
+    return;
+  }
+  if (presenceMode === "always" || !inTauri) return;
+  invoke("notch_screen_busy").then((value) => {
+    screenBusy = !!value;
+    paintPresence();
+  }).catch(() => {});
+});
+
 // ─── Live activity + hover card ───────────────────────────────────────────
 // The tab is one element that morphs: slim at rest, a little wider with art
 // and a level meter while something plays, and a small card under the
@@ -229,11 +304,18 @@ function currentActivity(now = Date.now()) {
   return null;
 }
 
+let lastActivityKind = "";
 const mmss = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 function paintActivity() {
   const activity = canPeek ? currentActivity() : null;
   const kind = activity?.kind || "";
+  // A timer that just ended or a battery that just ran low is worth a glance
+  // even while the tab is out of the way.
+  if (kind !== lastActivityKind) {
+    if (lastActivityKind === "timer" || kind === "battery") nudgePresence();
+    lastActivityKind = kind;
+  }
   document.body.classList.toggle("live", !!activity);
   for (const name of ["timer", "done", "volume", "media", "battery"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
@@ -271,7 +353,12 @@ const pollBattery = singleFlight(async () => {
 });
 let batteryTimer = null;
 
+let lastTrack = "";
 function paintMedia() {
+  // A new song is worth a glance even when the tab is out of the way.
+  const track = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
+  if (track && lastTrack && track !== lastTrack) nudgePresence();
+  if (track) lastTrack = track;
   const art = (media && media.thumb) || "";
   for (const img of [lArt, cArt]) {
     if (img.getAttribute("src") !== art) {
@@ -388,6 +475,7 @@ function closeCard() {
   cardOpen = false;
   document.body.classList.remove("card");
   followMorph();
+  paintPresence();
 }
 
 // Intent delay in, a short grace out: brushing past the edge does nothing,
@@ -503,6 +591,7 @@ pill.addEventListener("pointerup", (e) => {
   const d = drag;
   drag = null;
   draggingNotch = false;
+  paintPresence();
   scheduleHitReport();
   // Drop any queued follow-move so it can't fight the settle animation.
   cancelAnimationFrame(dragRaf);

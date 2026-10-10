@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.81.0"
+version = "0.82.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"

@@ -840,6 +840,81 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
     }
 }
 
+/// True while the user works in an app that owns the screen: the foreground
+/// window is maximized, or snapped to cover its monitor's whole work area.
+/// The smart notch steps aside for these instead of sitting over a browser
+/// or an editor. The desktop, the shell and Booki's own windows never count.
+pub fn foreground_maximized() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::IsZoomed;
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
+            return false;
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if matches!(
+            class.as_str(),
+            "Progman"
+                | "WorkerW"
+                | "Shell_TrayWnd"
+                | "Shell_SecondaryTrayWnd"
+                | "MultitaskingViewFrame"
+                | "XamlExplorerHostIslandWindow"
+        ) {
+            return false;
+        }
+        if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
+            return false;
+        }
+        if IsZoomed(hwnd).as_bool() {
+            return true;
+        }
+        let mut wr = RECT::default();
+        if GetWindowRect(hwnd, &mut wr).is_err() {
+            return false;
+        }
+        let hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            return false;
+        }
+        // A few px of slack for the invisible resize borders Windows adds.
+        let w = mi.rcWork;
+        wr.left <= w.left + 8
+            && wr.top <= w.top + 8
+            && wr.right >= w.right - 8
+            && wr.bottom >= w.bottom - 8
+    }
+}
+
+/// True when the cursor is within `pad` physical px of the window's rect,
+/// visible or not. Lets a notch that stepped aside come back on approach.
+pub fn cursor_near_window(hwnd: isize, pad: i32) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let mut p = POINT::default();
+        if GetCursorPos(&mut p).is_err() {
+            return false;
+        }
+        let mut r = RECT::default();
+        if GetWindowRect(handle, &mut r).is_err() {
+            return false;
+        }
+        p.x >= r.left - pad && p.x <= r.right + pad && p.y >= r.top - pad && p.y <= r.bottom + pad
+    }
+}
+
 /// True if a fullscreen game / movie / presentation is running — so Booki can get
 /// completely out of the way (e.g. not cover subtitles or a game).
 pub fn is_fullscreen() -> bool {
