@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar para Windows</b></a> ·
-  <a href="docs/releases/v0.81.0.md"><b>Novedades de 0.81</b></a> ·
+  <a href="docs/releases/v0.82.0.md"><b>Novedades de 0.82</b></a> ·
   <a href="README.md">English</a>
 </p>
 

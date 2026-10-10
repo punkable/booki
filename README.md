@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="docs/releases/v0.81.0.md"><b>What's new in 0.81</b></a> ·
+  <a href="docs/releases/v0.82.0.md"><b>What's new in 0.82</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
@@ -80,14 +80,15 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-### New in 0.81
+### New in 0.82
 
-- **Settings, redesigned** — Home shows your dock on a small desktop with an at-a-glance summary; every page has clearer hierarchy and a live preview.
-- **Apps & folders, rebuilt** — edit your dock in a tidy grid; browse apps, folders and websites in tabs with large icons.
-- **Group colour and icon** — a curated palette and the icon library, in compact pickers.
-- **Notch Island** — a dot that becomes a capsule for your timer, music or low battery.
+- **Open apps, not new copies** — clicking an open app goes to its window; clicking the one in front minimizes it.
+- **Quick launcher** — Ctrl+Alt+Space searches apps, folders and open windows.
+- **A notch that steps aside** — it hides over maximized apps and comes back when you reach for it.
+- **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
+- **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [complete 0.81 release notes](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [complete 0.82 release notes](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 
