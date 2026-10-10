@@ -1064,7 +1064,7 @@ fn collect_system_stats() -> SystemStats {
             std::time::Instant::now(),
         )
     });
-    entry.0.refresh();
+    entry.0.refresh(true);
     let secs = entry.1.elapsed().as_secs_f64().max(0.001);
     entry.1 = std::time::Instant::now();
     let (mut down, mut up) = (0u64, 0u64);
@@ -1077,7 +1077,9 @@ fn collect_system_stats() -> SystemStats {
     // volume (opening handles) on every tick was needless work.
     let mut dguard = DISKS.lock().unwrap();
     let disks = dguard.get_or_insert_with(sysinfo::Disks::new_with_refreshed_list);
-    disks.refresh();
+    for disk in disks.list_mut() {
+        disk.refresh_specifics(sysinfo::DiskRefreshKind::nothing().with_storage());
+    }
     let (mut dtotal, mut davail) = (0u64, 0u64);
     for d in disks.iter() {
         dtotal += d.total_space();
@@ -1177,13 +1179,16 @@ async fn fetch_favicon(url: String) -> Option<String> {
     };
     // sz=128 → a crisp icon on high-DPI tiles (downscaled cleanly when small).
     let api = format!("https://www.google.com/s2/favicons?sz=128&domain={host}");
-    let resp = ureq::get(&api)
-        .timeout(std::time::Duration::from_secs(6))
+    let mut resp = ureq::get(&api)
+        .config()
+        .timeout_global(Some(std::time::Duration::from_secs(6)))
+        .build()
         .call()
         .ok()?;
     let mut bytes: Vec<u8> = Vec::new();
     use std::io::Read;
-    resp.into_reader()
+    resp.body_mut()
+        .as_reader()
         .take(1_000_000)
         .read_to_end(&mut bytes)
         .ok()?;
