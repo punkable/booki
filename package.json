@@ -25,6 +25,7 @@
     "check:node": "node scripts/check-node.mjs",
     "check:versions": "node scripts/check-versions.mjs",
     "typecheck": "tsc --project tsconfig.json",
+    "capture:reference": "node scripts/capture-reference.mjs",
     "test:validation": "node --test scripts/validation.test.mjs",
     "check:all": "npm run check:node && npm run check:versions && npm run lint && npm run typecheck && npm run check:text && npm run check:icons && npm run check:i18n && npm run test:validation && npm run build && npm test",
     "preview": "vite preview",
