@@ -127,6 +127,7 @@ export const STRINGS = {
     "autoProf.days": "Días",
     "autoProf.other": "El resto del tiempo",
     "autoProf.otherHint": "Si no aplica ninguna regla.",
+    "setup.finishHint": "Cómo se ve el dock sobre tu fondo. Puedes cambiarlo cuando quieras.",
   },
   en: {
     "home.atGlance": "At a glance",
@@ -254,6 +255,7 @@ export const STRINGS = {
     "autoProf.days": "Days",
     "autoProf.other": "The rest of the time",
     "autoProf.otherHint": "When no rule applies.",
+    "setup.finishHint": "How the dock looks over your wallpaper. You can change it any time.",
   },
   pt: {
     "home.atGlance": "Num relance",
@@ -381,6 +383,7 @@ export const STRINGS = {
     "autoProf.days": "Dias",
     "autoProf.other": "No resto do tempo",
     "autoProf.otherHint": "Quando nenhuma regra se aplica.",
+    "setup.finishHint": "Como o dock aparece sobre o seu fundo. Dá para mudar quando quiser.",
   },
   fr: {
     "home.atGlance": "En un coup d’œil",
@@ -508,6 +511,7 @@ export const STRINGS = {
     "autoProf.days": "Jours",
     "autoProf.other": "Le reste du temps",
     "autoProf.otherHint": "Quand aucune règle ne s’applique.",
+    "setup.finishHint": "L’aspect du dock sur votre fond d’écran. Modifiable à tout moment.",
   },
   de: {
     "home.atGlance": "Auf einen Blick",
@@ -635,5 +639,6 @@ export const STRINGS = {
     "autoProf.days": "Tage",
     "autoProf.other": "Den Rest der Zeit",
     "autoProf.otherHint": "Wenn keine Regel greift.",
+    "setup.finishHint": "Wie das Dock über deinem Hintergrund aussieht. Jederzeit änderbar.",
   },
 };

@@ -3768,7 +3768,7 @@ const dockTooltip = createDockTooltip(dockEl, {
     let detail = t("hint.launch");
     if (pin.kind === "group") detail = t((pin.children || []).length === 1 ? "hint.groupSingle" : "hint.group").replace("{n}", (pin.children || []).length);
     else if (pin.kind === "folder") detail = t("hint.folder");
-    else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = t("hint.widget"); }
+    else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name) || t("hint.widget"); }
     else if (pin.kind === "action") { name = el.getAttribute("aria-label"); detail = t("hint.settings"); }
     else if (pin.kind === "trash") detail = t("hint.trash");
     else if (el.dataset.running === "true") {
@@ -3779,6 +3779,17 @@ const dockTooltip = createDockTooltip(dockEl, {
   },
 });
 function hideTip() { dockTooltip.hide(); }
+/** The full text of a widget's lines that the tile cuts off (an ellipsis
+   like "Portapa…", or a scrolling line), so the tooltip can show it. */
+function clippedText(el, name) {
+  const cut = [...el.querySelectorAll(".w-pv-title, .w-pv-sub")]
+    .filter((line) => line.scrollWidth > line.clientWidth + 1)
+    // A scrolling line repeats its text for the loop; read one copy.
+    .map((line) => (line.querySelector(".mq > span") || line).textContent.trim())
+    .filter((text) => text && text !== name);
+  const text = [...new Set(cut)].join(" · ");
+  return text.length > 140 ? `${text.slice(0, 139)}…` : text;
+}
 
 // ─────────────────────── Trash confirmation ───────────────────────
 // A small in-dock popover: nothing is ever deleted without an explicit yes.
