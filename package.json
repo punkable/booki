@@ -39,7 +39,7 @@
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.7.0",
     "playwright": "^1.62.0",
-    "typescript": "~5.9.3",
+    "typescript": "~7.0.2",
     "vite": "^7.3.6"
   },
   "dependencies": {
