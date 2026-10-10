@@ -28,7 +28,9 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.className = "productivity-button"; b.addEventListener("click", fn); container.appendChild(b); return b;
   };
-  button(t("stack.close"), close, head); panel.appendChild(head);
+  const closeButton = document.createElement("button"); closeButton.type = "button"; closeButton.className = "stack-close";
+  closeButton.innerHTML = icon("x"); closeButton.title = t("stack.close"); closeButton.setAttribute("aria-label", t("stack.close"));
+  closeButton.addEventListener("click", close); head.appendChild(closeButton); panel.appendChild(head);
   const body = document.createElement("div"); panel.appendChild(body);
   let timer = null;
   let monthOffset = 0;
@@ -117,23 +119,66 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
       for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
     },
     weather(body, st) {
-      if (Number.isFinite(st.latitude) && Number.isFinite(st.longitude)) drawForecast(body, st);
-      const help = document.createElement("p"); help.className = "weather-hint"; help.textContent = t("focus.cityHint"); body.appendChild(help);
-      const input = document.createElement("input"); input.placeholder = t("focus.city"); input.setAttribute("aria-label", t("focus.city")); input.value = st.city || ""; input.maxLength = 100; body.appendChild(input);
-      const units = document.createElement("select"); units.setAttribute("aria-label", t("w.weather"));
-      for (const unit of ["celsius", "fahrenheit"]) { const option = document.createElement("option"); option.value = unit; option.textContent = t(`premium.${unit}`); units.appendChild(option); }
-      units.value = st.units || "celsius"; units.addEventListener("change", () => update({ units: units.value })); body.appendChild(units);
-      const results = document.createElement("div"); results.setAttribute("role", "status");
-      const search = button(t("focus.search"), async () => {
-        if (!input.value.trim()) return;
-        search.disabled = true; results.textContent = "…";
+      const hasCity = Number.isFinite(st.latitude) && Number.isFinite(st.longitude);
+      if (hasCity) drawForecast(body, st);
+      else {
+        const empty = document.createElement("div"); empty.className = "weather-empty";
+        const art = document.createElement("span"); art.className = "weather-glyph"; art.setAttribute("aria-hidden", "true"); art.innerHTML = icon("cloud-sun");
+        empty.append(art, text("strong", "", t("focus.noCity")), text("span", "", t("weather.emptyHint")));
+        body.appendChild(empty);
+      }
+      // City search: one field, Enter or the button searches, results are rows.
+      const form = document.createElement("form"); form.className = "weather-search"; form.setAttribute("role", "search");
+      const lens = document.createElement("span"); lens.className = "weather-search-icon"; lens.setAttribute("aria-hidden", "true"); lens.innerHTML = icon("search");
+      const input = document.createElement("input"); input.type = "search"; input.placeholder = t("weather.searchCity");
+      input.setAttribute("aria-label", t("focus.city")); input.maxLength = 100; input.autocomplete = "off"; input.spellcheck = false;
+      const submit = document.createElement("button"); submit.type = "submit"; submit.className = "weather-search-go";
+      submit.innerHTML = icon("chevron-right"); submit.title = t("focus.search"); submit.setAttribute("aria-label", t("focus.search"));
+      form.append(lens, input, submit); body.appendChild(form);
+      const results = document.createElement("ul"); results.className = "weather-results"; results.setAttribute("aria-live", "polite"); body.appendChild(results);
+      const status = (message) => { results.replaceChildren(); if (message) results.appendChild(text("li", "weather-results-note", message)); };
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = input.value.trim(); if (!query || submit.disabled) return;
+        submit.disabled = true; form.setAttribute("aria-busy", "true"); status("…");
         try {
-          const cities = await weatherSearch(input.value.trim()); results.replaceChildren();
-          if (!cities.length) results.textContent = t("focus.noCity");
-          for (const city of cities) button([city.name, city.admin1, city.country].filter(Boolean).join(", "), () => update({ city: city.name, latitude: city.latitude, longitude: city.longitude }), results);
-        } catch (_) { results.textContent = t("focus.weatherError"); }
-        finally { search.disabled = false; }
-      }, body); body.appendChild(results);
+          const cities = await weatherSearch(query);
+          if (disposed) return;
+          status(cities.length ? "" : t("weather.noResults"));
+          for (const city of cities) {
+            const place = [city.admin1, city.country].filter(Boolean).join(", ");
+            const row = document.createElement("li");
+            const pick = document.createElement("button"); pick.type = "button"; pick.className = "weather-result";
+            pick.setAttribute("aria-label", [city.name, place].filter(Boolean).join(", "));
+            const current = st.latitude === city.latitude && st.longitude === city.longitude;
+            if (current) pick.setAttribute("aria-current", "true");
+            pick.append(text("strong", "", city.name), text("span", "", place));
+            if (current) { const tick = document.createElement("span"); tick.className = "weather-result-tick"; tick.setAttribute("aria-hidden", "true"); tick.innerHTML = icon("check"); pick.appendChild(tick); }
+            pick.addEventListener("click", () => update({ city: city.name, latitude: city.latitude, longitude: city.longitude }));
+            row.appendChild(pick); results.appendChild(row);
+          }
+        } catch (_) { if (!disposed) status(t("focus.weatherError")); }
+        finally { submit.disabled = false; form.removeAttribute("aria-busy"); }
+      });
+      // Units as a two-way switch rather than a dropdown.
+      const footer = document.createElement("div"); footer.className = "weather-footer";
+      const unitGroup = document.createElement("div"); unitGroup.className = "weather-units"; unitGroup.setAttribute("role", "radiogroup"); unitGroup.setAttribute("aria-label", t("weather.units"));
+      const chosen = st.units === "fahrenheit" ? "fahrenheit" : "celsius";
+      for (const [unit, label] of [["celsius", "°C"], ["fahrenheit", "°F"]]) {
+        const option = document.createElement("button"); option.type = "button"; option.textContent = label;
+        option.setAttribute("role", "radio"); option.setAttribute("aria-checked", String(unit === chosen)); option.title = t(`premium.${unit}`);
+        option.setAttribute("aria-label", t(`premium.${unit}`)); option.tabIndex = unit === chosen ? 0 : -1;
+        option.addEventListener("click", () => { if (unit !== chosen) update({ units: unit }); });
+        option.addEventListener("keydown", (event) => {
+          if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+          event.preventDefault(); update({ units: chosen === "celsius" ? "fahrenheit" : "celsius" }).then(() => panel.querySelector('.weather-units [aria-checked="true"]')?.focus());
+        });
+        unitGroup.appendChild(option);
+      }
+      const privacy = document.createElement("p"); privacy.className = "weather-privacy";
+      const shield = document.createElement("span"); shield.setAttribute("aria-hidden", "true"); shield.innerHTML = icon("shield");
+      privacy.append(shield, text("span", "", t("weather.privacy")));
+      footer.append(unitGroup, privacy); body.appendChild(footer);
     },
   };
   const glyph = (code, isDay) => {
@@ -150,12 +195,13 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     return el;
   };
   function drawForecast(body, st) {
-    const box = document.createElement("div"); box.className = "weather-forecast"; box.setAttribute("aria-busy", "true");
-    box.textContent = "…"; body.appendChild(box);
+    const box = document.createElement("div"); box.className = "weather-forecast is-loading"; box.setAttribute("aria-busy", "true");
+    box.append(text("div", "weather-skeleton", ""), text("div", "weather-skeleton", ""), text("div", "weather-skeleton", ""));
+    body.appendChild(box);
     loadForecast(weatherForecast, st.latitude, st.longitude).then((data) => {
       if (disposed || !box.isConnected) return;
       const lang = curLang(), units = st.units;
-      box.replaceChildren(); box.removeAttribute("aria-busy");
+      box.replaceChildren(); box.removeAttribute("aria-busy"); box.classList.remove("is-loading");
       const now = document.createElement("div"); now.className = "weather-now";
       const detail = document.createElement("div"); detail.className = "weather-detail";
       detail.append(text("strong", "weather-city", st.city || t("w.weather")), text("span", "", t(weatherKind(data?.now?.code).label)));
@@ -186,7 +232,10 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
       }
     }, () => {
       if (disposed || !box.isConnected) return;
-      box.removeAttribute("aria-busy"); box.textContent = t("focus.weatherError");
+      box.removeAttribute("aria-busy"); box.classList.remove("is-loading"); box.classList.add("is-error");
+      box.replaceChildren(text("span", "", t("focus.weatherError")));
+      const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry");
+      retry.addEventListener("click", () => draw()); box.appendChild(retry);
     });
   }
   panel.addEventListener("keydown", (event) => {

@@ -86,7 +86,7 @@ test("weather stays offline until a city is chosen and requests are cached", asy
   await page.waitForTimeout(1500); assert.equal(await page.evaluate(() => window.__weatherRequests), 0);
   await page.locator('#dock > [data-widget="weather"]').click();
   assert.equal(await page.locator(".weather-forecast").count(), 0, "no forecast before a city is chosen");
-  await page.getByRole("textbox", { name: "City", exact: true }).fill("Santiago");
+  await page.getByRole("searchbox", { name: "City", exact: true }).fill("Santiago");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: "Santiago, Chile", exact: true }).click();
   await page.waitForTimeout(1800);
@@ -98,9 +98,10 @@ test("weather stays offline until a city is chosen and requests are cached", asy
   assert.equal(await forecast.locator(".weather-days li").count(), 3);
   assert.equal(await forecast.getByRole("img", { name: "Rain" }).count(), 4);
   assert.equal(await forecast.getByLabel("Chance of rain 70%").count(), 1);
-  await page.getByRole("combobox", { name: "Weather" }).selectOption("fahrenheit");
+  await page.getByRole("radio", { name: "Fahrenheit" }).click();
   await page.waitForTimeout(300);
   assert.match(await forecast.locator(".weather-temp").innerText(), /71°/);
+  assert.equal(await page.getByRole("radio", { name: "Fahrenheit" }).getAttribute("aria-checked"), "true");
   assert.equal(await page.evaluate(() => window.__forecastRequests), 1, "the forecast is cached per city");
   assert.deepEqual(errors, []); await page.close();
 });
