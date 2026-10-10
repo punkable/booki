@@ -573,6 +573,7 @@ export const dock = {
   exportDiagnostics: (path) => invoke("export_diagnostics", { path }),
   weatherSearch: (city) => invoke("weather_search", { city }),
   weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
+  weatherForecast: (latitude, longitude) => invoke("weather_forecast", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path, expected) => invoke("import_config", { path, expected }),
   previewImport: (path) => invoke("preview_config_import", { path }),

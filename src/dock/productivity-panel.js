@@ -1,8 +1,23 @@
 import { t, curLang } from "../i18n.js";
 import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer } from "./productivity.js";
+import { dock as dockApi } from "../api.js";
+import { icon } from "../icons.js";
+import { weatherKind, formatDegrees, formatHour, formatWeekday } from "./weather-codes.js";
+
+// One forecast per city for ten minutes, however often the panel is reopened.
+const forecastCache = new Map();
+function loadForecast(request, latitude, longitude) {
+  const key = `${latitude},${longitude}`;
+  const hit = forecastCache.get(key);
+  if (hit && Date.now() < hit.expires) return hit.promise;
+  const entry = { promise: Promise.resolve().then(() => request(latitude, longitude)), expires: Date.now() + 600000 };
+  forecastCache.set(key, entry);
+  entry.promise.catch(() => { if (forecastCache.get(key) === entry) forecastCache.delete(key); });
+  return entry.promise;
+}
 
 /* Build with textContent: task text and remote city names never become HTML. */
-export function buildProductivityPanel(item, { save, weatherSearch, close }) {
+export function buildProductivityPanel(item, { save, weatherSearch, weatherForecast = dockApi.weatherForecast, close }) {
   const panel = document.createElement("div");
   panel.className = "productivity-panel";
   panel.setAttribute("role", "dialog");
@@ -102,7 +117,8 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", t("focus.today")); } grid.appendChild(cell); } body.appendChild(grid);
     },
     weather(body, st) {
-      const help = document.createElement("p"); help.textContent = t("focus.cityHint"); body.appendChild(help);
+      if (Number.isFinite(st.latitude) && Number.isFinite(st.longitude)) drawForecast(body, st);
+      const help = document.createElement("p"); help.className = "weather-hint"; help.textContent = t("focus.cityHint"); body.appendChild(help);
       const input = document.createElement("input"); input.placeholder = t("focus.city"); input.setAttribute("aria-label", t("focus.city")); input.value = st.city || ""; input.maxLength = 100; body.appendChild(input);
       const units = document.createElement("select"); units.setAttribute("aria-label", t("w.weather"));
       for (const unit of ["celsius", "fahrenheit"]) { const option = document.createElement("option"); option.value = unit; option.textContent = t(`premium.${unit}`); units.appendChild(option); }
@@ -120,6 +136,59 @@ export function buildProductivityPanel(item, { save, weatherSearch, close }) {
       }, body); body.appendChild(results);
     },
   };
+  const glyph = (code, isDay) => {
+    const kind = weatherKind(code, isDay);
+    const el = document.createElement("span"); el.className = "weather-glyph"; el.innerHTML = icon(kind.icon);
+    el.setAttribute("role", "img"); el.setAttribute("aria-label", t(kind.label)); el.title = t(kind.label);
+    return el;
+  };
+  const text = (tag, className, value) => { const el = document.createElement(tag); el.className = className; el.textContent = value; return el; };
+  const rainChance = (value) => {
+    // Below 20% the figure is noise; leave the cell quiet.
+    if (!(Number(value) >= 20)) return text("span", "weather-rain", "");
+    const el = text("span", "weather-rain", `${Math.round(value)}%`); el.setAttribute("aria-label", `${t("weather.rainChance")} ${Math.round(value)}%`);
+    return el;
+  };
+  function drawForecast(body, st) {
+    const box = document.createElement("div"); box.className = "weather-forecast"; box.setAttribute("aria-busy", "true");
+    box.textContent = "…"; body.appendChild(box);
+    loadForecast(weatherForecast, st.latitude, st.longitude).then((data) => {
+      if (disposed || !box.isConnected) return;
+      const lang = curLang(), units = st.units;
+      box.replaceChildren(); box.removeAttribute("aria-busy");
+      const now = document.createElement("div"); now.className = "weather-now";
+      const detail = document.createElement("div"); detail.className = "weather-detail";
+      detail.append(text("strong", "weather-city", st.city || t("w.weather")), text("span", "", t(weatherKind(data?.now?.code).label)));
+      if (data?.today) detail.append(text("span", "weather-range", `${t("weather.high")} ${formatDegrees(data.today.max, units)} · ${t("weather.low")} ${formatDegrees(data.today.min, units)}`));
+      now.append(glyph(data?.now?.code, data?.now?.isDay), text("span", "weather-temp", formatDegrees(data?.now?.temperature, units)), detail);
+      box.appendChild(now);
+      const hours = Array.isArray(data?.hours) ? data.hours : [];
+      if (hours.length) {
+        box.appendChild(text("p", "weather-heading", t("weather.nextHours")));
+        const list = document.createElement("ol"); list.className = "weather-hours";
+        for (const hour of hours) {
+          const row = document.createElement("li");
+          row.append(text("span", "weather-when", formatHour(hour.time, lang)), glyph(hour.code, hour.isDay), text("span", "weather-value", formatDegrees(hour.temperature, units)), rainChance(hour.precipitation));
+          list.appendChild(row);
+        }
+        box.appendChild(list);
+      }
+      const days = Array.isArray(data?.days) ? data.days : [];
+      if (days.length) {
+        box.appendChild(text("p", "weather-heading", t("weather.nextDays")));
+        const list = document.createElement("ol"); list.className = "weather-days";
+        for (const day of days) {
+          const row = document.createElement("li");
+          row.append(text("span", "weather-when", formatWeekday(day.date, lang)), glyph(day.code), rainChance(day.precipitation), text("span", "weather-value", `${formatDegrees(day.min, units)} / ${formatDegrees(day.max, units)}`));
+          list.appendChild(row);
+        }
+        box.appendChild(list);
+      }
+    }, () => {
+      if (disposed || !box.isConnected) return;
+      box.removeAttribute("aria-busy"); box.textContent = t("focus.weatherError");
+    });
+  }
   panel.addEventListener("keydown", (event) => {
     if (!(SECTIONS[item.widget] || []).includes("calendar") || !["PageUp", "PageDown", "Home"].includes(event.key)) return;
     event.preventDefault();

@@ -72,17 +72,36 @@ test("weather stays offline until a city is chosen and requests are cached", asy
     window.__TAURI__.core.invoke = (cmd, args) => {
       if (cmd === "weather_search") return Promise.resolve([{ name: "Santiago", country: "Chile", latitude: -33.45, longitude: -70.66 }]);
       if (cmd === "weather_current") { window.__weatherRequests++; return Promise.resolve({ temperature_2m: 22 }); }
+      if (cmd === "weather_forecast") {
+        window.__forecastRequests = (window.__forecastRequests || 0) + 1;
+        return Promise.resolve({
+          now: { temperature: 21.6, code: 2, isDay: 1 }, today: { max: 24, min: 12 },
+          hours: [18, 19, 20, 21].map((h, i) => ({ time: `2026-10-10T${h}:00`, temperature: 20 - i, code: i === 3 ? 61 : 3, precipitation: i === 3 ? 70 : 0, isDay: 1 })),
+          days: ["11", "12", "13"].map((d) => ({ date: `2026-10-${d}`, code: 61, max: 19, min: 11, precipitation: 80 })),
+        });
+      }
       return old(cmd, args);
     };
   });
   await page.waitForTimeout(1500); assert.equal(await page.evaluate(() => window.__weatherRequests), 0);
   await page.locator('#dock > [data-widget="weather"]').click();
+  assert.equal(await page.locator(".weather-forecast").count(), 0, "no forecast before a city is chosen");
   await page.getByRole("textbox", { name: "City", exact: true }).fill("Santiago");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: "Santiago, Chile", exact: true }).click();
   await page.waitForTimeout(1800);
   assert.equal(await page.evaluate(() => window.__weatherRequests), 1);
   assert.match(await page.locator('#dock > [data-widget="weather"]').innerText(), /22°/);
+  const forecast = page.locator(".weather-forecast");
+  assert.match(await forecast.locator(".weather-now").innerText(), /22°[\s\S]*Santiago[\s\S]*Partly cloudy[\s\S]*High 24° · Low 12°/);
+  assert.equal(await forecast.locator(".weather-hours li").count(), 4);
+  assert.equal(await forecast.locator(".weather-days li").count(), 3);
+  assert.equal(await forecast.getByRole("img", { name: "Rain" }).count(), 4);
+  assert.equal(await forecast.getByLabel("Chance of rain 70%").count(), 1);
+  await page.getByRole("combobox", { name: "Weather" }).selectOption("fahrenheit");
+  await page.waitForTimeout(300);
+  assert.match(await forecast.locator(".weather-temp").innerText(), /71°/);
+  assert.equal(await page.evaluate(() => window.__forecastRequests), 1, "the forecast is cached per city");
   assert.deepEqual(errors, []); await page.close();
 });
 
