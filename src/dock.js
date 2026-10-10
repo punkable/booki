@@ -32,6 +32,7 @@ import { singleFlight } from "./dock/async-cache.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
+import { formatDegrees } from "./dock/weather-codes.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
@@ -945,7 +946,10 @@ function tickProductivity() {
         record.value = value; record.error = false;
       }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
     }
-    setText(el, style.city || t("w.weather"), cached.value ? `${Math.round(style.units === "fahrenheit" ? cached.value.temperature_2m * 9 / 5 + 32 : cached.value.temperature_2m)}°` : cached.error ? t("focus.weatherError") : "…");
+    const value = cached.value;
+    // Today's range sits beside the city when Open-Meteo returned it.
+    const range = value && Number.isFinite(value.temperature_max) && Number.isFinite(value.temperature_min) ? ` · ${formatDegrees(value.temperature_max, style.units)}/${formatDegrees(value.temperature_min, style.units)}` : "";
+    setText(el, `${style.city || t("w.weather")}${range}`, value ? formatDegrees(value.temperature_2m, style.units) : cached.error ? t("focus.weatherError") : "…");
     setTileLabel(el, `${style.city || t("w.weather")} · Open-Meteo`);
   });
 }
@@ -1258,7 +1262,7 @@ async function editNote(item) {
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
   const head = document.createElement("div"); head.className = "productivity-head";
   const title = document.createElement("strong"); title.textContent = t("w.notes");
-  const close = document.createElement("button"); close.type = "button"; close.textContent = t("stack.close"); close.className = "productivity-button";
+  const close = document.createElement("button"); close.type = "button"; close.className = "stack-close"; close.innerHTML = icon("x"); close.title = t("stack.close"); close.setAttribute("aria-label", t("stack.close"));
   close.addEventListener("click", closeNoteEditor); head.append(title, close);
   const ta = document.createElement("textarea"); ta.className = "note-input";
   ta.value = item.style?.note || ""; ta.placeholder = t("w.notesEmpty"); ta.setAttribute("aria-label", t("w.notes")); ta.maxLength = 20000;

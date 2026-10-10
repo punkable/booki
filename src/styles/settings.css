@@ -376,7 +376,7 @@
 .home-usage-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: 13px; }
 .home-usage-figures strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .home-usage { flex-wrap: wrap; } .home-usage-icon { display: none; } }
-.home-stats strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.home-stats strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-left: 2px; }
 .home-actions { display: flex; gap: 8px; }
 .home-subtitle { margin-top: 4px; }
 .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 28px; }
@@ -615,7 +615,7 @@
 .app-library-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .library-refresh { width: 36px; padding: 0; }
 .library-destination { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12px; }
-.library-destination select { height: 32px; padding: 0 8px; color: var(--ink); font: inherit; font-size: 13px; background: var(--field); border: 1px solid var(--control-stroke); border-radius: var(--r-control); }
+.library-destination select { height: 32px; padding: 0 30px 0 10px; color: var(--ink); font: inherit; font-size: 13px; background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; border: 1px solid var(--control-stroke); border-radius: var(--r-control); appearance: none; cursor: pointer; }
 .app-library-filters { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; width: fit-content; max-width: 100%; background: var(--subtle-pressed); border-radius: 10px; }
 .app-library-filters button { min-height: 30px; padding: 0 14px; color: var(--ink-2); font: inherit; font-size: 13px; font-weight: 500; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
 .app-library-filters button:hover { color: var(--ink); }
