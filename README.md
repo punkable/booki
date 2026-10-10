@@ -1,70 +1,76 @@
 <p align="center">
-  <img src="assets/brand/svg/isotype.svg" alt="Booki capybara" height="72" />
+  <img src="assets/brand/svg/isotype.svg" alt="Booki capybara" height="84" />
 </p>
 
 <h1 align="center">Booki</h1>
 
-<h3 align="center">A calmer way to use Windows.</h3>
+<h3 align="center">Your desktop, calmer.</h3>
+
+<p align="center">A beautiful dock for Windows 11 — apps, folders and live widgets in one calm bar.<br/>Free, private and open source.</p>
 
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><b>Download</b></a> ·
-  <a href="docs/presentation/booki-070-en.mp4"><b>Watch the film</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
+  <a href="docs/releases/v0.81.0.md"><b>What's new in 0.81</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=available&style=flat-square" alt="Available release" /></a>
+  <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=latest&style=flat-square&color=dfaa75" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078d4?style=flat-square" alt="Windows 10 and 11" />
+  <img src="https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20React-24c8db?style=flat-square" alt="Built with Tauri 2 and React" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center">
-  <a href="docs/presentation/booki-070-en.mp4"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock on a soft desktop: apps, clock, weather, CPU, tasks and now playing" /></a>
-</p>
+<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock on a soft desktop with apps, two colored groups, clock, weather, system, focus timer and music, and the notch Island showing the timer" /></p>
+
+<table align="center">
+<tr>
+<td align="center" width="25%"><b>⚡ Light</b><br/><sub>Native Rust core. Widgets pause when the dock hides.</sub></td>
+<td align="center" width="25%"><b>🔒 Private</b><br/><sub>No accounts, no telemetry, no cloud.</sub></td>
+<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Glass, Mica or solid. Any edge. Five languages.</sub></td>
+<td align="center" width="25%"><b>🧡 Open</b><br/><sub>MIT licensed. Built in the open.</sub></td>
+</tr>
+</table>
 
 ---
 
-<h2 align="center">Everything you use. One beautiful dock.</h2>
+<h2 align="center">The notch that tells you things.</h2>
 
-<p align="center">Pin apps, folders, files and websites. Click to launch, or jump back to a window that's already open.<br/>Clicks outside the bar go straight through to whatever is behind it.</p>
+<p align="center">A quiet dot at the top of your screen that opens into a capsule for your focus timer, the song that's playing or a low battery.<br/>Hover it for a card with more. Prefer something simpler? Choose an attached tab or a floating pill.</p>
 
-<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Close-up of Booki's live widgets: clock, weather, CPU and tasks" /></p>
+<p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="The notch Island showing a running focus timer above a dark Booki dock" /></p>
+
+<h2 align="center">Groups that look like yours.</h2>
+
+<p align="center">Pin apps, folders, files and websites, then gather them into groups.<br/>Give each group a colour from a curated palette and an icon from the library — it shows in the dock and in Settings.</p>
+
+<p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki Settings, Apps and folders: the dock as a tidy grid, a library with large icons and a group inspector with colour and icon pickers" /></p>
 
 <h2 align="center">Live, at a glance.</h2>
 
-<p align="center">Time, weather, CPU, memory, network, battery, notes, clipboard and now playing — compact tiles that sit right on the bar and pause when the dock is hidden.</p>
+<p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.</p>
 
-<p align="center"><img src="docs/presentation/focus-en.jpg" width="1000" alt="Booki timer, tasks, calendar and weather widgets with the tasks list open" /></p>
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki widget gallery with live previews" /></p>
 
-<h2 align="center">A little more focus.</h2>
+<h2 align="center">Settings you actually enjoy.</h2>
 
-<p align="center">A countdown timer, a task list, a monthly calendar and optional city weather.<br/>Your tasks stay on your PC. Weather asks only for the city you choose — never your location.</p>
+<p align="center">Five clear pages — Home, Dock, Widgets, Apps and System — with a live preview of your dock and everything at a glance.</p>
 
-<p align="center"><img src="docs/presentation/library-workspace-en.png" width="1000" alt="Booki library with a persistent dock editor, app suggestions and an item inspector" /></p>
+<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with the dock on a small desktop and at-a-glance tiles" /></p>
 
-<h2 align="center">Find any app. Fast.</h2>
+<h2 align="center">At home in the dark.</h2>
 
-<p align="center">Search everything installed, see what's open, and get suggestions from your own usage.<br/>Keep your dock in view while you search. Select an app to inspect it, then add it with + or drag it into a position or group.<br/>Usage is read locally from Windows and from launches through Booki. Nothing is uploaded.</p>
+<p align="center">Follows your Windows theme and accent. Glass blurs what's behind it, Mica tints with your wallpaper, Solid stays crisp.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
 
-<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with a live dock preview and behavior scenarios" /></p>
-
-<h2 align="center">Make it yours.</h2>
-
-<p align="center">A live preview of your dock, three behaviors to choose from — always visible, smart, or reveal at the edge — named profiles, any screen edge, glass or solid surfaces, and five languages.</p>
-
-<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki in dark mode on a dark desktop" /></p>
-
-<h2 align="center">Light or dark. At home in either.</h2>
-
-<p align="center">Follows your Windows theme and wallpaper accent, with optional native desktop blur behind the bar. When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki Dock settings in dark mode" /></p>
 
 ---
 
 <h2 align="center">Private by design.</h2>
 
-<p align="center">No accounts. No telemetry. No cloud sync. Open source under MIT.</p>
+<p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><sub>Images and film show the actual Booki interface with example data and generic sample app icons. The presentation shows the 0.70 overhaul. The library screenshot shows the 0.71 workspace. See the <a href="docs/releases/v0.71.0.md">0.71 library, settings and system update</a>.</sub></p>
+<p align="center"><sub>Images show the actual Booki 0.81 interface with example data and generic sample icons.</sub></p>
 
 ## Get started
 
@@ -74,34 +80,14 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-> Download the latest published version using the release badge above. Booki checks the same release channel for updates; updates preserve the existing installation and configuration.
+### New in 0.81
 
-### New in 0.72
+- **Settings, redesigned** — Home shows your dock on a small desktop with an at-a-glance summary; every page has clearer hierarchy and a live preview.
+- **Apps & folders, rebuilt** — edit your dock in a tidy grid; browse apps, folders and websites in tabs with large icons.
+- **Group colour and icon** — a curated palette and the icon library, in compact pickers.
+- **Notch Island** — a dot that becomes a capsule for your timer, music or low battery.
 
-- Clearer library actions and a dock editor that reserves space instead of covering apps.
-- Stronger keyboard focus, responsive details and Escape navigation.
-- Complete folder search and sorting, recoverable profiles and explicit retry states.
-- Encrypted note recovery with preview, Restore and Discard after interrupted saves.
-
-See the [complete 0.72 release notes](docs/releases/v0.72.0.md).
-
-### Previous 0.71 improvements
-
-- A persistent dock editor beside the app library: select to inspect, use **+** or drag to add, arrange groups and undo edits.
-- Unified dock behavior settings, curated finishes and a widget gallery with a configuration inspector.
-- Booki context menus with Settings throughout, optional movable Settings pins and internal subfolder navigation.
-- Complete profiles, protected saves and conflict recovery; notes autosave retains failed drafts for retry.
-- Native Windows notifications for media, volume, running windows and app catalog changes, with blocking queries moved off the interface thread.
-
-See the [complete 0.71 release notes](docs/releases/v0.71.0.md).
-
-### Previous 0.70 improvements
-
-- New Home dashboard in Settings, a visual widget gallery, adjustable widget widths and reduced transparency.
-- Four new widgets: timer, tasks, calendar and optional city weather (Open-Meteo).
-- A redesigned app library with search, running apps and local usage suggestions.
-- Fixes from [#64](https://github.com/punkable/booki/issues/64): pinning keeps your original shortcuts, dragging out can return a shortcut to the desktop, folders show every entry, smart hide responds to Show Desktop, and changing language refreshes widgets and menus.
-- Safer configuration writes, a privacy-respecting diagnostics export, steadier updates and a fully translated installer.
+See the [complete 0.81 release notes](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 
@@ -109,10 +95,10 @@ See the [complete 0.71 release notes](docs/releases/v0.71.0.md).
 |---|---|
 | Click a pin | Launch it or focus its window |
 | Drag desktop → dock | Pin an app, folder, file or image; ordinary pinning preserves the original |
-| Drag a pin out | Unpin; 0.70 additionally offers an explicit desktop-return action for shortcuts |
+| Drag a pin out | Unpin, or return a shortcut to the desktop |
 | Right-click the dock | Add items, choose a profile or open Settings |
 | Middle-click a pin | Reveal its location in Explorer |
-| Double-click a widget | Open its configuration; utility widgets in 0.70 also open their own panel |
+| Double-click a widget | Open its configuration; utility widgets open their own panel |
 | `Alt` + `1…9` | Launch the corresponding pin; the modifier is configurable |
 | Push the cursor to the edge | Reveal a hidden dock when edge/hover behavior is enabled |
 | Wheel over Media, if enabled | Change system volume |
@@ -120,8 +106,8 @@ See the [complete 0.71 release notes](docs/releases/v0.71.0.md).
 ## Privacy and your data
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
-- Network requests are limited to update checks/downloads and website favicons; 0.70 adds optional Open-Meteo weather after choosing a city, without device-location access.
-- 0.70 app recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
+- Network requests are limited to update checks/downloads and website favicons, plus optional Open-Meteo weather after choosing a city, without device-location access.
+- App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
 - Clipboard history is local. Restart persistence is off by default; when enabled, it is protected for your Windows user and can expire.
 - Compatible captures hide the dock by default. Enable **Visible in captures** in Settings when recording it.
 - Uninstall preserves settings unless you select **Delete app data**. Normal uninstall removes the startup entry and Explorer shell actions.
