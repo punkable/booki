@@ -78,7 +78,7 @@ features = [
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]
-version = "0.58"
+version = "0.62"
 
 [profile.release]
 panic = "abort"
