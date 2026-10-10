@@ -48,3 +48,17 @@ nativo, DWM, ventanas Win32) se revisó en el código y no se probó en un equip
   El código nativo compila y pasa clippy contra `x86_64-pc-windows-msvc`, pero no se ejecutó en Windows.
 - **Archivos grandes:** `dock.js` (~4.900 líneas) y `lib.rs` (~3.600). Conviene partirlos al tocarlos.
 - **Pruebas visuales:** añadir capturas de referencia de los acabados y de las páginas de Ajustes.
+
+## Revisión 2026-10-10 (0.81.0)
+
+- **Dependencias al día:** Tauri 2.12 con sus plugins (crates y paquetes npm en la misma
+  versión menor), `sysinfo` 0.39, `ureq` 3, `dirs` 7, `base64` 0.23 y `png` 0.18. Los dos
+  PRs de Dependabot (#79 y #86) fallaban en CI: uno por desalinear el puente de Tauri y el
+  otro por cambios de API en `sysinfo` y `ureq`. Este cambio los sustituye.
+- **Dependabot:** las versiones menores y de parche llegan juntas y cada versión mayor llega
+  en su propio PR. `windows` y `windows-core` se actualizan siempre juntos.
+- **CI:** `actions/checkout`, `actions/setup-node` y `actions/upload-artifact` pasan a v5
+  (Node 24), lo que quita el aviso de Node 20 obsoleto en cada ejecución.
+- **Sigue pendiente:** todo lo de la lista anterior. La migración de `ureq` y `sysinfo` toca
+  el clima, el favicon de los sitios y el widget Sistema, así que conviene revisarlos en un
+  Windows real junto con el blur, Mica y el notch.

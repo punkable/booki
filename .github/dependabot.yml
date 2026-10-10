@@ -1,5 +1,13 @@
 # Keep the three ecosystems patched: npm (frontend), cargo (backend) and the
 # release workflow's actions. Weekly, batched, so update PRs stay manageable.
+#
+# Minor and patch updates arrive together; major updates come one PR per
+# package, so a breaking API change never blocks the safe ones. For 0.x crates
+# Dependabot calls 0.32 -> 0.39 "minor" even though it can break the build.
+#
+# The Tauri crates (cargo) and @tauri-apps/* (npm) must share major.minor
+# (`npm run check:versions`). Dependabot cannot group across ecosystems, so
+# when one side moves a Tauri minor, bump the other side in the same PR.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -9,6 +17,7 @@ updates:
     groups:
       npm-all:
         patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule:
@@ -22,9 +31,16 @@ updates:
     ignore:
       - dependency-name: glib
     groups:
+      # `windows` and `windows-core` must stay on the same release.
+      windows-rs:
+        patterns: [windows, windows-core]
       cargo-all:
         patterns: ["*"]
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions-all:
+        patterns: ["*"]
