@@ -25,6 +25,7 @@
     "check:node": "node scripts/check-node.mjs",
     "check:versions": "node scripts/check-versions.mjs",
     "typecheck": "tsc --project tsconfig.json",
+    "capture:reference": "node scripts/capture-reference.mjs",
     "test:validation": "node --test scripts/validation.test.mjs",
     "check:all": "npm run check:node && npm run check:versions && npm run lint && npm run typecheck && npm run check:text && npm run check:icons && npm run check:i18n && npm run test:validation && npm run build && npm test",
     "preview": "vite preview",
@@ -33,7 +34,7 @@
     "tauri:build": "tauri build"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0",
+    "@tauri-apps/cli": "^2.12.1",
     "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
@@ -44,10 +45,10 @@
   },
   "dependencies": {
     "@crabnebula/tauri-plugin-drag": "^2.1.0",
-    "@tauri-apps/api": "~2.11.1",
-    "@tauri-apps/plugin-dialog": "~2.7.3",
-    "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2.10.1",
+    "@tauri-apps/api": "~2.12.2",
+    "@tauri-apps/plugin-dialog": "~2.8.1",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.13.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }

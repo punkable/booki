@@ -27,8 +27,8 @@ jobs:
             target: aarch64-pc-windows-msvc
             bundles: nsis
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: package.json
           cache: npm
@@ -58,7 +58,7 @@ jobs:
           -- --locked
       - name: Validate architecture bundle set
         run: node scripts/check-bundles.mjs ${{ matrix.arch }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: booki-windows-${{ matrix.arch }}
           path: |

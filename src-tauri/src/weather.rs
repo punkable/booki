@@ -2,19 +2,21 @@
 use serde_json::Value;
 use std::io::Read;
 fn request(url: &str, query: &[(&str, String)]) -> Result<Value, String> {
-    let agent = ureq::AgentBuilder::new()
-        .timeout(std::time::Duration::from_secs(10))
-        .build();
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(10)))
+        .build()
+        .into();
     let mut req = agent.get(url);
     for (key, value) in query {
         req = req.query(key, value);
     }
-    let response = req
+    let mut response = req
         .call()
         .map_err(|_| "weather request failed".to_string())?;
     let mut bytes = Vec::new();
     response
-        .into_reader()
+        .body_mut()
+        .as_reader()
         .take(256 * 1024)
         .read_to_end(&mut bytes)
         .map_err(|_| "weather response failed".to_string())?;
