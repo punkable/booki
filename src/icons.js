@@ -103,6 +103,25 @@ export const iconVolume = () =>
   S(`<path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>`);
 export const iconNote = () =>
   S(`<path d="M15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9Z"/><path d="M15 3v6h6M7 13h8M7 17h5"/>`);
+// Timer and calendar controls for the dock's panels.
+export const iconPlay = () => S(`<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"/>`);
+export const iconPause = () => S(`<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>`);
+export const iconChevronLeft = () => S(`<path d="m15 6-6 6 6 6"/>`);
+// Weather conditions for the forecast panel.
+export const iconCloud = () =>
+  S(`<path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z"/>`);
+export const iconCloudSun = () =>
+  S(`<path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41M15.95 12.65a4 4 0 0 0-5.93-4.13"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>`);
+export const iconCloudRain = () =>
+  S(`<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 14v6M8 14v6M12 16v6"/>`);
+export const iconCloudDrizzle = () =>
+  S(`<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 19v1M8 14v1M16 19v1M16 14v1M12 21v1M12 16v1"/>`);
+export const iconCloudSnow = () =>
+  S(`<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M8 15h.01M8 19h.01M12 17h.01M12 21h.01M16 15h.01M16 19h.01"/>`);
+export const iconCloudFog = () =>
+  S(`<path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/><path d="M16 17H7M17 21H9"/>`);
+export const iconCloudLightning = () =>
+  S(`<path d="M6 16.3A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 .5 9"/><path d="m13 12-3 5h4l-3 5"/>`);
 
 const iconMap = {
   plus: iconPlus,
@@ -162,6 +181,16 @@ const iconMap = {
   disk: iconDisk,
   battery: iconBattery,
   volume: iconVolume,
+  play: iconPlay,
+  pause: iconPause,
+  "chevron-left": iconChevronLeft,
+  cloud: iconCloud,
+  "cloud-sun": iconCloudSun,
+  "cloud-rain": iconCloudRain,
+  "cloud-drizzle": iconCloudDrizzle,
+  "cloud-snow": iconCloudSnow,
+  "cloud-fog": iconCloudFog,
+  "cloud-lightning": iconCloudLightning,
 };
 
 export function icon(name) {

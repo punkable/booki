@@ -873,6 +873,13 @@ async fn weather_current(latitude: f64, longitude: f64) -> Result<serde_json::Va
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn weather_forecast(latitude: f64, longitude: f64) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || weather::forecast(latitude, longitude))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Export an allowlist, never the user's config, paths, logs or widget contents.
 #[tauri::command]
 fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String> {
@@ -1217,6 +1224,7 @@ pub fn run() {
             export_diagnostics,
             weather_search,
             weather_current,
+            weather_forecast,
             import_config,
             preview_config_import,
             paths_exist,

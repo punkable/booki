@@ -326,6 +326,19 @@ async function mockInvoke(cmd, args) {
         ["videos", "C:/Users/demo/Videos"],
         ["music", "C:/Users/demo/Music"],
       ];
+    // Browser preview only: a fixed city and forecast, never a network call.
+    case "weather_search":
+      return [{ name: "Santiago", admin1: "Región Metropolitana", country: "Chile", latitude: -33.45, longitude: -70.66 }];
+    case "weather_current":
+      return { temperature_2m: 21.6, weather_code: 2, temperature_max: 24, temperature_min: 12 };
+    case "weather_forecast":
+      return {
+        now: { temperature: 21.6, code: 2, isDay: 1 }, today: { max: 24, min: 12 },
+        hours: [[18, 21, 2, 0], [19, 20, 3, 10], [20, 18, 3, 20], [21, 16, 61, 60], [22, 15, 61, 70], [23, 14, 3, 30]]
+          .map(([hour, temperature, code, precipitation]) => ({ time: `2026-10-10T${hour}:00`, temperature, code, precipitation, isDay: hour < 20 ? 1 : 0 })),
+        days: [["11", 61, 19, 11, 80], ["12", 2, 23, 10, 10], ["13", 0, 26, 12, 0]]
+          .map(([day, code, max, min, precipitation]) => ({ date: `2026-10-${day}`, code, max, min, precipitation })),
+      };
     case "export_config":
     case "import_config":
       console.info("[demo]", cmd, args);
@@ -584,6 +597,7 @@ export const dock = {
   exportDiagnostics: (path) => invoke("export_diagnostics", { path }),
   weatherSearch: (city) => invoke("weather_search", { city }),
   weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
+  weatherForecast: (latitude, longitude) => invoke("weather_forecast", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
   importConfig: (path, expected) => invoke("import_config", { path, expected }),
   previewImport: (path) => invoke("preview_config_import", { path }),

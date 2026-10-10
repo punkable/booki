@@ -286,20 +286,69 @@ body.edge-left .w-value, body.edge-right .w-value { font-size: calc(var(--size) 
 /* Width comes from the shared model, including per-widget size choices. */
 body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, var(--size)); }
 .productivity-panel, .edit-toolbar { position: fixed; z-index: 50; padding: 16px; border: 1px solid var(--stroke); border-radius: 18px; background: var(--layer-strong); color: var(--ink); box-shadow: 0 12px 40px #0004; }
-.productivity-panel { width: min(320px, calc(100vw - 24px)); max-height: min(420px, calc(100vh - 24px)); overflow: auto; border-radius: var(--r-overlay); background: var(--layer-strong); box-shadow: var(--shadow); }
+.productivity-panel { width: min(320px, calc(100vw - 24px)); max-height: min(600px, calc(100vh - 24px)); overflow: auto; border-radius: var(--r-overlay); background: var(--layer-strong); box-shadow: var(--shadow); }
 [data-theme="light"] .productivity-panel, [data-theme="light"] .edit-toolbar { background: #fff; }
 .productivity-head, .focus-actions, .focus-task, .edit-toolbar { display: flex; align-items: center; gap: 10px; }
 .productivity-head { justify-content: space-between; margin-bottom: 14px; }
-.productivity-button, .edit-toolbar button { color: var(--ink); border: 1px solid var(--stroke); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 8px 12px; border-radius: 9px; cursor: pointer; }
+.productivity-button, .edit-toolbar button { color: var(--ink); border: 0; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 7px 12px; border-radius: 9px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.productivity-button:hover, .edit-toolbar button:hover { background: color-mix(in srgb, var(--ink) 14%, transparent); }
 .productivity-panel input { min-width: 0; max-width: 100%; padding: 8px; border-radius: 8px; background: transparent; color: var(--ink); border: 1px solid var(--stroke); }
 .productivity-panel label { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
 .productivity-panel input[type="number"] { width: 65px; }
-.focus-countdown { font-size: 44px; text-align: center; font-variant-numeric: tabular-nums; padding: 10px; }
 .focus-task label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .focus-task label:has(input:checked) span { text-decoration: line-through; opacity: .6; }
-.focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.focus-calendar > * { font-size: 11px; padding: 6px 0; }
-.focus-calendar .today { background: var(--accent); color: #161618; border-radius: 8px; font-weight: 700; }
+/* Weather panel: forecast first, then the city search, then units and source. */
+.productivity-weather { --weather-field: color-mix(in srgb, var(--ink) 6%, transparent); }
+.weather-glyph { display: inline-grid; place-items: center; color: var(--ink); }
+.weather-glyph svg { width: 20px; height: 20px; }
+.weather-forecast { margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+.weather-now { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--weather-field); }
+.weather-now > .weather-glyph svg { width: 36px; height: 36px; stroke-width: 1.25; }
+.weather-temp { font-size: 36px; font-weight: 600; line-height: 1; letter-spacing: -1px; }
+.weather-detail { display: grid; gap: 2px; min-width: 0; font-size: 12px; color: var(--ink-2); }
+.weather-city { color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.weather-heading { margin: 14px 0 6px; font-size: 11px; font-weight: 600; color: var(--ink-2); }
+.weather-hours, .weather-days, .weather-results { list-style: none; margin: 0; padding: 0; }
+.weather-hours { display: grid; grid-template-columns: repeat(auto-fit, minmax(36px, 1fr)); gap: 4px; text-align: center; }
+.weather-hours li { display: grid; justify-items: center; gap: 4px; font-size: 12px; }
+.weather-days li { display: grid; grid-template-columns: 3.5em 24px 1fr auto; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; }
+.weather-days li + li { border-top: 1px solid var(--stroke); }
+.weather-when { color: var(--ink-2); text-transform: capitalize; }
+.weather-rain { min-height: 1em; font-size: 11px; color: var(--ink-2); }
+.weather-days .weather-value { text-align: right; }
+.weather-skeleton { height: 14px; margin-bottom: 8px; border-radius: 7px; background: var(--weather-field); animation: weather-pulse 1.2s ease-in-out infinite alternate; }
+.weather-skeleton:first-child { height: 60px; border-radius: 14px; }
+@keyframes weather-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .weather-skeleton { animation: none; } }
+.weather-forecast.is-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--weather-field); font-size: 12px; }
+.weather-empty { display: grid; justify-items: center; gap: 4px; padding: 16px 8px 18px; text-align: center; font-size: 12px; color: var(--ink-2); }
+.weather-empty strong { color: var(--ink); font-size: 14px; }
+.weather-empty .weather-glyph { margin-bottom: 6px; color: var(--ink-2); }
+.weather-empty .weather-glyph svg { width: 36px; height: 36px; stroke-width: 1.25; }
+.weather-search { display: flex; align-items: center; gap: 6px; padding: 3px 3px 3px 10px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--weather-field); }
+.weather-search:focus-within { border-color: color-mix(in srgb, var(--ink) 55%, transparent); }
+.weather-search-icon { display: grid; color: var(--ink-2); }
+.weather-search-icon svg { width: 15px; height: 15px; }
+.productivity-panel .weather-search input { flex: 1; min-width: 0; padding: 7px 0; border: 0; border-radius: 0; background: transparent; font: inherit; font-size: 13px; outline: none; }
+.weather-search input::-webkit-search-cancel-button { display: none; }
+.weather-search-go { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: 9px; color: var(--ink); background: transparent; cursor: pointer; }
+.weather-search-go svg { width: 16px; height: 16px; }
+.weather-search-go:hover { background: var(--hover); }
+.weather-search-go:focus-visible, .weather-result:focus-visible, .weather-units button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.weather-results { margin-top: 6px; }
+.weather-results-note { padding: 8px 10px; font-size: 12px; color: var(--ink-2); }
+.weather-result { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; text-align: left; font: inherit; color: var(--ink); background: transparent; cursor: pointer; }
+.weather-result:hover { background: var(--hover); }
+.weather-result strong { font-size: 13px; font-weight: 600; }
+.weather-result > span:not(.weather-result-tick) { grid-column: 1; font-size: 11px; color: var(--ink-2); }
+.weather-result-tick { grid-column: 2; grid-row: 1 / span 2; align-self: center; display: grid; }
+.weather-result-tick svg { width: 16px; height: 16px; }
+.weather-footer { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.weather-units { display: inline-flex; flex: 0 0 auto; padding: 2px; border-radius: 10px; background: var(--weather-field); }
+.weather-units button { min-width: 38px; padding: 5px 8px; border: 0; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); background: transparent; cursor: pointer; }
+.weather-units button[aria-checked="true"] { color: var(--ink); background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.weather-privacy { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 11px; line-height: 1.35; color: var(--ink-2); }
+.weather-privacy svg { width: 13px; height: 13px; margin-top: 1px; }
 .productivity-section + .productivity-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--stroke); }
 .focus-finished .w-card { box-shadow: inset 0 0 0 2px var(--w-accent); }
 .reduce-transparency .dock, .reduce-transparency .w-card, .reduce-transparency .live-preview-bar { backdrop-filter: none !important; }
@@ -307,15 +356,69 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 
 /* Productivity and note panels opened from the dock. */
 .productivity-head { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--stroke); }
-.focus-countdown { letter-spacing: -1.8px; }
 .focus-task label { min-width: 0; }
 .focus-task .task-edit { overflow-wrap: anywhere; }
 .focus-actions { flex-wrap: wrap; }
 .note-editor.note-workspace { display: flex; flex-direction: column; gap: 10px; width: min(320px, calc(100vw - 16px)); height: auto; max-height: calc(100vh - 16px); overflow-y: auto; padding: 12px; border-color: var(--stroke); }
-.note-workspace .note-input { width: 100%; min-height: 130px; max-height: min(240px, 45vh); padding: 8px; resize: vertical; font: inherit; color: inherit; background: transparent; border: 1px solid var(--stroke); border-radius: 8px; }
+.note-workspace .note-input { width: 100%; min-height: 130px; max-height: min(240px, 45vh); padding: 10px 12px; resize: vertical; font: inherit; font-size: 13px; line-height: 1.5; color: inherit; background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--stroke); border-radius: 12px; }
+.note-workspace .note-input:focus-visible { outline: none; border-color: color-mix(in srgb, var(--ink) 55%, transparent); }
 .note-save-state { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--ink-2); }
 .note-save-state [hidden] { display: none; }
 .note-recovery { padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; background: var(--hover); }
 .note-recovery p { margin: 0 0 10px; font-size: 0.75rem; line-height: 1.5; }
 .note-recovery button { margin: 0 6px 6px 0; max-width: 100%; white-space: normal; }
 .note-recovery-preview { max-height: 80px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 10px; font-size: 0.75rem; color: var(--ink-2); }
+
+/* Focus timer: a ring that empties as the block runs, one primary action. */
+.productivity-panel .productivity-head strong { font-size: 14px; }
+.focus-dial { position: relative; display: grid; place-items: center; width: 168px; aspect-ratio: 1; margin: 2px auto 12px; }
+.focus-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.focus-dial circle { fill: none; stroke-width: 5; }
+.focus-dial-track { stroke: color-mix(in srgb, var(--ink) 10%, transparent); }
+.focus-dial-progress { stroke: color-mix(in srgb, var(--ink) 55%, transparent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.focus-dial.is-running .focus-dial-progress { stroke: var(--accent); }
+.focus-countdown { position: relative; font-size: 40px; font-weight: 600; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .focus-dial-progress { transition: none; } }
+.focus-timer-actions { justify-content: center; gap: 8px; }
+.focus-primary { display: inline-flex; align-items: center; gap: 8px; min-width: 128px; justify-content: center; padding: 9px 18px; border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: #161618; background: var(--accent); cursor: pointer; }
+.focus-primary svg { width: 15px; height: 15px; fill: currentColor; stroke: none; }
+.focus-primary:hover { filter: brightness(1.06); }
+.focus-icon-button { width: 36px; height: 36px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.focus-icon-button svg { width: 16px; height: 16px; }
+.focus-stepper { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 6px 6px 6px 12px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.focus-stepper-label { font-size: 12px; color: var(--ink-2); }
+.focus-stepper-controls { display: flex; align-items: center; gap: 2px; }
+.focus-stepper button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; color: var(--ink); background: transparent; cursor: pointer; }
+.focus-stepper button:hover:not(:disabled) { background: var(--hover); }
+.focus-stepper button:disabled { opacity: .35; cursor: default; }
+.focus-stepper button svg { width: 14px; height: 14px; }
+.productivity-panel .focus-stepper input[type="number"] { width: 44px; padding: 4px 0; border: 0; text-align: center; font: inherit; font-size: 13px; font-weight: 600; -moz-appearance: textfield; appearance: textfield; }
+.focus-stepper input::-webkit-inner-spin-button, .focus-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Tasks: a quiet list, the remove button appears on hover or focus. */
+.focus-tasks-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+.focus-tasks-head span { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.focus-task-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.focus-task { gap: 4px; padding: 2px 2px 2px 6px; border-radius: 10px; }
+.focus-task:hover, .focus-task:focus-within { background: var(--hover); }
+.productivity-panel .focus-task label { flex: 1; margin: 0; gap: 10px; min-width: 0; }
+.focus-task input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.focus-task .task-edit { flex: 1; min-width: 0; padding: 7px 0; border: 0; text-align: left; font: inherit; font-size: 13px; color: var(--ink); background: transparent; cursor: text; overflow-wrap: anywhere; }
+.focus-task label:has(input:checked) .task-edit { text-decoration: line-through; color: var(--ink-2); }
+.productivity-panel .focus-task .task-rename { flex: 1; padding: 6px 8px; font: inherit; font-size: 13px; }
+.focus-task-remove { opacity: 0; width: 28px; height: 28px; }
+.focus-task:hover .focus-task-remove, .focus-task-remove:focus-visible { opacity: 1; }
+@media (hover: none) { .focus-task-remove { opacity: 1; } }
+.focus-add-task { display: flex; align-items: center; gap: 6px; padding: 3px 3px 3px 10px; border: 1px solid var(--stroke); border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.focus-add-task:focus-within { border-color: color-mix(in srgb, var(--ink) 55%, transparent); }
+.productivity-panel .focus-add-task input { flex: 1; min-width: 0; padding: 7px 0; border: 0; border-radius: 0; background: transparent; font: inherit; font-size: 13px; outline: none; }
+
+/* Calendar: month and arrows on one line, round days, today in the accent. */
+.focus-month { display: flex; align-items: center; gap: 2px; margin-bottom: 8px; }
+.focus-month-title { flex: 1; font-size: 14px; text-transform: capitalize; }
+.focus-today { padding: 5px 10px; border: 0; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); cursor: pointer; }
+.focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
+.focus-calendar > * { display: grid; place-items: center; height: 32px; font-size: 12px; }
+.focus-calendar > strong { height: 24px; font-size: 11px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; }
+.focus-calendar .today { justify-self: center; width: 32px; border-radius: 999px; background: var(--accent); color: #161618; font-weight: 700; }
+.focus-month .stack-close:focus-visible, .focus-today:focus-visible, .focus-primary:focus-visible, .focus-stepper button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

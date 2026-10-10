@@ -126,10 +126,11 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
     <section className="card home-hero" aria-label={t("overhaul.preview")}>
       <DockPreview cfg={cfg} large stage onSelect={onSelect} />
       <div className="home-hero-bar">
+        {/* Label then count, so "1" never needs a plural in five languages. */}
         <div className="home-stats">
-          <span><strong>{counts.apps}</strong> {t("overhaul.apps")}</span>
-          <span><strong>{counts.widgets}</strong> {t("tab.widgets")}</span>
-          <span><strong>{counts.groups}</strong> {t("overhaul.groups")}</span>
+          <span>{t("overhaul.apps")} <strong>{counts.apps}</strong></span>
+          <span>{t("tab.widgets")} <strong>{counts.widgets}</strong></span>
+          <span>{t("overhaul.groups")} <strong>{counts.groups}</strong></span>
         </div>
         <div className="home-actions">
           <button type="button" className="button" onClick={() => navigate("widgets")}><Icon name="zap" />{t("overhaul.addWidget")}</button>
