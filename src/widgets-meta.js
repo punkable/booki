@@ -33,7 +33,7 @@ export const WIDGET_ICONS = {
 
 /** Line glyph (icons.js) drawn in the dock cell and the add panel. */
 export const WIDGET_GLYPHS = {
-  clock: "clock", calendar: "calendar", weather: "sparkles", system: "cpu",
+  clock: "clock", calendar: "calendar", weather: "cloud-sun", system: "cpu",
   battery: "battery", media: "music", volume: "volume", notes: "note",
   clipboard: "clipboard", focus: "timer",
   // Metric glyphs inside the system widget.

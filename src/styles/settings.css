@@ -375,7 +375,7 @@
 .home-usage-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: 13px; }
 .home-usage-figures strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) { .home-usage { flex-wrap: wrap; } .home-usage-icon { display: none; } }
-.home-stats strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.home-stats strong { color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-left: 2px; }
 .home-actions { display: flex; gap: 8px; }
 .home-subtitle { margin-top: 4px; }
 .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 28px; }

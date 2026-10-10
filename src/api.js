@@ -330,7 +330,7 @@ async function mockInvoke(cmd, args) {
     case "weather_search":
       return [{ name: "Santiago", admin1: "Región Metropolitana", country: "Chile", latitude: -33.45, longitude: -70.66 }];
     case "weather_current":
-      return { temperature_2m: 21.6, weather_code: 2 };
+      return { temperature_2m: 21.6, weather_code: 2, temperature_max: 24, temperature_min: 12 };
     case "weather_forecast":
       return {
         now: { temperature: 21.6, code: 2, isDay: 1 }, today: { max: 24, min: 12 },

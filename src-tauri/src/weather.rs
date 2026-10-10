@@ -49,17 +49,33 @@ fn check_coordinates(latitude: f64, longitude: f64) -> Result<(), String> {
 }
 pub fn current(latitude: f64, longitude: f64) -> Result<Value, String> {
     check_coordinates(latitude, longitude)?;
-    request(
+    let data = request(
         "https://api.open-meteo.com/v1/forecast",
         &[
             ("latitude", latitude.to_string()),
             ("longitude", longitude.to_string()),
             ("current", "temperature_2m,weather_code".into()),
+            ("daily", "temperature_2m_max,temperature_2m_min".into()),
+            ("timezone", "auto".into()),
+            ("forecast_days", "1".into()),
         ],
-    )?
-    .get("current")
-    .cloned()
-    .ok_or_else(|| "weather unavailable".into())
+    )?;
+    with_today_range(&data)
+}
+/// The current block, plus today's high and low for the dock tile.
+fn with_today_range(data: &Value) -> Result<Value, String> {
+    let mut current = data.get("current").cloned().ok_or("weather unavailable")?;
+    if let Some(fields) = current.as_object_mut() {
+        for (key, column_key) in [
+            ("temperature_max", "temperature_2m_max"),
+            ("temperature_min", "temperature_2m_min"),
+        ] {
+            if let Some(value) = column(data, "daily", column_key).first() {
+                fields.insert(key.into(), value.clone());
+            }
+        }
+    }
+    Ok(current)
 }
 /// Hours shown after the current one, and days shown after today.
 const FORECAST_HOURS: usize = 6;
@@ -177,6 +193,21 @@ mod tests {
         assert_eq!(days.len(), 2, "today is reported separately");
         assert_eq!(days[0]["date"], "2026-10-11");
         assert_eq!(days[0]["min"], 11.0);
+    }
+    #[test]
+    fn current_carries_todays_range() {
+        let data = serde_json::json!({
+            "current": { "temperature_2m": 21.4, "weather_code": 2 },
+            "daily": { "temperature_2m_max": [24.0], "temperature_2m_min": [12.0] }
+        });
+        let current = super::with_today_range(&data).unwrap();
+        assert_eq!(current["temperature_2m"], 21.4);
+        assert_eq!(current["temperature_max"], 24.0);
+        assert_eq!(current["temperature_min"], 12.0);
+        let bare =
+            super::with_today_range(&serde_json::json!({ "current": { "temperature_2m": 3.0 } }))
+                .unwrap();
+        assert!(bare.get("temperature_max").is_none());
     }
     #[test]
     fn missing_blocks_do_not_panic() {

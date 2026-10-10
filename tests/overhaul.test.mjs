@@ -71,7 +71,7 @@ test("weather stays offline until a city is chosen and requests are cached", asy
     const old = window.__TAURI__.core.invoke; window.__weatherRequests = 0;
     window.__TAURI__.core.invoke = (cmd, args) => {
       if (cmd === "weather_search") return Promise.resolve([{ name: "Santiago", country: "Chile", latitude: -33.45, longitude: -70.66 }]);
-      if (cmd === "weather_current") { window.__weatherRequests++; return Promise.resolve({ temperature_2m: 22 }); }
+      if (cmd === "weather_current") { window.__weatherRequests++; return Promise.resolve({ temperature_2m: 22, temperature_max: 24, temperature_min: 12 }); }
       if (cmd === "weather_forecast") {
         window.__forecastRequests = (window.__forecastRequests || 0) + 1;
         return Promise.resolve({
@@ -92,6 +92,7 @@ test("weather stays offline until a city is chosen and requests are cached", asy
   await page.waitForTimeout(1800);
   assert.equal(await page.evaluate(() => window.__weatherRequests), 1);
   assert.match(await page.locator('#dock > [data-widget="weather"]').innerText(), /22°/);
+  assert.match(await page.locator('#dock > [data-widget="weather"]').innerText(), /Santiago · 24°\/12°/);
   const forecast = page.locator(".weather-forecast");
   assert.match(await forecast.locator(".weather-now").innerText(), /22°[\s\S]*Santiago[\s\S]*Partly cloudy[\s\S]*High 24° · Low 12°/);
   assert.equal(await forecast.locator(".weather-hours li").count(), 4);
