@@ -298,10 +298,10 @@ pub struct Config {
     /// Modifier for the position hotkeys ("Alt" | "Ctrl+Alt" | "Alt+Shift").
     #[serde(default = "default_hotkey_modifier")]
     pub hotkey_modifier: String,
-    /// When on, clicking a pin whose app already has a window focuses that
-    /// window instead of launching a new instance. Off by default (each click
-    /// launches; single-instance apps still focus themselves).
-    #[serde(default)]
+    /// When on (the default), clicking a pin whose app already has a window
+    /// focuses that window instead of launching a new instance; with several
+    /// windows the dock lists them.
+    #[serde(default = "default_true")]
     pub focus_if_running: bool,
     /// Store clipboard history on disk between app restarts. Off by default for
     /// privacy; the in-session clipboard history still works either way.
@@ -401,7 +401,7 @@ impl Default for Config {
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
-            focus_if_running: false,
+            focus_if_running: true,
             clipboard_persist: false,
             clipboard_retention_days: default_clipboard_retention_days(),
             clipboard_history_limit: default_clipboard_history_limit(),
@@ -547,7 +547,7 @@ fn load_from_disk() -> Config {
 }
 
 /// Latest config schema revision written by this build.
-pub const SETTINGS_REV: u32 = 9;
+pub const SETTINGS_REV: u32 = 10;
 
 /// Bring a config from any older build up to `SETTINGS_REV`. Pure, so the
 /// same steps run on load and on restored profiles and backups. Returns
@@ -588,6 +588,11 @@ pub fn migrate(cfg: &mut Config) -> bool {
         if !matches!(cfg.notch_mode.as_str(), "floating" | "smart") {
             cfg.notch_mode = "attached".into();
         }
+    }
+    // rev 10: clicking an open app goes to its window. The old default was
+    // off, so nobody chose "off"; existing setups get the new behaviour too.
+    if cfg.settings_rev < 10 {
+        cfg.focus_if_running = true;
     }
     cfg.legacy = Legacy::default();
     cfg.settings_rev = SETTINGS_REV;
@@ -939,6 +944,20 @@ mod migration_tests {
             assert_eq!(cfg.settings_rev, SETTINGS_REV);
             assert!(!migrate(&mut cfg));
         }
+    }
+
+    #[test]
+    fn clicking_an_open_app_focuses_it_after_rev_10() {
+        let mut cfg = Config {
+            settings_rev: 9,
+            focus_if_running: false,
+            ..Config::default()
+        };
+        assert!(migrate(&mut cfg));
+        assert!(cfg.focus_if_running);
+        cfg.focus_if_running = false;
+        assert!(!migrate(&mut cfg), "a later choice of off is kept");
+        assert!(!cfg.focus_if_running);
     }
 
     #[test]

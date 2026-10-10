@@ -1,7 +1,9 @@
 /* Home: your dock on a little desktop, what it is set to at a glance, and
    what changed in this version. Every tile leads to where it is changed. */
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { dock as dockApi } from "../../api.js";
 import { t } from "../../i18n.js";
+import { pinnedKeys, pathKey } from "../../dock/app-candidates.js";
 import { countContent, LAYOUT_SCENARIOS } from "../../dock/layout-model.js";
 import { activeFinish } from "../../surface.js";
 import { resolveNotchMode } from "../../notch-mode.js";
@@ -19,13 +21,70 @@ function QuickTile({ glyph, hue, label, value, onClick }) {
   </button>;
 }
 
-export function HomePage({ cfg, navigate, onSelect, onWhatsNew }) {
+const SETUP_DISMISSED = "booki.homeSetupDismissed";
+const readDismissed = () => { try { return localStorage.getItem(SETUP_DISMISSED) === "1"; } catch (_) { return false; } };
+
+/* First steps for a new dock: bring in the apps you already use and start
+   with Windows. It disappears once both are done, or when dismissed. */
+function SetupCard({ cfg, set, apps, navigate }) {
+  const [autostart, setAutostart] = useState(null);
+  const [frequent, setFrequent] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [dismissed, setDismissed] = useState(readDismissed);
+  useEffect(() => { dockApi.getAutostart().then((v) => setAutostart(!!v)).catch(() => setAutostart(false)); }, []);
+  useEffect(() => {
+    if (cfg.usageRecommendationsEnabled === false) { setFrequent([]); return; }
+    let alive = true;
+    dockApi.frequentApps(12).then((rows) => { if (alive) setFrequent(Array.isArray(rows) ? rows : []); }).catch(() => {});
+    return () => { alive = false; };
+  }, [cfg.usageRecommendationsEnabled]);
+  const keys = pinnedKeys(cfg.pinned);
+  const fresh = frequent.filter((app) => app.path && !keys.has(pathKey(app.path))).slice(0, 6);
+  const appsDone = apps >= 3;
+  if (dismissed || autostart === null || (appsDone && autostart)) return null;
+  const addFrequent = () => {
+    set({ pinned: [...cfg.pinned, ...fresh.map((app) => ({ id: crypto.randomUUID(), kind: "app", name: app.name, path: app.path, args: [] }))] });
+  };
+  const toggleStart = async () => {
+    setBusy(true);
+    await dockApi.setAutostart(true).catch(() => {});
+    const real = !!(await dockApi.getAutostart().catch(() => false));
+    setAutostart(real); set({ autostart: real }); setBusy(false);
+  };
+  const dismiss = () => { setDismissed(true); try { localStorage.setItem(SETUP_DISMISSED, "1"); } catch (_) {} };
+  return <section className="card setup-card" aria-labelledby="setup-title">
+    <header className="setup-head">
+      <h2 id="setup-title">{t("setup.title")}</h2>
+      <button type="button" className="button setup-dismiss" aria-label={t("setup.dismiss")} title={t("setup.dismiss")} onClick={dismiss}><Icon name="x" /></button>
+    </header>
+    <ol className="setup-steps">
+      <li data-done={appsDone}>
+        <Icon name={appsDone ? "check" : "app"} className="setup-icon" />
+        <span className="setup-text"><strong>{t("setup.appsTitle")}</strong><span>{appsDone ? t("setup.appsDone") : fresh.length ? t("setup.appsFrequent").replace("{n}", String(fresh.length)) : t("setup.appsHint")}</span></span>
+        {!appsDone && <span className="setup-actions">
+          {fresh.length > 0 && <button type="button" className="button button-accent" onClick={addFrequent}><Icon name="plus" />{t("setup.addFrequent")}</button>}
+          <button type="button" className="button" onClick={() => navigate("apps")}>{t("setup.pickApps")}</button>
+        </span>}
+      </li>
+      <li data-done={!!autostart}>
+        <Icon name={autostart ? "check" : "power"} className="setup-icon" />
+        <span className="setup-text"><strong>{t("be.autostart")}</strong><span>{autostart ? t("setup.startDone") : t("setup.startHint")}</span></span>
+        {!autostart && <span className="setup-actions"><button type="button" className="button" disabled={busy} onClick={toggleStart}>{t("setup.startOn")}</button></span>}
+      </li>
+    </ol>
+  </section>;
+}
+
+export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
   const counts = countContent(cfg.pinned);
   const scenario = LAYOUT_SCENARIOS.find((s) => s.id === (cfg.autoHideMode || "smart"));
   const release = currentRelease();
-  const toDock = () => navigate("dock");
+  // Each tile opens the Dock page at the control it summarises.
+  const toDock = (key) => () => (reveal ? reveal("dock", key) : navigate("dock"));
   return <>
     <PageHeader title={t("overhaul.home")}>{t("overhaul.welcome")}</PageHeader>
+
+    <SetupCard cfg={cfg} set={set} apps={counts.apps} navigate={navigate} />
 
     <section className="card home-hero" aria-label={t("overhaul.preview")}>
       <DockPreview cfg={cfg} large stage onSelect={onSelect} />
@@ -44,12 +103,12 @@ export function HomePage({ cfg, navigate, onSelect, onWhatsNew }) {
 
     <h2 className="ui-group-title home-subtitle">{t("home.atGlance")}</h2>
     <div className="quick-grid">
-      <QuickTile glyph="eye" hue="#5e7bff" label={t("dock.behavior")} value={t(scenario?.title || "overhaul.smart")} onClick={toDock} />
-      <QuickTile glyph="palette" hue="#ff4f7b" label={t("finish.title")} value={t(`finish.${activeFinish(cfg)}`)} onClick={toDock} />
-      <QuickTile glyph="sun" hue="#ff9a2e" label={t("ap.theme")} value={t(`theme.${cfg.theme || "system"}`)} onClick={toDock} />
-      <QuickTile glyph="app" hue="#30b0c7" label={t("be.position")} value={t(`edge.${cfg.edge || "bottom"}`)} onClick={toDock} />
-      <QuickTile glyph="sparkles" hue="#a35bff" label={t("be.notchMode")} value={t(NOTCH_LABELS[resolveNotchMode(cfg)])} onClick={toDock} />
-      <QuickTile glyph="grid" hue="#34c759" label={t("ap.iconSize")} value={`${cfg.iconSize ?? 48} px`} onClick={toDock} />
+      <QuickTile glyph="eye" hue="#5e7bff" label={t("dock.behavior")} value={t(scenario?.title || "overhaul.smart")} onClick={toDock("dock.behavior")} />
+      <QuickTile glyph="palette" hue="#ff4f7b" label={t("finish.title")} value={t(`finish.${activeFinish(cfg)}`)} onClick={toDock("tab.appearance")} />
+      <QuickTile glyph="sun" hue="#ff9a2e" label={t("ap.theme")} value={t(`theme.${cfg.theme || "system"}`)} onClick={toDock("ap.theme")} />
+      <QuickTile glyph="app" hue="#30b0c7" label={t("be.position")} value={t(`edge.${cfg.edge || "bottom"}`)} onClick={toDock("be.position")} />
+      <QuickTile glyph="sparkles" hue="#a35bff" label={t("be.notchMode")} value={t(NOTCH_LABELS[resolveNotchMode(cfg)])} onClick={toDock("be.notchMode")} />
+      <QuickTile glyph="grid" hue="#34c759" label={t("ap.iconSize")} value={`${cfg.iconSize ?? 48} px`} onClick={toDock("ap.iconSize")} />
     </div>
 
     <section className="card whats-new">

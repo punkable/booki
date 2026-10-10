@@ -65,7 +65,7 @@ const DEMO_CONFIG = {
   taskbarFollow: true,
   taskbarSettleMs: 1000,
   taskbarHoldWhileHover: true,
-  focusIfRunning: false,
+  focusIfRunning: true,
   notchMode: "attached",
   clipboardPersist: false,
   clipboardRetentionDays: 7,

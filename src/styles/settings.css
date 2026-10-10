@@ -330,6 +330,8 @@
 .live-preview-app { display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, var(--control)); border-radius: 24%; }
 .live-preview-app svg { width: 55%; height: 55%; }
 .live-preview-app img { width: 100%; height: 100%; object-fit: contain; }
+.live-preview-app .preview-fallback { width: 100%; height: 100%; display: grid; place-items: center; border-radius: inherit; background: linear-gradient(180deg, var(--fb-color), var(--fb-deep)); color: var(--fb-ink); font-weight: 650; line-height: 1; }
+.live-preview-app .preview-fallback svg { width: 55%; height: 55%; }
 .live-preview-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; padding: 3px; }
 .live-preview-group .live-preview-app { background: transparent; }
 .live-preview-mini-widget svg { width: 10px; height: 10px; }
@@ -380,6 +382,31 @@
 .whats-new-badge { padding: 4px 10px; color: var(--accent-contrast); font-weight: 700; font-size: 12px; background: var(--accent); border-radius: 999px; }
 .whats-new-text { flex: 1 1 260px; display: flex; flex-direction: column; gap: 2px; }
 .whats-new-text span { color: var(--ink-2); font-size: 13px; }
+
+/* Widgets inspector with nothing selected: the widgets already on the dock. */
+.widgets-in-dock { padding: 14px 8px 0; }
+.widgets-in-dock h2 { margin: 0 0 8px; padding: 0 8px; font-size: 14px; font-weight: 650; }
+.widgets-in-dock ul { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.widgets-in-dock-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; color: var(--ink); font: inherit; text-align: left; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
+.widgets-in-dock-item:hover { background: var(--card-hover); }
+.widgets-in-dock-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.widgets-in-dock-item > span:nth-child(2) { flex: 1; font-weight: 600; }
+.widgets-in-dock-item .catalog-icon { width: 28px; height: 28px; }
+
+/* First steps on a fresh dock (home.jsx SetupCard). */
+.setup-card { margin-bottom: 28px; padding: 16px 18px; }
+.setup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.setup-head h2 { margin: 0; font-size: 15px; font-weight: 650; }
+.setup-dismiss { min-width: 32px; padding: 0 8px; }
+.setup-steps { margin: 0; padding: 0; list-style: none; }
+.setup-steps li { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; padding: 12px 0; }
+.setup-steps li + li { border-top: 1px solid var(--divider); }
+.setup-icon { flex: none; width: 32px; height: 32px; color: var(--accent-contrast); background: var(--accent); border-radius: 9px; }
+.setup-icon svg { width: 17px; height: 17px; }
+.setup-steps li[data-done="true"] .setup-icon { color: #fff; background: #248a3d; }
+.setup-text { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.setup-text span { color: var(--ink-2); font-size: 13px; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ── Widgets ────────────────────────────────────────────────────────────── */
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }

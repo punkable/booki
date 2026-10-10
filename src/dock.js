@@ -67,6 +67,7 @@ import {
 } from "./dock/widget-view.js";
 import { dockRadius } from "./surface.js";
 import { groupAppearance } from "./group-style.js";
+import { pinFallback } from "./pin-fallback.js";
 import { canMergeKind, kindForPath, mergePins, normalizeGroups, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
@@ -573,9 +574,14 @@ function appTile(item) {
 
   const addGlyph = () => {
     if (el.querySelector(".glyph, img")) return;
+    const look = pinFallback(item);
     const glyph = document.createElement("span");
-    glyph.className = "glyph";
-    glyph.textContent = (item.name || "?").trim().charAt(0).toUpperCase();
+    glyph.className = "glyph fallback";
+    glyph.style.setProperty("--fb-color", look.color);
+    glyph.style.setProperty("--fb-deep", look.deep);
+    glyph.style.setProperty("--fb-ink", look.ink);
+    if (look.glyph) glyph.innerHTML = icon(look.glyph);
+    else glyph.textContent = look.letter;
     el.appendChild(glyph);
   };
   const addImg = (src) => {
@@ -642,7 +648,13 @@ function groupTile(item) {
     mini.appendChild(img);
   };
   const setMiniLetter = (mini, child) => {
-    mini.textContent = (child.name || "?").trim().charAt(0).toUpperCase();
+    const look = pinFallback(child);
+    mini.classList.add("fallback");
+    mini.style.setProperty("--fb-color", look.color);
+    mini.style.setProperty("--fb-deep", look.deep);
+    mini.style.setProperty("--fb-ink", look.ink);
+    if (look.glyph) mini.innerHTML = icon(look.glyph);
+    else mini.textContent = look.letter;
   };
   const kids = (item.children || []).slice(0, 4);
   for (const child of kids) {
@@ -980,7 +992,7 @@ const pollMedia = singleFlight(async () => {
     const toggle = el.querySelector(".w-ctl-toggle");
     setWidgetAvailable(el, !!m);
     if (!m) {
-      setText(el, t("w.media"), "—", t("w.media"));
+      setText(el, t("w.media"), t("w.mediaIdle"), t("w.media"));
       delete el.dataset.mqTitle;
       el.classList.remove("playing");
       if (art) { art.style.display = "none"; art.removeAttribute("data-src"); }
@@ -1313,19 +1325,55 @@ function launch(el, item) {
     toggleStack(el, item);
     return;
   }
+  // Launcher + switcher: when "focus if running" is on (the default)
+  // and the app already has a window, bring it to the front instead of
+  // launching a new instance. With several windows, let the user pick one.
+  const hwnd = el.dataset.hwnd;
+  const switching = cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
+  const wins = switching ? windowsFor(item) : [];
+  // A tucked-away dock (Alt+N while hidden) can't show a picker: go to the first.
+  if (wins.length > 1 && !hiddenState) { openWindowPicker(el, item, wins); return; }
   // Launching/switching means the user is done with the dock for now — release
   // any pinned reveal so smart-hide can tuck it back into the notch.
   pinnedReveal = false;
   scheduleHide();
-  // Launcher + switcher: when "focus if running" is enabled and the app already
-  // has a window, bring it to the front instead of launching a new instance.
-  // Off by default — each click launches (single-instance apps focus themselves).
-  const hwnd = el.dataset.hwnd;
-  if (cfg.focusIfRunning && el.dataset.running === "true" && hwnd) {
+  if (switching) {
     dockApi.focusWindow(Number(hwnd));
     return;
   }
+  markLaunching(el);
   dockApi.launch(item.path, item.args || []);
+}
+
+/** Brief launch feedback: the icon pops and the indicator pulses until the
+   app shows a window (or a few seconds pass), so a slow cold start never
+   looks like a missed click. */
+function markLaunching(el) {
+  el.classList.remove("launching");
+  void el.offsetWidth; // restart the animation on a repeated click
+  el.classList.add("launching");
+  clearTimeout(el._launchTimer);
+  el._launchTimer = setTimeout(() => el.classList.remove("launching"), 4000);
+}
+
+/** Several windows of one app: list them beside the tile, in the order
+   Windows reports them, with a way to open another one. */
+function openWindowPicker(el, item, wins) {
+  hideTip();
+  ctxMenu.innerHTML = "";
+  ++menuGeneration;
+  const { add, sep } = menuActions(ctxMenu, closeMenu);
+  addMenuHead(menuPinTitle(item), t("m.windows").replace("{n}", String(wins.length)));
+  sep();
+  for (const w of wins.slice(0, 10)) {
+    add("app", w.title || menuPinTitle(item), () => dockApi.focusWindow(Number(w.hwnd)));
+  }
+  sep();
+  add("plus", t("m.newWindow"), () => { markLaunching(el); dockApi.launch(item.path, item.args || []); });
+  const r = el.getBoundingClientRect();
+  // After the click that opened it has finished bubbling: a window click
+  // closes any open menu.
+  setTimeout(() => placeMenu({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }), 0);
 }
 
 async function onAddApp() {
@@ -3682,7 +3730,10 @@ const dockTooltip = createDockTooltip(dockEl, {
     else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = t("hint.widget"); }
     else if (pin.kind === "action") { name = el.getAttribute("aria-label"); detail = t("hint.settings"); }
     else if (pin.kind === "trash") detail = t("hint.trash");
-    else if (el.dataset.running === "true") detail = t(cfg.focusIfRunning ? "hint.switch" : "hint.running");
+    else if (el.dataset.running === "true") {
+      const count = windowsFor(pin).length;
+      detail = cfg.focusIfRunning === false ? t("hint.running") : count > 1 ? t("hint.pickWindow").replace("{n}", String(count)) : t("hint.switch");
+    }
     return { name, detail };
   },
 });
@@ -4028,6 +4079,7 @@ function startRunningPoll() {
         if (matches.length) {
           t.dataset.running = "true";
           t.dataset.hwnd = String(matches[0].hwnd);
+          t.classList.remove("launching");
           if (badge) badge.textContent = matches.length > 1 ? String(matches.length) : "";
         } else {
           t.dataset.running = "false";
