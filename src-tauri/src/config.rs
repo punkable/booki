@@ -142,12 +142,34 @@ fn default_clipboard_sensitive_guard() -> bool {
     true
 }
 
+fn default_launcher_hotkey() -> String {
+    "Ctrl+Alt+Space".into()
+}
 fn default_true() -> bool {
     true
 }
 
 fn default_hide_in_fullscreen() -> bool {
     true
+}
+
+/// Automatic profile switching. The dock evaluates these (it already knows
+/// the clock and the monitors); an empty profile name means "no rule".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ProfileRules {
+    pub enabled: bool,
+    /// Profile while an external monitor is connected (2+ displays).
+    pub monitor_profile: String,
+    /// Profile during the schedule below.
+    pub schedule_profile: String,
+    /// "HH:MM" local time.
+    pub schedule_from: String,
+    pub schedule_to: String,
+    /// Days the schedule applies, 0 = Sunday … 6 = Saturday.
+    pub schedule_days: Vec<u8>,
+    /// Profile when no rule above matches.
+    pub other_profile: String,
 }
 
 /// Full dock configuration.
@@ -226,6 +248,9 @@ pub struct Config {
     /// Global hotkey accelerator to toggle the dock (e.g. "Alt+Space"); empty = none.
     #[serde(default)]
     pub hotkey: String,
+    /// Global shortcut that opens the quick app launcher; empty = none.
+    #[serde(default = "default_launcher_hotkey")]
+    pub launcher_hotkey: String,
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
@@ -284,6 +309,10 @@ pub struct Config {
     /// Name of the last dock profile applied/saved (shown with a check mark).
     #[serde(default)]
     pub last_profile: String,
+    /// Switch profiles on their own: by schedule or when an external monitor
+    /// is connected. Global, so applying a profile never changes them.
+    #[serde(default)]
+    pub profile_rules: ProfileRules,
     /// How the tucked-away dock comes back: "click" (only clicking the notch —
     /// nothing auto-reveals) or "hover" (hovering the notch, or pushing the
     /// cursor against its screen edge, brings it out).
@@ -304,10 +333,10 @@ pub struct Config {
     /// Modifier for the position hotkeys ("Alt" | "Ctrl+Alt" | "Alt+Shift").
     #[serde(default = "default_hotkey_modifier")]
     pub hotkey_modifier: String,
-    /// When on, clicking a pin whose app already has a window focuses that
-    /// window instead of launching a new instance. Off by default (each click
-    /// launches; single-instance apps still focus themselves).
-    #[serde(default)]
+    /// When on (the default), clicking a pin whose app already has a window
+    /// focuses that window instead of launching a new instance; with several
+    /// windows the dock lists them.
+    #[serde(default = "default_true")]
     pub focus_if_running: bool,
     /// Store clipboard history on disk between app restarts. Off by default for
     /// privacy; the in-session clipboard history still works either way.
@@ -388,6 +417,7 @@ impl Default for Config {
             always_on_top: true,
             magnify_style: default_anim(),
             hotkey: String::new(),
+            launcher_hotkey: default_launcher_hotkey(),
             monitor: default_monitor(),
             monitor_name: String::new(),
             overflow_mode: default_overflow(),
@@ -407,12 +437,13 @@ impl Default for Config {
             onboarded: false,
             settings_intro_seen: false,
             last_profile: String::new(),
+            profile_rules: ProfileRules::default(),
             notch_trigger: default_notch_trigger(),
             notch_visibility: default_notch_visibility(),
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
-            focus_if_running: false,
+            focus_if_running: true,
             clipboard_persist: false,
             clipboard_retention_days: default_clipboard_retention_days(),
             clipboard_history_limit: default_clipboard_history_limit(),
@@ -558,7 +589,7 @@ fn load_from_disk() -> Config {
 }
 
 /// Latest config schema revision written by this build.
-pub const SETTINGS_REV: u32 = 9;
+pub const SETTINGS_REV: u32 = 10;
 
 /// Bring a config from any older build up to `SETTINGS_REV`. Pure, so the
 /// same steps run on load and on restored profiles and backups. Returns
@@ -599,6 +630,11 @@ pub fn migrate(cfg: &mut Config) -> bool {
         if !matches!(cfg.notch_mode.as_str(), "floating" | "smart") {
             cfg.notch_mode = "attached".into();
         }
+    }
+    // rev 10: clicking an open app goes to its window. The old default was
+    // off, so nobody chose "off"; existing setups get the new behaviour too.
+    if cfg.settings_rev < 10 {
+        cfg.focus_if_running = true;
     }
     cfg.legacy = Legacy::default();
     cfg.settings_rev = SETTINGS_REV;
@@ -950,6 +986,20 @@ mod migration_tests {
             assert_eq!(cfg.settings_rev, SETTINGS_REV);
             assert!(!migrate(&mut cfg));
         }
+    }
+
+    #[test]
+    fn clicking_an_open_app_focuses_it_after_rev_10() {
+        let mut cfg = Config {
+            settings_rev: 9,
+            focus_if_running: false,
+            ..Config::default()
+        };
+        assert!(migrate(&mut cfg));
+        assert!(cfg.focus_if_running);
+        cfg.focus_if_running = false;
+        assert!(!migrate(&mut cfg), "a later choice of off is kept");
+        assert!(!cfg.focus_if_running);
     }
 
     #[test]

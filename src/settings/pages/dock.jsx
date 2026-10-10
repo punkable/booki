@@ -92,7 +92,7 @@ export function DockPage({ cfg, set }) {
       </Row>
       <Toggle label={t("be.showLabels")} checked={cfg.showLabels !== false} onChange={(v) => set({ showLabels: v })} />
       <Toggle label={t("be.showIndicators")} checked={cfg.showIndicators !== false} onChange={(v) => set({ showIndicators: v })} />
-      <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")} checked={!!cfg.focusIfRunning} onChange={(v) => set({ focusIfRunning: v })} />
+      <Toggle label={t("be.focusRunning")} hint={t("be.focusRunningHint")} checked={cfg.focusIfRunning !== false} onChange={(v) => set({ focusIfRunning: v })} />
       <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")} checked={cfg.alwaysOnTop !== false}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <Toggle label={t("be.taskbarFollow")} hint={t("be.taskbarFollowHint")} checked={cfg.taskbarFollow !== false} onChange={(v) => set({ taskbarFollow: v })} />

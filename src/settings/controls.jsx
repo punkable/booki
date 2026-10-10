@@ -110,7 +110,7 @@ export function MonitorPicker({ value, monitors, onChange }) {
 }
 
 /** Records a shortcut with at least one modifier. */
-export function HotkeyInput({ value, onChange }) {
+export function HotkeyInput({ value, onChange, label }) {
   const capture = (e) => {
     if (e.key === "Tab") return;
     e.preventDefault();
@@ -120,7 +120,7 @@ export function HotkeyInput({ value, onChange }) {
     onChange([...mods, key].join("+"));
   };
   return <div className="hotkey">
-    <input readOnly aria-label={t("sc.toggle")} value={value || ""} placeholder={t("sc.press")} onKeyDown={capture} />
+    <input readOnly aria-label={label || t("sc.toggle")} value={value || ""} placeholder={t("sc.press")} onKeyDown={capture} />
     {value && <button type="button" className="button" onClick={() => onChange("")}>{t("sc.clear")}</button>}
   </div>;
 }

@@ -109,7 +109,7 @@ test('a startup save error offers retry beside the dock without covering its but
 
 test('hiding running indicators retains cached hints and switches to the existing app window', async () => {
   const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[app],showIndicators:false,focusIfRunning:true}),initScript:`const old=window.__TAURI__.core.invoke;window.activations=[];
-    window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='list_windows')return Promise.resolve([{hwnd:42,exe:'C:/editor.exe',title:'Editor'}]);if(cmd==='focus_window'||cmd==='launch_app')window.activations.push({cmd,args});return old(cmd,args);};`});
+    window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='list_windows')return Promise.resolve([{hwnd:42,exe:'C:/editor.exe',title:'Editor'}]);if(cmd==='toggle_window'||cmd==='launch_app')window.activations.push({cmd,args});return old(cmd,args);};`});
   const tile=page.locator('.tile[data-id="editor"]');
   await page.waitForFunction(()=>document.querySelector('.tile[data-id="editor"]').dataset.running==='true');
   assert.equal(await tile.evaluate(el=>getComputedStyle(el,'::after').display),'none');
@@ -117,6 +117,6 @@ test('hiding running indicators retains cached hints and switches to the existin
   assert.equal(await page.locator('.dock-tip-detail').textContent(),'Running · switch to window');
   await tile.click();
   await page.waitForFunction(()=>window.activations.length>0);
-  assert.deepEqual(await page.evaluate(()=>window.activations),[{cmd:'focus_window',args:{hwnd:42}}]);
+  assert.deepEqual(await page.evaluate(()=>window.activations),[{cmd:'toggle_window',args:{hwnd:42}}]);
   assert.deepEqual(errors,[]);await page.close();
 });

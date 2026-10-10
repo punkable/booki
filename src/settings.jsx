@@ -176,7 +176,7 @@ function App() {
         <NativeBackdrop cfg={cfg} />
         <RecoveryNotice revision={cfg.revision} onProfiles={() => navigate("system")} onStartFresh={store.startFresh} />
         <SettingsBoundary key={page} onHome={() => navigate("home")}>
-          {page === "home" && <HomePage cfg={cfg} navigate={navigate} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
+          {page === "home" && <HomePage cfg={cfg} set={set} navigate={navigate} reveal={(tab, key) => { navigate(tab); setSearchTarget({ key, tab, label: t(key) }); }} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
           {page === "dock" && <DockPage {...pageProps} />}
           {page === "widgets" && <WidgetsPage {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}

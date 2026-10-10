@@ -1,6 +1,6 @@
 //! Native change notifications. Callbacks only enqueue; queries run elsewhere.
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicIsize, Ordering},
     mpsc::{sync_channel, SyncSender},
     Arc, OnceLock,
 };
@@ -31,6 +31,9 @@ pub static VOLUME: AtomicBool = AtomicBool::new(false);
 pub static WINDOWS: AtomicBool = AtomicBool::new(false);
 pub static CLIPBOARD: AtomicBool = AtomicBool::new(false);
 pub static CATALOG: AtomicBool = AtomicBool::new(false);
+/// The last window outside Booki that came to the foreground (the hook skips
+/// our own process), so a dock click can tell which app was in front.
+pub static LAST_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
 fn signal(kind: &'static str) {
     if let Some(queue) = QUEUE.get() {
         let _ = queue.try_send(kind);
@@ -136,12 +139,15 @@ fn media_lease(manager: &Sessions) -> Option<MediaLease> {
 unsafe extern "system" fn window_event(
     _: HWINEVENTHOOK,
     event: u32,
-    _: HWND,
+    hwnd: HWND,
     object: i32,
     child: i32,
     _: u32,
     _: u32,
 ) {
+    if event == EVENT_SYSTEM_FOREGROUND {
+        LAST_FOREGROUND.store(hwnd.0 as isize, Ordering::Relaxed);
+    }
     if event == EVENT_SYSTEM_FOREGROUND
         || (object == 0
             && child == 0

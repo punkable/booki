@@ -979,6 +979,13 @@ body.notch-body.act-timer .nl-art, body.notch-body.act-timer .nl-eq,
 body.notch-body.act-battery .nl-art, body.notch-body.act-battery .nl-eq { display: none; }
 body.notch-body.act-timer .nl-ring, body.notch-body.act-timer .nl-text,
 body.notch-body.act-battery .nl-text { display: block; }
+body.notch-body.act-volume .nl-art, body.notch-body.act-volume .nl-eq,
+body.notch-body.act-done .nl-art, body.notch-body.act-done .nl-eq { display: none; }
+body.notch-body.act-volume .nl-ring, body.notch-body.act-volume .nl-text,
+body.notch-body.act-done .nl-text { display: block; }
+body.notch-body.act-volume .nl-ring-fill { transition: stroke-dashoffset var(--dur-2) var(--ease); }
+body.notch-body.act-done .nl { justify-content: center; gap: 6px; }
+body.notch-body.act-done .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 body.notch-body.act-battery .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-battery .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
 body.notch-body.act-battery .nl-text { color: var(--danger); }
@@ -1206,6 +1213,40 @@ body.edit .dock { cursor: grab; }
   filter: none;
   transition: border-radius var(--dur-3) var(--ease);
 }
+/* Fallback for a pin with no icon: its own palette colour (pin-fallback.js),
+   lit from the top like the app icons around it. */
+.tile .glyph.fallback {
+  background: linear-gradient(180deg, var(--fb-color), var(--fb-deep));
+  color: var(--fb-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.tile .glyph svg { width: 52%; height: 52%; stroke-width: 1.8; }
+
+/* Launch feedback: the icon pops once and the indicator pulses until the
+   app's window shows up (dock.js markLaunching). */
+.tile.launching img,
+.tile.launching .glyph { animation: launch-pop 0.42s var(--ease-bounce); }
+.tile.launching::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 6px;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transform: translateX(-50%);
+  animation: launch-pulse 0.9s ease-in-out infinite;
+}
+body.edge-top .tile.launching::after { bottom: auto; top: -5px; }
+body.edge-left .tile.launching::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
+body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
+@keyframes launch-pop { 0%, 100% { transform: scale(1); } 45% { transform: scale(0.88); } 75% { transform: scale(1.05); } }
+@keyframes launch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.launching img, .tile.launching .glyph { animation: none; }
+  .tile.launching::after { animation: none; opacity: 0.6; }
+}
 
 /* Folder / group tile — mini grid tracks the dock's cornerRadius (--tile-r). */
 .tile.group .group-grid {
@@ -1232,6 +1273,12 @@ body.edit .dock { cursor: grab; }
   transition: border-radius var(--dur-3) var(--ease);
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
+.tile.group .group-mini.fallback {
+  background: linear-gradient(180deg, var(--fb-color), var(--fb-deep));
+  color: var(--fb-ink);
+  border-radius: max(2px, calc(var(--tile-r) * 0.35));
+}
+.tile.group .group-mini.fallback svg { width: 70%; height: 70%; }
 
 /* A coloured group tints its grid; a group with a glyph is a solid badge. */
 .tile.group.tinted .group-grid {
@@ -1734,6 +1781,26 @@ body.edge-right .stack.open { transform: none; }
 .add-row:not(.pinned) .add-state { opacity: .6; transition: opacity var(--dur-1) var(--ease); }
 .add-row:not(.pinned):hover .add-state, .add-row.active .add-state { opacity: 1; color: var(--ink); }
 .add-skel { pointer-events: none; opacity: 0.5; }
+/* Quick launcher: the add panel's look, sized to its results. */
+.stack.add-mode.launcher-mode { height: auto; max-height: min(420px, calc(100vh - 16px)); }
+.launcher-body { flex: 0 1 auto; }
+.launcher-fallback { background: var(--fb-deep); color: var(--fb-ink); }
+.launcher-fallback svg { width: 16px; height: 16px; }
+.launcher-kind {
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.launcher-row.active .launcher-kind { opacity: 1; }
+.launcher-hint {
+  padding: 8px 6px 0;
+  margin-top: 6px;
+  border-top: 1px solid var(--stroke);
+  font-size: 0.6875rem;
+  color: var(--ink-2);
+}
 .add-skel::before {
   content: "";
   width: 28px;
@@ -2015,6 +2082,8 @@ body.edge-right .stack.open { transform: none; }
 .dock-tip-mark { flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
 .dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
 .dock-tip-mark svg { width: 22px; height: 22px; }
+.dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: linear-gradient(180deg, var(--fb-color), var(--fb-deep)); color: var(--fb-ink); font-size: 13px; font-weight: 650; }
+.dock-tip-mark .glyph.fallback svg { width: 16px; height: 16px; }
 .dock-tip.show { opacity: 1; }
 body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; }
 @media (prefers-reduced-motion: reduce) { .dock-tip { transition: none; } }
@@ -2643,7 +2712,8 @@ body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill { box-sh
 
 /* Hiding the dots never disables the launcher/switcher or cached app hints. */
 body.hide-running-indicators .tile[data-running="true"]::after,
-body.hide-running-indicators .stack-item[data-running="true"]::after { display: none; }
+body.hide-running-indicators .stack-item[data-running="true"]::after,
+body.hide-running-indicators .tile.launching::after { display: none; }
 
 .tile.group .group-grid > svg { width: 58%; height: 58%; color: var(--ink-2); }
 .tile.group .group-cover { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }

@@ -21,6 +21,10 @@ pub fn focus_window(_hwnd: isize) -> bool {
     false
 }
 
+pub fn toggle_window(_hwnd: isize) -> bool {
+    false
+}
+
 pub fn close_window(_hwnd: isize) -> bool {
     false
 }

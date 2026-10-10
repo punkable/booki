@@ -7,6 +7,7 @@ import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
 import { isLibIcon, libGlyphSVG, resolveLibIcon } from "../icon-library.js";
 import { icon } from "../icons.js";
+import { pinFallback } from "../pin-fallback.js";
 import { resolveSurfaceStyle, glassFillColor, surfaceAlpha, dockRadius, surfaceForeground, transparencyReduced } from "../surface.js";
 
 /* The real widget markup/styles, with safe example data. Private notes and
@@ -26,14 +27,14 @@ export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, g
       setSystem(el, SAMPLE_STATS, { cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net") });
     } else if (PREVIEW_WIDGETS.includes(widget)) {
       el.querySelector(".w-pv-title").textContent = widgetDisplayName(widget, t);
-      el.querySelector(".w-pv-sub").textContent = t("overhaul.sample");
+      el.querySelector(".w-pv-sub").textContent = t(widget === "notes" ? "w.notesEmpty" : "clip.empty");
     } else if (RING_WIDGETS.includes(widget)) {
       setMetric(el, widgetDisplayName(widget, t), { battery: 78, volume: 55 }[widget] || 0);
     } else if (widget === "clock") {
       const parts = clockParts(new Date(), curLang());
       setText(el, parts.date, parts.time);
     } else {
-      const examples = { media: [t("w.media"), t("overhaul.sample")], focus: [t("w.focus"), "25:00"], calendar: [new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())], weather: [t("w.weather"), "21°"] };
+      const examples = { media: [t("w.media"), t("w.mediaIdle")], focus: [t("w.focus"), "25:00"], calendar: [new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())], weather: [t("w.weather"), "21°"] };
       setText(el, ...(examples[widget] || [widgetDisplayName(widget, t), "—"]));
     }
   }, [widget, style, size]);
@@ -43,6 +44,14 @@ export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, g
     style={{ "--size": `${size}px`, "--gap": `${gap}px`, "--w-accent": style.color || WIDGET_META[widget]?.accent, "--widget-width": `${width}px`, width }}>
     <span className="w-card" />
   </span>;
+}
+/** The same coloured initial (or globe) the dock draws for a pin with no icon. */
+function FallbackGlyph({ item, size }) {
+  const look = pinFallback(item);
+  const style = { "--fb-color": look.color, "--fb-deep": look.deep, "--fb-ink": look.ink, fontSize: Math.round(size * 0.38) };
+  return look.glyph
+    ? <span className="preview-fallback" style={style} dangerouslySetInnerHTML={{ __html: icon(look.glyph) }} />
+    : <span className="preview-fallback" style={style}>{look.letter}</span>;
 }
 export function PreviewPin({ item, size = 40, gap = 6 }) {
   const [src, setSrc] = useState(() => isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon || null);
@@ -65,7 +74,7 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
     {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[canonicalWidget(child.widget)] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
       : src ? <img src={src} alt="" />
         : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
-          : <span dangerouslySetInnerHTML={{ __html: icon("app") }} />}
+          : <FallbackGlyph item={item} size={size} />}
   </span>;
 }
 /* The preview always shows the whole dock: it scales down to fit its column
