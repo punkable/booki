@@ -116,7 +116,9 @@ test("resting on a group opens it in place, and an app drops between its members
   await source.dispatchEvent("dragstart", { dataTransfer });
   const box = await groupPin.boundingBox();
   for (let i = 0; i < 12 && !(await page.locator(".library-pin-strip.in-group").count()); i++) {
-    await groupPin.dispatchEvent("dragover", { dataTransfer, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
+    // The strip can switch to the group between the check and this event, which
+    // removes the group pin; don't wait the full default timeout for it.
+    await groupPin.dispatchEvent("dragover", { dataTransfer, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 }, { timeout: 500 }).catch(() => {});
     await page.waitForTimeout(100);
   }
   await page.locator(".library-pin-strip.in-group").waitFor();

@@ -20,7 +20,7 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**", "src-tauri/**", "assets/**"] },
+  { ignores: ["dist/**", "node_modules/**", "src-tauri/**", "assets/**", ".claude/**"] },
 
   js.configs.recommended,
 
