@@ -2,6 +2,7 @@
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
   es: {
+    "settings.loadError": "No se pudieron cargar los ajustes. Booki sigue funcionando y tu configuración no ha cambiado.",
     "be.reveal": "Para sacar el dock",
     "be.revealClick": "Clic en el notch",
     "be.revealHover": "Pasar el cursor",
@@ -174,6 +175,7 @@ export const STRINGS = {
     "release83.groups": "Arrastrar apps dentro y fuera de los grupos en Ajustes no respondía en Windows; ahora sí. Si te quedas sobre un grupo se abre, para soltar la app entre sus miembros o reordenarlos.",
   },
   en: {
+    "settings.loadError": "Settings couldn’t load. Booki is still running and your configuration hasn’t changed.",
     "be.reveal": "To bring the dock back",
     "be.revealClick": "Click the notch",
     "be.revealHover": "Hover",
@@ -346,6 +348,7 @@ export const STRINGS = {
     "release83.groups": "Dragging apps into and out of groups in Settings did nothing on Windows; now it works. Resting on a group opens it, so you can drop the app between its members or reorder them.",
   },
   pt: {
+    "settings.loadError": "Não foi possível carregar as configurações. O Booki continua em execução e sua configuração não mudou.",
     "be.reveal": "Para trazer o dock",
     "be.revealClick": "Clicar no notch",
     "be.revealHover": "Passar o cursor",
@@ -518,6 +521,7 @@ export const STRINGS = {
     "release83.groups": "Arrastrar apps para dentro e fora dos grupos nas Definições não respondia no Windows; agora sim. Ao parar sobre um grupo ele abre-se, para largar a app entre os membros ou reordená-los.",
   },
   fr: {
+    "settings.loadError": "Impossible de charger les réglages. Booki fonctionne toujours et votre configuration n’a pas changé.",
     "be.reveal": "Pour faire revenir le dock",
     "be.revealClick": "Clic sur le notch",
     "be.revealHover": "Survol",
@@ -690,6 +694,7 @@ export const STRINGS = {
     "release83.groups": "Glisser des apps dans et hors des groupes dans les Réglages ne répondait pas sous Windows ; c’est réglé. En restant sur un groupe, il s’ouvre pour déposer l’app entre ses membres ou les réordonner.",
   },
   de: {
+    "settings.loadError": "Die Einstellungen konnten nicht geladen werden. Booki läuft weiter und deine Konfiguration ist unverändert.",
     "be.reveal": "Dock zurückholen",
     "be.revealClick": "Notch anklicken",
     "be.revealHover": "Darüberfahren",
