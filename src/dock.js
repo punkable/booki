@@ -22,26 +22,20 @@ import {
   isTauri,
 } from "./api.js";
 import { createDockTooltip, setTileLabel } from "./dock/tooltip.js";
-import { timerSeconds, formatTimer, tasksSummary } from "./dock/productivity.js";
 import { buildProductivityPanel } from "./dock/productivity-panel.js";
 import { createDraftSaver } from "./dock/draft-saver.js";
-import { parseConfigConflict } from "./settings/config-conflicts.js";
-import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
-import { singleFlight } from "./dock/async-cache.js";
+import { observeSystem } from "./dock/system-observer.js";
 import { widgetWidth } from "./dock/layout-model.js";
-import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
-import { formatDegrees } from "./dock/weather-codes.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "./icon-library.js";
-import { applyTheme, applyEdge } from "./theme.js";
+import { applyEdge } from "./theme.js";
 import { paintedLook } from "./system-look.js";
-import { t, setLang, curLang, ensureLang } from "./i18n.js";
+import { t, ensureLang } from "./i18n.js";
 import {
   WIDGET_ICONS,
   WIDGET_GLYPHS,
   WIDGET_VARIANTS,
-  STAT_WIDGETS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   WIDGET_META,
@@ -51,39 +45,21 @@ import { reduceMotion } from "./dock/motion.js";
 import { placeBesideBar, transformOrigin } from "./dock/placement.js";
 import {
   MEDIA_SVG,
-  BATTERY_LOW,
-  dockPreviewSnippet,
-  clockParts,
-  volumeStep,
   widgetCardHTML,
-  setMetric,
-  setText,
-  setMediaText,
   setPreviewSubText,
   refreshPreviewMarquees,
   LIVE_WIDGETS,
-  setSystem,
 } from "./dock/widget-view.js";
-import { dockRadius } from "./surface.js";
 import { groupAppearance } from "./group-style.js";
 import { pinFallback } from "./pin-fallback.js";
-import {
-  canMergeKind,
-  kindForPath,
-  mergePins,
-  normalizeGroups,
-  placePin,
-  takeOutOfGroup,
-} from "./pins.js";
+import { canMergeKind, kindForPath, mergePins, placePin, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
-import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
+import { menuActions, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { buildLauncher } from "./dock/launcher.js";
-import { desiredProfile } from "./profile-rules.js";
-import { materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
+import { materialTint, setMaterialTint, followFrames } from "./material.js";
 import { S } from "./dock/state.js";
 import {
-  emitConfigChanged,
   iconCache,
   uid,
   isVertical,
@@ -96,16 +72,7 @@ import {
   baseName,
   menuPinTitle,
 } from "./dock/helpers.js";
-import {
-  dockEl,
-  dockKeys,
-  ctxMenu,
-  dropOverlay,
-  undoToast,
-  closestSel,
-  esc,
-  stackEl,
-} from "./dock/dom.js";
+import { dockEl, dockKeys, ctxMenu, dropOverlay, closestSel, esc, stackEl } from "./dock/dom.js";
 import {
   pointInLiveHitArea,
   MATERIAL_PANELS,
@@ -122,7 +89,35 @@ import {
   edgeAutoScroll,
   stopEdgeScroll,
 } from "./dock/magnify.js";
-import { fitDock, reframe, SHADOW_PAD, applyFrame, checkScreenChange } from "./dock/frame.js";
+import { fitDock, reframe, applyFrame, checkScreenChange } from "./dock/frame.js";
+import {
+  cacheWidgetEls,
+  eachWidget,
+  tickClocks,
+  tickProductivity,
+  queueVolumeSet,
+  adjustVolumeFromWheel,
+  widgetPresent,
+  onDisplayPower,
+  onEnergySaver,
+  syncPolls,
+  refreshMedia,
+  refreshVolume,
+  wireLiveWidgets,
+} from "./dock/live-widgets.js";
+import {
+  onFullscreenSignal,
+  setHidden,
+  wantsHideNow,
+  setupAutoHide,
+  reveal,
+  scheduleHide,
+  onDesktopSignal,
+  onOcclusionSignal,
+  pinOpen,
+  softOpen,
+} from "./dock/autohide.js";
+import { addMenuHead, placeMenu, closeMenu } from "./dock/menu-core.js";
 import {
   windowsFor,
   setAttention,
@@ -130,7 +125,7 @@ import {
   startRunningPoll,
   wireRunningWindows,
 } from "./dock/running-windows.js";
-import { hideUndoToast, placeUndoToast, showUndoToast, wireUndoToast } from "./dock/undo-toast.js";
+import { placeUndoToast, showUndoToast, wireUndoToast } from "./dock/undo-toast.js";
 import {
   popButton,
   showConfirmPop,
@@ -141,6 +136,14 @@ import {
   confirmMove,
   wirePopovers,
 } from "./dock/popovers.js";
+import {
+  maybeSyncCtxMenu,
+  checkAutoProfile,
+  reloadConfig,
+  applyAll,
+  persist,
+  wireConfigSync,
+} from "./dock/config-sync.js";
 import { toggleClipboardStack, wireClipboardStack } from "./dock/clipboard-stack.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
 
@@ -244,46 +247,6 @@ async function boot() {
   }
 }
 
-// Explorer right-click menu: entries live in the registry, written by the
-// backend with labels WE localize here (so all 5 languages work). Re-synced
-// whenever the groups, the language, or the toggle change.
-const ctxGroupsSig = (c) =>
-  (c.pinned || []).filter((p) => p.kind === "group").map((p) => `${p.id}:${p.name}`).join("|") +
-  `|${c.contextMenu !== false}|${c.language || ""}`;
-let lastCtxSig = null;
-function syncCtxMenu() {
-  lastCtxSig = ctxGroupsSig(S.cfg);
-  dockApi
-    .syncContextMenu(S.cfg.contextMenu !== false, t("ctx.addToBooki"), t("ctx.addToGroup"))
-    .catch(() => {});
-}
-// Cheap guard used from persist(): dock-side group edits bypass reloadConfig
-// (self-emit echo guard), so re-sync here when the signature actually moved.
-function maybeSyncCtxMenu() {
-  if (S.cfg && ctxGroupsSig(S.cfg) !== lastCtxSig) syncCtxMenu();
-}
-
-let configReloadGeneration = 0;
-// Automatic profiles: re-check every minute (and when the displays change)
-// while rules are on, and apply only when the answer changes, so a profile
-// picked by hand stays until the next change of schedule or monitors.
-let autoProfileLast = null;
-let autoProfileTimer = null;
-const checkAutoProfile = singleFlight(async () => {
-  clearTimeout(autoProfileTimer);
-  const rules = S.cfg?.profileRules;
-  if (!rules?.enabled) { autoProfileLast = null; return; }
-  autoProfileTimer = setTimeout(checkAutoProfile, 60000);
-  try {
-    const [available, monitors] = await Promise.all([dockApi.profileList(), dockApi.listMonitors()]);
-    const want = desiredProfile(rules, { now: new Date(), monitors: Array.isArray(monitors) ? monitors.length : 1, available: available || [] });
-    if (want === autoProfileLast) return;
-    autoProfileLast = want;
-    if (want && want !== S.cfg.lastProfile) await dockApi.profileApply(want);
-  } catch (_) {
-    autoProfileLast = null; // try again on the next tick
-  }
-});
 let autoProfileResize = null;
 window.addEventListener("resize", () => {
   if (!S.cfg?.profileRules?.enabled) return;
@@ -291,222 +254,7 @@ window.addEventListener("resize", () => {
   autoProfileResize = setTimeout(checkAutoProfile, 1500);
 });
 
-async function reloadConfig({ afterSaves = true } = {}) {
-  const request = ++configReloadGeneration;
-  // Let queued dock saves land first; otherwise the reload replaces cfg and
-  // the queued save writes back the backend copy, losing the dock's edit.
-  // A save that reloads from inside the queue must skip this, or it waits on itself.
-  if (afterSaves) await persistQueue;
-  const next = await configApi.get();
-  if (request !== configReloadGeneration) return;
-  const prev = S.cfg;
-  S.cfg = next;
-  // If the language changed, make sure its dictionary is loaded before re-render.
-  if (!prev || prev.language !== S.cfg.language) await ensureLang(S.cfg.language);
-  if (request !== configReloadGeneration) return;
-  maybeSyncCtxMenu();
-  // Placement moved while the frame size may not have: force a re-place.
-  const PLACEMENT = ["edgeGap", "notchPosition", "notchMode", "monitor", "monitorName"];
-  if (prev && PLACEMENT.some((key) => prev[key] !== S.cfg[key])) S.lastFull = null;
-  // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
-  // instantly, the window moves, and the bar pops back in on the new edge.
-  const edgeSwapped = prev && prev.edge !== S.cfg.edge;
-  if (edgeSwapped) {
-    document.body.classList.add("edge-swap");
-  }
-  applyAll();
-  if (JSON.stringify(prev?.profileRules) !== JSON.stringify(S.cfg.profileRules)) { autoProfileLast = null; checkAutoProfile(); }
-  // Only rebuild the bar when the pinned items actually changed — sliders and
-  // toggles in Settings shouldn't make the whole dock flash.
-  const languageChanged = !!prev && prev.language !== S.cfg.language;
-  if (languageChanged) { closeMenu(); closeTrashPop(); hideTip(); }
-  const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(S.cfg.pinned);
-  if (pinsChanged) {
-    // Stale flyout handlers hold old children — close rather than lie.
-    const keepCatalog = S.stackOpen && S.stackItemId === "__add";
-    if (S.stackOpen && !keepCatalog) closeStack();
-    await render();
-    if (keepCatalog) S.stackRefreshPins?.();
-  } else {
-    fitDock();
-  }
-  reframe();
-  // Re-arming auto-hide resets the shown/hidden state; only do it when the
-  // behavior actually changed, so unrelated tweaks can't blink the dock.
-  const hideChanged =
-    !prev ||
-    prev.edge !== S.cfg.edge ||
-    (prev.autoHideMode || "") !== (S.cfg.autoHideMode || "") ||
-    prev.notchMode !== S.cfg.notchMode ||
-    prev.notchPosition !== S.cfg.notchPosition;
-  if (hideChanged) setupAutoHide();
-  if (edgeSwapped) {
-    // Briefly SHOW the dock in its new spot so the user actually sees it move —
-    // otherwise smart-hide (the settings window occludes the dock area) tucks it
-    // away and only the notch appears to move. (Notch-only changes preview the
-    // notch via notch_preview.) Then let the faded-out bar pop back in.
-    positionPreview();
-    setTimeout(() => {
-      requestAnimationFrame(() => document.body.classList.remove("edge-swap"));
-    }, 90);
-  }
-}
-
-// Show the dock in its current position for a few seconds regardless of
-// smart-hide occlusion — used as a live preview while tweaking position in
-// Settings. After the window elapses, normal hide behavior resumes.
-let previewTimer = null;
-function positionPreview() {
-  S.previewing = true;
-  clearTimeout(previewTimer);
-  S.manualHide = false;
-  S.hiddenState = false;
-  document.body.classList.remove("tucked");
-  dockApi.revealDock();
-  startPolls(); // visible again → resume live widgets
-  applyFrame();
-  previewTimer = setTimeout(() => {
-    S.previewing = false;
-    setupAutoHide(); // return to whatever the hide mode wants
-  }, 2600);
-}
-
-// The tray menu and the Settings title are drawn by Rust; tell it which
-// language the pages resolved ("system" included) whenever that changes.
-let nativeLang = null;
-function syncNativeLanguage() {
-  if (!isTauri || curLang() === nativeLang) return;
-  nativeLang = curLang();
-  dockApi.syncNativeLanguage(nativeLang).catch(() => { nativeLang = null; });
-}
-
-function applyAll() {
-  setLang(S.cfg.language);
-  syncNativeLanguage();
-  // The two strings baked into index.html were Spanish, which no language
-  // setting could reach — a German user dragging a file onto the bar was told
-  // "Suelta para anclar a Booki". They live in the dictionary now and are
-  // written here, so they follow the language like everything else.
-  dropOverlay.querySelector("#drop-pill").textContent = t("dock.dropPin");
-  const pill = document.getElementById("update-pill");
-  if (pill) {
-    pill.textContent = t("dock.update");
-    pill.title = t("dock.updateTip");
-  }
-  dockEl.setAttribute("aria-label", t("a11y.dock"));
-  applyTheme(S.cfg);
-  applyEdge(S.cfg);
-  dockKeys.sync();
-  document.body.classList.toggle("hide-running-indicators", S.cfg.showIndicators === false);
-  // The stage window spans the whole edge; the BAR aligns to the notch's
-  // along-edge slot with CSS (the window itself no longer travels).
-  const slot = S.cfg.notchPosition === "start" ? "start" : S.cfg.notchPosition === "end" ? "end" : "center";
-  ["slot-start", "slot-center", "slot-end"].forEach((c) => document.body.classList.remove(c));
-  document.body.classList.add(`slot-${slot}`);
-  const root = document.documentElement;
-  // CSS materials on a transparent window (native DWM vibrancy left a gray box).
-  // Solidity + optional glass tint drive dock/notch fill together.
-  const look = paintedLook(S.cfg);
-  applyMaterial(look);
-  if (look.accent) {
-    root.style.setProperty("--accent", look.accent);
-  }
-  dockEl.style.setProperty("--gap", `${S.cfg.spacing ?? 6}px`);
-  // How close the bar sits to its screen edge (user-tunable). The transparent
-  // pad on the anchored side shrinks down to the requested gap; anything past
-  // the stage pad is handled by the window's own margin (backend dock_xy).
-  const edgeGap = Math.max(0, Math.min(96, S.cfg.edgeGap ?? 12));
-  root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
-  // A small gap leaves no room for the outward drop shadow — soften it.
-  document.body.classList.toggle("tight-edge", edgeGap < 24);
-  // Tile/corner roundness (user-tunable). Drives tiles, widgets (.w-card),
-  // group grids/minis, and letter glyphs. Dock chrome is a touch rounder.
-  const cr = S.cfg.cornerRadius ?? 12;
-  root.style.setProperty("--tile-r", `${cr}px`);
-  root.style.setProperty("--dock-r", `${dockRadius(S.cfg)}px`);
-  document.body.classList.toggle("show-labels", S.cfg.showLabels !== false);
-  document.body.classList.toggle("compact", !!S.cfg.compact);
-  document.body.classList.toggle("autohide", hideMode() !== "off");
-  // Magnify animation style → easing curve used for the size/lift transitions.
-  const style = S.cfg.magnifyStyle || "spring";
-  const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
-  root.style.setProperty("--mag-ease", ease);
-  // Genie minimize: the notch always sits on the dock's edge, so the bar funnels
-  // toward its along-position on that same edge.
-  const ox = { start: 16.6, end: 83.4 }[S.cfg.notchPosition] ?? 50;
-  root.style.setProperty("--genie-ox", `${ox}%`);
-  root.style.setProperty("--genie-oxn", `${ox}`);
-  const gedge = S.cfg.edge || "bottom";
-  ["genie-bottom", "genie-top", "genie-left", "genie-right"].forEach((c) =>
-    document.body.classList.remove(c)
-  );
-  document.body.classList.add(`genie-${gedge}`);
-}
-
-let persistQueue = Promise.resolve();
-function persist(patch = {}, { showError = true } = {}) {
-  const pending = persistQueue.then(() => performPersist(patch, showError));
-  persistQueue = pending.catch(() => {});
-  return pending;
-}
-async function performPersist(patch, showError) {
-  // Keep named group containers intact, including empty and single-item groups.
-  S.cfg.pinned = normalizeGroups(S.cfg.pinned);
-  const changes = { pinned: S.cfg.pinned, seenVersion: S.cfg.seenVersion || "", onboarded: !!S.cfg.onboarded, settingsIntroSeen: !!S.cfg.settingsIntroSeen, ...patch };
-  try {
-    await configApi.patch(changes);
-    maybeSyncCtxMenu();
-    await emitConfigChanged();
-    return true;
-  } catch (error) {
-    logMessage("error", `dock save failed: ${error}`);
-    const conflict = parseConfigConflict(error);
-    // Restore the persisted view; retain the proposed edit for explicit retry.
-    await reloadConfig({ afterSaves: false }).catch(() => {});
-    if (undoToast && showError) {
-      hideUndoToast();
-      undoToast.innerHTML = `<span>${esc(t(conflict ? "workspace.conflict" : "status.saveError"))}</span><button type="button">${esc(t(conflict ? "workspace.keepMine" : "focus.retry"))}</button>`;
-      undoToast.classList.remove("hidden");
-      placeUndoToast();
-      const retryButton = undoToast.querySelector("button");
-      retryButton?.addEventListener("click", async () => {
-        retryButton.disabled = true;
-        try {
-          await configApi.get(); // Retry is an explicit decision against the latest snapshot.
-          await configApi.patch(changes);
-          await emitConfigChanged();
-          await reloadConfig();
-          if (undoToast.contains(retryButton)) hideUndoToast();
-        } catch (retryError) {
-          logMessage("error", `dock retry failed: ${retryError}`);
-          retryButton.disabled = false;
-        }
-      });
-    }
-    return false;
-  }
-}
-
 // ──────────────────────────── Render ────────────────────────────
-
-// Cache of live-widget elements by type, rebuilt on each render so the poll
-// loop never re-queries the DOM every tick. Invalidated (rebuilt) below.
-let widgetEls = {};
-function cacheWidgetEls() {
-  widgetEls = {};
-  // The widget elements are about to be replaced, so any "already painted this
-  // minute" shortcut is stale — a fresh clock card would otherwise sit on its
-  // placeholder until the minute rolled over.
-  lastClockKey = "";
-  // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
-  // The flyout keeps its DOM after closing (until the next open), so gate on
-  // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
-  const sel = S.stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
-  document.querySelectorAll(sel).forEach((el) => {
-    const w = el.dataset.widget || "";
-    (widgetEls[w] || (widgetEls[w] = [])).push(el);
-  });
-}
 
 // Remember which ids were on the bar last render, so only genuinely NEW tiles
 // animate in (not every tile on an unrelated re-render).
@@ -879,61 +627,6 @@ function widgetTile(item, { inFlyout = false } = {}) {
   return el;
 }
 
-// Run fn over every cached element of a widget type (no per-tick DOM query).
-function eachWidget(type, fn) {
-  const list = widgetEls[type];
-  if (list) list.forEach(fn);
-}
-
-// The poll loop ticks every second so the clock rolls over promptly, but the
-// card only shows hours and minutes: 59 of every 60 ticks used to reformat the
-// same two strings with Intl and write them straight back into the DOM. Keep
-// the 1s cadence (it is what makes the rollover feel immediate) and skip the
-// work when the displayed minute has not changed.
-let lastClockKey = "";
-function tickClocks() {
-  if (S.hiddenState) return; // don't update a tucked-away dock
-  const { key, time, date } = clockParts(new Date(), curLang());
-  tickProductivity();
-  if (key === lastClockKey) return;
-  lastClockKey = key;
-  eachWidget("clock", (el) => setText(el, date, time));
-}
-
-const weatherCache = new Map();
-function tickProductivity() {
-  // Focus shows the running (or just finished) timer, otherwise the next task.
-  eachWidget("focus", (el) => {
-    const item = findWidgetPin(el.dataset.id); if (!item) return;
-    const style = item.style || {};
-    const seconds = timerSeconds(style);
-    const finished = !!style.endsAt && seconds === 0;
-    const summary = tasksSummary(style.tasks);
-    if (style.endsAt) setText(el, finished ? t("focus.finished") : summary.next || t("w.focus"), formatTimer(seconds));
-    else if (summary.total) setText(el, summary.next || t("focus.allDone"), `${summary.done}/${summary.total}`);
-    else setText(el, t("w.focus"), formatTimer(seconds));
-    el.classList.toggle("focus-finished", finished);
-  });
-  eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
-  eachWidget("weather", (el) => {
-    const style = findWidgetPin(el.dataset.id)?.style || {};
-    if (!Number.isFinite(style.latitude) || !Number.isFinite(style.longitude)) { setText(el, t("focus.noCity"), "—"); return; }
-    const key = `${style.latitude},${style.longitude}`;
-    let cached = weatherCache.get(key);
-    if (!cached || (!cached.pending && Date.now() >= cached.expires)) {
-      cached = { pending: true, expires: Date.now() + 600000, value: cached?.value }; weatherCache.set(key, cached);
-      const record = cached;
-      dockApi.weatherCurrent(style.latitude, style.longitude).then((value) => {
-        record.value = value; record.error = false;
-      }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!S.hiddenState) tickProductivity(); });
-    }
-    const value = cached.value;
-    // Today's range sits beside the city when Open-Meteo returned it.
-    const range = value && Number.isFinite(value.temperature_max) && Number.isFinite(value.temperature_min) ? ` · ${formatDegrees(value.temperature_max, style.units)}/${formatDegrees(value.temperature_min, style.units)}` : "";
-    setText(el, `${style.city || t("w.weather")}${range}`, value ? formatDegrees(value.temperature_2m, style.units) : cached.error ? t("focus.weatherError") : "…");
-    setTileLabel(el, `${style.city || t("w.weather")} · Open-Meteo`);
-  });
-}
 function closeProductivityPanel() {
   S.productivityPanel?.dispose?.();
   S.productivityPanel?.remove(); S.productivityPanel = null; S.pinnedReveal = false; reframe(); scheduleHide();
@@ -969,267 +662,6 @@ function openProductivity(item, tile) {
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
   requestAnimationFrame(() => { place(); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
 }
-
-// System stats (system + battery widgets) — one snapshot fans out to
-// every stat card on the bar (from the cached element map).
-const pollStats = singleFlight(async () => {
-  let s;
-  try {
-    s = await dockApi.systemStats();
-  } catch (_) {
-    return;
-  }
-  if (!s) return;
-  const labels = { cpu: "CPU", ram: "RAM", disk: t("w.disk"), net: t("w.net") };
-  eachWidget("system", (el) => setSystem(el, s, labels));
-  eachWidget("battery", (el) => {
-    setWidgetAvailable(el, s.battery >= 0);
-    if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
-    setMetric(el, t("w.battery"), s.battery);
-    el.classList.toggle("charging", !!s.charging);
-    // A ring left at its default color (never manually re-colored) turns red
-    // when running low and unplugged — the same "pay attention" cue Windows
-    // itself uses, without overriding a color the user picked on purpose.
-    if (el.dataset.autoAccent) {
-      el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
-    }
-  });
-});
-
-function setWidgetAvailable(el, available) {
-  const item = findWidgetPin(el.dataset.id);
-  const hide = !!item?.style?.hideWhenUnavailable && !available;
-  if (el.classList.contains("conditionally-hidden") === hide) return;
-  el.classList.toggle("conditionally-hidden", hide);
-  requestAnimationFrame(() => { fitDock(); reframe(); });
-}
-
-// Now-playing card: the system media session (Spotify, browser, …).
-// The play/pause glyph is only rebuilt when the state flips, not every poll.
-function setMediaToggle(toggle, playing) {
-  if (!toggle || toggle.dataset.playing === String(playing)) return;
-  toggle.dataset.playing = String(playing);
-  toggle.innerHTML = playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
-}
-const pollMedia = singleFlight(async () => {
-  const m = await dockApi.mediaInfo().catch(() => null);
-  eachWidget("media", (el) => {
-    const art = el.querySelector(".w-art");
-    const ico = el.querySelector(".w-ico");
-    const toggle = el.querySelector(".w-ctl-toggle");
-    setWidgetAvailable(el, !!m);
-    if (!m) {
-      setText(el, t("w.media"), t("w.mediaIdle"), t("w.media"));
-      delete el.dataset.mqTitle;
-      el.classList.remove("playing");
-      if (art) { art.style.display = "none"; art.removeAttribute("data-src"); }
-      if (ico) ico.style.display = "";
-      setMediaToggle(toggle, false);
-      return;
-    }
-    setMediaText(el, m.artist || t("w.media"), m.title || "—");
-    setTileLabel(el, `${m.title} — ${m.artist}`);
-    el.classList.toggle("playing", !!m.playing);
-    setMediaToggle(toggle, !!m.playing);
-    if (art && m.thumb) {
-      // Cross-fade the album art when the track's art actually changes.
-      if (art.dataset.src !== m.thumb) {
-        art.dataset.src = m.thumb;
-        art.style.opacity = "0";
-        art.onload = () => { art.style.opacity = "1"; };
-        art.src = m.thumb;
-      }
-      art.style.display = "block";
-      if (ico) ico.style.display = "none";
-    } else if (art) {
-      // Playing something with no artwork → don't leave the previous track's
-      // cover showing; fall back to the widget icon.
-      art.style.display = "none";
-      art.removeAttribute("data-src");
-      if (ico) ico.style.display = "";
-    }
-  });
-});
-
-// System volume — scroll changes it, click toggles mute.
-let lastVolumePct = NaN;
-let volumeWheelTimer = null;
-let volumeInfoPending = false;
-function renderVolume(pct, muted) {
-  lastVolumePct = Number(pct);
-  eachWidget("volume", (el) => {
-    setMetric(el, muted ? t("w.muted") : t("w.volume"), pct, `${t("w.volume")}: ${pct}%`);
-    el.classList.toggle("muted", muted);
-  });
-}
-const pollVolume = singleFlight(async () => {
-  const v = await dockApi.volumeInfo().catch(() => null);
-  if (Array.isArray(v)) renderVolume(v[0], !!v[1]);
-});
-function readVolumeFromTile(tile) {
-  const vEl = tile?.querySelector(".w-ring-num");
-  const dataValue = Number(vEl?.dataset.v);
-  if (Number.isFinite(dataValue)) return dataValue;
-  const textValue = parseInt(vEl?.textContent || "", 10);
-  return Number.isFinite(textValue) ? textValue : NaN;
-}
-function queueVolumeSet(next) {
-  const pct = Math.max(0, Math.min(100, Math.round(next)));
-  renderVolume(pct, false);
-  clearTimeout(volumeWheelTimer);
-  volumeWheelTimer = setTimeout(() => {
-    dockApi.volumeSet(pct).then(refreshVolume, () => {});
-  }, 70);
-}
-function adjustVolumeFromWheel(deltaY, sourceTile) {
-  let cur = Number.isFinite(lastVolumePct) ? lastVolumePct : readVolumeFromTile(sourceTile);
-  if (!Number.isFinite(cur)) {
-    if (volumeInfoPending) return;
-    volumeInfoPending = true;
-    dockApi.volumeInfo()
-      .then((v) => {
-        volumeInfoPending = false;
-        if (Array.isArray(v)) {
-          lastVolumePct = Number(v[0]);
-          adjustVolumeFromWheel(deltaY, sourceTile);
-        }
-      })
-      .catch(() => { volumeInfoPending = false; });
-    return;
-  }
-  const step = volumeStep(deltaY);
-  queueVolumeSet(cur + (deltaY > 0 ? -step : step));
-}
-
-// Clipboard-history widget: the bar card shows a live PREVIEW of the most
-// recent copy (not just a bare count) — reads at a glance, like a real
-// notification card. The full list is fetched once, when the flyout opens.
-function renderClipboardSummary(count, preview) {
-  eachWidget("clipboard", (el) => {
-    const shown = preview ? dockPreviewSnippet(preview) : t("clip.empty");
-    setPreviewSubText(el, shown, !preview);
-    const badge = el.querySelector(".w-pv-count");
-    if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
-    setTileLabel(el, widgetLabel("clipboard"));
-  });
-}
-const pollClipboard = singleFlight(async () => {
-  const s = await dockApi.clipboardSummary().catch(() => ({ count: 0, preview: null }));
-  renderClipboardSummary(s.count, s.preview);
-});
-
-// ONE poll loop drives every live widget on its own cadence — a single timer
-// instead of three, and it does nothing while the dock is tucked away. Fewer
-// wakeups → lighter on the battery.
-let widgetPollTimer = null;
-let pollDue = { stats: 0, media: 0, volume: 0 };
-// DOM-based so it also sees widgets rendered inside an open group flyout (they
-// poll only while visible). widgetEls is rebuilt by cacheWidgetEls on every
-// render and on flyout open/close.
-function widgetPresent(w) {
-  const has = (t) => !!(widgetEls[t] && widgetEls[t].length);
-  return Array.isArray(w) ? w.some(has) : has(w);
-}
-function anyPinnedWidget(predicate, items = S.cfg?.pinned || []) {
-  return items.some((item) =>
-    (item.kind === "widget" && predicate(item)) ||
-    anyPinnedWidget(predicate, item.children || [])
-  );
-}
-// What startPolls last scheduled for, so a re-render that keeps the same live
-// widgets can repaint without throwing away every timer and its cadence.
-let pollKey = "";
-let pollsActive = false;
-function stopPolls() {
-  clearInterval(widgetPollTimer);
-  widgetPollTimer = null;
-  // Also stop the running-app/trash poll so a tucked-away dock burns zero timer
-  // wakeups (not just early-returns). Resumed by startPolls on reveal.
-  clearInterval(S.pollTimer);
-  S.pollTimer = null;
-  pollsActive = false;
-}
-// Display power and Energy Saver, as Windows reports them. With the display
-// off nothing on screen can change for anyone, so every poll stops; turning
-// it back on restarts them through startPolls, which still honours a
-// tucked-away dock. Energy Saver doubles the cadence of everything but the
-// clock, which has to tick on time.
-let energySaver = false;
-function pollSlowdown() { return energySaver ? 2 : 1; }
-function onDisplayPower(on) {
-  if (S.displayOff === !on) return;
-  S.displayOff = !on;
-  if (S.displayOff) stopPolls();
-  else startPolls();
-}
-function onEnergySaver(on) {
-  if (energySaver === !!on) return;
-  energySaver = !!on;
-  if (pollsActive) startPolls(); // pick up the new cadence
-}
-function pollKinds() {
-  return {
-    clock: widgetPresent(["clock", "focus"]),
-    local: widgetPresent(["calendar", "weather"]),
-    stats: widgetPresent(STAT_WIDGETS),
-    media: widgetPresent("media"),
-    volume: widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume),
-    clipboard: widgetPresent("clipboard"),
-  };
-}
-// First paint so freshly built cards aren't blank until the next tick.
-function paintPolls(k) {
-  if (k.clock || k.local) tickClocks();
-  if (k.stats) pollStats();
-  if (k.media) pollMedia();
-  if (k.volume) pollVolume();
-  if (k.clipboard) pollClipboard();
-}
-/* Called after the bar or a flyout was rebuilt. Restarts the timers only when
-   the set of live widget kinds changed; otherwise it just repaints the new
-   cards (and running-app dots) and keeps every poll's cadence. */
-function syncPolls({ repaint = true } = {}) {
-  if (S.hiddenState || S.displayOff) return;
-  const kinds = pollKinds();
-  if (!pollsActive || JSON.stringify(kinds) !== pollKey) { startPolls(); return; }
-  if (!repaint) return;
-  S.appPollTick?.(); // running dots and the trash badge on the new tiles
-  paintPolls(kinds);
-}
-function startPolls() {
-  clearInterval(widgetPollTimer);
-  widgetPollTimer = null;
-  if (S.hiddenState || S.displayOff) return; // tucked away or screen off → stay idle
-  startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const k = pollKinds();
-  pollKey = JSON.stringify(k);
-  pollsActive = true;
-  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard } = k;
-  // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
-  // First paint immediately so cards aren't blank until the first tick, then
-  // schedule each poll a full interval out (no wasteful double-poll at start).
-  paintPolls(k);
-  const t0 = Date.now();
-  const slow = pollSlowdown();
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow };
-  // Base cadence: 1 s only when a clock needs the second/minute rollover;
-  // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : 60000;
-  widgetPollTimer = setInterval(() => {
-    if (S.hiddenState || S.displayOff) return; // don't poll a tucked-away dock
-    const now = Date.now();
-    if (hasClock || hasLocal) tickClocks();
-    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400 * slow; pollStats(); }
-    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(S.nativeSupport, "media", 3000) * slow; pollMedia(); }
-    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(S.nativeSupport, "volume", 4000) * slow; pollVolume(); }
-    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
-  }, base);
-}
-// Nudge a specific poll right away (e.g. after a transport/volume button).
-function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(S.nativeSupport, "media", 3000); if (!S.hiddenState) pollMedia(); }
-function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(S.nativeSupport, "volume", 4000); if (!S.hiddenState) pollVolume(); }
-function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
 
 async function addWidget(type, { showError = true } = {}) {
   S.cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
@@ -2496,13 +1928,6 @@ function menuKindLabel(item) {
   return t("m.app");
 }
 
-function addMenuHead(title, subtitle) {
-  const head = document.createElement("div");
-  head.className = "menu-head";
-  head.innerHTML = `<strong>${esc(title)}</strong><span>${esc(subtitle || "")}</span>`;
-  ctxMenu.appendChild(head);
-}
-
 function openMenu(e, item) {
   e.preventDefault();
   e.stopPropagation();
@@ -2700,57 +2125,6 @@ function openFileMenu(e, item, parent, openFolder) {
   placeMenu(e);
 }
 
-let menuReturnFocus = null;
-// The context menu lives beside the bar (like the folder flyout): the window is
-// grown to fit it, so it can never be cut off by the dock window's bounds.
-function placeMenu(e, focus = true) {
-  if (focus) menuReturnFocus = document.activeElement;
-  const cx = e.clientX;
-  const cy = e.clientY;
-  // Measure invisibly, grow the window FIRST, then reveal in its final spot —
-  // one paint, no flicker from the window resizing under an already-visible menu.
-  ctxMenu.classList.add("measuring");
-  ctxMenu.classList.remove("hidden");
-  document.body.classList.add("menu-open");
-  applyFrame();
-  const put = () => {
-    const { left, top } = placeBesideBar({
-      bar: dockEl.getBoundingClientRect(),
-      box: { width: ctxMenu.offsetWidth, height: ctxMenu.offsetHeight },
-      edge: S.cfg.edge,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      along: isVertical() ? cy : cx,
-    });
-    ctxMenu.style.left = `${left}px`;
-    ctxMenu.style.top = `${top}px`;
-    // Scale the menu out from the point that opened it (the cursor/tile), not
-    // its own center — keeps the spatial link between trigger and content.
-    const o = transformOrigin(ctxMenu.getBoundingClientRect(), cx, cy);
-    ctxMenu.style.transformOrigin = `${o.x}px ${o.y}px`;
-  };
-  put();
-  // The window resizes asynchronously after applyFrame(); reposition again the
-  // moment it actually settles (via the resize hook) AND on a short fallback, so
-  // the menu can never end up clipped by a window that grew a beat too late.
-  S.pendingReplace = put;
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      put();
-      ctxMenu.classList.remove("measuring");
-      if (focus && !ctxMenu.classList.contains("hidden")) menuItems(ctxMenu)[0]?.focus();
-    });
-  });
-}
-function closeMenu() {
-  ++S.menuGeneration;
-  if (ctxMenu.classList.contains("hidden")) return;
-  ctxMenu.classList.add("hidden");
-  document.body.classList.remove("menu-open");
-  S.pendingReplace = null;
-  if (ctxMenu.contains(document.activeElement)) menuReturnFocus?.focus?.();
-  reframe();
-}
-
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 document.addEventListener("contextmenu", (e) => {
@@ -2871,188 +2245,6 @@ window.addEventListener("resize", () => {
   screenChangeTimer = setTimeout(checkScreenChange, 250);
 });
 
-// ───────────────────────── Auto-hide ─────────────────────────
-// Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
-// driven by the backend occlusion watcher) · "edge" (hide, reveal on hover).
-
-let desktopActive = false;
-let occluded = false; // last occlusion signal from the backend (smart mode)
-let blackoutTimer = null;
-let occRevealTimer = null; // debounce for the smart-mode auto-reveal
-let hiddenBeforeFullscreen = false;
-const SMART_REVEAL_DELAY = 1100;
-
-// Fullscreen game/movie/presentation → get completely out of the way: flash a
-// brief toast, then hide BOTH the bar and the notch. Restore when it ends.
-const FS_TOAST_HOLD_MS = 1500;
-const FS_TOAST_FADE_MS = 260;
-
-function hideInFullscreenEnabled() {
-  return S.cfg.hideInFullscreen !== false;
-}
-
-function clearFsTimers() {
-  clearTimeout(blackoutTimer);
-  blackoutTimer = null;
-  clearTimeout(occRevealTimer);
-  occRevealTimer = null;
-  clearTimeout(S.hideTimer);
-  S.hideTimer = null;
-}
-
-function onFullscreenSignal(value) {
-  clearFsTimers();
-  if (value) {
-    // Already blacked out — ignore repeat signals.
-    if (S.fullscreen) return;
-    // Opt-out: stay visible. Do NOT set `fullscreen` or pinOpen/tryTuck break.
-    if (!hideInFullscreenEnabled()) return;
-    S.fullscreen = true;
-    hiddenBeforeFullscreen = S.hiddenState;
-    S.pinnedReveal = false;
-    S.hiddenState = true;
-    stopPolls(); // fullscreen game/movie → go fully idle
-    document.body.classList.add("tucked");
-    // Already tucked into the notch → skip the toast chip; blackout quietly.
-    if (hiddenBeforeFullscreen) {
-      blackoutTimer = setTimeout(() => {
-        if (S.fullscreen) dockApi.hideAll();
-      }, 320);
-      return;
-    }
-    // Calm two-line status on the notch, then fade into full blackout.
-    dockApi.notchToast(t("fs.hiddenTitle"), t("fs.hiddenSub"));
-    blackoutTimer = setTimeout(() => {
-      if (!S.fullscreen) return;
-      dockApi.notchToastDismiss().catch(() => {});
-      blackoutTimer = setTimeout(() => {
-        if (S.fullscreen) dockApi.hideAll();
-      }, FS_TOAST_FADE_MS);
-    }, FS_TOAST_HOLD_MS);
-  } else {
-    // Never entered a blackout (hide was off) — nothing to restore.
-    if (!S.fullscreen) return;
-    S.fullscreen = false;
-    const wasTucked = hiddenBeforeFullscreen;
-    hiddenBeforeFullscreen = false;
-    document.body.classList.remove("tucked");
-    // clear_fullscreen_blackout must finish before hide/reveal or Rust no-ops.
-    void (async () => {
-      await dockApi.clearFullscreenBlackout().catch(() => {});
-      await dockApi.notchToastDismiss().catch(() => {});
-      // Restore the pre-FS visibility for every hide mode, not only smart+click.
-      // setupAutoHide() starts edge visible — that would pop a tucked dock open.
-      if (wasTucked && !(hideMode() === "smart" && desktopActive && !S.manualHide)) {
-        S.hiddenState = true;
-        stopPolls();
-        document.body.classList.add("tucked");
-        await dockApi.hideDock(S.cfg.edge).catch(() => {});
-      } else if (hideMode() === "off") {
-        S.hiddenState = false;
-        startPolls();
-        document.body.classList.add("revealing");
-        await dockApi.revealDock().catch(() => {});
-        applyFrame();
-        setTimeout(() => document.body.classList.remove("revealing"), 380);
-      } else {
-        S.hiddenState = false;
-        setupAutoHide();
-      }
-    })();
-  }
-}
-
-function hideMode() {
-  return S.cfg.autoHideMode || (S.cfg.autoHide ? "edge" : "off");
-}
-
-function setHidden(v) {
-  if (v === S.hiddenState) return;
-  S.hiddenState = v;
-  // Fully STOP the widget poll while tucked away (not just skip it) — a truly
-  // idle dock burns no timer wakeups; it resumes the moment it reappears.
-  if (v) stopPolls();
-  else startPolls();
-  if (v) {
-    // The window is about to go away — the pointer can't be "inside" anymore.
-    // (Windows won't fire pointerout for a window that hides under the cursor.)
-    S.pointerInside = false;
-    // Slide/fade the bar out, then hand off to the notch window (and hide the
-    // dock window) once the animation has played.
-    document.body.classList.add("tucked");
-    setTimeout(() => {
-      if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
-    }, 190); // match genie (~170ms) + a frame
-  } else {
-    // Show the dock window (and hide the notch), make sure it's sized to the full
-    // bar, then slide the bar back in. Force the stage fully interactive during
-    // the reveal animation so early clicks aren't lost to stale hit rects.
-    document.body.classList.add("revealing");
-    dockApi.revealDock();
-    applyFrame();
-    setTimeout(() => {
-      if (!S.hiddenState) document.body.classList.remove("tucked");
-    }, 40);
-    setTimeout(() => {
-      document.body.classList.remove("revealing");
-      reportHitRects();
-    }, 380);
-  }
-}
-
-// ─── The ONE rule of hiding ───────────────────────────────────────────────
-// The dock NEVER tucks away while you're using it: pointer on the bar, a drag
-// in flight, an open group/menu/popover. Timers and occlusion signals don't
-// hide directly — they go through tryTuck(), which defers until the gesture
-// ends; the pointer leaving the window is what finishes a deferred hide.
-// The auto-hide delay is purely a grace period AFTER you leave, never a
-// countdown while you're on the dock.
-
-// Snapshot of everything the visibility policy needs. Built in ONE place so
-// every caller below decides from the same inputs — the old code had each of
-// reveal(), tryTuck() and onOcclusionSignal() testing a different subset of the
-// flags in a different order, which is how a fix for one case kept breaking
-// another.
-function visibilityState() {
-  return {
-    mode: hideMode(),
-    trigger: S.cfg.notchTrigger || "click",
-    fullscreen: S.fullscreen,
-    previewing: S.previewing,
-    occluded,
-    desktop: desktopActive,
-    manualHide: S.manualHide,
-    summoned: S.pinnedReveal,
-    draggingFile: S.draggingFile,
-    pointerInside: S.pointerInside,
-  };
-}
-
-// Would the current mode want the dock hidden right now (ignoring the user's
-// ongoing interaction)?
-function wantsHideNow() {
-  return wantsHidden(visibilityState());
-}
-
-// Anything mid-use that a hide would yank out from under the user.
-// Note: pinnedReveal alone is NOT enough — occlusion must still be able to
-// tuck a notch-summoned dock once the user is working in another app.
-function interacting() {
-  return (
-    S.pointerInside || S.dragging || S.draggingFile || S.stackOpen ||
-    !!S.edgeMove || document.body.classList.contains("menu-open") ||
-    !!document.querySelector(".trash-pop, .note-editor, .coach, .productivity-panel")
-  );
-}
-
-// Hide if the user isn't mid-something; otherwise wait — the pointer-out
-// handler re-checks when they actually leave.
-function tryTuck() {
-  if (S.fullscreen || S.previewing || !wantsHideNow()) return;
-  if (interacting()) return; // deferred: pointer-out / gesture-end re-checks
-  setHidden(true);
-}
-
 // Track pointer presence at the WINDOW level (bar + its transparent pad):
 // relatedTarget === null means the pointer truly entered/left the window,
 // not just moved between elements inside it.
@@ -3156,141 +2348,12 @@ if (dockApi.onCursorInside)
     }
   });
 
-function setupAutoHide() {
-  // Fullscreen blackout owns visibility — don't reveal/hide underneath it
-  // (config reload / preview end during a game would flash Booki over it).
-  if (S.fullscreen) return;
-  clearTimeout(S.hideTimer);
-  S.pinnedReveal = false;
-  // smart starts hidden only if we're currently in an app (occluded), so a
-  // config reload while working doesn't flash the dock open. edge now starts
-  // VISIBLE and then visibly tucks after the grace delay (unless you move onto
-  // it) — starting already-hidden read as "the dock never comes out".
-  S.hiddenState = hideMode() === "smart" && occluded;
-  document.body.classList.toggle("tucked", S.hiddenState);
-  applyFrame();
-  // Sync the two windows to the starting state (these don't emit, so this won't
-  // pin the dock open).
-  if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
-  else dockApi.revealDock();
-  // Keep the poll loop in step with visibility (idle when tucked away).
-  if (S.hiddenState) stopPolls();
-  else startPolls();
-  if (!S.hiddenState && wantsHideNow()) scheduleHide();
-}
-
-// Pointer entered the dock area while HIDDEN → reveal (hover trigger only; in
-// click mode a hidden dock comes back exclusively from the notch).
-function reveal() {
-  if ((S.cfg.notchTrigger || "click") === "click") return; // hover trigger only
-  // "The pointer just arrived — with that, does the policy want the bar out?"
-  // The chain of early-outs this replaced (fullscreen, manual swipe, mode off,
-  // occluded-and-not-summoned) is now one lookup that cannot drift from the
-  // other two decision points.
-  if (decideVisible({ ...visibilityState(), pointerInside: true }) !== true) return;
-  clearTimeout(S.hideTimer);
-  setHidden(false);
-}
-
-// Grace period after leaving the dock; the callback re-checks EVERYTHING so a
-// pointer that came back (or an opened menu) simply cancels the hide.
-function scheduleHide() {
-  if (hideMode() === "off") return;
-  clearTimeout(S.hideTimer);
-  S.hideTimer = setTimeout(tryTuck, S.cfg.autoHideDelay ?? 650);
-}
-
-// Smart-hide: the backend tells us when a window covers the dock's home area.
-// We hide to the notch when covered and reappear when the desktop is clear —
-// measured against a stable rect in Rust, so it can no longer flap.
-function onDesktopSignal(value) {
-  desktopActive = value;
-  if (value) occluded = false;
-  // Win+D can hide a native window without changing our JS visibility.
-  if (value && !S.hiddenState && decideVisible(visibilityState()) === true) {
-    dockApi.revealDock().catch(() => {});
-  }
-  onOcclusionSignal(occluded);
-}
-
-function onOcclusionSignal(value) {
-  occluded = value;
-  // Going back to work in an app releases a manual swipe-hide: next time the
-  // desktop is clear, normal smart behavior resumes.
-  if (value) S.manualHide = false;
-  // These own visibility while they last; occlusion doesn't get a vote.
-  if (S.previewing || S.fullscreen || S.draggingFile) return;
-  if (hideMode() !== "smart") return;
-
-  const want = decideVisible(visibilityState());
-  if (want === null) {
-    // Click trigger: the desktop cleared, but a tucked dock waits to be asked.
-    clearTimeout(occRevealTimer);
-    return;
-  }
-  if (want) {
-    // Back on the desktop → come out, but only once it has STAYED clear for a
-    // beat. Switching or moving windows opens transient gaps over the dock's
-    // spot, and revealing on those made it pop out "by itself" mid alt-tab.
-    clearTimeout(occRevealTimer);
-    occRevealTimer = setTimeout(() => {
-      if (decideVisible(visibilityState()) !== true) return;
-      S.pinnedReveal = false;
-      setHidden(false);
-    }, SMART_REVEAL_DELAY);
-    return;
-  }
-  clearTimeout(occRevealTimer); // covered again → drop any pending reveal
-  // The policy says hide, but the gate still applies: never yank the bar out
-  // from under someone using it. The pointer-out handler re-checks.
-  if (S.pointerInside || interacting()) return;
-  S.pinnedReveal = false;
-  setHidden(true);
-}
-
 document.body.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", () => { if (wantsHideNow()) scheduleHide(); });
 
-// The notch is now its own small window. Clicking it calls the backend, which
-// shows the dock window again and fires `booki://reveal`. This must NOT go
-// through reveal() — that helper is the hover-trigger path and bails out in
-// click mode, which silently ate the notch click (the dock never came back in
-// \u201cal salir\u201d). An explicit summon always reveals, whatever the trigger.
-let pinTimer = null;
-function pinOpen() {
-  if (S.fullscreen) return;
-  S.manualHide = false;
-  S.pinnedReveal = true;
-  S.pinTouched = false;
-  clearTimeout(S.hideTimer);
-  setHidden(false);
-  // Outside clicks pass through the stage window now, so they can't release
-  // the pin — instead the pin ends when you visit the dock and leave, with a
-  // timeout valve for an accidental summon that's never used.
-  clearTimeout(pinTimer);
-  pinTimer = setTimeout(() => {
-    if (S.pinnedReveal && !S.pinTouched) {
-      S.pinnedReveal = false;
-      if (wantsHideNow()) scheduleHide();
-    }
-  }, 8000);
-}
 onReveal(pinOpen);
 
-// Soft reveal from notch hover: show the dock without stealing focus or pinning
-// it open — it can tuck again once the pointer leaves / smart-hide decides.
-// Only act when JS still thinks we're tucked; otherwise reveal_dock's emit
-// (also used by setHidden / setupAutoHide) would clear pending hide timers.
-function softOpen() {
-  if (S.fullscreen || !S.hiddenState) return;
-  S.manualHide = false;
-  clearTimeout(S.hideTimer);
-  setHidden(false);
-  // Soft reveal is not a pin — if smart-hide still wants us gone, arm the grace
-  // hide so we don't sit over the app forever (occlusion won't re-fire if true).
-  if (wantsHideNow() && !S.pointerInside) scheduleHide();
-}
 onSoftReveal(softOpen);
 
 // Hot edge: the cursor was pushed against the dock's screen edge — an explicit
@@ -4217,9 +3280,11 @@ function partyMode() {
 
 // Hand each module the calls it makes back into modules that import it
 // (see `deps` there).
-wireRunningWindows({ refreshTrashState, pollSlowdown });
+wireLiveWidgets({ startRunningPoll });
+wireRunningWindows({ refreshTrashState });
 wireUndoToast({ persist, render });
-wirePopovers({ refreshTrashState, scheduleHide });
-wireClipboardStack({ refreshClipboard, placeStackNear, closeStack });
+wirePopovers({ refreshTrashState });
+wireConfigSync({ render, hideTip, closeStack });
+wireClipboardStack({ placeStackNear, closeStack });
 
 boot();

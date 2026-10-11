@@ -8,6 +8,7 @@ import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { dockEl, stackEl } from "./dom.js";
 import { checkScreenChange } from "./frame.js";
+import { pollSlowdown } from "./live-widgets.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -116,5 +117,5 @@ export function startRunningPoll() {
   });
   S.appPollTick = tick;
   tick();
-  S.pollTimer = setInterval(tick, recoveryInterval(S.nativeSupport, "windows", 5000) * deps.pollSlowdown());
+  S.pollTimer = setInterval(tick, recoveryInterval(S.nativeSupport, "windows", 5000) * pollSlowdown());
 }

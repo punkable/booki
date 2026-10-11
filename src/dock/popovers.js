@@ -10,6 +10,7 @@ import { S } from "./state.js";
 import { baseName } from "./helpers.js";
 import { dockEl, esc } from "./dom.js";
 import { reframe, applyFrame } from "./frame.js";
+import { scheduleHide } from "./autohide.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -159,12 +160,12 @@ export function confirmTrash(paths, emptyBin = false) {
     }
     await deps.refreshTrashState();
     S.pinnedReveal = false;
-    deps.scheduleHide();
+    scheduleHide();
   });
   popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
     S.pinnedReveal = false;
-    deps.scheduleHide();
+    scheduleHide();
   });
   showConfirmPop(pop);
 }
@@ -186,7 +187,7 @@ function trashBlockedInfo() {
   ok.addEventListener("click", () => {
     closeTrashPop();
     S.pinnedReveal = false;
-    deps.scheduleHide();
+    scheduleHide();
   });
   pop.appendChild(ok);
   placePop(pop);
@@ -215,12 +216,12 @@ export function confirmMove(paths, item) {
       logMessage("error", `move: ${err}`);
     }
     S.pinnedReveal = false;
-    deps.scheduleHide();
+    scheduleHide();
   });
   popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
     S.pinnedReveal = false;
-    deps.scheduleHide();
+    scheduleHide();
   });
   showConfirmPop(pop);
 }

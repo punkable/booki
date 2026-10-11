@@ -6,6 +6,7 @@ import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { stackEl } from "./dom.js";
 import { applyFrame } from "./frame.js";
+import { refreshClipboard } from "./live-widgets.js";
 import { showErrorToast } from "./undo-toast.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -158,14 +159,14 @@ async function renderClipboardList(grid, foot) {
     act("pencil", t("clip.edit"), () => startClipEdit(row, entry, grid, foot));
     act("trash", t("clip.delete"), () => clipAction(async () => {
       await dockApi.clipboardDelete(entry.id);
-      deps.refreshClipboard();
+      refreshClipboard();
       await renderClipboardList(grid, foot);
     }));
     row.appendChild(acts);
 
     const copy = () => clipAction(async () => {
       await dockApi.clipboardCopy(entry.text);
-      deps.refreshClipboard();
+      refreshClipboard();
       row.classList.add("copied");
       setTimeout(() => row.classList.remove("copied"), 700);
     }, "overhaul.failed");
@@ -183,7 +184,7 @@ async function renderClipboardList(grid, foot) {
   clear.textContent = t("clip.clear");
   clear.addEventListener("click", () => clipAction(async () => {
     await dockApi.clipboardClear();
-    deps.refreshClipboard();
+    refreshClipboard();
     await renderClipboardList(grid, foot);
   }));
   foot.appendChild(clear);
@@ -224,7 +225,7 @@ function startClipEdit(row, entry, grid, foot) {
     ev.stopPropagation();
     const v = ta.value.trim();
     await clipAction(async () => {
-      if (v) { await dockApi.clipboardCopy(v); deps.refreshClipboard(); }
+      if (v) { await dockApi.clipboardCopy(v); refreshClipboard(); }
       await renderClipboardList(grid, foot);
     });
   });
