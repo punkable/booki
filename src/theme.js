@@ -37,7 +37,7 @@ export function applyTheme(cfg) {
   }
   // While in auto mode, re-check every few minutes so day/night flips live.
   clearInterval(autoTimer);
-  if ((cfg.theme || "system") === "auto") {
+  if (look.theme === "auto") {
     autoTimer = setInterval(() => applyTheme(cfg), 5 * 60 * 1000);
   }
 }
