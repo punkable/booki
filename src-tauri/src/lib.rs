@@ -291,9 +291,13 @@ fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<Str
 #[tauri::command]
 fn launch_app(path: String, args: Option<Vec<String>>) -> Result<(), String> {
     apps::launch(&path, &args.unwrap_or_default())?;
-    if config::load().usage_recommendations_enabled {
-        usage::record_launch(&path);
-    }
+    // Recording rewrites and fsyncs the usage file; the launch itself stays on
+    // this thread so the app opens right away, the bookkeeping does not.
+    tauri::async_runtime::spawn_blocking(move || {
+        if config::load().usage_recommendations_enabled {
+            usage::record_launch(&path);
+        }
+    });
     Ok(())
 }
 
@@ -453,26 +457,21 @@ async fn set_material(
     shapes: Vec<surface_geometry::MaterialShape>,
     tint: String,
 ) -> bool {
+    // The frontend still sends its tint, but the native surface is a pure
+    // blur and the tint is painted in CSS, so it is accepted and ignored.
+    let _ = tint;
     #[cfg(windows)]
     {
         let owner = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
         if owner == 0 {
             return false;
         }
-        let hex = tint.trim_start_matches('#');
-        let rgba = u32::from_str_radix(hex, 16).unwrap_or(0x1c1c1ea0);
-        let argb = if hex.len() == 8 {
-            // RRGGBBAA -> AARRGGBB
-            rgba.rotate_right(8)
-        } else {
-            0xff00_0000 | rgba
-        };
         let key = window.label().to_string();
         let dpr = window.scale_factor().unwrap_or(1.0);
         let (tx, rx) = std::sync::mpsc::channel();
         if app
             .run_on_main_thread(move || {
-                let _ = tx.send(win::material::apply(owner, &key, &shapes, dpr, argb));
+                let _ = tx.send(win::material::apply(owner, &key, &shapes, dpr));
             })
             .is_err()
         {
@@ -914,10 +913,13 @@ fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String>
     snapshot::write_bytes(std::path::Path::new(&path), &bytes)
 }
 
-/// Accent color derived from the desktop wallpaper (async: decodes an image).
+/// Accent color derived from the desktop wallpaper (decodes an image, so it
+/// runs on the blocking pool).
 #[tauri::command]
 async fn wallpaper_accent() -> Option<String> {
-    win::wallpaper_accent()
+    util::blocking(win::wallpaper_accent)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -929,7 +931,7 @@ fn system_events_support() -> serde_json::Value {
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false })
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false, "clipboard": false })
     }
 }
 
@@ -958,24 +960,51 @@ fn hotkeys_apply(
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    if !toggle.trim().is_empty() {
-        gs.register(toggle.trim()).map_err(|e| e.to_string())?;
+    // Every shortcut registers on its own. One combo that another app already
+    // owns used to return early and leave the launcher and position keys
+    // unregistered until a restart; now only that combo is missing and the
+    // error names it.
+    let mut failed: Vec<String> = Vec::new();
+    let toggle = toggle.trim();
+    if !toggle.is_empty() {
+        if let Err(error) = gs.register(toggle) {
+            log::warn!("Toggle shortcut {toggle} not registered: {error}");
+            failed.push(toggle.to_string());
+        }
     }
-    // Best-effort, like the position keys: another app may own the combo.
-    let parsed = launcher.trim().parse::<Shortcut>().ok();
-    if let Some(shortcut) = parsed {
-        let _ = gs.register(shortcut);
+    let launcher = launcher.trim();
+    let parsed = launcher.parse::<Shortcut>().ok();
+    match parsed {
+        Some(shortcut) => {
+            if let Err(error) = gs.register(shortcut) {
+                log::warn!("Launcher shortcut {launcher} not registered: {error}");
+                failed.push(launcher.to_string());
+            }
+        }
+        None if !launcher.is_empty() => {
+            log::warn!("Launcher shortcut {launcher} is not a valid shortcut");
+            failed.push(launcher.to_string());
+        }
+        None => {}
     }
     if let Ok(mut slot) = LAUNCHER_SHORTCUT.lock() {
         *slot = parsed;
     }
     if positions {
         for i in 1..=9 {
-            // Best-effort: another app may own one of the combos; skip it.
-            let _ = gs.register(format!("{modifier}+{i}").as_str());
+            // Best-effort: another app may own one of the nine combos, and
+            // the rest are still useful, so a miss is logged, not reported.
+            let combo = format!("{modifier}+{i}");
+            if let Err(error) = gs.register(combo.as_str()) {
+                log::info!("Position shortcut {combo} not registered: {error}");
+            }
         }
     }
-    Ok(())
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Shortcut not available: {}", failed.join(", ")))
+    }
 }
 
 /// Called from Settings when the position-hotkey options change.
@@ -1531,7 +1560,13 @@ pub fn run() {
                             }
                             // fullscreen game / movie / presentation → get out of the way.
                             // Smart notch also softens the dot while fullscreen.
-                            if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
+                            // Only the dock's hide-in-fullscreen acts on this
+                            // signal, so with it off the window scan is skipped.
+                            // Feeding `false` instead still sends the "fullscreen
+                            // ended" edge, so turning the option off mid-game
+                            // can't leave the dock blacked out.
+                            let fullscreen = cfg_cache.hide_in_fullscreen && win::is_fullscreen();
+                            if let Some(v) = debounce(&mut fs, fullscreen) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }
                             // The notch steps aside while an app owns the screen

@@ -11,9 +11,15 @@ pub(crate) struct RecentFile {
 /// The system's recently-opened files (newest first), read from the Windows
 /// Recent folder. Each entry is a .lnk we can open directly with the shell, so
 /// no fragile binary parsing is involved. Empty off-Windows or on any error.
+/// Reads the folder on the blocking pool, off the UI thread.
 #[tauri::command]
-pub(crate) fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
-    let cap = limit.unwrap_or(12).min(40);
+pub(crate) async fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
+    util::blocking(move || read_recent(limit.unwrap_or(12).min(40)))
+        .await
+        .unwrap_or_default()
+}
+
+fn read_recent(cap: usize) -> Vec<RecentFile> {
     let Some(data) = dirs::data_dir() else {
         return Vec::new();
     };
@@ -60,16 +66,22 @@ pub(crate) fn recent_files(limit: Option<usize>) -> Vec<RecentFile> {
 /// Recent files RELEVANT to one pinned app: keeps only entries whose default
 /// "open" handler is that app (via the shell's file associations), so an app's
 /// right-click menu never lists documents it has nothing to do with. Returns
-/// the REAL file paths (Recent .lnk targets), newest first. Async — resolving
-/// shortcuts + associations does COM work.
+/// the REAL file paths (Recent .lnk targets), newest first. Resolving shortcuts
+/// and associations does COM and disk work, so it runs on the blocking pool;
+/// shortcut_target initializes COM on that thread itself.
 #[tauri::command]
 pub(crate) async fn recent_files_for(app_path: String, limit: Option<usize>) -> Vec<RecentFile> {
-    let cap = limit.unwrap_or(6).min(20);
+    util::blocking(move || recent_for_app(&app_path, limit.unwrap_or(6).min(20)))
+        .await
+        .unwrap_or_default()
+}
+
+fn recent_for_app(app_path: &str, cap: usize) -> Vec<RecentFile> {
     // Pins are often .lnk shortcuts — compare against the real executable name.
     let exe = if app_path.to_ascii_lowercase().ends_with(".lnk") {
-        win::shortcut_target(&app_path).unwrap_or_else(|| app_path.clone())
+        win::shortcut_target(app_path).unwrap_or_else(|| app_path.to_string())
     } else {
-        app_path.clone()
+        app_path.to_string()
     };
     let exe_name = std::path::Path::new(&exe)
         .file_name()
@@ -80,7 +92,7 @@ pub(crate) async fn recent_files_for(app_path: String, limit: Option<usize>) -> 
     }
     let mut assoc_cache: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
     let mut out: Vec<RecentFile> = Vec::new();
-    for r in recent_files(Some(40)) {
+    for r in read_recent(40) {
         // Each Recent entry is a .lnk — its target gives the real file + extension.
         let Some(target) = win::shortcut_target(&r.path) else {
             continue;

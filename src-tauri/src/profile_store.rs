@@ -130,7 +130,31 @@ pub fn delete(root: &Path, name: &str) -> Result<String, String> {
         let _ = fs::remove_dir_all(&destination);
         return Err(error);
     }
+    prune_deleted(root, KEEP_DELETED);
     Ok(token)
+}
+
+/// How many deleted profiles stay restorable. Older ones are removed so the
+/// archive can't grow forever.
+const KEEP_DELETED: usize = 10;
+
+fn token_time(token: &str) -> u128 {
+    token
+        .split('-')
+        .next()
+        .and_then(|nanos| nanos.parse().ok())
+        .unwrap_or(0)
+}
+
+/// Remove all but the `keep` newest deleted-profile archives.
+fn prune_deleted(root: &Path, keep: usize) {
+    let mut records = deleted(root);
+    records.sort_by_key(|record| std::cmp::Reverse(token_time(&record.token)));
+    for record in records.into_iter().skip(keep) {
+        if let Ok(directory) = deleted_path(root, &record.token) {
+            let _ = fs::remove_dir_all(directory);
+        }
+    }
 }
 
 pub fn deleted(root: &Path) -> Vec<Deleted> {
@@ -228,6 +252,29 @@ mod tests {
         assert!(!preview(&root, "Work").unwrap().recovered);
         assert!(preview(&root, "Work").unwrap().config.autostart);
         assert!(restore(&root, "../Work").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn only_the_newest_deleted_profiles_are_kept() {
+        let root =
+            std::env::temp_dir().join(format!("booki-profiles-prune-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let text = serde_json::to_string(&Config::default()).unwrap();
+        let mut tokens = Vec::new();
+        for i in 0..KEEP_DELETED + 3 {
+            let name = format!("P{i}");
+            snapshot::write(&path(&root, &name).unwrap(), &text).unwrap();
+            tokens.push(delete(&root, &name).unwrap());
+        }
+        let kept: Vec<String> = deleted(&root).into_iter().map(|d| d.token).collect();
+        assert_eq!(kept.len(), KEEP_DELETED);
+        for newest in &tokens[3..] {
+            assert!(kept.contains(newest));
+        }
+        for oldest in &tokens[..3] {
+            assert!(!kept.contains(oldest));
+        }
         fs::remove_dir_all(root).unwrap();
     }
 

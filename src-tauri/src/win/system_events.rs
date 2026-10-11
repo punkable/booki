@@ -25,7 +25,25 @@ use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVE
 use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-static QUEUE: OnceLock<SyncSender<&'static str>> = OnceLock::new();
+/// Wakes the delivery thread. The signals themselves live in PENDING, one flag
+/// per kind, so a burst of window events can never push out a clipboard,
+/// resume or display signal: the old queue carried the kinds themselves and
+/// dropped whatever arrived while its 32 slots were full.
+static QUEUE: OnceLock<SyncSender<()>> = OnceLock::new();
+const KINDS: [&str; 11] = [
+    "ready",
+    "windows",
+    "clipboard",
+    "preferences",
+    "display",
+    "resume",
+    "media",
+    "session",
+    "volume",
+    "device",
+    "catalog",
+];
+static PENDING: [AtomicBool; KINDS.len()] = [const { AtomicBool::new(false) }; KINDS.len()];
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
 pub static VOLUME: AtomicBool = AtomicBool::new(false);
 pub static WINDOWS: AtomicBool = AtomicBool::new(false);
@@ -34,10 +52,30 @@ pub static CATALOG: AtomicBool = AtomicBool::new(false);
 /// The last window outside Booki that came to the foreground (the hook skips
 /// our own process), so a dock click can tell which app was in front.
 pub static LAST_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+/// Mark `kind` pending and wake the delivery thread. If the flag was already
+/// set, the delivery that clears it is still ahead and covers this signal too.
+/// If the wake can't be queued, a wake is already waiting, and the drain it
+/// triggers runs after this flag was set, so nothing is lost.
 fn signal(kind: &'static str) {
-    if let Some(queue) = QUEUE.get() {
-        let _ = queue.try_send(kind);
+    let Some(index) = KINDS.iter().position(|known| *known == kind) else {
+        return;
+    };
+    if PENDING[index].swap(true, Ordering::AcqRel) {
+        return;
     }
+    if let Some(queue) = QUEUE.get() {
+        let _ = queue.try_send(());
+    }
+}
+
+/// Clear and return every pending kind.
+fn take_pending() -> std::collections::HashSet<&'static str> {
+    KINDS
+        .iter()
+        .zip(PENDING.iter())
+        .filter(|(_, flag)| flag.swap(false, Ordering::AcqRel))
+        .map(|(kind, _)| *kind)
+        .collect()
 }
 
 #[implement(IAudioEndpointVolumeCallback)]
@@ -304,9 +342,9 @@ fn watch_catalog() {
         }
     });
 }
-/// One bounded event queue for the process, with a 100ms coalescing window.
+/// One wake-up queue for the process, with a 100ms coalescing window.
 pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
-    let (tx, rx) = sync_channel(32);
+    let (tx, rx) = sync_channel::<()>(1);
     if QUEUE.set(tx).is_err() {
         return;
     }
@@ -371,16 +409,18 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
                 .ok()
         });
         deliver("ready");
-        while let Ok(first) = rx.recv() {
+        while rx.recv().is_ok() {
+            // Let a burst settle, then take everything that is pending. A
+            // signal set after this drain sends a fresh wake.
             let started = Instant::now();
-            let mut batch = std::collections::HashSet::from([first]);
             while let Some(remaining) = Duration::from_millis(100).checked_sub(started.elapsed()) {
-                match rx.recv_timeout(remaining) {
-                    Ok(kind) => {
-                        batch.insert(kind);
-                    }
-                    Err(_) => break,
+                if rx.recv_timeout(remaining).is_err() {
+                    break;
                 }
+            }
+            let mut batch = take_pending();
+            if batch.is_empty() {
+                continue;
             }
             if batch.remove("session") {
                 media = manager.as_ref().and_then(media_lease);

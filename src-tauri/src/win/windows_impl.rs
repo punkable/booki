@@ -1222,7 +1222,16 @@ pub fn sync_context_menu(
             Ok(())
         }
     }
-    unsafe fn create(path: &str) -> Result<HKEY, String> {
+    /// An open registry key, closed when dropped, so an early `?` return can't
+    /// leak the handle.
+    struct OwnedKey(HKEY);
+    impl Drop for OwnedKey {
+        fn drop(&mut self) {
+            let _ = unsafe { RegCloseKey(self.0) };
+        }
+    }
+
+    unsafe fn create(path: &str) -> Result<OwnedKey, String> {
         let wpath = wide(path);
         let mut key = HKEY::default();
         let r = unsafe {
@@ -1241,43 +1250,65 @@ pub fn sync_context_menu(
         if r.is_err() {
             Err(format!("reg create {path} failed ({r:?})"))
         } else {
-            Ok(key)
+            Ok(OwnedKey(key))
         }
     }
 
-    unsafe {
-        for base in ["*", "Directory"] {
-            let root = format!("Software\\Classes\\{base}\\shell\\{RUN_VALUE}");
-            // Always start clean (also removes the menu when disabling).
-            let wroot = wide(&root);
-            let _ = RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr()));
-            if !enabled {
-                continue;
-            }
-            let key = create(&root)?;
-            set_str(key, Some("MUIVerb"), RUN_VALUE)?;
-            set_str(key, Some("Icon"), &format!("\"{exe}\""))?;
-            // An empty SubCommands + subkeys under shell\ = a cascading menu.
-            set_str(key, Some("SubCommands"), "")?;
-            let _ = RegCloseKey(key);
+    unsafe fn write_menu(
+        root: &str,
+        exe: &str,
+        label_pin: &str,
+        group_entries: &[(String, String)],
+    ) -> Result<(), String> {
+        let key = create(root)?;
+        set_str(key.0, Some("MUIVerb"), RUN_VALUE)?;
+        set_str(key.0, Some("Icon"), &format!("\"{exe}\""))?;
+        // An empty SubCommands + subkeys under shell\ = a cascading menu.
+        set_str(key.0, Some("SubCommands"), "")?;
+        drop(key);
 
-            // Entries sort alphabetically by key name → numeric prefixes fix order.
-            let pin_key = create(&format!("{root}\\shell\\01_pin"))?;
-            set_str(pin_key, Some("MUIVerb"), label_pin)?;
-            let _ = RegCloseKey(pin_key);
-            let cmd = create(&format!("{root}\\shell\\01_pin\\command"))?;
-            set_str(cmd, None, &format!("\"{exe}\" --pin \"%1\""))?;
-            let _ = RegCloseKey(cmd);
+        // Entries sort alphabetically by key name → numeric prefixes fix order.
+        let pin_key = create(&format!("{root}\\shell\\01_pin"))?;
+        set_str(pin_key.0, Some("MUIVerb"), label_pin)?;
+        drop(pin_key);
+        let cmd = create(&format!("{root}\\shell\\01_pin\\command"))?;
+        set_str(cmd.0, None, &format!("\"{exe}\" --pin \"%1\""))?;
+        drop(cmd);
 
-            for (i, (id, label)) in group_entries.iter().enumerate() {
-                let sub = format!("{root}\\shell\\10_{i:02}");
-                let gk = create(&sub)?;
-                set_str(gk, Some("MUIVerb"), label)?;
-                let _ = RegCloseKey(gk);
-                let gc = create(&format!("{sub}\\command"))?;
-                set_str(gc, None, &format!("\"{exe}\" --pin-group \"{id}\" \"%1\""))?;
-                let _ = RegCloseKey(gc);
-            }
+        for (i, (id, label)) in group_entries.iter().enumerate() {
+            let sub = format!("{root}\\shell\\10_{i:02}");
+            let gk = create(&sub)?;
+            set_str(gk.0, Some("MUIVerb"), label)?;
+            drop(gk);
+            let gc = create(&format!("{sub}\\command"))?;
+            set_str(
+                gc.0,
+                None,
+                &format!("\"{exe}\" --pin-group \"{id}\" \"%1\""),
+            )?;
+        }
+        Ok(())
+    }
+
+    let roots =
+        ["*", "Directory"].map(|base| format!("Software\\Classes\\{base}\\shell\\{RUN_VALUE}"));
+    let delete_all = || {
+        for root in &roots {
+            let wroot = wide(root);
+            let _ = unsafe { RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr())) };
+        }
+    };
+    // Always start clean (also removes the menu when disabling).
+    delete_all();
+    if !enabled {
+        return Ok(());
+    }
+    for root in &roots {
+        if let Err(error) = unsafe { write_menu(root, exe, label_pin, group_entries) } {
+            // A half-written cascade shows a broken or empty menu in Explorer;
+            // leave no menu at all and let the caller report the error.
+            delete_all();
+            return Err(error);
         }
     }
     Ok(())
@@ -1350,6 +1381,9 @@ pub fn trash_paths(paths: &[String]) -> Result<(), String> {
     };
     if paths.is_empty() {
         return Ok(());
+    }
+    for p in paths {
+        crate::util::check_shell_path(p)?;
     }
     // pFrom is a double-null-terminated list of null-separated paths.
     let mut buf: Vec<u16> = Vec::new();
@@ -1572,6 +1606,10 @@ pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
+    for p in paths {
+        crate::util::check_shell_path(p)?;
+    }
+    crate::util::check_shell_path(dest)?;
     let mut from: Vec<u16> = Vec::new();
     for p in paths {
         from.extend(p.encode_utf16());

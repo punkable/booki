@@ -79,14 +79,25 @@ pub(crate) fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool
     hist.len() != before
 }
 
-/// Encrypt (DPAPI) and persist the history.
-///
-/// Callers must NOT hold the CLIP_HISTORY guard while calling this. It was
-/// previously invoked from inside the lock at all nine call sites, and
-/// save_config — a synchronous command, so it runs on the UI thread — takes the
-/// same lock, which meant a slow disk could freeze the whole dock. Mutate under
-/// the guard, clone a snapshot, drop the guard, then call this.
-pub(crate) fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
+/// Serializes every write of the history file. The copy is taken while this
+/// lock is held, so the last write always carries the newest list. With the
+/// old clone-then-write order the watcher could clone, the user could clear
+/// and save the empty list, and the watcher's older clone would then land last
+/// and bring the history back on the next start.
+static CLIP_PERSIST: Mutex<()> = Mutex::new(());
+
+/// Persist the current history. Callers must NOT hold the CLIP_HISTORY guard.
+/// The history lock is held only for the copy, so a slow disk never stalls
+/// readers of the list (save_config takes it on the UI thread).
+pub(crate) fn clip_persist(cfg: &Config) {
+    let _write = CLIP_PERSIST.lock().unwrap_or_else(|e| e.into_inner());
+    let snapshot = CLIP_HISTORY.lock().unwrap().clone();
+    clip_write_disk(&snapshot, cfg);
+}
+
+/// Encrypt (DPAPI) and write one copy of the history. Only `clip_persist`
+/// calls this, with the persist lock held.
+fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
     let path = clip_history_path();
     if !cfg.clipboard_persist {
         CLIP_STORAGE_FAILED.store(false, Ordering::Relaxed);
@@ -128,12 +139,8 @@ pub(crate) fn clip_parse_disk(bytes: &[u8]) -> Option<Vec<ClipEntry>> {
 }
 
 pub(crate) fn clip_apply_config(cfg: &Config) {
-    let snapshot = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
-        clip_prune_locked(&mut hist, cfg);
-        hist.clone()
-    };
-    clip_write_disk(&snapshot, cfg);
+    clip_prune_locked(&mut CLIP_HISTORY.lock().unwrap(), cfg);
+    clip_persist(cfg);
 }
 
 pub(crate) fn clip_load_from_disk() {
@@ -160,24 +167,17 @@ pub(crate) fn clip_load_from_disk() {
         .unwrap_or(0)
         .saturating_add(1);
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
-    let snapshot = {
-        let mut current = CLIP_HISTORY.lock().unwrap();
-        *current = hist;
-        current.clone()
-    };
+    *CLIP_HISTORY.lock().unwrap() = hist;
     if loaded_legacy || cfg.clipboard_persist {
-        clip_write_disk(&snapshot, &cfg);
+        clip_persist(&cfg);
     }
 }
 
 pub(crate) fn clip_enforce_current_policy() {
     let cfg = config::load();
-    let (changed, snapshot) = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
-        (clip_prune_locked(&mut hist, &cfg), hist.clone())
-    };
+    let changed = clip_prune_locked(&mut CLIP_HISTORY.lock().unwrap(), &cfg);
     if changed || !cfg.clipboard_persist {
-        clip_write_disk(&snapshot, &cfg);
+        clip_persist(&cfg);
     }
 }
 
@@ -242,12 +242,12 @@ pub(crate) fn clip_remember(text: &str) {
     if cfg.clipboard_sensitive_guard && clip_looks_sensitive(&text) {
         return;
     }
-    let (should_write, snapshot) = {
+    let should_write = {
         let mut hist = CLIP_HISTORY.lock().unwrap();
         let pruned = clip_prune_locked(&mut hist, &cfg);
         if hist.first().map(|e| e.text == text).unwrap_or(false) {
             // Already the most recent entry — nothing changed.
-            (pruned || !cfg.clipboard_persist, hist.clone())
+            pruned || !cfg.clipboard_persist
         } else {
             let (favorite, private) = hist
                 .iter()
@@ -266,11 +266,11 @@ pub(crate) fn clip_remember(text: &str) {
                 },
             );
             clip_prune_locked(&mut hist, &cfg);
-            (true, hist.clone())
+            true
         }
     };
     if should_write {
-        clip_write_disk(&snapshot, &cfg);
+        clip_persist(&cfg);
     }
 }
 
@@ -286,29 +286,41 @@ pub(crate) fn clipboard_feature_active(cfg: &config::Config) -> bool {
     cfg.clipboard_persist || has_pin(&cfg.pinned)
 }
 
-/// Clipboard history for the widget flyout (newest first).
 #[tauri::command]
 pub(crate) fn clipboard_storage_failed() -> bool {
     CLIP_STORAGE_FAILED.load(Ordering::Relaxed)
 }
 
+// Every command below can encrypt and fsync the history file, and that write
+// waits for any write already in progress, so they all run on the blocking
+// pool instead of the UI thread.
+
+/// Clipboard history for the widget flyout (newest first).
 #[tauri::command]
-pub(crate) fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
-    clip_enforce_current_policy();
-    let hist = CLIP_HISTORY.lock().unwrap();
-    let cfg = config::load();
-    let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(clip_limit(&cfg));
-    hist.iter().take(cap).cloned().collect()
+pub(crate) async fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
+    util::blocking(move || {
+        clip_enforce_current_policy();
+        let cfg = config::load();
+        let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(clip_limit(&cfg));
+        let hist = CLIP_HISTORY.lock().unwrap();
+        hist.iter().take(cap).cloned().collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// Just the count, for the widget's badge (cheap to poll often).
 #[tauri::command]
-pub(crate) fn clipboard_count() -> usize {
-    clip_enforce_current_policy();
-    CLIP_HISTORY.lock().unwrap().len()
+pub(crate) async fn clipboard_count() -> usize {
+    util::blocking(|| {
+        clip_enforce_current_policy();
+        CLIP_HISTORY.lock().unwrap().len()
+    })
+    .await
+    .unwrap_or_default()
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Default)]
 pub(crate) struct ClipSummary {
     pub(crate) count: usize,
     pub(crate) preview: Option<String>,
@@ -317,72 +329,72 @@ pub(crate) struct ClipSummary {
 /// Count + the newest entry's text in ONE round trip — the bar widget shows a
 /// live preview of what you last copied, not just a bare number.
 #[tauri::command]
-pub(crate) fn clipboard_summary() -> ClipSummary {
-    clip_enforce_current_policy();
-    let hist = CLIP_HISTORY.lock().unwrap();
-    ClipSummary {
-        count: hist.len(),
-        preview: hist.first().map(|e| e.text.clone()),
-    }
+pub(crate) async fn clipboard_summary() -> ClipSummary {
+    util::blocking(|| {
+        clip_enforce_current_policy();
+        let hist = CLIP_HISTORY.lock().unwrap();
+        ClipSummary {
+            count: hist.len(),
+            preview: hist.first().map(|e| e.text.clone()),
+        }
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// Put a history entry (or freshly-edited text) back on the OS clipboard, and
 /// record/bump it in history immediately — instant UI feedback instead of
 /// waiting for the background watcher's next tick.
 #[tauri::command]
-pub(crate) fn clipboard_copy(text: String) -> bool {
-    let ok = win::set_clipboard_text(&text);
-    if ok {
-        clip_remember(&text);
-    }
-    ok
+pub(crate) async fn clipboard_copy(text: String) -> bool {
+    util::blocking(move || {
+        let ok = win::set_clipboard_text(&text);
+        if ok {
+            clip_remember(&text);
+        }
+        ok
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// Change the in-memory list, then persist it, off the UI thread.
+async fn clip_edit(edit: impl FnOnce(&mut Vec<ClipEntry>, &Config) + Send + 'static) {
+    let _ = util::blocking(move || {
+        let cfg = config::load();
+        edit(&mut CLIP_HISTORY.lock().unwrap(), &cfg);
+        clip_persist(&cfg);
+    })
+    .await;
 }
 
 #[tauri::command]
-pub(crate) fn clipboard_delete(id: u64) {
-    let cfg = config::load();
-    let snapshot = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
-        hist.retain(|e| e.id != id);
-        hist.clone()
-    };
-    clip_write_disk(&snapshot, &cfg);
+pub(crate) async fn clipboard_delete(id: u64) {
+    clip_edit(move |hist, _| hist.retain(|e| e.id != id)).await;
 }
 
 #[tauri::command]
-pub(crate) fn clipboard_favorite(id: u64, favorite: bool) {
-    let cfg = config::load();
-    let snapshot = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
+pub(crate) async fn clipboard_favorite(id: u64, favorite: bool) {
+    clip_edit(move |hist, cfg| {
         if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
             entry.favorite = favorite;
         }
-        clip_prune_locked(&mut hist, &cfg);
-        hist.clone()
-    };
-    clip_write_disk(&snapshot, &cfg);
+        clip_prune_locked(hist, cfg);
+    })
+    .await;
 }
 
 #[tauri::command]
-pub(crate) fn clipboard_private(id: u64, private: bool) {
-    let cfg = config::load();
-    let snapshot = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
+pub(crate) async fn clipboard_private(id: u64, private: bool) {
+    clip_edit(move |hist, _| {
         if let Some(entry) = hist.iter_mut().find(|entry| entry.id == id) {
             entry.private = private;
         }
-        hist.clone()
-    };
-    clip_write_disk(&snapshot, &cfg);
+    })
+    .await;
 }
 
 #[tauri::command]
-pub(crate) fn clipboard_clear() {
-    let cfg = config::load();
-    let snapshot = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
-        hist.clear();
-        hist.clone()
-    };
-    clip_write_disk(&snapshot, &cfg);
+pub(crate) async fn clipboard_clear() {
+    clip_edit(|hist, _| hist.clear()).await;
 }
