@@ -8,11 +8,7 @@ import { stackEl } from "./dom.js";
 import { applyFrame } from "./frame.js";
 import { refreshClipboard } from "./live-widgets.js";
 import { showErrorToast } from "./undo-toast.js";
-
-// Calls into modules that import this one. dock.js wires them before boot, so
-// the imports never form a cycle.
-const deps = {};
-export function wireClipboardStack(fns) { Object.assign(deps, fns); }
+import { placeStackNear, closeStack } from "./stack.js";
 
 // Clipboard-history flyout: the "clipboard" widget's click target. Reuses the
 // same #stack panel/positioning as the folder/group flyout (one flyout
@@ -22,7 +18,7 @@ let clipStackQuery = "";
 let clipRenderSeq = 0;
 export async function toggleClipboardStack(tileEl) {
   if (S.stackOpen) {
-    deps.closeStack();
+    closeStack();
     return;
   }
   stackEl.innerHTML = "";
@@ -41,7 +37,7 @@ export async function toggleClipboardStack(tileEl) {
   close.className = "stack-close";
   close.title = t("stack.close");
   close.innerHTML = icon("x");
-  close.addEventListener("click", deps.closeStack);
+  close.addEventListener("click", closeStack);
   head.appendChild(close);
   stackEl.appendChild(head);
 
@@ -84,7 +80,7 @@ export async function toggleClipboardStack(tileEl) {
   S.stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
-  const placeStack = () => deps.placeStackNear(tileEl);
+  const placeStack = () => placeStackNear(tileEl);
   S.pendingReplace = placeStack;
 
   await renderClipboardList(grid, foot);

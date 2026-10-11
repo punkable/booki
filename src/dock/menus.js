@@ -23,11 +23,9 @@ import {
   addSeparatorAfter,
   removeItem,
 } from "./pin-ops.js";
-
-// Calls into modules that import this one. dock.js wires them before boot, so
-// the imports never form a cycle.
-const deps = {};
-export function wireMenus(fns) { Object.assign(deps, fns); }
+import { openStack, openAddPanel, openLauncher } from "./stack.js";
+import { enterEdit } from "./edit-reorder.js";
+import { ungroup, takeOutChild } from "./group-ops.js";
 
 // ───────────────────────── Context menu ─────────────────────────
 
@@ -71,7 +69,7 @@ export function openMenu(e, item) {
     add("folder", t("m.open"), () => {
       // Always open (never toggle-close) — right-click → Open should reveal.
       const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-      if (tileEl) deps.openStack(tileEl, item);
+      if (tileEl) openStack(tileEl, item);
     });
   } else if (item.kind === "trash") {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
@@ -112,10 +110,10 @@ export function openMenu(e, item) {
       add("palette", t("m.changeIcon"), () => changeIcon(item));
       if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     }
-    if (item.kind === "group") add("grid", t("group.ungroup"), () => deps.ungroup(item));
+    if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
   }
   sep();
-  add("plus", t("add.open"), () => deps.openAddPanel(dockEl));
+  add("plus", t("add.open"), () => openAddPanel(dockEl));
   add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
   sep();
   add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
@@ -175,12 +173,12 @@ export function openBackgroundMenu(e) {
   ctxMenu.replaceChildren();
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead("Booki", t("m.dockMenu"));
-  add("plus", t("add.open"), () => deps.openAddPanel(dockEl));
-  add("search", t("launcher.menu"), deps.openLauncher);
+  add("plus", t("add.open"), () => openAddPanel(dockEl));
+  add("search", t("launcher.menu"), openLauncher);
   const profilesSlot = document.createElement("div");
   ctxMenu.append(profilesSlot);
   sep();
-  add("grid", t("overhaul.editing"), deps.enterEdit);
+  add("grid", t("overhaul.editing"), enterEdit);
   add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
     const item = findWidgetPin(el.dataset.id);
@@ -210,7 +208,7 @@ export function openFileMenu(e, item, parent, openFolder) {
     add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));
     if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
   }
-  if (parent) add("take-out", t("group.takeOut"), () => deps.takeOutChild(parent, item.id));
+  if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
   sep(); add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   placeMenu(e);
 }
