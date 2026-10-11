@@ -28,7 +28,7 @@ import { createDraftSaver } from "./dock/draft-saver.js";
 import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
-import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
+import { widgetWidth } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
 import { formatDegrees } from "./dock/weather-codes.js";
@@ -48,7 +48,6 @@ import {
   canonicalWidget,
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
-import { availW, availH, rectFromElement, pointInRect, hitSignature } from "./dock/geometry.js";
 import { placeBesideBar, transformOrigin } from "./dock/placement.js";
 import {
   MEDIA_SVG,
@@ -81,14 +80,7 @@ import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/cont
 import { buildAddPanel } from "./dock/add-panel.js";
 import { buildLauncher } from "./dock/launcher.js";
 import { desiredProfile } from "./profile-rules.js";
-import {
-  reportMaterial,
-  shapeOf,
-  materialTint,
-  setMaterialTint,
-  applyMaterial,
-  followFrames,
-} from "./material.js";
+import { materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
 import { S } from "./dock/state.js";
 import {
   emitConfigChanged,
@@ -115,6 +107,23 @@ import {
   stackEl,
 } from "./dock/dom.js";
 import {
+  pointInLiveHitArea,
+  MATERIAL_PANELS,
+  reportDockMaterial,
+  reportHitRects,
+  scheduleHitReport,
+} from "./dock/hit-regions.js";
+import {
+  setAllSizes,
+  resetMagnify,
+  invalidateMag,
+  magnify,
+  magPointer,
+  edgeAutoScroll,
+  stopEdgeScroll,
+} from "./dock/magnify.js";
+import { fitDock, reframe, SHADOW_PAD, applyFrame, checkScreenChange } from "./dock/frame.js";
+import {
   windowsFor,
   setAttention,
   clearAttention,
@@ -122,6 +131,16 @@ import {
   wireRunningWindows,
 } from "./dock/running-windows.js";
 import { hideUndoToast, placeUndoToast, showUndoToast, wireUndoToast } from "./dock/undo-toast.js";
+import {
+  popButton,
+  showConfirmPop,
+  dismissPop,
+  closeTrashPop,
+  placePop,
+  confirmTrash,
+  confirmMove,
+  wirePopovers,
+} from "./dock/popovers.js";
 import { toggleClipboardStack, wireClipboardStack } from "./dock/clipboard-stack.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
 
@@ -544,45 +563,6 @@ async function render() {
   // syncPolls() paints at once and restarts timers only if the live widget
   // kinds changed; it self-guards while the dock is tucked away.
   if (!S.hiddenState) syncPolls();
-}
-
-// Smallest a shrunk icon may get before we stop shrinking and start scrolling —
-// below this they're too tiny to recognise.
-const MIN_TILE = 30;
-
-// Keep the dock within the screen no matter how many items are pinned. First
-// shrink icons to fit (macOS-style). If even at the minimum size they'd still
-// run past the screen, cap the bar to the screen and switch to SCROLL mode
-// (wheel + hover the ends) so you can reach the side items — the bar never grows
-// past the screen and never "breaks".
-function fitDock() {
-  setAllSizes(baseSize());
-  const vertical = isVertical();
-  const span = vertical ? availH(isTauri) : availW(isTauri);
-  // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
-  // usable, or a full bar would overflow past the far screen edge.
-  const slotPad = S.cfg && S.cfg.notchPosition && S.cfg.notchPosition !== "center" ? span * 0.12 : 0;
-  const usable = span - SHADOW_PAD * 2 - 24 - slotPad;
-  let overflow = false;
-  if (usable > 0) {
-    const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
-    if (natural > usable) {
-      const eff = chooseFitSize(baseSize(), natural, usable, S.cfg.overflowMode);
-      if (eff >= MIN_TILE) {
-        setAllSizes(eff);
-        overflow = (vertical ? dockEl.scrollHeight : dockEl.scrollWidth) > usable;
-      } else {
-        setAllSizes(MIN_TILE); // floor reached → the rest lives behind a scroll
-        const natural2 = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
-        overflow = natural2 > usable;
-      }
-    }
-  }
-  document.body.classList.toggle("dock-overflow", overflow);
-  // Cap the visible bar so the window can never exceed the screen.
-  dockEl.style.maxWidth = overflow && !vertical ? `${usable}px` : "";
-  dockEl.style.maxHeight = overflow && vertical ? `${usable}px` : "";
-  invalidateMag(); // tile sizes/positions just changed → re-measure lazily
 }
 
 function actionTile(item) {
@@ -1508,175 +1488,6 @@ async function addPaths(paths, forceKind, atIndex = null, { showError = true } =
   return true;
 }
 
-// ──────────────────────── Magnify on hover ────────────────────────
-
-function setAllSizes(size) {
-  dockEl.querySelectorAll(".tile").forEach((t) => {
-    const isSep = t.classList.contains("separator");
-    t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
-    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, S.cfg.spacing ?? 6, findWidgetPin(t.dataset.id)?.style || {})}px`);
-    t.style.transform = "";
-    t.style.zIndex = "";
-    t.classList.remove("focus");
-  });
-}
-
-function resetMagnify() {
-  // Drop "live" mode first so restoring the transform transition lets the tiles
-  // ease smoothly back to rest instead of snapping.
-  dockEl.classList.remove("mag-live");
-  dockEl.querySelectorAll(".tile").forEach((t) => {
-    t.style.transform = "";
-    t.style.zIndex = "";
-    t.classList.remove("focus");
-  });
-  magFocus = null;
-  // Resting hit-rects — don't leave the inflated mag union clickable.
-  S.lastHitSig = "";
-  scheduleHitReport();
-}
-
-// Cached tile geometry for magnify: measured ONCE per layout (transforms don't
-// affect offsetLeft/Top, so the resting centers stay valid), then reused on
-// every pointer move — no more read/write layout thrashing in the hot loop.
-let magCache = null;
-let magFocus = null;
-function invalidateMag() {
-  magCache = null;
-  S.magDockRect = null;
-  magFocus = null;
-}
-function buildMagCache() {
-  const vertical = isVertical();
-  // Measure the bar's viewport rect ONCE here (it only moves on reframe/edge
-  // change, both of which invalidate the cache) so the hot per-frame loop never
-  // reads layout again — pure compositor writes = smooth at any refresh rate.
-  S.magDockRect = dockEl.getBoundingClientRect();
-  magCache = [...dockEl.querySelectorAll(".tile")].map((el) => ({
-    el,
-    center: vertical ? el.offsetTop + el.offsetHeight / 2 : el.offsetLeft + el.offsetWidth / 2,
-    // Widgets are info CARDS, not launch icons — scaling a big media/clock card
-    // covers its neighbours, so they (and separators) don't magnify.
-    noMag: el.classList.contains("separator") || el.classList.contains("widget"),
-  }));
-}
-
-// Booki magnify — Apple/Cool Dock style wave: tiles scale + lift toward the
-// screen interior AND nudge along the main axis so neighbours make room
-// instead of stacking. Geometry is cached; this loop only writes transforms.
-function magnify(clientX, clientY) {
-  if (S.cfg.magnification === false || (S.cfg.magnifyStyle || "spring") === "off") return;
-  if (dockEl.classList.contains("dragging") || S.editMode) return;
-  // In scroll (overflow) mode the bar clips its ends, so a scaled tile would be
-  // cut off — skip magnify; the name still shows via tooltip on hover.
-  if (document.body.classList.contains("dock-overflow")) return;
-  if (!magCache) buildMagCache();
-  // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
-  // you leave still eases. This is what makes it feel crisp at high refresh.
-  // Guarded: re-adding a class that is already there still queues a mutation
-  // record, and this runs every frame — that single write was waking the
-  // observer below once per frame, which scheduled a full hit-rect report that
-  // raced the one magnify schedules itself.
-  if (!dockEl.classList.contains("mag-live")) dockEl.classList.add("mag-live");
-  const base = baseSize();
-  // Reduced motion reaches magnify here, not through CSS: the wave is written
-  // as an inline transform every frame, which the global override cannot touch,
-  // so the setting used to do nothing at all to the dock's largest animation.
-  // What goes is the decoration — neighbours rippling outward, tiles lifting
-  // off the bar. What stays is a small scale on the tile under the pointer,
-  // because that is not ornament: it is how you know what you are about to
-  // click, and removing it would make the dock harder to use, not calmer.
-  const calm = reduceMotion();
-  const maxScale = calm ? Math.min(1.12, Math.max(1, S.cfg.zoom || 1.25)) : Math.max(1, S.cfg.zoom || 1.25);
-  const spread = calm ? base * 0.6 : base * 2.0;
-  const vertical = isVertical();
-  const mainAxis = vertical ? "Y" : "X";
-  const liftAxis = vertical ? "X" : "Y";
-  const liftSign = (vertical ? S.cfg.edge === "left" : S.cfg.edge === "top") ? 1 : -1;
-  const dr = S.magDockRect;
-  const pointer = vertical ? clientY - dr.top : clientX - dr.left;
-  let best = null;
-  let bestInf = 0;
-  for (const item of magCache) {
-    const delta = item.center - pointer;
-    const influence = item.noMag ? 0 : Math.max(0, 1 - (Math.abs(delta) / spread) ** 2);
-    const scale = item.noMag ? 1 : 1 + (maxScale - 1) * influence;
-    // Lift toward the screen interior (translate BEFORE scale so it stays a
-    // constant px amount). Neighbours also push along the bar — the wave.
-    // Rail-origin scale does most of the "lift"; keep translate modest.
-    const lift = calm ? 0 : Math.round(influence * 5);
-    const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    const push = item.noMag || calm ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
-    const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
-    item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
-    item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
-    if (!item.noMag && influence > bestInf) {
-      bestInf = influence;
-      best = item.el;
-    }
-  }
-  const focus = best && bestInf > 0.45 ? best : null;
-  if (focus !== magFocus) {
-    if (magFocus) magFocus.classList.remove("focus");
-    if (focus) focus.classList.add("focus");
-    magFocus = focus;
-  }
-  // Hit-rects must track the wave — style mutations are ignored while mag-live,
-  // so schedule from this rAF instead of waiting for the MutationObserver.
-  scheduleMagHitRects();
-}
-
-let magHitTimer = 0;
-function scheduleMagHitRects() {
-  if (magHitTimer) return;
-  magHitTimer = requestAnimationFrame(() => {
-    magHitTimer = 0;
-    if (!dockEl.classList.contains("mag-live")) {
-      reportHitRects();
-      return;
-    }
-    reportHitRectsLive();
-  });
-}
-
-/** Hit-test using transformed tile bounds while magnify is live. */
-function reportHitRectsLive() {
-  reportDockMaterial();
-  if (!dockApi.setHitRects) return;
-  try {
-    // Derive the region from the bar's RESTING rect plus the most the wave can
-    // ever add, instead of measuring every tile.
-    //
-    // This used to walk all the tiles and getBoundingClientRect() each one,
-    // from inside the magnify rAF — a forced layout right after writing their
-    // transforms, then an IPC call, every frame. On a 144Hz screen with a full
-    // bar that is ~2200 rect reads and 144 backend calls a second for as long
-    // as the cursor rests on the dock.
-    //
-    // The bound is exact: magnify scales a tile by at most `zoom` about the
-    // rail, lifts it 5px perpendicular and pushes neighbours base*0.22 along
-    // the bar. A pad covering all three is a superset of the real union — and,
-    // unlike the union, it does not change as the wave travels, so the
-    // signature check below collapses the whole gesture into one call.
-    const dr = S.magDockRect || dockEl.getBoundingClientRect();
-    const base = baseSize();
-    const grow = Math.max(0, (Math.max(1, S.cfg.zoom || 1.25) - 1) * base);
-    const pad = Math.ceil(grow + base * 0.22 + 6);
-    const rect = [
-      Math.floor(dr.left - pad),
-      Math.floor(dr.top - pad),
-      Math.ceil(dr.width + pad * 2),
-      Math.ceil(dr.height + pad * 2),
-    ];
-    const sig = `mag:${rect.map(Math.round).join(",")}`;
-    if (sig === S.lastHitSig) return;
-    S.lastHitSig = sig;
-    dockApi.setHitRects([rect], false).catch(() => {});
-  } catch (_) {
-    /* best-effort */
-  }
-}
-
 // Show the changelog the first time the app opens after an update.
 async function checkChangelog() {
   try {
@@ -1936,7 +1747,7 @@ dockEl.addEventListener(
 );
 
 let magnifyRaf = 0;
-let magPointer = { x: 0, y: 0 };
+
 dockEl.addEventListener("pointermove", (e) => {
   // Always keep the freshest pointer position; coalesce to one magnify per frame
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
@@ -1951,32 +1762,6 @@ dockEl.addEventListener("pointermove", (e) => {
   });
 });
 dockEl.addEventListener("pointerleave", () => { resetMagnify(); stopEdgeScroll(); });
-
-// Overflow mode: hovering near an end of the bar auto-scrolls it that way, so you
-// can reach the side items by just moving the cursor there (macOS-Genie style).
-let edgeScrollRaf = 0;
-let edgeScrollVel = 0;
-function edgeAutoScroll() {
-  const vertical = isVertical();
-  const r = dockEl.getBoundingClientRect();
-  const pos = vertical ? magPointer.y : magPointer.x;
-  const lo = vertical ? r.top : r.left;
-  const hi = vertical ? r.bottom : r.right;
-  const zone = Math.min(90, (hi - lo) * 0.18);
-  if (pos < lo + zone) edgeScrollVel = -Math.ceil((lo + zone - pos) / 6);
-  else if (pos > hi - zone) edgeScrollVel = Math.ceil((pos - (hi - zone)) / 6);
-  else edgeScrollVel = 0;
-  if (edgeScrollVel && !edgeScrollRaf) {
-    const tick = () => {
-      if (!edgeScrollVel || !document.body.classList.contains("dock-overflow")) { edgeScrollRaf = 0; return; }
-      if (isVertical()) dockEl.scrollTop += edgeScrollVel;
-      else dockEl.scrollLeft += edgeScrollVel;
-      edgeScrollRaf = requestAnimationFrame(tick);
-    };
-    edgeScrollRaf = requestAnimationFrame(tick);
-  }
-}
-function stopEdgeScroll() { edgeScrollVel = 0; }
 
 // ─────────── Edit mode (iOS-style long-press) + reorder ───────────
 
@@ -3073,117 +2858,6 @@ if (typeof ResizeObserver !== "undefined") {
   }).observe(dockEl);
 }
 
-let reframeTimer = null;
-function reframe() {
-  // Coalesce rapid calls (render + settings changes) into one resize.
-  clearTimeout(reframeTimer);
-  reframeTimer = setTimeout(
-    () => requestAnimationFrame(() => requestAnimationFrame(applyFrame)),
-    50
-  );
-}
-
-// Tight visual breathing room around the bar. Booki now leans on Mica-style
-// tint instead of large drop shadows, so the native transparent stage can stay
-// smaller and clicks just outside the painted dock reach the app underneath.
-const SHADOW_PAD = 18;
-
-// Fixed headroom past the bar for everything that opens around it — group
-// flyouts, context menu, popovers, tooltips, the update pill, magnify and the
-// soft shadow. Reserving it permanently is THE anti-flicker design: opening a
-// group/menu is pure DOM inside a window that never resizes (every native
-// resize repaints a frame where the WebView's layout lags the new rect — that
-// lag was the visible jump/blink). Empty stage regions don't steal clicks: a
-// cursor watcher (backend) flips the window click-through outside the hit
-// rects the frontend reports (reportHitRects).
-const PANEL_ROOM = 420;
-
-function edgePadCss() {
-  return Math.min(SHADOW_PAD, Math.max(0, Math.min(96, S.cfg.edgeGap ?? 12)));
-}
-function computeFrame() {
-  const dpr = window.devicePixelRatio || 1;
-  // The STAGE: full length along the anchored edge; bar depth + panel headroom
-  // across it. It only changes when the bar's depth changes (icon size, labels,
-  // compact) or the screen does — never when something opens or closes.
-  // Use offsetWidth/Height (layout size) — NOT getBoundingClientRect — so a dock
-  // that's currently scaled by the minimize animation doesn't size the window too
-  // small (which left the bar looking cut off after revealing, esp. at the top).
-  const edgePad = edgePadCss();
-  let wCss, hCss;
-  if (isVertical()) {
-    wCss = dockEl.offsetWidth + edgePad + PANEL_ROOM;
-    hCss = availH(isTauri);
-  } else {
-    wCss = availW(isTauri);
-    hCss = dockEl.offsetHeight + edgePad + PANEL_ROOM;
-  }
-  wCss = Math.min(wCss, availW(isTauri));
-  hCss = Math.min(hCss, availH(isTauri));
-  return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
-}
-
-/** Bar-only size for smart-hide occlusion (no PANEL_ROOM flyout headroom). */
-function computeHomeFrame() {
-  const dpr = window.devicePixelRatio || 1;
-  const edgePad = edgePadCss();
-  let wCss, hCss;
-  if (isVertical()) {
-    wCss = dockEl.offsetWidth + edgePad;
-    hCss = availH(isTauri);
-  } else {
-    wCss = availW(isTauri);
-    hCss = dockEl.offsetHeight + edgePad;
-  }
-  wCss = Math.min(wCss, availW(isTauri));
-  hCss = Math.min(hCss, availH(isTauri));
-  return { w: Math.ceil(wCss * dpr), h: Math.ceil(hCss * dpr) };
-}
-
-let lastFrameEdge = null;
-function applyFrame() {
-  const full = computeFrame();
-  const home = computeHomeFrame();
-  // Skip the native resize when the change is small: the transparent SHADOW_PAD
-  // absorbs minor bar-size jitter, so live widgets whose text
-  // width wiggles (net rates, media title, rolling numbers) don't make the whole
-  // window grow/shrink every second — that constant resize was a real flicker.
-  // Only resize once a change is big enough to threaten the shadow's headroom.
-  const key = `${S.cfg.edge}:${S.cfg.monitor ?? -1}`;
-  const dpr = window.devicePixelRatio || 1;
-  const slack = Math.round(8 * dpr); // px; small enough to keep the tighter stage accurate
-  if (
-    S.lastFull && lastFrameEdge === key &&
-    Math.abs(full.w - S.lastFull.w) <= slack && Math.abs(full.h - S.lastFull.h) <= slack
-  ) {
-    return;
-  }
-  S.lastFull = full;
-  lastFrameEdge = key;
-  // Stage stays large for flyouts; home rect is bar-sized for smart-hide.
-  dockApi.setDockFrame(S.cfg.edge, full.w, full.h, false, home.w, home.h);
-}
-
-// Reposition when the screen metrics change — resolution, DPI/scale, taskbar
-// size, or plugging/unplugging a monitor. The dock's pixel size may be identical
-// (so applyFrame's no-op guard would skip it), yet its anchored spot moved, which
-// otherwise left it half-off-screen until the next settings change.
-let lastScreenSig = "";
-function screenSig() {
-  const s = window.screen || {};
-  return [s.width, s.height, s.availWidth, s.availHeight, window.devicePixelRatio || 1].join("x");
-}
-function checkScreenChange() {
-  if (!S.cfg) return; // a resize before boot finished → nothing to reframe yet
-  const sig = screenSig();
-  if (sig === lastScreenSig) return;
-  lastScreenSig = sig;
-  S.lastFull = null; // force setDockFrame even if the pixel size is unchanged
-  if (typeof invalidateMag === "function") invalidateMag();
-  fitDock();
-  applyFrame();
-}
-lastScreenSig = screenSig();
 let screenChangeTimer = null;
 window.addEventListener("resize", () => {
   // The bar's viewport rect (cached for magnify) shifts when the window resizes
@@ -3403,44 +3077,6 @@ window.addEventListener("pointerout", (e) => {
   if (!S.hiddenState && wantsHideNow()) scheduleHide();
 });
 
-// ───────────────── Hit regions of the stage window ─────────────────
-// The window spans the whole edge, but only the painted bar/tiles and open
-// panels are interactive; everywhere else the backend flips it click-through.
-// Report those regions whenever the DOM changes.
-const DOCK_HIT_PAD = 0;
-const TILE_HIT_PAD = 2;
-const PANEL_HIT_PAD = 4;
-// Open panels that must stay clickable. Tooltips are not listed: they never
-// take input, and counting them blocked clicks on whatever sat under them.
-const HIT_PANELS =
-  ".productivity-panel, .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
-
-function pointInLiveHitArea(x, y) {
-  if (S.edgeMove || S.dragging || S.draggingFile) return true;
-  const rects = [
-    rectFromElement(dockEl, DOCK_HIT_PAD),
-    ...[...dockEl.querySelectorAll(".tile")].map((el) => rectFromElement(el, TILE_HIT_PAD)),
-    S.stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
-    ...[...document.querySelectorAll(
-      HIT_PANELS
-    )].map((el) => rectFromElement(el, PANEL_HIT_PAD)),
-  ];
-  return rects.some((rect) => pointInRect(x, y, rect));
-}
-// Real blur behind the bar and whatever panel is open over the desktop.
-const MATERIAL_PANELS = "#ctx-menu:not(.hidden), .trash-pop, .coach, .update-pill:not(.hidden)";
-function reportDockMaterial() {
-  const body = document.body.classList;
-  if (S.hiddenState || body.contains("tucked") || body.contains("edge-swap") || body.contains("booting")) {
-    reportMaterial([]);
-    return;
-  }
-  reportMaterial([
-    shapeOf(dockEl),
-    S.stackOpen ? shapeOf(stackEl) : null,
-    ...[...document.querySelectorAll(MATERIAL_PANELS)].map((el) => shapeOf(el)),
-  ]);
-}
 // Surfaces move under CSS transitions (reveal, tuck, a flyout opening) that
 // fire no mutations mid-flight; follow them frame by frame for their length.
 const materialObserver = new MutationObserver(() => followFrames(reportDockMaterial));
@@ -3467,56 +3103,6 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   reportDockMaterial();
 });
 
-function reportHitRects() {
-  reportDockMaterial();
-  if (!dockApi.setHitRects) return;
-  // Anything of ours in flight (tile drag, edge-move, edit wobble, an OS file
-  // drag over the dock) → the whole stage stays interactive; never yank the
-  // window out from under a gesture.
-  // During reveal (and a short grace after it) the whole stage must stay
-  // interactive so the cursor watcher doesn't flip the window click-through
-  // before the frontend has reported fresh hit rects.
-  const all = !!(
-    S.edgeMove || S.dragging || S.draggingFile || document.body.classList.contains("edit") ||
-    document.body.classList.contains("revealing") ||
-    document.querySelector(".drag-clone, .stack-drag-clone")
-  );
-  // While the wave is live the region is the fixed magnify envelope. Measuring
-  // transformed tiles here instead produced a different signature than the
-  // envelope, so any unrelated mutation made the two ping-pong IPC calls.
-  if (!all && !S.stackOpen && dockEl.classList.contains("mag-live") && !document.querySelector(HIT_PANELS)) {
-    reportHitRectsLive();
-    return;
-  }
-  const rects = [];
-  const add = (el, inflate = 0) => {
-    const rect = rectFromElement(el, inflate);
-    if (rect) rects.push(rect);
-  };
-  // Keep the shadow room visual. The clickable region follows the bar,
-  // transformed tiles and live panels, so apps behind Booki receive near-edge
-  // clicks immediately.
-  add(dockEl, DOCK_HIT_PAD);
-  for (const tile of dockEl.querySelectorAll(".tile")) add(tile, TILE_HIT_PAD);
-  // Inflate toward the dock so the pointer doesn't fall through the gap.
-  if (S.stackOpen) add(stackEl, Math.max(PANEL_HIT_PAD, 8));
-  for (const el of document.querySelectorAll(
-    HIT_PANELS
-  ))
-    add(el, PANEL_HIT_PAD);
-  const sig = hitSignature(rects, all);
-  if (sig === S.lastHitSig) return;
-  S.lastHitSig = sig;
-  dockApi.setHitRects(rects, all).catch(() => {});
-}
-let hitRafId = 0;
-function scheduleHitReport() {
-  if (hitRafId) return;
-  hitRafId = requestAnimationFrame(() => {
-    hitRafId = 0;
-    reportHitRects();
-  });
-}
 // Any open/close/move in the window re-reports (one measurement per frame);
 // a slow safety tick self-heals anything the observer can't see.
 // Magnify writes transform/z-index every pointer frame — layout slots stay put,
@@ -3883,215 +3469,6 @@ function clippedText(el, name) {
     .filter((text) => text && text !== name);
   const text = [...new Set(cut)].join(" · ");
   return text.length > 140 ? `${text.slice(0, 139)}…` : text;
-}
-
-// ─────────────────────── Trash confirmation ───────────────────────
-// A small in-dock popover: nothing is ever deleted without an explicit yes.
-// Files go to the Recycle Bin (undoable), never a permanent delete.
-
-let popSeq = 0;
-
-/** A popover button. The one helper every confirm popover builds with. */
-function popButton(pop, cls, label, fn) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.className = `tp-btn ${cls}`.trim();
-  b.textContent = label;
-  b.addEventListener("click", fn);
-  pop.appendChild(b);
-  return b;
-}
-
-/* Show a yes/no popover as an alertdialog: named by its question, described
-   by its detail line, with the first button focused once it is visible so a
-   keyboard user can answer it. closeTrashPop hands focus back. */
-function showConfirmPop(pop) {
-  const id = `trash-pop-${++popSeq}`;
-  const text = pop.querySelector(".tp-text");
-  const sub = pop.querySelector(".tp-sub");
-  pop.setAttribute("role", "alertdialog");
-  if (text) { text.id = `${id}-text`; pop.setAttribute("aria-labelledby", text.id); }
-  if (sub) { sub.id = `${id}-sub`; pop.setAttribute("aria-describedby", sub.id); }
-  const back = document.activeElement;
-  pop._returnFocus = back instanceof HTMLElement && back !== document.body ? back : null;
-  placePop(pop);
-  S.trashPop = pop;
-  // placePop reveals the popover after ~70 ms; focus it once it is shown.
-  setTimeout(() => requestAnimationFrame(() => {
-    if (S.trashPop === pop) pop.querySelector("button")?.focus({ preventScroll: true });
-  }), 90);
-}
-// Dismiss a popover along the same path it entered (fade + slight drop), then
-// run `done`. Under reduced motion the removal is immediate.
-function dismissPop(pop, done) {
-  const finish = () => {
-    pop.remove();
-    if (done) done();
-  };
-  if (!pop || !pop.isConnected) {
-    if (pop) pop.remove();
-    if (done) done();
-    return;
-  }
-  if (reduceMotion()) return finish();
-  pop.classList.add("closing");
-  setTimeout(finish, 180);
-}
-function closeTrashPop() {
-  const pop = S.trashPop;
-  S.trashPop = null;
-  // Give focus back to where it was, unless the user already moved it.
-  const back = pop?._returnFocus;
-  if (back?.isConnected && pop.contains(document.activeElement)) back.focus({ preventScroll: true });
-  dismissPop(pop, () => {
-    // Shrink the window only after the exit finishes, or it would clip it.
-    if (!S.trashPop) {
-      document.body.classList.remove("pop-open");
-      reframe();
-    }
-  });
-}
-
-// Place a dock popover (trash confirm / first-run tips) NEXT TO the bar — never
-// on top of it — and grow the window so nothing gets clipped.
-function placePop(pop) {
-  pop.classList.add("measuring");
-  document.body.appendChild(pop);
-  document.body.classList.add("pop-open");
-  applyFrame(); // grow the window before anything is visible
-  const put = () => {
-    // Centre on the BAR, not the window: a slot-aligned dock sits off-centre.
-    pop.style.left = pop.style.right = pop.style.top = pop.style.bottom = "";
-    pop.style.transform = "";
-    const { left, top } = placeBesideBar({
-      bar: dockEl.getBoundingClientRect(),
-      box: { width: pop.offsetWidth, height: pop.offsetHeight },
-      edge: S.cfg.edge,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      gap: 12,
-    });
-    pop.style.left = `${left}px`;
-    pop.style.top = `${top}px`;
-  };
-  put();
-  // Reveal only after the window has grown and the popover sits in place.
-  setTimeout(() => {
-    requestAnimationFrame(() => {
-      put();
-      pop.classList.remove("measuring");
-    });
-  }, 70);
-  // The coach swaps its content per step WITHOUT re-calling placePop; since the
-  // popover is now hard-positioned (no translate centering), re-run put() on
-  // any size change so every step stays centered on the bar and in-viewport.
-  if (typeof ResizeObserver !== "undefined") {
-    // Disconnect once the popover leaves the document. An observer left
-    // watching a detached node keeps it (and its whole subtree) alive, and the
-    // dock opens one of these for every trash prompt and coach step.
-    const ro = new ResizeObserver(() => {
-      if (pop.isConnected) put();
-      else ro.disconnect();
-    });
-    ro.observe(pop);
-  }
-}
-
-function confirmTrash(paths, emptyBin = false) {
-  closeTrashPop();
-  S.pinnedReveal = true; // keep the dock open while the question is on screen
-  const n = paths.length;
-  const text = emptyBin
-    ? t("trash.emptyAsk")
-    : (n === 1 ? t("trash.askOne").replace("{name}", () => esc(baseName(paths[0]))) : t("trash.ask").replace("{n}", n));
-  const pop = document.createElement("div");
-  pop.className = "trash-pop";
-  pop.innerHTML =
-    `${icon("trash")}<span class="tp-col"><span class="tp-text">${text}</span>` +
-    `<span class="tp-sub">${t("trash.sub")}</span></span>`;
-  popButton(pop, "danger", emptyBin ? t("trash.empty") : t("trash.delete"), async () => {
-    closeTrashPop();
-    try {
-      if (emptyBin) await dockApi.emptyTrash();
-      else await dockApi.trashPaths(paths);
-      const tile = dockEl.querySelector(".tile.trash");
-      if (tile) {
-        tile.classList.remove("gulp");
-        void tile.offsetWidth;
-        tile.classList.add("gulp");
-      }
-    } catch (err) {
-      // Deletion was blocked (usually Defender's Controlled Folder Access) —
-      // explain honestly instead of failing in silence.
-      logMessage("error", `trash: ${err}`);
-      trashBlockedInfo();
-      return;
-    }
-    await refreshTrashState();
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  popButton(pop, "", t("trash.cancel"), () => {
-    closeTrashPop();
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  showConfirmPop(pop);
-}
-
-// Shown when Windows refuses the operation: it's almost always Defender's
-// "Controlled folder access" being cautious about an app it doesn't know yet.
-function trashBlockedInfo() {
-  closeTrashPop();
-  S.pinnedReveal = true;
-  const pop = document.createElement("div");
-  pop.className = "trash-pop blocked";
-  pop.innerHTML =
-    `<span class="tp-emoji">${emo("shield", 24)}</span><span class="tp-col">` +
-    `<span class="tp-text">${t("trash.blocked")}</span>` +
-    `<span class="tp-sub">${t("trash.blockedSub")}</span></span>`;
-  const ok = document.createElement("button");
-  ok.className = "tp-btn";
-  ok.textContent = t("trash.ok");
-  ok.addEventListener("click", () => {
-    closeTrashPop();
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  pop.appendChild(ok);
-  placePop(pop);
-  S.trashPop = pop;
-}
-
-// Drop-on-folder: ask, then move the files into that folder (shell move —
-// undoable with Ctrl+Z in Explorer).
-function confirmMove(paths, item) {
-  closeTrashPop();
-  S.pinnedReveal = true;
-  const n = paths.length;
-  const what = n === 1 ? `«${esc(baseName(paths[0]))}»` : t("move.n").replace("{n}", n);
-  const pop = document.createElement("div");
-  pop.className = "trash-pop";
-  pop.innerHTML =
-    `${icon("folder")}<span class="tp-col"><span class="tp-text">${t("move.ask")
-      .replace("{what}", () => what)
-      .replace("{dest}", () => esc(item.name))}</span>` +
-    `<span class="tp-sub">${t("move.sub")}</span></span>`;
-  popButton(pop, "", t("move.ok"), async () => {
-    closeTrashPop();
-    try {
-      await dockApi.movePaths(paths, item.path);
-    } catch (err) {
-      logMessage("error", `move: ${err}`);
-    }
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  popButton(pop, "", t("trash.cancel"), () => {
-    closeTrashPop();
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  showConfirmPop(pop);
 }
 
 // Open files with an app and remember them as recents (a small jump list).
@@ -4840,8 +4217,9 @@ function partyMode() {
 
 // Hand each module the calls it makes back into modules that import it
 // (see `deps` there).
-wireRunningWindows({ refreshTrashState, pollSlowdown, checkScreenChange });
-wireUndoToast({ persist, render, reframe });
-wireClipboardStack({ refreshClipboard, applyFrame, placeStackNear, closeStack });
+wireRunningWindows({ refreshTrashState, pollSlowdown });
+wireUndoToast({ persist, render });
+wirePopovers({ refreshTrashState, scheduleHide });
+wireClipboardStack({ refreshClipboard, placeStackNear, closeStack });
 
 boot();

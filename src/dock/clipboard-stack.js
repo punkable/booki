@@ -5,6 +5,7 @@ import { icon } from "../icons.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { stackEl } from "./dom.js";
+import { applyFrame } from "./frame.js";
 import { showErrorToast } from "./undo-toast.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -81,7 +82,7 @@ export async function toggleClipboardStack(tileEl) {
 
   S.stackOpen = true;
   document.body.classList.add("stack-open");
-  deps.applyFrame();
+  applyFrame();
   const placeStack = () => deps.placeStackNear(tileEl);
   S.pendingReplace = placeStack;
 

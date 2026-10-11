@@ -5,6 +5,7 @@ import { placeBesideBar } from "./placement.js";
 import { S } from "./state.js";
 import { baseName } from "./helpers.js";
 import { dockEl, undoToast, esc } from "./dom.js";
+import { reframe } from "./frame.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -61,5 +62,5 @@ async function undoLastRemoval() {
   S.cfg.pinned.splice(Math.min(index, S.cfg.pinned.length), 0, item);
   if (!(await deps.persist())) return;
   await deps.render();
-  deps.reframe();
+  reframe();
 }

@@ -7,6 +7,7 @@ import { windowsFor as matchPinWindows, runningDescription } from "./running.js"
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { dockEl, stackEl } from "./dom.js";
+import { checkScreenChange } from "./frame.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -61,7 +62,7 @@ export function startRunningPoll() {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
     if (S.hiddenState || S.displayOff) return;
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
-    deps.checkScreenChange();
+    checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
     if (refreshTrash && dockEl.querySelector(".tile.trash")) deps.refreshTrashState();
     // Running state powers switching and hints independently of visible dots.
