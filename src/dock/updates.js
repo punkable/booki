@@ -33,6 +33,8 @@ export async function checkUpdates() {
   if (update && pill.classList.contains("hidden")) {
     pill.textContent = t("dock.update");
     pill.classList.remove("hidden");
+    // Once per session: the pill stays up, so later checks skip this branch.
+    dockApi.notify(t("toast.updateTitle"), t("toast.updateBody").replace("{version}", () => update.version || "")).catch(() => {});
     placeUpdatePill();
     // Straight to General — that's where the install button and progress live.
     // Bound once: the pill stays visible, so it must keep working after a click.

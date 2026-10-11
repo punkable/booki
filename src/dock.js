@@ -4,6 +4,7 @@
    This file boots the dock and wires the page-level listeners; the features
    live in ./dock/*.js, with shared mutable state in ./dock/state.js. */
 
+import "./dock/error-log.js";
 import {
   config as configApi,
   dock as dockApi,
@@ -93,11 +94,6 @@ import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
 
-// Surface any runtime error to the app log (diagnostics on the user's machine).
-window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
-window.addEventListener("unhandledrejection", (e) =>
-  logMessage("error", `dock: unhandled ${e.reason}`)
-);
 
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,
 // which the browser lets you drag out as an image — dropping one on the desktop
@@ -336,6 +332,14 @@ dockEl.addEventListener("keydown", (e) => {
     e.preventDefault(); // Space would otherwise scroll the bar
     if (S.editMode) exitEdit();
     else launch(tile, item, launchModifiers(e));
+    return;
+  }
+  // The remove badge is mouse-only (it sits inside the tile button), so in
+  // edit mode Delete or Backspace removes the focused tile; the undo toast
+  // brings it back.
+  if (S.editMode && (e.key === "Delete" || e.key === "Backspace")) {
+    e.preventDefault();
+    removeItem(item.id);
     return;
   }
   // The menu key and Shift+F10 are what a keyboard user presses for a context

@@ -136,12 +136,12 @@ export function openMenu(e, item) {
 // dropped into the pin's context menu. Runs after the menu is already on
 // screen; re-places it once the items are in. Nothing relevant -> no section.
 async function fillRecentFiles(slot, e, item, generation) {
-  let recents = [];
-  try {
-    recents = await dockApi.recentFilesFor(item.path, 6);
-  } catch (_) {
-    return;
-  }
+  // Files opened through Booki plus the app's own Windows Jump List.
+  const [own, jump] = await Promise.allSettled([dockApi.recentFilesFor(item.path, 6), dockApi.appRecentItems(item.path)]);
+  const seen = new Set();
+  const recents = [...(jump.status === "fulfilled" ? jump.value || [] : []), ...(own.status === "fulfilled" ? own.value || [] : [])]
+    .filter((r) => r?.path && !seen.has(r.path.toLowerCase()) && seen.add(r.path.toLowerCase()))
+    .slice(0, 8);
   if (!recents?.length || !slot.isConnected || generation !== S.menuGeneration || ctxMenu.classList.contains("hidden")) return;
   const head = document.createElement("div");
   head.className = "menu-label";

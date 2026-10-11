@@ -95,6 +95,8 @@ con `textContent`, y las notas de versión remotas se muestran como texto.
 
 ## Partir `dock.js`
 
+Hecho en el PR #108 (ver abajo). El plan original:
+
 El archivo tiene unas 40 variables de módulo que se reasignan (`cfg`, `hiddenState`,
 `stackOpen`…). Otro módulo no puede reasignar un `let` importado, así que el primer
 paso, y el único que no es mecánico, es mover ese estado a un objeto compartido
@@ -171,10 +173,31 @@ Conviene probar:
 - cambiar la escala de un monitor;
 - una app que parpadea, como un chat.
 
+## Avance posterior (PR #108)
+
+- **`dock.js` partido:** el estado compartido vive en `src/dock/state.js` y el resto
+  está en 25 módulos dentro de `src/dock/`. `dock.js` queda en unas 650 líneas que
+  conectan las piezas.
+- **Avisos nativos de Windows:** Booki se registra con su AUMID (`com.booki.dock`) y
+  muestra un aviso al terminar un temporizador de foco (aunque el dock esté oculto) y
+  la primera vez en la sesión que encuentra una actualización.
+- **Recientes de cada app:** el menú de un icono anclado junta los archivos de la Jump
+  List de Windows de esa app con los que se abrieron desde Booki.
+- **Botón de quitar:** ya no es un botón dentro de otro. En modo edición, Supr o
+  Retroceso quitan el icono enfocado y el aviso de deshacer lo recupera.
+- **winget y firma:** cada publicación genera los manifiestos de winget como artefacto.
+  Los pasos para firmar están en `docs/distribution/firma-y-winget.md`.
+
+Para probar en Windows, además de la lista de arriba:
+
+- el aviso al acabar un foco y el de actualización;
+- que Booki se agrupe con su propio icono en la barra de tareas;
+- los recientes de una app anclada como acceso directo, como `.exe` y de la Tienda.
+
 ### Sigue pendiente
 
-- Partir `dock.js`, ahora que terminó el arrastre de grupos.
-- Avisos nativos (toasts), listas de saltos de cada app y reservar espacio como la
-  barra de tareas: necesitan probarse en Windows mientras se hacen.
-- Firma Authenticode y manifiesto de winget.
-- El botón de quitar sigue dentro del botón del icono.
+- Reservar espacio como la barra de tareas (AppBar): cambia cómo se colocan todas las
+  ventanas y necesita probarse en Windows mientras se hace.
+- Firmar de verdad con Authenticode: requiere una cuenta de Azure Trusted Signing o un
+  certificado, y sus secretos en GitHub.
+- Enviar el primer manifiesto a winget, cuando haya una versión publicada con él.

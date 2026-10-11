@@ -29,6 +29,7 @@ import { iconCache, baseSize, widgetLabel, syncIcon, resolveIcon } from "./helpe
 import { dockEl, dockKeys } from "./dom.js";
 import { fitDock } from "./frame.js";
 import { cacheWidgetEls, tickClocks, syncPolls, refreshMedia } from "./live-widgets.js";
+import { scheduleFocusAlerts } from "./focus-alerts.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -45,6 +46,7 @@ let renderGeneration = 0;
 export async function render() {
   const generation = ++renderGeneration;
   const snapshot = S.cfg;
+  scheduleFocusAlerts(snapshot.pinned);
   // Build every tile in parallel and swap the whole bar in ONE DOM operation —
   // no icons popping in one by one, no empty-bar flash between renders.
   const tiles = await Promise.all(
@@ -106,7 +108,7 @@ function actionTile(item) {
     img.src = isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon; el.appendChild(img);
   } else fallback();
   el.addEventListener("contextmenu", (e) => deps.openMenu(e, item));
-  const rm = document.createElement("span"); rm.className = "rm"; rm.innerHTML = icon("x"); rm.title = t("apps.remove");
+  const rm = document.createElement("span"); rm.className = "rm"; rm.setAttribute("aria-hidden", "true"); rm.innerHTML = icon("x"); rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
   rm.addEventListener("click", (e) => { e.stopPropagation(); deps.removeItem(item.id); }); el.appendChild(rm);
   el.addEventListener("pointerdown", (e) => deps.onPointerDown(e, el, item)); return el;
@@ -169,8 +171,8 @@ function appTile(item) {
   }
 
   // Remove badge — only visible in edit mode.
-  const rm = document.createElement("button");
-  rm.className = "rm";
+  const rm = document.createElement("span");
+  rm.className = "rm"; rm.setAttribute("aria-hidden", "true");
   rm.innerHTML = icon("x");
   rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -256,8 +258,8 @@ function groupTile(item) {
   badge.className = "badge";
   el.appendChild(badge);
 
-  const rm = document.createElement("button");
-  rm.className = "rm";
+  const rm = document.createElement("span");
+  rm.className = "rm"; rm.setAttribute("aria-hidden", "true");
   rm.innerHTML = icon("x");
   rm.title = t("apps.remove");
   rm.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -349,8 +351,8 @@ export function widgetTile(item, { inFlyout = false } = {}) {
   // menu). Inside a group flyout it's just a live read-out — the flyout supplies
   // its own take-out/remove and drag-out gestures, so skip the dock wiring.
   if (!inFlyout) {
-    const rm = document.createElement("button");
-    rm.className = "rm";
+    const rm = document.createElement("span");
+    rm.className = "rm"; rm.setAttribute("aria-hidden", "true");
     rm.innerHTML = icon("x");
     rm.title = t("apps.remove");
     rm.addEventListener("pointerdown", (e) => e.stopPropagation());

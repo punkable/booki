@@ -21,6 +21,7 @@ import { closeMenu } from "./menu-core.js";
 import { render } from "./render.js";
 import { hideUndoToast, placeUndoToast } from "./undo-toast.js";
 import { closeTrashPop } from "./popovers.js";
+import { scheduleFocusAlerts } from "./focus-alerts.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -233,6 +234,8 @@ async function performPersist(patch, showError) {
   try {
     await configApi.patch(changes);
     maybeSyncCtxMenu();
+    // A started or paused focus timer is saved without a re-render.
+    scheduleFocusAlerts(S.cfg.pinned);
     await emitConfigChanged();
     return true;
   } catch (error) {
