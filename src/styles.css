@@ -1525,9 +1525,11 @@ body.edge-right .stack.open { transform: none; }
 .stack-close:active { transform: scale(0.96); }
 .stack-item { position: relative; }
 /* Take-out only — never a permanent delete X. Hover-only so rename/focus
-   does not keep a red badge stuck on every cell. */
+   does not keep a red badge stuck on every cell. Hidden with opacity, not
+   display, so Tab can still reach it from its cell. */
 .stack-rm {
-  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: none;
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: flex;
+  opacity: 0; pointer-events: none;
   align-items: center; justify-content: center; line-height: 1; color: var(--ink-2);
   background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
@@ -1537,9 +1539,17 @@ body.edge-right .stack.open { transform: none; }
   padding: 0;
 }
 .stack-rm svg { width: 13px; height: 13px; }
+/* A group cell and its take-out button are siblings in this wrapper, which
+   takes the cell's place in the grid. */
+.stack-cell { position: relative; display: grid; }
 @media (hover: hover) and (pointer: fine) {
-  .stack-item:hover .stack-rm { display: flex; }
+  .stack-item:hover .stack-rm,
+  .stack-cell:hover .stack-rm { opacity: 1; pointer-events: auto; }
 }
+/* Keyboard: the button appears while its cell (or itself) has focus. */
+.stack-cell:has(:focus-visible) .stack-rm,
+.stack-widget:has(:focus-visible) .stack-rm { opacity: 1; pointer-events: auto; }
+.stack-rm:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .stack-rm:hover {
   color: var(--ink);
   background: var(--layer-strong);

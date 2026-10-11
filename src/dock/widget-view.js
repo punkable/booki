@@ -83,8 +83,9 @@ export function clockParts(now, lang) {
    screen reader has no way to know a value updated unless the region says so,
    and "polite" means it waits for a pause rather than interrupting. The clock
    is deliberately not on this list: announcing the time every minute, forever,
-   is noise, not information. */
-export const LIVE_WIDGETS = ["system", "battery", "media", "volume", "clipboard"];
+   is noise, not information. Neither are System (CPU every couple of seconds)
+   nor Clipboard (it would read copied text aloud, which may be private). */
+export const LIVE_WIDGETS = ["battery", "media", "volume"];
 
 /** A cell's icon: a quiet line glyph, falling back to the Fluent emoji for any
     widget that has no glyph yet. */
@@ -216,20 +217,28 @@ export function setMetric(el, label, val, title) {
    batteryless desktop reports battery < 0 and lands here on every poll, which
    used to throw ~1500 times an hour and freeze the card on its placeholder. */
 export function setText(el, label, value, title) {
-  el.querySelector(".w-label").textContent = label;
+  // Most callers repaint every second with the same text. Every write wakes the
+  // dock's MutationObserver, which re-measures the whole bar, so skip no-ops.
+  putText(el.querySelector(".w-label"), label);
   const ringNum = el.querySelector(".w-ring-num");
   if (ringNum) {
     delete ringNum.dataset.v; // no numeric value to tween from next time
-    ringNum.textContent = value;
+    putText(ringNum, value);
     const ring = el.querySelector(".w-ring-fill");
-    if (ring) ring.style.strokeDashoffset = `${RING_C.toFixed(2)}`; // empty gauge
+    const empty = `${RING_C.toFixed(2)}`; // empty gauge
+    if (ring && ring.style.strokeDashoffset !== empty) ring.style.strokeDashoffset = empty;
   } else {
-    const val = el.querySelector(".w-value");
-    if (val) val.textContent = value;
+    putText(el.querySelector(".w-value"), value);
     const bar = el.querySelector(".w-bar");
-    if (bar) bar.style.display = "none";
+    if (bar && bar.style.display !== "none") bar.style.display = "none";
   }
-  if (title) el.title = title;
+  if (title && el.title !== title) el.title = title;
+}
+
+/** Set a node's text only when it differs. */
+export function putText(node, text) {
+  const next = String(text ?? "");
+  if (node && node.textContent !== next) node.textContent = next;
 }
 
 /* A line that doesn't fit its box scrolls gently in a loop instead of being
