@@ -108,6 +108,9 @@ function App() {
   const navigate = (id) => {
     const next = pageOf(id) || "home";
     setFocusedPin(null);
+    // A search result already revealed belongs to that visit; without this,
+    // coming back to its page would scroll and focus it again.
+    setSearchTarget(null);
     setPageRaw(next);
     try { localStorage.setItem("booki.lastTab", next); } catch (_) {}
     requestAnimationFrame(() => { if (main.current) main.current.scrollTop = 0; });

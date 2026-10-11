@@ -642,13 +642,19 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
     let kind = if p.is_dir() { "folder" } else { "app" };
     let item = config::PinnedApp {
         action: None,
-        id: format!(
-            "cm{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis())
-                .unwrap_or(0)
-        ),
+        // Explorer starts one process per selected file and they arrive back to
+        // back, so the clock alone can repeat within a millisecond.
+        id: {
+            static SEQ: AtomicU64 = AtomicU64::new(0);
+            format!(
+                "cm{}-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0),
+                SEQ.fetch_add(1, Ordering::Relaxed)
+            )
+        },
         name,
         path,
         args: vec![],
@@ -905,7 +911,7 @@ fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String>
             "pinCount": cfg.pinned.len() }
     });
     let bytes = serde_json::to_vec_pretty(&payload).map_err(|e| e.to_string())?;
-    std::fs::write(path, bytes).map_err(|e| e.to_string())
+    snapshot::write_bytes(std::path::Path::new(&path), &bytes)
 }
 
 /// Accent color derived from the desktop wallpaper (async: decodes an image).

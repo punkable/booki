@@ -60,7 +60,7 @@ async function applyLook() {
     document.body.classList.toggle("peek", shape === "attached");
     document.body.classList.toggle("floating", shape === "floating");
     document.body.classList.toggle("smart", shape === "smart");
-    focusTimers = focusTimersOf(cfg.pinned);
+    focusTimers = focusTimersOf(cfg.pinned || []);
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     // Stacked under a visible dock the card would grow over the bar.
@@ -390,7 +390,7 @@ function paintCard() {
   }
   if (activity?.kind === "done") {
     cTitle.textContent = t("focus.finished");
-    cSub.textContent = activity.next ? t("notch.nextTask").replace("{task}", activity.next) : t("notch.takeBreak");
+    cSub.textContent = activity.next ? t("notch.nextTask").replace("{task}", () => activity.next) : t("notch.takeBreak");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -505,7 +505,7 @@ cPlay.addEventListener("click", async (e) => {
 pill.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
-    invoke("notch_reveal");
+    invoke("notch_reveal").catch(() => {});
   }
 });
 
@@ -517,7 +517,7 @@ document.addEventListener("visibilitychange", () => {
 
 // Dragging a file NEAR the notch reveals the dock — otherwise there'd be
 // nowhere to drop while the dock is tucked away (its window is hidden).
-onFileDrop({ onEnter: () => invoke("notch_reveal") });
+onFileDrop({ onEnter: () => invoke("notch_reveal").catch(() => {}) });
 
 // Click = reveal the dock. Drag to a screen edge = move the dock there.
 let drag = null;
@@ -605,7 +605,7 @@ pill.addEventListener("pointerup", (e) => {
   if (!d.moved) {
     // The notch always lives on the dock's own edge, so a plain click just
     // brings the dock back where it is.
-    invoke("notch_reveal");
+    invoke("notch_reveal").catch(() => {});
     return;
   }
   // Dropped → snap the dock to the nearest screen edge.
@@ -633,6 +633,20 @@ pill.addEventListener("pointerup", (e) => {
   const from = { x: e.screenX - W / 2, y: e.screenY - H / 2 };
   tweenNotch(from, target, 260, () => invoke("set_dock_edge", { edge }));
 });
+
+// A cancelled drag (touch, pen, or the window hiding mid-press) never gets a
+// pointerup; without this the notch would stay "dragging" and fully clickable.
+function cancelNotchDrag() {
+  if (!drag) return;
+  drag = null;
+  draggingNotch = false;
+  cancelAnimationFrame(dragRaf);
+  dragRaf = 0;
+  paintPresence();
+  scheduleHitReport();
+}
+pill.addEventListener("pointercancel", cancelNotchDrag);
+pill.addEventListener("lostpointercapture", cancelNotchDrag);
 
 // Glide the notch window from `from` to `to` over `ms` (easeOutCubic), then `done`.
 function tweenNotch(from, to, ms, done) {
