@@ -21,13 +21,19 @@ import { GroupCreator } from './group-creator.jsx';
 import { Inspector } from './inspector.jsx';
 import { Icon, PageHeader } from './ui.jsx';
 
-/** Catalog, destination and inspector share one committed pin model. */
+/** Catalog, destination and inspector share one committed pin model.
+ *
+ * Opening a group turns the dock strip itself into the group, like opening
+ * a folder: its members take the strip's place, nothing unfolds below it.
+ * Dragging a member out of the strip takes it out of the group, and
+ * dragging an app in adds it. */
 export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPicker: IconPicker }) {
   const [selectedId, selectId] = useState(focusedPin || null);
   const [candidate, inspectCandidate] = useState(null);
   const [chosenIds, chooseIds] = useState([]);
   const [creatingGroup, createGroup] = useState(false);
   const [targetGroup, setTargetGroup] = useState('');
+  const [openId, setOpenId] = useState(null);
   const [error, setError] = useState('');
   const [undo, setUndo] = useState(null);
   const [pickingIcon, pickIcon] = useState(null);
@@ -37,17 +43,55 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const [pathMissing, setPathMissing] = useState(false);
   const [identities, setIdentities] = useState({});
   const [dropHint, setDropHint] = useState(null);
-  const [membersOver, setMembersOver] = useState(false);
-  const [memberHint, setMemberHint] = useState(null);
   const [dragId, setDragId] = useState(null);
+  const [outside, setOutside] = useState(false);
   const dragging = useRef(null);
   const springTimer = useRef(null);
   const springFor = useRef(null);
+  const stripRef = useRef(null);
   const cancelSpring = () => { clearTimeout(springTimer.current); springFor.current = null; };
+  const spring = (key, action) => {
+    if (springFor.current === key) return;
+    cancelSpring(); springFor.current = key;
+    springTimer.current = setTimeout(() => { if (springFor.current === key) { springFor.current = null; action(); } }, 650);
+  };
+  const latest = useRef(cfg); latest.current = cfg;
+  const found = openId && findPin(cfg.pinned, openId);
+  const openGroup = found?.kind === 'group' ? found : null;
+  const openRef = useRef(openGroup); openRef.current = openGroup;
+  const isMember = (group, id) => !!group?.children?.some((child) => child.id === id);
+  const commit = (next) => {
+    if (next === latest.current.pinned) return;
+    setUndo({ before: latest.current.pinned, after: JSON.stringify(next) });
+    set({ pinned: next }); setError('');
+  };
+  // A member taken out lands right after its group, where it came from.
+  const afterGroup = (groupId) => {
+    const rows = latest.current.pinned;
+    return rows[rows.findIndex((row) => row.id === groupId) + 1]?.id;
+  };
+  const takeOut = (pin, groupId) => commit(placePin(latest.current.pinned, pin, { beforeId: afterGroup(groupId) }));
+  const takeOutRef = useRef(takeOut); takeOutRef.current = takeOut;
   useEffect(() => {
-    const end = () => { dragging.current = null; setDragId(null); setDropHint(null); setMembersOver(false); setMemberHint(null); cancelSpring(); };
-    window.addEventListener('dragend', end); window.addEventListener('drop', end);
-    return () => { window.removeEventListener('dragend', end); window.removeEventListener('drop', end); };
+    const memberDrag = (event) => openRef.current && dragging.current && isMember(openRef.current, dragging.current.id)
+      && [...(event.dataTransfer?.types || [])].includes(PIN_DRAG_TYPE);
+    const reset = () => { dragging.current = null; setDragId(null); setDropHint(null); setOutside(false); cancelSpring(); };
+    // Anywhere outside the strip accepts a member, so letting go of it there
+    // takes it out of the group.
+    const over = (event) => {
+      if (!memberDrag(event)) return;
+      event.preventDefault();
+      setOutside(!stripRef.current?.contains(event.target));
+    };
+    const drop = (event) => {
+      if (!event.defaultPrevented && memberDrag(event) && !stripRef.current?.contains(event.target)) {
+        event.preventDefault();
+        takeOutRef.current(findPin(latest.current.pinned, dragging.current.id) || dragging.current, openRef.current.id);
+      }
+      reset();
+    };
+    window.addEventListener('dragover', over); window.addEventListener('drop', drop); window.addEventListener('dragend', reset);
+    return () => { window.removeEventListener('dragover', over); window.removeEventListener('drop', drop); window.removeEventListener('dragend', reset); };
   }, []);
   const startDrag = (event, item) => {
     dragging.current = item; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item));
@@ -57,7 +101,6 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     // Dim the source after the browser has taken its drag snapshot.
     requestAnimationFrame(() => setDragId(item.id));
   };
-  const latest = useRef(cfg); latest.current = cfg;
   const inspectorOrigin = useRef(null);
   const selected = candidate || findPin(cfg.pinned, selectedId);
   const selectedPath = selected?.path;
@@ -72,10 +115,14 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const candidatePinned = candidate && pinnedKeys(cfg.pinned, identities).has(appKey(candidate, identities));
   const groups = cfg.pinned.filter((item) => item.kind === 'group');
   const destination = groups.some((item) => item.id === targetGroup) ? targetGroup : '';
-  const commit = (next) => {
-    if (next === latest.current.pinned) return;
-    setUndo({ before: latest.current.pinned, after: JSON.stringify(next) });
-    set({ pinned: next }); setError('');
+  const enter = (group) => {
+    cancelSpring(); setDropHint(null); chooseIds([]);
+    setOpenId(group.id); setTargetGroup(group.id); inspectCandidate(null); selectId(null);
+  };
+  const leave = () => {
+    cancelSpring(); setDropHint(null); chooseIds([]);
+    if (targetGroup === openId) setTargetGroup('');
+    setOpenId(null);
   };
   const add = (apps) => {
     let next = latest.current.pinned;
@@ -107,39 +154,45 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const dragOver = (event) => { if ([...event.dataTransfer.types].includes(PIN_DRAG_TYPE)) event.preventDefault(); };
   // Dropping on a pin works like the dock: its middle files the dragged app
   // into a group (or makes a new group with an app), its sides reorder.
+  // Inside an open group only the sides count: groups don't nest.
   const dropModeAt = (event, item) => {
     const box = event.currentTarget.getBoundingClientRect();
     const along = (event.clientX - box.left) / (box.width || 1);
     const dragged = dragging.current;
-    const mergeable = !dragged || (dragged.kind !== 'group' && canMergeKind(dragged.kind));
     if (dragged?.id === item.id) return null;
+    if (openRef.current) return along < 0.5 ? 'before' : 'after';
+    const mergeable = !dragged || (dragged.kind !== 'group' && canMergeKind(dragged.kind));
     if (mergeable && item.kind === 'group' && along > 0.2 && along < 0.8) return 'into';
     if (mergeable && canMergeKind(item.kind) && along > 0.3 && along < 0.7) return 'merge';
     return along < 0.5 ? 'before' : 'after';
   };
   const pinDragOver = (event, item) => {
     if (![...event.dataTransfer.types].includes(PIN_DRAG_TYPE)) return;
+    if (openRef.current && dragging.current?.kind === 'group') return;
     event.preventDefault(); event.stopPropagation();
     const mode = dropModeAt(event, item);
     setDropHint((hint) => hint?.id === item.id && hint.mode === mode ? hint : mode ? { id: item.id, mode } : null);
-    // Resting on a group opens it in the inspector, so the app can be placed
+    // Resting on a group opens it in place, so the app can be placed
     // between its members, like a spring-loaded folder.
-    if (mode === 'into' && selectedId !== item.id) {
-      if (springFor.current !== item.id) {
-        cancelSpring(); springFor.current = item.id;
-        springTimer.current = setTimeout(() => { if (springFor.current === item.id) { inspectCandidate(null); selectId(item.id); } }, 650);
-      }
-    } else if (springFor.current === item.id) cancelSpring();
+    if (mode === 'into') spring(item.id, () => enter(item));
+    else if (springFor.current === item.id) cancelSpring();
   };
   const pinDrop = (event, item) => {
     cancelSpring();
     const mode = dropModeAt(event, item); setDropHint(null);
+    const group = openRef.current;
+    if (group) {
+      const kids = group.children || [];
+      const next = mode === 'after' ? kids.slice(kids.findIndex((kid) => kid.id === item.id) + 1).find((kid) => kid.id !== dragging.current?.id) : item;
+      return drop(event, { groupId: group.id, beforeId: next?.id });
+    }
     if (mode === 'into') return drop(event, { groupId: item.id });
     if (mode === 'merge') return drop(event, { mergeWith: item.id });
     const rows = latest.current.pinned.filter((row) => row.kind !== 'widget');
     const after = rows[rows.findIndex((row) => row.id === item.id) + 1];
     return drop(event, mode === 'after' ? { beforeId: after?.id } : { beforeId: item.id });
   };
+  const stripItems = openGroup ? openGroup.children || [] : cfg.pinned.filter((item) => item.kind !== 'widget');
   const inspect = (item) => { inspectorOrigin.current = document.activeElement; inspectCandidate(null); selectId(item.id); };
   const browse = async (folder) => {
     try {
@@ -150,37 +203,64 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const hasSettings = (items) => items.some((item) => item.kind === 'action' && item.action === 'settings' || hasSettings(item.children || []));
   return <>
     <PageHeader title={t('overhaul.appsFolders')}>{t('next.selectionHint')}</PageHeader>
-    <section className="library-dock-editor" aria-label={t('workspace.pinned')} onDragOver={dragOver} onDrop={(event) => drop(event)}>
+    <section className={'library-dock-editor' + (openGroup ? ' group-open' : '')} aria-label={openGroup ? `${t('apps.inDock')}: ${pinLabel(openGroup)}` : t('workspace.pinned')}
+      onDragOver={dragOver} onDrop={(event) => drop(event, openGroup ? { beforeId: afterGroup(openGroup.id) } : {})}
+      onKeyDown={(event) => { if (event.key === 'Escape' && openGroup && !event.defaultPrevented) { event.preventDefault(); leave(); } }}>
       <div className="library-dock-head">
-        <strong>{t('apps.inDock')}<span className="library-count">{cfg.pinned.filter((item) => item.kind !== 'widget').length}</span></strong>
+        {openGroup ? <div className="library-crumbs">
+          <button type="button" className={'button library-crumb-back' + (outside && dragId ? ' drop-out' : '')} onClick={leave}
+            onDragOver={(event) => { if (dragging.current && isMember(openGroup, dragging.current.id)) return; if ([...event.dataTransfer.types].includes(PIN_DRAG_TYPE)) spring('back', leave); }}
+            onDragLeave={() => { if (springFor.current === 'back') cancelSpring(); }}>
+            <Icon name="arrow-left" />{t('apps.inDock')}
+          </button>
+          <Icon name="chevron-right" />
+          <button type="button" className="library-crumb-group" aria-pressed={selectedId === openGroup.id} title={t('next.inspector')} onClick={() => inspect(openGroup)}>
+            <strong>{pinLabel(openGroup)}</strong><span className="library-count">{openGroup.children?.length || 0}</span><Icon name="settings" />
+          </button>
+        </div>
+        : <strong>{t('apps.inDock')}<span className="library-count">{cfg.pinned.filter((item) => item.kind !== 'widget').length}</span></strong>}
         <div className="library-dock-actions">
           {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
-          <button className="button button-accent" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
-          <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
-          <button className="button" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...latest.current.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
-          <button className="button" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
+          {!openGroup && <>
+            <button className="button button-accent" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
+            <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
+            <button className="button" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...latest.current.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
+            <button className="button" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
+          </>}
         </div>
       </div>
 
-      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropHint(null); }}>{cfg.pinned.filter((item) => item.kind !== 'widget').map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '') + (dropHint?.id === item.id ? ` drop-${dropHint.mode}` : '') + (dragId === item.id ? ' is-dragging' : '')}
+      <div ref={stripRef} key={openGroup ? openGroup.id : 'dock'} className={"library-pin-strip" + (openGroup ? " in-group" : "") + (chosenIds.length ? " selecting" : "") + (openGroup && outside && dragId ? " taking-out" : "")}
+        onDragOver={openGroup ? (event) => { if ([...event.dataTransfer.types].includes(PIN_DRAG_TYPE) && dragging.current?.kind !== 'group') event.preventDefault(); } : undefined}
+        onDrop={openGroup ? (event) => { setDropHint(null); drop(event, { groupId: openGroup.id }); } : undefined}
+        onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropHint(null); }}>{stripItems.map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '') + (dropHint?.id === item.id ? ` drop-${dropHint.mode}` : '') + (dragId === item.id ? ' is-dragging' : '')}
         draggable onDragStart={(event) => startDrag(event, item)}
         onDragOver={(event) => pinDragOver(event, item)} onDrop={(event) => pinDrop(event, item)}>
-        <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><PreviewPin item={item} size={40} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
+        <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => item.kind === 'group' ? enter(item) : inspect(item)}><PreviewPin item={item} size={40} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
         {canMergeKind(item.kind) && <input type="checkbox" aria-label={`${t('premium.selectApp')}: ${pinLabel(item)}`} checked={chosenIds.includes(item.id)} onChange={(event) => chooseIds((ids) => event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id))} />}
-        {item.kind === 'group' && <button className="library-group-drop" onClick={() => { inspect(item); setTargetGroup(item.id); }} aria-label={t('apps.addToFolder')} title={t('apps.addToFolder')}><Icon name="plus" /><span>{item.children?.length || 0}</span></button>}
+        {item.kind === 'group' && <span className="library-group-count" aria-hidden="true">{item.children?.length || 0}</span>}
+        {openGroup && <button className="library-take-out" aria-label={`${t('group.takeOut')}: ${pinLabel(item)}`} title={t('group.takeOut')} onClick={() => takeOut(item, openGroup.id)}><Icon name="take-out" /></button>}
         {dropHint?.id === item.id && ['into', 'merge'].includes(dropHint.mode) && <span className="library-drop-label" aria-hidden="true">{dropHint.mode === 'into' ? t('drop.addTo').replace('{name}', pinLabel(item)) : t('drag.makeGroup')}</span>}
-      </div>)}{!cfg.pinned.some((item) => item.kind !== 'widget') && <p className="library-empty">{t('add.none')}</p>}</div>
+      </div>)}
+        {!stripItems.length && <p className="library-empty">{t(openGroup ? 'apps.groupEmptyHint' : 'add.none')}</p>}
+        {openGroup && outside && dragId && <span className="library-take-out-label" aria-hidden="true">{t('group.takeOut')}</span>}
+      </div>
       {chosenIds.length > 0 && <div className="library-bulk-actions" role="group" aria-label={t('premium.addSelected')}>
         <span>{chosenIds.length}</span>
         <button className="button" onClick={() => { commit(chosenIds.reduce((items, id) => removePin(items, id), latest.current.pinned)); chooseIds([]); }}><Icon name="trash" />{t('apps.remove')}</button>
-        {destination && <button className="button" onClick={() => {
+        {openGroup ? <button className="button" onClick={() => {
+          let next = latest.current.pinned; const before = afterGroup(openGroup.id);
+          for (const id of chosenIds) { const pin = findPin(next, id); if (pin) next = placePin(next, pin, { beforeId: before }); }
+          commit(next); chooseIds([]);
+        }}><Icon name="take-out" />{t('group.takeOut')}</button>
+        : destination && <button className="button" onClick={() => {
           let next = latest.current.pinned;
           for (const id of chosenIds) { const pin = findPin(next, id); if (pin) next = placePin(next, pin, { groupId: destination }); }
           commit(next); chooseIds([]);
         }}><Icon name="folder" />{t('apps.addToFolder')}</button>}
         <button className="button" onClick={() => chooseIds([])}>{t('trash.cancel')}</button>
       </div>}
-      <p className="library-drop-hint">{t('apps.dragHint')}{cfg.pinned.some((item) => item.kind === 'widget') && <> · {t('apps.widgetsElsewhere')}</>}</p>
+      <p className="library-drop-hint">{openGroup ? t('apps.groupDragHint') : <>{t('apps.dragHint')}{cfg.pinned.some((item) => item.kind === 'widget') && <> · {t('apps.widgetsElsewhere')}</>}</>}</p>
     </section>
     {error && <p role="alert">{error}</p>}
     <div className="library-workspace">
@@ -219,35 +299,8 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
                 catch { setError(t('overhaul.failed')); }
               }}><Icon name="folder" />{t('apps.reassign')}</button>
             </div>}
-            {selected.kind === 'group' && <div className={'library-group-members' + (membersOver ? ' drop-over' : '')} aria-label={t('apps.groupMembers')}
-              onDragOver={(event) => { if (![...event.dataTransfer.types].includes(PIN_DRAG_TYPE) || dragging.current?.kind === 'group') return; event.preventDefault(); setMembersOver(true); }}
-              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) { setMembersOver(false); setMemberHint(null); } }}
-              onDrop={(event) => { setMembersOver(false); setMemberHint(null); drop(event, { groupId: selected.id }); }}>
-              <span className="library-group-members-title">{t('apps.groupMembers')}</span>
-              {(selected.children || []).map((child, index, kids) => <div key={child.id}
-                className={'library-group-member' + (memberHint?.id === child.id ? ` drop-${memberHint.before ? 'before' : 'after'}` : '') + (dragId === child.id ? ' is-dragging' : '')}
-                draggable onDragStart={(event) => startDrag(event, child)}
-                onDragOver={(event) => {
-                  if (![...event.dataTransfer.types].includes(PIN_DRAG_TYPE) || dragging.current?.kind === 'group') return;
-                  event.preventDefault(); event.stopPropagation(); setMembersOver(true);
-                  const box = event.currentTarget.getBoundingClientRect();
-                  const before = event.clientY < box.top + box.height / 2;
-                  setMemberHint((hint) => hint?.id === child.id && hint.before === before ? hint : { id: child.id, before });
-                }}
-                onDrop={(event) => {
-                  const box = event.currentTarget.getBoundingClientRect();
-                  const before = event.clientY < box.top + box.height / 2;
-                  const next = before ? child : kids.slice(index + 1).find((kid) => kid.id !== dragging.current?.id);
-                  setMembersOver(false); setMemberHint(null);
-                  drop(event, { groupId: selected.id, beforeId: next?.id });
-                }}>
-                <button className="button" onClick={() => inspect(child)}><PreviewPin item={child} size={22} gap={2} /><span>{pinLabel(child)}</span></button>
-                <button className="icon-button" aria-label={`${t('group.takeOut')}: ${pinLabel(child)}`} title={t('group.takeOut')} onClick={() => commit(placePin(latest.current.pinned, child))}><Icon name="take-out" /></button>
-              </div>)}
-              <p className="library-group-members-hint">{t(selected.children?.length ? 'apps.groupDragHint' : 'apps.groupEmptyHint')}</p>
-            </div>}
-            {selected.kind === 'group' && <button className="button" onClick={() => { commit(ungroupPin(latest.current.pinned, selected.id)); selectId(null); }}><Icon name="take-out" />{t('group.ungroup')}</button>}
-            <button className="button" onClick={() => { commit(removePin(latest.current.pinned, selected.id)); selectId(null); }}><Icon name="trash" />{t('apps.remove')}</button>
+            {selected.kind === 'group' && <button className="button" onClick={() => { commit(ungroupPin(latest.current.pinned, selected.id)); selectId(null); if (openId === selected.id) leave(); }}><Icon name="take-out" />{t('group.ungroup')}</button>}
+            <button className="button" onClick={() => { commit(removePin(latest.current.pinned, selected.id)); selectId(null); if (openId === selected.id) leave(); }}><Icon name="trash" />{t('apps.remove')}</button>
           </>}
         </> : <p className="muted">{t('next.inspectEmpty')}</p>}
       </Inspector>

@@ -62,6 +62,8 @@ export function surfaceAlpha(cfg) {
  * colour meant black. */
 export function resolveGlassTint(cfg) {
   const custom = String(cfg?.surfaceTint || "").trim();
+  // A colour that follows Windows or the wallpaper fills every finish.
+  if (cfg?.surfaceFollows && /^#[0-9a-fA-F]{6}$/.test(custom)) return custom.toLowerCase();
   if (effectiveSurface(cfg) !== "glass") return "";
   if (/^#[0-9a-fA-F]{6}$/.test(custom)) return custom.toLowerCase();
   if (String(cfg?.surfaceStyle).toLowerCase() === "tinted") return "#000000";

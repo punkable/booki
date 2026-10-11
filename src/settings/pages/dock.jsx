@@ -67,7 +67,7 @@ export function DockPage({ cfg, set }) {
       {glass && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
       </Row>}
-      {glass && <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")} stack><TintPicker value={cfg.surfaceTint || ""} onChange={(v) => set({ surfaceTint: v }, afterSurface)} /></Row>}
+      {glass && colorSource(cfg) === "custom" && <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")} stack><TintPicker value={cfg.surfaceTint || ""} onChange={(v) => set({ surfaceTint: v }, afterSurface)} /></Row>}
       <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
     </SettingsSection>
 
