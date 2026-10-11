@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
+import { config as configApi, dock as dockApi, emitNotchShape, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { imageSrc } from "./image-src.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
@@ -91,7 +91,13 @@ function reportNotchHitRects() {
   // Out of sight means out of the way: no blur, no clicks, the app behind
   // gets the whole edge.
   const away = !toasting && document.body.classList.contains("away");
-  reportMaterial(document.visibilityState === "hidden" || away ? [] : [shapeOf(toasting ? toastEl : pill)]);
+  // Windows' blur fills a rectangle, so material.rs pulls it in from rounded
+  // corners. On the slim tab, the live capsule and the dot that inset is a
+  // third of the height or more, which split the pill into a blurred and a
+  // flat band. Those shapes get the CSS fill alone; the card is big enough
+  // for the real blur.
+  const blurred = toasting || document.body.classList.contains("card");
+  reportMaterial(document.visibilityState === "hidden" || away || !blurred ? [] : [shapeOf(toasting ? toastEl : pill)]);
   // During drag or toast, keep the whole notch window interactive so gestures
   // and the message aren't yanked out from under the cursor.
   const all = !!(draggingNotch || toasting);
@@ -104,10 +110,30 @@ function reportNotchHitRects() {
     const pillRect = rectFromElement(pill, 1);
     if (pillRect) rects.push(pillRect);
   }
+  shareShape();
   const sig = hitSignature(rects, all);
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   invoke("set_notch_hit_rects", { rects, all }).catch(() => {});
+}
+
+// Tell the dock what the pill looks like once it settles. While it shows a
+// live activity or the card, the dock opens by stretching that capsule into
+// the bar instead of rising from the edge (dock/autohide.js).
+let lastShapeSig = "";
+function shareShape() {
+  if (pill.getAnimations().some((animation) => animation.playState === "running")) return;
+  const body = document.body.classList;
+  const shape = {
+    active: !body.contains("away") && !body.contains("toast") && (body.contains("live") || body.contains("card")),
+    width: pill.offsetWidth,
+    height: pill.offsetHeight,
+    attached: body.contains("peek"),
+  };
+  const sig = JSON.stringify(shape);
+  if (sig === lastShapeSig) return;
+  lastShapeSig = sig;
+  emitNotchShape(shape).catch(() => {});
 }
 
 let hitRaf = 0;

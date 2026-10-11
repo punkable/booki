@@ -29,11 +29,14 @@ test("following Windows takes its accent, mode and taskbar colour", () => {
   const tinted = resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
   assert.match(tinted.surfaceTint, /^#[0-9a-f]{6}$/);
   assert.notEqual(tinted.surfaceTint, "#0078d4", "an accent taskbar uses a deep shade");
-  // An explicit theme stays the user's, but the taskbar owns the dock's
-  // colour, even over the black of the Dark glass finish.
-  const mine = resolveLook({ ...cfg, theme: "light", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
-  assert.equal(mine.theme, "light");
+  // The taskbar owns the dock's colour, even over the black of the Dark
+  // glass finish, but an explicit theme stays the user's: light means the
+  // light taskbar fill, never a dark bar under light-theme ink.
+  const mine = resolveLook({ ...cfg, theme: "dark", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
   assert.equal(mine.surfaceTint, tinted.surfaceTint);
+  const lightPick = resolveLook({ ...cfg, theme: "light", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
+  assert.equal(lightPick.theme, "light");
+  assert.equal(lightPick.surfaceTint, "#eeeeee");
   // No Windows accent: fall back to the wallpaper, then to the picked accent.
   assert.equal(resolveLook(cfg, { platform: { accent: null }, wallpaper: "#336699" }).accent, "#336699");
   assert.equal(resolveLook(cfg, { platform: null }).accent, "#dfaa75");

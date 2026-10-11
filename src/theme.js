@@ -1,6 +1,6 @@
 /* Applies accent color, theme and dock edge to the document. */
 
-import { applySurfaceVars } from "./surface.js";
+import { applySurfaceVars, surfaceForeground } from "./surface.js";
 import { applyMaterial } from "./material.js";
 import { applyAccent } from "./util-color.js";
 import { onLookChange, paintedLook } from "./system-look.js";
@@ -29,7 +29,16 @@ export function applyTheme(cfg) {
   const root = document.documentElement;
   const look = paintedLook(cfg);
   applyAccent(root, look.accent);
-  const resolved = resolveTheme(look.theme);
+  const settings = document.body.classList.contains("settings-body");
+  // Settings is an app window, so "system" follows the Windows app mode
+  // there; only the dock and the notch follow the taskbar's mode.
+  let resolved = resolveTheme(settings ? cfg.theme : look.theme);
+  // A glass colour that forces its own ink (Dark glass, the taskbar's
+  // colour) fills the bar, its menus and its flyouts alike. Paint the whole
+  // window in the matching theme so no light-theme ink, hover or widget
+  // plate lands on a dark fill (or the reverse).
+  const ink = settings ? "" : surfaceForeground(look);
+  if (ink) resolved = ink === "#1b1b1b" ? "light" : "dark";
   if (resolved === "system") {
     root.removeAttribute("data-theme");
   } else {

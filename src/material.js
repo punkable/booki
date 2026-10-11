@@ -29,7 +29,7 @@ export function shapeOf(el, radius) {
   if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) < 0.999) return null;
   // Independent native windows cannot share WebView opacity, skew or a
   // compositor animation. Keep them hidden until the shape has settled.
-  const geometryKeys = ["transform", "scale", "rotate", "translate", "width", "height", "borderRadius", "opacity", "filter"];
+  const geometryKeys = ["transform", "scale", "rotate", "translate", "width", "height", "borderRadius", "opacity", "filter", "clipPath"];
   if (el.getAnimations().some((animation) => animation.playState === "running" &&
     animation.effect?.getKeyframes().some((frame) => geometryKeys.some((key) => key in frame)))) return null;
   const matrix = new DOMMatrixReadOnly(cs.transform === "none" ? undefined : cs.transform);

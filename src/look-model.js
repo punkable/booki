@@ -55,10 +55,12 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
   const dark = themeIsDark(theme || "system", systemDark);
   let surfaceTint;
   if (source === "windows") {
-    surfaceTint = platform?.accentOnTaskbar && windowsAccent
-      // Windows paints an accent taskbar with a deep shade of the accent.
-      ? mixHex(windowsAccent, "#000000", 0.45)
-      : dark ? TASKBAR_DARK : TASKBAR_LIGHT;
+    // Windows paints an accent taskbar with a deep shade of the accent. It
+    // only does so in dark mode, so a light theme picked in Booki keeps the
+    // light taskbar fill instead of a dark bar under dark-on-light ink.
+    surfaceTint = !dark ? TASKBAR_LIGHT
+      : platform?.accentOnTaskbar && windowsAccent ? mixHex(windowsAccent, "#000000", 0.45)
+      : TASKBAR_DARK;
   } else {
     surfaceTint = wall
       ? dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72)
