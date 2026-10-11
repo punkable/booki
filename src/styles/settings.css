@@ -537,9 +537,6 @@
 .library-pin.is-separator .library-pin-name { color: var(--ink-2); }
 .library-pin input { position: absolute; top: 6px; left: 6px; margin: 0; accent-color: var(--accent); opacity: 0; transition: opacity var(--dur-1) var(--ease); }
 .library-pin:hover input, .library-pin input:focus-visible, .library-pin input:checked, .library-pin-strip.selecting .library-pin input { opacity: 1; }
-.library-group-drop { position: absolute; top: 4px; right: 4px; display: inline-flex; align-items: center; gap: 2px; height: 20px; padding: 0 6px; color: var(--ink-2); font: inherit; font-size: 11px; font-weight: 600; background: var(--subtle-pressed); border: 0; border-radius: 999px; cursor: pointer; }
-.library-group-drop:hover { color: var(--accent-contrast); background: var(--accent); }
-.library-group-drop svg { width: 10px; height: 10px; }
 .library-bulk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--divider); }
 .library-bulk-actions > span { min-width: 24px; height: 24px; display: grid; place-items: center; color: var(--accent-contrast); font-size: 12px; font-weight: 600; background: var(--accent); border-radius: 999px; }
 .library-drop-hint { margin: 0; padding: 8px 14px 10px; color: var(--ink-2); font-size: 12px; border-top: 1px solid var(--divider); }
@@ -559,15 +556,6 @@
 .library-inspector .muted { font-size: 12px; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
 .library-inspector > .button { justify-content: center; }
 .library-inspector .library-dock-actions > .button { flex: 1; justify-content: center; }
-.library-group-members { display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--subtle-pressed); border: 1.5px dashed transparent; border-radius: 10px; transition: border-color var(--dur-1) var(--ease), background var(--dur-1) var(--ease); }
-.library-group-members.drop-over { background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-.library-group-members-title { padding: 2px 6px 4px; color: var(--ink-2); font-size: 12px; font-weight: 600; }
-.library-group-member { display: flex; align-items: center; gap: 2px; border-radius: 8px; cursor: grab; }
-.library-group-member:hover { background: var(--subtle-hover); }
-.library-group-members .button { flex: 1; min-width: 0; justify-content: flex-start; gap: 8px; min-height: 34px; padding: 0 6px; background: transparent; border-color: transparent; cursor: inherit; }
-.library-group-members .button > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.library-group-members .button .live-preview-app { width: 22px; height: 22px; }
-.library-group-members-hint { margin: 4px 6px 2px; color: var(--ink-2); font-size: 11.5px; line-height: 15px; }
 /* Drop feedback in the pin strip: a bar between pins to reorder, a ring
    around a pin to file into it (or make a group with it). */
 .library-pin.drop-before::before, .library-pin.drop-after::after { content: ""; position: absolute; top: 8px; bottom: 8px; width: 3px; background: var(--accent); border-radius: 2px; pointer-events: none; }
@@ -576,13 +564,33 @@
 .library-pin.drop-into, .library-pin.drop-merge { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }
 .library-pin.drop-into > button:first-child > :first-child, .library-pin.drop-merge > button:first-child > :first-child { transform: scale(1.08); }
 .library-pin > button:first-child > :first-child { transition: transform var(--dur-2) var(--ease); }
-.library-pin.is-dragging, .library-group-member.is-dragging { opacity: 0.35; }
-.library-group-member { position: relative; }
-.library-group-member.drop-before::before, .library-group-member.drop-after::after { content: ""; position: absolute; right: 6px; left: 6px; height: 2px; background: var(--accent); border-radius: 1px; pointer-events: none; }
-.library-group-member.drop-before::before { top: -2px; }
-.library-group-member.drop-after::after { bottom: -2px; }
+.library-pin.is-dragging { opacity: 0.35; }
 @media (prefers-reduced-motion: reduce) { .library-pin > button:first-child > :first-child { transition: none; } }
 .library-drop-label { position: absolute; left: 50%; top: 2px; z-index: 2; max-width: calc(100% + 24px); overflow: hidden; text-overflow: ellipsis; translate: -50% 0; padding: 3px 8px; color: var(--accent-contrast); font-size: 11.5px; font-weight: 600; white-space: nowrap; background: var(--accent); border-radius: 999px; pointer-events: none; }
+
+/* An open group takes the strip's place, like opening a folder. */
+.library-crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; margin-right: auto; color: var(--ink-2); }
+.library-crumbs > svg { flex: none; width: 14px; height: 14px; }
+.library-dock-head .library-crumb-back { gap: 6px; background: transparent; border-color: transparent; }
+.library-dock-head .library-crumb-back:hover { background: var(--subtle-hover); }
+.library-dock-head .library-crumb-back.drop-out { color: var(--accent-contrast); background: var(--accent); }
+.library-crumb-group { display: inline-flex; align-items: center; gap: 8px; min-width: 0; min-height: 30px; padding: 0 8px; color: var(--ink); font: inherit; font-size: 15px; background: none; border: 0; border-radius: var(--r-control); cursor: pointer; }
+.library-crumb-group:hover, .library-crumb-group[aria-pressed="true"] { background: var(--subtle-hover); }
+.library-crumb-group strong { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.library-crumb-group > svg { flex: none; width: 14px; height: 14px; color: var(--ink-2); }
+.library-pin-strip { position: relative; transition: background var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease); }
+.library-pin-strip.in-group { min-height: 92px; margin: 6px; padding: 0 4px; background: var(--subtle-pressed); border-radius: 12px; animation: library-group-open var(--dur-2) var(--ease); }
+.library-pin-strip.in-group .library-empty { grid-column: 1 / -1; align-self: center; margin: 0; text-align: center; }
+.library-pin-strip.taking-out { box-shadow: inset 0 0 0 1.5px var(--strong-stroke); }
+@keyframes library-group-open { from { opacity: 0; transform: scale(0.97); } }
+.library-group-count { position: absolute; top: 4px; right: 4px; min-width: 20px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center; color: var(--ink-2); font-size: 11px; font-weight: 600; background: var(--subtle-pressed); border-radius: 999px; pointer-events: none; }
+.library-take-out { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0; color: var(--ink-2); background: var(--card); border: 1px solid var(--card-stroke); border-radius: 999px; cursor: pointer; opacity: 0; transition: opacity var(--dur-1) var(--ease); }
+.library-take-out svg { width: 12px; height: 12px; }
+.library-pin:hover .library-take-out, .library-take-out:focus-visible { opacity: 1; }
+.library-take-out:hover { color: var(--accent-contrast); background: var(--accent); border-color: transparent; }
+.library-take-out-label { position: absolute; top: 6px; right: 8px; padding: 3px 8px; color: var(--accent-contrast); font-size: 11.5px; font-weight: 600; background: var(--accent); border-radius: 999px; pointer-events: none; }
+@media (hover: none) { .library-take-out { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .library-pin-strip.in-group { animation: none; } }
 
 .group-look { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .look-picker { position: relative; min-width: 0; }
@@ -679,8 +687,11 @@
 .profile-active-mark { color: var(--accent); }
 .profile-open-mark { color: var(--ink-2); transition: transform var(--dur-3) var(--ease); }
 .profile-record.selected .profile-open-mark { transform: rotate(90deg); }
-.profile-inspector { position: static; margin: 0 16px 16px; }
+.profile-inspector { position: static; margin: 12px 16px 16px; }
+/* The profile replaces the list, so its way back is always shown. */
+.profile-inspector .inspector-back { display: inline-flex; }
 .profile-inspector > :not(.inspector-back):not(.inspector-dismiss) { padding: 0 12px; }
+.profile-inspector > .profile-inspector-title { margin: 0; padding-top: 12px; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .profile-preview-line { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
 .profile-preview-line .live-preview-scene { padding: 8px 0; }
 .profile-summary { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--ink-2); font-size: 12px; }

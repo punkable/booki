@@ -11,6 +11,9 @@ import { hexToRgb, rgbToHex } from "./util-color.js";
 
 export const COLOR_SOURCES = ["windows", "wallpaper", "custom"];
 const HEX = /^#[0-9a-f]{6}$/i;
+// The Windows 11 taskbar's own fills in dark and light mode.
+const TASKBAR_DARK = "#1f1f1f";
+const TASKBAR_LIGHT = "#eeeeee";
 
 export function colorSource(cfg) {
   return COLOR_SOURCES.includes(cfg?.colorSource) ? cfg.colorSource : "custom";
@@ -35,7 +38,7 @@ function themeIsDark(theme, systemDark) {
 }
 
 /** Pure: a config, what Windows reports and the wallpaper colour → the
- * config to paint. A glass colour the user picked always wins. */
+ * config to paint. */
 export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark = false } = {}) {
   const source = colorSource(cfg);
   if (!cfg || source === "custom") return cfg;
@@ -47,15 +50,20 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
   const theme = source === "windows" && (cfg.theme || "system") === "system" && platform
     ? (platform.systemLight ? "light" : "dark")
     : cfg.theme;
-  let surfaceTint = cfg.surfaceTint;
-  if (!HEX.test(String(cfg.surfaceTint || ""))) {
-    const dark = themeIsDark(theme || "system", systemDark);
-    if (source === "windows" && platform?.accentOnTaskbar && windowsAccent) {
+  // In these modes the source owns the dock's colour too, like the taskbar:
+  // a glass colour picked by hand (or by the Dark glass finish) yields to it.
+  const dark = themeIsDark(theme || "system", systemDark);
+  let surfaceTint;
+  if (source === "windows") {
+    surfaceTint = platform?.accentOnTaskbar && windowsAccent
       // Windows paints an accent taskbar with a deep shade of the accent.
-      surfaceTint = mixHex(windowsAccent, "#000000", 0.45);
-    } else if (source === "wallpaper" && wall) {
-      surfaceTint = dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72);
-    }
+      ? mixHex(windowsAccent, "#000000", 0.45)
+      : dark ? TASKBAR_DARK : TASKBAR_LIGHT;
+  } else {
+    surfaceTint = wall
+      ? dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72)
+      : dark ? TASKBAR_DARK : TASKBAR_LIGHT;
   }
-  return { ...cfg, accent, theme, surfaceTint };
+  // `surfaceFollows` lets the colour fill every finish, not just glass.
+  return { ...cfg, accent, theme, surfaceTint, surfaceFollows: true };
 }

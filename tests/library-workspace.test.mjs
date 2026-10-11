@@ -105,14 +105,16 @@ test('dragging in the dock editor makes groups, files apps into them and takes t
   const group = rows.find((p) => p.kind === 'group');
   assert.deepEqual(group.children.map((c) => c.id), ['editor', 'beta']);
   // Anywhere across the middle of a group files the app inside it.
-  const groupPin = page.locator('.library-pin').filter({ has: page.locator('.library-group-drop') });
+  const groupPin = page.locator('.library-pin').filter({ has: page.locator('.library-group-count') });
   await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(groupPin, { targetPosition: { x: 30, y: 60 } });
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 1);
   rows = await pinned();
   assert.deepEqual(rows[0].children.map((c) => c.id), ['editor', 'beta', 'gamma']);
-  // Out again: drag a member from the group panel to the row.
+  // Opening the group turns the strip into its members; dragging one out of
+  // the strip takes it out of the group.
   await groupPin.locator('button').first().click();
-  await page.locator('.library-group-member').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-pin-strip'), { targetPosition: { x: 600, y: 40 } });
+  await page.locator('.library-pin-strip.in-group').waitFor();
+  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-catalog'), { targetPosition: { x: 200, y: 200 } });
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 2);
   rows = await pinned();
   assert.deepEqual(rows.map((p) => p.id).slice(1), ['gamma']);

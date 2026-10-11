@@ -14,9 +14,9 @@ pub fn physical_bounds(x: f64, y: f64, width: f64, height: f64, dpr: f64) -> (i3
     )
 }
 
+/// Corner radii scaled down like CSS does when they overflow the box.
 #[cfg(any(windows, test))]
-pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
-    let (w, h) = (width.max(1) as f64, height.max(1) as f64);
+fn normalized_radii(w: f64, h: f64, radii: [i32; 4]) -> [f64; 4] {
     let mut r = radii.map(|v| v.max(0) as f64);
     let mut scale = 1.0_f64;
     for (extent, sum) in [
@@ -30,6 +30,45 @@ pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
         }
     }
     r.iter_mut().for_each(|v| *v *= scale);
+    r
+}
+
+/// How far (left, top, right, bottom, in physical px) to pull the blur in
+/// from a rounded shape's edges so its square corners stay inside the curve.
+///
+/// Windows ignores the window region for the blur-behind effect, so the blur
+/// always fills its whole rectangle. Left at the shape's full size, its square
+/// corners showed past the rounded CSS edge as a rectangle inside the bar,
+/// clearest on dark glass. A corner of radius r clears the curve once the
+/// rectangle is inset by r·(1 − 1/√2) on both of its sides.
+#[cfg(any(windows, test))]
+pub fn blur_insets(width: i32, height: i32, radii: [i32; 4]) -> [i32; 4] {
+    let (w, h) = (width.max(1) as f64, height.max(1) as f64);
+    let r = normalized_radii(w, h, radii);
+    let k = 1.0 - std::f64::consts::FRAC_1_SQRT_2;
+    let inset = |a: f64, b: f64| (a.max(b) * k).ceil() as i32;
+    let [mut left, mut top, mut right, mut bottom] = [
+        inset(r[0], r[3]),
+        inset(r[0], r[1]),
+        inset(r[1], r[2]),
+        inset(r[3], r[2]),
+    ];
+    // Never collapse a small shape to nothing.
+    if left + right >= width {
+        left = 0;
+        right = 0;
+    }
+    if top + bottom >= height {
+        top = 0;
+        bottom = 0;
+    }
+    [left, top, right, bottom]
+}
+
+#[cfg(any(windows, test))]
+pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
+    let (w, h) = (width.max(1) as f64, height.max(1) as f64);
+    let r = normalized_radii(w, h, radii);
     let corners = [
         (r[0], r[0], r[0], std::f64::consts::PI),
         (w - r[1], r[1], r[1], 1.5 * std::f64::consts::PI),
@@ -80,6 +119,21 @@ mod tests {
             .iter()
             .all(|&(x, y)| (0..=118).contains(&x) && (0..=13).contains(&y)));
         assert!(!points.contains(&(0, 0)));
+    }
+    #[test]
+    fn blur_stays_inside_rounded_corners() {
+        // A 20px bar radius pulls the blur in 6px on every side.
+        assert_eq!(blur_insets(400, 64, [20; 4]), [6, 6, 6, 6]);
+        // The attached notch keeps its square edge flush.
+        assert_eq!(blur_insets(112, 12, [11, 11, 0, 0]), [4, 4, 4, 0]);
+        // Square shapes stay whole and tiny ones never collapse.
+        assert_eq!(blur_insets(60, 30, [0; 4]), [0; 4]);
+        assert_eq!(blur_insets(4, 4, [999; 4]), [1; 4]);
+        assert_eq!(blur_insets(1, 1, [999; 4]), [0; 4]);
+        // The inset corner point lies inside the corner's circle.
+        let [left, top, ..] = blur_insets(300, 80, [24; 4]);
+        let (dx, dy) = (24.0 - left as f64, 24.0 - top as f64);
+        assert!((dx * dx + dy * dy).sqrt() <= 24.0);
     }
     #[test]
     fn square_and_dpi_scaled_shapes_preserve_their_bounds() {

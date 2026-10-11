@@ -65,12 +65,10 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
     {error && <div className="profile-error" role="alert"><span>{error}</span><button className="button" disabled={busy} onClick={() => action(refresh)}>{t("apps.refresh")}</button></div>}
     <div className="profile-list" aria-label={t("prof.title")}>
       {!profiles.length && <p className="profile-empty">{t("design.profileEmpty")}</p>}
-      {profiles.map(n => <div className={"profile-record" + (n === selected ? " selected" : "")} key={n}>
-        <button className="profile-choice" aria-pressed={n === selected} disabled={busy} onClick={event => { origin.current = event.currentTarget; setError(""); setSelected(n); setManageOpen(false); setTargetName(""); }}>
-          <span dangerouslySetInnerHTML={{ __html: icon("copy") }} /><span className="prof-name">{n}</span>{n === active && <span className="profile-active-mark" dangerouslySetInnerHTML={{ __html: icon("check") }} />}<span className="profile-open-mark" dangerouslySetInnerHTML={{ __html: icon("chevron-right") }} />
-        </button>
-        {n === selected && <Inspector className="profile-inspector" selectionKey={selected} origin={origin} onBack={() => setSelected("")}>
-          <h3 className="booki-sr-only">{selected}</h3>
+      {/* A chosen profile opens in place of the list, rather than unfolding
+         under its row and pushing the others down. */}
+      {selected && profiles.includes(selected) ? <Inspector className="profile-inspector" selectionKey={selected} origin={origin} onBack={() => setSelected("")}>
+          <h3 className="profile-inspector-title">{selected}</h3>
           {loading && <p role="status">{t("overhaul.loading")}</p>}
           {preview && <><div className="profile-preview-line"><DockPreview cfg={preview.config} />
             <div className="profile-summary"><span>{counts.apps} {t("overhaul.apps")} · {counts.widgets} {t("tab.widgets")} · {counts.groups} {t("overhaul.groups")}</span><span>{t(`edge.${preview.config.edge || "bottom"}`)} · {t(`theme.${preview.config.theme || "system"}`)}</span><small>{t("design.profileScope")}</small></div>
@@ -84,7 +82,11 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
               </div>
             </details>
           </>}
-        </Inspector>}
+        </Inspector>
+      : profiles.map(n => <div className="profile-record" key={n}>
+        <button className="profile-choice" aria-pressed={n === selected} disabled={busy} onClick={event => { origin.current = event.currentTarget; setError(""); setSelected(n); setManageOpen(false); setTargetName(""); }}>
+          <span dangerouslySetInnerHTML={{ __html: icon("copy") }} /><span className="prof-name">{n}</span>{n === active && <span className="profile-active-mark" dangerouslySetInnerHTML={{ __html: icon("check") }} />}<span className="profile-open-mark" dangerouslySetInnerHTML={{ __html: icon("chevron-right") }} />
+        </button>
       </div>)}
     </div>
     {deleted.length > 0 && <CollapsibleSection title={t("integral.deletedProfiles")} icon="copy" count={deleted.length}>
