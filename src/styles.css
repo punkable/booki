@@ -1322,6 +1322,26 @@ body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; t
 body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -5px; }
 body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
+/* A window of this app is flashing on the taskbar: the running pill widens,
+   turns amber and breathes until that window comes to the front or the tile
+   is clicked (dock.js paintAttention). It stays visible even when running
+   indicators are hidden, because it asks for something. */
+.tile.attention { --attention: #f59e0b; }
+.tile.attention[data-running="true"]::after,
+body.hide-running-indicators .tile.attention[data-running="true"]::after {
+  display: block;
+  width: 14px;
+  background: var(--attention);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--attention) 55%, transparent);
+  animation: attention-pulse 1.6s ease-in-out infinite;
+}
+body.edge-left .tile.attention[data-running="true"]::after,
+body.edge-right .tile.attention[data-running="true"]::after { width: 3px; height: 14px; }
+@keyframes attention-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.attention[data-running="true"]::after { animation: none; }
+}
+:root[data-reduce-motion] .tile.attention[data-running="true"]::after { animation: none; }
 /* Pin / unpin: tiles fade+scale in when added and out when removed. */
 .tile.tile-in { animation: tile-in var(--dur-2) var(--ease); }
 .tile.tile-out { animation: tile-out var(--dur-2) var(--ease) forwards; pointer-events: none; }
@@ -1525,9 +1545,11 @@ body.edge-right .stack.open { transform: none; }
 .stack-close:active { transform: scale(0.96); }
 .stack-item { position: relative; }
 /* Take-out only — never a permanent delete X. Hover-only so rename/focus
-   does not keep a red badge stuck on every cell. */
+   does not keep a red badge stuck on every cell. Hidden with opacity, not
+   display, so Tab can still reach it from its cell. */
 .stack-rm {
-  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: none;
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: flex;
+  opacity: 0; pointer-events: none;
   align-items: center; justify-content: center; line-height: 1; color: var(--ink-2);
   background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
@@ -1537,9 +1559,17 @@ body.edge-right .stack.open { transform: none; }
   padding: 0;
 }
 .stack-rm svg { width: 13px; height: 13px; }
+/* A group cell and its take-out button are siblings in this wrapper, which
+   takes the cell's place in the grid. */
+.stack-cell { position: relative; display: grid; }
 @media (hover: hover) and (pointer: fine) {
-  .stack-item:hover .stack-rm { display: flex; }
+  .stack-item:hover .stack-rm,
+  .stack-cell:hover .stack-rm { opacity: 1; pointer-events: auto; }
 }
+/* Keyboard: the button appears while its cell (or itself) has focus. */
+.stack-cell:has(:focus-visible) .stack-rm,
+.stack-widget:has(:focus-visible) .stack-rm { opacity: 1; pointer-events: auto; }
+.stack-rm:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .stack-rm:hover {
   color: var(--ink);
   background: var(--layer-strong);
@@ -2717,3 +2747,184 @@ body.hide-running-indicators .tile.launching::after { display: none; }
 
 .tile.group .group-grid > svg { width: 58%; height: 58%; color: var(--ink-2); }
 .tile.group .group-cover { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
+
+/* ─────────── Windows high contrast ───────────
+   forced-colors is how WebView2 reports a Windows contrast theme. The same
+   rules repeat under [data-high-contrast], which platform-preferences.js sets
+   from the backend, in case the media query does not match. Surfaces go solid
+   (no glass, no sheen), every tile and panel gets a visible edge, and focus,
+   selection and running state use the system Highlight colours. */
+@media (forced-colors: active) {
+  .dock,
+  .notch-pill,
+  .notch-toast,
+  .stack,
+  .menu,
+  .dock-tip,
+  .trash-pop,
+  .undo-toast,
+  .coach,
+  .note-editor,
+  .edit-toolbar,
+  .update-pill,
+  .tile .label {
+    --surface-ink: CanvasText;
+    --ink: CanvasText;
+    --ink-2: CanvasText;
+    --ink-3: CanvasText;
+    --bg: Canvas;
+    --layer: Canvas;
+    --layer-strong: Canvas;
+    --surface-tint: Canvas;
+    --surf-fill: Canvas;
+    --panel-fill: Canvas;
+    --hover: Canvas;
+    --pressed: Canvas;
+    --stroke: CanvasText;
+    --stroke-strong: CanvasText;
+    --surf-stroke: CanvasText;
+    --accent: Highlight;
+    --accent-contrast: HighlightText;
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .dock::before {
+    display: none;
+  }
+  .tile:not(.separator) {
+    border: 1px solid ButtonBorder;
+  }
+  .tile:hover,
+  .tile:active {
+    background: Canvas;
+    border-color: Highlight;
+  }
+  .dock :focus-visible,
+  .stack :focus-visible,
+  .trash-pop :focus-visible,
+  .notch-pill:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .tile.drop-target,
+  .tile.merge-target {
+    background: Canvas;
+    box-shadow: none;
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .tile.merge-target::before {
+    box-shadow: none;
+  }
+  .tile[data-running="true"]::after,
+  .stack-item[data-running="true"]::after,
+  .tile.launching::after,
+  .notch-pill::after {
+    background: CanvasText;
+    box-shadow: none;
+  }
+  .sep-line {
+    background: CanvasText;
+  }
+  .tile .badge:not(:empty) {
+    color: HighlightText;
+    background: Highlight;
+  }
+  .stack-breadcrumbs button[aria-current] {
+    color: HighlightText;
+    background: Highlight;
+  }
+  /* Filled Highlight states draw their own colours: without this the browser
+     paints a Canvas backplate behind the text and hides it. */
+  .tile .badge:not(:empty),
+  .stack-breadcrumbs button[aria-current] {
+    forced-color-adjust: none;
+  }
+}
+:root[data-high-contrast] .dock,
+:root[data-high-contrast] .notch-pill,
+:root[data-high-contrast] .notch-toast,
+:root[data-high-contrast] .stack,
+:root[data-high-contrast] .menu,
+:root[data-high-contrast] .dock-tip,
+:root[data-high-contrast] .trash-pop,
+:root[data-high-contrast] .undo-toast,
+:root[data-high-contrast] .coach,
+:root[data-high-contrast] .note-editor,
+:root[data-high-contrast] .edit-toolbar,
+:root[data-high-contrast] .update-pill,
+:root[data-high-contrast] .tile .label {
+  --surface-ink: CanvasText;
+  --ink: CanvasText;
+  --ink-2: CanvasText;
+  --ink-3: CanvasText;
+  --bg: Canvas;
+  --layer: Canvas;
+  --layer-strong: Canvas;
+  --surface-tint: Canvas;
+  --surf-fill: Canvas;
+  --panel-fill: Canvas;
+  --hover: Canvas;
+  --pressed: Canvas;
+  --stroke: CanvasText;
+  --stroke-strong: CanvasText;
+  --surf-stroke: CanvasText;
+  --accent: Highlight;
+  --accent-contrast: HighlightText;
+  color: CanvasText;
+  background: Canvas;
+  border-color: CanvasText;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-high-contrast] .dock::before {
+  display: none;
+}
+:root[data-high-contrast] .tile:not(.separator) {
+  border: 1px solid ButtonBorder;
+}
+:root[data-high-contrast] .tile:hover,
+:root[data-high-contrast] .tile:active {
+  background: Canvas;
+  border-color: Highlight;
+}
+:root[data-high-contrast] .dock :focus-visible,
+:root[data-high-contrast] .stack :focus-visible,
+:root[data-high-contrast] .trash-pop :focus-visible,
+:root[data-high-contrast] .notch-pill:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+:root[data-high-contrast] .tile.drop-target,
+:root[data-high-contrast] .tile.merge-target {
+  background: Canvas;
+  box-shadow: none;
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+:root[data-high-contrast] .tile.merge-target::before {
+  box-shadow: none;
+}
+:root[data-high-contrast] .tile[data-running="true"]::after,
+:root[data-high-contrast] .stack-item[data-running="true"]::after,
+:root[data-high-contrast] .tile.launching::after,
+:root[data-high-contrast] .notch-pill::after {
+  background: CanvasText;
+  box-shadow: none;
+}
+:root[data-high-contrast] .sep-line {
+  background: CanvasText;
+}
+:root[data-high-contrast] .tile .badge:not(:empty) {
+  color: HighlightText;
+  background: Highlight;
+}
+:root[data-high-contrast] .stack-breadcrumbs button[aria-current] {
+  color: HighlightText;
+  background: Highlight;
+}

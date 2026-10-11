@@ -1058,8 +1058,106 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Add or remove the "start with Windows" registry entry for this exe.
+/// Task Manager's Startup apps page keeps its own on/off switch for each Run
+/// entry here, as a binary value named like the entry. The first byte is even
+/// when enabled (02) and odd when the user turned it off (03).
+const STARTUP_APPROVED_KEY: &str =
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
+
+/// True when the user turned Booki off in Task Manager (or Settings > Apps >
+/// Startup). The Run entry is still there in that case, but Windows skips it.
+pub fn autostart_disabled_by_user() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_BINARY};
+    let key = wide(STARTUP_APPROVED_KEY);
+    let value = wide(RUN_VALUE);
+    let mut data = [0u8; 64];
+    let mut size = data.len() as u32;
+    let found = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_BINARY,
+            None,
+            Some(data.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+        .is_ok()
+    };
+    found && size >= 1 && data[0] & 1 == 1
+}
+
+/// Turning autostart on in Booki is a fresh choice, so it also clears a
+/// "disabled" mark Task Manager left behind; turning it off removes the mark.
+fn write_startup_approved(enabled: bool) -> Result<(), String> {
+    use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+        KEY_SET_VALUE, REG_BINARY, REG_OPTION_NON_VOLATILE,
+    };
+    let key_path = wide(STARTUP_APPROVED_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        let mut key = HKEY::default();
+        let opened = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            0,
+            None,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        );
+        if opened.is_err() {
+            return Err(format!(
+                "could not open the StartupApproved key ({opened:?})"
+            ));
+        }
+        let result = if enabled {
+            // 02 followed by zeros: "enabled", with no disable time stamp.
+            let mut blob = [0u8; 12];
+            blob[0] = 0x02;
+            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_BINARY, Some(&blob));
+            if r.is_err() {
+                Err(format!("could not write the StartupApproved value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        } else {
+            let r = RegDeleteValueW(key, PCWSTR(value_name.as_ptr()));
+            if r.is_err() && r != ERROR_FILE_NOT_FOUND {
+                Err(format!(
+                    "could not delete the StartupApproved value ({r:?})"
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        let _ = RegCloseKey(key);
+        result
+    }
+}
+
+/// Add or remove the "start with Windows" entry for this exe, as the user
+/// asked in Booki.
 pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
+    write_run_value(enabled, exe)?;
+    write_startup_approved(enabled)
+}
+
+/// Point an existing autostart entry at this exe (after a move or reinstall)
+/// without overriding the user: when they turned Booki off in Task Manager,
+/// nothing is written.
+pub fn repair_autostart(exe: &str) -> Result<(), String> {
+    if autostart_disabled_by_user() {
+        return Ok(());
+    }
+    write_run_value(true, exe)
+}
+
+fn write_run_value(enabled: bool, exe: &str) -> Result<(), String> {
     use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
     use windows::Win32::System::Registry::{
         RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
@@ -1222,7 +1320,16 @@ pub fn sync_context_menu(
             Ok(())
         }
     }
-    unsafe fn create(path: &str) -> Result<HKEY, String> {
+    /// An open registry key, closed when dropped, so an early `?` return can't
+    /// leak the handle.
+    struct OwnedKey(HKEY);
+    impl Drop for OwnedKey {
+        fn drop(&mut self) {
+            let _ = unsafe { RegCloseKey(self.0) };
+        }
+    }
+
+    unsafe fn create(path: &str) -> Result<OwnedKey, String> {
         let wpath = wide(path);
         let mut key = HKEY::default();
         let r = unsafe {
@@ -1241,54 +1348,77 @@ pub fn sync_context_menu(
         if r.is_err() {
             Err(format!("reg create {path} failed ({r:?})"))
         } else {
-            Ok(key)
+            Ok(OwnedKey(key))
         }
     }
 
-    unsafe {
-        for base in ["*", "Directory"] {
-            let root = format!("Software\\Classes\\{base}\\shell\\{RUN_VALUE}");
-            // Always start clean (also removes the menu when disabling).
-            let wroot = wide(&root);
-            let _ = RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr()));
-            if !enabled {
-                continue;
-            }
-            let key = create(&root)?;
-            set_str(key, Some("MUIVerb"), RUN_VALUE)?;
-            set_str(key, Some("Icon"), &format!("\"{exe}\""))?;
-            // An empty SubCommands + subkeys under shell\ = a cascading menu.
-            set_str(key, Some("SubCommands"), "")?;
-            let _ = RegCloseKey(key);
+    unsafe fn write_menu(
+        root: &str,
+        exe: &str,
+        label_pin: &str,
+        group_entries: &[(String, String)],
+    ) -> Result<(), String> {
+        let key = create(root)?;
+        set_str(key.0, Some("MUIVerb"), RUN_VALUE)?;
+        set_str(key.0, Some("Icon"), &format!("\"{exe}\""))?;
+        // An empty SubCommands + subkeys under shell\ = a cascading menu.
+        set_str(key.0, Some("SubCommands"), "")?;
+        drop(key);
 
-            // Entries sort alphabetically by key name → numeric prefixes fix order.
-            let pin_key = create(&format!("{root}\\shell\\01_pin"))?;
-            set_str(pin_key, Some("MUIVerb"), label_pin)?;
-            let _ = RegCloseKey(pin_key);
-            let cmd = create(&format!("{root}\\shell\\01_pin\\command"))?;
-            set_str(cmd, None, &format!("\"{exe}\" --pin \"%1\""))?;
-            let _ = RegCloseKey(cmd);
+        // Entries sort alphabetically by key name → numeric prefixes fix order.
+        let pin_key = create(&format!("{root}\\shell\\01_pin"))?;
+        set_str(pin_key.0, Some("MUIVerb"), label_pin)?;
+        drop(pin_key);
+        let cmd = create(&format!("{root}\\shell\\01_pin\\command"))?;
+        set_str(cmd.0, None, &format!("\"{exe}\" --pin \"%1\""))?;
+        drop(cmd);
 
-            for (i, (id, label)) in group_entries.iter().enumerate() {
-                let sub = format!("{root}\\shell\\10_{i:02}");
-                let gk = create(&sub)?;
-                set_str(gk, Some("MUIVerb"), label)?;
-                let _ = RegCloseKey(gk);
-                let gc = create(&format!("{sub}\\command"))?;
-                set_str(gc, None, &format!("\"{exe}\" --pin-group \"{id}\" \"%1\""))?;
-                let _ = RegCloseKey(gc);
-            }
+        for (i, (id, label)) in group_entries.iter().enumerate() {
+            let sub = format!("{root}\\shell\\10_{i:02}");
+            let gk = create(&sub)?;
+            set_str(gk.0, Some("MUIVerb"), label)?;
+            drop(gk);
+            let gc = create(&format!("{sub}\\command"))?;
+            set_str(
+                gc.0,
+                None,
+                &format!("\"{exe}\" --pin-group \"{id}\" \"%1\""),
+            )?;
+        }
+        Ok(())
+    }
+
+    let roots =
+        ["*", "Directory"].map(|base| format!("Software\\Classes\\{base}\\shell\\{RUN_VALUE}"));
+    let delete_all = || {
+        for root in &roots {
+            let wroot = wide(root);
+            let _ = unsafe { RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(wroot.as_ptr())) };
+        }
+    };
+    // Always start clean (also removes the menu when disabling).
+    delete_all();
+    if !enabled {
+        return Ok(());
+    }
+    for root in &roots {
+        if let Err(error) = unsafe { write_menu(root, exe, label_pin, group_entries) } {
+            // A half-written cascade shows a broken or empty menu in Explorer;
+            // leave no menu at all and let the caller report the error.
+            delete_all();
+            return Err(error);
         }
     }
     Ok(())
 }
 
-/// True when the "start with Windows" registry entry exists.
+/// True when the "start with Windows" entry exists and the user has not
+/// turned it off in Task Manager.
 pub fn get_autostart() -> bool {
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
     let key_path = wide(RUN_KEY);
     let value_name = wide(RUN_VALUE);
-    unsafe {
+    let registered = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
             PCWSTR(key_path.as_ptr()),
@@ -1299,7 +1429,8 @@ pub fn get_autostart() -> bool {
             None,
         )
         .is_ok()
-    }
+    };
+    registered && !autostart_disabled_by_user()
 }
 
 /// Quiet NSIS updates are safe only for the registered per-user installation.
@@ -1350,6 +1481,9 @@ pub fn trash_paths(paths: &[String]) -> Result<(), String> {
     };
     if paths.is_empty() {
         return Ok(());
+    }
+    for p in paths {
+        crate::util::check_shell_path(p)?;
     }
     // pFrom is a double-null-terminated list of null-separated paths.
     let mut buf: Vec<u16> = Vec::new();
@@ -1572,6 +1706,10 @@ pub fn move_paths(paths: &[String], dest: &str) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
+    for p in paths {
+        crate::util::check_shell_path(p)?;
+    }
+    crate::util::check_shell_path(dest)?;
     let mut from: Vec<u16> = Vec::new();
     for p in paths {
         from.extend(p.encode_utf16());

@@ -16,6 +16,7 @@ mod favicon;
 mod files;
 mod media;
 mod metrics;
+mod native_text;
 mod notch_window;
 mod note_journal;
 mod profile_store;
@@ -289,11 +290,30 @@ fn relocate_shortcut(app: AppHandle, id: String, to_desktop: bool) -> Result<Str
 }
 
 #[tauri::command]
-fn launch_app(path: String, args: Option<Vec<String>>) -> Result<(), String> {
-    apps::launch(&path, &args.unwrap_or_default())?;
-    if config::load().usage_recommendations_enabled {
-        usage::record_launch(&path);
+fn launch_app(path: String, args: Option<Vec<String>>, verb: Option<String>) -> Result<(), String> {
+    let args = args.unwrap_or_default();
+    match verb.as_deref() {
+        None | Some("") | Some("open") => apps::launch(&path, &args)?,
+        // ShellExecuteW blocks until the UAC prompt is answered, so the
+        // elevated launch runs off the UI thread. Cancelling the prompt is a
+        // normal answer, so a failure is only logged.
+        Some("runas") => {
+            let elevated = path.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(error) = apps::launch_elevated(&elevated, &args) {
+                    log::warn!("Run as administrator did not start: {error}");
+                }
+            });
+        }
+        Some(other) => return Err(format!("unsupported launch verb: {other}")),
     }
+    // Recording rewrites and fsyncs the usage file; the launch itself stays on
+    // this thread so the app opens right away, the bookkeeping does not.
+    tauri::async_runtime::spawn_blocking(move || {
+        if config::load().usage_recommendations_enabled {
+            usage::record_launch(&path);
+        }
+    });
     Ok(())
 }
 
@@ -373,7 +393,7 @@ fn platform_capabilities() -> serde_json::Value {
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true,"accent":null,"accentOnTaskbar":false,"systemLight":false })
+        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true,"accent":null,"accentOnTaskbar":false,"systemLight":false,"textScale":100 })
     }
 }
 
@@ -453,26 +473,21 @@ async fn set_material(
     shapes: Vec<surface_geometry::MaterialShape>,
     tint: String,
 ) -> bool {
+    // The frontend still sends its tint, but the native surface is a pure
+    // blur and the tint is painted in CSS, so it is accepted and ignored.
+    let _ = tint;
     #[cfg(windows)]
     {
         let owner = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
         if owner == 0 {
             return false;
         }
-        let hex = tint.trim_start_matches('#');
-        let rgba = u32::from_str_radix(hex, 16).unwrap_or(0x1c1c1ea0);
-        let argb = if hex.len() == 8 {
-            // RRGGBBAA -> AARRGGBB
-            rgba.rotate_right(8)
-        } else {
-            0xff00_0000 | rgba
-        };
         let key = window.label().to_string();
         let dpr = window.scale_factor().unwrap_or(1.0);
         let (tx, rx) = std::sync::mpsc::channel();
         if app
             .run_on_main_thread(move || {
-                let _ = tx.send(win::material::apply(owner, &key, &shapes, dpr, argb));
+                let _ = tx.send(win::material::apply(owner, &key, &shapes, dpr));
             })
             .is_err()
         {
@@ -768,6 +783,10 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     config::backup_for_update()?;
     let previous = config::load();
     let previous_autostart = get_autostart();
+    // Only a profile that changes the choice touches the registry. Applying
+    // one that agrees with the current config must not re-enable an entry
+    // the user turned off in Task Manager (automatic profiles apply often).
+    let touch_autostart = cfg.autostart != previous.autostart;
     if let Err(error) = hotkeys_apply(
         app,
         &cfg.hotkey,
@@ -784,7 +803,12 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
         );
         return Err(error);
     }
-    if let Err(error) = set_autostart(cfg.autostart) {
+    let autostart_result = if touch_autostart {
+        set_autostart(cfg.autostart)
+    } else {
+        Ok(())
+    };
+    if let Err(error) = autostart_result {
         let _ = hotkeys_apply(
             app,
             &previous.hotkey,
@@ -795,7 +819,9 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
         return Err(error);
     }
     if let Err(error) = config::save_replacement(&cfg) {
-        let _ = set_autostart(previous_autostart);
+        if touch_autostart {
+            let _ = set_autostart(previous_autostart);
+        }
         let _ = hotkeys_apply(
             app,
             &previous.hotkey,
@@ -914,10 +940,59 @@ fn export_diagnostics(window: WebviewWindow, path: String) -> Result<(), String>
     snapshot::write_bytes(std::path::Path::new(&path), &bytes)
 }
 
-/// Accent color derived from the desktop wallpaper (async: decodes an image).
+/// Accent color derived from the desktop wallpaper (decodes an image, so it
+/// runs on the blocking pool).
 #[tauri::command]
 async fn wallpaper_accent() -> Option<String> {
-    win::wallpaper_accent()
+    util::blocking(win::wallpaper_accent)
+        .await
+        .unwrap_or_default()
+}
+
+/// Display power and Energy Saver as last reported by Windows. The dock reads
+/// this once at start; changes arrive as display-off/display-on and
+/// energy-saver signals.
+#[tauri::command]
+fn power_status() -> serde_json::Value {
+    #[cfg(windows)]
+    {
+        use win::system_events;
+        serde_json::json!({ "displayOn": system_events::DISPLAY_ON.load(Ordering::Relaxed), "energySaver": system_events::energy_saver() })
+    }
+    #[cfg(not(windows))]
+    {
+        serde_json::json!({ "displayOn": true, "energySaver": false })
+    }
+}
+
+/// Windows currently flashing for attention (taskbar HSHELL_FLASH).
+#[tauri::command]
+fn attention_windows() -> Vec<i64> {
+    #[cfg(windows)]
+    {
+        win::system_events::attention_windows()
+            .into_iter()
+            .map(|hwnd| hwnd as i64)
+            .collect()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// The user clicked the tile of these windows: stop showing them as waiting.
+#[tauri::command]
+fn dismiss_attention(hwnds: Vec<i64>) {
+    #[cfg(windows)]
+    {
+        let hwnds: Vec<isize> = hwnds.into_iter().map(|hwnd| hwnd as isize).collect();
+        win::system_events::dismiss_attention(&hwnds);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = hwnds;
+    }
 }
 
 #[tauri::command]
@@ -929,7 +1004,7 @@ fn system_events_support() -> serde_json::Value {
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false })
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false, "clipboard": false })
     }
 }
 
@@ -958,24 +1033,51 @@ fn hotkeys_apply(
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    if !toggle.trim().is_empty() {
-        gs.register(toggle.trim()).map_err(|e| e.to_string())?;
+    // Every shortcut registers on its own. One combo that another app already
+    // owns used to return early and leave the launcher and position keys
+    // unregistered until a restart; now only that combo is missing and the
+    // error names it.
+    let mut failed: Vec<String> = Vec::new();
+    let toggle = toggle.trim();
+    if !toggle.is_empty() {
+        if let Err(error) = gs.register(toggle) {
+            log::warn!("Toggle shortcut {toggle} not registered: {error}");
+            failed.push(toggle.to_string());
+        }
     }
-    // Best-effort, like the position keys: another app may own the combo.
-    let parsed = launcher.trim().parse::<Shortcut>().ok();
-    if let Some(shortcut) = parsed {
-        let _ = gs.register(shortcut);
+    let launcher = launcher.trim();
+    let parsed = launcher.parse::<Shortcut>().ok();
+    match parsed {
+        Some(shortcut) => {
+            if let Err(error) = gs.register(shortcut) {
+                log::warn!("Launcher shortcut {launcher} not registered: {error}");
+                failed.push(launcher.to_string());
+            }
+        }
+        None if !launcher.is_empty() => {
+            log::warn!("Launcher shortcut {launcher} is not a valid shortcut");
+            failed.push(launcher.to_string());
+        }
+        None => {}
     }
     if let Ok(mut slot) = LAUNCHER_SHORTCUT.lock() {
         *slot = parsed;
     }
     if positions {
         for i in 1..=9 {
-            // Best-effort: another app may own one of the combos; skip it.
-            let _ = gs.register(format!("{modifier}+{i}").as_str());
+            // Best-effort: another app may own one of the nine combos, and
+            // the rest are still useful, so a miss is logged, not reported.
+            let combo = format!("{modifier}+{i}");
+            if let Err(error) = gs.register(combo.as_str()) {
+                log::info!("Position shortcut {combo} not registered: {error}");
+            }
         }
     }
-    Ok(())
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("Shortcut not available: {}", failed.join(", ")))
+    }
 }
 
 /// Called from Settings when the position-hotkey options change.
@@ -1007,6 +1109,62 @@ fn open_settings_window(app: &AppHandle) {
     open_settings_url(app, "settings.html");
 }
 
+static REPOSITION_QUEUED: AtomicBool = AtomicBool::new(false);
+
+/// Re-place the dock and notch for the current displays, on the main thread.
+/// Requests that arrive while one is queued fold into it (a scale change
+/// reaches both windows, and moving them can report another one).
+fn reposition_surfaces(app: &AppHandle) {
+    if REPOSITION_QUEUED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let handle = app.clone();
+    let queued = app.run_on_main_thread(move || {
+        REPOSITION_QUEUED.store(false, Ordering::Release);
+        let cfg = config::load();
+        if let Some(dock) = handle.get_webview_window("dock") {
+            let _ = position_dock(&dock, &cfg.edge);
+        }
+        if let Some(notch) = handle.get_webview_window("notch") {
+            let _ = position_notch(&notch, &cfg.edge);
+        }
+    });
+    if queued.is_err() {
+        REPOSITION_QUEUED.store(false, Ordering::Release);
+    }
+}
+
+/// The tray's right-click menu in one language.
+fn tray_menu(app: &AppHandle, language: &str) -> tauri::Result<Menu<tauri::Wry>> {
+    let text = native_text::text(language);
+    let toggle = MenuItem::with_id(app, "toggle", text.toggle, true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", text.settings, true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", text.quit, true, None::<&str>)?;
+    Menu::with_items(app, &[&toggle, &settings, &quit_item])
+}
+
+/// The dock reports the language it resolved (so "system" matches the pages);
+/// rebuild the tray menu and retitle Settings when it changed.
+#[tauri::command]
+fn sync_native_language(app: AppHandle, language: String) {
+    let language = native_text::supported(&language)
+        .unwrap_or_else(|| native_text::resolve(&config::load().language));
+    if !native_text::set_current(language) {
+        return;
+    }
+    if let Some(tray) = app.tray_by_id("booki-tray") {
+        match tray_menu(&app, language) {
+            Ok(menu) => {
+                let _ = tray.set_menu(Some(menu));
+            }
+            Err(error) => log::warn!("Tray menu not rebuilt: {error}"),
+        }
+    }
+    if let Some(settings) = app.get_webview_window("settings") {
+        let _ = settings.set_title(native_text::text(language).settings_title);
+    }
+}
+
 /// Bring an existing Settings window forward. `show` alone leaves a minimized
 /// window on the taskbar, so opening Settings again looked like it did nothing.
 fn bring_settings_forward(window: &WebviewWindow) {
@@ -1036,7 +1194,7 @@ fn open_settings_url(app: &AppHandle, url: &str) {
     }
     let (width, height) = settings_size(app);
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
-        .title("Booki — Ajustes")
+        .title(native_text::text(native_text::current()).settings_title)
         .inner_size(width, height)
         .min_inner_size(520.0, 480.0)
         .resizable(true)
@@ -1309,9 +1467,23 @@ pub fn run() {
             is_dir,
             list_installed_apps,
             system_events_support,
+            sync_native_language,
+            power_status,
+            attention_windows,
+            dismiss_attention,
             quit,
             frontend_log,
         ])
+        .on_window_event(|window, event| {
+            // A monitor's scale can change (Settings > Display > Scale) with
+            // no display change, so the "display" signal never fires; the
+            // dock and notch would keep their old physical size and position.
+            if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+                if matches!(window.label(), "dock" | "notch") {
+                    reposition_surfaces(window.app_handle());
+                }
+            }
+        })
         .setup(|app| {
             log::info!("Booki backend started");
             #[cfg(windows)]
@@ -1335,16 +1507,7 @@ pub fn run() {
                         }
                     }
                     if kind == "display" || kind == "resume" {
-                        let app = handle.clone();
-                        let _ = handle.run_on_main_thread(move || {
-                            let cfg = config::load();
-                            if let Some(dock) = app.get_webview_window("dock") {
-                                let _ = position_dock(&dock, &cfg.edge);
-                            }
-                            if let Some(notch) = app.get_webview_window("notch") {
-                                let _ = position_notch(&notch, &cfg.edge);
-                            }
-                        });
+                        reposition_surfaces(&handle);
                     }
                     if kind == "resume" {
                         for source in ["media", "volume", "windows"] {
@@ -1354,7 +1517,12 @@ pub fn run() {
                     if kind == "catalog" {
                         CATALOG_GENERATION.fetch_add(1, Ordering::Relaxed);
                     }
-                    let _ = handle.emit(&format!("booki://{kind}-changed"), ());
+                    let event = format!("booki://{kind}-changed");
+                    let _ = match kind {
+                        "energy-saver" => handle.emit(&event, win::system_events::energy_saver()),
+                        "attention" => handle.emit(&event, win::system_events::attention_windows()),
+                        _ => handle.emit(&event, ()),
+                    };
                 }));
             }
             clip_load_from_disk();
@@ -1369,17 +1537,17 @@ pub fn run() {
             // re-assert the Run key to the CURRENT exe on every launch. This fixes
             // a stale/missing entry (e.g. after moving or reinstalling the app) so
             // autostart keeps working without the user toggling it again.
+            // repair_autostart writes nothing when the user turned Booki off in
+            // Task Manager, so this never re-enables it behind their back.
             if config::load().autostart {
                 if let Ok(exe) = std::env::current_exe() {
-                    let _ = win::set_autostart(true, &exe.to_string_lossy());
+                    let _ = win::repair_autostart(&exe.to_string_lossy());
                 }
             }
-            // System tray.
-            let toggle =
-                MenuItem::with_id(app, "toggle", "Mostrar / ocultar dock", true, None::<&str>)?;
-            let settings = MenuItem::with_id(app, "settings", "Ajustes…", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Salir de Booki", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle, &settings, &quit_item])?;
+            // System tray, in the configured language. The dock corrects it
+            // through sync_native_language once it has resolved "system".
+            native_text::set_current(native_text::resolve(&config::load().language));
+            let menu = tray_menu(app.handle(), native_text::current())?;
 
             let mut tray_builder = TrayIconBuilder::with_id("booki-tray")
                 .tooltip("Booki")
@@ -1531,7 +1699,13 @@ pub fn run() {
                             }
                             // fullscreen game / movie / presentation → get out of the way.
                             // Smart notch also softens the dot while fullscreen.
-                            if let Some(v) = debounce(&mut fs, win::is_fullscreen()) {
+                            // Only the dock's hide-in-fullscreen acts on this
+                            // signal, so with it off the window scan is skipped.
+                            // Feeding `false` instead still sends the "fullscreen
+                            // ended" edge, so turning the option off mid-game
+                            // can't leave the dock blacked out.
+                            let fullscreen = cfg_cache.hide_in_fullscreen && win::is_fullscreen();
+                            if let Some(v) = debounce(&mut fs, fullscreen) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }
                             // The notch steps aside while an app owns the screen

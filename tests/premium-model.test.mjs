@@ -71,6 +71,18 @@ test('failed download releases the native lock and can retry', async () => {
   update.download = download; await controller.download();
   assert.equal(controller.snapshot().phase, 'ready');
 });
+test('a failing lock release keeps the download error and still allows a retry', async () => {
+  let releases = 0;
+  const { controller, update, events } = updateHarness({ release: async () => { releases++; if (releases === 1) throw new Error('release failed'); events.push('unlock'); } });
+  await controller.check(); const download = update.download;
+  update.download = async () => { throw new Error('offline'); };
+  await assert.rejects(controller.download(), /offline/);
+  assert.equal(controller.snapshot().phase, 'available');
+  assert.match(String(controller.snapshot().error), /offline/);
+  update.download = download; await controller.download();
+  assert.equal(controller.snapshot().phase, 'ready');
+  assert.deepEqual(events, ['lock', 'lock', 'download']);
+});
 test('failed save or backup blocks installation and leaves the verified download ready to retry', async () => {
   let fail = true;
   const { controller, events } = updateHarness({ backup: async () => { if (fail) throw new Error('disk full'); events.push('backup'); } });

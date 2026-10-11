@@ -31,6 +31,8 @@ pub struct Capabilities {
     pub accent_on_taskbar: bool,
     /// The Windows mode (taskbar, Start) is light. Apps can differ.
     pub system_light: bool,
+    /// Accessibility > Text size, in percent (100–225).
+    pub text_scale: u32,
 }
 
 /// A DWORD under HKCU, or None when it is missing.
@@ -121,6 +123,11 @@ pub fn capabilities() -> Capabilities {
                 .map(accent_hex),
             accent_on_taskbar: user_dword(personalize, w!("ColorPrevalence")) == Some(1),
             system_light: user_dword(personalize, w!("SystemUsesLightTheme")) == Some(1),
+            text_scale: user_dword(
+                w!("Software\\Microsoft\\Accessibility"),
+                w!("TextScaleFactor"),
+            )
+            .map_or(100, |scale| scale.clamp(100, 225)),
         }
     }
 }

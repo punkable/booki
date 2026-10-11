@@ -1,8 +1,11 @@
 /* Dock hints never resize the native stage or rely on WebView's title popup.
  * Content comes from the current pin and cached app state, not hover-time IPC. */
 export function setTileLabel(tile, label) {
-  tile.removeAttribute('title');
-  tile.setAttribute('aria-label', label || '');
+  // Widgets relabel on every tick; skip unchanged writes so the dock's
+  // MutationObserver is not woken for nothing.
+  if (tile.hasAttribute('title')) tile.removeAttribute('title');
+  const next = label || '';
+  if (tile.getAttribute('aria-label') !== next) tile.setAttribute('aria-label', next);
 }
 
 export function createDockTooltip(root, { edge, describe, blocked }) {

@@ -3,6 +3,45 @@
 use base64::Engine;
 use std::path::Path;
 
+/// Run blocking work (disk, shell, network, COM) on the blocking thread pool.
+/// Sync commands run on the UI thread and plain `async fn` bodies hold an
+/// async worker, so slow work in either freezes the dock or starves other
+/// commands. Shell helpers initialize COM on their own thread, so they work
+/// unchanged here.
+pub async fn blocking<T: Send + 'static>(
+    job: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(job)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Check a path before it goes into a shell file operation. SHFileOperationW
+/// takes a list of NUL-separated paths that ends at an empty one, so an empty
+/// path or one containing NUL would silently cut the list. A relative path is
+/// resolved against the working directory, which is System32 when Booki starts
+/// with Windows. Only drive paths (`C:\…`) and UNC paths (`\\server\share…`)
+/// are accepted.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn check_shell_path(path: &str) -> Result<(), String> {
+    if path.trim().is_empty() {
+        return Err("empty path".into());
+    }
+    if path.contains('\0') {
+        return Err("path contains a NUL character".into());
+    }
+    let bytes = path.as_bytes();
+    let is_sep = |b: u8| b == b'\\' || b == b'/';
+    let drive =
+        bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && is_sep(bytes[2]);
+    let unc = bytes.len() > 2 && is_sep(bytes[0]) && is_sep(bytes[1]) && !is_sep(bytes[2]);
+    if drive || unc {
+        Ok(())
+    } else {
+        Err(format!("not an absolute path: {path}"))
+    }
+}
+
 /// Read an image file and return it as a `data:` URI, for custom tile icons.
 pub fn read_image_data_uri(path: &str) -> Option<String> {
     let mime = match Path::new(path)
@@ -33,7 +72,21 @@ pub fn read_image_data_uri(path: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::read_image_data_uri;
+    use super::{check_shell_path, read_image_data_uri};
+
+    #[test]
+    fn shell_paths_must_be_absolute_and_clean() {
+        assert!(check_shell_path(r"C:\Users\me\file.txt").is_ok());
+        assert!(check_shell_path("d:/data").is_ok());
+        assert!(check_shell_path(r"\\server\share\x").is_ok());
+        assert!(check_shell_path("").is_err());
+        assert!(check_shell_path("   ").is_err());
+        assert!(check_shell_path("C:\\a\0b").is_err());
+        assert!(check_shell_path("file.txt").is_err());
+        assert!(check_shell_path(r"C:file.txt").is_err());
+        assert!(check_shell_path(r"\Windows").is_err());
+        assert!(check_shell_path(r"\\\x").is_err());
+    }
 
     #[test]
     fn icon_reader_only_returns_images() {

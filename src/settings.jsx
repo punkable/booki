@@ -144,6 +144,12 @@ function App() {
   // A close problem is reported at the top of the page; bring it into view.
   useEffect(() => { if (closeError && main.current) main.current.scrollTop = 0; }, [closeError]);
 
+  if (!cfg && store.loadError) return <div className="settings"><aside className="sidebar" /><main className="settings-main">
+    <div className="page"><section className="settings-recovery settings-load-error" role="alert">
+      <p>{t("settings.loadError")}</p>
+      <button type="button" className="button button-accent" autoFocus onClick={store.retryLoad}>{t("focus.retry")}</button>
+    </section></div>
+  </main></div>;
   if (!cfg) return <div className="settings" aria-busy="true"><aside className="sidebar" /><main className="settings-main" /></div>;
 
   const select = (item) => { navigate(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); };

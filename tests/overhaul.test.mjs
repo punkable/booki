@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { serveDist, launchBrowser, openPage, makeConfig } from "./harness.mjs";
+import { serveDist, launchBrowser, openPage, makeConfig, waitForAsyncCondition } from "./harness.mjs";
 let srv, port, browser;
 test.before(async () => { ({ srv, port } = await serveDist()); browser = await launchBrowser(); });
 test.after(async () => { await browser?.close(); srv?.close(); });
@@ -89,7 +89,7 @@ test("weather stays offline until a city is chosen and requests are cached", asy
   await page.getByRole("searchbox", { name: "City", exact: true }).fill("Santiago");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: "Santiago, Chile", exact: true }).click();
-  await page.waitForTimeout(1800);
+  await page.waitForFunction(() => /Santiago · 24°\/12°/.test(document.querySelector('#dock > [data-widget="weather"]')?.innerText || ""), undefined, { timeout: 5000 });
   assert.equal(await page.evaluate(() => window.__weatherRequests), 1);
   assert.match(await page.locator('#dock > [data-widget="weather"]').innerText(), /22°/);
   assert.match(await page.locator('#dock > [data-widget="weather"]').innerText(), /Santiago · 24°\/12°/);
@@ -137,7 +137,10 @@ test("settings preserve edits during a delayed save and an external dock update"
     await window.__TAURI__.core.invoke("save_config", { patch: { pinned: [{ id: "external", kind: "app", name: "External", path: "C:/external.exe" }] } });
     for (const cb of window.__listeners["booki://config-changed"] || []) cb({ payload: null });
   });
-  await page.waitForTimeout(1800);
+  await waitForAsyncCondition(page, async () => {
+    const saved = await window.__TAURI__.core.invoke("get_config");
+    return saved.autoHideMode === "edge" && saved.notchTrigger === "hover";
+  });
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
   assert.equal(saved.autoHideMode, "edge"); assert.equal(saved.notchTrigger, "hover");
   assert.equal(saved.pinned[0].name, "External");

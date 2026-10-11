@@ -21,6 +21,7 @@ function paint(cfg) {
 
 export function useSettingsStore() {
   const [cfg, setCfg] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   // null, "unsaved" (the last edit failed to save) or "failed" (the window refused to close).
   const [closeError, setCloseErrorState] = useState(null);
@@ -184,10 +185,15 @@ export function useSettingsStore() {
     } catch (_) { setSaveState("error"); }
   };
 
-  // First load.
-  useEffect(() => {
-    configApi.get().then(async (c) => {
+  // First load. A failed read shows an error with Retry instead of an empty window.
+  const loadSeq = useRef(0);
+  const load = () => {
+    const seq = ++loadSeq.current;
+    setLoadError(false);
+    return configApi.get().then(async (c) => {
       await ensureLang(c.language);
+      // A config-changed read may already have filled the window.
+      if (seq !== loadSeq.current || cfgRef.current) return;
       let next = c;
       // Migrate the legacy localStorage intro flag into persisted config once.
       try {
@@ -197,10 +203,17 @@ export function useSettingsStore() {
           configApi.patch({ settingsIntroSeen: true }).catch(() => {});
         }
       } catch (_) {}
+      cfgRef.current = next;
       setCfg(next);
       paint(next);
+    }).catch(async () => {
+      if (seq !== loadSeq.current) return;
+      // No config means no saved language yet: speak the system's.
+      await ensureLang("system");
+      setLoadError(true);
     });
-  }, []);
+  };
+  useEffect(() => { load(); }, []);
 
   // A native close waits for the last edit.
   useEffect(() => {
@@ -230,17 +243,24 @@ export function useSettingsStore() {
       const seq = ++latest;
       configApi.get().then((c) => {
         if (disposed || seq !== latest) return;
-        setCfg((prev) => {
-          if (!prev) return c;
-          const next = { ...c };
+        // Merge against the ref, not inside a setCfg updater: StrictMode runs
+        // updaters twice, and painting or loading a language is a side effect.
+        // cfgRef always holds the newest draft (set() writes it synchronously).
+        const prev = cfgRef.current;
+        let next = c;
+        if (prev) {
+          next = { ...c };
           for (const key of new Set([...savingKeys.current, ...dirtyKeys.current])) next[key] = prev[key];
           next.onboarded = prev.onboarded || c.onboarded;
           next.settingsIntroSeen = prev.settingsIntroSeen || c.settingsIntroSeen;
           next.seenVersion = c.seenVersion || prev.seenVersion;
-          paint(next);
-          ensureLang(next.language).then(() => setCfg((current) => ({ ...current })));
-          cfgRef.current = next;
-          return next;
+        }
+        cfgRef.current = next;
+        setCfg(next);
+        setLoadError(false);
+        paint(next);
+        ensureLang(next.language).then(() => {
+          if (!disposed) setCfg((current) => (current ? { ...current } : current));
         });
       }).catch(() => {});
     }).then((u) => { if (disposed) u(); else un = u; });
@@ -248,7 +268,7 @@ export function useSettingsStore() {
   }, []);
 
   return {
-    cfg, set, saveState, closeError, configConflict,
+    cfg, set, saveState, closeError, configConflict, loadError, retryLoad: load,
     flushSave, settled, close, finishClose, resolveConfigConflict,
     prepareConfigOperation, applySnapshot, reset,
     applyProfile: (name, expected) => applySnapshot(() => dockApi.profileApply(name, expected)),

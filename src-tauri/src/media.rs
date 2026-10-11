@@ -54,13 +54,30 @@ pub(crate) async fn volume_info() -> Option<(u32, bool)> {
         .unwrap_or_default()
 }
 
+// Core Audio calls can stall while the audio service is busy (device switch,
+// driver restart), so they stay off the UI thread. AudioRuntime initializes
+// COM on the blocking thread. Off the UI thread, two wheel steps can run at
+// once, so changes take turns and each applies the newest requested level:
+// the last one to run always leaves the newest level set.
+static VOLUME_TURN: Mutex<()> = Mutex::new(());
+static VOLUME_WANTED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 #[tauri::command]
-pub(crate) fn volume_set(pct: u32) -> Result<(), String> {
-    win::volume_set(pct)
+pub(crate) async fn volume_set(pct: u32) -> Result<(), String> {
+    VOLUME_WANTED.store(pct, Ordering::SeqCst);
+    util::blocking(|| {
+        let _turn = VOLUME_TURN.lock().unwrap_or_else(|e| e.into_inner());
+        win::volume_set(VOLUME_WANTED.load(Ordering::SeqCst))
+    })
+    .await?
 }
 
 /// Toggle mute; returns the new muted state.
 #[tauri::command]
-pub(crate) fn volume_mute() -> Result<bool, String> {
-    win::volume_mute_toggle()
+pub(crate) async fn volume_mute() -> Result<bool, String> {
+    util::blocking(|| {
+        let _turn = VOLUME_TURN.lock().unwrap_or_else(|e| e.into_inner());
+        win::volume_mute_toggle()
+    })
+    .await?
 }

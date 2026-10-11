@@ -13,14 +13,40 @@ concurrency:
   group: booki-release
   cancel-in-progress: false
 jobs:
+  # Publish only what is on main: a manual run from main, or a tag whose
+  # commit main already contains. Anything else stops before checks run.
+  source:
+    name: Release source is on main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF" in
+            refs/heads/main) ;;
+            refs/tags/*)
+              git fetch --no-tags origin main
+              git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD || {
+                echo "::error::Tag $GITHUB_REF_NAME points at a commit that is not on main."; exit 1; }
+              ;;
+            *) echo "::error::Releases run only from main or a tag on main, not $GITHUB_REF."; exit 1 ;;
+          esac
   # Exactly the same frontend/browser and Rust checks used by CI.
   checks:
+    needs: source
     uses: ./.github/workflows/checks.yml
   release:
     needs: checks
     runs-on: windows-2022
+    timeout-minutes: 120
     permissions:
       contents: write
+    # No dependency caches here: the job that holds the signing key builds
+    # from a clean toolchain and registry, never from restored cache entries.
     steps:
       - uses: actions/checkout@v5
         with:
@@ -28,13 +54,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version-file: package.json
-          cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
+          # Pinned by SHA, so name the toolchain the @stable ref used to imply.
+          toolchain: stable
           targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
       - run: npm ci
       - name: Validate tag, checkout and signing prerequisite
         shell: bash

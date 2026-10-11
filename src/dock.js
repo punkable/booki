@@ -29,6 +29,8 @@ import { createDraftSaver } from "./dock/draft-saver.js";
 import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
+import { windowsFor as matchPinWindows, runningDescription } from "./dock/running.js";
+import { installDockKeyboard } from "./dock/keyboard-nav.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
@@ -86,6 +88,12 @@ window.addEventListener("unhandledrejection", (e) =>
 );
 
 const dockEl = document.getElementById("dock");
+// One Tab stop for the whole bar; arrows move between tiles (see dock/keyboard-nav.js).
+// Arrows stand down while a tile is pressed, dragged or the bar is being moved.
+const dockKeys = installDockKeyboard(dockEl, {
+  isVertical: () => isVertical(),
+  isBusy: () => dragging || !!press || !!edgeMove,
+});
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 const undoToast = document.getElementById("undo-toast");
@@ -141,6 +149,16 @@ function showUndoToast(item, index) {
   undoRemovalTimer = setTimeout(hideUndoToast, 5000);
 }
 
+/** A short failure notice in the same toast the save error uses. */
+function showErrorToast(message) {
+  if (!undoToast) return;
+  hideUndoToast();
+  undoToast.innerHTML = `<span>${esc(message)}</span>`;
+  undoToast.classList.remove("hidden");
+  placeUndoToast();
+  undoRemovalTimer = setTimeout(hideUndoToast, 5000);
+}
+
 async function undoLastRemoval() {
   if (!undoRemoval || !cfg) return;
   const { item, index } = undoRemoval;
@@ -168,6 +186,9 @@ function findPinnedById(id, items = cfg?.pinned || []) {
 
 // ───────────────────────────── Boot ─────────────────────────────
 
+// Set once the listeners below are registered, so the boot retry after a
+// failure later in boot() never registers them a second time.
+let booted = false;
 async function boot() {
   try {
     cfg = await configApi.get();
@@ -175,6 +196,8 @@ async function boot() {
     applyAll();
     await render(); // render() starts widget polls when visible
     reframe();
+    if (booted) return;
+    booted = true;
     setupAutoHide();
     setupFileDrop();
     // Remove booting class to trigger the slide-in animation.
@@ -188,6 +211,18 @@ async function boot() {
       nativeSupport = support;
       if (windowsChanged && !hiddenState) startRunningPoll();
     });
+    // Display power, Energy Saver and taskbar attention (Windows only; the
+    // listeners are inert elsewhere). Resume implies the display is on, so a
+    // missed display-on can never leave the polls stopped.
+    dockApi.onSystemChange("display-off", () => onDisplayPower(false));
+    dockApi.onSystemChange("display-on", () => onDisplayPower(true));
+    dockApi.onSystemChange("resume", () => onDisplayPower(true));
+    dockApi.onSystemChange("energy-saver", (event) => onEnergySaver(!!event?.payload));
+    dockApi.onSystemChange("attention", (event) => setAttention(event?.payload));
+    if (isTauri) {
+      dockApi.powerStatus().then((s) => { if (s) { onEnergySaver(!!s.energySaver); onDisplayPower(s.displayOn !== false); } }).catch(() => {});
+      dockApi.attentionWindows().then(setAttention).catch(() => {});
+    }
     onOcclusion(onOcclusionSignal);
     onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
@@ -364,8 +399,18 @@ function positionPreview() {
   }, 2600);
 }
 
+// The tray menu and the Settings title are drawn by Rust; tell it which
+// language the pages resolved ("system" included) whenever that changes.
+let nativeLang = null;
+function syncNativeLanguage() {
+  if (!isTauri || curLang() === nativeLang) return;
+  nativeLang = curLang();
+  dockApi.syncNativeLanguage(nativeLang).catch(() => { nativeLang = null; });
+}
+
 function applyAll() {
   setLang(cfg.language);
+  syncNativeLanguage();
   // The two strings baked into index.html were Spanish, which no language
   // setting could reach — a German user dragging a file onto the bar was told
   // "Suelta para anclar a Booki". They live in the dictionary now and are
@@ -376,8 +421,10 @@ function applyAll() {
     pill.textContent = t("dock.update");
     pill.title = t("dock.updateTip");
   }
+  dockEl.setAttribute("aria-label", t("a11y.dock"));
   applyTheme(cfg);
   applyEdge(cfg);
+  dockKeys.sync();
   document.body.classList.toggle("hide-running-indicators", cfg.showIndicators === false);
   // The stage window spans the whole edge; the BAR aligns to the notch's
   // along-edge slot with CSS (the window itself no longer travels).
@@ -536,13 +583,14 @@ async function render() {
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
   }
+  dockKeys.sync();
 
   fitDock();
   // Repaint widget values right away so a freshly built card never lingers on
   // its "…" placeholder (e.g. after adding a widget or any structural re-render).
-  // startPolls() does an immediate first paint and is idempotent (it resets its
-  // own timer); it self-guards while the dock is tucked away.
-  if (!hiddenState) startPolls();
+  // syncPolls() paints at once and restarts timers only if the live widget
+  // kinds changed; it self-guards while the dock is tucked away.
+  if (!hiddenState) syncPolls();
 }
 
 // Smallest a shrunk icon may get before we stop shrinking and start scrolling —
@@ -1034,6 +1082,12 @@ function setWidgetAvailable(el, available) {
 }
 
 // Now-playing card: the system media session (Spotify, browser, …).
+// The play/pause glyph is only rebuilt when the state flips, not every poll.
+function setMediaToggle(toggle, playing) {
+  if (!toggle || toggle.dataset.playing === String(playing)) return;
+  toggle.dataset.playing = String(playing);
+  toggle.innerHTML = playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+}
 const pollMedia = singleFlight(async () => {
   const m = await dockApi.mediaInfo().catch(() => null);
   eachWidget("media", (el) => {
@@ -1047,13 +1101,13 @@ const pollMedia = singleFlight(async () => {
       el.classList.remove("playing");
       if (art) { art.style.display = "none"; art.removeAttribute("data-src"); }
       if (ico) ico.style.display = "";
-      if (toggle) toggle.innerHTML = MEDIA_SVG.play;
+      setMediaToggle(toggle, false);
       return;
     }
     setMediaText(el, m.artist || t("w.media"), m.title || "—");
     setTileLabel(el, `${m.title} — ${m.artist}`);
     el.classList.toggle("playing", !!m.playing);
-    if (toggle) toggle.innerHTML = m.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+    setMediaToggle(toggle, !!m.playing);
     if (art && m.thumb) {
       // Cross-fade the album art when the track's art actually changes.
       if (art.dataset.src !== m.thumb) {
@@ -1159,6 +1213,10 @@ function anyPinnedWidget(predicate, items = cfg?.pinned || []) {
     anyPinnedWidget(predicate, item.children || [])
   );
 }
+// What startPolls last scheduled for, so a re-render that keeps the same live
+// widgets can repaint without throwing away every timer and its cadence.
+let pollKey = "";
+let pollsActive = false;
 function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
@@ -1166,40 +1224,84 @@ function stopPolls() {
   // wakeups (not just early-returns). Resumed by startPolls on reveal.
   clearInterval(pollTimer);
   pollTimer = null;
+  pollsActive = false;
+}
+// Display power and Energy Saver, as Windows reports them. With the display
+// off nothing on screen can change for anyone, so every poll stops; turning
+// it back on restarts them through startPolls, which still honours a
+// tucked-away dock. Energy Saver doubles the cadence of everything but the
+// clock, which has to tick on time.
+let displayOff = false;
+let energySaver = false;
+function pollSlowdown() { return energySaver ? 2 : 1; }
+function onDisplayPower(on) {
+  if (displayOff === !on) return;
+  displayOff = !on;
+  if (displayOff) stopPolls();
+  else startPolls();
+}
+function onEnergySaver(on) {
+  if (energySaver === !!on) return;
+  energySaver = !!on;
+  if (pollsActive) startPolls(); // pick up the new cadence
+}
+function pollKinds() {
+  return {
+    clock: widgetPresent(["clock", "focus"]),
+    local: widgetPresent(["calendar", "weather"]),
+    stats: widgetPresent(STAT_WIDGETS),
+    media: widgetPresent("media"),
+    volume: widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume),
+    clipboard: widgetPresent("clipboard"),
+  };
+}
+// First paint so freshly built cards aren't blank until the next tick.
+function paintPolls(k) {
+  if (k.clock || k.local) tickClocks();
+  if (k.stats) pollStats();
+  if (k.media) pollMedia();
+  if (k.volume) pollVolume();
+  if (k.clipboard) pollClipboard();
+}
+/* Called after the bar or a flyout was rebuilt. Restarts the timers only when
+   the set of live widget kinds changed; otherwise it just repaints the new
+   cards (and running-app dots) and keeps every poll's cadence. */
+function syncPolls({ repaint = true } = {}) {
+  if (hiddenState || displayOff) return;
+  const kinds = pollKinds();
+  if (!pollsActive || JSON.stringify(kinds) !== pollKey) { startPolls(); return; }
+  if (!repaint) return;
+  appPollTick?.(); // running dots and the trash badge on the new tiles
+  paintPolls(kinds);
 }
 function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
-  if (hiddenState) return; // tucked away → stay idle until revealed
+  if (hiddenState || displayOff) return; // tucked away or screen off → stay idle
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
-  const hasClock = widgetPresent(["clock", "focus"]);
-  const hasLocal = widgetPresent(["calendar", "weather"]);
-  const hasStats = widgetPresent(STAT_WIDGETS);
-  const hasMedia = widgetPresent("media");
-  const hasVolume = widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume);
-  const hasClipboard = widgetPresent("clipboard");
+  const k = pollKinds();
+  pollKey = JSON.stringify(k);
+  pollsActive = true;
+  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard } = k;
   // Nothing live pinned → no timer at all (zero idle cost).
   if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
-  if (hasClock || hasLocal) tickClocks();
-  if (hasStats) pollStats();
-  if (hasMedia) pollMedia();
-  if (hasVolume) pollVolume();
-  if (hasClipboard) pollClipboard();
+  paintPolls(k);
   const t0 = Date.now();
-  pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000, clipboard: t0 + 4000 };
+  const slow = pollSlowdown();
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 : 60000;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : 60000;
   widgetPollTimer = setInterval(() => {
-    if (hiddenState) return; // don't poll a tucked-away dock
+    if (hiddenState || displayOff) return; // don't poll a tucked-away dock
     const now = Date.now();
     if (hasClock || hasLocal) tickClocks();
-    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
-    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000); pollMedia(); }
-    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000); pollVolume(); }
-    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000; pollClipboard(); }
+    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400 * slow; pollStats(); }
+    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000) * slow; pollMedia(); }
+    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000) * slow; pollVolume(); }
+    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
@@ -1279,6 +1381,8 @@ async function editNote(item) {
   const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
   let recoveryPending = true;
   let retryLoad = null;
+  // Each save writes the whole config, so it waits for a ~1 s pause in typing
+  // (the last argument). Closing the editor flushes whatever is still pending.
   const saver = createDraftSaver(async (text) => {
     // Journal first: a failed configuration write still leaves a recoverable
     // encrypted local copy. Clear only the matching text after durable save.
@@ -1294,7 +1398,7 @@ async function editNote(item) {
     });
     await dockApi.clearNoteDraft(item.id, text);
     return true;
-  }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; });
+  }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; }, 1000);
   panel.flush = () => recoveryPending ? Promise.resolve(true) : saver.flush(); panel.dispose = saver.cancelTimer;
   retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } }); footer.append(status, retry); panel.append(head, ta, footer);
   ta.disabled = true;
@@ -1353,7 +1457,14 @@ async function editNote(item) {
 
 // ─────────────────────────── Launch ───────────────────────────
 
-function launch(el, item) {
+/** Taskbar modifiers on a click: Shift opens a new instance, Ctrl+Shift runs
+   the app as administrator. */
+function launchModifiers(e) {
+  const shift = !!e?.shiftKey, ctrl = !!(e?.ctrlKey || e?.metaKey);
+  return { admin: shift && ctrl, newInstance: shift && !ctrl };
+}
+
+function launch(el, item, mods = {}) {
   if (item.kind === "action") { if (item.action === "settings") dockApi.openSettings(); return; }
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
@@ -1378,8 +1489,16 @@ function launch(el, item) {
   // Launcher + switcher: when "focus if running" is on (the default)
   // and the app already has a window, bring it to the front instead of
   // launching a new instance. With several windows, let the user pick one.
+  clearAttention(el, item); // the user answered whichever window was waiting
+  if (mods.admin && item.kind === "app" && item.path) {
+    pinnedReveal = false;
+    scheduleHide();
+    markLaunching(el);
+    dockApi.launch(item.path, item.args || [], "runas");
+    return;
+  }
   const hwnd = el.dataset.hwnd;
-  const switching = cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
+  const switching = !mods.newInstance && cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
   const wins = switching ? windowsFor(item) : [];
   // A tucked-away dock (Alt+N while hidden) can't show a picker: go to the first.
   if (wins.length > 1 && !hiddenState) { openWindowPicker(el, item, wins); return; }
@@ -1729,16 +1848,18 @@ dockEl.addEventListener("dblclick", (e) => {
   if (tile.classList.contains("widget")) dockApi.openSettingsTab("widgets");
 });
 
-// Middle-click an app/folder/file pin → open its location in Explorer.
+// Middle-click works like the taskbar: an app opens a new instance and a
+// folder opens a new Explorer window. Ctrl+middle-click opens the location.
 dockEl.addEventListener("auxclick", (e) => {
   if (e.button !== 1) return;
   const tile = closestSel(e.target, ".tile");
   if (!tile || !tile.dataset.id) return;
   const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
-  if (item && item.path && (item.kind === "app" || item.kind === "folder")) {
-    e.preventDefault();
-    dockApi.openLocation(item.path);
-  }
+  if (!item || !item.path || (item.kind !== "app" && item.kind !== "folder")) return;
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) dockApi.openLocation(item.path);
+  else if (item.kind === "app") launch(tile, item, { newInstance: true });
+  else dockApi.launch(item.path, []);
 });
 
 // Drag the empty bar to MOVE the dock to another edge — with a live preview so
@@ -1828,6 +1949,7 @@ async function endEdgeMove(commit) {
     // Land on the new edge with a pop so the move reads as motion, not a jump.
     cfg.edge = target;
     applyEdge(cfg);
+    dockKeys.sync();
     fitDock();
     document.body.classList.add("edge-swap");
     applyFrame();
@@ -2180,7 +2302,7 @@ function flipReorder(mutate) {
   }
 }
 
-async function onPressUp() {
+async function onPressUp(e) {
   window.removeEventListener("pointermove", onPressMove);
   cancelAnimationFrame(pressMoveRaf);
   pressMoveRaf = 0;
@@ -2233,7 +2355,7 @@ async function onPressUp() {
     return;
   }
   if (!p.moved && !editMode && p.item.kind !== "separator") {
-    launch(p.el, p.item);
+    launch(p.el, p.item, launchModifiers(e));
   }
 }
 
@@ -2278,7 +2400,7 @@ dockEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault(); // Space would otherwise scroll the bar
     if (editMode) exitEdit();
-    else launch(tile, item);
+    else launch(tile, item, launchModifiers(e));
     return;
   }
   // The menu key and Shift+F10 are what a keyboard user presses for a context
@@ -2490,6 +2612,18 @@ async function moveChildTo(group, child, slot) {
   closeStack();
   await render();
   reframe();
+}
+
+/** The hover control that takes a child out of its group, back onto the dock. */
+function takeOutButton(group, child) {
+  const out = document.createElement("button");
+  out.type = "button";
+  out.className = "stack-rm";
+  out.innerHTML = icon("take-out");
+  out.title = t("group.takeOut");
+  out.setAttribute("aria-label", `${t("group.takeOut")}: ${child.name || widgetLabel(child.widget)}`);
+  out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(group, child.id); });
+  return out;
 }
 
 // Let a flyout child be dragged to reorder inside the panel, or dragged out to
@@ -2720,6 +2854,7 @@ function openMenu(e, item) {
   if (item.kind === "app") {
     if (wins.length) add("plus", t("m.newWindow"), () => dockApi.launch(item.path, item.args || []));
     else add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
+    if (isTauri && item.path) add("shield", t("m.runAsAdmin"), () => dockApi.launch(item.path, item.args || [], "runas"));
   } else if (item.kind === "folder" || item.kind === "group") {
     add("folder", t("m.open"), () => {
       // Always open (never toggle-close) — right-click → Open should reveal.
@@ -2797,26 +2932,18 @@ function confirmRemoveGroup(item) {
   pop.innerHTML =
     `${icon("trash")}<span class="tp-col"><span class="tp-text">${t("group.removeAsk").replace("{name}", () => name).replace("{n}", String(n))}</span>` +
     `<span class="tp-sub">${t("group.removeSub")}</span></span>`;
-  const mkBtn = (cls, label, fn) => {
-    const b = document.createElement("button");
-    b.className = `tp-btn ${cls}`;
-    b.textContent = label;
-    b.addEventListener("click", fn);
-    pop.appendChild(b);
-  };
-  mkBtn("danger", t("apps.remove"), async () => {
+  popButton(pop, "danger", t("apps.remove"), async () => {
     closeTrashPop();
     await removeItem(item.id);
     pinnedReveal = false;
     scheduleHide();
   });
-  mkBtn("", t("trash.cancel"), () => {
+  popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
     pinnedReveal = false;
     scheduleHide();
   });
-  placePop(pop);
-  trashPop = pop;
+  showConfirmPop(pop);
 }
 
 // Recent files for THIS app only (matched by file association in the backend)
@@ -3560,6 +3687,7 @@ if (dockApi.onCursorInside)
     if (v === pointerInside) return;
     pointerInside = v;
     if (v) {
+      if (displayOff) onDisplayPower(true); // a pointer on the dock means the screen is on
       if (pinnedReveal) pinTouched = true;
       if (!hiddenState) clearTimeout(hideTimer);
     } else {
@@ -3889,6 +4017,38 @@ function clippedText(el, name) {
 // Files go to the Recycle Bin (undoable), never a permanent delete.
 
 let trashPop = null;
+let popSeq = 0;
+
+/** A popover button. The one helper every confirm popover builds with. */
+function popButton(pop, cls, label, fn) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = `tp-btn ${cls}`.trim();
+  b.textContent = label;
+  b.addEventListener("click", fn);
+  pop.appendChild(b);
+  return b;
+}
+
+/* Show a yes/no popover as an alertdialog: named by its question, described
+   by its detail line, with the first button focused once it is visible so a
+   keyboard user can answer it. closeTrashPop hands focus back. */
+function showConfirmPop(pop) {
+  const id = `trash-pop-${++popSeq}`;
+  const text = pop.querySelector(".tp-text");
+  const sub = pop.querySelector(".tp-sub");
+  pop.setAttribute("role", "alertdialog");
+  if (text) { text.id = `${id}-text`; pop.setAttribute("aria-labelledby", text.id); }
+  if (sub) { sub.id = `${id}-sub`; pop.setAttribute("aria-describedby", sub.id); }
+  const back = document.activeElement;
+  pop._returnFocus = back instanceof HTMLElement && back !== document.body ? back : null;
+  placePop(pop);
+  trashPop = pop;
+  // placePop reveals the popover after ~70 ms; focus it once it is shown.
+  setTimeout(() => requestAnimationFrame(() => {
+    if (trashPop === pop) pop.querySelector("button")?.focus({ preventScroll: true });
+  }), 90);
+}
 // Dismiss a popover along the same path it entered (fade + slight drop), then
 // run `done`. Under reduced motion the removal is immediate.
 function dismissPop(pop, done) {
@@ -3908,6 +4068,9 @@ function dismissPop(pop, done) {
 function closeTrashPop() {
   const pop = trashPop;
   trashPop = null;
+  // Give focus back to where it was, unless the user already moved it.
+  const back = pop?._returnFocus;
+  if (back?.isConnected && pop.contains(document.activeElement)) back.focus({ preventScroll: true });
   dismissPop(pop, () => {
     // Shrink the window only after the exit finishes, or it would clip it.
     if (!trashPop) {
@@ -3973,15 +4136,7 @@ function confirmTrash(paths, emptyBin = false) {
   pop.innerHTML =
     `${icon("trash")}<span class="tp-col"><span class="tp-text">${text}</span>` +
     `<span class="tp-sub">${t("trash.sub")}</span></span>`;
-  const mkBtn = (cls, label, fn) => {
-    const b = document.createElement("button");
-    b.className = `tp-btn ${cls}`;
-    b.textContent = label;
-    b.addEventListener("click", fn);
-    pop.appendChild(b);
-    return b;
-  };
-  mkBtn("danger", emptyBin ? t("trash.empty") : t("trash.delete"), async () => {
+  popButton(pop, "danger", emptyBin ? t("trash.empty") : t("trash.delete"), async () => {
     closeTrashPop();
     try {
       if (emptyBin) await dockApi.emptyTrash();
@@ -4003,13 +4158,12 @@ function confirmTrash(paths, emptyBin = false) {
     pinnedReveal = false;
     scheduleHide();
   });
-  mkBtn("", t("trash.cancel"), () => {
+  popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
     pinnedReveal = false;
     scheduleHide();
   });
-  placePop(pop);
-  trashPop = pop;
+  showConfirmPop(pop);
 }
 
 // Shown when Windows refuses the operation: it's almost always Defender's
@@ -4050,14 +4204,7 @@ function confirmMove(paths, item) {
       .replace("{what}", () => what)
       .replace("{dest}", () => esc(item.name))}</span>` +
     `<span class="tp-sub">${t("move.sub")}</span></span>`;
-  const mkBtn = (cls, label, fn) => {
-    const b = document.createElement("button");
-    b.className = `tp-btn ${cls}`;
-    b.textContent = label;
-    b.addEventListener("click", fn);
-    pop.appendChild(b);
-  };
-  mkBtn("", t("move.ok"), async () => {
+  popButton(pop, "", t("move.ok"), async () => {
     closeTrashPop();
     try {
       await dockApi.movePaths(paths, item.path);
@@ -4067,13 +4214,12 @@ function confirmMove(paths, item) {
     pinnedReveal = false;
     scheduleHide();
   });
-  mkBtn("", t("trash.cancel"), () => {
+  popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
     pinnedReveal = false;
     scheduleHide();
   });
-  placePop(pop);
-  trashPop = pop;
+  showConfirmPop(pop);
 }
 
 // Open files with an app and remember them as recents (a small jump list).
@@ -4169,29 +4315,37 @@ function setupFileDrop() {
 // without waiting on another enumeration.
 let lastWindows = [];
 
-/** The open windows that belong to a pin (a group collects its children's). */
+/** The open windows that belong to a pin (matching rules in dock/running.js). */
 function windowsFor(pin, wins = lastWindows) {
-  if (!pin || pin.kind === "separator" || pin.kind === "trash" || pin.kind === "widget") return [];
-  if (pin.kind === "group") {
-    const seen = new Set();
-    const out = [];
-    for (const child of pin.children || []) {
-      for (const w of windowsFor(child, wins)) {
-        if (seen.has(w.hwnd)) continue;
-        seen.add(w.hwnd);
-        out.push(w);
-      }
-    }
-    return out;
-  }
-  // Prefer matching by the owning process's executable (reliable, exact);
-  // fall back to a title contains-name match for .lnk/shell pins.
-  const path = (pin.path || "").toLowerCase();
-  const exeBase = path.endsWith(".exe") ? path.split(/[\\/]/).pop() : "";
-  const name = (pin.name || "").toLowerCase();
-  let matches = exeBase ? wins.filter((w) => ((w.exe || "").split(/[\\/]/).pop() || "") === exeBase) : [];
-  if (!matches.length && name) matches = wins.filter((w) => w.title.toLowerCase().includes(name));
-  return matches;
+  return matchPinWindows(pin, wins);
+}
+
+// Windows flashing on the taskbar (asking for attention). The backend keeps
+// the list and drops a window once it comes to the front; a tile shows the
+// state when any of its windows is in it.
+let attentionHwnds = new Set();
+function setAttention(list) {
+  attentionHwnds = new Set((Array.isArray(list) ? list : []).map(Number));
+  paintAttention();
+}
+function paintAttention() {
+  dockEl.querySelectorAll(".tile[data-id]").forEach((tile) => {
+    const item = cfg?.pinned.find((p) => p.id === tile.dataset.id);
+    const waiting = !!item && item.kind === "app" && attentionHwnds.size > 0 &&
+      windowsFor(item).some((w) => attentionHwnds.has(Number(w.hwnd)));
+    if (waiting === tile.classList.contains("attention")) return;
+    tile.classList.toggle("attention", waiting);
+    if (waiting) tile.setAttribute("aria-description", t("dock.attention"));
+    else tile.removeAttribute("aria-description");
+  });
+}
+function clearAttention(el, item) {
+  if (!el?.classList.contains("attention")) return;
+  const hwnds = windowsFor(item).map((w) => Number(w.hwnd)).filter((h) => attentionHwnds.has(h));
+  for (const h of hwnds) attentionHwnds.delete(h);
+  el.classList.remove("attention");
+  el.removeAttribute("aria-description");
+  if (hwnds.length) dockApi.dismissAttention(hwnds).catch(() => {});
 }
 
 let pollTimer = null;
@@ -4199,9 +4353,10 @@ function startRunningPoll() {
   if (!isTauri) return;
   clearInterval(pollTimer); // never stack two running-app polls
   pollTimer = null;
+  if (displayOff) return; // nobody can see the dots; display-on restarts it
   const tick = singleFlight(async (refreshTrash = true) => {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
-    if (hiddenState) return;
+    if (hiddenState || displayOff) return;
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
@@ -4216,6 +4371,7 @@ function startRunningPoll() {
       const wins = await dockApi.listWindows();
       lastWindows = wins;
       const matchWins = (pin) => windowsFor(pin, wins);
+      const say = (n) => runningDescription(n, t); // `t` is the tile inside the loop
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash" || app.kind === "action") return;
@@ -4231,7 +4387,14 @@ function startRunningPoll() {
           delete t.dataset.hwnd;
           if (badge) badge.textContent = "";
         }
+        // The dot and the count are visual; say the same thing to a screen reader.
+        const said = say(matches.length);
+        if ((t.getAttribute("aria-description") || "") !== said) {
+          if (said) t.setAttribute("aria-description", said);
+          else t.removeAttribute("aria-description");
+        }
       });
+      paintAttention();
       // Mirror running state onto open group flyout cells.
       if (stackOpen && stackItemId) {
         const grp = cfg.pinned.find((p) => p.id === stackItemId);
@@ -4249,7 +4412,7 @@ function startRunningPoll() {
   });
   appPollTick = tick;
   tick();
-  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000));
+  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000) * pollSlowdown());
 }
 
 // ─────────────────── Folder stacks (flyout) ───────────────────
@@ -4442,16 +4605,12 @@ async function openStack(tileEl, item) {
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
         wCell.appendChild(widgetTile(it, { inFlyout: true }));
         wireStackDragOut(wCell, item, it);
-        const out = document.createElement("span");
-        out.className = "stack-rm";
-        out.innerHTML = icon("take-out");
-        out.title = t("group.takeOut");
-        out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(item, it.id); });
-        wCell.appendChild(out);
+        wCell.appendChild(takeOutButton(item, it));
         grid.appendChild(wCell);
         continue;
       }
       const cell = document.createElement("button");
+      let holder = null; // wrapper that also holds the take-out button
       cell.className = "stack-item";
       if (isGroup && it.id) cell.dataset.childId = it.id;
       cell.style.setProperty("--i", Math.min(cellIdx++, 6)); // staggered entry (capped)
@@ -4510,15 +4669,11 @@ async function openStack(tileEl, item) {
         // Drag a child OUT of the flyout to unpin it (parity with the dock's
         // pull-out-to-remove gesture); hover control pops it back onto the dock.
         wireStackDragOut(cell, item, it);
-        const out = document.createElement("span");
-        out.className = "stack-rm";
-        out.innerHTML = icon("take-out");
-        out.title = t("group.takeOut");
-        out.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          takeOutChild(item, it.id);
-        });
-        cell.appendChild(out);
+        // The take-out control is a real button, so it sits beside the cell
+        // button (a button inside a button is invalid and unreachable by Tab).
+        holder = document.createElement("div");
+        holder.className = "stack-cell";
+        holder.append(cell, takeOutButton(item, it));
       } else if (it.path && !it.is_dir) {
         // Real files: hover actions (copy path · reveal in Explorer · open
         // with…) and drag-out — pull the file into Explorer or any other app.
@@ -4552,7 +4707,7 @@ async function openStack(tileEl, item) {
         cell.appendChild(acts);
         wireFileDragOut(cell, it);
       }
-      grid.appendChild(cell);
+      grid.appendChild(holder || cell);
     }
     // Quick add cells — app and folder — so filling a group is one tap each.
     if (isGroup) {
@@ -4704,7 +4859,7 @@ async function openStack(tileEl, item) {
   document.body.classList.add("stack-open");
   // Pick up any widgets rendered inside the flyout so they poll live while open.
   cacheWidgetEls();
-  startPolls();
+  syncPolls();
   // Grow the window synchronously BEFORE the flyout becomes visible — same
   // pattern as the context menu / popovers, so opening a folder never flashes
   // a clipped panel while the window catches up.
@@ -4846,11 +5001,16 @@ function openLauncher() {
 }
 
 let stackCloseTimer = null;
+// Declared here, not with the clipboard flyout below, because closeStack clears
+// it and may run before that part of the module has been evaluated.
+let clipSearchTimer = null;
 let stackDispose = null;
 let stackRefreshPins = null;
 function closeStack() {
   if (!stackOpen) return;
   stackOpen = false;
+  clearTimeout(clipSearchTimer);
+  clipSearchTimer = null;
   stackDispose?.();
   stackDispose = null;
   stackRefreshPins = null;
@@ -4859,7 +5019,7 @@ function closeStack() {
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode");
   cacheWidgetEls();
-  startPolls();
+  syncPolls({ repaint: false });
   clearTimeout(stackCloseTimer);
   stackCloseTimer = setTimeout(reframe, 180);
   // After closing, allow smart-hide to re-evaluate (flyout was blocking tuck).
@@ -4871,7 +5031,6 @@ function closeStack() {
 // concept, different content) so it inherits the stage-window stability,
 // hit-region reporting and open/close transition for free.
 let clipStackQuery = "";
-let clipSearchTimer = null;
 let clipRenderSeq = 0;
 async function toggleClipboardStack(tileEl) {
   if (stackOpen) {
@@ -4997,29 +5156,37 @@ async function renderClipboardList(grid, foot) {
         ev.stopPropagation();
         await fn();
       });
+      // Keys on the button must not also reach the row's copy shortcut.
+      b.addEventListener("keydown", (ev) => ev.stopPropagation());
       acts.appendChild(b);
     };
-    act("star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), async () => {
+    act("star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), () => clipAction(async () => {
       await dockApi.clipboardFavorite(entry.id, !entry.favorite);
       await renderClipboardList(grid, foot);
-    });
-    act(entry.private ? "lock" : "eye-off", entry.private ? t("clip.makePersistent") : t("clip.private"), async () => {
+    }));
+    act(entry.private ? "lock" : "eye-off", entry.private ? t("clip.makePersistent") : t("clip.private"), () => clipAction(async () => {
       await dockApi.clipboardPrivate(entry.id, !entry.private);
       await renderClipboardList(grid, foot);
-    });
+    }));
     act("pencil", t("clip.edit"), () => startClipEdit(row, entry, grid, foot));
-    act("trash", t("clip.delete"), async () => {
+    act("trash", t("clip.delete"), () => clipAction(async () => {
       await dockApi.clipboardDelete(entry.id);
       refreshClipboard();
       await renderClipboardList(grid, foot);
-    });
+    }));
     row.appendChild(acts);
 
-    row.addEventListener("click", async () => {
+    const copy = () => clipAction(async () => {
       await dockApi.clipboardCopy(entry.text);
       refreshClipboard();
       row.classList.add("copied");
       setTimeout(() => row.classList.remove("copied"), 700);
+    }, "overhaul.failed");
+    row.addEventListener("click", copy);
+    row.addEventListener("keydown", (ev) => {
+      if (ev.target !== row || (ev.key !== "Enter" && ev.key !== " ")) return;
+      ev.preventDefault();
+      copy();
     });
     grid.appendChild(row);
   });
@@ -5027,17 +5194,28 @@ async function renderClipboardList(grid, foot) {
   const clear = document.createElement("button");
   clear.className = "clip-clear";
   clear.textContent = t("clip.clear");
-  clear.addEventListener("click", async () => {
+  clear.addEventListener("click", () => clipAction(async () => {
     await dockApi.clipboardClear();
     refreshClipboard();
     await renderClipboardList(grid, foot);
-  });
+  }));
   foot.appendChild(clear);
   const meta = document.createElement("div");
   meta.className = "clip-meta";
   meta.textContent = t("clip.countHint").replace("{n}", rawCount);
   foot.appendChild(meta);
   if (pendingReplace) requestAnimationFrame(pendingReplace);
+}
+
+// A clipboard command that fails (history locked, IPC error) says so in the
+// toast instead of becoming an unhandled rejection.
+async function clipAction(fn, messageKey = "status.saveError") {
+  try {
+    await fn();
+  } catch (error) {
+    logMessage("error", `clipboard action failed: ${error}`);
+    showErrorToast(t(messageKey));
+  }
 }
 
 // Turn one row into an inline editor; Save copies the edited text (bumping it
@@ -5058,8 +5236,10 @@ function startClipEdit(row, entry, grid, foot) {
   save.addEventListener("click", async (ev) => {
     ev.stopPropagation();
     const v = ta.value.trim();
-    if (v) { await dockApi.clipboardCopy(v); refreshClipboard(); }
-    await renderClipboardList(grid, foot);
+    await clipAction(async () => {
+      if (v) { await dockApi.clipboardCopy(v); refreshClipboard(); }
+      await renderClipboardList(grid, foot);
+    });
   });
   const cancel = document.createElement("button");
   cancel.className = "clip-act";

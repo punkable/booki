@@ -55,6 +55,7 @@ features = [
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_System_WinRT",
     "Win32_Foundation",
+    "Win32_Globalization",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
     "Win32_Media_Audio",

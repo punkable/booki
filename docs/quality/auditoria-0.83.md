@@ -103,3 +103,78 @@ usan `add-panel.js` y `launcher.js`. Orden propuesto, de menos a más acoplado:
 actualizaciones, portapapeles, apps abiertas, popovers, regiones de clic, marco, y luego
 el resto. La parte de edición y reordenación espera a que termine el trabajo de arrastre
 de grupos.
+
+## Avance posterior (PR #107)
+
+Lo pendiente de arriba quedó resuelto salvo lo que se indica al final. Además se
+revisaron Ajustes y el dock, y se integró Booki más con Windows.
+
+### Pendientes resueltos
+
+- **Núcleo:** el trabajo lento sale del hilo de la interfaz: rutas de red, volumen,
+  miniaturas, papelera, favicon, recientes, portapapeles e iconos. `move_paths` sigue en
+  el hilo principal porque sus diálogos lo necesitan. El historial del portapapeles se
+  escribe en orden. Papelera y mover rechazan rutas vacías, relativas o con NUL. Cada
+  atajo se registra por separado. El menú del Explorador no queda a medias. Se quitó
+  código muerto. Las copias de configs dañadas y de perfiles borrados se limitan a 10.
+  Las señales nativas ya no se pierden.
+- **Dock:** "app abierta" ya no coincide por título con ventanas ajenas. `aria-live`
+  queda solo en batería, música y volumen. Las filas del portapapeles copian con Enter.
+  Sacar de un grupo es un botón real. Las confirmaciones son diálogos que reciben el
+  foco. No se reescribe el DOM si nada cambió, y los sondeos ya no se reinician en cada
+  render. Las notas se guardan tras 1 s de pausa.
+- **Ajustes:** si falla la primera carga se muestra el error con un botón para
+  reintentar. Fechas en el idioma elegido. Se borró código sin uso. eslint revisa los
+  hooks de React.
+- **CI y pruebas:** todos los jobs tienen tiempo máximo. Las acciones de terceros van
+  fijadas por SHA. Solo se publica desde `main`, sin cachés en el job que firma. Las
+  pruebas rechazan un `dist/` desactualizado y usan esperas por condición.
+
+### Más nativo de Windows
+
+- **Teclado como la barra de tareas:** flechas entre iconos, Inicio y Fin, una sola
+  parada de Tab. El lector de pantalla anuncia "En ejecución · N ventanas".
+- **Clics como la barra de tareas:** Mayús+clic y clic central abren otra ventana.
+  Ctrl+Mayús+clic ejecuta como administrador, y la opción también está en el menú.
+  Ctrl+clic central abre la ubicación del archivo.
+- **Avisos de atención:** cuando una app parpadea en la barra de tareas, su icono en el
+  dock se marca hasta que la abres.
+- **Alto contraste:** dock, notch, menús y Ajustes usan los colores del sistema.
+- **Tamaño del texto de Windows:** Ajustes lo respeta. El dock no, porque su tamaño lo
+  elige el usuario.
+- **Bandeja y título de Ajustes** en el idioma de Booki. Antes estaban siempre en
+  español.
+- **Inicio con Windows fiel:** si lo desactivas en el Administrador de tareas, Booki lo
+  respeta y no vuelve a activarlo.
+- **Energía:** con la pantalla apagada se detienen los sondeos. Con el ahorro de
+  energía, van a la mitad de ritmo.
+- **Escala por monitor:** al cambiar la escala de un monitor, el dock se recoloca.
+- **Atajos** con los nombres de teclas de Windows en cada idioma (Ctrl+Mayús+Espacio).
+
+### Probar en un Windows 11 real
+
+Nada de lo anterior se ejecutó en Windows; la CI de Windows lo compila y empaqueta.
+Conviene probar:
+
+- la rueda de volumen;
+- el portapapeles, borrándolo y reiniciando;
+- la papelera;
+- soltar archivos para moverlos;
+- el menú del Explorador;
+- un atajo ya ocupado por otra app;
+- ocultar en pantalla completa;
+- las combinaciones de clic y la ventana de UAC;
+- desactivar Booki en el Administrador de tareas y reiniciar;
+- el tamaño de texto de Windows;
+- el alto contraste;
+- apagar la pantalla y el ahorro de energía;
+- cambiar la escala de un monitor;
+- una app que parpadea, como un chat.
+
+### Sigue pendiente
+
+- Partir `dock.js`, ahora que terminó el arrastre de grupos.
+- Avisos nativos (toasts), listas de saltos de cada app y reservar espacio como la
+  barra de tareas: necesitan probarse en Windows mientras se hacen.
+- Firma Authenticode y manifiesto de winget.
+- El botón de quitar sigue dentro del botón del icono.

@@ -11,8 +11,10 @@ export class SettingsBoundary extends React.Component {
     if (!this.state.failed) return this.props.children;
     return <section className="settings-recovery" role="alert">
       <p>{t('hotfix.settingsFailed')}</p>
-      <button className="button button-accent" onClick={() => this.setState({ failed: false })}>{t('focus.retry')}</button>
-      {this.props.onHome && <button className="button" onClick={this.props.onHome}>{t('overhaul.home')}</button>}
+      <div className="settings-recovery-actions">
+        <button type="button" className="button button-accent" onClick={() => this.setState({ failed: false })}>{t('focus.retry')}</button>
+        {this.props.onHome && <button type="button" className="button" onClick={this.props.onHome}>{t('overhaul.home')}</button>}
+      </div>
     </section>;
   }
 }

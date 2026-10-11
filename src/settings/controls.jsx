@@ -2,7 +2,8 @@
    src/styles/settings.css; no component library. */
 import React from "react";
 import { dock as dockApi } from "../api.js";
-import { t } from "../i18n.js";
+import { t, curLang } from "../i18n.js";
+import { formatHotkey, keyLabel } from "./hotkey-labels.js";
 import { icon } from "../icons.js";
 import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
@@ -141,8 +142,9 @@ export function HotkeyInput({ value, onChange, label }) {
     onChange([...mods, key].join("+"));
   };
   return <div className="hotkey">
-    <input readOnly aria-label={label || t("sc.toggle")} value={value || ""} placeholder={t("sc.press")} onKeyDown={capture} />
-    {value && <button type="button" className="button" onClick={() => onChange("")}>{t("sc.clear")}</button>}
+    <input readOnly aria-label={label || t("sc.toggle")} value={formatHotkey(value, curLang())} placeholder={t("sc.press")} onKeyDown={capture} />
+    {/* Always present so both shortcut rows line up; there is nothing to clear while empty. */}
+    <button type="button" className="button" disabled={!value} onClick={() => onChange("")}>{t("sc.clear")}</button>
   </div>;
 }
 
@@ -156,6 +158,6 @@ export function ModifierPicker({ cfg, set }) {
     dockApi.applyHotkeys(cfg.hotkey || "", cfg.positionHotkeys !== false, ordered);
   };
   return <div className="chips" role="group" aria-label={t("sc.posMod")}>
-    {MODIFIERS.map((key) => <button key={key} type="button" className="chip" aria-pressed={current.includes(key)} onClick={() => toggle(key)}>{key === "Super" ? "Win" : key}</button>)}
+    {MODIFIERS.map((key) => <button key={key} type="button" className="chip" aria-pressed={current.includes(key)} onClick={() => toggle(key)}>{keyLabel(key, curLang())}</button>)}
   </div>;
 }

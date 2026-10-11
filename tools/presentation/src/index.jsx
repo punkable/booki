@@ -13,7 +13,8 @@ face.load().then((loaded) => { document.fonts.add(loaded); continueRender(fontRe
 
 const ease = Easing.bezier(0.22, 1, 0.36, 1);
 const lerp = (t, from, to, a, b) => interpolate(t, [from, to], [a, b], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: ease });
-function useRise(t, delay = 0) { const { fps } = useVideoConfig(); return spring({ frame: t - delay, fps, config: { damping: 200, mass: 0.9 } }); }
+const riseAt = (t, delay, fps) => spring({ frame: t - delay, fps, config: { damping: 200, mass: 0.9 } });
+function useRise(t, delay = 0) { const { fps } = useVideoConfig(); return riseAt(t, delay, fps); }
 
 function Title({ t, lines, color = ink, sub = quiet, align = 'left', size = 96, delay = 4, style }) {
   const a = useRise(t, delay); const b = useRise(t, delay + 8);
@@ -64,11 +65,12 @@ function Widgets({ t, c, locale }) {
 }
 function Focus({ t, c, locale }) {
   const panel = useRise(t, 14);
+  const { fps } = useVideoConfig();
   return <AbsoluteFill style={{ background: '#fbfaf8' }}>
     <Title t={t} lines={c.focus} size={92} style={{ position: 'absolute', left: 96, top: 140, width: 900 }} />
     <Img src={staticFile(`tasks-${locale}.png`)} style={{ position: 'absolute', left: 1290, top: 150, width: 560, opacity: panel, transform: `translateY(${(1 - panel) * 60}px)`, filter: 'drop-shadow(0 40px 60px #5a3d2026)' }} />
     {['timer', 'tasks', 'calendar', 'weather'].map((type, i) => {
-      const r = useRise(t, 30 + i * 7);
+      const r = riseAt(t, 30 + i * 7, fps);
       return <Img key={type} src={staticFile(`widget-${type}-${locale}.png`)} style={{ position: 'absolute', left: 96 + i * 292, top: 520, width: 270, borderRadius: 18, opacity: r, transform: `translateY(${(1 - r) * 80}px)`, boxShadow: '0 24px 48px #302f3514' }} />;
     })}
     <Note text={c.note} />

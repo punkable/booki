@@ -5,9 +5,9 @@
    rendering, layout and event wiring — which is where every bug this suite
    guards against actually lived (widget geometry, hide logic, null derefs).
 
-   Run `npm run build` first; these tests read `dist/`. */
+   Run `npm run build` first; these tests read `dist/` and refuse a stale one. */
 import http from "node:http";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { extname, join, dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -29,9 +29,37 @@ export function assertBuilt() {
   if (!existsSync(join(DIST, "index.html"))) {
     throw new Error("dist/ is missing — run `npm run build` before `npm test`.");
   }
+  assertFresh();
+}
+
+/* A stale dist/ makes every browser test check yesterday's code and pass.
+   Compare the build time with the newest input instead of rebuilding here,
+   which would make each test file pay for a full Vite build.
+   BOOKI_ALLOW_STALE_DIST=1 skips the check. */
+const ROOT = resolve(HERE, "..");
+let freshChecked = false;
+function newestMtime(path) {
+  const stat = statSync(path, { throwIfNoEntry: false });
+  if (!stat) return 0;
+  if (!stat.isDirectory()) return stat.mtimeMs;
+  let newest = 0;
+  for (const name of readdirSync(path)) newest = Math.max(newest, newestMtime(join(path, name)));
+  return newest;
+}
+function assertFresh() {
+  if (freshChecked || process.env.BOOKI_ALLOW_STALE_DIST === "1") return;
+  const built = statSync(join(DIST, "index.html"), { throwIfNoEntry: false })?.mtimeMs;
+  if (!built) return; // assertBuilt reports a missing build
+  const inputs = ["src", "assets", "vite.config.js"].map((p) => join(ROOT, p));
+  const newest = Math.max(...inputs.map(newestMtime));
+  if (newest > built + 1000) {
+    throw new Error("dist/ is older than src/ — run `npm run build` before `npm test` (or set BOOKI_ALLOW_STALE_DIST=1).");
+  }
+  freshChecked = true;
 }
 
 export async function serveDist() {
+  if (existsSync(join(DIST, "index.html"))) assertFresh();
   const srv = http.createServer((req, res) => {
     // Resolve the request inside dist/ and prove it stayed there.
     //
@@ -229,8 +257,28 @@ export async function openPage(browser, port, page_ = "index.html", { cfg, viewp
   // and before application boot, without depending on init-script ordering.
   await page.addInitScript(bridgeSource(cfg || makeConfig(), { stats }) + '\n' + initScript);
   await page.goto(`http://127.0.0.1:${port}/${page_}`);
-  await page.waitForTimeout(1200); // boot + first widget paint
+  await waitForBoot(page, page_);
   return { page, errors };
+}
+
+/* Wait until the page has booted instead of a fixed 1.2 s. Settings is ready
+   once the first config read has rendered a page (or the load error). The
+   dock is ready once its slide-in class is gone and its 800 ms first-run and
+   changelog timer, which can save config, has run. A page that does not report
+   ready in 1.2 s, and the notch, which has no boot marker, keep the old wait. */
+const BOOT_READY = {
+  "index.html": () => performance.now() > 1000 && !document.body.classList.contains("booting") && !document.body.classList.contains("boot-animate") && !!document.getElementById("dock"),
+  "settings.html": () => !!document.querySelector(".settings:not([aria-busy]) .page"),
+};
+async function waitForBoot(page, name) {
+  const ready = BOOT_READY[name.split("?")[0]];
+  if (!ready) { await page.waitForTimeout(1200); return; }
+  try {
+    await page.waitForFunction(ready, undefined, { timeout: 1200, polling: 25 });
+    // Two frames so layout and effects queued on mount settle.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.waitForTimeout(100);
+  } catch { /* not ready within the old budget: carry on as before */ }
 }
 
 /* Prefer a browser the environment already provides (BOOKI_CHROMIUM, or the
