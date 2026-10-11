@@ -21,7 +21,8 @@ export function createUpdateController(dependencies) {
   let locked = false;
   /** @param {Partial<UpdateState>} patch */
   const publish = (patch) => { state = { ...state, ...patch }; for (const listener of listeners) listener(state); };
-  const unlock = async () => { if (locked) { await release(); locked = false; } };
+  // The flag clears even if release() fails, so a later download can acquire again.
+  const unlock = async () => { if (!locked) return; try { await release(); } finally { locked = false; } };
   const checkUpdate = () => {
     if (checking) return checking;
     if (['downloading', 'ready', 'installing'].includes(state.phase)) return Promise.resolve(state.update);
@@ -48,7 +49,12 @@ export function createUpdateController(dependencies) {
         publish({ pct: updateProgress(total, received) });
       });
       publish({ phase: 'ready', pct: 1 });
-    }).catch(async (error) => { try { await unlock(); } finally { publish({ phase: 'available', error, pct: null }); } throw error; })
+    }).catch(async (error) => {
+      // A failed release must not replace the download error the user sees.
+      await unlock().catch(() => {});
+      publish({ phase: 'available', error, pct: null });
+      throw error;
+    })
       .finally(() => { downloading = null; });
     return downloading;
   };
