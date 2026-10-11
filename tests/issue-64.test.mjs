@@ -15,7 +15,7 @@ test("Win+D desktop signal reveals a smart dock even with click trigger", async 
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => document.body.classList.contains("tucked")), true);
   await event(page, "booki://desktop", true);
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(() => !document.body.classList.contains("tucked"), undefined, { timeout: 5000 });
   assert.equal(await page.evaluate(() => document.body.classList.contains("tucked")), false);
   await event(page, "booki://desktop", false);
   await event(page, "booki://occlusion", true);
