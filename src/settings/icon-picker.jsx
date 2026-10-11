@@ -4,6 +4,7 @@ import { dock, pickImageFile } from '../api.js';
 import { t } from '../i18n.js';
 import { ICON_LIBRARY, ICON_STYLES, isLibIcon, parseLibIcon, libToken, libIconDataUri, resolveLibIcon, currentAccentColors } from '../icon-library.js';
 import { Icon, useModalControls } from './ui.jsx';
+import { imageSrc } from '../image-src.js';
 
 /** Preview a local draft before replacing an icon; Cancel leaves the pin intact. */
 export function IconPickerModal({ item, onPick, onClose }) {
@@ -37,7 +38,7 @@ export function IconPickerModal({ item, onPick, onClose }) {
     <div className="modal icon-picker" aria-busy={busy} role="dialog" aria-modal="true" aria-label={t('icon.title')} onClick={(event) => event.stopPropagation()}>
       <div className="modal-head"><strong>{t('icon.title')}</strong><button type="button" className="icon-button" aria-label={t('stack.close')} onClick={onClose}><Icon name="x" /></button></div>
       <div className="icon-picker-preview" aria-label={t('icon.preview')}>
-        {preview ? <img src={preview} alt="" /> : <Icon name="app" />}<span>{item.name}</span>
+        {preview ? <img src={imageSrc(preview)} alt="" /> : <Icon name="app" />}<span>{item.name}</span>
       </div>
       <div className="icon-styles">{ICON_STYLES.map((value) => <button key={value} type="button" aria-pressed={style === value} className={'seg-mini' + (style === value ? ' active' : '')} onClick={() => { setStyle(value); if (isLibIcon(draft)) setDraft(libToken(parseLibIcon(draft).name, value)); }}>{t('icon.style.' + value)}</button>)}</div>
       <input type="search" className="text-field" aria-label={t('icon.search')} placeholder={t('icon.search')} value={query} onChange={(event) => setQuery(event.target.value)} />

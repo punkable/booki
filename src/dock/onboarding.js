@@ -1,0 +1,72 @@
+/* First-run tips and the changelog after an update. */
+
+import { dock as dockApi } from "../api.js";
+import { emo } from "../emoji.js";
+import { t } from "../i18n.js";
+import { S } from "./state.js";
+import { reframe } from "./frame.js";
+import { setHidden, scheduleHide } from "./autohide.js";
+import { dismissPop, placePop } from "./popovers.js";
+import { persist } from "./config-sync.js";
+
+// Show the changelog the first time the app opens after an update.
+export async function checkChangelog() {
+  try {
+    // Don't open Settings "What's new" during first-run tips.
+    if (!S.cfg.onboarded) return;
+    const v = await dockApi.appVersion();
+    if (v && S.cfg.seenVersion !== v) {
+      // Patch releases are fixes: record them without opening Settings.
+      const feature = (version) => String(version || "").split(".").slice(0, 2).join(".");
+      const announce = feature(S.cfg.seenVersion) !== feature(v);
+      S.cfg.seenVersion = v;
+      if (!(await persist())) return;
+      if (announce) dockApi.openChangelog();
+    }
+  } catch (_) {}
+}
+
+// First-run tips: three small coach bubbles, shown once ever.
+export async function maybeOnboard() {
+  if (S.cfg.onboarded) return;
+  const steps = [
+    { emoji: emo("pointer", 22), text: t("ob.step1") },
+    { emoji: emo("card", 22), text: t("ob.step2") },
+    { emoji: emo("beaver", 22), text: t("ob.step3") },
+  ];
+  let i = 0;
+  S.pinnedReveal = true; // keep the dock open during the tour
+  setHidden(false); // the tips are useless if the dock booted tucked away
+  const pop = document.createElement("div");
+  pop.className = "coach";
+  placePop(pop);
+  const showStep = () => {
+    const last = i === steps.length - 1;
+    pop.innerHTML =
+      `<span class="coach-emoji">${steps[i].emoji}</span>` +
+      `<span class="coach-text">${steps[i].text}</span>` +
+      `<span class="coach-dots">${steps.map((_, k) => (k === i ? "●" : "○")).join(" ")}</span>`;
+    const btn = document.createElement("button");
+    btn.className = "coach-btn";
+    btn.textContent = last ? t("ob.done") : t("ob.next");
+    btn.addEventListener("click", async () => {
+      i += 1;
+      if (i < steps.length) {
+        showStep();
+      } else {
+        dismissPop(pop, () => {
+          document.body.classList.remove("pop-open");
+          reframe();
+        });
+        S.cfg.onboarded = true;
+        S.cfg.settingsIntroSeen = true;
+        await persist();
+        S.pinnedReveal = false;
+        scheduleHide();
+        checkChangelog();
+      }
+    });
+    pop.appendChild(btn);
+  };
+  showStep();
+}

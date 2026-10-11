@@ -135,7 +135,11 @@ async function mockInvoke(cmd, args) {
     case "copy_text":
       return true;
     case "recent_files_for":
+    case "app_recent_items":
       return [];
+    case "notify":
+      // Browser preview has no Windows toasts; the caller handles the error.
+      throw new Error("toasts are unavailable: Windows only");
     case "clipboard_count":
       return demoClipboard.length;
     case "clipboard_summary":
@@ -511,6 +515,12 @@ export const dock = {
   copyText: (text) => invoke("copy_text", { text }),
   // Recents filtered to one app (by file association) for its context menu.
   recentFilesFor: (path, limit = 6) => invoke("recent_files_for", { appPath: path, limit }),
+  // Up to 10 documents from an app's own Jump List "Recent" list
+  // ({ name, path }); [] when the app keeps none or on any failure.
+  appRecentItems: (path) => invoke("app_recent_items", { path }),
+  // Windows toast. Rejects when toasts are off or unavailable, so callers
+  // can fall back to the notch toast. Do not disturb is applied by Windows.
+  notify: (title, body = "") => invoke("notify", { title, body }),
   // Clipboard history widget: count for the badge, full list for the flyout,
   // copy-back/edit (bumps to front), delete one, clear all.
   clipboardCount: () => invoke("clipboard_count"),

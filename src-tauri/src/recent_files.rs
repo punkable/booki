@@ -129,3 +129,184 @@ fn recent_for_app(app_path: &str, cap: usize) -> Vec<RecentFile> {
     }
     out
 }
+
+/// Jump List "Recent" items of one app (an .exe, a .lnk or a
+/// `shell:AppsFolder\…` entry): up to 10 documents the app or the shell
+/// recorded for it, newest first. Empty off-Windows or on any failure. COM
+/// work runs on the blocking pool; each helper initialises COM itself.
+#[tauri::command]
+pub(crate) async fn app_recent_items(path: String) -> Vec<RecentFile> {
+    util::blocking(move || jump_list_items(&path, 10))
+        .await
+        .unwrap_or_default()
+}
+
+fn jump_list_items(app_path: &str, cap: usize) -> Vec<RecentFile> {
+    let app_path = app_path.trim();
+    if app_path.is_empty() {
+        return Vec::new();
+    }
+    let (explicit, exe) = if let Some(id) = apps_folder_id(app_path) {
+        (Some(id.to_string()), String::new())
+    } else if app_path.to_ascii_lowercase().ends_with(".lnk") {
+        (
+            win::shortcut_app_id(app_path),
+            win::shortcut_target(app_path).unwrap_or_default(),
+        )
+    } else {
+        (None, app_path.to_string())
+    };
+    let folders = if exe.is_empty() {
+        Vec::new()
+    } else {
+        win::app_id_known_folders()
+    };
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for id in app_id_candidates(explicit.as_deref(), &exe, &folders) {
+        for (name, path) in win::jump_list_recent(&id, cap) {
+            if out.len() >= cap {
+                return out;
+            }
+            if seen.insert(path.to_lowercase()) {
+                out.push(RecentFile { name, path });
+            }
+        }
+    }
+    out
+}
+
+/// The AppUserModelID in a `shell:AppsFolder\<AUMID>` path.
+fn apps_folder_id(path: &str) -> Option<&str> {
+    const PREFIX: &str = "shell:appsfolder\\";
+    let head = path.get(..PREFIX.len())?;
+    let id = &path[PREFIX.len()..];
+    (head.eq_ignore_ascii_case(PREFIX) && !id.is_empty()).then_some(id)
+}
+
+/// AppIDs an app's Jump List may be stored under, most likely first: the
+/// explicit AppUserModelID, then the implicit ID Windows derives for a Win32
+/// app without one. That implicit ID is the executable path, with a known
+/// folder written as its `{GUID}` (`{6D809377-…}\App\app.exe` for Program
+/// Files). Which form SetAppID accepts is not documented, so both are tried.
+/// An AppUserModelID is at most 128 characters; longer candidates are dropped.
+fn app_id_candidates(
+    explicit: Option<&str>,
+    exe: &str,
+    folders: &[(String, String)],
+) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    let mut push = |id: String| {
+        if !id.is_empty()
+            && id.chars().count() <= 128
+            && !ids.iter().any(|known| known.eq_ignore_ascii_case(&id))
+        {
+            ids.push(id);
+        }
+    };
+    if let Some(id) = explicit {
+        push(id.trim().to_string());
+    }
+    let exe = exe.trim().replace('/', "\\");
+    if exe.to_ascii_lowercase().ends_with(".exe") {
+        if let Some(relative) = known_folder_relative(&exe, folders) {
+            push(relative);
+        }
+        push(exe);
+    }
+    ids
+}
+
+/// `exe` rewritten against the deepest known folder that contains it.
+fn known_folder_relative(exe: &str, folders: &[(String, String)]) -> Option<String> {
+    folders
+        .iter()
+        .filter_map(|(guid, folder)| {
+            let folder = folder.replace('/', "\\");
+            let folder = folder.trim_end_matches('\\');
+            let rest = exe.get(folder.len()..)?.strip_prefix('\\')?;
+            let inside = !folder.is_empty()
+                && !rest.is_empty()
+                && exe.get(..folder.len())?.eq_ignore_ascii_case(folder);
+            inside.then(|| (folder.len(), format!("{guid}\\{rest}")))
+        })
+        .max_by_key(|(length, _)| *length)
+        .map(|(_, id)| id)
+}
+
+#[cfg(test)]
+mod jump_list_tests {
+    use super::{app_id_candidates, apps_folder_id, known_folder_relative};
+
+    fn folders() -> Vec<(String, String)> {
+        vec![
+            (
+                "{6D809377-6AF0-444B-8957-A3773F02200E}".into(),
+                r"C:\Program Files".into(),
+            ),
+            (
+                "{F1B32785-6FBA-4FCF-9D55-7B8E7F157091}".into(),
+                r"C:\Users\me\AppData\Local".into(),
+            ),
+            (
+                "{5CD7AEE2-2219-4A67-B85D-6C9CE15660CB}".into(),
+                r"C:\Users\me\AppData\Local\Programs".into(),
+            ),
+        ]
+    }
+
+    #[test]
+    fn rewrites_against_deepest_known_folder() {
+        assert_eq!(
+            known_folder_relative(r"c:\program files\App\app.exe", &folders()).as_deref(),
+            Some(r"{6D809377-6AF0-444B-8957-A3773F02200E}\App\app.exe")
+        );
+        assert_eq!(
+            known_folder_relative(r"C:\Users\me\AppData\Local\Programs\x\x.exe", &folders())
+                .as_deref(),
+            Some(r"{5CD7AEE2-2219-4A67-B85D-6C9CE15660CB}\x\x.exe")
+        );
+        // A sibling folder that merely shares a prefix is not inside it.
+        assert_eq!(
+            known_folder_relative(r"C:\Program Files (x86)\a.exe", &folders()),
+            None
+        );
+    }
+
+    #[test]
+    fn candidates_put_explicit_first_and_dedupe() {
+        assert_eq!(
+            app_id_candidates(
+                Some("Vendor.App"),
+                "C:/Program Files/App/app.exe",
+                &folders()
+            ),
+            vec![
+                "Vendor.App".to_string(),
+                r"{6D809377-6AF0-444B-8957-A3773F02200E}\App\app.exe".to_string(),
+                r"C:\Program Files\App\app.exe".to_string(),
+            ]
+        );
+        assert_eq!(
+            app_id_candidates(None, r"D:\tools\t.exe", &folders()),
+            vec![r"D:\tools\t.exe".to_string()]
+        );
+        assert_eq!(
+            app_id_candidates(Some(r"d:\TOOLS\t.exe"), r"D:\tools\t.exe", &[]),
+            vec![r"d:\TOOLS\t.exe".to_string()]
+        );
+        assert!(app_id_candidates(None, r"C:\docs\readme.txt", &folders()).is_empty());
+        let long = format!(r"D:\{}\a.exe", "d".repeat(130));
+        assert!(app_id_candidates(None, &long, &[]).is_empty());
+    }
+
+    #[test]
+    fn reads_apps_folder_ids() {
+        assert_eq!(
+            apps_folder_id(r"shell:AppsFolder\Microsoft.WindowsNotepad_8wekyb3d8bbwe!App"),
+            Some("Microsoft.WindowsNotepad_8wekyb3d8bbwe!App")
+        );
+        assert_eq!(apps_folder_id(r"shell:AppsFolder\"), None);
+        assert_eq!(apps_folder_id(r"C:\app.exe"), None);
+    }
+}

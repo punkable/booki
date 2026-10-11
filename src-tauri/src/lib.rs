@@ -19,6 +19,7 @@ mod metrics;
 mod native_text;
 mod notch_window;
 mod note_journal;
+mod notifications;
 mod profile_store;
 mod profiles;
 mod recent_files;
@@ -49,6 +50,7 @@ use files::*;
 use media::*;
 use metrics::*;
 use notch_window::*;
+use notifications::notify;
 use profiles::*;
 use recent_files::*;
 use std::fs;
@@ -1276,6 +1278,11 @@ fn install_panic_hook() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
+    // Before any window exists: taskbar grouping and toasts follow this ID,
+    // which the installers also stamp on the Start-menu shortcut. The logger
+    // is not up yet; a failure shows up later as a `notify` error.
+    #[cfg(windows)]
+    let _ = win::set_app_user_model_id(notifications::APP_USER_MODEL_ID);
     tauri::Builder::default()
         // MUST be the first plugin: if Booki is already running, a new launch
         // (e.g. clicking the icon while the autostart copy is alive) just brings
@@ -1448,6 +1455,8 @@ pub fn run() {
             empty_trash,
             recent_files,
             recent_files_for,
+            app_recent_items,
+            notify,
             clipboard_history,
             clipboard_storage_failed,
             clipboard_count,

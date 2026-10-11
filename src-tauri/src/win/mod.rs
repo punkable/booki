@@ -23,6 +23,12 @@ pub mod material;
 #[cfg(windows)]
 pub mod platform;
 #[cfg(windows)]
+mod shell_notify;
+#[cfg(windows)]
+pub use shell_notify::{
+    app_id_known_folders, jump_list_recent, set_app_user_model_id, shortcut_app_id, show_toast,
+};
+#[cfg(windows)]
 pub mod system_events;
 #[cfg(windows)]
 mod windows_impl;
@@ -55,4 +61,9 @@ pub use stub::{
     sync_context_menu, taskbar_autohide, toggle_window, trash_count, trash_is_empty, trash_paths,
     unprotect_data, volume_get, volume_mute_toggle, volume_set, wallpaper_accent, work_area,
     work_area_ex,
+};
+#[cfg(not(windows))]
+#[allow(unused_imports)]
+pub use stub::{
+    app_id_known_folders, jump_list_recent, set_app_user_model_id, shortcut_app_id, show_toast,
 };

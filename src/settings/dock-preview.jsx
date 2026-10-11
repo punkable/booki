@@ -5,6 +5,7 @@ import { widgetWidth } from "../dock/layout-model.js";
 import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName, canonicalWidget } from "../widgets-meta.js";
 import { t, curLang } from "../i18n.js";
 import { dock } from "../api.js";
+import { imageSrc } from "../image-src.js";
 import { isLibIcon, libGlyphSVG, resolveLibIcon } from "../icon-library.js";
 import { icon } from "../icons.js";
 import { pinFallback } from "../pin-fallback.js";
@@ -72,7 +73,7 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
     dangerouslySetInnerHTML={{ __html: libGlyphSVG(look.glyph) }} />;
   return <span className="live-preview-app" title={item.name} style={{ width: size, height: size, ...(look?.color ? { background: `color-mix(in srgb, ${look.color} 30%, transparent)` } : {}) }}>
     {item.kind === "group" ? <span className="live-preview-group">{(item.children || []).slice(0, 4).map((child) => <span key={child.id}>{child.kind === "widget" ? <span className="live-preview-mini-widget" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[canonicalWidget(child.widget)] || "sparkles") }} /> : <PreviewPin item={child} size={14} gap={2} />}</span>)}</span>
-      : src ? <img src={src} alt="" />
+      : src ? <img src={imageSrc(src)} alt="" />
         : item.kind === "folder" || item.kind === "trash" || item.kind === "action" ? <span dangerouslySetInnerHTML={{ __html: icon(item.kind === "trash" ? "trash" : item.kind === "action" ? "settings" : "folder") }} />
           : <FallbackGlyph item={item} size={size} />}
   </span>;

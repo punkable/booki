@@ -10,6 +10,7 @@
 
 import { config as configApi, dock as dockApi, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
+import { imageSrc } from "./image-src.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { showBookiMenu } from "./native-context-menu.js";
 import { applyAccent } from "./util-color.js";
@@ -361,7 +362,7 @@ function paintMedia() {
   const track = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
   if (track && lastTrack && track !== lastTrack) nudgePresence();
   if (track) lastTrack = track;
-  const art = (media && media.thumb) || "";
+  const art = imageSrc((media && media.thumb) || "");
   for (const img of [lArt, cArt]) {
     if (img.getAttribute("src") !== art) {
       if (art) img.src = art;

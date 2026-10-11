@@ -94,16 +94,22 @@ export function libIconDataUri(name, style, { accent, accentDeep, contrast }) {
   }
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">${body}</svg>`;
-  return "data:image/svg+xml;base64," + btoa(svg);
+  // Percent-encoded rather than base64 so the markup never reaches the <img>
+  // unescaped (the colours come from CSS custom properties).
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
 /** Read the live accent colors from CSS custom properties. */
 export function currentAccentColors() {
   const s = getComputedStyle(document.documentElement);
+  // Keep only characters a CSS colour can use, so a stray value can't break
+  // out of the SVG attribute it is written into.
+  const color = (name, fallback) =>
+    s.getPropertyValue(name).trim().replace(/[^#(),.%/\w\s-]/g, "") || fallback;
   return {
-    accent: s.getPropertyValue("--accent").trim() || "#dfaa75",
-    accentDeep: s.getPropertyValue("--accent-deep").trim() || "#b9875f",
-    contrast: s.getPropertyValue("--accent-contrast").trim() || "#ffffff",
+    accent: color("--accent", "#dfaa75"),
+    accentDeep: color("--accent-deep", "#b9875f"),
+    contrast: color("--accent-contrast", "#ffffff"),
   };
 }
 
