@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -87,10 +87,18 @@ function release83() {
   ] };
 }
 
-export function currentRelease() {
+function release84() {
   return { version: "0.84.0", date: "2026-10-11", headline: t("release84.headline"), sections: [
     { icon: "performance", title: t("release84.windowsTitle"), notes: [t("release84.windows"), t("release84.native")] },
     { icon: "sparkles", title: t("release83.colorsTitle"), notes: [t("release84.groups")] },
     { icon: "settings", title: t("release84.fixesTitle"), notes: [t("release84.fixes")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.85.0", date: "2026-10-11", headline: t("release85.headline"), sections: [
+    { icon: "sparkles", title: t("release85.stylesTitle"), notes: [t("release85.styles"), t("release85.colors")] },
+    { icon: "performance", title: t("release85.glassTitle"), notes: [t("release85.glass")] },
+    { icon: "settings", title: t("release84.fixesTitle"), notes: [t("release85.menu"), t("release85.fixes")] },
   ] };
 }

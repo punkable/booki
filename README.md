@@ -80,6 +80,13 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
+### New in 0.85
+
+- **Four dock styles you can tell apart** — Taskbar, Glass, Clear glass and Solid, each previewed as it really looks in Settings and switchable from the dock's right-click menu.
+- **Dock fill and accent are separate** — the fill can follow the wallpaper, the accent or a color you pick; the Taskbar style matches your Windows taskbar.
+- **Real blurred glass** on Windows 11, clipped to the dock's rounded shape, with no sheen or inner rectangle.
+- **A fuller right-click menu** on the dock and the notch, and a notch that no longer stays cut in half.
+
 ### New in 0.84.1
 
 - **The theme you pick is the one you get**, without light and dark pieces mixed in the dock and its menus.
@@ -107,7 +114,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 - **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
 - **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 
