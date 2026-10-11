@@ -699,6 +699,7 @@
 .recovery-notice, .settings-recovery { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 16px; background: color-mix(in srgb, #fce100 14%, var(--card)); border: 1px solid color-mix(in srgb, #fce100 40%, transparent); border-radius: var(--r-card); }
 .recovery-notice h2, .settings-recovery h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .recovery-notice p, .settings-recovery p { margin: 0; }
+.settings-recovery > .button { align-self: flex-start; }
 
 /* ── Other dialogs ──────────────────────────────────────────────────────── */
 .modal-scrim-locked { cursor: default; }
