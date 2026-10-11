@@ -1,6 +1,7 @@
 /* Building the bar: one tile per pin, swapped in as a single DOM update. */
 
 import { dock as dockApi } from "../api.js";
+import { imageSrc } from "../image-src.js";
 import { setTileLabel } from "./tooltip.js";
 import { widgetWidth } from "./layout-model.js";
 import { icon } from "../icons.js";
@@ -153,7 +154,7 @@ function appTile(item) {
       iconCache.delete(item.path);
       addGlyph();
     });
-    img.src = src;
+    img.src = imageSrc(src);
     el.appendChild(img);
   };
   // Show the icon we already have instantly; otherwise a shimmer skeleton while
@@ -202,7 +203,7 @@ function groupTile(item) {
   grid.className = "group-grid";
   const setMiniImg = (mini, src) => {
     const img = document.createElement("img");
-    img.src = src;
+    img.src = imageSrc(src);
     img.alt = "";
     mini.appendChild(img);
   };
