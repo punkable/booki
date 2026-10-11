@@ -5,7 +5,7 @@ let refreshQueued = false;
 const subscribers = new Set();
 let stop = null, watching = false, generation = 0;
 export function platformSnapshot() { return capabilities; }
-export function refreshPlatformPreferences() {
+function refreshPlatformPreferences() {
   if (pending) { refreshQueued = true; return pending; }
   pending = invoke('platform_capabilities').then(value => {
     if (!value || typeof value.transparency !== 'boolean') return;

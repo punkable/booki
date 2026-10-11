@@ -250,16 +250,6 @@
 .ui-seg-item.on { color: var(--ink); background: var(--layer-strong); box-shadow: 0 0 0 1px var(--control-stroke), 0 1px 2px rgba(0, 0, 0, 0.08); }
 .ui-seg-ico svg { width: 14px; height: 14px; }
 
-.ui-help { display: inline-grid; color: var(--ink-2); }
-
-/* Menus (ui.jsx Menu) */
-.ui-menu { position: relative; display: inline-flex; }
-.ui-menu-pop { position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; min-width: 180px; padding: 4px; background: var(--layer-strong); border: 1px solid var(--card-stroke); border-radius: var(--r-overlay); box-shadow: var(--shadow); }
-.ui-menu-pop.up { top: auto; bottom: calc(100% + 4px); }
-.ui-menu-list { display: flex; flex-direction: column; }
-.ui-menu-item { display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 10px; color: var(--ink); font: inherit; text-align: left; background: none; border: 0; border-radius: var(--r-control); cursor: pointer; }
-.ui-menu-item:hover { background: var(--subtle-hover); }
-
 /* Colour swatches */
 .swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .swatch { position: relative; width: 28px; height: 28px; padding: 0; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); border-radius: 50%; cursor: pointer; }

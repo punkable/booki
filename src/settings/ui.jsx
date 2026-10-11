@@ -5,11 +5,10 @@
  * control on the right, all on one alignment. Controls are native elements
  * styled in src/styles/settings.css — no component library.
  *
- * The second half keeps the small subset of the Fluent UI API the Apps editor
- * was written against (Button, Menu, Dropdown…), implemented natively, so the
- * dependency could be dropped without rewriting that editor's logic.
+ * Button keeps the small Fluent-style API (appearance, size, icon) that the
+ * profile and update panels were written against.
  */
-import React, { cloneElement, createContext, useContext, useEffect, useId, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { icon } from "../icons.js";
 
 /** Inline line icon from src/icons.js. */
@@ -82,7 +81,7 @@ export function Row({ label, hint, children, stack = false }) {
 // ── Controls ───────────────────────────────────────────────────────────────
 
 /** The on/off switch itself. */
-export function Switch({ checked, onChange, label }) {
+function Switch({ checked, onChange, label }) {
   return (
     <button
       type="button"
@@ -191,20 +190,6 @@ export function Select({ value, options, onChange, label }) {
   );
 }
 
-/** Small "?" that explains a setting on hover. */
-export function HelpTip({ text }) {
-  return (
-    <span className="ui-help" title={text} aria-label={text} role="img">
-      <Icon name="help" />
-    </span>
-  );
-}
-
-/** A plain heading inside a page, for the few places that are not groups. */
-export function SectionTitle({ children }) {
-  return <h2 className="ui-group-title">{children}</h2>;
-}
-
 /**
  * Dialog behaviour: lock page scroll, Escape closes, focus moves in, Tab
  * cycles inside, focus returns on close.
@@ -273,124 +258,3 @@ export function Button({ appearance, size, icon: glyph, children, className = ""
     </button>
   );
 }
-
-/** Outer container kept for API compatibility; renders its children only. */
-export function Card({ children, className = "" }) {
-  return <div className={className}>{children}</div>;
-}
-
-const MenuCtx = createContext(null);
-
-/** Menu = one trigger + one popover; closes on item click, outside click or Escape. */
-export function Menu({ children }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    const esc = (e) => { if (e.key === "Escape") { e.stopPropagation(); setOpen(false); } };
-    window.addEventListener("pointerdown", away, true);
-    window.addEventListener("keydown", esc, true);
-    return () => {
-      window.removeEventListener("pointerdown", away, true);
-      window.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
-  return (
-    <MenuCtx.Provider value={{ open, setOpen }}>
-      <span className="ui-menu" ref={ref}>{children}</span>
-    </MenuCtx.Provider>
-  );
-}
-
-export function MenuTrigger({ children }) {
-  const ctx = useContext(MenuCtx);
-  return cloneElement(children, {
-    "aria-haspopup": "menu",
-    "aria-expanded": ctx.open,
-    onClick: (e) => {
-      children.props.onClick?.(e);
-      ctx.setOpen((v) => !v);
-    },
-  });
-}
-
-export function MenuPopover({ children, className = "" }) {
-  const ctx = useContext(MenuCtx);
-  const ref = useRef(null);
-  const [flip, setFlip] = useState(false);
-  useEffect(() => {
-    if (!ctx.open || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setFlip(r.bottom > window.innerHeight - 8);
-  }, [ctx.open]);
-  if (!ctx.open) return null;
-  return (
-    <div ref={ref} className={"ui-menu-pop " + (flip ? "up " : "") + className}>
-      {children}
-    </div>
-  );
-}
-
-export function MenuList({ children }) {
-  return <div role="menu" className="ui-menu-list">{children}</div>;
-}
-
-export function MenuItem({ children, onClick }) {
-  const ctx = useContext(MenuCtx);
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      className="ui-menu-item"
-      onClick={(e) => {
-        onClick?.(e);
-        ctx.setOpen(false);
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** Dropdown/Option pair backed by a native select. */
-export function Dropdown({ selectedOptions, onOptionSelect, children, className = "" }) {
-  const id = useId();
-  const options = React.Children.toArray(children).map((c) => ({ value: c.props.value, label: c.props.children }));
-  return (
-    <span className={"ui-select " + className}>
-      <select
-        id={id}
-        value={(selectedOptions && selectedOptions[0]) ?? ""}
-        onChange={(e) => onOptionSelect?.(e, { optionValue: e.target.value })}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <Icon name="chevron-down" />
-    </span>
-  );
-}
-
-export function Option() {
-  return null;
-}
-
-// Fluent icon names the editor used, mapped onto the Booki icon set.
-const glyph = (name) => {
-  const C = () => <Icon name={name} />;
-  C.displayName = `Glyph(${name})`;
-  return C;
-};
-export const AddRegular = glyph("plus");
-export const FolderRegular = glyph("folder");
-export const FolderAddRegular = glyph("folder-plus");
-export const LineHorizontal3Regular = glyph("list");
-export const DeleteRegular = glyph("trash");
-export const GridRegular = glyph("grid");
-export const ListRegular = glyph("list");
-export const ArrowUndo24Regular = glyph("take-out");
-export const Flash24Regular = glyph("zap");
-export const Info24Regular = glyph("info");
-export const Search24Regular = glyph("search");
