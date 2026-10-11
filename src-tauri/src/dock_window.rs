@@ -2,6 +2,10 @@
 
 use super::*;
 
+/// Painted bar size (physical px) from the last full set_dock_frame, so
+/// position_dock can re-anchor the occlusion rect without the flyout room.
+static DOCK_HOME_SIZE: Mutex<(i32, i32)> = Mutex::new((0, 0));
+
 #[derive(serde::Serialize)]
 pub(crate) struct MonitorInfo {
     pub(crate) index: i32,
@@ -120,7 +124,16 @@ pub(crate) fn dock_xy(
 pub(crate) fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), String> {
     let wsize = window.outer_size().map_err(|e| e.to_string())?;
     let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
-    *DOCK_HOME_RECT.lock().unwrap() = (x, y, x + wsize.width as i32, y + wsize.height as i32);
+    // The occlusion rect is the painted bar that set_dock_frame recorded, not
+    // this whole window (flyout room, or the tucked strip). Re-anchor it here.
+    let (hw, hh) = *DOCK_HOME_SIZE.lock().unwrap();
+    let (hw, hh) = if hw > 0 && hh > 0 {
+        (hw, hh)
+    } else {
+        (wsize.width as i32, wsize.height as i32)
+    };
+    let (hx, hy) = dock_xy(window, edge, hw, hh).unwrap_or((x, y));
+    *DOCK_HOME_RECT.lock().unwrap() = (hx, hy, hx + hw, hy + hh);
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
@@ -175,6 +188,7 @@ pub(crate) fn set_dock_frame(
         let hh = home_height.unwrap_or(h).max(8);
         let (hx, hy) = dock_xy(&window, &edge, hw as i32, hh as i32).unwrap_or((x, y));
         *DOCK_HOME_RECT.lock().unwrap() = (hx, hy, hx + hw as i32, hy + hh as i32);
+        *DOCK_HOME_SIZE.lock().unwrap() = (hw as i32, hh as i32);
     }
     // Resize + reposition in ONE SetWindowPos: the old set_size-then-set_position
     // pair painted an intermediate frame (resized but not yet moved), which read

@@ -8,7 +8,7 @@ import { icon } from "./icons.js";
 import { showBookiMenu } from "./native-context-menu.js";
 import { isTextEditor } from "./dock/context-menu.js";
 import { useSettingsStore } from "./settings/store.js";
-import { findSettings } from "./settings/search.js";
+import { findSettings, SEARCH_PARENT } from "./settings/search.js";
 import { NativeBackdrop } from "./settings/native-backdrop.jsx";
 import { RecoveryNotice } from "./settings/recovery-notice.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
@@ -74,7 +74,9 @@ function useRevealSetting(page, target) {
   useEffect(() => {
     if (!target) return undefined;
     let frame, timer;
-    const find = () => [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === target.label);
+    const byLabel = (label) => [...document.querySelectorAll("[data-setting-label]")].find((el) => el.dataset.settingLabel === label);
+    // A row hidden by another setting falls back to the control that shows it.
+    const find = () => byLabel(target.label) || (SEARCH_PARENT[target.key] ? byLabel(t(SEARCH_PARENT[target.key])) : undefined);
     frame = requestAnimationFrame(() => {
       // Open only the collapsed groups that contain the target.
       for (let parent = find()?.parentElement; parent; parent = parent.parentElement) {

@@ -552,6 +552,8 @@ function notchSize() {
 }
 
 pill.addEventListener("pointerdown", (e) => {
+  // Right-click opens the notch's own menu; it must not reveal the dock too.
+  if (e.button !== 0) return;
   const { w, h } = notchSize();
   draggingNotch = false;
   drag = {

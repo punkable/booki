@@ -604,7 +604,8 @@ function clippedText(el, name) {
 }
 
 window.addEventListener("pointerdown", (e) => {
-  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
+  // The context menu sits outside #stack; its items act on the open flyout.
+  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, "#ctx-menu") && !closestSel(e.target, ".tile")) closeStack();
 });
 
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.

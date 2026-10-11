@@ -22,6 +22,7 @@ import {
   setSystem,
 } from "./widget-view.js";
 import { S } from "./state.js";
+import { dockKeys } from "./dom.js";
 import { widgetLabel, findWidgetPin } from "./helpers.js";
 import { fitDock, reframe } from "./frame.js";
 
@@ -136,6 +137,7 @@ function setWidgetAvailable(el, available) {
   const hide = !!item?.style?.hideWhenUnavailable && !available;
   if (el.classList.contains("conditionally-hidden") === hide) return;
   el.classList.toggle("conditionally-hidden", hide);
+  dockKeys.sync();
   requestAnimationFrame(() => { fitDock(); reframe(); });
 }
 

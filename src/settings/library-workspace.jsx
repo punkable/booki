@@ -12,7 +12,7 @@ function pinLabel(item) {
 }
 
 import { dock, pickAppFile, pickFolder } from '../api.js';
-import { findPin, updatePin, removePin, placePin, movePinBy, ungroupPin, mkPin, mergePins, settingsPin, PIN_DRAG_TYPE, readPinDrop, canMergeKind } from '../pins.js';
+import { findPin, updatePin, removePin, placePin, movePinBy, ungroupPin, mkPin, mergePins, settingsPin, PIN_DRAG_TYPE, readPinDrop, canMergeKind, pinsKey } from '../pins.js';
 import { appKey, pinnedKeys } from '../dock/app-candidates.js';
 import { AppLibrary } from './app-library.jsx';
 import { PreviewPin } from './dock-preview.jsx';
@@ -62,7 +62,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const isMember = (group, id) => !!group?.children?.some((child) => child.id === id);
   const commit = (next) => {
     if (next === latest.current.pinned) return;
-    setUndo({ before: latest.current.pinned, after: JSON.stringify(next) });
+    setUndo({ before: latest.current.pinned, after: pinsKey(next) });
     set({ pinned: next }); setError('');
   };
   // A member taken out lands right after its group, where it came from.
@@ -72,10 +72,14 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   };
   const takeOut = (pin, groupId) => commit(placePin(latest.current.pinned, pin, { beforeId: afterGroup(groupId) }));
   const takeOutRef = useRef(takeOut); takeOutRef.current = takeOut;
+  // A drop handled here stops propagation, and a pin moved by it is gone from
+  // the strip before its dragend fires, so every drop ends the drag itself.
+  const endDrag = () => { dragging.current = null; setDragId(null); setDropHint(null); setOutside(false); cancelSpring(); };
+  const endDragRef = useRef(endDrag); endDragRef.current = endDrag;
   useEffect(() => {
     const memberDrag = (event) => openRef.current && dragging.current && isMember(openRef.current, dragging.current.id)
       && [...(event.dataTransfer?.types || [])].includes(PIN_DRAG_TYPE);
-    const reset = () => { dragging.current = null; setDragId(null); setDropHint(null); setOutside(false); cancelSpring(); };
+    const reset = () => endDragRef.current();
     // Anywhere outside the strip accepts a member, so letting go of it there
     // takes it out of the group.
     const over = (event) => {
@@ -135,6 +139,9 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     commit(next);
   };
   const drop = (event, options = {}) => {
+    try { dropPin(event, options); } finally { endDrag(); }
+  };
+  const dropPin = (event, options) => {
     event.preventDefault(); event.stopPropagation();
     const payload = readPinDrop(event.dataTransfer);
     if (!payload) return;
@@ -175,7 +182,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     // Resting on a group opens it in place, so the app can be placed
     // between its members, like a spring-loaded folder.
     if (mode === 'into') spring(item.id, () => enter(item));
-    else if (springFor.current === item.id) cancelSpring();
+    else cancelSpring(); // left the group (or never on one): no late opening
   };
   const pinDrop = (event, item) => {
     cancelSpring();
@@ -220,7 +227,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         </div>
         : <strong>{t('apps.inDock')}<span className="library-count">{cfg.pinned.filter((item) => item.kind !== 'widget').length}</span></strong>}
         <div className="library-dock-actions">
-          {undo && undo.after === JSON.stringify(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
+          {undo && undo.after === pinsKey(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
           {!openGroup && <>
             <button className="button button-accent" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
             <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
@@ -235,7 +242,8 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         onDrop={openGroup ? (event) => { setDropHint(null); drop(event, { groupId: openGroup.id }); } : undefined}
         onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropHint(null); }}>{stripItems.map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '') + (dropHint?.id === item.id ? ` drop-${dropHint.mode}` : '') + (dragId === item.id ? ' is-dragging' : '')}
         draggable onDragStart={(event) => startDrag(event, item)}
-        onDragOver={(event) => pinDragOver(event, item)} onDrop={(event) => pinDrop(event, item)}>
+        onDragOver={(event) => pinDragOver(event, item)} onDrop={(event) => pinDrop(event, item)}
+        onDragLeave={(event) => { if (springFor.current === item.id && !event.currentTarget.contains(event.relatedTarget)) cancelSpring(); }}>
         <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => item.kind === 'group' ? enter(item) : inspect(item)}><PreviewPin item={item} size={40} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
         {canMergeKind(item.kind) && <input type="checkbox" aria-label={`${t('premium.selectApp')}: ${pinLabel(item)}`} checked={chosenIds.includes(item.id)} onChange={(event) => chooseIds((ids) => event.target.checked ? [...ids, item.id] : ids.filter((id) => id !== item.id))} />}
         {item.kind === 'group' && <span className="library-group-count" aria-hidden="true">{item.children?.length || 0}</span>}
@@ -270,7 +278,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
           webPanel={<div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="button button-accent" disabled={webBusy || !webUrl.trim()} onClick={async () => {
       if (webBusy) return;
       try {
-        const raw = webUrl.trim(); const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(raw) ? raw : 'https://' + raw);
+        const raw = webUrl.trim(); const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) || /^(mailto|tel):/i.test(raw) ? raw : 'https://' + raw);
         if (!['https:', 'http:'].includes(url.protocol) || !url.hostname) throw new Error('unsupported');
         setWebBusy(true); const name = webName.trim() || url.hostname; let favicon = null;
         try { favicon = await dock.fetchFavicon(url.href); } catch { /* A favicon never prevents adding a website. */ }

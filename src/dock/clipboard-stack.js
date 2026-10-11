@@ -8,7 +8,7 @@ import { stackEl } from "./dom.js";
 import { applyFrame } from "./frame.js";
 import { refreshClipboard } from "./live-widgets.js";
 import { showErrorToast } from "./undo-toast.js";
-import { placeStackNear, closeStack } from "./stack.js";
+import { placeStackNear, closeStack, clearStackTint } from "./stack.js";
 
 // Clipboard-history flyout: the "clipboard" widget's click target. Reuses the
 // same #stack panel/positioning as the folder/group flyout (one flyout
@@ -22,6 +22,7 @@ export async function toggleClipboardStack(tileEl) {
     return;
   }
   stackEl.innerHTML = "";
+  clearStackTint();
   stackEl.setAttribute("aria-label", t("w.clipboard"));
   const head = document.createElement("div");
   head.className = "stack-head";
@@ -84,6 +85,8 @@ export async function toggleClipboardStack(tileEl) {
   S.pendingReplace = placeStack;
 
   await renderClipboardList(grid, foot);
+  // Closed (second click, Escape, blur) while the list loaded: stay closed.
+  if (!S.stackOpen || !stackEl.contains(grid)) return;
   requestAnimationFrame(() => {
     placeStack();
     requestAnimationFrame(() => {

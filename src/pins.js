@@ -115,6 +115,35 @@ export function normalizeGroups(pinned) {
     : pin);
 }
 
+/** Pins in the exact shape Rust's PinnedApp saves them, defaults included.
+ * A pin built here (no widget/style/icon/children/recents) otherwise differs
+ * from the saved copy, which made Settings report false save conflicts. */
+export function canonicalPins(pinned) {
+  return (pinned || []).map((pin) => ({
+    id: pin.id,
+    name: pin.name ?? "",
+    path: pin.path ?? "",
+    args: pin.args ?? [],
+    kind: pin.kind ?? "app",
+    ...(pin.action != null ? { action: pin.action } : {}),
+    widget: pin.widget ?? null,
+    style: pin.style ?? null,
+    icon: pin.icon ?? null,
+    children: canonicalPins(pin.children),
+    recents: pin.recents ?? [],
+  }));
+}
+
+/** A comparison key for a pin list that ignores key order and missing defaults. */
+export function pinsKey(pinned) {
+  const stable = (value) => Array.isArray(value)
+    ? value.map(stable)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]))
+      : value;
+  return JSON.stringify(stable(canonicalPins(pinned)));
+}
+
 /** Build a pin from a filesystem path. */
 export function mkPin(path, kind = "app") {
   const file = String(path || "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "App";

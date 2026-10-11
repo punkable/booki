@@ -15,6 +15,7 @@ export function addMenuHead(title, subtitle) {
 }
 
 let menuReturnFocus = null;
+let menuPrevReplace = null;
 // The context menu lives beside the bar (like the folder flyout): the window is
 // grown to fit it, so it can never be cut off by the dock window's bounds.
 export function placeMenu(e, focus = true) {
@@ -46,6 +47,9 @@ export function placeMenu(e, focus = true) {
   // The window resizes asynchronously after applyFrame(); reposition again the
   // moment it actually settles (via the resize hook) AND on a short fallback, so
   // the menu can never end up clipped by a window that grew a beat too late.
+  // Remember an open flyout's re-place hook so closing the menu gives it back.
+  if (S.pendingReplace && !S.pendingReplace._menu) menuPrevReplace = S.pendingReplace;
+  put._menu = true;
   S.pendingReplace = put;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -60,7 +64,8 @@ export function closeMenu() {
   if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
   document.body.classList.remove("menu-open");
-  S.pendingReplace = null;
+  if (S.pendingReplace?._menu) S.pendingReplace = S.stackOpen ? menuPrevReplace : null;
+  menuPrevReplace = null;
   if (ctxMenu.contains(document.activeElement)) menuReturnFocus?.focus?.();
   reframe();
 }

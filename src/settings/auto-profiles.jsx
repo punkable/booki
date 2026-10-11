@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { dock as dockApi } from "../api.js";
 import { curLang, t } from "../i18n.js";
-import { DEFAULT_RULES } from "../profile-rules.js";
+import { withRuleDefaults } from "../profile-rules.js";
 import { Row, Select, SettingsSection, Toggle } from "./ui.jsx";
 
 // Monday first; values follow Date#getDay (0 = Sunday).
@@ -12,15 +12,22 @@ const WEEK = [1, 2, 3, 4, 5, 6, 0];
 const dayName = (day) => new Intl.DateTimeFormat(curLang(), { weekday: "short" }).format(new Date(2026, 9, 11 + day));
 
 export function AutoProfiles({ cfg, set }) {
-  const rules = { ...DEFAULT_RULES, ...(cfg.profileRules || {}) };
+  const rules = withRuleDefaults(cfg.profileRules);
   const [profiles, setProfiles] = useState(null);
+  const [listRevision, setListRevision] = useState(0);
+  // Saving, duplicating or renaming a profile elsewhere in Settings updates the menus.
+  useEffect(() => {
+    const bump = () => setListRevision((value) => value + 1);
+    window.addEventListener("booki:profiles-changed", bump);
+    return () => window.removeEventListener("booki:profiles-changed", bump);
+  }, []);
   // The list is only needed once the rules are on.
   useEffect(() => {
     if (!rules.enabled) return undefined;
     let alive = true;
     dockApi.profileList().then((list) => { if (alive) setProfiles(list || []); }, () => { if (alive) setProfiles([]); });
     return () => { alive = false; };
-  }, [rules.enabled, cfg.lastProfile]);
+  }, [rules.enabled, cfg.lastProfile, listRevision]);
   const update = (patch) => set({ profileRules: { ...rules, ...patch } });
   const options = [{ value: "", label: t("autoProf.none") }, ...(profiles || []).map((name) => ({ value: name, label: name }))];
   // A profile that was deleted still shows, so the choice is never silently lost.

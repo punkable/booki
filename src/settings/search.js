@@ -22,6 +22,17 @@ const SEARCH_INDEX = [
   ["overhaul.diagnostics", "system"], ["faq.title", "system"], ["ab.title", "system"], ["act.reset", "system"],
 ];
 
+// Rows that only show under another setting (auto-hide on, glass finish,
+// magnification, a picked colour…). When the row is hidden, the result goes
+// to the section or switch that controls it instead of doing nothing.
+export const SEARCH_PARENT = {
+  "be.reveal": "dock.behavior", "be.notchMode": "dock.behavior", "be.notchPresence": "dock.behavior", "be.hideDelay": "dock.behavior",
+  "be.monitor": "be.position", "ap.accent": "look.source",
+  "dock.intensity": "tab.appearance", "ap.surfaceTint": "tab.appearance", "ap.nativeMaterial": "tab.appearance",
+  "be.zoom": "be.magnify", "be.anim": "be.magnify",
+  "be.taskbarSettle": "be.taskbarFollow", "be.taskbarHoldHover": "be.taskbarFollow",
+};
+
 const PAGE_LABELS = { home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
 
 const SEARCH_ALIASES = {

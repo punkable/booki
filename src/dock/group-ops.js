@@ -54,14 +54,17 @@ async function reorderGroupChild(group, childId, beforeId) {
   S.cfg.pinned[gi].children = kids;
   // Keep flyout open across persist so smart-hide can't tuck mid-reorder.
   S.pinnedReveal = true;
-  if (!(await persist())) return;
-  closeStack();
-  await render();
-  reframe();
-  const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
-  const it = S.cfg.pinned.find((p) => p.id === group.id);
-  if (el && it) await openStack(el, it);
-  S.pinnedReveal = false;
+  try {
+    if (!(await persist())) return;
+    closeStack();
+    await render();
+    reframe();
+    const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+    const it = S.cfg.pinned.find((p) => p.id === group.id);
+    if (el && it) await openStack(el, it);
+  } finally {
+    S.pinnedReveal = false;
+  }
 }
 
 /* Where a member dragged out of a group's panel would land on the bar: inside
@@ -171,7 +174,8 @@ export function wireStackDragOut(cell, group, child) {
     st.slot = null;
     markOutTarget(null);
     clearDropHint();
-    st.beforeId = null;
+    // undefined = no target under the pointer (no reorder); null = append.
+    st.beforeId = undefined;
     const sibs = [...stackEl.querySelectorAll(".stack-item[data-child-id]")].filter((n) => n !== cell);
     let target = null;
     for (const s of sibs) {
@@ -212,7 +216,7 @@ export function wireStackDragOut(cell, group, child) {
       }
       if (s.slot) await moveChildTo(group, child, s.slot);
       else await takeOutChild(group, child.id);
-    } else if ("beforeId" in s && s.beforeId !== child.id) {
+    } else if (s.beforeId !== undefined && s.beforeId !== child.id) {
       if (s.clone) s.clone.remove();
       const kids = group.children || [];
       const from = kids.findIndex((c) => c.id === child.id);

@@ -27,8 +27,11 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const [selected, setSelected] = useState({}); const [message, setMessage] = useState('');
   const generation = useRef(0);
   const [iconRevision, setIconRevision] = useState(0);
-  const load = async (refresh = false) => {
-    const seq = ++generation.current; setLoading(true); setFailed([]); setPage(0);
+  // A background reload (window focus, catalog change) keeps the page and
+  // skips the loading flash; only a fresh load starts at page 1.
+  const load = async (refresh = false, background = false) => {
+    const seq = ++generation.current; setFailed([]);
+    if (!background) { setLoading(true); setPage(0); }
     if (refresh) { dock.invalidateIcons(); setIconRevision(value => value + 1); }
     const sourceNames = ['groups', 'running', 'used', 'folders'];
     const deadline = (promise) => {
@@ -52,8 +55,8 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const reload = useRef(load); reload.current = load;
   useEffect(() => {
     let disposed = false, unlisten, catalogTimer;
-    dock.onSystemChange('catalog', () => { clearTimeout(catalogTimer); catalogTimer = setTimeout(() => { if (!disposed) reload.current(true); }, 500); }).then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
-    const onFocus = () => reload.current();
+    dock.onSystemChange('catalog', () => { clearTimeout(catalogTimer); catalogTimer = setTimeout(() => { if (!disposed) reload.current(true, true); }, 500); }).then((stop) => { if (disposed) stop(); else unlisten = stop; }).catch(() => {});
+    const onFocus = () => reload.current(false, true);
     window.addEventListener('focus', onFocus);
     return () => { disposed = true; clearTimeout(catalogTimer); unlisten?.(); window.removeEventListener('focus', onFocus); };
   }, []);
@@ -79,6 +82,8 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   </div>)}</div>;
   const chosen = Object.values(selected).filter((c) => c && !keys.has(appKey(c, data.identities)));
   const PAGE_SIZE = 36;
+  // The list can shrink under a kept page (an app uninstalled meanwhile).
+  const shownPage = Math.min(page, Math.max(0, Math.ceil(installed.length / PAGE_SIZE) - 1));
   const searching = !!query.trim();
   const showAll = searching || filter === 'all';
   const panel = searching ? 'apps' : filter;
@@ -102,9 +107,9 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
       {!searching && filter === 'running' && !sections.running.length && <p className="muted">{t('add.none')}</p>}
       {showAll && <>
         <h3 className="app-library-heading">{t('add.all')} <span>{installed.length}</span></h3>
-        {cards(installed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE))}
+        {cards(installed.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE))}
         {!installed.length && !sections.utilities.length && !sections.frequent.length && !sections.running.length && !loading && !failed.includes(0) && <p className="muted">{t('add.none')}</p>}
-        {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="button" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('stack.previous')}</button><span>{page + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="button" disabled={(page + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(page + 1)}>{t('stack.next')}</button></div>}
+        {installed.length > PAGE_SIZE && <div className="app-library-pager"><button className="button" disabled={shownPage === 0} onClick={() => setPage(shownPage - 1)}>{t('stack.previous')}</button><span>{shownPage + 1} / {Math.ceil(installed.length / PAGE_SIZE)}</span><button className="button" disabled={(shownPage + 1) * PAGE_SIZE >= installed.length} onClick={() => setPage(shownPage + 1)}>{t('stack.next')}</button></div>}
       </>}
       {showAll && sections.utilities.length > 0 && <details key={searching ? "search-tools" : "tools"} open={searching || undefined} className="app-library-utilities"><summary>{t('design.systemApps')} <span>{sections.utilities.length}</span></summary>{cards(sections.utilities)}</details>}
       {panel === 'folders' && <div className="app-library-folders-wrap"><div className="app-library-folders">{data.folders.map(([key, path]) => <button key={key} disabled={keys.has(data.identities[path] || pathKey(path))} className="app-library-folder" onClick={() => add([{kind:'folder', name:t(`kf.${key}`), path, args:[]}])}><Icon name="folder" /><span>{t(`kf.${key}`)}</span></button>)}

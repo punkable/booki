@@ -77,6 +77,8 @@ export function onFullscreenSignal(value) {
     void (async () => {
       await dockApi.clearFullscreenBlackout().catch(() => {});
       await dockApi.notchToastDismiss().catch(() => {});
+      // Another app went fullscreen meanwhile: its blackout wins.
+      if (S.fullscreen) return;
       // Restore the pre-FS visibility for every hide mode, not only smart+click.
       // setupAutoHide() starts edge visible — that would pop a tucked dock open.
       if (wasTucked && !(hideMode() === "smart" && desktopActive && !S.manualHide)) {

@@ -24,6 +24,8 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
     const id = ++refreshId.current;
     const [list, archive] = await Promise.all([dockApi.profileList(), dockApi.profileDeleted()]);
     if (alive.current && id === refreshId.current) { setProfiles(list || []); setDeleted(archive || []); setProfileRevision(value => value + 1); }
+    // Automatic profiles lists the same names in its menus.
+    window.dispatchEvent(new Event("booki:profiles-changed"));
   };
   const action = async (fn) => {
     if (actionBusy.current) return; actionBusy.current = true; setBusy(true); setError("");

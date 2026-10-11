@@ -546,11 +546,26 @@ fn reset_config(app: AppHandle) -> Result<Config, String> {
     let c = config::update(|current| {
         *current = Config {
             pinned: std::mem::take(&mut current.pinned),
+            // Start with Windows mirrors the Run key, which a reset leaves alone.
+            autostart: current.autostart,
             always_on_top: true,
+            // Already current: a reset must not re-run the migrations on the
+            // next launch and undo the choices made after it.
+            settings_rev: config::SETTINGS_REV,
             ..Default::default()
         };
         Ok(())
     })?;
+    // The shortcuts go back to their defaults too, not only in the file.
+    if let Err(error) = hotkeys_apply(
+        &app,
+        &c.hotkey,
+        c.position_hotkeys,
+        &c.hotkey_modifier,
+        &c.launcher_hotkey,
+    ) {
+        log::warn!("reset: hotkeys not applied: {error}");
+    }
     apply_always_on_top(&app);
     apply_capture_policy(&app, c.capture_visible);
     Ok(c)

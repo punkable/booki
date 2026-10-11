@@ -100,6 +100,15 @@ pub(crate) fn profile_duplicate(name: String, new_name: String) -> Result<(), St
 pub(crate) fn profile_rename(app: AppHandle, name: String, new_name: String) -> Result<(), String> {
     let _guard = profile_store::LOCK.lock().map_err(|e| e.to_string())?;
     let root = profiles_dir();
+    let (old, new) = (name.trim(), new_name.trim());
+    if old != new && old.to_lowercase() == new.to_lowercase() {
+        profile_store::rename_case(&root, old, new)?;
+        if config::load().last_profile == old {
+            let _ = config::patch(serde_json::json!({ "lastProfile": new }));
+        }
+        let _ = app.emit("booki://config-changed", ());
+        return Ok(());
+    }
     profile_store::copy(&root, &name, &new_name)?;
     let active = config::load().last_profile == name.trim();
     if active {

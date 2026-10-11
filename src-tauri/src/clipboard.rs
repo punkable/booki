@@ -62,19 +62,27 @@ pub(crate) fn clip_prune_locked(hist: &mut Vec<ClipEntry>, cfg: &Config) -> bool
     }
     let limit = clip_limit(cfg);
     if hist.len() > limit {
-        let mut kept = Vec::with_capacity(limit);
-        for entry in hist.iter().filter(|entry| entry.favorite).take(limit) {
-            kept.push(entry.clone());
-        }
-        if kept.len() < limit {
-            for entry in hist.iter().filter(|entry| !entry.favorite) {
-                if kept.len() >= limit {
-                    break;
-                }
-                kept.push(entry.clone());
+        // Favorites stay first in line for a slot, but the list keeps its
+        // newest-first order: the oldest non-favorites are the ones dropped.
+        let favorites = hist
+            .iter()
+            .filter(|entry| entry.favorite)
+            .count()
+            .min(limit);
+        let mut favorite_slots = favorites;
+        let mut other_slots = limit - favorites;
+        hist.retain(|entry| {
+            let slots = if entry.favorite {
+                &mut favorite_slots
+            } else {
+                &mut other_slots
+            };
+            if *slots == 0 {
+                return false;
             }
-        }
-        *hist = kept;
+            *slots -= 1;
+            true
+        });
     }
     hist.len() != before
 }
@@ -397,4 +405,39 @@ pub(crate) async fn clipboard_private(id: u64, private: bool) {
 #[tauri::command]
 pub(crate) async fn clipboard_clear() {
     clip_edit(|hist, _| hist.clear()).await;
+}
+
+#[cfg(test)]
+mod prune_tests {
+    use super::*;
+
+    fn entry(id: u64, favorite: bool) -> ClipEntry {
+        ClipEntry {
+            id,
+            text: id.to_string(),
+            ts: clip_now_ms(),
+            favorite,
+            private: false,
+        }
+    }
+
+    #[test]
+    fn pruning_keeps_newest_first_and_drops_the_oldest_non_favorites() {
+        let cfg = Config {
+            clipboard_history_limit: 3,
+            clipboard_retention_days: 0,
+            ..Config::default()
+        };
+        // Newest first; the favorite (3) is older than the newest copies.
+        let mut hist = vec![
+            entry(5, false),
+            entry(4, false),
+            entry(3, true),
+            entry(2, false),
+            entry(1, false),
+        ];
+        assert!(clip_prune_locked(&mut hist, &cfg));
+        let ids: Vec<u64> = hist.iter().map(|e| e.id).collect();
+        assert_eq!(ids, vec![5, 4, 3]);
+    }
 }
