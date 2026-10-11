@@ -5,9 +5,10 @@ import { dock as dockApi } from "../../api.js";
 import { t } from "../../i18n.js";
 import { resolveNotchMode } from "../../notch-mode.js";
 import { resolveSurfaceStyle } from "../../surface.js";
+import { colorSource } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
-import { AccentPicker, MonitorPicker, PositionPicker, ScenarioPicker, TintPicker } from "../controls.jsx";
+import { AccentPicker, ColorSourcePicker, MonitorPicker, PositionPicker, ScenarioPicker, TintPicker } from "../controls.jsx";
 import { CollapsibleSection, PageHeader, Row, SegmentedControl, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
@@ -60,7 +61,8 @@ export function DockPage({ cfg, set }) {
         <SegmentedControl value={cfg.theme || "system"} onChange={(v) => set({ theme: v })}
           options={["system", "light", "dark", "auto"].map((value) => ({ value, label: t(`theme.${value}`) }))} />
       </Row>
-      <Row label={t("ap.accent")} hint={t("ap.accentHint")} stack><AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} /></Row>
+      <Row label={t("look.source")} hint={t("look.sourceHint")} stack><ColorSourcePicker cfg={cfg} set={set} /></Row>
+      {colorSource(cfg) === "custom" && <Row label={t("ap.accent")} hint={t("ap.accentHint")} stack><AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} /></Row>}
       <div className="row-block"><FinishPicker cfg={cfg} set={(patch) => set(patch, afterSurface)} /></div>
       {glass && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />

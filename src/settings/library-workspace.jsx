@@ -38,13 +38,25 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   const [identities, setIdentities] = useState({});
   const [dropHint, setDropHint] = useState(null);
   const [membersOver, setMembersOver] = useState(false);
+  const [memberHint, setMemberHint] = useState(null);
+  const [dragId, setDragId] = useState(null);
   const dragging = useRef(null);
+  const springTimer = useRef(null);
+  const springFor = useRef(null);
+  const cancelSpring = () => { clearTimeout(springTimer.current); springFor.current = null; };
   useEffect(() => {
-    const end = () => { dragging.current = null; setDropHint(null); setMembersOver(false); };
+    const end = () => { dragging.current = null; setDragId(null); setDropHint(null); setMembersOver(false); setMemberHint(null); cancelSpring(); };
     window.addEventListener('dragend', end); window.addEventListener('drop', end);
     return () => { window.removeEventListener('dragend', end); window.removeEventListener('drop', end); };
   }, []);
-  const startDrag = (event, item) => { dragging.current = item; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item)); };
+  const startDrag = (event, item) => {
+    dragging.current = item; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify(item));
+    // Carry just the icon under the pointer, like dragging an icon on the desktop.
+    const art = event.currentTarget.querySelector('.live-preview-app, .live-preview-separator, button > :first-child');
+    if (art && event.dataTransfer.setDragImage) { const box = art.getBoundingClientRect(); event.dataTransfer.setDragImage(art, box.width / 2, box.height / 2); }
+    // Dim the source after the browser has taken its drag snapshot.
+    requestAnimationFrame(() => setDragId(item.id));
+  };
   const latest = useRef(cfg); latest.current = cfg;
   const inspectorOrigin = useRef(null);
   const selected = candidate || findPin(cfg.pinned, selectedId);
@@ -110,8 +122,17 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     event.preventDefault(); event.stopPropagation();
     const mode = dropModeAt(event, item);
     setDropHint((hint) => hint?.id === item.id && hint.mode === mode ? hint : mode ? { id: item.id, mode } : null);
+    // Resting on a group opens it in the inspector, so the app can be placed
+    // between its members, like a spring-loaded folder.
+    if (mode === 'into' && selectedId !== item.id) {
+      if (springFor.current !== item.id) {
+        cancelSpring(); springFor.current = item.id;
+        springTimer.current = setTimeout(() => { if (springFor.current === item.id) { inspectCandidate(null); selectId(item.id); } }, 650);
+      }
+    } else if (springFor.current === item.id) cancelSpring();
   };
   const pinDrop = (event, item) => {
+    cancelSpring();
     const mode = dropModeAt(event, item); setDropHint(null);
     if (mode === 'into') return drop(event, { groupId: item.id });
     if (mode === 'merge') return drop(event, { mergeWith: item.id });
@@ -141,7 +162,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         </div>
       </div>
 
-      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropHint(null); }}>{cfg.pinned.filter((item) => item.kind !== 'widget').map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '') + (dropHint?.id === item.id ? ` drop-${dropHint.mode}` : '')}
+      <div className={"library-pin-strip" + (chosenIds.length ? " selecting" : "")} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setDropHint(null); }}>{cfg.pinned.filter((item) => item.kind !== 'widget').map((item) => <div key={item.id} className={'library-pin' + (item.kind === 'separator' ? ' is-separator' : '') + (selectedId === item.id ? ' selected' : '') + (dropHint?.id === item.id ? ` drop-${dropHint.mode}` : '') + (dragId === item.id ? ' is-dragging' : '')}
         draggable onDragStart={(event) => startDrag(event, item)}
         onDragOver={(event) => pinDragOver(event, item)} onDrop={(event) => pinDrop(event, item)}>
         <button type="button" aria-label={pinLabel(item)} aria-pressed={selectedId === item.id} onClick={() => inspect(item)}><PreviewPin item={item} size={40} gap={6} /><span className="library-pin-name">{pinLabel(item)}</span></button>
@@ -200,10 +221,26 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
             </div>}
             {selected.kind === 'group' && <div className={'library-group-members' + (membersOver ? ' drop-over' : '')} aria-label={t('apps.groupMembers')}
               onDragOver={(event) => { if (![...event.dataTransfer.types].includes(PIN_DRAG_TYPE) || dragging.current?.kind === 'group') return; event.preventDefault(); setMembersOver(true); }}
-              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setMembersOver(false); }}
-              onDrop={(event) => { setMembersOver(false); drop(event, { groupId: selected.id }); }}>
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) { setMembersOver(false); setMemberHint(null); } }}
+              onDrop={(event) => { setMembersOver(false); setMemberHint(null); drop(event, { groupId: selected.id }); }}>
               <span className="library-group-members-title">{t('apps.groupMembers')}</span>
-              {(selected.children || []).map((child) => <div key={child.id} className="library-group-member" draggable onDragStart={(event) => startDrag(event, child)}>
+              {(selected.children || []).map((child, index, kids) => <div key={child.id}
+                className={'library-group-member' + (memberHint?.id === child.id ? ` drop-${memberHint.before ? 'before' : 'after'}` : '') + (dragId === child.id ? ' is-dragging' : '')}
+                draggable onDragStart={(event) => startDrag(event, child)}
+                onDragOver={(event) => {
+                  if (![...event.dataTransfer.types].includes(PIN_DRAG_TYPE) || dragging.current?.kind === 'group') return;
+                  event.preventDefault(); event.stopPropagation(); setMembersOver(true);
+                  const box = event.currentTarget.getBoundingClientRect();
+                  const before = event.clientY < box.top + box.height / 2;
+                  setMemberHint((hint) => hint?.id === child.id && hint.before === before ? hint : { id: child.id, before });
+                }}
+                onDrop={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect();
+                  const before = event.clientY < box.top + box.height / 2;
+                  const next = before ? child : kids.slice(index + 1).find((kid) => kid.id !== dragging.current?.id);
+                  setMembersOver(false); setMemberHint(null);
+                  drop(event, { groupId: selected.id, beforeId: next?.id });
+                }}>
                 <button className="button" onClick={() => inspect(child)}><PreviewPin item={child} size={22} gap={2} /><span>{pinLabel(child)}</span></button>
                 <button className="icon-button" aria-label={`${t('group.takeOut')}: ${pinLabel(child)}`} title={t('group.takeOut')} onClick={() => commit(placePin(latest.current.pinned, child))}><Icon name="take-out" /></button>
               </div>)}

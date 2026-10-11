@@ -373,7 +373,7 @@ fn platform_capabilities() -> serde_json::Value {
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true })
+        serde_json::json!({ "build":0,"systemBackdrop":false,"highContrast":false,"animations":true,"transparency":true,"accent":null,"accentOnTaskbar":false,"systemLight":false })
     }
 }
 
@@ -1036,6 +1036,10 @@ fn open_settings_url(app: &AppHandle, url: &str) {
         .resizable(true)
         .center()
         .decorations(true)
+        // Tauri's file-drop handler takes over WebView2's drop target on
+        // Windows, so HTML drag and drop never fires in the page. Settings
+        // moves apps in and out of groups with it and takes no file drops.
+        .disable_drag_drop_handler()
         .build();
     // NOTE: the settings window is deliberately NOT transparent. A transparent
     // WebView2 window rendered blank/see-through on real Windows (the page never

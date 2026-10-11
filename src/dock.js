@@ -36,6 +36,7 @@ import { formatDegrees } from "./dock/weather-codes.js";
 import { emo } from "./emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "./icon-library.js";
 import { applyTheme, applyEdge } from "./theme.js";
+import { paintedLook } from "./system-look.js";
 import { checkForUpdate } from "./update.js";
 import { t, setLang, curLang, ensureLang } from "./i18n.js";
 import {
@@ -382,9 +383,10 @@ function applyAll() {
   const root = document.documentElement;
   // CSS materials on a transparent window (native DWM vibrancy left a gray box).
   // Solidity + optional glass tint drive dock/notch fill together.
-  applyMaterial(cfg);
-  if (cfg.accent) {
-    root.style.setProperty("--accent", cfg.accent);
+  const look = paintedLook(cfg);
+  applyMaterial(look);
+  if (look.accent) {
+    root.style.setProperty("--accent", look.accent);
   }
   dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
   // How close the bar sits to its screen edge (user-tunable). The transparent
@@ -3449,7 +3451,7 @@ matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", 
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if (!cfg) return;
-  setMaterialTint(materialTint(cfg));
+  setMaterialTint(materialTint(paintedLook(cfg)));
   reportDockMaterial();
 });
 

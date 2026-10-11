@@ -167,7 +167,9 @@ unsafe extern "system" fn platform_message(
 ) -> windows::Win32::Foundation::LRESULT {
     match message {
         WM_CLIPBOARDUPDATE => signal("clipboard"),
-        WM_SETTINGCHANGE | WM_THEMECHANGED => signal("preferences"),
+        // The accent colour (and with it, an automatic accent following a new
+        // wallpaper) arrives as WM_DWMCOLORIZATIONCOLORCHANGED (0x0320).
+        WM_SETTINGCHANGE | WM_THEMECHANGED | 0x0320 => signal("preferences"),
         WM_DISPLAYCHANGE => signal("display"),
         WM_POWERBROADCAST
             if wp.0 == PBT_APMRESUMEAUTOMATIC as usize || wp.0 == PBT_APMRESUMESUSPEND as usize =>

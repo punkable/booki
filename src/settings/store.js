@@ -9,13 +9,14 @@ import { config as configApi, dock as dockApi, emitConfigChanged, onConfigChange
 import { parseConfigConflict } from "./config-conflicts.js";
 import { applyTheme } from "../theme.js";
 import { applySurfaceVars } from "../surface.js";
+import { paintedLook } from "../system-look.js";
 import { normalizeGroups as normalizePinned } from "../pins.js";
 import { updates } from "../update.js";
 import { setLang, ensureLang } from "../i18n.js";
 
 function paint(cfg) {
   applyTheme(cfg);
-  applySurfaceVars(cfg);
+  applySurfaceVars(paintedLook(cfg));
 }
 
 export function useSettingsStore() {
