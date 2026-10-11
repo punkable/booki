@@ -666,6 +666,17 @@ export async function onOcclusion(cb) {
   return T.event.listen("booki://occlusion", (e) => cb(!!e.payload));
 }
 
+/** The notch's settled pill: `{ active, width, height, attached }` in CSS px. */
+export async function emitNotchShape(shape) {
+  if (T && T.event && T.event.emit) await T.event.emit("booki://notch-shape", shape);
+}
+
+/** Listen for the notch's pill shape (see emitNotchShape). */
+export async function onNotchShape(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-shape", (e) => cb(e.payload || null));
+}
+
 /** Listen for the "reveal the dock" signal (fired when the notch is clicked). */
 export async function onReveal(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};

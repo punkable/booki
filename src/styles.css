@@ -271,6 +271,33 @@ body.autohide.tucked.genie-right .dock {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
 }
 
+/* Opening from a live notch (autohide.js): the bar starts as the notch's
+   capsule, clipped to its size where the notch sits, and stretches to full
+   size. No genie squash or rise; the icons fade in as it opens. */
+body.dock-body.tucked.reveal-morph .dock {
+  transform: none;
+  opacity: 1;
+  filter: none;
+  clip-path: var(--morph-clip);
+  translate: var(--morph-shift, 0px 0px);
+}
+body.dock-body.reveal-morph:not(.tucked) .dock {
+  /* A little past the bar so its shadow is back before the clip goes away. */
+  clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px));
+  translate: 0px 0px;
+}
+body.dock-body.reveal-morph:not(.morph-start) .dock {
+  transition:
+    clip-path 0.46s cubic-bezier(0.32, 0.72, 0, 1),
+    translate 0.46s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity var(--dur-1) var(--ease-out);
+}
+body.dock-body.reveal-morph.morph-start .dock { transition: none !important; }
+body.dock-body.reveal-morph:not(.tucked) .dock > * {
+  animation: morph-content 0.3s var(--ease-out) 0.12s both;
+}
+@keyframes morph-content { from { opacity: 0; } to { opacity: 1; } }
+
 /* Edge change: hide the bar instantly while its window teleports to the new
    edge, then pop it back in (the class is removed a beat later in dock.js). */
 body.edge-swap .dock {
@@ -997,6 +1024,14 @@ body.notch-body.smart .notch-pill::before,
 body.notch-body.smart .notch-pill::after { display: none; }
 body.notch-body.smart.peekable.live .notch-pill { width: 112px; height: 24px; }
 body.notch-body.smart.peekable.card .notch-pill { width: 300px; height: 54px; border-radius: 22px; }
+/* The tab, the live capsule and the dot are too small for Windows' blur
+   (notch.js reports it only for the card), so they take the bar's denser
+   panel fill. No top sheen either: on a 12–18px shape it read as the pill
+   cut in half. */
+body.notch-body:not(.card) .notch-pill {
+  --glass: var(--panel-fill);
+  background: var(--glass);
+}
 
 /* Card: the tab opens into a small glance of what is playing (or the time). */
 body.notch-body.peekable.card .notch-pill {

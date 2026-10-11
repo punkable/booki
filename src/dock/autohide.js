@@ -1,12 +1,14 @@
 /* Auto-hide: when the bar tucks into the notch and when it comes back. */
 
-import { dock as dockApi } from "../api.js";
+import { dock as dockApi, onNotchShape } from "../api.js";
 import { decideVisible, wantsHidden } from "./visibility-policy.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { reportHitRects } from "./hit-regions.js";
 import { applyFrame } from "./frame.js";
 import { stopPolls, startPolls } from "./live-widgets.js";
+import { dockEl } from "./dom.js";
+import { reduceMotion } from "./motion.js";
 
 // ───────────────────────── Auto-hide ─────────────────────────
 // Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
@@ -105,6 +107,51 @@ export function hideMode() {
   return S.cfg.autoHideMode || (S.cfg.autoHide ? "edge" : "off");
 }
 
+// ─── Opening from a live notch ────────────────────────────────────────────
+// While the notch shows a live activity (music, a timer) or its card, the bar
+// opens by stretching that capsule to its full size: it starts clipped to the
+// capsule's size where the notch sits and grows from there, instead of the
+// genie rising from the edge. The notch reports its settled shape.
+let notchShape = null;
+onNotchShape((shape) => { notchShape = shape; });
+const MORPH_MS = 460;
+let morphTimer = null;
+
+function endMorph() {
+  clearTimeout(morphTimer);
+  document.body.classList.remove("reveal-morph", "morph-start");
+  for (const name of ["--morph-clip", "--morph-shift"]) document.body.style.removeProperty(name);
+}
+
+/** Put the tucked bar at the notch capsule's size, ready to grow. Returns
+ *  false (and the genie stays) when the notch is idle or motion is reduced. */
+function prepareMorph() {
+  endMorph();
+  const edge = S.cfg.edge || "bottom";
+  const body = document.body;
+  if (!notchShape?.active || reduceMotion() || !body.classList.contains("tucked")) return false;
+  if (edge !== "bottom" && edge !== "top") return false;
+  // The window is still hidden here, so these steps never show.
+  body.classList.add("reveal-morph", "morph-start");
+  const r = dockEl.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) { endMorph(); return false; }
+  const w = Math.min(r.width, Math.max(1, notchShape.width));
+  const h = Math.min(r.height, Math.max(1, notchShape.height));
+  const side = (r.width - w) / 2;
+  const radius = Math.min(h / 2, 18);
+  const clip = edge === "bottom"
+    ? `inset(${r.height - h}px ${side}px 0px ${side}px round ${radius}px)`
+    : `inset(0px ${side}px ${r.height - h}px ${side}px round ${radius}px)`;
+  // An attached tab sits on the screen edge; a floating pill or dot already
+  // shares the bar's gap.
+  const gap = edge === "bottom" ? innerHeight - r.bottom : -r.top;
+  body.style.setProperty("--morph-clip", clip);
+  body.style.setProperty("--morph-shift", `0px ${notchShape.attached ? gap : 0}px`);
+  void dockEl.offsetWidth;
+  body.classList.remove("morph-start");
+  return true;
+}
+
 export function setHidden(v) {
   if (v === S.hiddenState) return;
   S.hiddenState = v;
@@ -116,6 +163,7 @@ export function setHidden(v) {
     // The window is about to go away — the pointer can't be "inside" anymore.
     // (Windows won't fire pointerout for a window that hides under the cursor.)
     S.pointerInside = false;
+    endMorph();
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
     document.body.classList.add("tucked");
@@ -126,12 +174,14 @@ export function setHidden(v) {
     // Show the dock window (and hide the notch), make sure it's sized to the full
     // bar, then slide the bar back in. Force the stage fully interactive during
     // the reveal animation so early clicks aren't lost to stale hit rects.
+    const morph = prepareMorph();
     document.body.classList.add("revealing");
     dockApi.revealDock();
     applyFrame();
     setTimeout(() => {
       if (!S.hiddenState) document.body.classList.remove("tucked");
     }, 40);
+    if (morph) morphTimer = setTimeout(endMorph, 40 + MORPH_MS + 60);
     setTimeout(() => {
       document.body.classList.remove("revealing");
       reportHitRects();

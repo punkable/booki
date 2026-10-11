@@ -50,6 +50,9 @@ test('the current changelog renders every section icon as SVG', async () => {
 
 test('native material reports four corners and retains fallback after failure', async () => {
   const { page, errors } = await openPage(browser, port, 'notch.html', { cfg: makeConfig({ notchMode: 'attached', notchPeek: true }) });
+  // Only the open card sits on Windows' blur; the slim tab is CSS-only.
+  await page.hover('#notch-pill');
+  await page.waitForFunction(() => document.body.classList.contains('card'));
   await page.evaluate(() => {
     const old = window.__TAURI__.core.invoke;
     window.__materialReports = [];
@@ -61,7 +64,7 @@ test('native material reports four corners and retains fallback after failure', 
       for (const cb of window.__listeners['booki://config-changed'] || []) cb({ payload: {} });
     });
   });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(900);
   const reports = await page.evaluate(() => window.__materialReports);
   assert.ok(reports.length);
   const shape = reports.find((r) => r.shapes.length)?.shapes[0];
@@ -76,6 +79,8 @@ test('native material reports four corners and retains fallback after failure', 
 
 test('a late material reply cannot re-enable glass after the user disables it', async () => {
   const { page, errors } = await openPage(browser, port, 'notch.html');
+  await page.hover('#notch-pill');
+  await page.waitForFunction(() => document.body.classList.contains('card'));
   await page.evaluate(async () => {
     const old = window.__TAURI__.core.invoke;
     window.__TAURI__.core.invoke = (cmd, args) => {
