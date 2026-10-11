@@ -1,5 +1,22 @@
 /* Current update is localized; historical notes retain their original text. */
-import { t } from "./i18n.js";
+import { t, curLang } from "./i18n.js";
+
+// Release dates are written as "2026-10-05" or, in older notes, "2 jul 2026".
+const MONTHS = { jan: 0, ene: 0, feb: 1, mar: 2, apr: 3, abr: 3, may: 4, jun: 5, jul: 6, aug: 7, ago: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11, dic: 11 };
+function parseReleaseDate(text) {
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text || "");
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  m = /^(\d{1,2}) ([a-z]+)\.? (\d{4})$/i.exec(text || "");
+  const month = m ? MONTHS[m[2].toLowerCase()] : undefined;
+  return month === undefined ? null : new Date(Date.UTC(+m[3], month, +m[1]));
+}
+/** A release date in the reader's language; text that does not parse is shown as written. */
+export function formatReleaseDate(text, lang = curLang()) {
+  const date = parseReleaseDate(text);
+  if (!date) return text;
+  try { return new Intl.DateTimeFormat(lang, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date); }
+  catch (_) { return text; }
+}
 function overhaulRelease() {
   return { version: "0.70.0", date: "2026-10-05", headline: t("release.headline"), sections: [
     { icon: "sparkles", title: t("release.design"), notes: [t("release.dashboard"), t("release.widgets"), t("release.premium")] },

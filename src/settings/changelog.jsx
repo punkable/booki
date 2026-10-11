@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../i18n.js";
-import { currentRelease, previousReleases } from "../release-notes.js";
+import { currentRelease, formatReleaseDate, previousReleases } from "../release-notes.js";
 import { Icon, useModalControls } from "./ui.jsx";
 
 const ICONS = { settings: "settings", sparkles: "sparkles", search: "search", undo: "take-out", performance: "zap" };
@@ -23,7 +23,7 @@ function Release({ entry }) {
 function HistoricalRelease({ entry }) {
   const [open, setOpen] = useState(false);
   return <details className="release-history-entry" onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary><strong>v{entry.version}</strong><span>{entry.date}</span><span>{entry.headline}</span></summary>
+    <summary><strong>v{entry.version}</strong><span>{formatReleaseDate(entry.date)}</span><span>{entry.headline}</span></summary>
     {open && <Release entry={entry} />}
   </details>;
 }
@@ -45,7 +45,7 @@ export function ChangelogModal({ onClose }) {
         <button type="button" className="icon-button" aria-label={t("stack.close")} onClick={onClose}><Icon name="x" /></button>
       </header>
       <div className="modal-body">
-        <p className="release-meta"><span className="badge">v{latest.version}</span><span>{latest.date}</span></p>
+        <p className="release-meta"><span className="badge">v{latest.version}</span><span>{formatReleaseDate(latest.date)}</span></p>
         {latest.headline && <p className="release-headline">{latest.headline}</p>}
         <Release entry={latest} />
         {history !== null && older.length > 0 && <details className="release-history"><summary>{t("overhaul.history")}</summary>
