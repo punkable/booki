@@ -52,6 +52,7 @@ features = [
     "implement",
     "ApplicationModel",
     "Win32_UI_Accessibility",
+    "Win32_UI_Shell_Common",
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_System_WinRT",
     "Win32_Foundation",
@@ -76,6 +77,8 @@ features = [
     "Foundation",
     "Foundation_Collections",
     "Storage_Streams",
+    "UI_Notifications",
+    "Data_Xml_Dom",
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]

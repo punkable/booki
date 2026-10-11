@@ -199,3 +199,23 @@ pub fn packaged_apps() -> Vec<(String, String)> {
 pub fn quiet_update_supported() -> bool {
     false
 }
+
+pub fn set_app_user_model_id(_id: &str) -> bool {
+    false
+}
+
+pub fn show_toast(_app_id: &str, _xml: &str) -> Result<(), String> {
+    Err("toasts are unavailable: Windows only".into())
+}
+
+pub fn shortcut_app_id(_lnk: &str) -> Option<String> {
+    None
+}
+
+pub fn app_id_known_folders() -> Vec<(String, String)> {
+    Vec::new()
+}
+
+pub fn jump_list_recent(_app_id: &str, _cap: usize) -> Vec<(String, String)> {
+    Vec::new()
+}
