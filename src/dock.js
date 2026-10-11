@@ -12,6 +12,7 @@ import {
   onOcclusion,
   onDesktop,
   onReveal,
+  onNotchMenu,
   onSoftReveal,
   onFullscreen,
   onToggleDock,
@@ -550,6 +551,15 @@ dockEl.addEventListener("pointerenter", reveal);
 dockEl.addEventListener("pointerleave", () => { if (wantsHideNow()) scheduleHide(); });
 
 onReveal(pinOpen);
+
+// Right-click on the notch: it already brought the dock back (pinned open);
+// once the bar is in place, open the dock's own menu over its middle.
+onNotchMenu(() => setTimeout(() => {
+  const bar = dockEl.getBoundingClientRect();
+  const x = bar.left + bar.width / 2;
+  const y = bar.top + bar.height / 2;
+  openBackgroundMenu({ clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} });
+}, 160));
 
 onSoftReveal(softOpen);
 

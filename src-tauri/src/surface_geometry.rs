@@ -65,6 +65,35 @@ pub fn blur_insets(width: i32, height: i32, radii: [i32; 4]) -> [i32; 4] {
     [left, top, right, bottom]
 }
 
+/// Rounded clip for the composition backdrop, as `(x, y, width, height,
+/// radius)` in window pixels. Windows' rounded geometry takes one radius for
+/// all four corners, so a side whose two corners are square (the attached
+/// notch's edge) is pushed out past the window by the radius; the window
+/// edge then cuts those corners square.
+#[cfg(any(windows, test))]
+pub fn backdrop_clip(width: i32, height: i32, radii: [i32; 4]) -> (f32, f32, f32, f32, f32) {
+    let (w, h) = (width.max(1) as f64, height.max(1) as f64);
+    let r = normalized_radii(w, h, radii);
+    let radius = r.iter().cloned().fold(0.0_f64, f64::max);
+    let square = |a: f64, b: f64| a < 0.5 && b < 0.5;
+    let (mut x, mut y, mut cw, mut ch) = (0.0, 0.0, w, h);
+    if square(r[0], r[1]) {
+        y -= radius;
+        ch += radius;
+    }
+    if square(r[3], r[2]) {
+        ch += radius;
+    }
+    if square(r[0], r[3]) {
+        x -= radius;
+        cw += radius;
+    }
+    if square(r[1], r[2]) {
+        cw += radius;
+    }
+    (x as f32, y as f32, cw as f32, ch as f32, radius as f32)
+}
+
 #[cfg(any(windows, test))]
 pub fn outline(width: i32, height: i32, radii: [i32; 4]) -> Vec<(i32, i32)> {
     let (w, h) = (width.max(1) as f64, height.max(1) as f64);
@@ -134,6 +163,27 @@ mod tests {
         let [left, top, ..] = blur_insets(300, 80, [24; 4]);
         let (dx, dy) = (24.0 - left as f64, 24.0 - top as f64);
         assert!((dx * dx + dy * dy).sqrt() <= 24.0);
+    }
+    #[test]
+    fn backdrop_clip_matches_the_painted_shape() {
+        // A bar: the whole window, one radius.
+        assert_eq!(
+            backdrop_clip(400, 64, [20; 4]),
+            (0.0, 0.0, 400.0, 64.0, 20.0)
+        );
+        // The attached tab: its square bottom edge is pushed past the window.
+        assert_eq!(
+            backdrop_clip(112, 12, [11, 11, 0, 0]),
+            (0.0, 0.0, 112.0, 23.0, 11.0)
+        );
+        // A tab on the top edge pushes the top out instead.
+        assert_eq!(
+            backdrop_clip(112, 12, [0, 0, 11, 11]),
+            (0.0, -11.0, 112.0, 23.0, 11.0)
+        );
+        // A pill's radius is capped to half its height.
+        assert_eq!(backdrop_clip(118, 13, [999; 4]).4, 6.5);
+        assert_eq!(backdrop_clip(60, 30, [0; 4]), (0.0, 0.0, 60.0, 30.0, 0.0));
     }
     #[test]
     fn square_and_dpi_scaled_shapes_preserve_their_bounds() {

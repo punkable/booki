@@ -9,37 +9,55 @@
 //!
 //! One material window per shape, each sized to that shape. An earlier
 //! version used a single window the size of the whole stage and clipped it
-//! with a region; acrylic ignores window regions, so it painted a tinted box
-//! across the entire screen edge. Sizing each window to its shape means the
-//! worst case is a square-cornered bar, never a giant box. The blur ignores
-//! window regions too, so each window is also inset from the rounded corners
-//! (`surface_geometry::blur_insets`); a region still trims where it is honoured.
+//! with a region; the blur ignores window regions, so it painted a tinted box
+//! across the entire screen edge.
+//!
+//! On Windows 11 each window is the system's acrylic backdrop drawn through
+//! Windows.UI.Composition: a host backdrop brush (the desktop behind the
+//! window, already blurred by DWM) clipped to the shape's rounded corners. It
+//! fills the shape exactly, edge to edge, so there is no flat rim around a
+//! blurred rectangle. Older systems keep the blur-behind window, which
+//! ignores the window region too, so it is inset from the rounded corners
+//! (`surface_geometry::blur_insets`) and the CSS fill covers the edge.
 //! System corner rounding and borders are disabled to avoid a second outline.
 //!
 //! The material windows never take input (`WM_NCHITTEST` → `HTTRANSPARENT`)
-//! and never activate. The blur uses `SetWindowCompositionAttribute`, the call
-//! the Windows 10 and 11 shells use for their own flyouts; it is undocumented,
-//! so it is looked up at runtime and everything degrades to "no material".
+//! and never activate. The blur-behind fallback uses
+//! `SetWindowCompositionAttribute`, the call the Windows 10 shell uses for its
+//! own flyouts; it is undocumented, so it is looked up at runtime and
+//! everything degrades to "no material".
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::sync::{Mutex, OnceLock};
 
+use windows::core::Interface;
+use windows::Foundation::Numerics::Vector2;
+use windows::System::{DispatcherQueue, DispatcherQueueController};
+use windows::Win32::System::WinRT::Composition::ICompositorDesktopInterop;
+use windows::Win32::System::WinRT::{
+    CreateDispatcherQueueController, DispatcherQueueOptions, DQTAT_COM_NONE, DQTYPE_THREAD_CURRENT,
+};
+use windows::UI::Composition::Desktop::DesktopWindowTarget;
+use windows::UI::Composition::{CompositionRoundedRectangleGeometry, Compositor, SpriteVisual};
+
 use windows::core::{s, w};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
-    DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
+    DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_USE_HOSTBACKDROPBRUSH,
+    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
 };
 use windows::Win32::Graphics::Gdi::{
     CreatePolygonRgn, DeleteObject, SetWindowRgn, ALTERNATE, HGDIOBJ,
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, GetWindow, GetWindowRect, IsWindow, IsWindowVisible,
-    RegisterClassW, SetWindowPos, ShowWindow, GW_HWNDPREV, HTTRANSPARENT, MA_NOACTIVATE,
-    SWP_ASYNCWINDOWPOS, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-    SW_HIDE, WM_MOUSEACTIVATE, WM_NCHITTEST, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetWindow, GetWindowRect, IsWindow,
+    IsWindowVisible, RegisterClassW, SetWindowPos, ShowWindow, GW_HWNDPREV, HTTRANSPARENT,
+    MA_NOACTIVATE, SWP_ASYNCWINDOWPOS, SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_SHOWWINDOW, SW_HIDE, WM_MOUSEACTIVATE, WM_NCHITTEST, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 /// Most shapes one surface can show at once (bar + flyout + menu + popovers).
@@ -51,6 +69,8 @@ struct Piece {
     /// Screen rect and four radii in physical px, to skip moves that change nothing.
     placed: Option<(i32, i32, i32, i32, [i32; 4])>,
     blurred: bool,
+    /// Drawn by the composition backdrop (Windows 11) rather than blur-behind.
+    composed: bool,
 }
 
 /// Everything under one webview window (keyed by its label).
@@ -72,7 +92,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
     }
 }
 
-fn create_window() -> Option<HWND> {
+fn create_window(composed: bool) -> Option<HWND> {
     static CLASS: OnceLock<bool> = OnceLock::new();
     unsafe {
         let instance = GetModuleHandleW(None).ok()?;
@@ -88,8 +108,15 @@ fn create_window() -> Option<HWND> {
         if !registered {
             return None;
         }
+        // A composition window draws only its visual tree: without the
+        // redirection bitmap everything outside the clipped backdrop is clear.
+        let extra = if composed {
+            WS_EX_NOREDIRECTIONBITMAP
+        } else {
+            Default::default()
+        };
         let hwnd = CreateWindowExW(
-            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST,
+            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST | extra,
             w!("BookiMaterial"),
             w!(""),
             WS_POPUP,
@@ -169,11 +196,165 @@ fn apply_blur(hwnd: HWND) -> bool {
     }
 }
 
+/// The composition side of a piece: its window target (which must outlive
+/// the visual), the backdrop visual and the rounded clip it is cut to.
+struct Backdrop {
+    _target: DesktopWindowTarget,
+    visual: SpriteVisual,
+    clip: CompositionRoundedRectangleGeometry,
+}
+
+#[derive(Default)]
+struct Composition {
+    compositor: Option<Compositor>,
+    _queue: Option<DispatcherQueueController>,
+    /// Set once anything in the composition path failed; everything then
+    /// stays on blur-behind for the rest of the session.
+    unavailable: bool,
+    backdrops: HashMap<isize, Backdrop>,
+}
+
+// Composition objects belong to the thread that created the compositor, the
+// main thread that also calls `apply()`. They never cross to the watcher.
+thread_local! {
+    static COMPOSITION: RefCell<Composition> = RefCell::new(Composition::default());
+}
+
+fn compositor(state: &mut Composition) -> Option<Compositor> {
+    if state.unavailable {
+        return None;
+    }
+    if state.compositor.is_none() {
+        let made = (|| -> windows::core::Result<Compositor> {
+            // A compositor needs a dispatcher queue on its thread; the main
+            // thread's message loop pumps it.
+            if DispatcherQueue::GetForCurrentThread().is_err() {
+                let options = DispatcherQueueOptions {
+                    dwSize: std::mem::size_of::<DispatcherQueueOptions>() as u32,
+                    threadType: DQTYPE_THREAD_CURRENT,
+                    apartmentType: DQTAT_COM_NONE,
+                };
+                state._queue = Some(unsafe { CreateDispatcherQueueController(options)? });
+            }
+            Compositor::new()
+        })();
+        match made {
+            Ok(compositor) => state.compositor = Some(compositor),
+            Err(error) => {
+                log::warn!("material: no compositor ({error}); using blur");
+                state.unavailable = true;
+                return None;
+            }
+        }
+    }
+    state.compositor.clone()
+}
+
+/// Is the rounded acrylic backdrop available? Windows 11 only: the host
+/// backdrop attribute is refused on Windows 10.
+fn composition_available() -> bool {
+    COMPOSITION.with(|cell| compositor(&mut cell.borrow_mut()).is_some())
+}
+
+fn give_up_composition() {
+    COMPOSITION.with(|cell| cell.borrow_mut().unavailable = true);
+}
+
+/// Hook a fresh composition window up to the host backdrop.
+fn attach_backdrop(hwnd: HWND) -> bool {
+    let on = BOOL(1);
+    let allowed = unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_USE_HOSTBACKDROPBRUSH,
+            &on as *const _ as *const c_void,
+            std::mem::size_of::<BOOL>() as u32,
+        )
+    };
+    if allowed.is_err() {
+        return false;
+    }
+    COMPOSITION.with(|cell| {
+        let mut state = cell.borrow_mut();
+        let Some(compositor) = compositor(&mut state) else {
+            return false;
+        };
+        let made = (|| -> windows::core::Result<Backdrop> {
+            let interop: ICompositorDesktopInterop = compositor.cast()?;
+            let target = unsafe { interop.CreateDesktopWindowTarget(hwnd, true)? };
+            let visual = compositor.CreateSpriteVisual()?;
+            visual.SetBrush(&compositor.CreateHostBackdropBrush()?)?;
+            let clip = compositor.CreateRoundedRectangleGeometry()?;
+            visual.SetClip(&compositor.CreateGeometricClipWithGeometry(&clip)?)?;
+            target.SetRoot(&visual)?;
+            Ok(Backdrop {
+                _target: target,
+                visual,
+                clip,
+            })
+        })();
+        match made {
+            Ok(backdrop) => {
+                state.backdrops.insert(hwnd.0 as isize, backdrop);
+                true
+            }
+            Err(error) => {
+                log::warn!("material: backdrop failed ({error}); using blur");
+                false
+            }
+        }
+    })
+}
+
+/// Size the backdrop to its window and cut it to the shape's corners.
+fn shape_backdrop(hwnd: HWND, w: i32, h: i32, radii: [i32; 4]) -> bool {
+    COMPOSITION.with(|cell| {
+        let state = cell.borrow();
+        let Some(backdrop) = state.backdrops.get(&(hwnd.0 as isize)) else {
+            return false;
+        };
+        let (x, y, cw, ch, r) = crate::surface_geometry::backdrop_clip(w, h, radii);
+        let v = |x: f32, y: f32| Vector2 { X: x, Y: y };
+        backdrop.visual.SetSize(v(w as f32, h as f32)).is_ok()
+            && backdrop.clip.SetOffset(v(x, y)).is_ok()
+            && backdrop.clip.SetSize(v(cw, ch)).is_ok()
+            && backdrop.clip.SetCornerRadius(v(r, r)).is_ok()
+    })
+}
+
 fn hide(piece: &mut Piece) {
     piece.placed = None;
     unsafe {
         let _ = ShowWindow(HWND(piece.hwnd as *mut c_void), SW_HIDE);
     }
+}
+
+/// A material window: the rounded acrylic backdrop where Windows offers it,
+/// blur-behind otherwise.
+fn new_piece() -> Option<Piece> {
+    if composition_available() {
+        if let Some(hwnd) = create_window(true) {
+            if attach_backdrop(hwnd) {
+                return Some(Piece {
+                    hwnd: hwnd.0 as isize,
+                    placed: None,
+                    blurred: false,
+                    composed: true,
+                });
+            }
+            unsafe {
+                let _ = DestroyWindow(hwnd);
+            }
+        }
+        give_up_composition();
+    }
+    let hwnd = create_window(false)?;
+    Some(Piece {
+        hwnd: hwnd.0 as isize,
+        placed: None,
+        blurred: false,
+        composed: false,
+    })
 }
 
 /// Show material under `owner` for each of `shapes` (`[x, y, w, h, tl, tr, br, bl]`
@@ -201,24 +382,25 @@ pub fn apply(
     }
     let shapes = &shapes[..shapes.len().min(MAX_PIECES)];
     while surface.pieces.len() < shapes.len() {
-        let Some(hwnd) = create_window() else {
+        let Some(piece) = new_piece() else {
             surface.pieces.iter_mut().for_each(hide);
             return false;
         };
-        surface.pieces.push(Piece {
-            hwnd: hwnd.0 as isize,
-            placed: None,
-            blurred: false,
-        });
+        surface.pieces.push(piece);
     }
     let px = |v: f64| (v * dpr).round() as i32;
     for (piece, &(x, y, w, h, tl, tr, br, bl)) in surface.pieces.iter_mut().zip(shapes) {
         let hwnd = HWND(piece.hwnd as *mut c_void);
         let (x, y, w, h) = crate::surface_geometry::physical_bounds(x, y, w, h, dpr);
         let radii = [tl, tr, br, bl].map(|v| px(v).max(0));
-        // The blur ignores the region below, so keep its square corners
-        // inside the rounded shape; the CSS fill still covers the edge.
-        let [il, it, ir, ib] = crate::surface_geometry::blur_insets(w, h, radii);
+        // The composition backdrop is cut to the exact shape. Blur-behind
+        // ignores the region below, so keep its square corners inside the
+        // rounded shape; the CSS fill still covers the edge.
+        let [il, it, ir, ib] = if piece.composed {
+            [0; 4]
+        } else {
+            crate::surface_geometry::blur_insets(w, h, radii)
+        };
         let (x, y, w, h) = (x + il, y + it, w - il - ir, h - it - ib);
         let r = [
             radii[0] - il.max(it),
@@ -230,7 +412,7 @@ pub fn apply(
         let rect = (origin.left + x, origin.top + y, w, h, r);
         // Color/opacity are CSS-only; do not reset the compositor effect
         // on every tint or opacity edit.
-        if !piece.blurred {
+        if !piece.blurred && !piece.composed {
             if !apply_blur(hwnd) {
                 surface.pieces.iter_mut().for_each(hide);
                 return false;
@@ -241,7 +423,14 @@ pub fn apply(
             continue;
         }
         unsafe {
-            if piece.placed.map(|p| (p.2, p.3, p.4)) != Some((w, h, r)) {
+            if piece.composed {
+                if piece.placed.map(|p| (p.2, p.3, p.4)) != Some((w, h, r))
+                    && !shape_backdrop(hwnd, w, h, r)
+                {
+                    surface.pieces.iter_mut().for_each(hide);
+                    return false;
+                }
+            } else if piece.placed.map(|p| (p.2, p.3, p.4)) != Some((w, h, r)) {
                 let points = crate::surface_geometry::outline(w, h, r)
                     .into_iter()
                     .map(|(x, y)| POINT { x, y })

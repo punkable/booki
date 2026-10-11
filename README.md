@@ -27,7 +27,7 @@
 <tr>
 <td align="center" width="25%"><b>⚡ Light</b><br/><sub>Native Rust core. Widgets pause when the dock hides.</sub></td>
 <td align="center" width="25%"><b>🔒 Private</b><br/><sub>No accounts, no telemetry, no cloud.</sub></td>
-<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Glass, Mica or solid. Any edge. Five languages.</sub></td>
+<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Taskbar, glass, clear or solid. Any edge. Five languages.</sub></td>
 <td align="center" width="25%"><b>🧡 Open</b><br/><sub>MIT licensed. Built in the open.</sub></td>
 </tr>
 </table>
@@ -60,7 +60,7 @@
 
 <h2 align="center">At home in the dark.</h2>
 
-<p align="center">Follows your Windows theme and accent. Glass blurs what's behind it, Mica tints with your wallpaper, Solid stays crisp.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center">Follows your Windows theme and accent. Match the taskbar, blur what's behind with glass or clear glass, or stay solid.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
 
 <p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki Dock settings in dark mode" /></p>
 

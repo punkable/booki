@@ -11,7 +11,7 @@ import { t } from "../i18n.js";
 const SEARCH_INDEX = [
   ["dock.behavior", "dock"], ["be.reveal", "dock"], ["be.notchMode", "dock"], ["be.notchPresence", "dock"], ["be.hideDelay", "dock"], ["be.hideInFullscreen", "dock"],
   ["be.position", "dock"], ["be.monitor", "dock"], ["be.edgeGap", "dock"],
-  ["tab.appearance", "dock"], ["ap.theme", "dock"], ["look.source", "dock"], ["ap.accent", "dock"], ["dock.intensity", "dock"], ["ap.surfaceTint", "dock"], ["overhaul.reduceTransparency", "dock"],
+  ["tab.appearance", "dock"], ["ap.theme", "dock"], ["look.source", "dock"], ["dock.intensity", "dock"], ["finish.title", "dock"], ["surface.color", "dock"], ["overhaul.reduceTransparency", "dock"],
   ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"], ["ap.compact", "dock"],
   ["gp.interaction", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
   ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
@@ -28,7 +28,7 @@ const SEARCH_INDEX = [
 export const SEARCH_PARENT = {
   "be.reveal": "dock.behavior", "be.notchMode": "dock.behavior", "be.notchPresence": "dock.behavior", "be.hideDelay": "dock.behavior",
   "be.monitor": "be.position", "ap.accent": "look.source",
-  "dock.intensity": "tab.appearance", "ap.surfaceTint": "tab.appearance", "ap.nativeMaterial": "tab.appearance",
+  "dock.intensity": "tab.appearance", "surface.color": "tab.appearance", "ap.nativeMaterial": "tab.appearance",
   "be.zoom": "be.magnify", "be.anim": "be.magnify",
   "be.taskbarSettle": "be.taskbarFollow", "be.taskbarHoldHover": "be.taskbarFollow",
 };
@@ -41,7 +41,8 @@ const SEARCH_ALIASES = {
   "look.source": "color colour windows barra tareas taskbar fondo pantalla wallpaper acento accent automatico automatic tema theme",
   "tab.appearance": "acabado finish surface fondo background mica acrylic acrilico tintado tinted solido solid material cristal vidrio glass",
   "dock.intensity": "intensidad solidez opacity opacidad translucidez translucency cristal vidrio glass",
-  "ap.surfaceTint": "color cristal tint tinta fondo glass tint surface",
+  "surface.color": "color cristal tint tinta fondo glass tint surface background barra tareas taskbar wallpaper",
+  "finish.title": "estilo style acabado finish barra tareas taskbar vidrio glass claro clear solido solid acrilico acrylic transparencia",
   "ap.translucency": "transparencia translucidez opacity material strength",
   "dock.behavior": "ocultar esconder auto hide hidden smart inteligente comportamiento behavior siempre visible",
   "be.hideInFullscreen": "pantalla completa fullscreen juego pelicula movie presentation ocultar",

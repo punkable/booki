@@ -164,6 +164,7 @@
 .ui-row-control { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .ui-row-stack { flex-wrap: wrap; }
 .ui-row-stack > .ui-row-control { flex: 1 1 100%; justify-content: flex-start; }
+.ui-row-stack > .ui-row-control > .finish-grid, .ui-row-stack > .ui-row-control > .look-source { flex: 1 1 auto; }
 .ui-toggle-row { cursor: pointer; }
 .ui-toggle-row:hover { background: var(--card-hover); }
 .ui-group > .ui-toggle-row:first-child:hover { border-top-left-radius: var(--r-card); border-top-right-radius: var(--r-card); }
@@ -278,18 +279,25 @@
 .choice-name, .finish-name { font-weight: 600; }
 .choice-hint, .finish-hint { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
 
-/* Finish samples: each card paints its own material over a fixed scene. */
-.finish-grid { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+/* Style samples: each card paints that style's real fill (finish-picker.jsx
+   passes --sample-fill and --sample-ink) over a busy little wallpaper, so the
+   blur, the tint and the opacity are what tell them apart. */
+.finish-grid { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
 .finish-card { padding: 8px 8px 12px; }
-.finish-sample { position: relative; display: grid; place-items: center; width: 100%; height: 64px; margin-bottom: 6px; overflow: hidden; border-radius: 6px;
-  background: radial-gradient(circle at 20% 30%, #ff9a62 0 18%, transparent 40%), radial-gradient(circle at 80% 70%, #4a7dff 0 20%, transparent 45%), linear-gradient(135deg, #f6d6b8, #9fb7e8); }
-.finish-sample-bar { display: flex; gap: 5px; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.35); }
-.finish-sample-bar i { width: 16px; height: 16px; border-radius: 5px; background: rgba(255, 255, 255, 0.85); }
-.finish-glass .finish-sample-bar { background: rgba(244, 244, 247, 0.45); backdrop-filter: blur(8px) saturate(150%); }
-.finish-darkGlass .finish-sample-bar { background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(8px); }
-.finish-mica .finish-sample-bar { background: color-mix(in srgb, #9fb7e8 16%, #f3f3f3); border-color: rgba(0, 0, 0, 0.08); }
-.finish-mica .finish-sample-bar i, .finish-solid .finish-sample-bar i { background: rgba(0, 0, 0, 0.12); }
-.finish-solid .finish-sample-bar { background: #f9f9f9; border-color: rgba(0, 0, 0, 0.08); }
+.finish-sample { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 72px; margin-bottom: 6px; padding-bottom: 8px; overflow: hidden; border-radius: 6px;
+  background:
+    radial-gradient(circle at 18% 28%, #ff7a3d 0 9%, transparent 22%),
+    radial-gradient(circle at 46% 58%, #b06cff 0 8%, transparent 20%),
+    radial-gradient(circle at 74% 34%, #ffd23d 0 7%, transparent 18%),
+    radial-gradient(circle at 88% 80%, #ff4f7b 0 8%, transparent 20%),
+    repeating-linear-gradient(100deg, #2f6b33 0 3px, #4f9a44 3px 6px, #23552a 6px 9px); }
+.finish-sample-bar { display: flex; align-items: center; gap: 4px; padding: 5px 7px; color: var(--sample-ink, var(--ink)); background: var(--sample-fill); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18); }
+.finish-sample-bar.is-glass { -webkit-backdrop-filter: blur(10px) saturate(125%); backdrop-filter: blur(10px) saturate(125%); }
+.finish-clear .finish-sample-bar { border-color: rgba(255, 255, 255, 0.4); }
+.finish-sample-bar b { font: 650 11px/1 var(--font, inherit); letter-spacing: -0.01em; padding-right: 2px; }
+.finish-sample-bar i { width: 14px; height: 14px; border-radius: 4px; background: #3b82f6; }
+.finish-sample-bar i:nth-of-type(2) { background: #f97316; }
+.finish-sample-bar i:nth-of-type(3) { background: #22c55e; }
 
 /* Position */
 .position-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; }

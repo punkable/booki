@@ -1,22 +1,39 @@
-/* Where Booki's colours come from, as pure rules (no Tauri, no DOM), so
+/* What the dock and the notch paint, as pure rules (no Tauri, no DOM), so
    they are unit-tested in tests/colors-and-groups.test.mjs.
 
-   "custom" paints the accent and glass colour picked in Settings.
-   "windows" follows Windows: its accent colour (which Windows itself takes
-   from the wallpaper when the accent is set to Automatic), and the taskbar's
-   look for the glass: dark or light like the Windows mode, tinted with the
-   accent when Windows shows the accent on the taskbar.
-   "wallpaper" samples the wallpaper and tints the glass with it. */
+   Three separate choices, each with one job:
+   - the style (`surfaceStyle`): "taskbar" looks like the Windows taskbar,
+     "glass" is tinted acrylic, "clear" is barely tinted acrylic, "solid" is
+     opaque;
+   - the fill (`surfaceColor`): "auto" (the style's own neutral), "wallpaper",
+     "accent" or a colour picked by hand. The taskbar style ignores it and
+     takes the taskbar's colour, as Windows paints it;
+   - the accent (`colorSource`): Windows' accent, the wallpaper's colour or
+     one picked by hand. It colours indicators and selection, never the fill. */
 import { hexToRgb, rgbToHex } from "./util-color.js";
+import { resolveSurfaceStyle } from "./surface.js";
 
 export const COLOR_SOURCES = ["windows", "wallpaper", "custom"];
+export const SURFACE_COLORS = ["auto", "wallpaper", "accent"];
 const HEX = /^#[0-9a-f]{6}$/i;
 // The Windows 11 taskbar's own fills in dark and light mode.
-const TASKBAR_DARK = "#1f1f1f";
-const TASKBAR_LIGHT = "#eeeeee";
+export const TASKBAR_DARK = "#202020";
+export const TASKBAR_LIGHT = "#eeeeee";
+// Neutral acrylic tints (the "auto" fill) for the glass styles.
+const GLASS_AUTO = { dark: "#1c1c1c", light: "#f3f3f3" };
+const CLEAR_AUTO = { dark: "#0a0a0a", light: "#ffffff" };
 
 export function colorSource(cfg) {
   return COLOR_SOURCES.includes(cfg?.colorSource) ? cfg.colorSource : "custom";
+}
+
+/** The fill choice. Configs saved before `surfaceColor` existed carry a
+ * hand-picked glass colour in `surfaceTint`. */
+export function surfaceColor(cfg) {
+  const value = String(cfg?.surfaceColor ?? "").trim().toLowerCase();
+  if (SURFACE_COLORS.includes(value) || HEX.test(value)) return value;
+  const legacy = String(cfg?.surfaceTint ?? "").trim().toLowerCase();
+  return HEX.test(legacy) ? legacy : "auto";
 }
 
 /** `a` moved toward `b` by `amount` (0–1). */
@@ -37,35 +54,44 @@ function themeIsDark(theme, systemDark) {
   return systemDark;
 }
 
+/** The taskbar's fill: Windows paints it dark or light like its mode, and
+ * with a deep shade of the accent when "show accent on taskbar" is on (dark
+ * mode only, as in Windows). */
+export function taskbarFill(dark, platform) {
+  const accent = HEX.test(platform?.accent || "") ? platform.accent.toLowerCase() : "";
+  if (!dark) return TASKBAR_LIGHT;
+  return platform?.accentOnTaskbar && accent ? mixHex(accent, "#000000", 0.45) : TASKBAR_DARK;
+}
+
 /** Pure: a config, what Windows reports and the wallpaper colour → the
- * config to paint. */
+ * config to paint, with `glassTint` (the fill colour, "" for the theme's)
+ * and the canonical `surfaceStyle`. */
 export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark = false } = {}) {
+  if (!cfg) return cfg;
   const source = colorSource(cfg);
-  if (!cfg || source === "custom") return cfg;
+  const style = resolveSurfaceStyle(cfg);
   const windowsAccent = HEX.test(platform?.accent || "") ? platform.accent.toLowerCase() : "";
   const wall = HEX.test(wallpaper || "") ? wallpaper.toLowerCase() : "";
-  const accent = (source === "windows" ? windowsAccent || wall : wall || windowsAccent) || cfg.accent;
-  // The dock sits where the taskbar does, so it follows the Windows mode
-  // (taskbar, Start), not the app mode, when the theme is left to the system.
-  const theme = source === "windows" && (cfg.theme || "system") === "system" && platform
+  const accent = source === "windows" ? windowsAccent || wall || cfg.accent
+    : source === "wallpaper" ? wall || windowsAccent || cfg.accent
+    : cfg.accent;
+  // The taskbar style sits where the taskbar does, so it follows the Windows
+  // mode (taskbar, Start), not the app mode, when the theme is left to the
+  // system.
+  const theme = style === "taskbar" && (cfg.theme || "system") === "system" && platform
     ? (platform.systemLight ? "light" : "dark")
     : cfg.theme;
-  // In these modes the source owns the dock's colour too, like the taskbar:
-  // a glass colour picked by hand (or by the Dark glass finish) yields to it.
   const dark = themeIsDark(theme || "system", systemDark);
-  let surfaceTint;
-  if (source === "windows") {
-    // Windows paints an accent taskbar with a deep shade of the accent. It
-    // only does so in dark mode, so a light theme picked in Booki keeps the
-    // light taskbar fill instead of a dark bar under dark-on-light ink.
-    surfaceTint = !dark ? TASKBAR_LIGHT
-      : platform?.accentOnTaskbar && windowsAccent ? mixHex(windowsAccent, "#000000", 0.45)
-      : TASKBAR_DARK;
-  } else {
-    surfaceTint = wall
-      ? dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72)
-      : dark ? TASKBAR_DARK : TASKBAR_LIGHT;
+  const tone = dark ? "dark" : "light";
+  let glassTint = "";
+  if (style === "taskbar") glassTint = taskbarFill(dark, platform);
+  else {
+    const fill = surfaceColor(cfg);
+    if (HEX.test(fill)) glassTint = fill;
+    else if (fill === "wallpaper" && wall) glassTint = dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72);
+    else if (fill === "accent" && HEX.test(accent || "")) glassTint = dark ? mixHex(accent, "#000000", 0.55) : mixHex(accent, "#ffffff", 0.7);
+    else if (style === "glass") glassTint = GLASS_AUTO[tone];
+    else if (style === "clear") glassTint = CLEAR_AUTO[tone];
   }
-  // `surfaceFollows` lets the colour fill every finish, not just glass.
-  return { ...cfg, accent, theme, surfaceTint, surfaceFollows: true };
+  return { ...cfg, accent, theme, surfaceStyle: style, glassTint };
 }

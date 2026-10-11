@@ -27,7 +27,7 @@
 <tr>
 <td align="center" width="25%"><b>⚡ Ligero</b><br/><sub>Núcleo nativo en Rust. Los widgets se pausan cuando el dock se oculta.</sub></td>
 <td align="center" width="25%"><b>🔒 Privado</b><br/><sub>Sin cuentas, sin telemetría, sin nube.</sub></td>
-<td align="center" width="25%"><b>🎨 Tuyo</b><br/><sub>Vidrio, Mica o sólido. Cualquier borde. Cinco idiomas.</sub></td>
+<td align="center" width="25%"><b>🎨 Tuyo</b><br/><sub>Barra de tareas, vidrio, claro o sólido. Cualquier borde. Cinco idiomas.</sub></td>
 <td align="center" width="25%"><b>🧡 Abierto</b><br/><sub>Licencia MIT. Hecho a la vista de todos.</sub></td>
 </tr>
 </table>
@@ -60,7 +60,7 @@
 
 <h2 align="center">Como en casa a oscuras.</h2>
 
-<p align="center">Sigue el tema y el color de Windows. Vidrio desenfoca lo que hay detrás, Mica se tiñe con tu fondo y Sólido se mantiene nítido.<br/>Cuando un juego o vídeo pasa a pantalla completa, Booki se aparta.</p>
+<p align="center">Sigue el tema y el color de Windows. Iguala la barra de tareas, desenfoca lo de atrás con vidrio o vidrio claro, o quédate en sólido.<br/>Cuando un juego o vídeo pasa a pantalla completa, Booki se aparta.</p>
 
 <p align="center"><img src="docs/presentation/dark-es.jpg" width="1000" alt="Ajustes del dock de Booki en modo oscuro" /></p>
 

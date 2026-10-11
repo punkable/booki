@@ -1408,6 +1408,7 @@ pub fn run() {
             hide_dock,
             reveal_dock,
             notch_reveal,
+            notch_reveal_for_menu,
             notch_screen_busy,
             notch_toast,
             notch_toast_dismiss,

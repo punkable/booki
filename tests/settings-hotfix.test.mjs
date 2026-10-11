@@ -60,7 +60,7 @@ test('native material reports four corners and retains fallback after failure', 
       if (cmd === 'set_material') { window.__materialReports.push(args); return Promise.resolve(false); }
       return old(cmd, args);
     };
-    window.__TAURI__.core.invoke('save_config', { patch: { surfaceTint: '#aa2233' } }).then(() => {
+    window.__TAURI__.core.invoke('save_config', { patch: { surfaceColor: '#aa2233' } }).then(() => {
       for (const cb of window.__listeners['booki://config-changed'] || []) cb({ payload: {} });
     });
   });
@@ -87,7 +87,7 @@ test('a late material reply cannot re-enable glass after the user disables it', 
       if (cmd === 'set_material' && args.shapes.length) return new Promise((resolve) => { window.__resolveMaterial = resolve; });
       return old(cmd, args);
     };
-    await old('save_config', { patch: { surfaceTint: '#223344' } });
+    await old('save_config', { patch: { surfaceColor: '#223344' } });
     for (const cb of window.__listeners['booki://config-changed'] || []) cb({ payload: {} });
   });
   await page.waitForFunction(() => !!window.__resolveMaterial);
@@ -115,7 +115,7 @@ test('an injected Home render failure preserves navigation without rewriting set
 });
 
 test('native blur keeps the configured dock fill and single CSS outline', async () => {
-  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ surfaceStyle: 'tinted', surfaceTint: '#223344', cornerRadius: 22 }) });
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ surfaceStyle: 'tinted', surfaceColor: '#223344', cornerRadius: 22 }) });
   const read = () => page.locator('.dock').evaluate((el) => {
     const cs = getComputedStyle(el);
     return { fill: cs.backgroundColor, border: cs.borderTopWidth, radius: cs.borderTopLeftRadius, shadow: cs.boxShadow };

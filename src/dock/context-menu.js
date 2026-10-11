@@ -31,7 +31,7 @@ export function menuActions(container, close) {
 }
 
 export function menuItems(menu) {
-  return [...menu.querySelectorAll('[role="menuitem"]')].filter((item) => !item.disabled && item.offsetParent !== null);
+  return [...menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"]')].filter((item) => !item.disabled && item.offsetParent !== null);
 }
 
 export function moveMenuFocus(event, menu) {

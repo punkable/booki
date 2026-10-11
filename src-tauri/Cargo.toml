@@ -79,6 +79,12 @@ features = [
     "Storage_Streams",
     "UI_Notifications",
     "Data_Xml_Dom",
+    # Rounded acrylic behind the dock (win/material.rs).
+    "Foundation_Numerics",
+    "System",
+    "UI_Composition",
+    "UI_Composition_Desktop",
+    "Win32_System_WinRT_Composition",
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]

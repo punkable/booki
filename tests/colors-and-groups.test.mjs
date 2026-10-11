@@ -1,62 +1,79 @@
-/* Booki 0.83: colours that follow Windows or the wallpaper, the suggested
-   palette, and dragging apps into a group's members in Settings. */
+/* The dock's style, fill and accent (each from its own source), the
+   suggested palette, and dragging apps into a group's members in Settings. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { serveDist, launchBrowser, openPage, makeConfig, waitForAsyncCondition } from "./harness.mjs";
-import { resolveLook, colorSource } from "../src/look-model.js";
+import { resolveLook, colorSource, surfaceColor } from "../src/look-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../src/palette.js";
 import { placePin } from "../src/pins.js";
 
 const app = (id, name) => ({ id, kind: "app", name, path: `C:/${name}.exe`, args: [] });
 
-test("custom colours paint exactly what was picked", () => {
-  const cfg = { colorSource: "custom", accent: "#a47864", theme: "system", surfaceTint: "" };
-  assert.equal(resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: true }, wallpaper: "#336699" }), cfg);
+const PLATFORM = (over = {}) => ({ accent: "#0078d4", accentOnTaskbar: false, systemLight: false, ...over });
+
+test("the accent comes from its own source and never decides the dock's fill", () => {
+  const cfg = { colorSource: "custom", accent: "#a47864", theme: "dark", surfaceStyle: "glass", surfaceColor: "auto" };
+  const custom = resolveLook(cfg, { platform: PLATFORM({ accentOnTaskbar: true }), wallpaper: "#336699" });
+  assert.equal(custom.accent, "#a47864");
+  assert.equal(custom.glassTint, "#1c1c1c", "glass keeps its neutral tint");
+  const windows = resolveLook({ ...cfg, colorSource: "windows" }, { platform: PLATFORM({ accentOnTaskbar: true }) });
+  assert.equal(windows.accent, "#0078d4");
+  assert.equal(windows.glassTint, custom.glassTint, "following the Windows accent leaves the fill alone");
+  // No Windows accent: fall back to the wallpaper, then to the picked accent.
+  assert.equal(resolveLook({ ...cfg, colorSource: "windows" }, { platform: PLATFORM({ accent: null }), wallpaper: "#336699" }).accent, "#336699");
+  assert.equal(resolveLook({ ...cfg, colorSource: "windows" }, { platform: null }).accent, "#a47864");
   assert.equal(colorSource({}), "custom");
   assert.equal(colorSource({ colorSource: "nonsense" }), "custom");
 });
 
-test("following Windows takes its accent, mode and taskbar colour", () => {
-  const cfg = { colorSource: "windows", accent: "#dfaa75", theme: "system", surfaceTint: "" };
-  const plain = resolveLook(cfg, { platform: { accent: "#0078D4", accentOnTaskbar: false, systemLight: false } });
-  assert.equal(plain.accent, "#0078d4");
-  assert.equal(plain.theme, "dark", "the dock follows the Windows mode, like the taskbar");
-  assert.equal(plain.surfaceTint, "#1f1f1f", "a plain taskbar paints the dock like the dark taskbar");
-  assert.equal(plain.surfaceFollows, true, "the taskbar colour fills every finish");
-  const light = resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: false, systemLight: true } });
-  assert.equal(light.surfaceTint, "#eeeeee");
-  const tinted = resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
-  assert.match(tinted.surfaceTint, /^#[0-9a-f]{6}$/);
-  assert.notEqual(tinted.surfaceTint, "#0078d4", "an accent taskbar uses a deep shade");
-  // The taskbar owns the dock's colour, even over the black of the Dark
-  // glass finish, but an explicit theme stays the user's: light means the
-  // light taskbar fill, never a dark bar under light-theme ink.
-  const mine = resolveLook({ ...cfg, theme: "dark", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
-  assert.equal(mine.surfaceTint, tinted.surfaceTint);
-  const lightPick = resolveLook({ ...cfg, theme: "light", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
-  assert.equal(lightPick.theme, "light");
-  assert.equal(lightPick.surfaceTint, "#eeeeee");
-  // No Windows accent: fall back to the wallpaper, then to the picked accent.
-  assert.equal(resolveLook(cfg, { platform: { accent: null }, wallpaper: "#336699" }).accent, "#336699");
-  assert.equal(resolveLook(cfg, { platform: null }).accent, "#dfaa75");
+test("the taskbar style paints the dock with the taskbar's own colour and mode", () => {
+  const cfg = { colorSource: "custom", accent: "#dfaa75", theme: "system", surfaceStyle: "taskbar", surfaceColor: "#ff0000" };
+  const dark = resolveLook(cfg, { platform: PLATFORM() });
+  assert.equal(dark.theme, "dark", "the dock follows the Windows mode, like the taskbar");
+  assert.equal(dark.glassTint, "#202020", "a plain dark taskbar, whatever fill was picked");
+  assert.equal(resolveLook(cfg, { platform: PLATFORM({ systemLight: true }) }).glassTint, "#eeeeee");
+  const accented = resolveLook(cfg, { platform: PLATFORM({ accentOnTaskbar: true }) });
+  assert.match(accented.glassTint, /^#[0-9a-f]{6}$/);
+  assert.notEqual(accented.glassTint, "#0078d4", "an accent taskbar uses a deep shade");
+  // An explicit theme stays the user's: light means the light taskbar fill,
+  // never a dark bar under light-theme ink.
+  const light = resolveLook({ ...cfg, theme: "light" }, { platform: PLATFORM({ accentOnTaskbar: true }) });
+  assert.equal(light.theme, "light");
+  assert.equal(light.glassTint, "#eeeeee");
 });
 
-test("following the wallpaper tints the glass for the current theme", () => {
-  const cfg = { colorSource: "wallpaper", accent: "#dfaa75", theme: "dark", surfaceTint: "" };
-  const dark = resolveLook(cfg, { wallpaper: "#3366cc" });
-  assert.equal(dark.accent, "#3366cc");
-  const light = resolveLook({ ...cfg, theme: "light" }, { wallpaper: "#3366cc" });
+test("each style is visibly different over the same wallpaper", async () => {
+  const { surfaceAlpha } = await import("../src/surface.js");
+  const alphas = ["solid", "taskbar", "glass", "clear"].map((surfaceStyle) => surfaceAlpha({ surfaceStyle, materialStrength: 60 }));
+  for (let i = 1; i < alphas.length; i++) assert.ok(alphas[i - 1] - alphas[i] >= 0.12, `${alphas}`);
+  assert.equal(surfaceAlpha({ surfaceStyle: "solid", materialStrength: 0 }), 1);
+});
+
+test("the fill can follow the wallpaper, the accent or a picked colour", () => {
+  const cfg = { colorSource: "custom", accent: "#3366cc", theme: "dark", surfaceStyle: "glass" };
   const lum = (hex) => [1, 3, 5].reduce((sum, i) => sum + parseInt(hex.slice(i, i + 2), 16), 0);
-  assert.ok(lum(dark.surfaceTint) < lum("#3366cc"), "darker on a dark theme");
-  assert.ok(lum(light.surfaceTint) > lum("#3366cc"), "lighter on a light theme");
+  const wallDark = resolveLook({ ...cfg, surfaceColor: "wallpaper" }, { wallpaper: "#33cc66" }).glassTint;
+  const wallLight = resolveLook({ ...cfg, theme: "light", surfaceColor: "wallpaper" }, { wallpaper: "#33cc66" }).glassTint;
+  assert.ok(lum(wallDark) < lum("#33cc66") && lum(wallLight) > lum("#33cc66"), "darker on dark, lighter on light");
+  const accent = resolveLook({ ...cfg, surfaceColor: "accent" }, {}).glassTint;
+  assert.ok(lum(accent) < lum("#3366cc"));
+  assert.equal(resolveLook({ ...cfg, surfaceColor: "#223344" }, {}).glassTint, "#223344");
+  // Before the wallpaper is sampled, the style's own tint stands in.
+  assert.equal(resolveLook({ ...cfg, surfaceColor: "wallpaper" }, {}).glassTint, "#1c1c1c");
+  // Configs from before rev 11 carry the picked colour in surfaceTint.
+  assert.equal(surfaceColor({ surfaceTint: "#0B1A2A" }), "#0b1a2a");
+  assert.equal(surfaceColor({ surfaceColor: "nonsense" }), "auto");
 });
 
-test("a colour that follows Windows fills solid and Mica finishes too", async () => {
-  const { resolveGlassTint } = await import("../src/surface.js");
-  const followed = { surfaceStyle: "solid", surfaceTint: "#1f1f1f", surfaceFollows: true };
-  assert.equal(resolveGlassTint(followed), "#1f1f1f");
-  assert.equal(resolveGlassTint({ ...followed, surfaceFollows: false }), "");
+test("older finishes read as their closest style", async () => {
+  const { resolveSurfaceStyle, resolveGlassTint } = await import("../src/surface.js");
+  assert.equal(resolveSurfaceStyle({ surfaceStyle: "mica" }), "solid");
+  assert.equal(resolveSurfaceStyle({ surfaceStyle: "acrylic" }), "glass");
+  assert.equal(resolveSurfaceStyle({ surfaceStyle: "clear" }), "clear");
+  assert.equal(resolveGlassTint({ glassTint: "#ABCDEF" }), "#abcdef");
+  assert.equal(resolveGlassTint({ surfaceColor: "#123456" }), "#123456");
+  assert.equal(resolveGlassTint({ surfaceColor: "auto" }), "");
 });
 
 test("the suggested palette is unique, valid and led by Booki's tan", () => {

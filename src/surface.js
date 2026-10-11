@@ -1,19 +1,21 @@
 /* One material for the dock, the notch and their flyouts.
 
-   Three finishes, each visibly different:
-   - glass: Windows' real blur behind a translucent fill. `materialStrength`
-     (0–100) moves it from clear to frosted; `surfaceTint` colours the fill
-     (black gives the taskbar-style dark glass older builds called "tinted").
-   - mica:  Windows 11 Mica. An opaque surface lightly tinted by the wallpaper,
-     no blur, so it stays calm over busy windows.
-   - solid: opaque, theme coloured, no effects.
+   Four styles, each visibly different:
+   - taskbar: the Windows 11 taskbar's acrylic. Its colour comes from Windows
+     (look-model.js), so the dock and the taskbar match.
+   - glass:   tinted acrylic. Windows blurs what is behind; `materialStrength`
+     (0–100) sets how much of the fill colour covers it.
+   - clear:   acrylic with a faint tint, so the blurred wallpaper shows
+     through.
+   - solid:   opaque, no effects.
 
-   Older configs ("acrylic", "tinted", a notch-only `notchStyle`) are read as
-   their closest finish; the backend migrates them on load (config rev 9). */
+   Older configs ("acrylic", "tinted", "mica", a notch-only `notchStyle`) are
+   read as their closest style; the backend migrates them on load (config
+   rev 11). */
 
-export const SURFACE_STYLES = ["glass", "mica", "solid"];
+export const SURFACE_STYLES = ["taskbar", "glass", "clear", "solid"];
 
-/** Preset fill colours for glass. Labels live in i18n (`tint.<id>`). */
+/** Preset fill colours. Labels live in i18n (`tint.<id>`). */
 export const SURFACE_TINT_PRESETS = [
   ["black", "#000000"],
   ["graphite", "#1c1c1c"],
@@ -25,9 +27,10 @@ export const SURFACE_TINT_PRESETS = [
   ["cloud", "#f0eee9"],
 ];
 
-const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", windows: "solid" };
+const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", windows: "solid", mica: "solid" };
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
-/** Active finish, accepting every value older builds wrote. */
+/** Active style, accepting every value older builds wrote. */
 export function resolveSurfaceStyle(cfg) {
   const raw = String(cfg?.surfaceStyle || cfg?.notchStyle || "").toLowerCase();
   if (SURFACE_STYLES.includes(raw)) return raw;
@@ -41,33 +44,45 @@ export function transparencyReduced(cfg) {
     || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-transparency: reduce)").matches);
 }
 
-/** The finish actually painted: reduced transparency always paints solid. */
+/** The style actually painted: reduced transparency always paints solid. */
 export function effectiveSurface(cfg) {
   return transparencyReduced(cfg) ? "solid" : resolveSurfaceStyle(cfg);
 }
 
-/** Only glass asks Windows for a native blur. */
+/** Every style but solid sits on Windows' blur. */
+export function translucent(cfg) {
+  return effectiveSurface(cfg) !== "solid";
+}
+
+/** Only the translucent styles ask Windows for a native blur. */
 export function nativeBlurWanted(cfg) {
-  return cfg?.nativeMaterial !== false && effectiveSurface(cfg) === "glass";
+  return cfg?.nativeMaterial !== false && translucent(cfg);
 }
 
-/** Fill opacity. Glass follows the intensity slider; mica and solid are opaque. */
+/** Fill opacity over the blur. Glass follows the opacity slider, the
+ * taskbar style matches the taskbar, clear lets the blur show; solid is
+ * opaque. */
 export function surfaceAlpha(cfg) {
-  if (effectiveSurface(cfg) !== "glass") return 1;
+  const style = effectiveSurface(cfg);
+  if (style === "solid") return 1;
+  if (style === "taskbar") return 0.82;
+  if (style === "clear") return 0.14;
   const strength = Math.max(0, Math.min(100, Number(cfg?.materialStrength ?? 60))) / 100;
-  return Math.round((0.3 + strength * 0.62) * 100) / 100;
+  return Math.round((0.2 + strength * 0.6) * 100) / 100;
 }
 
-/** Custom glass colour, or "" to use the theme surface. Legacy "tinted" with no
- * colour meant black. */
+/** Menus and flyouts carry text, so they never get thinner than this. */
+export function panelAlpha(cfg) {
+  return Math.round(Math.min(1, Math.max(0.78, surfaceAlpha(cfg) + 0.18)) * 100) / 100;
+}
+
+/** Fill colour (`#rrggbb`), or "" for the theme surface. A painted look
+ * (look-model.js) carries it in `glassTint`; a raw config only knows a
+ * colour picked by hand. */
 export function resolveGlassTint(cfg) {
-  const custom = String(cfg?.surfaceTint || "").trim();
-  // A colour that follows Windows or the wallpaper fills every finish.
-  if (cfg?.surfaceFollows && /^#[0-9a-fA-F]{6}$/.test(custom)) return custom.toLowerCase();
-  if (effectiveSurface(cfg) !== "glass") return "";
-  if (/^#[0-9a-fA-F]{6}$/.test(custom)) return custom.toLowerCase();
-  if (String(cfg?.surfaceStyle).toLowerCase() === "tinted") return "#000000";
-  return "";
+  if (cfg && "glassTint" in cfg) return HEX.test(cfg.glassTint || "") ? cfg.glassTint.toLowerCase() : "";
+  const picked = String(cfg?.surfaceColor || cfg?.surfaceTint || "").trim();
+  return HEX.test(picked) ? picked.toLowerCase() : "";
 }
 
 /** CSS colour for previews. */
@@ -75,7 +90,7 @@ export function glassFillColor(cfg) {
   return resolveGlassTint(cfg) || "var(--surface-tint)";
 }
 
-/** Ink that stays readable when a custom glass colour overrides the theme. */
+/** Ink that stays readable when the fill colour overrides the theme. */
 export function surfaceForeground(cfg) {
   const tint = resolveGlassTint(cfg);
   if (!tint || surfaceAlpha(cfg) < 0.6) return "";
@@ -87,34 +102,26 @@ export function surfaceForeground(cfg) {
   return luminance > 0.179 ? "#1b1b1b" : "#f2f2f2";
 }
 
-let wallpaperTint = "";
-/** Mica's wallpaper colour (`#rrggbb`), refreshed by the dock and notch. */
-export function setWallpaperTint(hex, roots = [document.documentElement]) {
-  wallpaperTint = /^#[0-9a-fA-F]{6}$/.test(hex || "") ? hex.toLowerCase() : "";
-  for (const el of roots) {
-    if (!el?.style) continue;
-    if (wallpaperTint) el.style.setProperty("--wall-tint", wallpaperTint);
-    else el.style.removeProperty("--wall-tint");
-  }
-}
-
-/** body.surface-<finish> plus the variables every surface reads. */
+/** body.surface-glass (translucent) or body.surface-solid, body.look-<style>,
+ * and the variables every surface reads. */
 export function applySurfaceVars(cfg, roots = [document.documentElement, document.body]) {
-  const surface = effectiveSurface(cfg);
+  const style = effectiveSurface(cfg);
   const alpha = surfaceAlpha(cfg);
   const tint = resolveGlassTint(cfg);
   const ink = surfaceForeground(cfg);
   for (const el of [].concat(roots)) {
     if (!el?.style) continue;
     el.style.setProperty("--glass-alpha", String(alpha));
+    el.style.setProperty("--panel-alpha", String(panelAlpha(cfg)));
     if (tint) el.style.setProperty("--glass-tint", tint);
     else el.style.removeProperty("--glass-tint");
     if (ink) el.style.setProperty("--surface-ink", ink);
     else el.style.removeProperty("--surface-ink");
   }
   const body = document.body;
-  for (const s of SURFACE_STYLES) body.classList.remove(`surface-${s}`);
-  body.classList.add(`surface-${surface}`);
+  body.classList.toggle("surface-glass", style !== "solid");
+  body.classList.toggle("surface-solid", style === "solid");
+  for (const s of SURFACE_STYLES) body.classList.toggle(`look-${s}`, s === style);
   body.classList.toggle("reduce-transparency", transparencyReduced(cfg));
   // A custom fill can force the opposite ink of the theme; widget plates
   // follow the ink, not the theme (see widgets.css).
@@ -129,17 +136,10 @@ export function dockRadius(cfg) {
   return Math.max(0, Number.isFinite(radius) ? radius : 12) + 8;
 }
 
-/* Finish presets only change the material, never layout or theme. */
-export const FINISH_PRESETS = [
-  { id: "glass", patch: { surfaceStyle: "glass", surfaceTint: "", materialStrength: 45 } },
-  { id: "darkGlass", patch: { surfaceStyle: "glass", surfaceTint: "#000000", materialStrength: 70 } },
-  { id: "mica", patch: { surfaceStyle: "mica", surfaceTint: "" } },
-  { id: "solid", patch: { surfaceStyle: "solid", surfaceTint: "" } },
-];
+/* One patch per style; a style never changes layout or theme. */
+export const FINISH_PRESETS = SURFACE_STYLES.map((id) => ({ id, patch: { surfaceStyle: id } }));
 
-/** Which preset a config matches, for the picker's selected state. */
+/** Which style a config uses, for the picker's selected state. */
 export function activeFinish(cfg) {
-  const surface = resolveSurfaceStyle(cfg);
-  if (surface !== "glass") return surface;
-  return resolveGlassTint(cfg) === "#000000" ? "darkGlass" : "glass";
+  return resolveSurfaceStyle(cfg);
 }
