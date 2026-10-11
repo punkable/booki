@@ -292,7 +292,9 @@ async function reloadConfig() {
   if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
   if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
-  if (prev && prev.edgeGap !== cfg.edgeGap) lastFull = null; // force re-place
+  // Placement moved while the frame size may not have: force a re-place.
+  const PLACEMENT = ["edgeGap", "notchPosition", "notchMode", "monitor", "monitorName"];
+  if (prev && PLACEMENT.some((key) => prev[key] !== cfg[key])) lastFull = null;
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
   const edgeSwapped = prev && prev.edge !== cfg.edge;
@@ -1655,9 +1657,12 @@ async function checkChangelog() {
     if (!cfg.onboarded) return;
     const v = await dockApi.appVersion();
     if (v && cfg.seenVersion !== v) {
+      // Patch releases are fixes: record them without opening Settings.
+      const feature = (version) => String(version || "").split(".").slice(0, 2).join(".");
+      const announce = feature(cfg.seenVersion) !== feature(v);
       cfg.seenVersion = v;
       if (!(await persist())) return;
-      dockApi.openChangelog();
+      if (announce) dockApi.openChangelog();
     }
   } catch (_) {}
 }

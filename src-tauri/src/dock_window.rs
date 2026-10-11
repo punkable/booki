@@ -126,10 +126,24 @@ pub(crate) fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), St
         .map_err(|e| e.to_string())
 }
 
-/// Re-anchor the dock window to the given screen edge.
+/// Re-anchor the dock window to the given screen edge. Settings calls this
+/// too, so it targets the dock by label rather than the calling window (which
+/// used to move the Settings window onto the dock's spot).
 #[tauri::command]
-pub(crate) fn reposition_dock(window: WebviewWindow, edge: String) -> Result<(), String> {
-    position_dock(&window, &edge)
+pub(crate) fn reposition_dock(app: AppHandle, edge: String) -> Result<(), String> {
+    let dock = app
+        .get_webview_window("dock")
+        .ok_or_else(|| "dock window not found".to_string())?;
+    position_dock(&dock, &edge)
+}
+
+/// Frame commands size and move the window that calls them, so only the dock may.
+fn require_dock(window: &WebviewWindow) -> Result<(), String> {
+    if window.label() == "dock" {
+        Ok(())
+    } else {
+        Err(format!("{} cannot move the dock frame", window.label()))
+    }
 }
 
 /// Resize the dock window to fit its content (plus magnify headroom) and
@@ -148,6 +162,7 @@ pub(crate) fn set_dock_frame(
     home_width: Option<u32>,
     home_height: Option<u32>,
 ) -> Result<(), String> {
+    require_dock(&window)?;
     // Floor at a few px so the thin auto-hide reveal strip is preserved.
     let w = width.max(8);
     let h = height.max(8);
@@ -189,6 +204,7 @@ pub(crate) fn set_dock_frame(
 /// usual applyFrame() path when the drag ends.
 #[tauri::command]
 pub(crate) fn dock_cover_workarea(window: WebviewWindow) -> Result<(f64, f64), String> {
+    require_dock(&window)?;
     let monitor = pick_monitor(&window).ok_or_else(|| "no monitor found".to_string())?;
     let mpos = monitor.position();
     let msize = monitor.size();
