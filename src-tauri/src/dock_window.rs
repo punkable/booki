@@ -307,13 +307,13 @@ pub(crate) fn reveal_running_dock(app: &AppHandle) {
 
 /// Set the dock's anchored edge (used when the user drags the notch to a screen
 /// edge, or clicks a notch that lives on another edge). Persists, repositions
-/// both windows, and tells the dock to re-read. The notch goes back to "auto"
-/// (follow the dock): after an explicit move the two belong together again —
-/// otherwise a stale explicit notch edge keeps tucking the dock toward a side
-/// the user just moved away from.
+/// both windows, and tells the dock to re-read.
 #[tauri::command]
 pub(crate) fn set_dock_edge(app: AppHandle, edge: String) {
-    if config::patch(serde_json::json!({ "edge": edge, "notchEdge": "auto" })).is_err() {
+    // Only `edge`: the notch follows the dock now, and a patch naming a legacy
+    // field (such as `notchEdge`) is rejected whole, so the move never saved.
+    if let Err(error) = config::patch(serde_json::json!({ "edge": edge })) {
+        eprintln!("[booki] set_dock_edge failed: {error}");
         return;
     }
     if let Some(dock) = app.get_webview_window("dock") {

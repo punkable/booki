@@ -181,7 +181,7 @@ async function boot() {
     document.body.classList.remove("booting");
     document.body.classList.add("boot-animate");
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
-    onConfigChanged(() => reloadConfig());
+    onConfigChanged(() => reloadConfig().catch((error) => logMessage("error", `dock reload failed: ${error}`)));
     checkAutoProfile();
     observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!hiddenState) appPollTick?.(false); } }, (support) => {
       const windowsChanged = !!nativeSupport.windows !== !!support.windows;
@@ -283,8 +283,12 @@ window.addEventListener("resize", () => {
   autoProfileResize = setTimeout(checkAutoProfile, 1500);
 });
 
-async function reloadConfig() {
+async function reloadConfig({ afterSaves = true } = {}) {
   const request = ++configReloadGeneration;
+  // Let queued dock saves land first; otherwise the reload replaces cfg and
+  // the queued save writes back the backend copy, losing the dock's edit.
+  // A save that reloads from inside the queue must skip this, or it waits on itself.
+  if (afterSaves) await persistQueue;
   const next = await configApi.get();
   if (request !== configReloadGeneration) return;
   const prev = cfg;
@@ -439,7 +443,7 @@ async function performPersist(patch, showError) {
     logMessage("error", `dock save failed: ${error}`);
     const conflict = parseConfigConflict(error);
     // Restore the persisted view; retain the proposed edit for explicit retry.
-    await reloadConfig().catch(() => {});
+    await reloadConfig({ afterSaves: false }).catch(() => {});
     if (undoToast && showError) {
       hideUndoToast();
       undoToast.innerHTML = `<span>${esc(t(conflict ? "workspace.conflict" : "status.saveError"))}</span><button type="button">${esc(t(conflict ? "workspace.keepMine" : "focus.retry"))}</button>`;
@@ -2124,7 +2128,7 @@ function processMove(e) {
     if (into?.kind === "group" || Date.now() - mergeArm > MERGE_ARM_MS) {
       centerTarget.classList.add("merge-target");
       placeHint(
-        into?.kind === "group" ? t("drop.addTo").replace("{name}", menuPinTitle(into)) : t("drag.makeGroup"),
+        into?.kind === "group" ? t("drop.addTo").replace("{name}", () => menuPinTitle(into)) : t("drag.makeGroup"),
         centerTarget
       );
     } else {
@@ -2312,12 +2316,13 @@ function pinNameFallback(item) {
   return item.name || baseName(item.path) || "App";
 }
 function renamePinnedItem(item, name, { commit = false } = {}) {
-  const gi = cfg.pinned.findIndex((p) => p.id === item.id);
-  if (gi < 0) return;
+  // Pins inside a group are renamed from the flyout, so look beyond the top level.
+  const live = findPinnedById(item.id);
+  if (!live) return;
   const fallback = pinNameFallback(item);
   const next = String(name || "").trim() || fallback;
-  cfg.pinned[gi].name = commit ? next : name;
-  item.name = cfg.pinned[gi].name;
+  live.name = commit ? next : name;
+  item.name = live.name;
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (tile) {
     setTileLabel(tile, commit ? next : (name || fallback));
@@ -2330,14 +2335,14 @@ function renamePinnedItem(item, name, { commit = false } = {}) {
   }
   clearTimeout(renameTimer);
   if (commit) {
-    cfg.pinned[gi].name = next;
+    live.name = next;
     item.name = next;
     persist();
   } else {
     renameTimer = setTimeout(() => {
-      const i = cfg.pinned.findIndex((p) => p.id === item.id);
-      if (i >= 0) {
-        cfg.pinned[i].name = String(cfg.pinned[i].name || "").trim() || fallback;
+      const pin = findPinnedById(item.id);
+      if (pin) {
+        pin.name = String(pin.name || "").trim() || fallback;
         persist();
       }
     }, 400);
@@ -2790,7 +2795,7 @@ function confirmRemoveGroup(item) {
   pop.className = "trash-pop";
   const name = esc(item.name || t("group.new"));
   pop.innerHTML =
-    `${icon("trash")}<span class="tp-col"><span class="tp-text">${t("group.removeAsk").replace("{name}", name).replace("{n}", String(n))}</span>` +
+    `${icon("trash")}<span class="tp-col"><span class="tp-text">${t("group.removeAsk").replace("{name}", () => name).replace("{n}", String(n))}</span>` +
     `<span class="tp-sub">${t("group.removeSub")}</span></span>`;
   const mkBtn = (cls, label, fn) => {
     const b = document.createElement("button");
@@ -2986,7 +2991,8 @@ window.addEventListener("keydown", (e) => {
     closeStack();
     cancelDrag();
     closeTrashPop();
-    closeProductivityPanel();
+    // Closing an absent panel would still release a pinned reveal and tuck the dock away.
+    if (productivityPanel) closeProductivityPanel();
   }
 });
 
@@ -2994,13 +3000,18 @@ async function changeIcon(item) {
   const path = await pickImageFile();
   if (!path) return;
   const uri = (await dockApi.imageDataUri(path)) || path;
-  item.icon = uri;
+  // The picker can stay open while a reload replaces cfg; edit the live pin.
+  const live = findPinnedById(item.id);
+  if (!live) return;
+  live.icon = uri;
   iconCache.delete(item.path);
   if (!(await persist())) return;
   await render();
 }
 async function clearIcon(item) {
-  item.icon = null;
+  const live = findPinnedById(item.id);
+  if (!live) return;
+  live.icon = null;
   iconCache.delete(item.path);
   if (!(await persist())) return;
   await render();
@@ -3781,9 +3792,9 @@ document.body.appendChild(dropHintEl);
 function dropHintText(spot) {
   const item = spot.target && cfg.pinned.find((p) => p.id === spot.target.dataset.id);
   const name = item ? menuPinTitle(item) : "";
-  if (item?.kind === "app") return t("drop.openWith").replace("{name}", name);
-  if (item?.kind === "folder") return t("drop.moveTo").replace("{name}", name);
-  if (item?.kind === "group") return t("drop.addTo").replace("{name}", name);
+  if (item?.kind === "app") return t("drop.openWith").replace("{name}", () => name);
+  if (item?.kind === "folder") return t("drop.moveTo").replace("{name}", () => name);
+  if (item?.kind === "group") return t("drop.addTo").replace("{name}", () => name);
   if (item?.kind === "trash") return t("drop.trash");
   return t("drop.pin");
 }
@@ -3956,7 +3967,7 @@ function confirmTrash(paths, emptyBin = false) {
   const n = paths.length;
   const text = emptyBin
     ? t("trash.emptyAsk")
-    : (n === 1 ? t("trash.askOne").replace("{name}", esc(baseName(paths[0]))) : t("trash.ask").replace("{n}", n));
+    : (n === 1 ? t("trash.askOne").replace("{name}", () => esc(baseName(paths[0]))) : t("trash.ask").replace("{n}", n));
   const pop = document.createElement("div");
   pop.className = "trash-pop";
   pop.innerHTML =
@@ -4036,8 +4047,8 @@ function confirmMove(paths, item) {
   pop.className = "trash-pop";
   pop.innerHTML =
     `${icon("folder")}<span class="tp-col"><span class="tp-text">${t("move.ask")
-      .replace("{what}", what)
-      .replace("{dest}", esc(item.name))}</span>` +
+      .replace("{what}", () => what)
+      .replace("{dest}", () => esc(item.name))}</span>` +
     `<span class="tp-sub">${t("move.sub")}</span></span>`;
   const mkBtn = (cls, label, fn) => {
     const b = document.createElement("button");
@@ -5119,7 +5130,11 @@ async function checkUpdates() {
     pill.classList.remove("hidden");
     placeUpdatePill();
     // Straight to General — that's where the install button and progress live.
-    pill.addEventListener("click", () => dockApi.openSettingsTab("general"), { once: true });
+    // Bound once: the pill stays visible, so it must keep working after a click.
+    if (!pill.dataset.bound) {
+      pill.dataset.bound = "1";
+      pill.addEventListener("click", () => dockApi.openSettingsTab("general"));
+    }
   }
 }
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.

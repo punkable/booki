@@ -95,7 +95,12 @@ export function useSettingsStore() {
     cfgRef.current = next;
     setCfg(next);
     if (prev && prev.language !== next.language) {
-      ensureLang(next.language).then(() => { setLang(next.language); setCfg((c) => ({ ...c })); });
+      ensureLang(next.language).then(() => {
+        // A slower language pack must not win over a later choice.
+        if (cfgRef.current?.language !== next.language) return;
+        setLang(next.language);
+        setCfg((c) => ({ ...c }));
+      });
     } else setLang(next.language);
     paint(next);
     setSaveState("saving");
@@ -188,7 +193,8 @@ export function useSettingsStore() {
       try {
         if (!c.settingsIntroSeen && localStorage.getItem("booki.introSeen") === "1") {
           next = { ...c, settingsIntroSeen: true };
-          configApi.save(next).catch(() => {});
+          // A patch, not a full save: the dock may have changed other fields meanwhile.
+          configApi.patch({ settingsIntroSeen: true }).catch(() => {});
         }
       } catch (_) {}
       setCfg(next);
@@ -217,8 +223,13 @@ export function useSettingsStore() {
   // progress flags always move forward.
   useEffect(() => {
     let un;
+    let disposed = false;
+    let latest = 0;
     onConfigChanged(() => {
-      configApi.get().then((c) =>
+      // Reads can resolve out of order; only the newest one may land.
+      const seq = ++latest;
+      configApi.get().then((c) => {
+        if (disposed || seq !== latest) return;
         setCfg((prev) => {
           if (!prev) return c;
           const next = { ...c };
@@ -230,10 +241,10 @@ export function useSettingsStore() {
           ensureLang(next.language).then(() => setCfg((current) => ({ ...current })));
           cfgRef.current = next;
           return next;
-        })
-      );
-    }).then((u) => (un = u));
-    return () => un && un();
+        });
+      }).catch(() => {});
+    }).then((u) => { if (disposed) u(); else un = u; });
+    return () => { disposed = true; un?.(); };
   }, []);
 
   return {
