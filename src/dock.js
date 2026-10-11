@@ -29,7 +29,8 @@ import { createDraftSaver } from "./dock/draft-saver.js";
 import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
-import { windowsFor as matchPinWindows } from "./dock/running.js";
+import { windowsFor as matchPinWindows, runningDescription } from "./dock/running.js";
+import { installDockKeyboard } from "./dock/keyboard-nav.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
@@ -87,6 +88,12 @@ window.addEventListener("unhandledrejection", (e) =>
 );
 
 const dockEl = document.getElementById("dock");
+// One Tab stop for the whole bar; arrows move between tiles (see dock/keyboard-nav.js).
+// Arrows stand down while a tile is pressed, dragged or the bar is being moved.
+const dockKeys = installDockKeyboard(dockEl, {
+  isVertical: () => isVertical(),
+  isBusy: () => dragging || !!press || !!edgeMove,
+});
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
 const undoToast = document.getElementById("undo-toast");
@@ -392,8 +399,10 @@ function applyAll() {
     pill.textContent = t("dock.update");
     pill.title = t("dock.updateTip");
   }
+  dockEl.setAttribute("aria-label", t("a11y.dock"));
   applyTheme(cfg);
   applyEdge(cfg);
+  dockKeys.sync();
   document.body.classList.toggle("hide-running-indicators", cfg.showIndicators === false);
   // The stage window spans the whole edge; the BAR aligns to the notch's
   // along-edge slot with CSS (the window itself no longer travels).
@@ -552,6 +561,7 @@ async function render() {
     hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
     dockEl.appendChild(hint);
   }
+  dockKeys.sync();
 
   fitDock();
   // Repaint widget values right away so a freshly built card never lingers on
@@ -1880,6 +1890,7 @@ async function endEdgeMove(commit) {
     // Land on the new edge with a pop so the move reads as motion, not a jump.
     cfg.edge = target;
     applyEdge(cfg);
+    dockKeys.sync();
     fitDock();
     document.body.classList.add("edge-swap");
     applyFrame();
@@ -4270,6 +4281,7 @@ function startRunningPoll() {
       const wins = await dockApi.listWindows();
       lastWindows = wins;
       const matchWins = (pin) => windowsFor(pin, wins);
+      const say = (n) => runningDescription(n, t); // `t` is the tile inside the loop
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
         const app = cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash" || app.kind === "action") return;
@@ -4284,6 +4296,12 @@ function startRunningPoll() {
           t.dataset.running = "false";
           delete t.dataset.hwnd;
           if (badge) badge.textContent = "";
+        }
+        // The dot and the count are visual; say the same thing to a screen reader.
+        const said = say(matches.length);
+        if ((t.getAttribute("aria-description") || "") !== said) {
+          if (said) t.setAttribute("aria-description", said);
+          else t.removeAttribute("aria-description");
         }
       });
       // Mirror running state onto open group flyout cells.

@@ -122,3 +122,57 @@ body:not(.surface-glass) .menu { -webkit-backdrop-filter: none; backdrop-filter:
 body.edge-top .drop-hint { transform: translateY(-4px) scale(0.96); }
 body.edge-top .drop-hint.show { transform: none; }
 @media (prefers-reduced-motion: reduce) { .drop-hint { transition: none; } }
+
+/* Windows high contrast: the hovered or focused row uses the system Highlight
+   colours instead of a fixed blue (see the contrast block in styles.css). */
+@media (forced-colors: active) {
+  .menu button:hover,
+  .menu button:focus-visible,
+  .menu button.danger:hover,
+  .menu button.danger:focus-visible {
+    color: HighlightText;
+    background: Highlight;
+  }
+  .menu button:hover svg,
+  .menu button:focus-visible svg,
+  .menu button.danger:hover svg,
+  .menu button.danger:focus-visible svg {
+    color: HighlightText;
+  }
+  .menu .sep {
+    background: CanvasText;
+  }
+  .drop-hint {
+    color: HighlightText;
+    background: Highlight;
+    box-shadow: none;
+  }
+  /* Filled Highlight states draw their own colours: without this the browser
+     paints a Canvas backplate behind the text and hides it. */
+  .menu button:hover,
+  .menu button:focus-visible,
+  .drop-hint {
+    forced-color-adjust: none;
+  }
+}
+:root[data-high-contrast] .menu button:hover,
+:root[data-high-contrast] .menu button:focus-visible,
+:root[data-high-contrast] .menu button.danger:hover,
+:root[data-high-contrast] .menu button.danger:focus-visible {
+  color: HighlightText;
+  background: Highlight;
+}
+:root[data-high-contrast] .menu button:hover svg,
+:root[data-high-contrast] .menu button:focus-visible svg,
+:root[data-high-contrast] .menu button.danger:hover svg,
+:root[data-high-contrast] .menu button.danger:focus-visible svg {
+  color: HighlightText;
+}
+:root[data-high-contrast] .menu .sep {
+  background: CanvasText;
+}
+:root[data-high-contrast] .drop-hint {
+  color: HighlightText;
+  background: Highlight;
+  box-shadow: none;
+}

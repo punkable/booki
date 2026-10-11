@@ -739,3 +739,149 @@
 .library-empty { grid-column: 1 / -1; margin: 0; padding: 18px 4px; color: var(--ink-2); font-size: 13px; text-align: center; }
 .sticky-preview .live-preview-scene.stage { min-height: 118px; padding: 18px 16px; border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .sticky-preview .live-preview-scene.stage .live-preview-caption { display: none; }
+
+/* ── Windows high contrast ──────────────────────────────────────────────
+   forced-colors, repeated under [data-high-contrast] as a fallback (set by
+   platform-preferences.js). Tokens map to system colours so cards, controls
+   and the accent follow the contrast theme; selection uses Highlight. */
+@media (forced-colors: active) {
+  :root .settings-body.settings-body {
+    --page-bg: Canvas;
+    --side-bg: Canvas;
+    --card: Canvas;
+    --card-2: Canvas;
+    --card-hover: Canvas;
+    --control: Canvas;
+    --control-hover: Canvas;
+    --field: Canvas;
+    --subtle-hover: Canvas;
+    --subtle-pressed: Canvas;
+    --card-stroke: CanvasText;
+    --divider: CanvasText;
+    --control-stroke: ButtonBorder;
+    --control-stroke-bottom: ButtonBorder;
+    --strong-stroke: CanvasText;
+    --ink: CanvasText;
+    --ink-2: CanvasText;
+    --ink-3: CanvasText;
+    --card-shadow: none;
+    --accent: Highlight;
+    --accent-contrast: HighlightText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .settings-body :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .nav-item[aria-current="page"],
+  .search-results button[aria-selected="true"],
+  .app-library-filters button[aria-pressed="true"],
+  .ui-seg-item.on {
+    color: HighlightText;
+    background: Highlight;
+    box-shadow: none;
+  }
+  .catalog-card[aria-pressed="true"],
+  .icon-cell[aria-pressed="true"],
+  .choice-card[aria-checked="true"],
+  .finish-card[aria-checked="true"],
+  .swatch[aria-pressed="true"],
+  .swatch[data-active] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .ui-slider input::-webkit-slider-runnable-track {
+    background: CanvasText;
+  }
+  .live-preview-bar,
+  .sticky-preview,
+  .finish-sample-bar {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .sticky-preview {
+    background: Canvas;
+    -webkit-mask: none;
+  }
+  .swatch {
+    forced-color-adjust: none;
+  }
+  /* Filled Highlight states draw their own colours: without this the browser
+     paints a Canvas backplate behind the text and hides it. */
+  .nav-item[aria-current="page"],
+  .search-results button[aria-selected="true"],
+  .app-library-filters button[aria-pressed="true"],
+  .ui-seg-item.on,
+  .button-accent,
+  .chip[aria-pressed="true"],
+  .monitor-box[aria-pressed="true"],
+  .look-auto[aria-pressed="true"],
+  .seg-mini.active {
+    forced-color-adjust: none;
+  }
+  .nav-item[aria-current="page"] .nav-icon {
+    color: inherit;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+:root[data-high-contrast] .settings-body.settings-body {
+  --page-bg: Canvas;
+  --side-bg: Canvas;
+  --card: Canvas;
+  --card-2: Canvas;
+  --card-hover: Canvas;
+  --control: Canvas;
+  --control-hover: Canvas;
+  --field: Canvas;
+  --subtle-hover: Canvas;
+  --subtle-pressed: Canvas;
+  --card-stroke: CanvasText;
+  --divider: CanvasText;
+  --control-stroke: ButtonBorder;
+  --control-stroke-bottom: ButtonBorder;
+  --strong-stroke: CanvasText;
+  --ink: CanvasText;
+  --ink-2: CanvasText;
+  --ink-3: CanvasText;
+  --card-shadow: none;
+  --accent: Highlight;
+  --accent-contrast: HighlightText;
+  color: CanvasText;
+  background: Canvas;
+}
+:root[data-high-contrast] .settings-body :focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+:root[data-high-contrast] .nav-item[aria-current="page"],
+:root[data-high-contrast] .search-results button[aria-selected="true"],
+:root[data-high-contrast] .app-library-filters button[aria-pressed="true"],
+:root[data-high-contrast] .ui-seg-item.on {
+  color: HighlightText;
+  background: Highlight;
+  box-shadow: none;
+}
+:root[data-high-contrast] .catalog-card[aria-pressed="true"],
+:root[data-high-contrast] .icon-cell[aria-pressed="true"],
+:root[data-high-contrast] .choice-card[aria-checked="true"],
+:root[data-high-contrast] .finish-card[aria-checked="true"],
+:root[data-high-contrast] .swatch[aria-pressed="true"],
+:root[data-high-contrast] .swatch[data-active] {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+:root[data-high-contrast] .ui-slider input::-webkit-slider-runnable-track {
+  background: CanvasText;
+}
+:root[data-high-contrast] .live-preview-bar,
+:root[data-high-contrast] .sticky-preview,
+:root[data-high-contrast] .finish-sample-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-high-contrast] .sticky-preview {
+  background: Canvas;
+  -webkit-mask: none;
+}

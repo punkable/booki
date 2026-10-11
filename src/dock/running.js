@@ -50,3 +50,10 @@ export function windowsFor(pin, wins) {
   }
   return matches;
 }
+
+/** What a screen reader hears about a pin's open windows ("" when none).
+ * @param {number} count @param {(key: string) => string} t */
+export function runningDescription(count, t) {
+  if (!(count > 0)) return "";
+  return count > 1 ? t("a11y.runningWindows").replace("{n}", String(count)) : t("a11y.running");
+}

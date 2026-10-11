@@ -12,6 +12,10 @@ function refreshPlatformPreferences() {
     capabilities = value;
     document.documentElement.toggleAttribute('data-reduce-transparency', !value.transparency);
     document.documentElement.toggleAttribute('data-reduce-motion', value.animations === false);
+    // Windows reports high contrast separately; the backend also folds it into
+    // `transparency`, but CSS needs to know it is a contrast theme, not just less glass.
+    // forced-colors covers WebView2; this is the fallback when it does not match.
+    document.documentElement.toggleAttribute('data-high-contrast', value.highContrast === true);
     for (const subscriber of subscribers) subscriber(value);
   }).catch(() => {}).finally(() => {
     pending = null;
