@@ -18,7 +18,6 @@ import {
   onLauncher,
   onLaunchIndex,
   onHotEdge,
-  emitConfigChanged as emitConfigChangedRaw,
   logMessage,
   isTauri,
 } from "./api.js";
@@ -30,7 +29,6 @@ import { parseConfigConflict } from "./settings/config-conflicts.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { windowsFor as matchPinWindows, runningDescription } from "./dock/running.js";
-import { installDockKeyboard } from "./dock/keyboard-nav.js";
 import { widgetWidth, chooseFitSize } from "./dock/layout-model.js";
 import { decideVisible, wantsHidden } from "./dock/visibility-policy.js";
 import { icon } from "./icons.js";
@@ -49,7 +47,6 @@ import {
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   WIDGET_META,
-  widgetDisplayName,
   canonicalWidget,
 } from "./widgets-meta.js";
 import { reduceMotion } from "./dock/motion.js";
@@ -73,14 +70,59 @@ import {
 import { dockRadius } from "./surface.js";
 import { groupAppearance } from "./group-style.js";
 import { pinFallback } from "./pin-fallback.js";
-import { canMergeKind, kindForPath, mergePins, normalizeGroups, placePin, takeOutOfGroup } from "./pins.js";
+import {
+  canMergeKind,
+  kindForPath,
+  mergePins,
+  normalizeGroups,
+  placePin,
+  takeOutOfGroup,
+} from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, menuItems, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { buildAddPanel } from "./dock/add-panel.js";
 import { buildLauncher } from "./dock/launcher.js";
 import { desiredProfile } from "./profile-rules.js";
-import { reportMaterial, shapeOf, materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
+import {
+  reportMaterial,
+  shapeOf,
+  materialTint,
+  setMaterialTint,
+  applyMaterial,
+  followFrames,
+} from "./material.js";
 import { S } from "./dock/state.js";
+import {
+  emitConfigChanged,
+  iconCache,
+  uid,
+  isVertical,
+  baseSize,
+  findPinnedById,
+  widgetLabel,
+  findWidgetPin,
+  syncIcon,
+  resolveIcon,
+  baseName,
+  menuPinTitle,
+} from "./dock/helpers.js";
+import {
+  dockEl,
+  dockKeys,
+  ctxMenu,
+  dropOverlay,
+  undoToast,
+  closestSel,
+  esc,
+  stackEl,
+} from "./dock/dom.js";
+import {
+  hideUndoToast,
+  placeUndoToast,
+  showUndoToast,
+  showErrorToast,
+  wireUndoToast,
+} from "./dock/undo-toast.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -88,99 +130,12 @@ window.addEventListener("unhandledrejection", (e) =>
   logMessage("error", `dock: unhandled ${e.reason}`)
 );
 
-const dockEl = document.getElementById("dock");
-// One Tab stop for the whole bar; arrows move between tiles (see dock/keyboard-nav.js).
-// Arrows stand down while a tile is pressed, dragged or the bar is being moved.
-const dockKeys = installDockKeyboard(dockEl, {
-  isVertical: () => isVertical(),
-  isBusy: () => S.dragging || !!S.press || !!S.edgeMove,
-});
-const ctxMenu = document.getElementById("ctx-menu");
-const dropOverlay = document.getElementById("drop-overlay");
-const undoToast = document.getElementById("undo-toast");
-
-// Safe .closest() — pointer/keyboard targets can be non-Element (document/window),
-// which would throw "closest is not a function".
-const closestSel = (target, sel) => (target && target.closest ? target.closest(sel) : null);
-
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,
 // which the browser lets you drag out as an image — dropping one on the desktop
 // made Windows save a stray .png. All our dragging is pointer-event based, and
 // incoming file drops from Explorer use Tauri's own channel (not webview
 // dragstart), so suppressing this is purely the fix with no downside.
 window.addEventListener("dragstart", (e) => e.preventDefault());
-
-// Escape user-controlled text (file/app names) before it goes into innerHTML —
-// a file literally named "<img onerror=…>.txt" must render as text, not run.
-const esc = (s) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-
-let undoRemoval = null;
-let undoRemovalTimer = null;
-
-function hideUndoToast() {
-  clearTimeout(undoRemovalTimer);
-  undoRemovalTimer = null;
-  undoRemoval = null;
-  undoToast?.classList.add("hidden");
-  if (undoToast) undoToast.innerHTML = "";
-}
-
-function placeUndoToast() {
-  if (!S.cfg || !undoToast || undoToast.classList.contains("hidden")) return;
-  const { left, top } = placeBesideBar({
-    bar: dockEl.getBoundingClientRect(),
-    box: { width: undoToast.offsetWidth, height: undoToast.offsetHeight },
-    edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12, pad: 8,
-  });
-  undoToast.style.left = `${left}px`; undoToast.style.top = `${top}px`;
-}
-
-function showUndoToast(item, index) {
-  if (!undoToast) return;
-  clearTimeout(undoRemovalTimer);
-  undoRemoval = { item: structuredClone(item), index };
-  undoToast.innerHTML = `<span>${esc(item.name || baseName(item.path || "Booki"))}</span><button type="button">${esc(t("act.undo"))}</button>`;
-  undoToast.classList.remove("hidden");
-  placeUndoToast();
-  undoToast.querySelector("button")?.addEventListener("click", undoLastRemoval, { once: true });
-  undoRemovalTimer = setTimeout(hideUndoToast, 5000);
-}
-
-/** A short failure notice in the same toast the save error uses. */
-function showErrorToast(message) {
-  if (!undoToast) return;
-  hideUndoToast();
-  undoToast.innerHTML = `<span>${esc(message)}</span>`;
-  undoToast.classList.remove("hidden");
-  placeUndoToast();
-  undoRemovalTimer = setTimeout(hideUndoToast, 5000);
-}
-
-async function undoLastRemoval() {
-  if (!undoRemoval || !S.cfg) return;
-  const { item, index } = undoRemoval;
-  hideUndoToast();
-  if (S.cfg.pinned.some((entry) => entry.id === item.id)) return;
-  S.cfg.pinned.splice(Math.min(index, S.cfg.pinned.length), 0, item);
-  if (!(await persist())) return;
-  await render();
-  reframe();
-}
-// The shared bridge filters this WebView's own echo by origin.
-function emitConfigChanged() { return emitConfigChangedRaw(); }
-const iconCache = new Map();
-const uid = () => Math.random().toString(36).slice(2, 9);
-const isVertical = () => S.cfg.edge === "left" || S.cfg.edge === "right";
-const baseSize = () => S.cfg.iconSize || 48;
-function findPinnedById(id, items = S.cfg?.pinned || []) {
-  for (const item of items) {
-    if (item.id === id) return item;
-    const child = findPinnedById(id, item.children || []);
-    if (child) return child;
-  }
-  return null;
-}
 
 // ───────────────────────────── Boot ─────────────────────────────
 
@@ -850,10 +805,6 @@ function separatorTile(item) {
 // macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
 // throughput. Cheap by design — stats only poll while the dock is visible.
 
-function widgetLabel(type) {
-  return widgetDisplayName(type, t);
-}
-
 function widgetTile(item, { inFlyout = false } = {}) {
   const type = canonicalWidget(item.widget || "clock") || "clock";
   const st = item.style || {};
@@ -968,10 +919,6 @@ function tickClocks() {
   eachWidget("clock", (el) => setText(el, date, time));
 }
 
-function findWidgetPin(id, items = S.cfg.pinned) {
-  for (const item of items) { if (item.id === id) return item; const child = item.children && findWidgetPin(id, item.children); if (child) return child; }
-  return null;
-}
 const weatherCache = new Map();
 function tickProductivity() {
   // Focus shows the running (or just finished) timer, otherwise the next task.
@@ -1041,7 +988,6 @@ function openProductivity(item, tile) {
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
   requestAnimationFrame(() => { place(); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
 }
-
 
 // System stats (system + battery widgets) — one snapshot fans out to
 // every stat card on the bar (from the cached element map).
@@ -1312,40 +1258,6 @@ async function addWidget(type, { showError = true } = {}) {
   return true;
 }
 
-// Pinned pictures show their own thumbnail instead of a generic file icon.
-const IMAGE_EXT = /\.(png|jpe?g|gif|bmp|webp|ico)$/i;
-
-// The icon we can show RIGHT NOW without any async work (library glyph, custom
-// override, or a cached extraction). null → it needs async extraction, so the
-// caller shows a skeleton and fills in via resolveIcon().
-function syncIcon(item) {
-  if (isLibIcon(item.icon)) return resolveLibIcon(item.icon);
-  if (item.icon) return item.icon;
-  if (iconCache.has(item.path)) return iconCache.get(item.path);
-  return null;
-}
-
-async function resolveIcon(item) {
-  if (isLibIcon(item.icon)) return resolveLibIcon(item.icon); // built-in library glyph
-  if (item.icon) return item.icon; // custom override (data URI or path-as-uri)
-  if (iconCache.has(item.path)) return iconCache.get(item.path);
-  let uri;
-  try {
-    uri = IMAGE_EXT.test(item.path || "")
-      ? (await dockApi.imageDataUri(item.path)) || (await dockApi.appIcon(item.path))
-      : await dockApi.appIcon(item.path);
-  } catch (_) {
-    uri = null;
-  }
-  // Only cache a real icon — never a failed/empty result, so a transient
-  // extraction failure retries on the next render instead of sticking forever.
-  if (uri) {
-    iconCache.set(item.path, uri);
-    while (iconCache.size > 256) iconCache.delete(iconCache.keys().next().value);
-  }
-  return uri;
-}
-
 // Notes use a serialized autosave and keep their draft visible on failure.
 let noteEditor = null;
 async function closeNoteEditor() {
@@ -1593,11 +1505,6 @@ async function addPaths(paths, forceKind, atIndex = null, { showError = true } =
   await render();
   reframe();
   return true;
-}
-
-function baseName(path) {
-  const file = String(path).replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "App";
-  return file.replace(/\.(exe|lnk|bat|cmd)$/i, "");
 }
 
 // ──────────────────────── Magnify on hover ────────────────────────
@@ -2071,7 +1978,6 @@ function edgeAutoScroll() {
 function stopEdgeScroll() { edgeScrollVel = 0; }
 
 // ─────────── Edit mode (iOS-style long-press) + reorder ───────────
-
 
 function enterEdit() {
   if (S.editMode) return;
@@ -2791,15 +2697,6 @@ async function relocateShortcut(item, toDesktop) {
     placePop(pop);
     return false;
   }
-}
-
-function menuPinTitle(item) {
-  if (!item) return "Booki";
-  if (item.kind === "separator") return t("m.separator");
-  if (item.kind === "trash") return t("trash.name");
-  if (item.kind === "widget") return widgetLabel(item.widget);
-  if (item.kind === "action" && item.name === "Booki") return t("m.settings");
-  return item.name || baseName(item.path || "") || t("m.pin");
 }
 
 function menuKindLabel(item) {
@@ -3556,7 +3453,6 @@ for (const event of ["transitionrun", "transitionend", "transitioncancel", "anim
     if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial);
   });
 }
-
 
 matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", () => {
   if (!S.cfg) return;
@@ -4391,7 +4287,6 @@ function startRunningPoll() {
 
 // ─────────────────── Folder stacks (flyout) ───────────────────
 
-const stackEl = document.getElementById("stack");
 let stackSeq = 0; // guards async fills against a flyout that was reopened meanwhile
 
 // Files that get a REAL thumbnail (Explorer-grade, via the shell) instead of
@@ -4439,7 +4334,6 @@ function wireFileDragOut(cell, it) {
     window.addEventListener("pointercancel", cleanup);
   });
 }
-
 
 /** Open a stack; switching to another group/folder replaces the current one. */
 async function toggleStack(tileEl, item) {
@@ -5311,5 +5205,9 @@ function partyMode() {
     tiles.forEach((t) => (t.style.animationDelay = ""));
   }, 4200);
 }
+
+// Hand each module the calls it makes back into modules that import it
+// (see `deps` there).
+wireUndoToast({ persist, render, reframe });
 
 boot();
