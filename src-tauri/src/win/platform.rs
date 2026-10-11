@@ -24,6 +24,39 @@ pub struct Capabilities {
     pub high_contrast: bool,
     pub animations: bool,
     pub transparency: bool,
+    /// Windows accent colour (`#rrggbb`); with the "Automatic" accent this is
+    /// the colour Windows picked from the wallpaper.
+    pub accent: Option<String>,
+    /// "Show accent colour on Start and taskbar" is on.
+    pub accent_on_taskbar: bool,
+    /// The Windows mode (taskbar, Start) is light. Apps can differ.
+    pub system_light: bool,
+}
+
+/// A DWORD under HKCU, or None when it is missing.
+fn user_dword(key: windows::core::PCWSTR, value: windows::core::PCWSTR) -> Option<u32> {
+    let mut data = 0u32;
+    let mut length = 4u32;
+    let result = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key,
+            value,
+            RRF_RT_REG_DWORD,
+            None,
+            Some((&mut data as *mut u32).cast()),
+            Some(&mut length),
+        )
+    };
+    result.is_ok().then_some(data)
+}
+
+/// `AccentColor` is stored as 0xAABBGGRR.
+fn accent_hex(abgr: u32) -> String {
+    let r = abgr & 0xff;
+    let g = (abgr >> 8) & 0xff;
+    let b = (abgr >> 16) & 0xff;
+    format!("#{:02x}{:02x}{:02x}", r, g, b)
 }
 
 pub fn capabilities() -> Capabilities {
@@ -77,12 +110,17 @@ pub fn capabilities() -> Capabilities {
             Some(&mut length),
         );
         let high_contrast = contrast.dwFlags.contains(HCF_HIGHCONTRASTON);
+        let personalize = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
         Capabilities {
             build,
             system_backdrop: build >= 22621,
             high_contrast,
             animations: animations.as_bool(),
             transparency: transparent != 0 && !high_contrast,
+            accent: user_dword(w!("Software\\Microsoft\\Windows\\DWM"), w!("AccentColor"))
+                .map(accent_hex),
+            accent_on_taskbar: user_dword(personalize, w!("ColorPrevalence")) == Some(1),
+            system_light: user_dword(personalize, w!("SystemUsesLightTheme")) == Some(1),
         }
     }
 }

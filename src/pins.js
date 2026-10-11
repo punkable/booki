@@ -57,8 +57,13 @@ export function placePin(items, pin, { beforeId, groupId } = {}) {
   // Keep the destination intact while removing a child from its own group.
   const strip = (rows) => rows.filter((item) => item.id !== pin.id).map((item) => item.kind === 'group' ? { ...item, children: strip(item.children || []) } : item);
   let next = strip(items);
-  if (groupId) next = updatePin(next, groupId, { children: [...(findPin(next, groupId)?.children || []), pin] });
-  else {
+  if (groupId) {
+    // Inside a group, `beforeId` names the member it goes in front of.
+    const children = [...(findPin(next, groupId)?.children || [])];
+    const at = beforeId ? children.findIndex((item) => item.id === beforeId) : -1;
+    children.splice(at < 0 ? children.length : at, 0, pin);
+    next = updatePin(next, groupId, { children });
+  } else {
     const at = next.findIndex((item) => item.id === beforeId);
     next.splice(at < 0 ? next.length : at, 0, pin);
   }

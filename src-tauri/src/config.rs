@@ -73,6 +73,10 @@ fn default_accent() -> String {
 fn default_theme() -> String {
     "system".into()
 }
+fn default_color_source() -> String {
+    // Existing setups keep the colours they picked.
+    "custom".into()
+}
 fn default_icon_size() -> u32 {
     36
 }
@@ -191,9 +195,14 @@ pub struct Config {
     /// Accent color (hex).
     #[serde(default = "default_accent")]
     pub accent: String,
-    /// "system" | "light" | "dark".
+    /// "system" | "light" | "dark" | "auto" (light by day, dark by night).
     #[serde(default = "default_theme")]
     pub theme: String,
+    /// Where Booki's colours come from: "custom" (the accent and glass colour
+    /// chosen in Settings), "windows" (the Windows accent, and the taskbar's
+    /// colour for the glass) or "wallpaper" (sampled from the wallpaper).
+    #[serde(default = "default_color_source")]
+    pub color_source: String,
     #[serde(default = "default_icon_size")]
     pub icon_size: u32,
     #[serde(default)]
@@ -399,6 +408,7 @@ impl Default for Config {
             edge: default_edge(),
             accent: default_accent(),
             theme: default_theme(),
+            color_source: default_color_source(),
             icon_size: default_icon_size(),
             magnification: false,
             zoom: default_zoom(),

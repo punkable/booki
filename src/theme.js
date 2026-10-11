@@ -1,9 +1,9 @@
 /* Applies accent color, theme and dock edge to the document. */
 
-import { observePlatformPreferences } from "./platform-preferences.js";
 import { applySurfaceVars } from "./surface.js";
 import { applyMaterial } from "./material.js";
 import { applyAccent } from "./util-color.js";
+import { onLookChange, paintedLook } from "./system-look.js";
 
 /** "auto" theme → light during the day (7:00–19:00), dark at night. */
 function resolveTheme(theme) {
@@ -14,17 +14,22 @@ function resolveTheme(theme) {
 
 let autoTimer = null;
 let latestConfig = null;
-observePlatformPreferences(() => {
+// Windows preferences, the accent or the wallpaper changed: repaint with
+// the colours they now give.
+onLookChange(() => {
   if (!latestConfig) return;
-  if (document.body.classList.contains("settings-body")) applySurfaceVars(latestConfig);
-  else applyMaterial(latestConfig);
+  applyTheme(latestConfig);
+  const look = paintedLook(latestConfig);
+  if (document.body.classList.contains("settings-body")) applySurfaceVars(look);
+  else applyMaterial(look);
 });
 
 export function applyTheme(cfg) {
   latestConfig = cfg;
   const root = document.documentElement;
-  applyAccent(root, cfg.accent);
-  const resolved = resolveTheme(cfg.theme);
+  const look = paintedLook(cfg);
+  applyAccent(root, look.accent);
+  const resolved = resolveTheme(look.theme);
   if (resolved === "system") {
     root.removeAttribute("data-theme");
   } else {

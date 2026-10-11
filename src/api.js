@@ -35,6 +35,7 @@ const DEMO_CONFIG = {
   edge: "bottom",
   accent: "#dfaa75",
   theme: "system",
+  colorSource: "custom",
   iconSize: 36,
   magnification: false,
   zoom: 1.25,

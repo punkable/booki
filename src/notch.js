@@ -14,6 +14,7 @@ import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { showBookiMenu } from "./native-context-menu.js";
 import { applyAccent } from "./util-color.js";
 import { applyTheme } from "./theme.js";
+import { paintedLook } from "./system-look.js";
 import { t, setLang, ensureLang, curLang } from "./i18n.js";
 
 import { resolveNotchMode } from "./notch-mode.js";
@@ -47,7 +48,8 @@ async function applyLook() {
     pill.title = label;
     pill.setAttribute("aria-label", label);
     applyTheme(cfg);
-    if (cfg.accent) applyAccent(root, cfg.accent);
+    const look = paintedLook(cfg);
+    if (look.accent) applyAccent(root, look.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
     presenceMode = ["always", "edge"].includes(cfg.notchVisibility) ? cfg.notchVisibility : "auto";
     // The notch always lives on the dock's edge now.
@@ -69,7 +71,7 @@ async function applyLook() {
     pollBattery();
     readVolume();
     paintActivity();
-    applyMaterial(cfg);
+    applyMaterial(look);
     paintPresence();
     scheduleHitReport();
   } catch (_) {

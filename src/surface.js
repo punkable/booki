@@ -20,6 +20,9 @@ export const SURFACE_TINT_PRESETS = [
   ["slate", "#2d2d30"],
   ["night", "#0b1a2a"],
   ["white", "#f3f3f3"],
+  // Deep Mocha Mousse and Cloud Dancer, from the suggested palette.
+  ["mocha", "#2b211c"],
+  ["cloud", "#f0eee9"],
 ];
 
 const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", windows: "solid" };

@@ -6,17 +6,9 @@ import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
+import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
+import { COLOR_SOURCES, colorSource } from "../system-look.js";
 import { Icon, SegmentedControl } from "./ui.jsx";
-
-export const ACCENTS = [
-  ["ac.tan", "#dfaa75"],
-  ["ac.amber", "#ffbe0b"],
-  ["ac.orange", "#fb5607"],
-  ["ac.pink", "#ff006e"],
-  ["ac.violet", "#8338ec"],
-  ["ac.blue", "#3a86ff"],
-  ["ac.green", "#2ecc71"],
-];
 
 export const LANG_OPTIONS = [
   { value: "system", key: "lang.system" },
@@ -28,30 +20,59 @@ export const LANG_OPTIONS = [
 ];
 
 /** A row of colour swatches plus a custom colour well. */
-function Swatches({ value, presets, onChange, label, children }) {
+function Swatches({ value, presets, onChange, label, caption, children }) {
   const current = (value || "").toLowerCase();
   const isPreset = presets.some(([, hex]) => hex.toLowerCase() === current);
-  return <div className="swatches" role="group" aria-label={label}>
-    {presets.map(([name, hex]) => <button key={hex} type="button" className="swatch" style={{ "--sw": hex }}
-      aria-label={name} title={name} aria-pressed={current === hex.toLowerCase()} onClick={() => onChange(hex)} />)}
-    <label className="swatch swatch-custom" title={t("ap.custom")} data-active={!!current && !isPreset || undefined}
-      style={{ "--sw": current && !isPreset ? current : "transparent" }}>
-      <input type="color" aria-label={t("ap.custom")} value={/^#[0-9a-f]{6}$/.test(current) ? current : "#808080"} onChange={(e) => onChange(e.target.value)} />
-      <Icon name="plus" />
-    </label>
-    {children}
+  return <div className="swatches-block">
+    <div className="swatches" role="group" aria-label={label}>
+      {presets.map(([name, hex]) => <button key={hex} type="button" className="swatch" style={{ "--sw": hex }}
+        aria-label={name} title={name} aria-pressed={current === hex.toLowerCase()} onClick={() => onChange(hex)} />)}
+      <label className="swatch swatch-custom" title={t("ap.otherColor")} data-active={!!current && !isPreset || undefined}
+        style={{ "--sw": current && !isPreset ? current : "transparent" }}>
+        <input type="color" aria-label={t("ap.otherColor")} value={/^#[0-9a-f]{6}$/.test(current) ? current : "#808080"} onChange={(e) => onChange(e.target.value)} />
+        <Icon name="plus" />
+      </label>
+      {children}
+    </div>
+    {caption && <p className="swatch-caption">{caption}</p>}
   </div>;
 }
 
-export function AccentPicker({ value, onChange }) {
+/** Name of the picked colour: its palette name and Pantone reference, or
+ * "Custom colour" with its hex. */
+function paletteCaption(value) {
+  const entry = paletteEntry(value);
+  if (entry?.code) return `${entry.name} · PANTONE ${entry.code} · ${t("palette.year").replace("{year}", entry.year)}`;
+  if (entry) return t("palette.brand");
+  return /^#[0-9a-f]{6}$/i.test(value || "") ? `${t("ap.custom")} · ${value.toUpperCase()}` : "";
+}
+
+/** The suggested palette first; a custom colour stays available. `sources`
+ * adds one-off "copy the Windows accent / wallpaper colour" buttons. */
+export function AccentPicker({ value, onChange, sources = false }) {
   const from = (source) => async () => {
     const hex = await source().catch(() => null);
     if (hex) onChange(hex);
   };
-  return <Swatches value={value} label={t("ap.accent")} presets={ACCENTS.map(([key, hex]) => [t(key), hex])} onChange={onChange}>
-    <button type="button" className="chip" onClick={from(dockApi.systemAccent)}>{t("ap.systemShort")}</button>
-    <button type="button" className="chip" onClick={from(dockApi.wallpaperAccent)}><Icon name="image" />{t("ap.wallpaperShort")}</button>
+  return <Swatches value={value} label={t("ap.accent")} presets={ACCENT_PALETTE.map(({ name, hex }) => [name, hex])} onChange={onChange} caption={paletteCaption(value)}>
+    {sources && <>
+      <button type="button" className="chip" onClick={from(dockApi.systemAccent)}>{t("ap.systemShort")}</button>
+      <button type="button" className="chip" onClick={from(dockApi.wallpaperAccent)}><Icon name="image" />{t("ap.wallpaperShort")}</button>
+    </>}
   </Swatches>;
+}
+
+/** Where Booki's colours come from, and what that currently gives. */
+export function ColorSourcePicker({ cfg, set }) {
+  const source = colorSource(cfg);
+  return <div className="look-source">
+    <SegmentedControl value={source} onChange={(value) => set({ colorSource: value })}
+      options={COLOR_SOURCES.map((value) => ({ value, label: t(`look.${value}`) }))} />
+    {source !== "custom" && <p className="swatch-caption look-now">
+      <span className="look-now-dot" aria-hidden="true" />
+      {t(`look.${source}Now`)}
+    </p>}
+  </div>;
 }
 
 /** Glass colour. Empty means "follow the theme". */
