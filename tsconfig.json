@@ -23,6 +23,8 @@
     "src/dock/visibility-policy.js",
     "src/update-controller.js",
     "src/update-state.js",
-    "src/settings/snapshot-model.js"
+    "src/settings/snapshot-model.js",
+    "src/settings/config-conflicts.js",
+    "src/settings/hotkey-labels.js"
   ]
 }
