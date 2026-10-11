@@ -80,6 +80,12 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
+### New in 0.84.1
+
+- **The theme you pick is the one you get**, without light and dark pieces mixed in the dock and its menus.
+- **An even notch dot**, drawn whole at rest.
+- **The dock grows out of the notch** when something is playing or a timer is running.
+
 ### New in 0.84
 
 - **Keyboard and clicks like the taskbar** — arrow keys move along the dock; Shift+click opens another window and Ctrl+Shift+click runs as administrator.
@@ -101,7 +107,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 - **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
 - **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 
