@@ -9,11 +9,7 @@ import { S } from "./state.js";
 import { dockEl, stackEl } from "./dom.js";
 import { checkScreenChange } from "./frame.js";
 import { pollSlowdown } from "./live-widgets.js";
-
-// Calls into modules that import this one. dock.js wires them before boot, so
-// the imports never form a cycle.
-const deps = {};
-export function wireRunningWindows(fns) { Object.assign(deps, fns); }
+import { refreshTrashState } from "./render.js";
 
 // ─────────────────── Running-app indicators ───────────────────
 
@@ -65,7 +61,7 @@ export function startRunningPoll() {
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
-    if (refreshTrash && dockEl.querySelector(".tile.trash")) deps.refreshTrashState();
+    if (refreshTrash && dockEl.querySelector(".tile.trash")) refreshTrashState();
     // Running state powers switching and hints independently of visible dots.
     // Nothing that could be "running" is pinned (only widgets/trash/separators) →
     // skip enumerating every window (which now also resolves each process's exe).

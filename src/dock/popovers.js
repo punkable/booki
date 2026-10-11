@@ -11,11 +11,7 @@ import { baseName } from "./helpers.js";
 import { dockEl, esc } from "./dom.js";
 import { reframe, applyFrame } from "./frame.js";
 import { scheduleHide } from "./autohide.js";
-
-// Calls into modules that import this one. dock.js wires them before boot, so
-// the imports never form a cycle.
-const deps = {};
-export function wirePopovers(fns) { Object.assign(deps, fns); }
+import { refreshTrashState } from "./render.js";
 
 // ─────────────────────── Trash confirmation ───────────────────────
 // A small in-dock popover: nothing is ever deleted without an explicit yes.
@@ -158,7 +154,7 @@ export function confirmTrash(paths, emptyBin = false) {
       trashBlockedInfo();
       return;
     }
-    await deps.refreshTrashState();
+    await refreshTrashState();
     S.pinnedReveal = false;
     scheduleHide();
   });

@@ -6,7 +6,6 @@ import {
   dock as dockApi,
   pickAppFile,
   pickFolder,
-  pickImageFile,
   onFileDrop,
   onConfigChanged,
   onOcclusion,
@@ -21,37 +20,18 @@ import {
   logMessage,
   isTauri,
 } from "./api.js";
-import { createDockTooltip, setTileLabel } from "./dock/tooltip.js";
-import { buildProductivityPanel } from "./dock/productivity-panel.js";
-import { createDraftSaver } from "./dock/draft-saver.js";
+import { createDockTooltip } from "./dock/tooltip.js";
 import { observeSystem } from "./dock/system-observer.js";
-import { widgetWidth } from "./dock/layout-model.js";
 import { icon } from "./icons.js";
 import { emo } from "./emoji.js";
-import { isLibIcon, resolveLibIcon, libGlyphSVG } from "./icon-library.js";
+import { libGlyphSVG } from "./icon-library.js";
 import { applyEdge } from "./theme.js";
 import { paintedLook } from "./system-look.js";
 import { t, ensureLang } from "./i18n.js";
-import {
-  WIDGET_ICONS,
-  WIDGET_GLYPHS,
-  WIDGET_VARIANTS,
-  PREVIEW_WIDGETS,
-  RING_DEFAULTS,
-  WIDGET_META,
-  canonicalWidget,
-} from "./widgets-meta.js";
-import { reduceMotion } from "./dock/motion.js";
+import { WIDGET_VARIANTS } from "./widgets-meta.js";
 import { placeBesideBar, transformOrigin } from "./dock/placement.js";
-import {
-  MEDIA_SVG,
-  widgetCardHTML,
-  setPreviewSubText,
-  refreshPreviewMarquees,
-  LIVE_WIDGETS,
-} from "./dock/widget-view.js";
+import { refreshPreviewMarquees } from "./dock/widget-view.js";
 import { groupAppearance } from "./group-style.js";
-import { pinFallback } from "./pin-fallback.js";
 import { canMergeKind, kindForPath, mergePins, placePin, takeOutOfGroup } from "./pins.js";
 import { createFolderNavigation } from "./dock/folder-navigation.js";
 import { menuActions, moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
@@ -60,13 +40,11 @@ import { buildLauncher } from "./dock/launcher.js";
 import { materialTint, setMaterialTint, followFrames } from "./material.js";
 import { S } from "./dock/state.js";
 import {
-  iconCache,
   uid,
   isVertical,
   baseSize,
   findPinnedById,
   widgetLabel,
-  findWidgetPin,
   syncIcon,
   resolveIcon,
   baseName,
@@ -92,9 +70,6 @@ import {
 import { fitDock, reframe, applyFrame, checkScreenChange } from "./dock/frame.js";
 import {
   cacheWidgetEls,
-  eachWidget,
-  tickClocks,
-  tickProductivity,
   queueVolumeSet,
   adjustVolumeFromWheel,
   widgetPresent,
@@ -118,24 +93,15 @@ import {
   softOpen,
 } from "./dock/autohide.js";
 import { addMenuHead, placeMenu, closeMenu } from "./dock/menu-core.js";
+import { render, widgetTile, wireRender } from "./dock/render.js";
 import {
   windowsFor,
   setAttention,
   clearAttention,
   startRunningPoll,
-  wireRunningWindows,
 } from "./dock/running-windows.js";
-import { placeUndoToast, showUndoToast, wireUndoToast } from "./dock/undo-toast.js";
-import {
-  popButton,
-  showConfirmPop,
-  dismissPop,
-  closeTrashPop,
-  placePop,
-  confirmTrash,
-  confirmMove,
-  wirePopovers,
-} from "./dock/popovers.js";
+import { placeUndoToast, wireUndoToast } from "./dock/undo-toast.js";
+import { dismissPop, closeTrashPop, placePop, confirmTrash, confirmMove } from "./dock/popovers.js";
 import {
   maybeSyncCtxMenu,
   checkAutoProfile,
@@ -144,7 +110,19 @@ import {
   persist,
   wireConfigSync,
 } from "./dock/config-sync.js";
+import { closeProductivityPanel, openProductivity, editNote } from "./dock/widget-editors.js";
+import {
+  addWidget,
+  onAddApp,
+  onAddFolder,
+  addPaths,
+  renameGroup,
+  confirmShortcutOut,
+  removeItem,
+  openWith,
+} from "./dock/pin-ops.js";
 import { toggleClipboardStack, wireClipboardStack } from "./dock/clipboard-stack.js";
+import { openMenu, openBackgroundMenu, openFileMenu, wireMenus } from "./dock/menus.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
@@ -254,527 +232,6 @@ window.addEventListener("resize", () => {
   autoProfileResize = setTimeout(checkAutoProfile, 1500);
 });
 
-// ──────────────────────────── Render ────────────────────────────
-
-// Remember which ids were on the bar last render, so only genuinely NEW tiles
-// animate in (not every tile on an unrelated re-render).
-let lastRenderIds = new Set();
-let renderGeneration = 0;
-
-async function render() {
-  const generation = ++renderGeneration;
-  const snapshot = S.cfg;
-  // Build every tile in parallel and swap the whole bar in ONE DOM operation —
-  // no icons popping in one by one, no empty-bar flash between renders.
-  const tiles = await Promise.all(
-    snapshot.pinned.map((item) => {
-      if (item.kind === "separator") return separatorTile(item);
-      if (item.kind === "group") return groupTile(item);
-      if (item.kind === "widget") return widgetTile(item);
-      if (item.kind === "trash") return trashTile(item);
-      if (item.kind === "action") return actionTile(item);
-      return appTile(item);
-    })
-  );
-  if (generation !== renderGeneration || S.cfg !== snapshot) return;
-  // Fade+scale in only the tiles that weren't on the bar before.
-  const prevIds = lastRenderIds;
-  for (const el of tiles) {
-    const id = el.dataset && el.dataset.id;
-    if (id && !prevIds.has(id)) el.classList.add("tile-in");
-  }
-  dockEl.replaceChildren(...tiles);
-  lastRenderIds = new Set(S.cfg.pinned.map((p) => p.id));
-  cacheWidgetEls();
-  requestAnimationFrame(refreshPreviewMarquees);
-
-  // Empty state opens the same searchable app/widget panel as the dock menu.
-  if (!S.cfg.pinned.some((p) => p.kind !== "separator")) {
-    const hint = document.createElement("button");
-    hint.className = "tile hint";
-    hint.style.setProperty("--size", `${baseSize()}px`);
-    hint.title = t("dock.emptyAdd");
-    // The capybara mascot waves you in — friendlier than a bare "+".
-    hint.innerHTML =
-      `<span class="label">${t("dock.emptyAdd")}</span>` +
-      `<span class="hint-capy"><img src="/brand/svg/isotype.svg" alt="" draggable="false" />` +
-      `<span class="hint-plus-badge">${icon("plus")}</span></span>`;
-    hint.addEventListener("click", () => openAddPanel(hint));
-    hint.addEventListener("contextmenu", (e) => openBackgroundMenu(e));
-    dockEl.appendChild(hint);
-  }
-  dockKeys.sync();
-
-  fitDock();
-  // Repaint widget values right away so a freshly built card never lingers on
-  // its "…" placeholder (e.g. after adding a widget or any structural re-render).
-  // syncPolls() paints at once and restarts timers only if the live widget
-  // kinds changed; it self-guards while the dock is tucked away.
-  if (!S.hiddenState) syncPolls();
-}
-
-function actionTile(item) {
-  const el = document.createElement("button"); el.className = "tile action-tile";
-  const label = item.name && item.name !== "Booki" ? item.name : t("m.settings");
-  el.dataset.id = item.id; setTileLabel(el, label);
-  el.style.setProperty("--size", `${baseSize()}px`);
-  const fallback = () => { const glyph = document.createElement("span"); glyph.className = "action-icon"; glyph.innerHTML = icon("settings"); el.appendChild(glyph); };
-  if (item.icon) {
-    const img = document.createElement("img"); img.alt = "";
-    img.addEventListener("error", () => { img.remove(); fallback(); }, { once: true });
-    img.src = isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon; el.appendChild(img);
-  } else fallback();
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  const rm = document.createElement("span"); rm.className = "rm"; rm.innerHTML = icon("x"); rm.title = t("apps.remove");
-  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
-  rm.addEventListener("click", (e) => { e.stopPropagation(); removeItem(item.id); }); el.appendChild(rm);
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item)); return el;
-}
-
-function appTile(item) {
-  const el = document.createElement("button");
-  el.className = "tile";
-  el.dataset.id = item.id;
-  el.style.setProperty("--size", `${baseSize()}px`);
-  // Accessible name is independent of the custom hover/focus hint.
-  setTileLabel(el, item.name);
-
-  const label = document.createElement("span");
-  label.className = "label";
-  label.textContent = item.name;
-  el.appendChild(label);
-
-  const badge = document.createElement("span");
-  badge.className = "badge";
-  el.appendChild(badge);
-
-  const addGlyph = () => {
-    if (el.querySelector(".glyph, img")) return;
-    const look = pinFallback(item);
-    const glyph = document.createElement("span");
-    glyph.className = "glyph fallback";
-    glyph.style.setProperty("--fb-color", look.color);
-    glyph.style.setProperty("--fb-deep", look.deep);
-    glyph.style.setProperty("--fb-ink", look.ink);
-    if (look.glyph) glyph.innerHTML = icon(look.glyph);
-    else glyph.textContent = look.letter;
-    el.appendChild(glyph);
-  };
-  const addImg = (src) => {
-    const img = document.createElement("img");
-    img.alt = item.name;
-    // If the icon fails to decode, drop it, show the initial glyph, and forget
-    // the cached value so a later render can try extracting it again.
-    img.addEventListener("error", () => {
-      img.remove();
-      iconCache.delete(item.path);
-      addGlyph();
-    });
-    img.src = src;
-    el.appendChild(img);
-  };
-  // Show the icon we already have instantly; otherwise a shimmer skeleton while
-  // it extracts (cold app icons take a beat on Windows) — never a blank tile.
-  const now = syncIcon(item);
-  if (now) {
-    addImg(now);
-  } else {
-    const skel = document.createElement("span");
-    skel.className = "glyph skel";
-    el.appendChild(skel);
-    resolveIcon(item)
-      .then((src) => { skel.remove(); src ? addImg(src) : addGlyph(); })
-      .catch(() => { skel.remove(); addGlyph(); });
-  }
-
-  // Remove badge — only visible in edit mode.
-  const rm = document.createElement("button");
-  rm.className = "rm";
-  rm.innerHTML = icon("x");
-  rm.title = t("apps.remove");
-  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
-  rm.addEventListener("click", (e) => {
-    e.stopPropagation();
-    removeItem(item.id);
-  });
-  el.appendChild(rm);
-
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
-  return el;
-}
-
-// A "folder"/group tile — shows up to four child icons in a mini grid (iOS-style)
-// and opens a flyout with its contents on click.
-function groupTile(item) {
-  const el = document.createElement("button");
-  el.className = "tile group";
-  el.dataset.id = item.id;
-  el.style.setProperty("--size", `${baseSize()}px`);
-  const look = groupAppearance(item);
-  if (look.color) { el.style.setProperty("--group-color", look.color); el.style.setProperty("--group-ink", look.ink); el.classList.add("tinted"); }
-  setTileLabel(el, item.name || t("group.new"));
-
-  const grid = document.createElement("span");
-  grid.className = "group-grid";
-  const setMiniImg = (mini, src) => {
-    const img = document.createElement("img");
-    img.src = src;
-    img.alt = "";
-    mini.appendChild(img);
-  };
-  const setMiniLetter = (mini, child) => {
-    const look = pinFallback(child);
-    mini.classList.add("fallback");
-    mini.style.setProperty("--fb-color", look.color);
-    mini.style.setProperty("--fb-deep", look.deep);
-    mini.style.setProperty("--fb-ink", look.ink);
-    if (look.glyph) mini.innerHTML = icon(look.glyph);
-    else mini.textContent = look.letter;
-  };
-  const kids = (item.children || []).slice(0, 4);
-  for (const child of kids) {
-    const mini = document.createElement("span");
-    mini.className = "group-mini";
-    if (child.kind === "widget") {
-      // A grouped widget previews as its emoji (it only goes live inside the group).
-      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
-    } else {
-      const now = syncIcon(child);
-      if (now) {
-        setMiniImg(mini, now);
-      } else {
-        mini.classList.add("skel");
-        resolveIcon(child)
-          .then((src) => { mini.classList.remove("skel"); src ? setMiniImg(mini, src) : setMiniLetter(mini, child); })
-          .catch(() => { mini.classList.remove("skel"); setMiniLetter(mini, child); });
-      }
-    }
-    grid.appendChild(mini);
-  }
-  if (!kids.length) grid.innerHTML = icon("grid");
-  if (look.glyph) {
-    // A glyph makes the group a solid badge in its colour.
-    el.classList.add("badge-group");
-    grid.innerHTML = libGlyphSVG(look.glyph);
-  } else if (item.icon) {
-    const fallback = [...grid.childNodes];
-    const cover = document.createElement("img"); cover.className = "group-cover"; cover.alt = "";
-    cover.addEventListener("error", () => grid.replaceChildren(...fallback), { once: true });
-    cover.src = isLibIcon(item.icon) ? resolveLibIcon(item.icon) : item.icon;
-    grid.replaceChildren(cover);
-  }
-  el.appendChild(grid);
-
-  const label = document.createElement("span");
-  label.className = "label";
-  label.textContent = item.name || t("group.new");
-  el.appendChild(label);
-
-  const badge = document.createElement("span");
-  badge.className = "badge";
-  el.appendChild(badge);
-
-  const rm = document.createElement("button");
-  rm.className = "rm";
-  rm.innerHTML = icon("x");
-  rm.title = t("apps.remove");
-  rm.addEventListener("pointerdown", (e) => e.stopPropagation());
-  rm.addEventListener("click", (e) => {
-    e.stopPropagation();
-    removeItem(item.id);
-  });
-  el.appendChild(rm);
-
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
-  return el;
-}
-
-// Recycle Bin pin: drop files on it to delete (with an in-dock confirmation);
-// click opens the bin. The icon tints when the bin has items in it.
-function trashTile(item) {
-  const el = document.createElement("button");
-  el.className = "tile trash";
-  el.dataset.id = item.id;
-  el.style.setProperty("--size", `${baseSize()}px`);
-  setTileLabel(el, t("trash.name"));
-  el.innerHTML =
-    `<span class="label">${t("trash.name")}</span>` +
-    `<span class="badge trash-count"></span>` +
-    `<span class="trash-glyph">${icon("trash")}</span>`;
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
-  refreshTrashState(el);
-  return el;
-}
-
-async function refreshTrashState(el) {
-  const tile = el || dockEl.querySelector(".tile.trash");
-  if (!tile) return;
-  const count = await dockApi.trashCount().catch(() => 0);
-  tile.classList.toggle("full", count > 0);
-  const badge = tile.querySelector(".trash-count");
-  if (badge) badge.textContent = count > 0 ? (count > 99 ? "99+" : String(count)) : "";
-  setTileLabel(tile, count > 0 ? `${t("trash.name")} · ${count}` : t("trash.name"));
-}
-
-function separatorTile(item) {
-  const el = document.createElement("div");
-  el.className = "tile separator";
-  el.dataset.id = item.id;
-  el.style.setProperty("--size", `${Math.round(baseSize() * 0.5)}px`);
-  el.innerHTML = `<span class="sep-line"></span>`;
-  el.addEventListener("contextmenu", (e) => openMenu(e, item));
-  el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
-  return el;
-}
-
-// ───────────────────────────── Widgets ─────────────────────────────
-// macOS-style "cards" living in the dock: a live clock, CPU%, RAM% and network
-// throughput. Cheap by design — stats only poll while the dock is visible.
-
-function widgetTile(item, { inFlyout = false } = {}) {
-  const type = canonicalWidget(item.widget || "clock") || "clock";
-  const st = item.style || {};
-  const el = document.createElement("button");
-  el.className = "tile widget" + (inFlyout ? " in-flyout" : "");
-  el.dataset.id = item.id;
-  el.dataset.widget = type;
-  el.dataset.span = String(st.span || "auto");
-  el.style.setProperty("--widget-width", `${widgetWidth(type, baseSize(), S.cfg.spacing ?? 6, st)}px`);
-  el.dataset.variant = st.variant || "glass";
-  if (type === "media" && st.scrollVolume) el.dataset.scrollVolume = "1";
-  if (st.color) el.style.setProperty("--w-accent", st.color);
-  else if (RING_DEFAULTS[type]) {
-    el.style.setProperty("--w-accent", RING_DEFAULTS[type]);
-    el.dataset.autoAccent = "1"; // no custom color set → the battery ring may still shift to red when low
-  } else if (WIDGET_META[type]) {
-    el.style.setProperty("--w-accent", WIDGET_META[type].accent);
-  }
-  if (st.animated) el.classList.add("animated");
-  if (st.icon === false) el.classList.add("no-ico");
-  el.style.setProperty("--size", `${baseSize()}px`);
-  setTileLabel(el, widgetLabel(type));
-  if (LIVE_WIDGETS.includes(type)) el.setAttribute("aria-live", "polite");
-
-  const card = document.createElement("span");
-  card.className = "w-card";
-  if (PREVIEW_WIDGETS.includes(type)) el.classList.add("preview");
-  card.innerHTML = widgetCardHTML(type, st);
-  el.appendChild(card);
-
-  // On the bar the widget is a full dock tile (removable, draggable, right-click
-  // menu). Inside a group flyout it's just a live read-out — the flyout supplies
-  // its own take-out/remove and drag-out gestures, so skip the dock wiring.
-  if (!inFlyout) {
-    const rm = document.createElement("button");
-    rm.className = "rm";
-    rm.innerHTML = icon("x");
-    rm.title = t("apps.remove");
-    rm.addEventListener("pointerdown", (e) => e.stopPropagation());
-    rm.addEventListener("click", (e) => {
-      e.stopPropagation();
-      removeItem(item.id);
-    });
-    el.appendChild(rm);
-    el.addEventListener("contextmenu", (e) => openMenu(e, item));
-    el.addEventListener("pointerdown", (e) => onPointerDown(e, el, item));
-  }
-  if (type === "media") {
-    el.classList.add("media");
-    const art = document.createElement("img");
-    art.className = "w-art";
-    art.alt = "";
-    card.prepend(art);
-    el.querySelector(".w-label").textContent = t("w.media");
-    el.querySelector(".w-value").textContent = "—";
-    el.querySelector(".w-bar").style.display = "none";
-    // Hover controls: previous · play/pause · next (click on the card itself
-    // still toggles play/pause). Crisp SVG glyphs, not text emoji.
-    const controls = document.createElement("span");
-    controls.className = "w-controls";
-    const mkCtl = (label, svg, fn, cls) => {
-      const b = document.createElement("button");
-      b.className = "w-ctl" + (cls ? ` ${cls}` : "");
-      b.title = label;
-      b.setAttribute("aria-label", label);
-      b.innerHTML = svg;
-      b.addEventListener("pointerdown", (e) => e.stopPropagation());
-      b.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        // A failing native media call must never bubble as an uncaught error.
-        try { await fn(); } catch (_) {}
-        setTimeout(refreshMedia, 350); // refresh title/state right away
-      });
-      controls.appendChild(b);
-    };
-    mkCtl(t("w.prev"), MEDIA_SVG.prev, () => dockApi.mediaPrev());
-    mkCtl(t("w.playPause"), MEDIA_SVG.play, () => dockApi.mediaToggle(), "w-ctl-toggle");
-    mkCtl(t("w.next"), MEDIA_SVG.next, () => dockApi.mediaNext());
-    card.appendChild(controls);
-  }
-  if (["clock", "focus", "calendar", "weather"].includes(type)) tickClocks();
-  if (type === "notes") {
-    el.querySelector(".w-pv-title").textContent = t("w.notes");
-    setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
-    setTileLabel(el, widgetLabel("notes"));
-  }
-  if (type === "clipboard") {
-    el.querySelector(".w-pv-title").textContent = t("w.clipboard");
-    setPreviewSubText(el, t("clip.empty"), true);
-  }
-  return el;
-}
-
-function closeProductivityPanel() {
-  S.productivityPanel?.dispose?.();
-  S.productivityPanel?.remove(); S.productivityPanel = null; S.pinnedReveal = false; reframe(); scheduleHide();
-}
-function openProductivity(item, tile) {
-  closeProductivityPanel();
-  const panel = buildProductivityPanel(item, {
-    save: async (draft, previous) => {
-      // Recovery replaces cfg objects. Resolve the live pin by stable id on
-      // every edit, retaining unrelated appearance changes from Settings.
-      const live = findPinnedById(draft.id);
-      if (!live || live.kind !== "widget" || live.widget !== draft.widget) throw Object.assign(new Error("widget no longer exists"), { code: "WIDGET_UNAVAILABLE" });
-      const next = { ...(live.style || {}) };
-      for (const key of new Set([...Object.keys(previous || {}), ...Object.keys(draft.style || {})])) {
-        if (JSON.stringify(previous?.[key]) === JSON.stringify(draft.style?.[key])) continue;
-        if (draft.style?.[key] === undefined) delete next[key]; else next[key] = structuredClone(draft.style[key]);
-      }
-      live.style = next;
-      if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved");
-      draft.style = structuredClone(findPinnedById(draft.id)?.style || next);
-      tickProductivity();
-    }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
-  });
-  panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
-  S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
-  const place = () => {
-    if (!panel.isConnected) return;
-    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
-    panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
-  };
-  const dispose = panel.dispose;
-  const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
-  panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
-}
-
-async function addWidget(type, { showError = true } = {}) {
-  S.cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
-  if (!(await persist({}, { showError }))) return false;
-  await render();
-  reframe();
-  return true;
-}
-
-// Notes use a serialized autosave and keep their draft visible on failure.
-let noteEditor = null;
-async function closeNoteEditor() {
-  const editor = noteEditor;
-  if (!editor) return true;
-  if (!(await editor.flush())) return false;
-  if (noteEditor !== editor) return true;
-  editor.dispose(); editor.remove(); noteEditor = null;
-  S.pinnedReveal = false; reframe(); scheduleHide();
-  return true;
-}
-async function editNote(item) {
-  if (!(await closeNoteEditor())) return;
-  closeProductivityPanel();
-  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-  if (!tile) return;
-  const panel = document.createElement("section");
-  panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
-  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
-  const head = document.createElement("div"); head.className = "productivity-head";
-  const title = document.createElement("strong"); title.textContent = t("w.notes");
-  const close = document.createElement("button"); close.type = "button"; close.className = "stack-close"; close.innerHTML = icon("x"); close.title = t("stack.close"); close.setAttribute("aria-label", t("stack.close"));
-  close.addEventListener("click", closeNoteEditor); head.append(title, close);
-  const ta = document.createElement("textarea"); ta.className = "note-input";
-  ta.value = item.style?.note || ""; ta.placeholder = t("w.notesEmpty"); ta.setAttribute("aria-label", t("w.notes")); ta.maxLength = 20000;
-  const footer = document.createElement("div"); footer.className = "note-save-state";
-  const status = document.createElement("span"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.textContent = t("status.saved");
-  const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
-  let recoveryPending = true;
-  let retryLoad = null;
-  // Each save writes the whole config, so it waits for a ~1 s pause in typing
-  // (the last argument). Closing the editor flushes whatever is still pending.
-  const saver = createDraftSaver(async (text) => {
-    // Journal first: a failed configuration write still leaves a recoverable
-    // encrypted local copy. Clear only the matching text after durable save.
-    await dockApi.writeNoteDraft(item.id, text);
-    const current = findWidgetPin(item.id);
-    if (!current || current.widget !== "notes") return false;
-    current.style = { ...(current.style || {}), note: text };
-    if (!(await persist({}, { showError: false }))) return false;
-    eachWidget("notes", (el) => {
-      if (el.dataset.id !== item.id) return;
-      setPreviewSubText(el, text || t("w.notesEmpty"), !text);
-      setTileLabel(el, widgetLabel("notes"));
-    });
-    await dockApi.clearNoteDraft(item.id, text);
-    return true;
-  }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; }, 1000);
-  panel.flush = () => recoveryPending ? Promise.resolve(true) : saver.flush(); panel.dispose = saver.cancelTimer;
-  retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } }); footer.append(status, retry); panel.append(head, ta, footer);
-  ta.disabled = true;
-  const loadRecovery = async () => {
-    retry.hidden = true; status.textContent = t("overhaul.loading");
-    try {
-      const recovered = await dockApi.readNoteDraft(item.id);
-      if (noteEditor !== panel) return;
-      if (recovered != null && recovered !== ta.value) {
-        const recovery = document.createElement("div"); recovery.className = "note-recovery";
-        recovery.setAttribute("role", "status");
-        const message = document.createElement("p"); message.textContent = t("notes.recoveryFound"); recovery.append(message);
-        const preview = document.createElement("div"); preview.className = "note-recovery-preview"; preview.textContent = recovered || t("w.notesEmpty"); recovery.append(preview);
-        const restore = document.createElement("button"); restore.type = "button"; restore.className = "productivity-button"; restore.textContent = t("notes.restoreDraft");
-        const discard = document.createElement("button"); discard.type = "button"; discard.className = "productivity-button"; discard.textContent = t("notes.discardDraft");
-        const resume = () => { recovery.remove(); recoveryPending = false; retryLoad = null; ta.disabled = false; ta.focus(); status.textContent = t("status.saved"); };
-        restore.addEventListener("click", () => { ta.value = recovered; resume(); saver.change(recovered); });
-        discard.addEventListener("click", async () => {
-          restore.disabled = discard.disabled = true;
-          try { await dockApi.clearNoteDraft(item.id, recovered); if (noteEditor === panel) resume(); }
-          catch { status.textContent = t("status.saveError"); restore.disabled = discard.disabled = false; }
-        });
-        recovery.append(restore, discard); panel.insertBefore(recovery, ta);
-        status.textContent = t("notes.recoveryFound"); retryLoad = null; restore.focus();
-      } else {
-        if (recovered != null) await dockApi.clearNoteDraft(item.id, recovered);
-        if (noteEditor !== panel) return;
-        recoveryPending = false; retryLoad = null; ta.disabled = false; status.textContent = t("status.saved"); ta.focus();
-      }
-    } catch {
-      if (noteEditor !== panel) return;
-      status.textContent = t("status.saveError"); retry.hidden = false; retryLoad = loadRecovery;
-    }
-  };
-  ta.addEventListener("input", () => saver.change(ta.value));
-  panel.addEventListener("keydown", async (event) => {
-    event.stopPropagation();
-    if (event.key === "Escape" || ((event.ctrlKey || event.metaKey) && event.key === "Enter")) { event.preventDefault(); await closeNoteEditor(); }
-  });
-  panel.addEventListener("focusout", (event) => {
-    if (event.relatedTarget && panel.contains(event.relatedTarget)) return;
-    // Only close after focus has really moved out; a native dialog can blur it.
-    requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
-  });
-  document.body.appendChild(panel); noteEditor = panel; S.pinnedReveal = true; applyFrame();
-  loadRecovery();
-  const place = () => {
-    if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
-    panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
-  };
-  const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
-  panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); if (ta.disabled) panel.focus(); else ta.focus(); });
-}
-
 // ─────────────────────────── Launch ───────────────────────────
 
 /** Taskbar modifiers on a click: Shift opens a new instance, Ctrl+Shift runs
@@ -865,59 +322,6 @@ function openWindowPicker(el, item, wins) {
   // After the click that opened it has finished bubbling: a window click
   // closes any open menu.
   setTimeout(() => placeMenu({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }), 0);
-}
-
-async function onAddApp() {
-  const path = await pickAppFile();
-  if (!path) return;
-  await addPaths([path]);
-}
-
-async function onAddFolder() {
-  const path = await pickFolder();
-  if (!path) return;
-  await addPaths([path], "folder");
-}
-
-// The desktop Recycle Bin is a shell namespace item, not a normal folder — its
-// path (or a shortcut to it) carries one of these signatures. Pinning it should
-// give the Booki trash tile, not a broken folder pin.
-function isRecycleBin(path) {
-  const p = String(path).toLowerCase();
-  return (
-    p.includes("645ff040-5081-101b-9f08-00aa002f954e") || // Recycle Bin CLSID
-    p.includes("recyclebinfolder") ||
-    p.includes("$recycle.bin") ||
-    /(^|[\\/])recycle bin\.lnk$/.test(p) ||
-    /(^|[\\/])papelera( de reciclaje)?\.lnk$/.test(p)
-  );
-}
-
-async function addPaths(paths, forceKind, atIndex = null, { showError = true } = {}) {
-  const items = [];
-  for (const path of paths) {
-    if (isRecycleBin(path)) {
-      // Only one trash tile makes sense; if it's already there, skip silently.
-      if (!S.cfg.pinned.some((p) => p.kind === "trash")) {
-        items.push({ id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" });
-      }
-      continue;
-    }
-    let kind = forceKind || "app";
-    if (!forceKind) {
-      try {
-        if (await dockApi.isDir(path)) kind = "folder";
-      } catch (_) {}
-    }
-    items.push({ id: uid(), name: baseName(path), path, args: [], kind });
-  }
-  // Land exactly where the insertion gap showed during the drag (null = end).
-  if (atIndex == null || atIndex >= S.cfg.pinned.length) S.cfg.pinned.push(...items);
-  else S.cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
-  if (!(await persist({}, { showError }))) return false;
-  await render();
-  reframe();
-  return true;
 }
 
 // Show the changelog the first time the app opens after an update.
@@ -1541,101 +945,6 @@ async function createGroup(draggedId, targetId) {
   reframe();
 }
 
-// ─── Pin rename / folder management ───
-let renameTimer = null;
-function pinNameFallback(item) {
-  if (!item) return "App";
-  if (item.kind === "group") return t("group.new");
-  if (item.kind === "trash") return t("trash.name");
-  if (item.kind === "widget") return item.name || item.widget || "Widget";
-  if (item.kind === "folder") return item.name || baseName(item.path) || t("m.addFolder");
-  return item.name || baseName(item.path) || "App";
-}
-function renamePinnedItem(item, name, { commit = false } = {}) {
-  // Pins inside a group are renamed from the flyout, so look beyond the top level.
-  const live = findPinnedById(item.id);
-  if (!live) return;
-  const fallback = pinNameFallback(item);
-  const next = String(name || "").trim() || fallback;
-  live.name = commit ? next : name;
-  item.name = live.name;
-  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-  if (tile) {
-    setTileLabel(tile, commit ? next : (name || fallback));
-    const lab = tile.querySelector(".label");
-    if (lab) lab.textContent = commit ? next : (name || fallback);
-  }
-  const stackInput = stackEl?.querySelector?.(".stack-rename");
-  if (stackInput && S.stackItemId === item.id && document.activeElement !== stackInput) {
-    stackInput.value = commit ? next : (name || "");
-  }
-  clearTimeout(renameTimer);
-  if (commit) {
-    live.name = next;
-    item.name = next;
-    persist();
-  } else {
-    renameTimer = setTimeout(() => {
-      const pin = findPinnedById(item.id);
-      if (pin) {
-        pin.name = String(pin.name || "").trim() || fallback;
-        persist();
-      }
-    }, 400);
-  }
-}
-function renameGroup(group, name, opts) {
-  renamePinnedItem(group, name, opts);
-}
-/** Inline rename popover from the dock context menu (apps, folders, groups…). */
-function promptRename(item) {
-  if (!item || item.kind === "separator") return;
-  S.pinnedReveal = true;
-  closeMenu();
-  closeTrashPop();
-  const pop = document.createElement("div");
-  pop.className = "trash-pop rename-pop";
-  pop.innerHTML = `${icon("pencil")}<span class="tp-col"><span class="tp-text">${esc(t("apps.rename"))}</span></span>`;
-  const input = document.createElement("input");
-  input.className = "rename-pop-input";
-  input.type = "text";
-  input.value = item.name || "";
-  input.maxLength = 80;
-  input.setAttribute("aria-label", t("apps.rename"));
-  const finish = (commit) => {
-    if (commit) renamePinnedItem(item, input.value, { commit: true });
-    closeTrashPop();
-    S.pinnedReveal = false;
-    scheduleHide();
-  };
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      finish(true);
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      finish(false);
-    }
-  });
-  const ok = document.createElement("button");
-  ok.className = "tp-btn";
-  ok.textContent = t("apps.rename");
-  ok.addEventListener("click", () => finish(true));
-  const cancel = document.createElement("button");
-  cancel.className = "tp-btn";
-  cancel.textContent = t("trash.cancel");
-  cancel.addEventListener("click", () => finish(false));
-  pop.appendChild(input);
-  pop.appendChild(ok);
-  pop.appendChild(cancel);
-  S.trashPop = pop;
-  placePop(pop);
-  requestAnimationFrame(() => {
-    input.focus();
-    input.select();
-  });
-}
-
 // Dissolve a folder: spill its children back to the dock at its position.
 async function ungroup(group) {
   const gi = S.cfg.pinned.findIndex((p) => p.id === group.id);
@@ -1874,257 +1183,6 @@ window.addEventListener("pointerdown", (e) => {
   }
 });
 
-// ───────────────────────── Context menu ─────────────────────────
-
-function confirmShortcutOut(item) {
-  closeTrashPop();
-  const pop = document.createElement("div");
-  pop.className = "trash-pop";
-  const hint = document.createElement("span");
-  hint.className = "tp-text";
-  hint.textContent = t("shortcut.unpinHint");
-  pop.appendChild(hint);
-  const button = (key, action) => {
-    const b = document.createElement("button");
-    b.className = "tp-btn";
-    b.textContent = t(key);
-    b.addEventListener("click", async () => { closeTrashPop(); await action(); });
-    pop.appendChild(b);
-  };
-  button("shortcut.desktop", async () => {
-    if (await relocateShortcut(item, true)) await removeItem(item.id);
-  });
-  button("m.remove", () => removeItem(item.id));
-  button("trash.cancel", () => {});
-  S.trashPop = pop;
-  placePop(pop);
-}
-
-async function relocateShortcut(item, toDesktop) {
-  try {
-    await dockApi.relocateShortcut(item.id, toDesktop);
-    await reloadConfig();
-    return true;
-  } catch (err) {
-    logMessage("error", `shortcut transfer: ${err}`);
-    const pop = document.createElement("div");
-    pop.className = "trash-pop";
-    pop.textContent = t("shortcut.error");
-    closeTrashPop();
-    S.trashPop = pop;
-    placePop(pop);
-    return false;
-  }
-}
-
-function menuKindLabel(item) {
-  if (!item) return t("m.system");
-  if (item.kind === "action") return t("m.settings");
-  if (item.kind === "widget") return t("m.widgets");
-  if (item.kind === "folder") return t("m.folder");
-  if (item.kind === "group") return t("m.group");
-  if (item.kind === "separator") return t("m.separator");
-  if (item.kind === "trash") return t("trash.name");
-  return t("m.app");
-}
-
-function openMenu(e, item) {
-  e.preventDefault();
-  e.stopPropagation();
-  ctxMenu.innerHTML = "";
-  const { add, sep } = menuActions(ctxMenu, closeMenu);
-  const generation = ++S.menuGeneration;
-  addMenuHead(menuPinTitle(item), menuKindLabel(item));
-
-  // Like the macOS dock: an app's open windows come first (the likeliest
-  // reason to right-click a running app is to pick one of them), then what
-  // you can do with it, then how it sits on the dock, then removal. Sections
-  // are separated, not titled.
-  const wins = item.kind === "app" || item.kind === "group" ? windowsFor(item) : [];
-  if (wins.length) {
-    for (const w of wins.slice(0, 6)) {
-      add("app", w.title || menuPinTitle(item), () => dockApi.focusWindow(Number(w.hwnd)));
-    }
-    sep();
-  }
-
-  if (item.kind === "action") add("settings", t("m.open"), () => dockApi.openSettings());
-  if (item.kind === "app") {
-    if (wins.length) add("plus", t("m.newWindow"), () => dockApi.launch(item.path, item.args || []));
-    else add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
-    if (isTauri && item.path) add("shield", t("m.runAsAdmin"), () => dockApi.launch(item.path, item.args || [], "runas"));
-  } else if (item.kind === "folder" || item.kind === "group") {
-    add("folder", t("m.open"), () => {
-      // Always open (never toggle-close) — right-click → Open should reveal.
-      const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-      if (tileEl) openStack(tileEl, item);
-    });
-  } else if (item.kind === "trash") {
-    add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
-    add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
-  }
-  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
-  if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
-  if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
-    add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
-    add("external", t("shortcut.desktop"), () => relocateShortcut(item, true));
-  }
-  if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
-  if (wins.length) {
-    add("x", t(wins.length > 1 ? "m.closeAll" : "m.closeWindow"), async () => {
-      for (const w of wins) await dockApi.closeWindow(Number(w.hwnd)).catch(() => {});
-    });
-  }
-
-  // Files this app opened through Booki, then the system's recent files
-  // (filled asynchronously so opening the menu stays instant).
-  let recentsSlot = null;
-  if (item.kind === "app") {
-    if ((item.recents || []).length) {
-      sep();
-      item.recents.slice(0, 6).forEach((rp) => add("external", baseName(rp), () => dockApi.launch(item.path, [rp])));
-    }
-    recentsSlot = document.createElement("div");
-    recentsSlot.className = "ctx-recents";
-    ctxMenu.appendChild(recentsSlot);
-  }
-
-  if (item.kind !== "separator" && item.kind !== "trash") {
-    sep();
-    add("pencil", t("apps.rename"), () => promptRename(item));
-    // A custom icon only makes sense for apps/folders (groups show a mini-grid,
-    // widgets show their card).
-    if (item.kind === "app" || item.kind === "folder") {
-      add("palette", t("m.changeIcon"), () => changeIcon(item));
-      if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
-    }
-    if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
-  }
-  sep();
-  add("plus", t("add.open"), () => openAddPanel(dockEl));
-  add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
-  sep();
-  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
-  sep();
-  add(
-    "trash",
-    t("m.remove"),
-    () => {
-      if (item.kind === "group" && (item.children || []).length > 0) confirmRemoveGroup(item);
-      else removeItem(item.id);
-    },
-    "danger"
-  );
-
-  placeMenu(e);
-  if (recentsSlot) fillRecentFiles(recentsSlot, e, item, generation);
-}
-
-/** Two-step confirm before deleting a whole group (children would go with it). */
-function confirmRemoveGroup(item) {
-  S.pinnedReveal = true;
-  const n = (item.children || []).length;
-  const pop = document.createElement("div");
-  pop.className = "trash-pop";
-  const name = esc(item.name || t("group.new"));
-  pop.innerHTML =
-    `${icon("trash")}<span class="tp-col"><span class="tp-text">${t("group.removeAsk").replace("{name}", () => name).replace("{n}", String(n))}</span>` +
-    `<span class="tp-sub">${t("group.removeSub")}</span></span>`;
-  popButton(pop, "danger", t("apps.remove"), async () => {
-    closeTrashPop();
-    await removeItem(item.id);
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  popButton(pop, "", t("trash.cancel"), () => {
-    closeTrashPop();
-    S.pinnedReveal = false;
-    scheduleHide();
-  });
-  showConfirmPop(pop);
-}
-
-// Recent files for THIS app only (matched by file association in the backend)
-// dropped into the pin's context menu. Runs after the menu is already on
-// screen; re-places it once the items are in. Nothing relevant -> no section.
-async function fillRecentFiles(slot, e, item, generation) {
-  let recents = [];
-  try {
-    recents = await dockApi.recentFilesFor(item.path, 6);
-  } catch (_) {
-    return;
-  }
-  if (!recents?.length || !slot.isConnected || generation !== S.menuGeneration || ctxMenu.classList.contains("hidden")) return;
-  const head = document.createElement("div");
-  head.className = "menu-label";
-  head.textContent = t("m.recent");
-  slot.appendChild(head);
-  recents.forEach((r) => {
-    const b = document.createElement("button");
-    b.innerHTML = `${icon("external")}<span>${esc(r.name)}</span>`;
-    b.title = r.name;
-    b.setAttribute("role", "menuitem");
-    b.tabIndex = -1;
-    b.addEventListener("click", async () => {
-      closeMenu();
-      await dockApi.launch(r.path, []);
-    });
-    slot.appendChild(b);
-  });
-  const s = document.createElement("div");
-  s.className = "sep";
-  slot.appendChild(s);
-  placeMenu(e, false); // preserve keyboard selection while recents arrive
-}
-
-// Right-click on empty dock area / hint → add + profiles + settings.
-function openBackgroundMenu(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  const generation = ++S.menuGeneration;
-  ctxMenu.replaceChildren();
-  const { add, sep } = menuActions(ctxMenu, closeMenu);
-  addMenuHead("Booki", t("m.dockMenu"));
-  add("plus", t("add.open"), () => openAddPanel(dockEl));
-  add("search", t("launcher.menu"), openLauncher);
-  const profilesSlot = document.createElement("div");
-  ctxMenu.append(profilesSlot);
-  sep();
-  add("grid", t("overhaul.editing"), enterEdit);
-  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
-  for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
-    const item = findWidgetPin(el.dataset.id);
-    if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; if (!(await persist())) return; await render(); reframe(); });
-  }
-  placeMenu(e);
-  dockApi.profileList().then((profiles) => {
-    if (!Array.isArray(profiles) || !profiles.length || generation !== S.menuGeneration || ctxMenu.classList.contains("hidden")) return;
-    const actions = menuActions(profilesSlot, closeMenu);
-    actions.sep();
-    for (const name of profiles.slice(0, 6)) actions.add(name === S.cfg.lastProfile ? "check" : "sparkles", name, async () => {
-      const fresh = await dockApi.profileApply(name);
-      S.cfg = fresh; await ensureLang(S.cfg.language); maybeSyncCtxMenu(); applyAll(); await render(); reframe();
-    });
-    placeMenu(e, false);
-  }).catch(() => {});
-}
-
-function openFileMenu(e, item, parent, openFolder) {
-  e.preventDefault(); e.stopPropagation(); ++S.menuGeneration;
-  ctxMenu.replaceChildren();
-  addMenuHead(item.name, item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
-  const { add, sep } = menuActions(ctxMenu, closeMenu);
-  add("external", t("m.open"), () => { if (item.is_dir && openFolder) return openFolder(); if (item.kind === "action") return dockApi.openSettings(); return dockApi.launch(item.path, item.args || []); });
-  if (item.path) {
-    add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));
-    add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));
-    if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
-  }
-  if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
-  sep(); add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
-  placeMenu(e);
-}
-
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 document.addEventListener("contextmenu", (e) => {
@@ -2165,51 +1223,6 @@ window.addEventListener("keydown", (e) => {
     if (S.productivityPanel) closeProductivityPanel();
   }
 });
-
-async function changeIcon(item) {
-  const path = await pickImageFile();
-  if (!path) return;
-  const uri = (await dockApi.imageDataUri(path)) || path;
-  // The picker can stay open while a reload replaces cfg; edit the live pin.
-  const live = findPinnedById(item.id);
-  if (!live) return;
-  live.icon = uri;
-  iconCache.delete(item.path);
-  if (!(await persist())) return;
-  await render();
-}
-async function clearIcon(item) {
-  const live = findPinnedById(item.id);
-  if (!live) return;
-  live.icon = null;
-  iconCache.delete(item.path);
-  if (!(await persist())) return;
-  await render();
-}
-async function addSeparatorAfter(id) {
-  const i = S.cfg.pinned.findIndex((a) => a.id === id);
-  const at = i < 0 ? S.cfg.pinned.length : i + 1;
-  S.cfg.pinned.splice(at, 0, { id: uid(), name: "", path: "", args: [], kind: "separator" });
-  if (!(await persist())) return;
-  await render();
-  reframe();
-}
-async function removeItem(id) {
-  const index = S.cfg.pinned.findIndex((a) => a.id === id);
-  const removed = index >= 0 ? S.cfg.pinned[index] : null;
-  if (!removed) return;
-  // Play a quick fade+scale-out on the tile before the re-render swaps it away.
-  const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
-  if (el && !reduceMotion()) {
-    el.classList.add("tile-out");
-    await new Promise((r) => setTimeout(r, 170));
-  }
-  S.cfg.pinned = S.cfg.pinned.filter((a) => a.id !== id);
-  if (!(await persist())) return;
-  await render();
-  reframe();
-  showUndoToast(removed, index);
-}
 
 // ─────────────────── Window frame (magnify headroom) ───────────────────
 
@@ -2532,17 +1545,6 @@ function clippedText(el, name) {
     .filter((text) => text && text !== name);
   const text = [...new Set(cut)].join(" · ");
   return text.length > 140 ? `${text.slice(0, 139)}…` : text;
-}
-
-// Open files with an app and remember them as recents (a small jump list).
-async function openWith(item, paths) {
-  for (const p of paths) dockApi.launch(item.path, [p]);
-  const i = S.cfg.pinned.findIndex((x) => x.id === item.id);
-  if (i >= 0) {
-    const cur = S.cfg.pinned[i].recents || [];
-    S.cfg.pinned[i].recents = [...paths, ...cur.filter((r) => !paths.includes(r))].slice(0, 8);
-    await persist();
-  }
 }
 
 function setupFileDrop() {
@@ -3281,10 +2283,10 @@ function partyMode() {
 // Hand each module the calls it makes back into modules that import it
 // (see `deps` there).
 wireLiveWidgets({ startRunningPoll });
-wireRunningWindows({ refreshTrashState });
-wireUndoToast({ persist, render });
-wirePopovers({ refreshTrashState });
-wireConfigSync({ render, hideTip, closeStack });
+wireRender({ onPointerDown, openMenu, openBackgroundMenu, removeItem, openAddPanel });
+wireUndoToast({ persist });
+wireConfigSync({ hideTip, closeStack });
 wireClipboardStack({ placeStackNear, closeStack });
+wireMenus({ enterEdit, ungroup, takeOutChild, openStack, openAddPanel, openLauncher });
 
 boot();

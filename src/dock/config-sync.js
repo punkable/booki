@@ -18,6 +18,7 @@ import { fitDock, reframe, SHADOW_PAD, applyFrame } from "./frame.js";
 import { startPolls } from "./live-widgets.js";
 import { hideMode, setupAutoHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
+import { render } from "./render.js";
 import { hideUndoToast, placeUndoToast } from "./undo-toast.js";
 import { closeTrashPop } from "./popovers.js";
 
@@ -101,7 +102,7 @@ export async function reloadConfig({ afterSaves = true } = {}) {
     // Stale flyout handlers hold old children — close rather than lie.
     const keepCatalog = S.stackOpen && S.stackItemId === "__add";
     if (S.stackOpen && !keepCatalog) deps.closeStack();
-    await deps.render();
+    await render();
     if (keepCatalog) S.stackRefreshPins?.();
   } else {
     fitDock();
