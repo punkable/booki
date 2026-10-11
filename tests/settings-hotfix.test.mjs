@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { serveDist, launchBrowser, openPage, makeConfig } from './harness.mjs';
+import { serveDist, launchBrowser, openPage, makeConfig, waitForAsyncCondition } from './harness.mjs';
 import { formatReleaseDate, previousReleases } from '../src/release-notes.js';
+import { formatHotkey } from '../src/settings/hotkey-labels.js';
 import { WIDGET_ORDER } from '../src/widgets-meta.js';
 
 const { srv, port } = await serveDist();
@@ -149,6 +150,36 @@ test('a failed first config read shows an error with Retry instead of an empty w
   await retry.click();
   await page.locator('.home-hero').waitFor();
   assert.equal(await page.getByRole('alert').count(), 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('shortcut key names follow Windows in each language and fall back to the stored name', () => {
+  assert.equal(formatHotkey('Ctrl+Shift+Space', 'es'), 'Ctrl+Mayús+Espacio');
+  assert.equal(formatHotkey('Ctrl+Shift+Space', 'de'), 'Strg+Umschalt+Leertaste');
+  assert.equal(formatHotkey('Ctrl+Shift+Space', 'fr'), 'Ctrl+Maj+Espace');
+  assert.equal(formatHotkey('Super+Alt+K', 'en'), 'Win+Alt+K');
+  assert.equal(formatHotkey('Ctrl+F13', 'xx'), 'Ctrl+F13');
+  assert.equal(formatHotkey('', 'es'), '');
+});
+
+test('shortcut fields show localized key names, store English ones and always offer Clear', async () => {
+  const cfg = makeConfig({ language: 'es', hotkey: '', launcherHotkey: 'Ctrl+Shift+Space', hotkeyModifier: 'Ctrl+Shift' });
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 1100, height: 900 } });
+  await page.getByRole('navigation').getByRole('button', { name: 'Sistema', exact: true }).click();
+  const fields = page.locator('.hotkey');
+  await fields.first().waitFor();
+  assert.equal(await fields.count(), 2);
+  assert.equal(await fields.nth(1).locator('input').inputValue(), 'Ctrl+Mayús+Espacio');
+  const clearToggle = fields.nth(0).getByRole('button', { name: 'Borrar', exact: true });
+  assert.equal(await clearToggle.isDisabled(), true, 'nothing to clear on an empty shortcut');
+  assert.ok(await page.getByRole('group', { name: 'Tecla modificadora' }).getByRole('button', { name: 'Mayús', exact: true }).count());
+  await fields.nth(0).locator('input').press('Control+Shift+K');
+  assert.equal(await fields.nth(0).locator('input').inputValue(), 'Ctrl+Mayús+K');
+  assert.equal(await clearToggle.isDisabled(), false);
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).hotkey === 'Ctrl+Shift+K');
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
+  assert.equal(saved.launcherHotkey, 'Ctrl+Shift+Space');
   assert.deepEqual(errors, []);
   await page.close();
 });

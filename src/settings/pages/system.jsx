@@ -3,11 +3,12 @@
    help and about. */
 import React, { useEffect, useState } from "react";
 import { dock as dockApi, pickSavePath } from "../../api.js";
-import { t } from "../../i18n.js";
+import { t, curLang } from "../../i18n.js";
 import { UpdatesCard } from "../updates.jsx";
 import { ProfilesPage } from "../profiles.jsx";
 import { AutoProfiles } from "../auto-profiles.jsx";
 import { HotkeyInput, LANG_OPTIONS, ModifierPicker } from "../controls.jsx";
+import { formatHotkey } from "../hotkey-labels.js";
 import { CollapsibleSection, Icon, PageHeader, Row, Select, SettingsSection, Toggle } from "../ui.jsx";
 
 const REPO = "https://github.com/punkable/booki";
@@ -94,7 +95,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       </Row>
       <Toggle label={t("sc.positions")} checked={cfg.positionHotkeys !== false}
         onChange={(v) => { set({ positionHotkeys: v }); dockApi.applyHotkeys(cfg.hotkey || "", v, cfg.hotkeyModifier || "Alt"); }} />
-      {cfg.positionHotkeys !== false && <Row label={t("sc.posMod")} hint={t("sc.posHint").replaceAll("{mod}", (cfg.hotkeyModifier || "Alt").replace("Super", "Win"))}>
+      {cfg.positionHotkeys !== false && <Row label={t("sc.posMod")} hint={t("sc.posHint").replaceAll("{mod}", formatHotkey(cfg.hotkeyModifier || "Alt", curLang()))}>
         <ModifierPicker cfg={cfg} set={set} />
       </Row>}
     </SettingsSection>
