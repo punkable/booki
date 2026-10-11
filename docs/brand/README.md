@@ -120,6 +120,9 @@ Settings offers **System**, **Light**, **Dark** and **Auto** (`config.theme`, de
 - `light` / `dark`: `data-theme` on `<html>` forces it.
 - `auto`: light from 07:00 to 19:00, dark otherwise, re-checked every five minutes.
 - With `colorSource: "windows"` and theme `system`, the dock and notch follow the **Windows mode** (taskbar, Start) rather than the app mode, because they sit where the taskbar does.
+- Settings is an app window: its `system` theme follows the Windows **app** mode.
+- A glass colour that forces its own ink (`surfaceForeground()`, for example Dark glass or the taskbar colour) sets the dock and notch windows to the matching theme (`src/theme.js`), so the bar, menus, flyouts and widget plates all agree with the fill.
+- An explicit Light theme always paints a light dock. With `colorSource: "windows"`, the accent-taskbar fill applies only when the theme resolves dark.
 
 Every surface (dock, notch, menus, widgets, Settings) must follow the same resolved theme. Mixed light and dark pieces on one screen are a bug, not a style. Marketing uses the light theme; the product keeps both.
 
@@ -183,7 +186,7 @@ Tokens in `tokens.css`:
 Rules:
 
 - Motion explains where something came from. A surface grows out of the thing that opened it; it does not appear from somewhere else.
-- **The notch and the dock are one object.** When the dock opens from the notch, or from a live activity in the notch, the capsule stretches into the bar along the dock's edge. It must not read as a second element rising from below.
+- **The notch and the dock are one object.** When the dock opens from the notch, or from a live activity in the notch, the capsule stretches into the bar along the dock's edge. It must not read as a second element rising from below. The notch reports its settled shape (`booki://notch-shape`); while it shows a live activity or its card, `src/dock/autohide.js` starts the reveal clipped to that capsule and grows it to the bar over 0.46s. An idle notch keeps the genie.
 - Shape changes (tab → live activity → card) change the pill's own size on the spring curve; content layers cross-fade inside it.
 - Magnification styles: Spring (default), Smooth, Off.
 - `prefers-reduced-motion` cuts every animation to an instant change and stops the level meter. Keep that rule global.
@@ -204,7 +207,7 @@ The small window that stands for the dock while it is tucked away. Click to brin
 | `floating` | Same pill, off the edge, with a soft shadow | same | same |
 | `smart` | 18px dot | 112 × 24px capsule | 300 × 54px, 22px radius |
 
-Vertical edges swap width and height; the live card exists only on horizontal edges. The dot and tab must always be drawn whole, never clipped by their window.
+Vertical edges swap width and height; the live card exists only on horizontal edges. The dot and tab must always be drawn whole, never clipped by their window. The tab, live capsule and dot use the denser panel fill with no top sheen and no native blur (Windows' blur rectangle, inset from the rounded corners, split them into two bands); only the card and the toast ask for the blur.
 
 Live activities (`act-*` classes): media (cover art + three-bar level meter in the accent), focus timer (progress ring + time), volume (ring + level), done (accent dot + text), low battery (red dot + red text).
 

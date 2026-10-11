@@ -9,13 +9,15 @@ Estado al 11 de octubre de 2026. Este documento es el punto de partida para cual
 - **Funciones principales:** dock en cualquier borde con apps, carpetas, archivos y sitios; grupos con color y glifo; diez widgets (reloj, calendario, clima, sistema, batería, multimedia, volumen, notas, portapapeles, foco con tareas); notch con tres formas (pestaña, píldora flotante, punto inteligente) y actividades en vivo; lanzador rápido (Ctrl+Alt+Space); perfiles automáticos por monitor u horario; Ajustes con cinco páginas (Inicio, Dock, Widgets, Apps, Sistema); cinco idiomas.
 - **Colores:** el usuario elige entre su propio color, seguir a Windows (acento y barra de tareas) o el fondo de pantalla. Paleta sugerida con el tan de Booki y colores Pantone del año.
 
-## En curso
+## Corregido después de 0.84.0 (sin publicar)
 
-Un hilo aparte está corrigiendo tres errores visuales. Si retomas antes de que se mezcle su PR, no toques ese código sin revisarlo:
+El PR #111 corrigió tres errores visuales. Entra en la próxima versión cuando Pedro la pida:
 
-1. **Tema:** en modo claro, oscuro o sistema el dock queda siempre oscuro y algunas piezas se mezclan de colores. Lo esperado: todas las superficies siguen el mismo tema resuelto (ver la sección 4 de la guía visual).
-2. **Punto del notch cortado:** en la forma de punto, sin actividad, se ve cortado por la mitad y solo aparece entero al pasar el ratón. Lo esperado: el punto y la pestaña siempre se dibujan completos.
-3. **De actividad en vivo al dock:** al abrir el dock con algo sonando o con una actividad, se ve una animación que sube desde abajo. Lo esperado: la cápsula se estira hasta ocupar el dock completo, como un solo objeto (sección 8 de la guía visual).
+1. **Tema:** elegir Claro ya no deja el dock oscuro cuando Windows pinta el acento en la barra de tareas; ese relleno de acento solo aplica en oscuro. Si el color del vidrio fuerza su propia tinta (Vidrio oscuro, el color de la barra), toda la ventana del dock y del notch toma el tema que corresponde, así que menús, paneles y placas de widgets ya no se mezclan. Ajustes en "Sistema" sigue el modo de las apps de Windows.
+2. **Punto del notch:** la pestaña, la cápsula en vivo y el punto ya no usan el desenfoque nativo, que se recortaba y los partía en dos bandas, ni el brillo superior. Tienen un relleno parejo, y solo la tarjeta y el aviso piden el desenfoque.
+3. **De actividad en vivo al dock:** con una actividad o la tarjeta abierta en el notch, el dock se abre estirando esa cápsula hasta su tamaño completo (`clip-path` desde la forma que informa el notch en `booki://notch-shape`). Si el notch no tiene nada, el dock aparece con la animación de siempre.
+
+Falta verlos en un Windows 11 real.
 
 ## Pendiente
 
