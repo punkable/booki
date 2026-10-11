@@ -59,10 +59,10 @@ for (const file of walk(path.join(ROOT, "src"))) {
   const src = fs.readFileSync(file, "utf8");
   const lines = src.split("\n");
   lines.forEach((line, i) => {
-    // Only literal calls: t("a.b"). Dynamic ones — t("kf." + name) — cannot be
+    // Only literal calls: t("a.b") or t('a.b'). Dynamic ones — t("kf." + name) — cannot be
     // checked statically and are skipped rather than guessed at.
-    for (const m of line.matchAll(/\bt\(\s*"([^"]+)"\s*\)/g)) {
-      const key = m[1];
+    for (const m of line.matchAll(/\bt\(\s*(["'])([^"']+)\1\s*\)/g)) {
+      const key = m[2];
       if (!refKeys.has(key) && !allKeys.has(key)) {
         unknown.push(`${path.relative(ROOT, file)}:${i + 1}  t("${key}")`);
       }
