@@ -100,6 +100,15 @@ jobs:
           name: booki-signed-release
           path: dist/release-assets/*
           if-no-files-found: error
+      # winget manifests for a manual PR to microsoft/winget-pkgs; kept out of
+      # the release assets so publishing is unchanged.
+      - name: Prepare winget manifests
+        run: node scripts/winget-manifest.mjs
+      - uses: actions/upload-artifact@v5
+        with:
+          name: booki-winget-manifests
+          path: dist/winget/
+          if-no-files-found: error
       # Upload/download and verify every draft asset before making it public.
       # Updater signatures are not Windows Authenticode signatures.
       - name: Publish verified draft
