@@ -80,6 +80,7 @@ import { buildAddPanel } from "./dock/add-panel.js";
 import { buildLauncher } from "./dock/launcher.js";
 import { desiredProfile } from "./profile-rules.js";
 import { reportMaterial, shapeOf, materialTint, setMaterialTint, applyMaterial, followFrames } from "./material.js";
+import { S } from "./dock/state.js";
 
 // Surface any runtime error to the app log (diagnostics on the user's machine).
 window.addEventListener("error", (e) => logMessage("error", `dock: ${e.message}`));
@@ -92,7 +93,7 @@ const dockEl = document.getElementById("dock");
 // Arrows stand down while a tile is pressed, dragged or the bar is being moved.
 const dockKeys = installDockKeyboard(dockEl, {
   isVertical: () => isVertical(),
-  isBusy: () => dragging || !!press || !!edgeMove,
+  isBusy: () => S.dragging || !!S.press || !!S.edgeMove,
 });
 const ctxMenu = document.getElementById("ctx-menu");
 const dropOverlay = document.getElementById("drop-overlay");
@@ -114,9 +115,6 @@ window.addEventListener("dragstart", (e) => e.preventDefault());
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-let cfg = null;
-let nativeSupport = {};
-let appPollTick = null;
 let undoRemoval = null;
 let undoRemovalTimer = null;
 
@@ -129,11 +127,11 @@ function hideUndoToast() {
 }
 
 function placeUndoToast() {
-  if (!cfg || !undoToast || undoToast.classList.contains("hidden")) return;
+  if (!S.cfg || !undoToast || undoToast.classList.contains("hidden")) return;
   const { left, top } = placeBesideBar({
     bar: dockEl.getBoundingClientRect(),
     box: { width: undoToast.offsetWidth, height: undoToast.offsetHeight },
-    edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12, pad: 8,
+    edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12, pad: 8,
   });
   undoToast.style.left = `${left}px`; undoToast.style.top = `${top}px`;
 }
@@ -160,11 +158,11 @@ function showErrorToast(message) {
 }
 
 async function undoLastRemoval() {
-  if (!undoRemoval || !cfg) return;
+  if (!undoRemoval || !S.cfg) return;
   const { item, index } = undoRemoval;
   hideUndoToast();
-  if (cfg.pinned.some((entry) => entry.id === item.id)) return;
-  cfg.pinned.splice(Math.min(index, cfg.pinned.length), 0, item);
+  if (S.cfg.pinned.some((entry) => entry.id === item.id)) return;
+  S.cfg.pinned.splice(Math.min(index, S.cfg.pinned.length), 0, item);
   if (!(await persist())) return;
   await render();
   reframe();
@@ -173,9 +171,9 @@ async function undoLastRemoval() {
 function emitConfigChanged() { return emitConfigChangedRaw(); }
 const iconCache = new Map();
 const uid = () => Math.random().toString(36).slice(2, 9);
-const isVertical = () => cfg.edge === "left" || cfg.edge === "right";
-const baseSize = () => cfg.iconSize || 48;
-function findPinnedById(id, items = cfg?.pinned || []) {
+const isVertical = () => S.cfg.edge === "left" || S.cfg.edge === "right";
+const baseSize = () => S.cfg.iconSize || 48;
+function findPinnedById(id, items = S.cfg?.pinned || []) {
   for (const item of items) {
     if (item.id === id) return item;
     const child = findPinnedById(id, item.children || []);
@@ -191,8 +189,8 @@ function findPinnedById(id, items = cfg?.pinned || []) {
 let booted = false;
 async function boot() {
   try {
-    cfg = await configApi.get();
-    await ensureLang(cfg.language); // load pt/fr/de before the first paint
+    S.cfg = await configApi.get();
+    await ensureLang(S.cfg.language); // load pt/fr/de before the first paint
     applyAll();
     await render(); // render() starts widget polls when visible
     reframe();
@@ -206,10 +204,10 @@ async function boot() {
     setTimeout(() => document.body.classList.remove("boot-animate"), 500);
     onConfigChanged(() => reloadConfig().catch((error) => logMessage("error", `dock reload failed: ${error}`)));
     checkAutoProfile();
-    observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!hiddenState) appPollTick?.(false); } }, (support) => {
-      const windowsChanged = !!nativeSupport.windows !== !!support.windows;
-      nativeSupport = support;
-      if (windowsChanged && !hiddenState) startRunningPoll();
+    observeSystem(dockApi, { media: refreshMedia, volume: refreshVolume, windows: () => { if (!S.hiddenState) S.appPollTick?.(false); } }, (support) => {
+      const windowsChanged = !!S.nativeSupport.windows !== !!support.windows;
+      S.nativeSupport = support;
+      if (windowsChanged && !S.hiddenState) startRunningPoll();
     });
     // Display power, Energy Saver and taskbar attention (Windows only; the
     // listeners are inert elsewhere). Resume implies the display is on, so a
@@ -229,19 +227,19 @@ async function boot() {
     // Tray / global hotkey: tuck or summon through the same hide/reveal path
     // the notch uses so JS hiddenState stays in sync with the native windows.
     onToggleDock(() => {
-      if (fullscreen) return;
-      if (hiddenState) pinOpen();
+      if (S.fullscreen) return;
+      if (S.hiddenState) pinOpen();
       else setHidden(true);
     });
     // Quick launcher shortcut: summon the dock if tucked, then open the search.
     onLauncher(() => {
-      if (fullscreen) return;
-      if (hiddenState) pinOpen();
+      if (S.fullscreen) return;
+      if (S.hiddenState) pinOpen();
       openLauncher();
     });
     // Position hotkeys (modifier+1…9): launch the Nth item on the bar.
     onLaunchIndex((i) => {
-      const items = cfg.pinned.filter((p) => p.kind !== "separator");
+      const items = S.cfg.pinned.filter((p) => p.kind !== "separator");
       const item = items[i];
       if (!item) return;
       const el = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
@@ -256,10 +254,10 @@ async function boot() {
     setTimeout(checkUpdates, 4000);
     // First-run tips first; changelog only after the user is past onboarding.
     setTimeout(() => {
-      if (!cfg.onboarded) maybeOnboard();
+      if (!S.cfg.onboarded) maybeOnboard();
       else checkChangelog();
     }, 800);
-    logMessage("info", `dock booted ok (pinned=${cfg.pinned.length})`);
+    logMessage("info", `dock booted ok (pinned=${S.cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);
     // Self-heal: a transient failure (e.g. the backend not ready yet) shouldn't
@@ -279,15 +277,15 @@ const ctxGroupsSig = (c) =>
   `|${c.contextMenu !== false}|${c.language || ""}`;
 let lastCtxSig = null;
 function syncCtxMenu() {
-  lastCtxSig = ctxGroupsSig(cfg);
+  lastCtxSig = ctxGroupsSig(S.cfg);
   dockApi
-    .syncContextMenu(cfg.contextMenu !== false, t("ctx.addToBooki"), t("ctx.addToGroup"))
+    .syncContextMenu(S.cfg.contextMenu !== false, t("ctx.addToBooki"), t("ctx.addToGroup"))
     .catch(() => {});
 }
 // Cheap guard used from persist(): dock-side group edits bypass reloadConfig
 // (self-emit echo guard), so re-sync here when the signature actually moved.
 function maybeSyncCtxMenu() {
-  if (cfg && ctxGroupsSig(cfg) !== lastCtxSig) syncCtxMenu();
+  if (S.cfg && ctxGroupsSig(S.cfg) !== lastCtxSig) syncCtxMenu();
 }
 
 let configReloadGeneration = 0;
@@ -298,7 +296,7 @@ let autoProfileLast = null;
 let autoProfileTimer = null;
 const checkAutoProfile = singleFlight(async () => {
   clearTimeout(autoProfileTimer);
-  const rules = cfg?.profileRules;
+  const rules = S.cfg?.profileRules;
   if (!rules?.enabled) { autoProfileLast = null; return; }
   autoProfileTimer = setTimeout(checkAutoProfile, 60000);
   try {
@@ -306,14 +304,14 @@ const checkAutoProfile = singleFlight(async () => {
     const want = desiredProfile(rules, { now: new Date(), monitors: Array.isArray(monitors) ? monitors.length : 1, available: available || [] });
     if (want === autoProfileLast) return;
     autoProfileLast = want;
-    if (want && want !== cfg.lastProfile) await dockApi.profileApply(want);
+    if (want && want !== S.cfg.lastProfile) await dockApi.profileApply(want);
   } catch (_) {
     autoProfileLast = null; // try again on the next tick
   }
 });
 let autoProfileResize = null;
 window.addEventListener("resize", () => {
-  if (!cfg?.profileRules?.enabled) return;
+  if (!S.cfg?.profileRules?.enabled) return;
   clearTimeout(autoProfileResize);
   autoProfileResize = setTimeout(checkAutoProfile, 1500);
 });
@@ -326,34 +324,34 @@ async function reloadConfig({ afterSaves = true } = {}) {
   if (afterSaves) await persistQueue;
   const next = await configApi.get();
   if (request !== configReloadGeneration) return;
-  const prev = cfg;
-  cfg = next;
+  const prev = S.cfg;
+  S.cfg = next;
   // If the language changed, make sure its dictionary is loaded before re-render.
-  if (!prev || prev.language !== cfg.language) await ensureLang(cfg.language);
+  if (!prev || prev.language !== S.cfg.language) await ensureLang(S.cfg.language);
   if (request !== configReloadGeneration) return;
   maybeSyncCtxMenu();
   // Placement moved while the frame size may not have: force a re-place.
   const PLACEMENT = ["edgeGap", "notchPosition", "notchMode", "monitor", "monitorName"];
-  if (prev && PLACEMENT.some((key) => prev[key] !== cfg[key])) lastFull = null;
+  if (prev && PLACEMENT.some((key) => prev[key] !== S.cfg[key])) S.lastFull = null;
   // Edge changed → mask the window teleport with a fade+pop: the bar vanishes
   // instantly, the window moves, and the bar pops back in on the new edge.
-  const edgeSwapped = prev && prev.edge !== cfg.edge;
+  const edgeSwapped = prev && prev.edge !== S.cfg.edge;
   if (edgeSwapped) {
     document.body.classList.add("edge-swap");
   }
   applyAll();
-  if (JSON.stringify(prev?.profileRules) !== JSON.stringify(cfg.profileRules)) { autoProfileLast = null; checkAutoProfile(); }
+  if (JSON.stringify(prev?.profileRules) !== JSON.stringify(S.cfg.profileRules)) { autoProfileLast = null; checkAutoProfile(); }
   // Only rebuild the bar when the pinned items actually changed — sliders and
   // toggles in Settings shouldn't make the whole dock flash.
-  const languageChanged = !!prev && prev.language !== cfg.language;
+  const languageChanged = !!prev && prev.language !== S.cfg.language;
   if (languageChanged) { closeMenu(); closeTrashPop(); hideTip(); }
-  const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(cfg.pinned);
+  const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(S.cfg.pinned);
   if (pinsChanged) {
     // Stale flyout handlers hold old children — close rather than lie.
-    const keepCatalog = stackOpen && stackItemId === "__add";
-    if (stackOpen && !keepCatalog) closeStack();
+    const keepCatalog = S.stackOpen && S.stackItemId === "__add";
+    if (S.stackOpen && !keepCatalog) closeStack();
     await render();
-    if (keepCatalog) stackRefreshPins?.();
+    if (keepCatalog) S.stackRefreshPins?.();
   } else {
     fitDock();
   }
@@ -362,10 +360,10 @@ async function reloadConfig({ afterSaves = true } = {}) {
   // behavior actually changed, so unrelated tweaks can't blink the dock.
   const hideChanged =
     !prev ||
-    prev.edge !== cfg.edge ||
-    (prev.autoHideMode || "") !== (cfg.autoHideMode || "") ||
-    prev.notchMode !== cfg.notchMode ||
-    prev.notchPosition !== cfg.notchPosition;
+    prev.edge !== S.cfg.edge ||
+    (prev.autoHideMode || "") !== (S.cfg.autoHideMode || "") ||
+    prev.notchMode !== S.cfg.notchMode ||
+    prev.notchPosition !== S.cfg.notchPosition;
   if (hideChanged) setupAutoHide();
   if (edgeSwapped) {
     // Briefly SHOW the dock in its new spot so the user actually sees it move —
@@ -382,19 +380,18 @@ async function reloadConfig({ afterSaves = true } = {}) {
 // Show the dock in its current position for a few seconds regardless of
 // smart-hide occlusion — used as a live preview while tweaking position in
 // Settings. After the window elapses, normal hide behavior resumes.
-let previewing = false;
 let previewTimer = null;
 function positionPreview() {
-  previewing = true;
+  S.previewing = true;
   clearTimeout(previewTimer);
-  manualHide = false;
-  hiddenState = false;
+  S.manualHide = false;
+  S.hiddenState = false;
   document.body.classList.remove("tucked");
   dockApi.revealDock();
   startPolls(); // visible again → resume live widgets
   applyFrame();
   previewTimer = setTimeout(() => {
-    previewing = false;
+    S.previewing = false;
     setupAutoHide(); // return to whatever the hide mode wants
   }, 2600);
 }
@@ -409,7 +406,7 @@ function syncNativeLanguage() {
 }
 
 function applyAll() {
-  setLang(cfg.language);
+  setLang(S.cfg.language);
   syncNativeLanguage();
   // The two strings baked into index.html were Spanish, which no language
   // setting could reach — a German user dragging a file onto the bar was told
@@ -422,49 +419,49 @@ function applyAll() {
     pill.title = t("dock.updateTip");
   }
   dockEl.setAttribute("aria-label", t("a11y.dock"));
-  applyTheme(cfg);
-  applyEdge(cfg);
+  applyTheme(S.cfg);
+  applyEdge(S.cfg);
   dockKeys.sync();
-  document.body.classList.toggle("hide-running-indicators", cfg.showIndicators === false);
+  document.body.classList.toggle("hide-running-indicators", S.cfg.showIndicators === false);
   // The stage window spans the whole edge; the BAR aligns to the notch's
   // along-edge slot with CSS (the window itself no longer travels).
-  const slot = cfg.notchPosition === "start" ? "start" : cfg.notchPosition === "end" ? "end" : "center";
+  const slot = S.cfg.notchPosition === "start" ? "start" : S.cfg.notchPosition === "end" ? "end" : "center";
   ["slot-start", "slot-center", "slot-end"].forEach((c) => document.body.classList.remove(c));
   document.body.classList.add(`slot-${slot}`);
   const root = document.documentElement;
   // CSS materials on a transparent window (native DWM vibrancy left a gray box).
   // Solidity + optional glass tint drive dock/notch fill together.
-  const look = paintedLook(cfg);
+  const look = paintedLook(S.cfg);
   applyMaterial(look);
   if (look.accent) {
     root.style.setProperty("--accent", look.accent);
   }
-  dockEl.style.setProperty("--gap", `${cfg.spacing ?? 6}px`);
+  dockEl.style.setProperty("--gap", `${S.cfg.spacing ?? 6}px`);
   // How close the bar sits to its screen edge (user-tunable). The transparent
   // pad on the anchored side shrinks down to the requested gap; anything past
   // the stage pad is handled by the window's own margin (backend dock_xy).
-  const edgeGap = Math.max(0, Math.min(96, cfg.edgeGap ?? 12));
+  const edgeGap = Math.max(0, Math.min(96, S.cfg.edgeGap ?? 12));
   root.style.setProperty("--edge-pad", `${Math.min(SHADOW_PAD, edgeGap)}px`);
   // A small gap leaves no room for the outward drop shadow — soften it.
   document.body.classList.toggle("tight-edge", edgeGap < 24);
   // Tile/corner roundness (user-tunable). Drives tiles, widgets (.w-card),
   // group grids/minis, and letter glyphs. Dock chrome is a touch rounder.
-  const cr = cfg.cornerRadius ?? 12;
+  const cr = S.cfg.cornerRadius ?? 12;
   root.style.setProperty("--tile-r", `${cr}px`);
-  root.style.setProperty("--dock-r", `${dockRadius(cfg)}px`);
-  document.body.classList.toggle("show-labels", cfg.showLabels !== false);
-  document.body.classList.toggle("compact", !!cfg.compact);
+  root.style.setProperty("--dock-r", `${dockRadius(S.cfg)}px`);
+  document.body.classList.toggle("show-labels", S.cfg.showLabels !== false);
+  document.body.classList.toggle("compact", !!S.cfg.compact);
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
-  const style = cfg.magnifyStyle || "spring";
+  const style = S.cfg.magnifyStyle || "spring";
   const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
   root.style.setProperty("--mag-ease", ease);
   // Genie minimize: the notch always sits on the dock's edge, so the bar funnels
   // toward its along-position on that same edge.
-  const ox = { start: 16.6, end: 83.4 }[cfg.notchPosition] ?? 50;
+  const ox = { start: 16.6, end: 83.4 }[S.cfg.notchPosition] ?? 50;
   root.style.setProperty("--genie-ox", `${ox}%`);
   root.style.setProperty("--genie-oxn", `${ox}`);
-  const gedge = cfg.edge || "bottom";
+  const gedge = S.cfg.edge || "bottom";
   ["genie-bottom", "genie-top", "genie-left", "genie-right"].forEach((c) =>
     document.body.classList.remove(c)
   );
@@ -479,8 +476,8 @@ function persist(patch = {}, { showError = true } = {}) {
 }
 async function performPersist(patch, showError) {
   // Keep named group containers intact, including empty and single-item groups.
-  cfg.pinned = normalizeGroups(cfg.pinned);
-  const changes = { pinned: cfg.pinned, seenVersion: cfg.seenVersion || "", onboarded: !!cfg.onboarded, settingsIntroSeen: !!cfg.settingsIntroSeen, ...patch };
+  S.cfg.pinned = normalizeGroups(S.cfg.pinned);
+  const changes = { pinned: S.cfg.pinned, seenVersion: S.cfg.seenVersion || "", onboarded: !!S.cfg.onboarded, settingsIntroSeen: !!S.cfg.settingsIntroSeen, ...patch };
   try {
     await configApi.patch(changes);
     maybeSyncCtxMenu();
@@ -529,7 +526,7 @@ function cacheWidgetEls() {
   // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
-  const sel = stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
+  const sel = S.stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
   document.querySelectorAll(sel).forEach((el) => {
     const w = el.dataset.widget || "";
     (widgetEls[w] || (widgetEls[w] = [])).push(el);
@@ -543,7 +540,7 @@ let renderGeneration = 0;
 
 async function render() {
   const generation = ++renderGeneration;
-  const snapshot = cfg;
+  const snapshot = S.cfg;
   // Build every tile in parallel and swap the whole bar in ONE DOM operation —
   // no icons popping in one by one, no empty-bar flash between renders.
   const tiles = await Promise.all(
@@ -556,7 +553,7 @@ async function render() {
       return appTile(item);
     })
   );
-  if (generation !== renderGeneration || cfg !== snapshot) return;
+  if (generation !== renderGeneration || S.cfg !== snapshot) return;
   // Fade+scale in only the tiles that weren't on the bar before.
   const prevIds = lastRenderIds;
   for (const el of tiles) {
@@ -564,12 +561,12 @@ async function render() {
     if (id && !prevIds.has(id)) el.classList.add("tile-in");
   }
   dockEl.replaceChildren(...tiles);
-  lastRenderIds = new Set(cfg.pinned.map((p) => p.id));
+  lastRenderIds = new Set(S.cfg.pinned.map((p) => p.id));
   cacheWidgetEls();
   requestAnimationFrame(refreshPreviewMarquees);
 
   // Empty state opens the same searchable app/widget panel as the dock menu.
-  if (!cfg.pinned.some((p) => p.kind !== "separator")) {
+  if (!S.cfg.pinned.some((p) => p.kind !== "separator")) {
     const hint = document.createElement("button");
     hint.className = "tile hint";
     hint.style.setProperty("--size", `${baseSize()}px`);
@@ -590,7 +587,7 @@ async function render() {
   // its "…" placeholder (e.g. after adding a widget or any structural re-render).
   // syncPolls() paints at once and restarts timers only if the live widget
   // kinds changed; it self-guards while the dock is tucked away.
-  if (!hiddenState) syncPolls();
+  if (!S.hiddenState) syncPolls();
 }
 
 // Smallest a shrunk icon may get before we stop shrinking and start scrolling —
@@ -608,13 +605,13 @@ function fitDock() {
   const span = vertical ? availH(isTauri) : availW(isTauri);
   // A slot-aligned bar (start/end) sits behind a 12% offset — that space isn't
   // usable, or a full bar would overflow past the far screen edge.
-  const slotPad = cfg && cfg.notchPosition && cfg.notchPosition !== "center" ? span * 0.12 : 0;
+  const slotPad = S.cfg && S.cfg.notchPosition && S.cfg.notchPosition !== "center" ? span * 0.12 : 0;
   const usable = span - SHADOW_PAD * 2 - 24 - slotPad;
   let overflow = false;
   if (usable > 0) {
     const natural = vertical ? dockEl.scrollHeight : dockEl.scrollWidth;
     if (natural > usable) {
-      const eff = chooseFitSize(baseSize(), natural, usable, cfg.overflowMode);
+      const eff = chooseFitSize(baseSize(), natural, usable, S.cfg.overflowMode);
       if (eff >= MIN_TILE) {
         setAllSizes(eff);
         overflow = (vertical ? dockEl.scrollHeight : dockEl.scrollWidth) > usable;
@@ -865,7 +862,7 @@ function widgetTile(item, { inFlyout = false } = {}) {
   el.dataset.id = item.id;
   el.dataset.widget = type;
   el.dataset.span = String(st.span || "auto");
-  el.style.setProperty("--widget-width", `${widgetWidth(type, baseSize(), cfg.spacing ?? 6, st)}px`);
+  el.style.setProperty("--widget-width", `${widgetWidth(type, baseSize(), S.cfg.spacing ?? 6, st)}px`);
   el.dataset.variant = st.variant || "glass";
   if (type === "media" && st.scrollVolume) el.dataset.scrollVolume = "1";
   if (st.color) el.style.setProperty("--w-accent", st.color);
@@ -963,7 +960,7 @@ function eachWidget(type, fn) {
 // work when the displayed minute has not changed.
 let lastClockKey = "";
 function tickClocks() {
-  if (hiddenState) return; // don't update a tucked-away dock
+  if (S.hiddenState) return; // don't update a tucked-away dock
   const { key, time, date } = clockParts(new Date(), curLang());
   tickProductivity();
   if (key === lastClockKey) return;
@@ -971,7 +968,7 @@ function tickClocks() {
   eachWidget("clock", (el) => setText(el, date, time));
 }
 
-function findWidgetPin(id, items = cfg.pinned) {
+function findWidgetPin(id, items = S.cfg.pinned) {
   for (const item of items) { if (item.id === id) return item; const child = item.children && findWidgetPin(id, item.children); if (child) return child; }
   return null;
 }
@@ -1000,7 +997,7 @@ function tickProductivity() {
       const record = cached;
       dockApi.weatherCurrent(style.latitude, style.longitude).then((value) => {
         record.value = value; record.error = false;
-      }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!hiddenState) tickProductivity(); });
+      }, () => { record.error = true; record.expires = Date.now() + 60000; }).finally(() => { record.pending = false; if (!S.hiddenState) tickProductivity(); });
     }
     const value = cached.value;
     // Today's range sits beside the city when Open-Meteo returned it.
@@ -1009,10 +1006,9 @@ function tickProductivity() {
     setTileLabel(el, `${style.city || t("w.weather")} · Open-Meteo`);
   });
 }
-let productivityPanel = null;
 function closeProductivityPanel() {
-  productivityPanel?.dispose?.();
-  productivityPanel?.remove(); productivityPanel = null; pinnedReveal = false; reframe(); scheduleHide();
+  S.productivityPanel?.dispose?.();
+  S.productivityPanel?.remove(); S.productivityPanel = null; S.pinnedReveal = false; reframe(); scheduleHide();
 }
 function openProductivity(item, tile) {
   closeProductivityPanel();
@@ -1034,10 +1030,10 @@ function openProductivity(item, tile) {
     }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
   });
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
-  productivityPanel = panel; document.body.appendChild(panel); pinnedReveal = true; applyFrame();
+  S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
   const place = () => {
     if (!panel.isConnected) return;
-    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
     panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
   };
   const dispose = panel.dispose;
@@ -1207,7 +1203,7 @@ function widgetPresent(w) {
   const has = (t) => !!(widgetEls[t] && widgetEls[t].length);
   return Array.isArray(w) ? w.some(has) : has(w);
 }
-function anyPinnedWidget(predicate, items = cfg?.pinned || []) {
+function anyPinnedWidget(predicate, items = S.cfg?.pinned || []) {
   return items.some((item) =>
     (item.kind === "widget" && predicate(item)) ||
     anyPinnedWidget(predicate, item.children || [])
@@ -1222,8 +1218,8 @@ function stopPolls() {
   widgetPollTimer = null;
   // Also stop the running-app/trash poll so a tucked-away dock burns zero timer
   // wakeups (not just early-returns). Resumed by startPolls on reveal.
-  clearInterval(pollTimer);
-  pollTimer = null;
+  clearInterval(S.pollTimer);
+  S.pollTimer = null;
   pollsActive = false;
 }
 // Display power and Energy Saver, as Windows reports them. With the display
@@ -1231,13 +1227,12 @@ function stopPolls() {
 // it back on restarts them through startPolls, which still honours a
 // tucked-away dock. Energy Saver doubles the cadence of everything but the
 // clock, which has to tick on time.
-let displayOff = false;
 let energySaver = false;
 function pollSlowdown() { return energySaver ? 2 : 1; }
 function onDisplayPower(on) {
-  if (displayOff === !on) return;
-  displayOff = !on;
-  if (displayOff) stopPolls();
+  if (S.displayOff === !on) return;
+  S.displayOff = !on;
+  if (S.displayOff) stopPolls();
   else startPolls();
 }
 function onEnergySaver(on) {
@@ -1267,17 +1262,17 @@ function paintPolls(k) {
    the set of live widget kinds changed; otherwise it just repaints the new
    cards (and running-app dots) and keeps every poll's cadence. */
 function syncPolls({ repaint = true } = {}) {
-  if (hiddenState || displayOff) return;
+  if (S.hiddenState || S.displayOff) return;
   const kinds = pollKinds();
   if (!pollsActive || JSON.stringify(kinds) !== pollKey) { startPolls(); return; }
   if (!repaint) return;
-  appPollTick?.(); // running dots and the trash badge on the new tiles
+  S.appPollTick?.(); // running dots and the trash badge on the new tiles
   paintPolls(kinds);
 }
 function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
-  if (hiddenState || displayOff) return; // tucked away or screen off → stay idle
+  if (S.hiddenState || S.displayOff) return; // tucked away or screen off → stay idle
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const k = pollKinds();
   pollKey = JSON.stringify(k);
@@ -1295,22 +1290,22 @@ function startPolls() {
   // otherwise 1.5 s is plenty and lighter.
   const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : 60000;
   widgetPollTimer = setInterval(() => {
-    if (hiddenState || displayOff) return; // don't poll a tucked-away dock
+    if (S.hiddenState || S.displayOff) return; // don't poll a tucked-away dock
     const now = Date.now();
     if (hasClock || hasLocal) tickClocks();
     if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400 * slow; pollStats(); }
-    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000) * slow; pollMedia(); }
-    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000) * slow; pollVolume(); }
+    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(S.nativeSupport, "media", 3000) * slow; pollMedia(); }
+    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(S.nativeSupport, "volume", 4000) * slow; pollVolume(); }
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
-function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(nativeSupport, "media", 3000); if (!hiddenState) pollMedia(); }
-function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(nativeSupport, "volume", 4000); if (!hiddenState) pollVolume(); }
-function refreshClipboard() { pollDue.clipboard = 0; if (!hiddenState) pollClipboard(); }
+function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(S.nativeSupport, "media", 3000); if (!S.hiddenState) pollMedia(); }
+function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(S.nativeSupport, "volume", 4000); if (!S.hiddenState) pollVolume(); }
+function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
 
 async function addWidget(type, { showError = true } = {}) {
-  cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
+  S.cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
   if (!(await persist({}, { showError }))) return false;
   await render();
   reframe();
@@ -1359,7 +1354,7 @@ async function closeNoteEditor() {
   if (!(await editor.flush())) return false;
   if (noteEditor !== editor) return true;
   editor.dispose(); editor.remove(); noteEditor = null;
-  pinnedReveal = false; reframe(); scheduleHide();
+  S.pinnedReveal = false; reframe(); scheduleHide();
   return true;
 }
 async function editNote(item) {
@@ -1443,11 +1438,11 @@ async function editNote(item) {
     // Only close after focus has really moved out; a native dialog can blur it.
     requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
   });
-  document.body.appendChild(panel); noteEditor = panel; pinnedReveal = true; applyFrame();
+  document.body.appendChild(panel); noteEditor = panel; S.pinnedReveal = true; applyFrame();
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
+    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
     panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
@@ -1491,20 +1486,20 @@ function launch(el, item, mods = {}) {
   // launching a new instance. With several windows, let the user pick one.
   clearAttention(el, item); // the user answered whichever window was waiting
   if (mods.admin && item.kind === "app" && item.path) {
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
     markLaunching(el);
     dockApi.launch(item.path, item.args || [], "runas");
     return;
   }
   const hwnd = el.dataset.hwnd;
-  const switching = !mods.newInstance && cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
+  const switching = !mods.newInstance && S.cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
   const wins = switching ? windowsFor(item) : [];
   // A tucked-away dock (Alt+N while hidden) can't show a picker: go to the first.
-  if (wins.length > 1 && !hiddenState) { openWindowPicker(el, item, wins); return; }
+  if (wins.length > 1 && !S.hiddenState) { openWindowPicker(el, item, wins); return; }
   // Launching/switching means the user is done with the dock for now — release
   // any pinned reveal so smart-hide can tuck it back into the notch.
-  pinnedReveal = false;
+  S.pinnedReveal = false;
   scheduleHide();
   // The app's only window: bring it forward, or minimize it if it is
   // already in front (a second click, as on the taskbar).
@@ -1532,7 +1527,7 @@ function markLaunching(el) {
 function openWindowPicker(el, item, wins) {
   hideTip();
   ctxMenu.innerHTML = "";
-  ++menuGeneration;
+  ++S.menuGeneration;
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead(menuPinTitle(item), t("m.windows").replace("{n}", String(wins.length)));
   sep();
@@ -1578,7 +1573,7 @@ async function addPaths(paths, forceKind, atIndex = null, { showError = true } =
   for (const path of paths) {
     if (isRecycleBin(path)) {
       // Only one trash tile makes sense; if it's already there, skip silently.
-      if (!cfg.pinned.some((p) => p.kind === "trash")) {
+      if (!S.cfg.pinned.some((p) => p.kind === "trash")) {
         items.push({ id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" });
       }
       continue;
@@ -1592,8 +1587,8 @@ async function addPaths(paths, forceKind, atIndex = null, { showError = true } =
     items.push({ id: uid(), name: baseName(path), path, args: [], kind });
   }
   // Land exactly where the insertion gap showed during the drag (null = end).
-  if (atIndex == null || atIndex >= cfg.pinned.length) cfg.pinned.push(...items);
-  else cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
+  if (atIndex == null || atIndex >= S.cfg.pinned.length) S.cfg.pinned.push(...items);
+  else S.cfg.pinned.splice(Math.max(0, atIndex), 0, ...items);
   if (!(await persist({}, { showError }))) return false;
   await render();
   reframe();
@@ -1611,7 +1606,7 @@ function setAllSizes(size) {
   dockEl.querySelectorAll(".tile").forEach((t) => {
     const isSep = t.classList.contains("separator");
     t.style.setProperty("--size", `${isSep ? Math.round(size * 0.5) : size}px`);
-    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, cfg.spacing ?? 6, findWidgetPin(t.dataset.id)?.style || {})}px`);
+    if (t.dataset.widget) t.style.setProperty("--widget-width", `${widgetWidth(t.dataset.widget, size, S.cfg.spacing ?? 6, findWidgetPin(t.dataset.id)?.style || {})}px`);
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
@@ -1629,7 +1624,7 @@ function resetMagnify() {
   });
   magFocus = null;
   // Resting hit-rects — don't leave the inflated mag union clickable.
-  lastHitSig = "";
+  S.lastHitSig = "";
   scheduleHitReport();
 }
 
@@ -1638,10 +1633,9 @@ function resetMagnify() {
 // every pointer move — no more read/write layout thrashing in the hot loop.
 let magCache = null;
 let magFocus = null;
-let magDockRect = null;
 function invalidateMag() {
   magCache = null;
-  magDockRect = null;
+  S.magDockRect = null;
   magFocus = null;
 }
 function buildMagCache() {
@@ -1649,7 +1643,7 @@ function buildMagCache() {
   // Measure the bar's viewport rect ONCE here (it only moves on reframe/edge
   // change, both of which invalidate the cache) so the hot per-frame loop never
   // reads layout again — pure compositor writes = smooth at any refresh rate.
-  magDockRect = dockEl.getBoundingClientRect();
+  S.magDockRect = dockEl.getBoundingClientRect();
   magCache = [...dockEl.querySelectorAll(".tile")].map((el) => ({
     el,
     center: vertical ? el.offsetTop + el.offsetHeight / 2 : el.offsetLeft + el.offsetWidth / 2,
@@ -1663,8 +1657,8 @@ function buildMagCache() {
 // screen interior AND nudge along the main axis so neighbours make room
 // instead of stacking. Geometry is cached; this loop only writes transforms.
 function magnify(clientX, clientY) {
-  if (cfg.magnification === false || (cfg.magnifyStyle || "spring") === "off") return;
-  if (dockEl.classList.contains("dragging") || editMode) return;
+  if (S.cfg.magnification === false || (S.cfg.magnifyStyle || "spring") === "off") return;
+  if (dockEl.classList.contains("dragging") || S.editMode) return;
   // In scroll (overflow) mode the bar clips its ends, so a scaled tile would be
   // cut off — skip magnify; the name still shows via tooltip on hover.
   if (document.body.classList.contains("dock-overflow")) return;
@@ -1685,13 +1679,13 @@ function magnify(clientX, clientY) {
   // because that is not ornament: it is how you know what you are about to
   // click, and removing it would make the dock harder to use, not calmer.
   const calm = reduceMotion();
-  const maxScale = calm ? Math.min(1.12, Math.max(1, cfg.zoom || 1.25)) : Math.max(1, cfg.zoom || 1.25);
+  const maxScale = calm ? Math.min(1.12, Math.max(1, S.cfg.zoom || 1.25)) : Math.max(1, S.cfg.zoom || 1.25);
   const spread = calm ? base * 0.6 : base * 2.0;
   const vertical = isVertical();
   const mainAxis = vertical ? "Y" : "X";
   const liftAxis = vertical ? "X" : "Y";
-  const liftSign = (vertical ? cfg.edge === "left" : cfg.edge === "top") ? 1 : -1;
-  const dr = magDockRect;
+  const liftSign = (vertical ? S.cfg.edge === "left" : S.cfg.edge === "top") ? 1 : -1;
+  const dr = S.magDockRect;
   const pointer = vertical ? clientY - dr.top : clientX - dr.left;
   let best = null;
   let bestInf = 0;
@@ -1756,9 +1750,9 @@ function reportHitRectsLive() {
     // the bar. A pad covering all three is a superset of the real union — and,
     // unlike the union, it does not change as the wave travels, so the
     // signature check below collapses the whole gesture into one call.
-    const dr = magDockRect || dockEl.getBoundingClientRect();
+    const dr = S.magDockRect || dockEl.getBoundingClientRect();
     const base = baseSize();
-    const grow = Math.max(0, (Math.max(1, cfg.zoom || 1.25) - 1) * base);
+    const grow = Math.max(0, (Math.max(1, S.cfg.zoom || 1.25) - 1) * base);
     const pad = Math.ceil(grow + base * 0.22 + 6);
     const rect = [
       Math.floor(dr.left - pad),
@@ -1767,8 +1761,8 @@ function reportHitRectsLive() {
       Math.ceil(dr.height + pad * 2),
     ];
     const sig = `mag:${rect.map(Math.round).join(",")}`;
-    if (sig === lastHitSig) return;
-    lastHitSig = sig;
+    if (sig === S.lastHitSig) return;
+    S.lastHitSig = sig;
     dockApi.setHitRects([rect], false).catch(() => {});
   } catch (_) {
     /* best-effort */
@@ -1779,13 +1773,13 @@ function reportHitRectsLive() {
 async function checkChangelog() {
   try {
     // Don't open Settings "What's new" during first-run tips.
-    if (!cfg.onboarded) return;
+    if (!S.cfg.onboarded) return;
     const v = await dockApi.appVersion();
-    if (v && cfg.seenVersion !== v) {
+    if (v && S.cfg.seenVersion !== v) {
       // Patch releases are fixes: record them without opening Settings.
       const feature = (version) => String(version || "").split(".").slice(0, 2).join(".");
-      const announce = feature(cfg.seenVersion) !== feature(v);
-      cfg.seenVersion = v;
+      const announce = feature(S.cfg.seenVersion) !== feature(v);
+      S.cfg.seenVersion = v;
       if (!(await persist())) return;
       if (announce) dockApi.openChangelog();
     }
@@ -1794,14 +1788,14 @@ async function checkChangelog() {
 
 // First-run tips: three small coach bubbles, shown once ever.
 async function maybeOnboard() {
-  if (cfg.onboarded) return;
+  if (S.cfg.onboarded) return;
   const steps = [
     { emoji: emo("pointer", 22), text: t("ob.step1") },
     { emoji: emo("card", 22), text: t("ob.step2") },
     { emoji: emo("beaver", 22), text: t("ob.step3") },
   ];
   let i = 0;
-  pinnedReveal = true; // keep the dock open during the tour
+  S.pinnedReveal = true; // keep the dock open during the tour
   setHidden(false); // the tips are useless if the dock booted tucked away
   const pop = document.createElement("div");
   pop.className = "coach";
@@ -1824,10 +1818,10 @@ async function maybeOnboard() {
           document.body.classList.remove("pop-open");
           reframe();
         });
-        cfg.onboarded = true;
-        cfg.settingsIntroSeen = true;
+        S.cfg.onboarded = true;
+        S.cfg.settingsIntroSeen = true;
         await persist();
-        pinnedReveal = false;
+        S.pinnedReveal = false;
         scheduleHide();
         checkChangelog();
       }
@@ -1854,7 +1848,7 @@ dockEl.addEventListener("auxclick", (e) => {
   if (e.button !== 1) return;
   const tile = closestSel(e.target, ".tile");
   if (!tile || !tile.dataset.id) return;
-  const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
+  const item = S.cfg.pinned.find((p) => p.id === tile.dataset.id);
   if (!item || !item.path || (item.kind !== "app" && item.kind !== "folder")) return;
   e.preventDefault();
   if (e.ctrlKey || e.metaKey) dockApi.openLocation(item.path);
@@ -1867,7 +1861,6 @@ dockEl.addEventListener("auxclick", (e) => {
 // cover the screen, four anchor targets light up, and a ghost bar slides to
 // whichever edge is nearest the cursor. Release commits; Esc cancels. Nearest-
 // edge (not dominant-direction) makes the anchors forgiving, not rigid.
-let edgeMove = null;
 let edgeOverlay = null;
 
 function buildEdgeOverlay() {
@@ -1891,16 +1884,16 @@ function edgeMoveTarget(x, y, W, H) {
 }
 
 function updateEdgePreview(x, y) {
-  if (!edgeMove || !edgeMove.ready) return;
-  const { W, H } = edgeMove;
+  if (!S.edgeMove || !S.edgeMove.ready) return;
+  const { W, H } = S.edgeMove;
   const target = edgeMoveTarget(x, y, W, H);
-  edgeMove.target = target;
+  S.edgeMove.target = target;
   edgeOverlay.querySelectorAll(".edge-zone").forEach((z) =>
     z.classList.toggle("active", z.dataset.edge === target));
   const g = edgeOverlay.querySelector(".edge-ghost");
   const vert = target === "left" || target === "right";
-  const len = Math.min(edgeMove.barLen, (vert ? H : W) * 0.7);
-  const thick = edgeMove.barThick;
+  const len = Math.min(S.edgeMove.barLen, (vert ? H : W) * 0.7);
+  const thick = S.edgeMove.barThick;
   const m = 14;
   if (vert) {
     g.style.width = `${thick}px`;
@@ -1920,35 +1913,35 @@ async function enterEdgeMove() {
   // against the huge window and the numbers stop meaning anything).
   const r = dockEl.getBoundingClientRect();
   const vert = isVertical();
-  edgeMove.barLen = Math.round(vert ? r.height : r.width) || 320;
-  edgeMove.barThick = Math.round(vert ? r.width : r.height) || 54;
+  S.edgeMove.barLen = Math.round(vert ? r.height : r.width) || 320;
+  S.edgeMove.barThick = Math.round(vert ? r.width : r.height) || 54;
   buildEdgeOverlay();
   document.body.classList.add("edge-moving");
   let css = null;
   try { css = await dockApi.dockCoverWorkarea(); } catch (_) {}
-  if (!edgeMove) return; // released/cancelled while the resize was in flight
-  edgeMove.W = (css && css[0]) || window.innerWidth;
-  edgeMove.H = (css && css[1]) || window.innerHeight;
+  if (!S.edgeMove) return; // released/cancelled while the resize was in flight
+  S.edgeMove.W = (css && css[0]) || window.innerWidth;
+  S.edgeMove.H = (css && css[1]) || window.innerHeight;
   edgeOverlay.classList.remove("hidden");
-  edgeMove.ready = true;
-  updateEdgePreview(edgeMove.lastX, edgeMove.lastY);
+  S.edgeMove.ready = true;
+  updateEdgePreview(S.edgeMove.lastX, S.edgeMove.lastY);
 }
 
 async function endEdgeMove(commit) {
-  const mv = edgeMove;
-  edgeMove = null;
+  const mv = S.edgeMove;
+  S.edgeMove = null;
   if (edgeOverlay) edgeOverlay.classList.add("hidden");
   document.body.classList.remove("edge-moving");
   if (!mv || !mv.active) return; // never grew the window → nothing to restore
   // The OS window was grown to cover the screen, but lastFull still holds the
   // bar-sized frame — so applyFrame() would no-op and leave the window huge.
   // Force it to re-issue the real frame.
-  lastFull = null;
+  S.lastFull = null;
   const target = mv.target;
-  if (commit && target && target !== cfg.edge) {
+  if (commit && target && target !== S.cfg.edge) {
     // Land on the new edge with a pop so the move reads as motion, not a jump.
-    cfg.edge = target;
-    applyEdge(cfg);
+    S.cfg.edge = target;
+    applyEdge(S.cfg);
     dockKeys.sync();
     fitDock();
     document.body.classList.add("edge-swap");
@@ -1963,30 +1956,30 @@ async function endEdgeMove(commit) {
 
 dockEl.addEventListener("pointerdown", (e) => {
   if (e.button !== 0 || closestSel(e.target, ".tile")) return;
-  edgeMove = {
+  S.edgeMove = {
     x: e.screenX, y: e.screenY, active: false, ready: false,
-    lastX: e.clientX, lastY: e.clientY, target: cfg.edge,
+    lastX: e.clientX, lastY: e.clientY, target: S.cfg.edge,
   };
   try { dockEl.setPointerCapture(e.pointerId); } catch (_) {}
 });
 window.addEventListener("pointermove", (e) => {
-  if (!edgeMove) return;
-  edgeMove.lastX = e.clientX;
-  edgeMove.lastY = e.clientY;
-  if (!edgeMove.active) {
-    const dx = e.screenX - edgeMove.x;
-    const dy = e.screenY - edgeMove.y;
+  if (!S.edgeMove) return;
+  S.edgeMove.lastX = e.clientX;
+  S.edgeMove.lastY = e.clientY;
+  if (!S.edgeMove.active) {
+    const dx = e.screenX - S.edgeMove.x;
+    const dy = e.screenY - S.edgeMove.y;
     if (Math.hypot(dx, dy) < 20) return; // small threshold → forgiving, not rigid
-    edgeMove.active = true;
+    S.edgeMove.active = true;
     enterEdgeMove();
     return;
   }
   updateEdgePreview(e.clientX, e.clientY);
 });
-window.addEventListener("pointerup", () => { if (edgeMove) endEdgeMove(true).catch(() => {}); });
-window.addEventListener("pointercancel", () => { if (edgeMove) endEdgeMove(false).catch(() => {}); });
+window.addEventListener("pointerup", () => { if (S.edgeMove) endEdgeMove(true).catch(() => {}); });
+window.addEventListener("pointercancel", () => { if (S.edgeMove) endEdgeMove(false).catch(() => {}); });
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && edgeMove) endEdgeMove(false).catch(() => {});
+  if (e.key === "Escape" && S.edgeMove) endEdgeMove(false).catch(() => {});
 });
 
 // Mouse wheel over a widget → cycle its visual style (a fun, fast tweak).
@@ -2041,7 +2034,7 @@ dockEl.addEventListener("pointermove", (e) => {
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
   magPointer.x = e.clientX;
   magPointer.y = e.clientY;
-  if (edgeMove) return; // moving the whole dock to another edge — no magnify
+  if (S.edgeMove) return; // moving the whole dock to another edge — no magnify
   if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
   if (magnifyRaf) return;
   magnifyRaf = requestAnimationFrame(() => {
@@ -2079,39 +2072,36 @@ function stopEdgeScroll() { edgeScrollVel = 0; }
 
 // ─────────── Edit mode (iOS-style long-press) + reorder ───────────
 
-let editMode = false;
-let dragging = false;
-let press = null; // { el, item, startX, startY, longTimer, moved }
 
 function enterEdit() {
-  if (editMode) return;
-  editMode = true;
+  if (S.editMode) return;
+  S.editMode = true;
   document.body.classList.add("edit");
   const toolbar = document.createElement("div"); toolbar.className = "edit-toolbar";
   const label = document.createElement("span"); label.textContent = t("overhaul.editing");
   const done = document.createElement("button"); done.type = "button"; done.textContent = t("w.done"); done.addEventListener("click", exitEdit);
   toolbar.append(label, done); document.body.appendChild(toolbar);
-  pinnedReveal = true; applyFrame();
+  S.pinnedReveal = true; applyFrame();
   requestAnimationFrame(() => {
-    const pos = placeBesideBar({ bar: dockEl.getBoundingClientRect(), box: { width: toolbar.offsetWidth, height: toolbar.offsetHeight }, edge: cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    const pos = placeBesideBar({ bar: dockEl.getBoundingClientRect(), box: { width: toolbar.offsetWidth, height: toolbar.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
     toolbar.style.left = `${pos.left}px`; toolbar.style.top = `${pos.top}px`; scheduleHitReport();
   });
   setAllSizes(baseSize());
 }
 function exitEdit() {
-  if (!editMode) return;
-  editMode = false;
+  if (!S.editMode) return;
+  S.editMode = false;
   document.body.classList.remove("edit");
   document.querySelector(".edit-toolbar")?.remove();
-  pinnedReveal = false; reframe();
+  S.pinnedReveal = false; reframe();
 }
 
 function onPointerDown(e, el, item) {
   if (e.button !== 0) return;
-  press = { el, item, startX: e.clientX, startY: e.clientY, moved: false, pointerId: e.pointerId };
+  S.press = { el, item, startX: e.clientX, startY: e.clientY, moved: false, pointerId: e.pointerId };
   // Long-press on an app/folder enters edit mode (iOS-style).
-  if (item.kind !== "separator" && !editMode) {
-    press.longTimer = setTimeout(enterEdit, 550);
+  if (item.kind !== "separator" && !S.editMode) {
+    S.press.longTimer = setTimeout(enterEdit, 550);
   }
   window.addEventListener("pointermove", onPressMove);
   window.addEventListener("pointerup", onPressUp, { once: true });
@@ -2149,7 +2139,7 @@ function mergeTargetAt(sibs, x, y) {
     const lo = vertical ? r.left : r.top;
     const hi = vertical ? r.right : r.bottom;
     if (along < 0 || along > 1 || across < lo - 18 || across > hi + 18) continue;
-    const isGroup = s.classList.contains("group") || cfg.pinned.find((p) => p.id === s.dataset.id)?.kind === "group";
+    const isGroup = s.classList.contains("group") || S.cfg.pinned.find((p) => p.id === s.dataset.id)?.kind === "group";
     const margin = s === mergeEl ? 0.1 : isGroup ? 0.18 : 0.26;
     return along >= margin && along <= 1 - margin ? s : null;
   }
@@ -2166,9 +2156,9 @@ function killClone() {
 // Distance from the pointer to the bar, measured AWAY from the anchored edge.
 function pullDistance(e) {
   const r = dockEl.getBoundingClientRect();
-  if (cfg.edge === "top") return e.clientY - r.bottom;
-  if (cfg.edge === "left") return e.clientX - r.right;
-  if (cfg.edge === "right") return r.left - e.clientX;
+  if (S.cfg.edge === "top") return e.clientY - r.bottom;
+  if (S.cfg.edge === "left") return e.clientX - r.right;
+  if (S.cfg.edge === "right") return r.left - e.clientX;
   return r.top - e.clientY;
 }
 
@@ -2181,40 +2171,40 @@ function onPressMove(e) {
   if (pressMoveRaf) return;
   pressMoveRaf = requestAnimationFrame(() => {
     pressMoveRaf = 0;
-    if (press && pressMoveEv) processMove(pressMoveEv);
+    if (S.press && pressMoveEv) processMove(pressMoveEv);
   });
 }
 function processMove(e) {
-  if (!press) return;
-  const dx = e.clientX - press.startX;
-  const dy = e.clientY - press.startY;
-  if (!press.moved && Math.hypot(dx, dy) < 6) return;
-  press.moved = true;
-  clearTimeout(press.longTimer);
+  if (!S.press) return;
+  const dx = e.clientX - S.press.startX;
+  const dy = e.clientY - S.press.startY;
+  if (!S.press.moved && Math.hypot(dx, dy) < 6) return;
+  S.press.moved = true;
+  clearTimeout(S.press.longTimer);
   // Direct drag — no edit mode needed (intuitive). A plain click still launches.
-  if (press.item.kind === "separator") return;
-  if (!dragging) {
-    dragging = true;
+  if (S.press.item.kind === "separator") return;
+  if (!S.dragging) {
+    S.dragging = true;
     dockEl.classList.add("dragging");
-    press.el.classList.add("dragging");
+    S.press.el.classList.add("dragging");
     // Capture the pointer so moves keep firing even once the cursor leaves the
     // dock's small window — otherwise the "pull far out to unpin" gesture could
     // never reach its threshold with a mouse (mice get no implicit capture).
-    try { press.el.setPointerCapture(press.pointerId); } catch (_) {}
+    try { S.press.el.setPointerCapture(S.press.pointerId); } catch (_) {}
     // A floating copy follows the pointer; the real tile stays as a ghost slot,
     // so you SEE what you're moving instead of it teleporting between slots.
-    const r = press.el.getBoundingClientRect();
-    dragClone = press.el.cloneNode(true);
+    const r = S.press.el.getBoundingClientRect();
+    dragClone = S.press.el.cloneNode(true);
     dragClone.className = "tile drag-clone";
     dragClone.style.width = `${r.width}px`;
     dragClone.style.height = `${r.height}px`;
-    press.grabX = e.clientX - r.left;
-    press.grabY = e.clientY - r.top;
+    S.press.grabX = e.clientX - r.left;
+    S.press.grabY = e.clientY - r.top;
     document.body.appendChild(dragClone);
   }
   if (dragClone) {
-    dragClone.style.left = `${e.clientX - press.grabX}px`;
-    dragClone.style.top = `${e.clientY - press.grabY}px`;
+    dragClone.style.left = `${e.clientX - S.press.grabX}px`;
+    dragClone.style.top = `${e.clientY - S.press.grabY}px`;
   }
 
   // Pulled clearly out of the bar's window → dropping here
@@ -2223,20 +2213,20 @@ function processMove(e) {
   if (pulling !== willUnpin) {
     willUnpin = pulling;
     if (dragClone) dragClone.classList.toggle("will-unpin", willUnpin);
-    press.el.classList.toggle("unpin-slot", willUnpin);
+    S.press.el.classList.toggle("unpin-slot", willUnpin);
   }
   if (willUnpin) {
     clearMerge();
-    placeHint(/\.lnk$/i.test(press.item.path || "") ? t("shortcut.unpinHint") : t("m.remove"), press.el);
+    placeHint(/\.lnk$/i.test(S.press.item.path || "") ? t("shortcut.unpinHint") : t("m.remove"), S.press.el);
     return; // no reordering/merging while aiming outside the bar
   }
 
-  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== press.el);
+  const sibs = [...dockEl.querySelectorAll(".tile[data-id]")].filter((s) => s !== S.press.el);
 
   // Hovering the middle of another tile → group (merge) intent. Apps and
   // widgets can both be grouped (widgets go live only inside the group).
   // Separators, the trash tile and groups-into-groups never form a group.
-  const centerTarget = canMergeKind(press.item.kind) ? mergeTargetAt(sibs, e.clientX, e.clientY) : null;
+  const centerTarget = canMergeKind(S.press.item.kind) ? mergeTargetAt(sibs, e.clientX, e.clientY) : null;
 
   if (centerTarget) {
     if (mergeEl !== centerTarget) {
@@ -2246,7 +2236,7 @@ function processMove(e) {
     }
     // Dropping into an existing group is safe to arm at once; making a new
     // group waits a beat so a quick pass while reordering never does it.
-    const into = cfg.pinned.find((p) => p.id === centerTarget.dataset.id);
+    const into = S.cfg.pinned.find((p) => p.id === centerTarget.dataset.id);
     if (into?.kind === "group" || Date.now() - mergeArm > MERGE_ARM_MS) {
       centerTarget.classList.add("merge-target");
       placeHint(
@@ -2256,7 +2246,7 @@ function processMove(e) {
     } else {
       // Re-check once the hold time has passed even if the pointer rests.
       clearTimeout(mergeArmTimer);
-      mergeArmTimer = setTimeout(() => { if (press && pressMoveEv && mergeEl === centerTarget) processMove(pressMoveEv); }, MERGE_ARM_MS + 20);
+      mergeArmTimer = setTimeout(() => { if (S.press && pressMoveEv && mergeEl === centerTarget) processMove(pressMoveEv); }, MERGE_ARM_MS + 20);
     }
     return; // aiming at the middle → hold for a merge, don't reorder
   }
@@ -2276,8 +2266,8 @@ function processMove(e) {
     }
   }
   // Skip if it's already in place (avoids resetting the FLIP transition).
-  if (press.el.nextElementSibling === ref) return;
-  flipReorder(() => dockEl.insertBefore(press.el, ref));
+  if (S.press.el.nextElementSibling === ref) return;
+  flipReorder(() => dockEl.insertBefore(S.press.el, ref));
 }
 
 // FLIP: animate the OTHER tiles sliding to their new slots when the dragged tile
@@ -2287,7 +2277,7 @@ function flipReorder(mutate) {
   const first = new Map(tiles.map((t) => [t, t.getBoundingClientRect()]));
   mutate();
   for (const t of tiles) {
-    if (t === press?.el) continue; // the dragged tile follows the pointer itself
+    if (t === S.press?.el) continue; // the dragged tile follows the pointer itself
     const a = first.get(t);
     const b = t.getBoundingClientRect();
     const dx = a.left - b.left;
@@ -2306,14 +2296,14 @@ async function onPressUp(e) {
   window.removeEventListener("pointermove", onPressMove);
   cancelAnimationFrame(pressMoveRaf);
   pressMoveRaf = 0;
-  const p = press;
-  press = null;
+  const p = S.press;
+  S.press = null;
   placeHint(null);
   if (!p) return;
   clearTimeout(p.longTimer);
   try { p.el.releasePointerCapture(p.pointerId); } catch (_) {}
-  if (dragging) {
-    dragging = false;
+  if (S.dragging) {
+    S.dragging = false;
     dockEl.classList.remove("dragging");
     p.el.classList.remove("dragging");
     p.el.classList.remove("unpin-slot");
@@ -2347,14 +2337,14 @@ async function onPressUp(e) {
       await createGroup(p.item.id, armed);
     } else {
       const idToIndex = new Map([...dockEl.querySelectorAll(".tile[data-id]")].map((t, i) => [t.dataset.id, i]));
-      cfg.pinned.sort((a, b) => (idToIndex.get(a.id) ?? 0) - (idToIndex.get(b.id) ?? 0));
+      S.cfg.pinned.sort((a, b) => (idToIndex.get(a.id) ?? 0) - (idToIndex.get(b.id) ?? 0));
       if (!(await persist())) return;
       await render();
       reframe();
     }
     return;
   }
-  if (!p.moved && !editMode && p.item.kind !== "separator") {
+  if (!p.moved && !S.editMode && p.item.kind !== "separator") {
     launch(p.el, p.item, launchModifiers(e));
   }
 }
@@ -2362,14 +2352,14 @@ async function onPressUp(e) {
 // Cancel an in-progress drag (Escape / lost pointer / pointercancel): drop all
 // state and restore the original order — no reorder, no folder created.
 async function cancelDrag() {
-  if (!press && !dragging) return;
+  if (!S.press && !S.dragging) return;
   window.removeEventListener("pointermove", onPressMove);
   cancelAnimationFrame(pressMoveRaf);
   pressMoveRaf = 0;
-  if (press) { try { press.el.releasePointerCapture(press.pointerId); } catch (_) {} }
-  const wasDragging = dragging;
-  press = null;
-  dragging = false;
+  if (S.press) { try { S.press.el.releasePointerCapture(S.press.pointerId); } catch (_) {} }
+  const wasDragging = S.dragging;
+  S.press = null;
+  S.dragging = false;
   clearMerge();
   killClone();
   dockEl.classList.remove("dragging");
@@ -2399,7 +2389,7 @@ dockEl.addEventListener("keydown", (e) => {
 
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault(); // Space would otherwise scroll the bar
-    if (editMode) exitEdit();
+    if (S.editMode) exitEdit();
     else launch(tile, item, launchModifiers(e));
     return;
   }
@@ -2418,9 +2408,9 @@ dockEl.addEventListener("keydown", (e) => {
 
 // Merge a dragged pin onto a target → create a group (or add to one).
 async function createGroup(draggedId, targetId) {
-  const next = mergePins(cfg.pinned, draggedId, targetId, t("group.new"));
-  if (next === cfg.pinned) return;
-  cfg.pinned = next;
+  const next = mergePins(S.cfg.pinned, draggedId, targetId, t("group.new"));
+  if (next === S.cfg.pinned) return;
+  S.cfg.pinned = next;
   exitEdit();
   if (!(await persist())) return;
   await render();
@@ -2452,7 +2442,7 @@ function renamePinnedItem(item, name, { commit = false } = {}) {
     if (lab) lab.textContent = commit ? next : (name || fallback);
   }
   const stackInput = stackEl?.querySelector?.(".stack-rename");
-  if (stackInput && stackItemId === item.id && document.activeElement !== stackInput) {
+  if (stackInput && S.stackItemId === item.id && document.activeElement !== stackInput) {
     stackInput.value = commit ? next : (name || "");
   }
   clearTimeout(renameTimer);
@@ -2476,7 +2466,7 @@ function renameGroup(group, name, opts) {
 /** Inline rename popover from the dock context menu (apps, folders, groups…). */
 function promptRename(item) {
   if (!item || item.kind === "separator") return;
-  pinnedReveal = true;
+  S.pinnedReveal = true;
   closeMenu();
   closeTrashPop();
   const pop = document.createElement("div");
@@ -2491,7 +2481,7 @@ function promptRename(item) {
   const finish = (commit) => {
     if (commit) renamePinnedItem(item, input.value, { commit: true });
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   };
   input.addEventListener("keydown", (e) => {
@@ -2514,7 +2504,7 @@ function promptRename(item) {
   pop.appendChild(input);
   pop.appendChild(ok);
   pop.appendChild(cancel);
-  trashPop = pop;
+  S.trashPop = pop;
   placePop(pop);
   requestAnimationFrame(() => {
     input.focus();
@@ -2524,10 +2514,10 @@ function promptRename(item) {
 
 // Dissolve a folder: spill its children back to the dock at its position.
 async function ungroup(group) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  const gi = S.cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
-  const rest = cfg.pinned[gi].children || [];
-  cfg.pinned.splice(gi, 1, ...rest);
+  const rest = S.cfg.pinned[gi].children || [];
+  S.cfg.pinned.splice(gi, 1, ...rest);
   if (!(await persist())) return;
   closeStack();
   await render();
@@ -2536,41 +2526,41 @@ async function ungroup(group) {
 
 // Move one member back to the dock and reopen its preserved group.
 async function takeOutChild(group, childId) {
-  const { pinned, reopenId } = takeOutOfGroup(cfg.pinned, group.id, childId);
-  cfg.pinned = pinned;
+  const { pinned, reopenId } = takeOutOfGroup(S.cfg.pinned, group.id, childId);
+  S.cfg.pinned = pinned;
   if (!(await persist())) return;
   closeStack();
   await render();
   reframe();
   if (reopenId) {
     const tileEl = dockEl.querySelector(`.tile[data-id="${reopenId}"]`);
-    const it = cfg.pinned.find((p) => p.id === reopenId);
+    const it = S.cfg.pinned.find((p) => p.id === reopenId);
     if (tileEl && it) openStack(tileEl, it);
   }
 }
 
 /** Reorder a child inside its group and reopen the flyout. */
 async function reorderGroupChild(group, childId, beforeId) {
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  const gi = S.cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
-  const kids = [...(cfg.pinned[gi].children || [])];
+  const kids = [...(S.cfg.pinned[gi].children || [])];
   const from = kids.findIndex((c) => c.id === childId);
   if (from < 0) return;
   const [moved] = kids.splice(from, 1);
   let to = beforeId ? kids.findIndex((c) => c.id === beforeId) : kids.length;
   if (to < 0) to = kids.length;
   kids.splice(to, 0, moved);
-  cfg.pinned[gi].children = kids;
+  S.cfg.pinned[gi].children = kids;
   // Keep flyout open across persist so smart-hide can't tuck mid-reorder.
-  pinnedReveal = true;
+  S.pinnedReveal = true;
   if (!(await persist())) return;
   closeStack();
   await render();
   reframe();
   const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
-  const it = cfg.pinned.find((p) => p.id === group.id);
+  const it = S.cfg.pinned.find((p) => p.id === group.id);
   if (el && it) await openStack(el, it);
-  pinnedReveal = false;
+  S.pinnedReveal = false;
 }
 
 /* Where a member dragged out of a group's panel would land on the bar: inside
@@ -2583,7 +2573,7 @@ function dockDropSlot(x, y, fromGroupId) {
   if (x < bar.left - pad || x > bar.right + pad || y < bar.top - pad || y > bar.bottom + pad) return null;
   const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
   const target = mergeTargetAt(tiles, x, y);
-  if (target && target.dataset.id !== fromGroupId && cfg.pinned.find((p) => p.id === target.dataset.id)?.kind === "group") {
+  if (target && target.dataset.id !== fromGroupId && S.cfg.pinned.find((p) => p.id === target.dataset.id)?.kind === "group") {
     return { groupId: target.dataset.id };
   }
   const vertical = isVertical();
@@ -2605,9 +2595,9 @@ function markOutTarget(el) {
 
 /** Move a member out of its group to a spot on the bar or into another group. */
 async function moveChildTo(group, child, slot) {
-  const next = placePin(cfg.pinned, child, slot.groupId ? { groupId: slot.groupId } : { beforeId: slot.beforeId || undefined });
-  if (next === cfg.pinned) return;
-  cfg.pinned = next;
+  const next = placePin(S.cfg.pinned, child, slot.groupId ? { groupId: slot.groupId } : { beforeId: slot.beforeId || undefined });
+  if (next === S.cfg.pinned) return;
+  S.cfg.pinned = next;
   if (!(await persist())) return;
   closeStack();
   await render();
@@ -2750,12 +2740,12 @@ function wireStackDragOut(cell, group, child) {
 
 // Exit edit mode by clicking empty space or pressing Escape.
 window.addEventListener("pointerdown", (e) => {
-  if (editMode && !closestSel(e.target, ".tile, .edit-toolbar")) exitEdit();
+  if (S.editMode && !closestSel(e.target, ".tile, .edit-toolbar")) exitEdit();
   // Clicking anywhere outside the trash confirmation cancels it (never delete
   // on an ambiguous gesture).
-  if (trashPop && !closestSel(e.target, ".trash-pop")) {
+  if (S.trashPop && !closestSel(e.target, ".trash-pop")) {
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   }
 });
@@ -2782,7 +2772,7 @@ function confirmShortcutOut(item) {
   });
   button("m.remove", () => removeItem(item.id));
   button("trash.cancel", () => {});
-  trashPop = pop;
+  S.trashPop = pop;
   placePop(pop);
 }
 
@@ -2797,7 +2787,7 @@ async function relocateShortcut(item, toDesktop) {
     pop.className = "trash-pop";
     pop.textContent = t("shortcut.error");
     closeTrashPop();
-    trashPop = pop;
+    S.trashPop = pop;
     placePop(pop);
     return false;
   }
@@ -2835,7 +2825,7 @@ function openMenu(e, item) {
   e.stopPropagation();
   ctxMenu.innerHTML = "";
   const { add, sep } = menuActions(ctxMenu, closeMenu);
-  const generation = ++menuGeneration;
+  const generation = ++S.menuGeneration;
   addMenuHead(menuPinTitle(item), menuKindLabel(item));
 
   // Like the macOS dock: an app's open windows come first (the likeliest
@@ -2924,7 +2914,7 @@ function openMenu(e, item) {
 
 /** Two-step confirm before deleting a whole group (children would go with it). */
 function confirmRemoveGroup(item) {
-  pinnedReveal = true;
+  S.pinnedReveal = true;
   const n = (item.children || []).length;
   const pop = document.createElement("div");
   pop.className = "trash-pop";
@@ -2935,12 +2925,12 @@ function confirmRemoveGroup(item) {
   popButton(pop, "danger", t("apps.remove"), async () => {
     closeTrashPop();
     await removeItem(item.id);
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   showConfirmPop(pop);
@@ -2956,7 +2946,7 @@ async function fillRecentFiles(slot, e, item, generation) {
   } catch (_) {
     return;
   }
-  if (!recents?.length || !slot.isConnected || generation !== menuGeneration || ctxMenu.classList.contains("hidden")) return;
+  if (!recents?.length || !slot.isConnected || generation !== S.menuGeneration || ctxMenu.classList.contains("hidden")) return;
   const head = document.createElement("div");
   head.className = "menu-label";
   head.textContent = t("m.recent");
@@ -2983,7 +2973,7 @@ async function fillRecentFiles(slot, e, item, generation) {
 function openBackgroundMenu(e) {
   e.preventDefault();
   e.stopPropagation();
-  const generation = ++menuGeneration;
+  const generation = ++S.menuGeneration;
   ctxMenu.replaceChildren();
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead("Booki", t("m.dockMenu"));
@@ -3000,19 +2990,19 @@ function openBackgroundMenu(e) {
   }
   placeMenu(e);
   dockApi.profileList().then((profiles) => {
-    if (!Array.isArray(profiles) || !profiles.length || generation !== menuGeneration || ctxMenu.classList.contains("hidden")) return;
+    if (!Array.isArray(profiles) || !profiles.length || generation !== S.menuGeneration || ctxMenu.classList.contains("hidden")) return;
     const actions = menuActions(profilesSlot, closeMenu);
     actions.sep();
-    for (const name of profiles.slice(0, 6)) actions.add(name === cfg.lastProfile ? "check" : "sparkles", name, async () => {
+    for (const name of profiles.slice(0, 6)) actions.add(name === S.cfg.lastProfile ? "check" : "sparkles", name, async () => {
       const fresh = await dockApi.profileApply(name);
-      cfg = fresh; await ensureLang(cfg.language); maybeSyncCtxMenu(); applyAll(); await render(); reframe();
+      S.cfg = fresh; await ensureLang(S.cfg.language); maybeSyncCtxMenu(); applyAll(); await render(); reframe();
     });
     placeMenu(e, false);
   }).catch(() => {});
 }
 
 function openFileMenu(e, item, parent, openFolder) {
-  e.preventDefault(); e.stopPropagation(); ++menuGeneration;
+  e.preventDefault(); e.stopPropagation(); ++S.menuGeneration;
   ctxMenu.replaceChildren();
   addMenuHead(item.name, item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
   const { add, sep } = menuActions(ctxMenu, closeMenu);
@@ -3027,7 +3017,6 @@ function openFileMenu(e, item, parent, openFolder) {
   placeMenu(e);
 }
 
-let menuGeneration = 0;
 let menuReturnFocus = null;
 // The context menu lives beside the bar (like the folder flyout): the window is
 // grown to fit it, so it can never be cut off by the dock window's bounds.
@@ -3045,7 +3034,7 @@ function placeMenu(e, focus = true) {
     const { left, top } = placeBesideBar({
       bar: dockEl.getBoundingClientRect(),
       box: { width: ctxMenu.offsetWidth, height: ctxMenu.offsetHeight },
-      edge: cfg.edge,
+      edge: S.cfg.edge,
       viewport: { width: window.innerWidth, height: window.innerHeight },
       along: isVertical() ? cy : cx,
     });
@@ -3060,7 +3049,7 @@ function placeMenu(e, focus = true) {
   // The window resizes asynchronously after applyFrame(); reposition again the
   // moment it actually settles (via the resize hook) AND on a short fallback, so
   // the menu can never end up clipped by a window that grew a beat too late.
-  pendingReplace = put;
+  S.pendingReplace = put;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       put();
@@ -3070,25 +3059,22 @@ function placeMenu(e, focus = true) {
   });
 }
 function closeMenu() {
-  ++menuGeneration;
+  ++S.menuGeneration;
   if (ctxMenu.classList.contains("hidden")) return;
   ctxMenu.classList.add("hidden");
   document.body.classList.remove("menu-open");
-  pendingReplace = null;
+  S.pendingReplace = null;
   if (ctxMenu.contains(document.activeElement)) menuReturnFocus?.focus?.();
   reframe();
 }
 
-// When the dock window finishes resizing (async, after applyFrame), re-place the
-// overlay that's currently open so it can't be left clipped by a slow resize.
-let pendingReplace = null;
 // Right-click on the bar's empty space (tiles stopPropagation their own menu).
 dockEl.addEventListener("contextmenu", openBackgroundMenu);
 document.addEventListener("contextmenu", (e) => {
   if (isTextEditor(e.target)) return;
   e.preventDefault();
   if (closestSel(e.target, "#ctx-menu")) return;
-  const item = closestSel(e.target, "#stack") && findPinnedById(stackItemId);
+  const item = closestSel(e.target, "#stack") && findPinnedById(S.stackItemId);
   if (item) openMenu(e, item); else openBackgroundMenu(e);
 });
 ctxMenu.addEventListener("keydown", (e) => {
@@ -3101,8 +3087,8 @@ window.addEventListener("blur", () => {
   closeStack();
   // Focus moved to another app → release a pinned reveal so the dock can tuck
   // back into the notch instead of lingering on top of whatever the user opened.
-  if (pinnedReveal) {
-    pinnedReveal = false;
+  if (S.pinnedReveal) {
+    S.pinnedReveal = false;
     scheduleHide();
   }
 });
@@ -3119,7 +3105,7 @@ window.addEventListener("keydown", (e) => {
     cancelDrag();
     closeTrashPop();
     // Closing an absent panel would still release a pinned reveal and tuck the dock away.
-    if (productivityPanel) closeProductivityPanel();
+    if (S.productivityPanel) closeProductivityPanel();
   }
 });
 
@@ -3144,16 +3130,16 @@ async function clearIcon(item) {
   await render();
 }
 async function addSeparatorAfter(id) {
-  const i = cfg.pinned.findIndex((a) => a.id === id);
-  const at = i < 0 ? cfg.pinned.length : i + 1;
-  cfg.pinned.splice(at, 0, { id: uid(), name: "", path: "", args: [], kind: "separator" });
+  const i = S.cfg.pinned.findIndex((a) => a.id === id);
+  const at = i < 0 ? S.cfg.pinned.length : i + 1;
+  S.cfg.pinned.splice(at, 0, { id: uid(), name: "", path: "", args: [], kind: "separator" });
   if (!(await persist())) return;
   await render();
   reframe();
 }
 async function removeItem(id) {
-  const index = cfg.pinned.findIndex((a) => a.id === id);
-  const removed = index >= 0 ? cfg.pinned[index] : null;
+  const index = S.cfg.pinned.findIndex((a) => a.id === id);
+  const removed = index >= 0 ? S.cfg.pinned[index] : null;
   if (!removed) return;
   // Play a quick fade+scale-out on the tile before the re-render swaps it away.
   const el = dockEl.querySelector(`.tile[data-id="${id}"]`);
@@ -3161,7 +3147,7 @@ async function removeItem(id) {
     el.classList.add("tile-out");
     await new Promise((r) => setTimeout(r, 170));
   }
-  cfg.pinned = cfg.pinned.filter((a) => a.id !== id);
+  S.cfg.pinned = S.cfg.pinned.filter((a) => a.id !== id);
   if (!(await persist())) return;
   await render();
   reframe();
@@ -3214,9 +3200,8 @@ const SHADOW_PAD = 18;
 // rects the frontend reports (reportHitRects).
 const PANEL_ROOM = 420;
 
-let lastFull = null;
 function edgePadCss() {
-  return Math.min(SHADOW_PAD, Math.max(0, Math.min(96, cfg.edgeGap ?? 12)));
+  return Math.min(SHADOW_PAD, Math.max(0, Math.min(96, S.cfg.edgeGap ?? 12)));
 }
 function computeFrame() {
   const dpr = window.devicePixelRatio || 1;
@@ -3266,19 +3251,19 @@ function applyFrame() {
   // width wiggles (net rates, media title, rolling numbers) don't make the whole
   // window grow/shrink every second — that constant resize was a real flicker.
   // Only resize once a change is big enough to threaten the shadow's headroom.
-  const key = `${cfg.edge}:${cfg.monitor ?? -1}`;
+  const key = `${S.cfg.edge}:${S.cfg.monitor ?? -1}`;
   const dpr = window.devicePixelRatio || 1;
   const slack = Math.round(8 * dpr); // px; small enough to keep the tighter stage accurate
   if (
-    lastFull && lastFrameEdge === key &&
-    Math.abs(full.w - lastFull.w) <= slack && Math.abs(full.h - lastFull.h) <= slack
+    S.lastFull && lastFrameEdge === key &&
+    Math.abs(full.w - S.lastFull.w) <= slack && Math.abs(full.h - S.lastFull.h) <= slack
   ) {
     return;
   }
-  lastFull = full;
+  S.lastFull = full;
   lastFrameEdge = key;
   // Stage stays large for flyouts; home rect is bar-sized for smart-hide.
-  dockApi.setDockFrame(cfg.edge, full.w, full.h, false, home.w, home.h);
+  dockApi.setDockFrame(S.cfg.edge, full.w, full.h, false, home.w, home.h);
 }
 
 // Reposition when the screen metrics change — resolution, DPI/scale, taskbar
@@ -3291,11 +3276,11 @@ function screenSig() {
   return [s.width, s.height, s.availWidth, s.availHeight, window.devicePixelRatio || 1].join("x");
 }
 function checkScreenChange() {
-  if (!cfg) return; // a resize before boot finished → nothing to reframe yet
+  if (!S.cfg) return; // a resize before boot finished → nothing to reframe yet
   const sig = screenSig();
   if (sig === lastScreenSig) return;
   lastScreenSig = sig;
-  lastFull = null; // force setDockFrame even if the pixel size is unchanged
+  S.lastFull = null; // force setDockFrame even if the pixel size is unchanged
   if (typeof invalidateMag === "function") invalidateMag();
   fitDock();
   applyFrame();
@@ -3309,7 +3294,7 @@ window.addEventListener("resize", () => {
   requestAnimationFrame(refreshPreviewMarquees);
   // An open menu/flyout grew the window; now that it actually resized, snap it
   // back into place so it's never clipped by the resize lagging behind.
-  if (pendingReplace) { try { pendingReplace(); } catch (_) {} }
+  if (S.pendingReplace) { try { S.pendingReplace(); } catch (_) {} }
   clearTimeout(screenChangeTimer);
   screenChangeTimer = setTimeout(checkScreenChange, 250);
 });
@@ -3318,14 +3303,8 @@ window.addEventListener("resize", () => {
 // Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
 // driven by the backend occlusion watcher) · "edge" (hide, reveal on hover).
 
-let hiddenState = false;
-let hideTimer = null;
 let desktopActive = false;
 let occluded = false; // last occlusion signal from the backend (smart mode)
-let pinnedReveal = false; // user CLICKED the notch → keep the dock open to use it
-let fullscreen = false; // dock suppressed for a fullscreen blackout (not raw FS signal)
-let draggingFile = false; // an OS file drag is over the dock → keep it open
-let manualHide = false; // user swiped the bar away → hover must not bring it back
 let blackoutTimer = null;
 let occRevealTimer = null; // debounce for the smart-mode auto-reveal
 let hiddenBeforeFullscreen = false;
@@ -3337,7 +3316,7 @@ const FS_TOAST_HOLD_MS = 1500;
 const FS_TOAST_FADE_MS = 260;
 
 function hideInFullscreenEnabled() {
-  return cfg.hideInFullscreen !== false;
+  return S.cfg.hideInFullscreen !== false;
 }
 
 function clearFsTimers() {
@@ -3345,43 +3324,43 @@ function clearFsTimers() {
   blackoutTimer = null;
   clearTimeout(occRevealTimer);
   occRevealTimer = null;
-  clearTimeout(hideTimer);
-  hideTimer = null;
+  clearTimeout(S.hideTimer);
+  S.hideTimer = null;
 }
 
 function onFullscreenSignal(value) {
   clearFsTimers();
   if (value) {
     // Already blacked out — ignore repeat signals.
-    if (fullscreen) return;
+    if (S.fullscreen) return;
     // Opt-out: stay visible. Do NOT set `fullscreen` or pinOpen/tryTuck break.
     if (!hideInFullscreenEnabled()) return;
-    fullscreen = true;
-    hiddenBeforeFullscreen = hiddenState;
-    pinnedReveal = false;
-    hiddenState = true;
+    S.fullscreen = true;
+    hiddenBeforeFullscreen = S.hiddenState;
+    S.pinnedReveal = false;
+    S.hiddenState = true;
     stopPolls(); // fullscreen game/movie → go fully idle
     document.body.classList.add("tucked");
     // Already tucked into the notch → skip the toast chip; blackout quietly.
     if (hiddenBeforeFullscreen) {
       blackoutTimer = setTimeout(() => {
-        if (fullscreen) dockApi.hideAll();
+        if (S.fullscreen) dockApi.hideAll();
       }, 320);
       return;
     }
     // Calm two-line status on the notch, then fade into full blackout.
     dockApi.notchToast(t("fs.hiddenTitle"), t("fs.hiddenSub"));
     blackoutTimer = setTimeout(() => {
-      if (!fullscreen) return;
+      if (!S.fullscreen) return;
       dockApi.notchToastDismiss().catch(() => {});
       blackoutTimer = setTimeout(() => {
-        if (fullscreen) dockApi.hideAll();
+        if (S.fullscreen) dockApi.hideAll();
       }, FS_TOAST_FADE_MS);
     }, FS_TOAST_HOLD_MS);
   } else {
     // Never entered a blackout (hide was off) — nothing to restore.
-    if (!fullscreen) return;
-    fullscreen = false;
+    if (!S.fullscreen) return;
+    S.fullscreen = false;
     const wasTucked = hiddenBeforeFullscreen;
     hiddenBeforeFullscreen = false;
     document.body.classList.remove("tucked");
@@ -3391,20 +3370,20 @@ function onFullscreenSignal(value) {
       await dockApi.notchToastDismiss().catch(() => {});
       // Restore the pre-FS visibility for every hide mode, not only smart+click.
       // setupAutoHide() starts edge visible — that would pop a tucked dock open.
-      if (wasTucked && !(hideMode() === "smart" && desktopActive && !manualHide)) {
-        hiddenState = true;
+      if (wasTucked && !(hideMode() === "smart" && desktopActive && !S.manualHide)) {
+        S.hiddenState = true;
         stopPolls();
         document.body.classList.add("tucked");
-        await dockApi.hideDock(cfg.edge).catch(() => {});
+        await dockApi.hideDock(S.cfg.edge).catch(() => {});
       } else if (hideMode() === "off") {
-        hiddenState = false;
+        S.hiddenState = false;
         startPolls();
         document.body.classList.add("revealing");
         await dockApi.revealDock().catch(() => {});
         applyFrame();
         setTimeout(() => document.body.classList.remove("revealing"), 380);
       } else {
-        hiddenState = false;
+        S.hiddenState = false;
         setupAutoHide();
       }
     })();
@@ -3412,12 +3391,12 @@ function onFullscreenSignal(value) {
 }
 
 function hideMode() {
-  return cfg.autoHideMode || (cfg.autoHide ? "edge" : "off");
+  return S.cfg.autoHideMode || (S.cfg.autoHide ? "edge" : "off");
 }
 
 function setHidden(v) {
-  if (v === hiddenState) return;
-  hiddenState = v;
+  if (v === S.hiddenState) return;
+  S.hiddenState = v;
   // Fully STOP the widget poll while tucked away (not just skip it) — a truly
   // idle dock burns no timer wakeups; it resumes the moment it reappears.
   if (v) stopPolls();
@@ -3425,12 +3404,12 @@ function setHidden(v) {
   if (v) {
     // The window is about to go away — the pointer can't be "inside" anymore.
     // (Windows won't fire pointerout for a window that hides under the cursor.)
-    pointerInside = false;
+    S.pointerInside = false;
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
     document.body.classList.add("tucked");
     setTimeout(() => {
-      if (hiddenState) dockApi.hideDock(cfg.edge);
+      if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
     }, 190); // match genie (~170ms) + a frame
   } else {
     // Show the dock window (and hide the notch), make sure it's sized to the full
@@ -3440,7 +3419,7 @@ function setHidden(v) {
     dockApi.revealDock();
     applyFrame();
     setTimeout(() => {
-      if (!hiddenState) document.body.classList.remove("tucked");
+      if (!S.hiddenState) document.body.classList.remove("tucked");
     }, 40);
     setTimeout(() => {
       document.body.classList.remove("revealing");
@@ -3456,7 +3435,6 @@ function setHidden(v) {
 // ends; the pointer leaving the window is what finishes a deferred hide.
 // The auto-hide delay is purely a grace period AFTER you leave, never a
 // countdown while you're on the dock.
-let pointerInside = false;
 
 // Snapshot of everything the visibility policy needs. Built in ONE place so
 // every caller below decides from the same inputs — the old code had each of
@@ -3466,15 +3444,15 @@ let pointerInside = false;
 function visibilityState() {
   return {
     mode: hideMode(),
-    trigger: cfg.notchTrigger || "click",
-    fullscreen,
-    previewing,
+    trigger: S.cfg.notchTrigger || "click",
+    fullscreen: S.fullscreen,
+    previewing: S.previewing,
     occluded,
     desktop: desktopActive,
-    manualHide,
-    summoned: pinnedReveal,
-    draggingFile,
-    pointerInside,
+    manualHide: S.manualHide,
+    summoned: S.pinnedReveal,
+    draggingFile: S.draggingFile,
+    pointerInside: S.pointerInside,
   };
 }
 
@@ -3489,8 +3467,8 @@ function wantsHideNow() {
 // tuck a notch-summoned dock once the user is working in another app.
 function interacting() {
   return (
-    pointerInside || dragging || draggingFile || stackOpen ||
-    !!edgeMove || document.body.classList.contains("menu-open") ||
+    S.pointerInside || S.dragging || S.draggingFile || S.stackOpen ||
+    !!S.edgeMove || document.body.classList.contains("menu-open") ||
     !!document.querySelector(".trash-pop, .note-editor, .coach, .productivity-panel")
   );
 }
@@ -3498,7 +3476,7 @@ function interacting() {
 // Hide if the user isn't mid-something; otherwise wait — the pointer-out
 // handler re-checks when they actually leave.
 function tryTuck() {
-  if (fullscreen || previewing || !wantsHideNow()) return;
+  if (S.fullscreen || S.previewing || !wantsHideNow()) return;
   if (interacting()) return; // deferred: pointer-out / gesture-end re-checks
   setHidden(true);
 }
@@ -3509,29 +3487,28 @@ function tryTuck() {
 window.addEventListener("pointerover", (e) => {
   if (e.relatedTarget) return;
   if (!pointInLiveHitArea(e.clientX, e.clientY)) {
-    pointerInside = false;
+    S.pointerInside = false;
     return;
   }
-  pointerInside = true;
-  if (pinnedReveal) pinTouched = true; // the summon got used
+  S.pointerInside = true;
+  if (S.pinnedReveal) S.pinTouched = true; // the summon got used
   // A visible dock never counts down while you're on it — any trigger mode.
-  if (!hiddenState) clearTimeout(hideTimer);
+  if (!S.hiddenState) clearTimeout(S.hideTimer);
 });
 window.addEventListener("pointerout", (e) => {
   if (e.relatedTarget) return;
-  pointerInside = false;
+  S.pointerInside = false;
   // A used pin ends when you leave — the dock goes back to normal hiding.
-  if (pinnedReveal && pinTouched) pinnedReveal = false;
+  if (S.pinnedReveal && S.pinTouched) S.pinnedReveal = false;
   // Leaving is the moment a wanted hide (edge mode, or smart while covered)
   // actually happens — after the grace delay.
-  if (!hiddenState && wantsHideNow()) scheduleHide();
+  if (!S.hiddenState && wantsHideNow()) scheduleHide();
 });
 
 // ───────────────── Hit regions of the stage window ─────────────────
 // The window spans the whole edge, but only the painted bar/tiles and open
 // panels are interactive; everywhere else the backend flips it click-through.
 // Report those regions whenever the DOM changes.
-let lastHitSig = "";
 const DOCK_HIT_PAD = 0;
 const TILE_HIT_PAD = 2;
 const PANEL_HIT_PAD = 4;
@@ -3541,11 +3518,11 @@ const HIT_PANELS =
   ".productivity-panel, .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
 
 function pointInLiveHitArea(x, y) {
-  if (edgeMove || dragging || draggingFile) return true;
+  if (S.edgeMove || S.dragging || S.draggingFile) return true;
   const rects = [
     rectFromElement(dockEl, DOCK_HIT_PAD),
     ...[...dockEl.querySelectorAll(".tile")].map((el) => rectFromElement(el, TILE_HIT_PAD)),
-    stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
+    S.stackOpen ? rectFromElement(stackEl, PANEL_HIT_PAD) : null,
     ...[...document.querySelectorAll(
       HIT_PANELS
     )].map((el) => rectFromElement(el, PANEL_HIT_PAD)),
@@ -3556,13 +3533,13 @@ function pointInLiveHitArea(x, y) {
 const MATERIAL_PANELS = "#ctx-menu:not(.hidden), .trash-pop, .coach, .update-pill:not(.hidden)";
 function reportDockMaterial() {
   const body = document.body.classList;
-  if (hiddenState || body.contains("tucked") || body.contains("edge-swap") || body.contains("booting")) {
+  if (S.hiddenState || body.contains("tucked") || body.contains("edge-swap") || body.contains("booting")) {
     reportMaterial([]);
     return;
   }
   reportMaterial([
     shapeOf(dockEl),
-    stackOpen ? shapeOf(stackEl) : null,
+    S.stackOpen ? shapeOf(stackEl) : null,
     ...[...document.querySelectorAll(MATERIAL_PANELS)].map((el) => shapeOf(el)),
   ]);
 }
@@ -3582,14 +3559,14 @@ for (const event of ["transitionrun", "transitionend", "transitioncancel", "anim
 
 
 matchMedia("(prefers-reduced-transparency: reduce)").addEventListener("change", () => {
-  if (!cfg) return;
+  if (!S.cfg) return;
   applyAll();
   reportDockMaterial();
 });
 
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (!cfg) return;
-  setMaterialTint(materialTint(paintedLook(cfg)));
+  if (!S.cfg) return;
+  setMaterialTint(materialTint(paintedLook(S.cfg)));
   reportDockMaterial();
 });
 
@@ -3603,14 +3580,14 @@ function reportHitRects() {
   // interactive so the cursor watcher doesn't flip the window click-through
   // before the frontend has reported fresh hit rects.
   const all = !!(
-    edgeMove || dragging || draggingFile || document.body.classList.contains("edit") ||
+    S.edgeMove || S.dragging || S.draggingFile || document.body.classList.contains("edit") ||
     document.body.classList.contains("revealing") ||
     document.querySelector(".drag-clone, .stack-drag-clone")
   );
   // While the wave is live the region is the fixed magnify envelope. Measuring
   // transformed tiles here instead produced a different signature than the
   // envelope, so any unrelated mutation made the two ping-pong IPC calls.
-  if (!all && !stackOpen && dockEl.classList.contains("mag-live") && !document.querySelector(HIT_PANELS)) {
+  if (!all && !S.stackOpen && dockEl.classList.contains("mag-live") && !document.querySelector(HIT_PANELS)) {
     reportHitRectsLive();
     return;
   }
@@ -3625,14 +3602,14 @@ function reportHitRects() {
   add(dockEl, DOCK_HIT_PAD);
   for (const tile of dockEl.querySelectorAll(".tile")) add(tile, TILE_HIT_PAD);
   // Inflate toward the dock so the pointer doesn't fall through the gap.
-  if (stackOpen) add(stackEl, Math.max(PANEL_HIT_PAD, 8));
+  if (S.stackOpen) add(stackEl, Math.max(PANEL_HIT_PAD, 8));
   for (const el of document.querySelectorAll(
     HIT_PANELS
   ))
     add(el, PANEL_HIT_PAD);
   const sig = hitSignature(rects, all);
-  if (sig === lastHitSig) return;
-  lastHitSig = sig;
+  if (sig === S.lastHitSig) return;
+  S.lastHitSig = sig;
   dockApi.setHitRects(rects, all).catch(() => {});
 }
 let hitRafId = 0;
@@ -3676,7 +3653,7 @@ new MutationObserver((mutations) => {
 window.addEventListener("resize", scheduleHitReport);
 window.addEventListener("resize", placeUndoToast);
 setInterval(() => {
-  if (!hiddenState) reportHitRects();
+  if (!S.hiddenState) reportHitRects();
 }, 5000);
 
 // The backend cursor watcher is the source of truth for "is the pointer on
@@ -3684,51 +3661,51 @@ setInterval(() => {
 // stop arriving the moment the window starts ignoring the mouse.
 if (dockApi.onCursorInside)
   dockApi.onCursorInside((v) => {
-    if (v === pointerInside) return;
-    pointerInside = v;
+    if (v === S.pointerInside) return;
+    S.pointerInside = v;
     if (v) {
-      if (displayOff) onDisplayPower(true); // a pointer on the dock means the screen is on
-      if (pinnedReveal) pinTouched = true;
-      if (!hiddenState) clearTimeout(hideTimer);
+      if (S.displayOff) onDisplayPower(true); // a pointer on the dock means the screen is on
+      if (S.pinnedReveal) S.pinTouched = true;
+      if (!S.hiddenState) clearTimeout(S.hideTimer);
     } else {
-      if (pinnedReveal && pinTouched) pinnedReveal = false;
-      if (!hiddenState && wantsHideNow()) scheduleHide();
+      if (S.pinnedReveal && S.pinTouched) S.pinnedReveal = false;
+      if (!S.hiddenState && wantsHideNow()) scheduleHide();
     }
   });
 
 function setupAutoHide() {
   // Fullscreen blackout owns visibility — don't reveal/hide underneath it
   // (config reload / preview end during a game would flash Booki over it).
-  if (fullscreen) return;
-  clearTimeout(hideTimer);
-  pinnedReveal = false;
+  if (S.fullscreen) return;
+  clearTimeout(S.hideTimer);
+  S.pinnedReveal = false;
   // smart starts hidden only if we're currently in an app (occluded), so a
   // config reload while working doesn't flash the dock open. edge now starts
   // VISIBLE and then visibly tucks after the grace delay (unless you move onto
   // it) — starting already-hidden read as "the dock never comes out".
-  hiddenState = hideMode() === "smart" && occluded;
-  document.body.classList.toggle("tucked", hiddenState);
+  S.hiddenState = hideMode() === "smart" && occluded;
+  document.body.classList.toggle("tucked", S.hiddenState);
   applyFrame();
   // Sync the two windows to the starting state (these don't emit, so this won't
   // pin the dock open).
-  if (hiddenState) dockApi.hideDock(cfg.edge);
+  if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
   else dockApi.revealDock();
   // Keep the poll loop in step with visibility (idle when tucked away).
-  if (hiddenState) stopPolls();
+  if (S.hiddenState) stopPolls();
   else startPolls();
-  if (!hiddenState && wantsHideNow()) scheduleHide();
+  if (!S.hiddenState && wantsHideNow()) scheduleHide();
 }
 
 // Pointer entered the dock area while HIDDEN → reveal (hover trigger only; in
 // click mode a hidden dock comes back exclusively from the notch).
 function reveal() {
-  if ((cfg.notchTrigger || "click") === "click") return; // hover trigger only
+  if ((S.cfg.notchTrigger || "click") === "click") return; // hover trigger only
   // "The pointer just arrived — with that, does the policy want the bar out?"
   // The chain of early-outs this replaced (fullscreen, manual swipe, mode off,
   // occluded-and-not-summoned) is now one lookup that cannot drift from the
   // other two decision points.
   if (decideVisible({ ...visibilityState(), pointerInside: true }) !== true) return;
-  clearTimeout(hideTimer);
+  clearTimeout(S.hideTimer);
   setHidden(false);
 }
 
@@ -3736,8 +3713,8 @@ function reveal() {
 // pointer that came back (or an opened menu) simply cancels the hide.
 function scheduleHide() {
   if (hideMode() === "off") return;
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(tryTuck, cfg.autoHideDelay ?? 650);
+  clearTimeout(S.hideTimer);
+  S.hideTimer = setTimeout(tryTuck, S.cfg.autoHideDelay ?? 650);
 }
 
 // Smart-hide: the backend tells us when a window covers the dock's home area.
@@ -3747,7 +3724,7 @@ function onDesktopSignal(value) {
   desktopActive = value;
   if (value) occluded = false;
   // Win+D can hide a native window without changing our JS visibility.
-  if (value && !hiddenState && decideVisible(visibilityState()) === true) {
+  if (value && !S.hiddenState && decideVisible(visibilityState()) === true) {
     dockApi.revealDock().catch(() => {});
   }
   onOcclusionSignal(occluded);
@@ -3757,9 +3734,9 @@ function onOcclusionSignal(value) {
   occluded = value;
   // Going back to work in an app releases a manual swipe-hide: next time the
   // desktop is clear, normal smart behavior resumes.
-  if (value) manualHide = false;
+  if (value) S.manualHide = false;
   // These own visibility while they last; occlusion doesn't get a vote.
-  if (previewing || fullscreen || draggingFile) return;
+  if (S.previewing || S.fullscreen || S.draggingFile) return;
   if (hideMode() !== "smart") return;
 
   const want = decideVisible(visibilityState());
@@ -3775,7 +3752,7 @@ function onOcclusionSignal(value) {
     clearTimeout(occRevealTimer);
     occRevealTimer = setTimeout(() => {
       if (decideVisible(visibilityState()) !== true) return;
-      pinnedReveal = false;
+      S.pinnedReveal = false;
       setHidden(false);
     }, SMART_REVEAL_DELAY);
     return;
@@ -3783,8 +3760,8 @@ function onOcclusionSignal(value) {
   clearTimeout(occRevealTimer); // covered again → drop any pending reveal
   // The policy says hide, but the gate still applies: never yank the bar out
   // from under someone using it. The pointer-out handler re-checks.
-  if (pointerInside || interacting()) return;
-  pinnedReveal = false;
+  if (S.pointerInside || interacting()) return;
+  S.pinnedReveal = false;
   setHidden(true);
 }
 
@@ -3798,21 +3775,20 @@ dockEl.addEventListener("pointerleave", () => { if (wantsHideNow()) scheduleHide
 // click mode, which silently ate the notch click (the dock never came back in
 // \u201cal salir\u201d). An explicit summon always reveals, whatever the trigger.
 let pinTimer = null;
-let pinTouched = false; // the pointer actually visited the dock since the pin
 function pinOpen() {
-  if (fullscreen) return;
-  manualHide = false;
-  pinnedReveal = true;
-  pinTouched = false;
-  clearTimeout(hideTimer);
+  if (S.fullscreen) return;
+  S.manualHide = false;
+  S.pinnedReveal = true;
+  S.pinTouched = false;
+  clearTimeout(S.hideTimer);
   setHidden(false);
   // Outside clicks pass through the stage window now, so they can't release
   // the pin — instead the pin ends when you visit the dock and leave, with a
   // timeout valve for an accidental summon that's never used.
   clearTimeout(pinTimer);
   pinTimer = setTimeout(() => {
-    if (pinnedReveal && !pinTouched) {
-      pinnedReveal = false;
+    if (S.pinnedReveal && !S.pinTouched) {
+      S.pinnedReveal = false;
       if (wantsHideNow()) scheduleHide();
     }
   }, 8000);
@@ -3824,29 +3800,29 @@ onReveal(pinOpen);
 // Only act when JS still thinks we're tucked; otherwise reveal_dock's emit
 // (also used by setHidden / setupAutoHide) would clear pending hide timers.
 function softOpen() {
-  if (fullscreen || !hiddenState) return;
-  manualHide = false;
-  clearTimeout(hideTimer);
+  if (S.fullscreen || !S.hiddenState) return;
+  S.manualHide = false;
+  clearTimeout(S.hideTimer);
   setHidden(false);
   // Soft reveal is not a pin — if smart-hide still wants us gone, arm the grace
   // hide so we don't sit over the app forever (occlusion won't re-fire if true).
-  if (wantsHideNow() && !pointerInside) scheduleHide();
+  if (wantsHideNow() && !S.pointerInside) scheduleHide();
 }
 onSoftReveal(softOpen);
 
 // Hot edge: the cursor was pushed against the dock's screen edge — an explicit
 // "come out" gesture, treated exactly like clicking the notch.
 onHotEdge(() => {
-  if (fullscreen || !hiddenState) return;
+  if (S.fullscreen || !S.hiddenState) return;
   pinOpen();
 });
 
 // Clicking anywhere outside the dock releases a pinned reveal and lets the dock
 // tuck back into the notch (when the mode wants it hidden).
 window.addEventListener("pointerdown", (e) => {
-  if (!pinnedReveal) return;
+  if (!S.pinnedReveal) return;
   if (closestSel(e.target, "#dock")) return;
-  pinnedReveal = false;
+  S.pinnedReveal = false;
   scheduleHide();
 });
 
@@ -3865,7 +3841,7 @@ function dropSpot(position) {
   const el = document.elementFromPoint(x, y);
   const tile = el ? el.closest(".tile[data-id]") : null;
   if (tile) {
-    const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
+    const item = S.cfg.pinned.find((p) => p.id === tile.dataset.id);
     const k = item && item.kind;
     if (k === "app" || k === "folder" || k === "group" || k === "trash") {
       const r = tile.getBoundingClientRect();
@@ -3918,7 +3894,7 @@ dropHintEl.className = "drop-hint";
 dropHintEl.setAttribute("role", "status");
 document.body.appendChild(dropHintEl);
 function dropHintText(spot) {
-  const item = spot.target && cfg.pinned.find((p) => p.id === spot.target.dataset.id);
+  const item = spot.target && S.cfg.pinned.find((p) => p.id === spot.target.dataset.id);
   const name = item ? menuPinTitle(item) : "";
   if (item?.kind === "app") return t("drop.openWith").replace("{name}", () => name);
   if (item?.kind === "folder") return t("drop.moveTo").replace("{name}", () => name);
@@ -3951,10 +3927,10 @@ function placeHint(text, anchor) {
   let top;
   if (isVertical()) {
     top = a.top + a.height / 2 - h / 2;
-    left = cfg.edge === "left" ? bar.right + gap : bar.left - w - gap;
+    left = S.cfg.edge === "left" ? bar.right + gap : bar.left - w - gap;
   } else {
     left = a.left + a.width / 2 - w / 2;
-    top = cfg.edge === "top" ? bar.bottom + gap : bar.top - h - gap;
+    top = S.cfg.edge === "top" ? bar.bottom + gap : bar.top - h - gap;
   }
   dropHintEl.style.left = `${Math.max(6, Math.min(left, window.innerWidth - w - 6))}px`;
   dropHintEl.style.top = `${Math.max(6, Math.min(top, window.innerHeight - h - 6))}px`;
@@ -3966,7 +3942,7 @@ function setDropTarget(el) {
   // Only highlight tiles that actually accept a dropped file: apps (open with),
   // folders/groups (move/pin in) and the trash. Widgets/separators don't react.
   if (el) {
-    const item = cfg.pinned.find((p) => p.id === el.dataset.id);
+    const item = S.cfg.pinned.find((p) => p.id === el.dataset.id);
     const kind = item && item.kind;
     if (kind !== "app" && kind !== "folder" && kind !== "group" && kind !== "trash") {
       el = null;
@@ -3980,10 +3956,10 @@ function setDropTarget(el) {
 
 // ─────────────────────── Booki tooltips ───────────────────────
 const dockTooltip = createDockTooltip(dockEl, {
-  edge: () => cfg.edge,
-  blocked: () => editMode || !!dragging || hiddenState || stackOpen || !ctxMenu.classList.contains("hidden"),
+  edge: () => S.cfg.edge,
+  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
-    const pin = cfg.pinned.find(item => item.id === el.dataset.id);
+    const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
     if (!pin) return null;
     let name = pin.name || el.getAttribute("aria-label");
     let detail = t("hint.launch");
@@ -3994,7 +3970,7 @@ const dockTooltip = createDockTooltip(dockEl, {
     else if (pin.kind === "trash") detail = t("hint.trash");
     else if (el.dataset.running === "true") {
       const count = windowsFor(pin).length;
-      detail = cfg.focusIfRunning === false ? t("hint.running") : count > 1 ? t("hint.pickWindow").replace("{n}", String(count)) : t("hint.switch");
+      detail = S.cfg.focusIfRunning === false ? t("hint.running") : count > 1 ? t("hint.pickWindow").replace("{n}", String(count)) : t("hint.switch");
     }
     return { name, detail };
   },
@@ -4016,7 +3992,6 @@ function clippedText(el, name) {
 // A small in-dock popover: nothing is ever deleted without an explicit yes.
 // Files go to the Recycle Bin (undoable), never a permanent delete.
 
-let trashPop = null;
 let popSeq = 0;
 
 /** A popover button. The one helper every confirm popover builds with. */
@@ -4043,10 +4018,10 @@ function showConfirmPop(pop) {
   const back = document.activeElement;
   pop._returnFocus = back instanceof HTMLElement && back !== document.body ? back : null;
   placePop(pop);
-  trashPop = pop;
+  S.trashPop = pop;
   // placePop reveals the popover after ~70 ms; focus it once it is shown.
   setTimeout(() => requestAnimationFrame(() => {
-    if (trashPop === pop) pop.querySelector("button")?.focus({ preventScroll: true });
+    if (S.trashPop === pop) pop.querySelector("button")?.focus({ preventScroll: true });
   }), 90);
 }
 // Dismiss a popover along the same path it entered (fade + slight drop), then
@@ -4066,14 +4041,14 @@ function dismissPop(pop, done) {
   setTimeout(finish, 180);
 }
 function closeTrashPop() {
-  const pop = trashPop;
-  trashPop = null;
+  const pop = S.trashPop;
+  S.trashPop = null;
   // Give focus back to where it was, unless the user already moved it.
   const back = pop?._returnFocus;
   if (back?.isConnected && pop.contains(document.activeElement)) back.focus({ preventScroll: true });
   dismissPop(pop, () => {
     // Shrink the window only after the exit finishes, or it would clip it.
-    if (!trashPop) {
+    if (!S.trashPop) {
       document.body.classList.remove("pop-open");
       reframe();
     }
@@ -4094,7 +4069,7 @@ function placePop(pop) {
     const { left, top } = placeBesideBar({
       bar: dockEl.getBoundingClientRect(),
       box: { width: pop.offsetWidth, height: pop.offsetHeight },
-      edge: cfg.edge,
+      edge: S.cfg.edge,
       viewport: { width: window.innerWidth, height: window.innerHeight },
       gap: 12,
     });
@@ -4126,7 +4101,7 @@ function placePop(pop) {
 
 function confirmTrash(paths, emptyBin = false) {
   closeTrashPop();
-  pinnedReveal = true; // keep the dock open while the question is on screen
+  S.pinnedReveal = true; // keep the dock open while the question is on screen
   const n = paths.length;
   const text = emptyBin
     ? t("trash.emptyAsk")
@@ -4155,12 +4130,12 @@ function confirmTrash(paths, emptyBin = false) {
       return;
     }
     await refreshTrashState();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   showConfirmPop(pop);
@@ -4170,7 +4145,7 @@ function confirmTrash(paths, emptyBin = false) {
 // "Controlled folder access" being cautious about an app it doesn't know yet.
 function trashBlockedInfo() {
   closeTrashPop();
-  pinnedReveal = true;
+  S.pinnedReveal = true;
   const pop = document.createElement("div");
   pop.className = "trash-pop blocked";
   pop.innerHTML =
@@ -4182,19 +4157,19 @@ function trashBlockedInfo() {
   ok.textContent = t("trash.ok");
   ok.addEventListener("click", () => {
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   pop.appendChild(ok);
   placePop(pop);
-  trashPop = pop;
+  S.trashPop = pop;
 }
 
 // Drop-on-folder: ask, then move the files into that folder (shell move —
 // undoable with Ctrl+Z in Explorer).
 function confirmMove(paths, item) {
   closeTrashPop();
-  pinnedReveal = true;
+  S.pinnedReveal = true;
   const n = paths.length;
   const what = n === 1 ? `«${esc(baseName(paths[0]))}»` : t("move.n").replace("{n}", n);
   const pop = document.createElement("div");
@@ -4211,12 +4186,12 @@ function confirmMove(paths, item) {
     } catch (err) {
       logMessage("error", `move: ${err}`);
     }
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   popButton(pop, "", t("trash.cancel"), () => {
     closeTrashPop();
-    pinnedReveal = false;
+    S.pinnedReveal = false;
     scheduleHide();
   });
   showConfirmPop(pop);
@@ -4225,10 +4200,10 @@ function confirmMove(paths, item) {
 // Open files with an app and remember them as recents (a small jump list).
 async function openWith(item, paths) {
   for (const p of paths) dockApi.launch(item.path, [p]);
-  const i = cfg.pinned.findIndex((x) => x.id === item.id);
+  const i = S.cfg.pinned.findIndex((x) => x.id === item.id);
   if (i >= 0) {
-    const cur = cfg.pinned[i].recents || [];
-    cfg.pinned[i].recents = [...paths, ...cur.filter((r) => !paths.includes(r))].slice(0, 8);
+    const cur = S.cfg.pinned[i].recents || [];
+    S.cfg.pinned[i].recents = [...paths, ...cur.filter((r) => !paths.includes(r))].slice(0, 8);
     await persist();
   }
 }
@@ -4239,9 +4214,9 @@ function setupFileDrop() {
       // A file drag is aimed at the dock: force it open and PIN it open for the
       // whole drag (smart-hide would otherwise tuck it away mid-drag, since
       // dragging from Explorer counts as "working in another app").
-      draggingFile = true;
-      pinnedReveal = true;
-      clearTimeout(hideTimer);
+      S.draggingFile = true;
+      S.pinnedReveal = true;
+      clearTimeout(S.hideTimer);
       setHidden(false);
       dropOverlay.classList.add("active");
     },
@@ -4252,8 +4227,8 @@ function setupFileDrop() {
       showDropHint(spot);
     },
     onLeave: () => {
-      draggingFile = false;
-      pinnedReveal = false;
+      S.draggingFile = false;
+      S.pinnedReveal = false;
       dropOverlay.classList.remove("active");
       setDropTarget(null);
       setDropGap(null);
@@ -4261,8 +4236,8 @@ function setupFileDrop() {
       scheduleHide();
     },
     onDrop: async (paths, position) => {
-      draggingFile = false;
-      pinnedReveal = false;
+      S.draggingFile = false;
+      S.pinnedReveal = false;
       dropOverlay.classList.remove("active");
       const spot = dropSpot(position);
       const target = spot.target;
@@ -4271,7 +4246,7 @@ function setupFileDrop() {
       showDropHint(null);
       if (!paths || !paths.length) return;
       // Dropped onto an app icon → open the files with that app.
-      const item = target && cfg.pinned.find((p) => p.id === target.dataset.id);
+      const item = target && S.cfg.pinned.find((p) => p.id === target.dataset.id);
       if (item && item.kind === "app") {
         await openWith(item, paths);
         return;
@@ -4330,7 +4305,7 @@ function setAttention(list) {
 }
 function paintAttention() {
   dockEl.querySelectorAll(".tile[data-id]").forEach((tile) => {
-    const item = cfg?.pinned.find((p) => p.id === tile.dataset.id);
+    const item = S.cfg?.pinned.find((p) => p.id === tile.dataset.id);
     const waiting = !!item && item.kind === "app" && attentionHwnds.size > 0 &&
       windowsFor(item).some((w) => attentionHwnds.has(Number(w.hwnd)));
     if (waiting === tile.classList.contains("attention")) return;
@@ -4348,15 +4323,14 @@ function clearAttention(el, item) {
   if (hwnds.length) dockApi.dismissAttention(hwnds).catch(() => {});
 }
 
-let pollTimer = null;
 function startRunningPoll() {
   if (!isTauri) return;
-  clearInterval(pollTimer); // never stack two running-app polls
-  pollTimer = null;
-  if (displayOff) return; // nobody can see the dots; display-on restarts it
+  clearInterval(S.pollTimer); // never stack two running-app polls
+  S.pollTimer = null;
+  if (S.displayOff) return; // nobody can see the dots; display-on restarts it
   const tick = singleFlight(async (refreshTrash = true) => {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
-    if (hiddenState || displayOff) return;
+    if (S.hiddenState || S.displayOff) return;
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
@@ -4364,7 +4338,7 @@ function startRunningPoll() {
     // Running state powers switching and hints independently of visible dots.
     // Nothing that could be "running" is pinned (only widgets/trash/separators) →
     // skip enumerating every window (which now also resolves each process's exe).
-    if (!cfg.pinned.some((p) => p.kind === "app" || p.kind === "folder" || p.kind === "group")) {
+    if (!S.cfg.pinned.some((p) => p.kind === "app" || p.kind === "folder" || p.kind === "group")) {
       return;
     }
     try {
@@ -4373,7 +4347,7 @@ function startRunningPoll() {
       const matchWins = (pin) => windowsFor(pin, wins);
       const say = (n) => runningDescription(n, t); // `t` is the tile inside the loop
       dockEl.querySelectorAll(".tile[data-id]").forEach((t) => {
-        const app = cfg.pinned.find((a) => a.id === t.dataset.id);
+        const app = S.cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash" || app.kind === "action") return;
         const matches = matchWins(app);
         const badge = t.querySelector(".badge");
@@ -4396,8 +4370,8 @@ function startRunningPoll() {
       });
       paintAttention();
       // Mirror running state onto open group flyout cells.
-      if (stackOpen && stackItemId) {
-        const grp = cfg.pinned.find((p) => p.id === stackItemId);
+      if (S.stackOpen && S.stackItemId) {
+        const grp = S.cfg.pinned.find((p) => p.id === S.stackItemId);
         if (grp && grp.kind === "group") {
           stackEl.querySelectorAll(".stack-item[data-child-id]").forEach((cell) => {
             const child = (grp.children || []).find((c) => c.id === cell.dataset.childId);
@@ -4410,15 +4384,14 @@ function startRunningPoll() {
       /* ignore */
     }
   });
-  appPollTick = tick;
+  S.appPollTick = tick;
   tick();
-  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000) * pollSlowdown());
+  S.pollTimer = setInterval(tick, recoveryInterval(S.nativeSupport, "windows", 5000) * pollSlowdown());
 }
 
 // ─────────────────── Folder stacks (flyout) ───────────────────
 
 const stackEl = document.getElementById("stack");
-let stackOpen = false;
 let stackSeq = 0; // guards async fills against a flyout that was reopened meanwhile
 
 // Files that get a REAL thumbnail (Explorer-grade, via the shell) instead of
@@ -4467,21 +4440,20 @@ function wireFileDragOut(cell, it) {
   });
 }
 
-let stackItemId = null;
 
 /** Open a stack; switching to another group/folder replaces the current one. */
 async function toggleStack(tileEl, item) {
-  if (stackOpen && stackItemId === item.id) {
+  if (S.stackOpen && S.stackItemId === item.id) {
     closeStack();
     return;
   }
-  if (stackOpen) closeStack();
+  if (S.stackOpen) closeStack();
   await openStack(tileEl, item);
 }
 
 async function openStack(tileEl, item) {
-  if (stackOpen && stackItemId === item.id) return;
-  if (stackOpen) closeStack();
+  if (S.stackOpen && S.stackItemId === item.id) return;
+  if (S.stackOpen) closeStack();
   const isGroup = item.kind === "group";
   const folderNavigation = createFolderNavigation({ path: item.path, name: item.name });
   let navigateFolder = null;
@@ -4504,7 +4476,7 @@ async function openStack(tileEl, item) {
     breadcrumbs.lastElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
   };
   const seq = ++stackSeq;
-  stackItemId = item.id;
+  S.stackItemId = item.id;
   stackEl.innerHTML = "";
   stackEl.setAttribute("aria-label", item.name || t("group.new"));
   const head = document.createElement("div");
@@ -4771,7 +4743,7 @@ async function openStack(tileEl, item) {
     const pager = document.createElement("div");
     pager.className = "stack-pager";
     const loadPage = async (nextPage) => {
-      if (seq !== stackSeq || !stackOpen) return;
+      if (seq !== stackSeq || !S.stackOpen) return;
       const current = ++request;
       grid.setAttribute("aria-busy","true");
       const previousFocus = pager.contains(document.activeElement) ? document.activeElement?.dataset.pageAction : null;
@@ -4779,7 +4751,7 @@ async function openStack(tileEl, item) {
       buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
         const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1, search.value.trim(), order.value);
-        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        if (seq !== stackSeq || !S.stackOpen || current !== request) return;
         page = nextPage;
         fillGrid((rows || []).slice(0, pageSize));
         if (!rows?.length && search.value.trim()) grid.querySelector(".stack-empty").textContent = t("integral.noFolderMatches");
@@ -4805,9 +4777,9 @@ async function openStack(tileEl, item) {
         }
         grid.parentElement.scrollTop = 0;
         applyFrame();
-        if (pendingReplace) requestAnimationFrame(pendingReplace);
+        if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
       } catch (_) {
-        if (seq !== stackSeq || !stackOpen || current !== request) return;
+        if (seq !== stackSeq || !S.stackOpen || current !== request) return;
         buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
         const retainPage = pager.isConnected;
         if (!retainPage) grid.replaceChildren();
@@ -4826,7 +4798,7 @@ async function openStack(tileEl, item) {
         grid.prepend(failure);
         applyFrame();
       } finally {
-        if (current === request && seq === stackSeq && stackOpen) grid.setAttribute("aria-busy","false");
+        if (current === request && seq === stackSeq && S.stackOpen) grid.setAttribute("aria-busy","false");
       }
     };
     search.addEventListener("input", () => { request++; clearTimeout(queryTimer); queryTimer = setTimeout(() => loadPage(0),150); });
@@ -4855,7 +4827,7 @@ async function openStack(tileEl, item) {
   }
   stackEl.appendChild(grid);
 
-  stackOpen = true;
+  S.stackOpen = true;
   document.body.classList.add("stack-open");
   // Pick up any widgets rendered inside the flyout so they poll live while open.
   cacheWidgetEls();
@@ -4867,7 +4839,7 @@ async function openStack(tileEl, item) {
   // The stage window never resizes for the flyout, so it can open on the very
   // next frame — position it, then flip to .open so the transition plays.
   const placeStack = () => placeStackNear(tileEl);
-  pendingReplace = placeStack; // re-place if the window DOES resize (screen change)
+  S.pendingReplace = placeStack; // re-place if the window DOES resize (screen change)
   requestAnimationFrame(() => {
     placeStack();
     requestAnimationFrame(() => {
@@ -4887,7 +4859,7 @@ function placeStackNear(tileEl) {
   const anchor = tileEl.getBoundingClientRect();
   const gap = 6;
   const pad = 8;
-  const edge = cfg.edge || "bottom";
+  const edge = S.cfg.edge || "bottom";
   const availableHeight = isVertical() ? window.innerHeight - pad * 2
     : edge === "top" ? window.innerHeight - bar.bottom - gap - pad : bar.top - gap - pad;
   const availableWidth = !isVertical() ? window.innerWidth - pad * 2
@@ -4915,18 +4887,18 @@ function flattenPinned(items) {
   return (items || []).flatMap((it) => [it, ...flattenPinned(it.children)]);
 }
 function openAddPanel(anchorEl = dockEl, tab = "apps") {
-  if (stackOpen) closeStack();
-  stackItemId = "__add";
+  if (S.stackOpen) closeStack();
+  S.stackItemId = "__add";
   stackEl.classList.add("add-mode");
   stackEl.setAttribute("aria-label", t("add.title"));
   const place = () => placeStackNear(anchorEl?.isConnected ? anchorEl : dockEl);
   const panel = buildAddPanel(stackEl, {
     t,
     tab,
-    pinned: () => flattenPinned(cfg.pinned),
+    pinned: () => flattenPinned(S.cfg.pinned),
     listWindows: () => dockApi.listWindows(),
     listInstalled: () => dockApi.listInstalledApps(),
-    listFrequent: () => cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(50).then((apps) => apps.filter((a) => !(cfg.ignoredAppSuggestions || []).includes(a.path.replaceAll("\\", "/").toLowerCase()))),
+    listFrequent: () => S.cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(50).then((apps) => apps.filter((a) => !(S.cfg.ignoredAppSuggestions || []).includes(a.path.replaceAll("\\", "/").toLowerCase()))),
     identities: (paths) => dockApi.appIdentities(paths),
     appIcon: (path) => dockApi.appIcon(path),
     invalidateIcons: () => dockApi.invalidateIcons(),
@@ -4940,11 +4912,11 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
     relayout: () => requestAnimationFrame(place),
   });
   stackDispose = panel.dispose;
-  stackRefreshPins = panel.refreshPins;
-  stackOpen = true;
+  S.stackRefreshPins = panel.refreshPins;
+  S.stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
-  pendingReplace = place;
+  S.pendingReplace = place;
   requestAnimationFrame(() => {
     place();
     requestAnimationFrame(() => {
@@ -4959,36 +4931,36 @@ function openAddPanel(anchorEl = dockEl, tab = "apps") {
 /** The quick launcher (global shortcut, or "Search apps" in the dock menu):
    type to open an app, a pinned folder or switch to an open window. */
 function openLauncher() {
-  if (stackOpen && stackItemId === "__launcher") { closeStack(); return; }
-  if (stackOpen) closeStack();
+  if (S.stackOpen && S.stackItemId === "__launcher") { closeStack(); return; }
+  if (S.stackOpen) closeStack();
   closeMenu();
-  stackItemId = "__launcher";
+  S.stackItemId = "__launcher";
   stackEl.classList.add("add-mode", "launcher-mode");
   stackEl.setAttribute("aria-label", t("launcher.title"));
   const place = () => placeStackNear(dockEl);
   const panel = buildLauncher(stackEl, {
     t,
-    pinned: () => cfg.pinned,
-    switchesToOpen: cfg.focusIfRunning !== false,
+    pinned: () => S.cfg.pinned,
+    switchesToOpen: S.cfg.focusIfRunning !== false,
     listWindows: () => dockApi.listWindows(),
     listInstalled: () => dockApi.listInstalledApps(),
-    listFrequent: () => cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(12),
+    listFrequent: () => S.cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(12),
     appIcon: (path) => dockApi.appIcon(path),
     open: (entry) => {
       closeStack();
-      pinnedReveal = false;
+      S.pinnedReveal = false;
       scheduleHide();
-      if (entry.kind === "window" || (entry.hwnd && cfg.focusIfRunning !== false)) dockApi.focusWindow(Number(entry.hwnd));
+      if (entry.kind === "window" || (entry.hwnd && S.cfg.focusIfRunning !== false)) dockApi.focusWindow(Number(entry.hwnd));
       else dockApi.launch(entry.path, entry.args || []);
     },
     close: closeStack,
     relayout: () => requestAnimationFrame(place),
   });
   stackDispose = panel.dispose;
-  stackOpen = true;
+  S.stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
-  pendingReplace = place;
+  S.pendingReplace = place;
   requestAnimationFrame(() => {
     place();
     requestAnimationFrame(() => {
@@ -5001,21 +4973,17 @@ function openLauncher() {
 }
 
 let stackCloseTimer = null;
-// Declared here, not with the clipboard flyout below, because closeStack clears
-// it and may run before that part of the module has been evaluated.
-let clipSearchTimer = null;
 let stackDispose = null;
-let stackRefreshPins = null;
 function closeStack() {
-  if (!stackOpen) return;
-  stackOpen = false;
-  clearTimeout(clipSearchTimer);
-  clipSearchTimer = null;
+  if (!S.stackOpen) return;
+  S.stackOpen = false;
+  clearTimeout(S.clipSearchTimer);
+  S.clipSearchTimer = null;
   stackDispose?.();
   stackDispose = null;
-  stackRefreshPins = null;
-  stackItemId = null;
-  pendingReplace = null;
+  S.stackRefreshPins = null;
+  S.stackItemId = null;
+  S.pendingReplace = null;
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode");
   cacheWidgetEls();
@@ -5033,7 +5001,7 @@ function closeStack() {
 let clipStackQuery = "";
 let clipRenderSeq = 0;
 async function toggleClipboardStack(tileEl) {
-  if (stackOpen) {
+  if (S.stackOpen) {
     closeStack();
     return;
   }
@@ -5078,8 +5046,8 @@ async function toggleClipboardStack(tileEl) {
   search.value = clipStackQuery;
   search.addEventListener("input", () => {
     clipStackQuery = search.value;
-    clearTimeout(clipSearchTimer);
-    clipSearchTimer = setTimeout(() => renderClipboardList(grid, foot), 80);
+    clearTimeout(S.clipSearchTimer);
+    S.clipSearchTimer = setTimeout(() => renderClipboardList(grid, foot), 80);
   });
   searchWrap.appendChild(search);
   tools.appendChild(searchWrap);
@@ -5093,11 +5061,11 @@ async function toggleClipboardStack(tileEl) {
   foot.className = "clip-foot";
   stackEl.appendChild(foot);
 
-  stackOpen = true;
+  S.stackOpen = true;
   document.body.classList.add("stack-open");
   applyFrame();
   const placeStack = () => placeStackNear(tileEl);
-  pendingReplace = placeStack;
+  S.pendingReplace = placeStack;
 
   await renderClipboardList(grid, foot);
   requestAnimationFrame(() => {
@@ -5119,7 +5087,7 @@ async function renderClipboardList(grid, foot) {
   try {
     items = await dockApi.clipboardHistory(200);
   } catch (_) {}
-  if (seq !== clipRenderSeq || !stackOpen) return;
+  if (seq !== clipRenderSeq || !S.stackOpen) return;
   const rawCount = items.length;
   const q = clipStackQuery.trim().toLowerCase();
   if (q) {
@@ -5127,11 +5095,11 @@ async function renderClipboardList(grid, foot) {
   }
   grid.innerHTML = "";
   foot.innerHTML = "";
-  grid.classList.toggle("compact", !!cfg.clipboardCompact || rawCount > 18);
-  if (!stackOpen) return; // closed while we were awaiting
+  grid.classList.toggle("compact", !!S.cfg.clipboardCompact || rawCount > 18);
+  if (!S.stackOpen) return; // closed while we were awaiting
   if (!items.length) {
     grid.innerHTML = `<div class="stack-empty">${q ? t("clip.noMatches") : t("clip.empty")}</div>`;
-    if (pendingReplace) requestAnimationFrame(pendingReplace);
+    if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
     return;
   }
   items.forEach((entry, i) => {
@@ -5204,7 +5172,7 @@ async function renderClipboardList(grid, foot) {
   meta.className = "clip-meta";
   meta.textContent = t("clip.countHint").replace("{n}", rawCount);
   foot.appendChild(meta);
-  if (pendingReplace) requestAnimationFrame(pendingReplace);
+  if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
 }
 
 // A clipboard command that fails (history locked, IPC error) says so in the
@@ -5260,14 +5228,14 @@ function startClipEdit(row, entry, grid, foot) {
 async function addToFolderFromDock(group, preferKind = "app") {
   const path = preferKind === "folder" ? await pickFolder() : await pickAppFile();
   if (!path) return;
-  const gi = cfg.pinned.findIndex((p) => p.id === group.id);
+  const gi = S.cfg.pinned.findIndex((p) => p.id === group.id);
   if (gi < 0) return;
   const kind =
     preferKind === "folder"
       ? "folder"
       : await kindForPath(path, (p) => dockApi.isDir(p));
-  cfg.pinned[gi].children = [
-    ...(cfg.pinned[gi].children || []),
+  S.cfg.pinned[gi].children = [
+    ...(S.cfg.pinned[gi].children || []),
     { id: uid(), name: baseName(path), path, args: [], kind },
   ];
   if (!(await persist())) return;
@@ -5275,11 +5243,11 @@ async function addToFolderFromDock(group, preferKind = "app") {
   await render();
   reframe();
   const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
-  const it = cfg.pinned.find((p) => p.id === group.id);
+  const it = S.cfg.pinned.find((p) => p.id === group.id);
   if (el && it) openStack(el, it);
 }
 window.addEventListener("pointerdown", (e) => {
-  if (stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
+  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
 });
 
 // ─────────────────── Update check ───────────────────
@@ -5293,7 +5261,7 @@ function placeUpdatePill() {
   const { left, top } = placeBesideBar({
     bar: dockEl.getBoundingClientRect(),
     box: { width: pill.offsetWidth, height: pill.offsetHeight },
-    edge: cfg.edge || "bottom",
+    edge: S.cfg.edge || "bottom",
     viewport: { width: window.innerWidth, height: window.innerHeight },
     gap: 8,
   });
