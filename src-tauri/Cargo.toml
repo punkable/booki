@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.84.1"
+version = "0.85.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -79,6 +79,12 @@ features = [
     "Storage_Streams",
     "UI_Notifications",
     "Data_Xml_Dom",
+    # Rounded acrylic behind the dock (win/material.rs).
+    "Foundation_Numerics",
+    "System",
+    "UI_Composition",
+    "UI_Composition_Desktop",
+    "Win32_System_WinRT_Composition",
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]

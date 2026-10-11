@@ -9,7 +9,8 @@ import { imageSrc } from "../image-src.js";
 import { isLibIcon, libGlyphSVG, resolveLibIcon } from "../icon-library.js";
 import { icon } from "../icons.js";
 import { pinFallback } from "../pin-fallback.js";
-import { resolveSurfaceStyle, glassFillColor, surfaceAlpha, dockRadius, surfaceForeground, transparencyReduced } from "../surface.js";
+import { glassFillColor, surfaceAlpha, dockRadius, surfaceForeground, translucent, transparencyReduced } from "../surface.js";
+import { onLookChange, paintedLook } from "../system-look.js";
 
 /* The real widget markup/styles, with safe example data. Private notes and
    clipboard contents never appear in a preview or diagnostic screenshot. */
@@ -102,11 +103,19 @@ function useFitScale(maxHeight) {
   }, [maxHeight]);
   return { frame, bar, fit };
 }
-export function DockPreview({ cfg, large = false, stage = false, onSelect, onDragPin, onDropPin, onDragOver }) {
+/** The config as the dock paints it (Windows' taskbar colour, the wallpaper,
+ * the accent), repainted when any of those change. */
+function usePaintedLook(cfg) {
+  const [, setVersion] = useState(0);
+  useEffect(() => onLookChange(() => setVersion((v) => v + 1)), []);
+  return paintedLook(cfg);
+}
+export function DockPreview({ cfg: saved, large = false, stage = false, onSelect, onDragPin, onDropPin, onDragOver }) {
+  const cfg = usePaintedLook(saved);
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
   const size = large ? Math.max(32, Math.min(56, cfg.iconSize || 48)) : 32;
-  const surface = transparencyReduced(cfg) ? "solid" : resolveSurfaceStyle(cfg);
+  const surface = translucent(cfg) ? "glass" : "solid";
   const fill = glassFillColor(cfg);
   const items = cfg.pinned || [];
   const { frame, bar, fit } = useFitScale(vertical ? 300 : 140);

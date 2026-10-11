@@ -3,9 +3,9 @@
    the notch and Settings all read their colours from one place. */
 import { invoke, isTauri } from "./api.js";
 import { observePlatformPreferences, platformSnapshot } from "./platform-preferences.js";
-import { colorSource, resolveLook } from "./look-model.js";
+import { colorSource, resolveLook, surfaceColor } from "./look-model.js";
 
-export { COLOR_SOURCES, colorSource } from "./look-model.js";
+export { COLOR_SOURCES, SURFACE_COLORS, colorSource, surfaceColor } from "./look-model.js";
 const HEX = /^#[0-9a-f]{6}$/i;
 
 let wallpaper = "";
@@ -16,7 +16,7 @@ const notify = () => { for (const listener of listeners) listener(); };
 
 function needsWallpaper(cfg) {
   const source = colorSource(cfg);
-  return source === "wallpaper" || (source === "windows" && !platformSnapshot()?.accent);
+  return source === "wallpaper" || surfaceColor(cfg) === "wallpaper" || (source === "windows" && !platformSnapshot()?.accent);
 }
 
 /** Sample the wallpaper again (at most once a minute unless forced). */

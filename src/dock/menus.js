@@ -13,6 +13,8 @@ import { render } from "./render.js";
 import { windowsFor } from "./running-windows.js";
 import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
+import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
+import { paintedLook } from "../system-look.js";
 import { openProductivity } from "./widget-editors.js";
 import {
   promptRename,
@@ -166,7 +168,9 @@ async function fillRecentFiles(slot, e, item, generation) {
   placeMenu(e, false); // preserve keyboard selection while recents arrive
 }
 
-// Right-click on empty dock area / hint → add + profiles + settings.
+// Right-click on empty dock area / hint (or on the notch, which opens the
+// dock first): add, find and organise, the dock's style in one click, then
+// Settings.
 export function openBackgroundMenu(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -176,11 +180,15 @@ export function openBackgroundMenu(e) {
   addMenuHead("Booki", t("m.dockMenu"));
   add("plus", t("add.open"), () => openAddPanel(dockEl));
   add("search", t("launcher.menu"), openLauncher);
+  add("grid", t("workspace.library"), () => dockApi.openSettingsTab("apps"));
   const profilesSlot = document.createElement("div");
   ctxMenu.append(profilesSlot);
   sep();
-  add("grid", t("overhaul.editing"), enterEdit);
-  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
+  addStyleRow();
+  sep();
+  add("pencil", t("overhaul.editing"), enterEdit);
+  add("palette", t("m.appearance"), () => dockApi.openSettingsTab("dock"));
+  add("settings", t("m.settings"), () => dockApi.openSettingsTab("home"));
   for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
     const item = findWidgetPin(el.dataset.id);
     if (item) add("eye", widgetLabel(item.widget), async () => { item.style = { ...item.style, hideWhenUnavailable: false }; if (!(await persist())) return; await render(); reframe(); });
@@ -196,6 +204,44 @@ export function openBackgroundMenu(e) {
     });
     placeMenu(e, false);
   }).catch(() => {});
+}
+
+/** The four styles as small samples, so changing the dock's look is one
+ * click from the dock itself. Each sample is painted with that style's real
+ * fill for the current theme and colours. */
+function addStyleRow() {
+  const label = document.createElement("div");
+  label.className = "menu-label";
+  label.textContent = t("m.style");
+  const row = document.createElement("div");
+  row.className = "menu-styles";
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-label", t("m.style"));
+  const current = resolveSurfaceStyle(S.cfg);
+  for (const { id, patch } of FINISH_PRESETS) {
+    const look = paintedLook({ ...S.cfg, ...patch, reduceTransparency: false });
+    const tint = resolveGlassTint(look) || "var(--surface-tint)";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.tabIndex = -1;
+    button.setAttribute("role", "menuitemradio");
+    button.setAttribute("aria-checked", String(current === id));
+    button.dataset.style = id;
+    const sample = document.createElement("i");
+    sample.style.setProperty("--sample-fill", `color-mix(in srgb, ${tint} ${Math.round(surfaceAlpha(look) * 100)}%, transparent)`);
+    const name = document.createElement("span");
+    name.textContent = t(`finish.${id}`);
+    button.append(sample, name);
+    button.addEventListener("click", async () => {
+      closeMenu();
+      if (current === id) return;
+      S.cfg = { ...S.cfg, ...patch };
+      applyAll();
+      await persist(patch);
+    });
+    row.append(button);
+  }
+  ctxMenu.append(label, row);
 }
 
 export function openFileMenu(e, item, parent, openFolder) {

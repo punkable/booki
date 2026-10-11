@@ -204,6 +204,18 @@ pub(crate) fn notch_reveal(app: AppHandle) {
     let _ = app.emit("booki://reveal", ());
 }
 
+/// Right-click on the notch: bring the dock back so it can open its own menu
+/// there. False while a fullscreen app owns the screen and the dock must
+/// stay away; the notch then shows its small native menu instead.
+#[tauri::command]
+pub(crate) fn notch_reveal_for_menu(app: AppHandle) -> bool {
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return false;
+    }
+    notch_reveal(app);
+    true
+}
+
 /// Is an app owning the screen right now (maximized or fullscreen)? Asked by
 /// the notch each time it is shown, so it can start out of the way instead of
 /// waiting for the next change event from the watcher.

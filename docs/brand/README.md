@@ -7,7 +7,7 @@ This is the reference for how Booki looks, moves and speaks, as shipped in **0.8
 Booki is a calm, warm Windows dock. It should feel like part of Windows 11, with one personality detail: the capybara and its tan.
 
 - **Calm.** Quiet surfaces, one accent, few borders, no decoration that does not help.
-- **Native.** Segoe UI Variable, Windows materials (Glass, Mica, Solid), Windows accent and taskbar colours when the user asks for them.
+- **Native.** Segoe UI Variable, Windows 11 acrylic (Taskbar, Glass, Clear glass) or Solid, Windows accent and taskbar colours when the user asks for them.
 - **Warm.** Tan accent, warm neutrals in Settings, rounded shapes, a capybara mascot.
 - **One object.** The dock, the notch and their flyouts share one material and one motion language. They read as the same thing in different shapes.
 
@@ -36,17 +36,19 @@ Keep the original proportions and colours. Do not redraw, recolour, outline or a
 
 The accent marks the one thing that matters on a surface: the selected option, the running timer ring, the playing level meter, the primary button. Never use it for large fills or body text.
 
-### Where the colours come from (`colorSource`)
+### Where the colours come from
 
-Rules live in `src/look-model.js` (pure, unit-tested) and are applied by `paintedLook()` in `src/system-look.js`. Dock, notch and Settings all read colours from there.
+Rules live in `src/look-model.js` (pure, unit-tested) and are applied by `paintedLook()` in `src/system-look.js`. Dock, notch and Settings all read colours from there. Three choices, each with one job:
 
-| Source | Accent | Dock fill |
-|---|---|---|
-| `custom` (default for existing setups) | The accent picked in Settings | The glass colour picked in Settings, or the theme surface |
-| `windows` | Windows accent (falls back to the wallpaper) | The Windows 11 taskbar: `#1f1f1f` dark, `#eeeeee` light, or a deep accent shade (accent mixed 45% toward black) when Windows shows the accent on the taskbar |
-| `wallpaper` | Sampled from the wallpaper | Wallpaper colour mixed 60% toward black (dark) or 72% toward white (light) |
+| Choice | Config | Values | What it colours |
+|---|---|---|---|
+| Style | `surfaceStyle` | `taskbar`, `glass`, `clear`, `solid` | The material (see Materials) |
+| Fill | `surfaceColor` | `auto`, `wallpaper`, `accent`, `#rrggbb` | The dock, notch and flyout background. Ignored by `taskbar` |
+| Accent | `colorSource` | `custom`, `windows`, `wallpaper` | Indicators, selection, focus. Never the fill |
 
-In `windows` and `wallpaper` the source owns the fill in every finish (`surfaceFollows`), like the real taskbar.
+- `taskbar` takes the Windows 11 taskbar's fill: `#202020` dark, `#eeeeee` light, or a deep accent shade (accent mixed 45% toward black) when Windows shows the accent on the taskbar (dark mode only). With the theme on System it follows the Windows mode, not the app mode.
+- Fill `auto` is the style's neutral: `#1c1c1c` / `#f3f3f3` for Glass, `#0a0a0a` / `#ffffff` for Clear glass, the theme surface for Solid. `wallpaper` mixes the wallpaper colour 60% toward black (dark) or 72% toward white (light); `accent` mixes the accent 55% toward black or 70% toward white.
+- Config rev 11 migrated the old single source: "Like Windows" became the Taskbar style, "Wallpaper" became the wallpaper fill, a picked glass colour became the fill, and Mica became Solid with the wallpaper fill.
 
 ### Suggested accents
 
@@ -121,7 +123,7 @@ Settings offers **System**, **Light**, **Dark** and **Auto** (`config.theme`, de
 - `auto`: light from 07:00 to 19:00, dark otherwise, re-checked every five minutes.
 - With `colorSource: "windows"` and theme `system`, the dock and notch follow the **Windows mode** (taskbar, Start) rather than the app mode, because they sit where the taskbar does.
 - Settings is an app window: its `system` theme follows the Windows **app** mode.
-- A glass colour that forces its own ink (`surfaceForeground()`, for example Dark glass or the taskbar colour) sets the dock and notch windows to the matching theme (`src/theme.js`), so the bar, menus, flyouts and widget plates all agree with the fill.
+- A fill that forces its own ink (`surfaceForeground()`, for example a black fill or the taskbar colour) sets the dock and notch windows to the matching theme (`src/theme.js`), so the bar, menus, flyouts and widget plates all agree with the fill.
 - An explicit Light theme always paints a light dock. With `colorSource: "windows"`, the accent-taskbar fill applies only when the theme resolves dark.
 
 Every surface (dock, notch, menus, widgets, Settings) must follow the same resolved theme. Mixed light and dark pieces on one screen are a bug, not a style. Marketing uses the light theme; the product keeps both.
@@ -157,19 +159,22 @@ High contrast (`forced-colors: active` or `data-high-contrast`) replaces every t
 
 Nested shapes are concentric: a flyout or menu that sits on the bar uses a radius that matches the bar's curve. Widgets are tiles the height of an app icon in three widths: 1×1 gauges, 2×1 readouts, 3×1 cards.
 
-## 7. Materials (finishes)
+## 7. Materials (styles)
 
-One finish for the dock, the notch and their flyouts (`config.surfaceStyle`, `src/surface.js`, `src/material.js`):
+One style for the dock, the notch and their flyouts (`config.surfaceStyle`, `src/surface.js`, `src/material.js`). Each must look different at a glance; the fill opacity over the blur is the main difference:
 
-| Finish | What it is |
-|---|---|
-| **Glass** (default) | Windows' real blur behind a translucent fill. `materialStrength` 0 to 100 (default 60) moves it from clear to frosted; fill alpha = 0.30 + strength × 0.62. Native blur is requested only for Glass. |
-| **Mica** | Windows 11 Mica: opaque, lightly tinted by the wallpaper (14% `--wall-tint`), no blur. Calm over busy windows. |
-| **Solid** | Opaque, theme coloured, no effects. Also what reduced transparency paints. |
+| Style | What it is | Fill opacity |
+|---|---|---|
+| **Taskbar** | The Windows 11 taskbar's acrylic, in its colour. Dock and taskbar match. | 0.82 |
+| **Glass** (default) | Tinted acrylic. `materialStrength` 0 to 100 (default 60) sets how much colour covers the blur. | 0.20 + strength × 0.60 |
+| **Clear glass** | Acrylic with a faint tint: the blurred wallpaper shows through. A brighter hairline carries the shape. | 0.14 |
+| **Solid** | Opaque, no effects. Also what reduced transparency paints. | 1 |
 
-Surface details shared by every finish: a 1px light inset on the lit side, a soft shade on the opposite side and a faint sheen that rotates with the dock edge (`--surf-sheen-dir`). Settings uses Mica on Windows 11 (`body.settings-mica`) behind warm cards.
+The three translucent styles sit on Windows' blur. On Windows 11 it is the system acrylic backdrop drawn through Windows.UI.Composition (a host backdrop brush clipped to the shape's exact rounded corners, `src-tauri/src/win/material.rs`); older systems fall back to blur-behind, inset from the corners. Menus and flyouts never drop below 0.78 opacity (`--panel-alpha`) so text stays readable.
 
-Older finish names (`acrylic`, `tinted`, `liquid`, `island`, `windows`) are read as their closest current finish and migrated on load. Do not add new finish names.
+A surface is the blurred backdrop, one tint and one hairline: no sheen, no gloss gradient, no inner highlight. Settings uses Mica on Windows 11 (`body.settings-mica`) behind warm cards; that is the Settings window, not a dock style.
+
+Older names (`acrylic`, `tinted`, `liquid`, `island`, `windows`, `mica`) are read as their closest current style and migrated on load. Do not add new style names without a sample in Settings that shows how they differ.
 
 ## 8. Motion
 
@@ -207,7 +212,7 @@ The small window that stands for the dock while it is tucked away. Click to brin
 | `floating` | Same pill, off the edge, with a soft shadow | same | same |
 | `smart` | 18px dot | 112 × 24px capsule | 300 × 54px, 22px radius |
 
-Vertical edges swap width and height; the live card exists only on horizontal edges. The dot and tab must always be drawn whole, never clipped by their window. The tab, live capsule and dot use the denser panel fill with no top sheen and no native blur (Windows' blur rectangle, inset from the rounded corners, split them into two bands); only the card and the toast ask for the blur.
+Vertical edges swap width and height; the live card exists only on horizontal edges. The dot and tab must always be drawn whole, never clipped by their window. The tab, live capsule and dot use the denser panel fill and no native blur (Windows' blur rectangle, inset from the rounded corners, split them into two bands); only the card and the toast ask for the blur.
 
 Live activities (`act-*` classes): media (cover art + three-bar level meter in the accent), focus timer (progress ring + time), volume (ring + level), done (accent dot + text), low battery (red dot + red text).
 
@@ -245,7 +250,7 @@ Interaction preferences that are part of the identity:
 
 ## 12. Before shipping UI
 
-- It looks right in light, dark and system themes, in Glass, Mica and Solid, and on all four edges.
+- It looks right in light, dark and system themes, in Taskbar, Glass, Clear glass and Solid, and on all four edges.
 - It works with high contrast, reduced transparency and reduced motion.
 - Keyboard focus is visible (`:focus-visible` outline in `--ink`).
 - New colours come from the tokens or palettes above. New surfaces reuse `--surf-*` / `--panel-*`.

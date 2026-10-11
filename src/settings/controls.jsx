@@ -8,7 +8,7 @@ import { icon } from "../icons.js";
 import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
-import { COLOR_SOURCES, colorSource } from "../system-look.js";
+import { COLOR_SOURCES, SURFACE_COLORS, colorSource } from "../system-look.js";
 import { Icon, SegmentedControl } from "./ui.jsx";
 
 export const LANG_OPTIONS = [
@@ -21,11 +21,12 @@ export const LANG_OPTIONS = [
 ];
 
 /** A row of colour swatches plus a custom colour well. */
-function Swatches({ value, presets, onChange, label, caption, children }) {
+function Swatches({ value, presets, onChange, label, caption, lead, children }) {
   const current = (value || "").toLowerCase();
   const isPreset = presets.some(([, hex]) => hex.toLowerCase() === current);
   return <div className="swatches-block">
     <div className="swatches" role="group" aria-label={label}>
+      {lead}
       {presets.map(([name, hex]) => <button key={hex} type="button" className="swatch" style={{ "--sw": hex }}
         aria-label={name} title={name} aria-pressed={current === hex.toLowerCase()} onClick={() => onChange(hex)} />)}
       <label className="swatch swatch-custom" title={t("ap.otherColor")} data-active={!!current && !isPreset || undefined}
@@ -63,8 +64,8 @@ export function AccentPicker({ value, onChange, sources = false }) {
   </Swatches>;
 }
 
-/** Where Booki's colours come from, and what that currently gives. */
-export function ColorSourcePicker({ cfg, set }) {
+/** Where the accent comes from, and what that currently gives. */
+export function ColorSourcePicker({ cfg, set, children }) {
   const source = colorSource(cfg);
   return <div className="look-source">
     <SegmentedControl value={source} onChange={(value) => set({ colorSource: value })}
@@ -73,14 +74,19 @@ export function ColorSourcePicker({ cfg, set }) {
       <span className="look-now-dot" aria-hidden="true" />
       {t(`look.${source}Now`)}
     </p>}
+    {children}
   </div>;
 }
 
-/** Glass colour. Empty means "follow the theme". */
-export function TintPicker({ value, onChange }) {
-  return <Swatches value={value} label={t("ap.surfaceTint")} presets={SURFACE_TINT_PRESETS.map(([id, hex]) => [t(`tint.${id}`), hex])} onChange={onChange}>
-    <button type="button" className="chip" aria-pressed={!value} onClick={() => onChange("")}>{t("ap.surfaceTintAuto")}</button>
-  </Swatches>;
+/** The dock's fill: the style's own, the wallpaper's, the accent's, or a
+ * colour picked by hand. */
+export function SurfaceColorPicker({ value, onChange }) {
+  const current = String(value || "auto").toLowerCase();
+  const picked = /^#[0-9a-f]{6}$/.test(current) ? current : "";
+  return <Swatches value={picked} label={t("surface.color")} presets={SURFACE_TINT_PRESETS.map(([id, hex]) => [t(`tint.${id}`), hex])} onChange={onChange}
+    lead={SURFACE_COLORS.map((choice) => <button key={choice} type="button" className="chip" aria-pressed={current === choice} onClick={() => onChange(choice)}>
+      {choice === "wallpaper" && <Icon name="image" />}{t(`surface.${choice}`)}
+    </button>)} />;
 }
 
 /** The three ways the dock can behave; each is a small patch. */

@@ -27,7 +27,7 @@
 <tr>
 <td align="center" width="25%"><b>⚡ Light</b><br/><sub>Native Rust core. Widgets pause when the dock hides.</sub></td>
 <td align="center" width="25%"><b>🔒 Private</b><br/><sub>No accounts, no telemetry, no cloud.</sub></td>
-<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Glass, Mica or solid. Any edge. Five languages.</sub></td>
+<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Taskbar, glass, clear or solid. Any edge. Five languages.</sub></td>
 <td align="center" width="25%"><b>🧡 Open</b><br/><sub>MIT licensed. Built in the open.</sub></td>
 </tr>
 </table>
@@ -60,7 +60,7 @@
 
 <h2 align="center">At home in the dark.</h2>
 
-<p align="center">Follows your Windows theme and accent. Glass blurs what's behind it, Mica tints with your wallpaper, Solid stays crisp.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center">Follows your Windows theme and accent. Match the taskbar, blur what's behind with glass or clear glass, or stay solid.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
 
 <p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki Dock settings in dark mode" /></p>
 
@@ -79,6 +79,13 @@
 3. Drag an app or folder onto the dock, or right-click the dock to add items.
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
+
+### New in 0.85
+
+- **Four dock styles you can tell apart** — Taskbar, Glass, Clear glass and Solid, each previewed as it really looks in Settings and switchable from the dock's right-click menu.
+- **Dock fill and accent are separate** — the fill can follow the wallpaper, the accent or a color you pick; the Taskbar style matches your Windows taskbar.
+- **Real blurred glass** on Windows 11, clipped to the dock's rounded shape, with no sheen or inner rectangle.
+- **A fuller right-click menu** on the dock and the notch, and a notch that no longer stays cut in half.
 
 ### New in 0.84.1
 
@@ -107,7 +114,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 - **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
 - **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 

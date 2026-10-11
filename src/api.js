@@ -50,6 +50,7 @@ const DEMO_CONFIG = {
   notchPosition: "center",
   surfaceStyle: "glass",
   surfaceTint: "",
+  surfaceColor: "auto",
   alwaysOnTop: true,
   magnifyStyle: "spring",
   hotkey: "",
@@ -669,6 +670,16 @@ export async function onOcclusion(cb) {
 /** The notch's settled pill: `{ active, width, height, attached }` in CSS px. */
 export async function emitNotchShape(shape) {
   if (T && T.event && T.event.emit) await T.event.emit("booki://notch-shape", shape);
+}
+
+/** Right-click on the notch: it brings the dock back and asks it to open
+ * its own menu there, so both share one menu. */
+export async function emitNotchMenu() {
+  if (T && T.event && T.event.emit) await T.event.emit("booki://notch-menu", null);
+}
+export async function onNotchMenu(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://notch-menu", () => cb());
 }
 
 /** Listen for the notch's pill shape (see emitNotchShape). */

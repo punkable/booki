@@ -23,7 +23,7 @@ const platform = (extra) => `{ const old = window.__TAURI__.core.invoke; window.
 
 test("a light theme stays light when Windows paints an accent taskbar", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
-    cfg: makeConfig({ theme: "light", colorSource: "windows", surfaceStyle: "glass", materialStrength: 70 }),
+    cfg: makeConfig({ theme: "light", colorSource: "windows", surfaceStyle: "taskbar" }),
     initScript: platform(),
   });
   await waitForAsyncCondition(page, () => document.documentElement.style.getPropertyValue("--glass-tint") === "#eeeeee");
@@ -34,7 +34,7 @@ test("a light theme stays light when Windows paints an accent taskbar", async ()
 
 test("a dark glass colour paints its whole window dark, menus included", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
-    cfg: makeConfig({ theme: "light", surfaceStyle: "glass", surfaceTint: "#000000", materialStrength: 70 }),
+    cfg: makeConfig({ theme: "light", surfaceStyle: "glass", surfaceColor: "#000000", materialStrength: 70 }),
   });
   assert.equal(await theme(page), "dark", "dark ink, hovers and plates match the black fill");
   assert.deepEqual(errors, []);
@@ -43,7 +43,7 @@ test("a dark glass colour paints its whole window dark, menus included", async (
 
 test("Settings follows the Windows app mode, not the taskbar's", async () => {
   const { page, errors } = await openPage(browser, port, "settings.html", {
-    cfg: makeConfig({ theme: "system", colorSource: "windows" }),
+    cfg: makeConfig({ theme: "system", colorSource: "windows", surfaceStyle: "taskbar" }),
     viewport: { width: 1200, height: 900 },
     initScript: platform({ accentOnTaskbar: false }),
   });

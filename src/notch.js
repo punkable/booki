@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNotchShape, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
+import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { imageSrc } from "./image-src.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
@@ -566,7 +566,10 @@ document.addEventListener("visibilitychange", () => {
   pill.classList.remove("notch-enter");
   void pill.offsetWidth; // force reflow
   pill.classList.add("notch-enter");
-  setTimeout(() => pill.classList.remove("notch-enter"), 280);
+  // Ends on its own; the class must not outlive it (a throttled timer
+  // once left it on and the tab could no longer step out of the way).
+  pill.addEventListener("animationend", () => pill.classList.remove("notch-enter"), { once: true });
+  setTimeout(() => pill.classList.remove("notch-enter"), 600);
   scheduleHitReport();
 });
 
@@ -711,5 +714,15 @@ function tweenNotch(from, to, ms, done) {
 // First paint: report an empty/through state until layout settles, then the pill.
 scheduleHitReport();
 
-// Never expose WebView navigation commands over Booki chrome.
-document.addEventListener("contextmenu", showBookiMenu);
+// Never expose WebView navigation commands over Booki chrome. Right-click
+// brings the dock back and opens the dock's own menu, so the notch and the
+// dock share one menu; the small native one stays as a fallback when the
+// dock cannot come back (a fullscreen app owns the screen).
+document.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (!inTauri || document.body.classList.contains("toast")) return showBookiMenu(event);
+  invoke("notch_reveal_for_menu")
+    .then((revealed) => (revealed ? emitNotchMenu() : showBookiMenu(event)))
+    .catch(() => showBookiMenu(event));
+});

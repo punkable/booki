@@ -4,11 +4,11 @@ import React, { useEffect, useState } from "react";
 import { dock as dockApi } from "../../api.js";
 import { t } from "../../i18n.js";
 import { resolveNotchMode } from "../../notch-mode.js";
-import { resolveSurfaceStyle } from "../../surface.js";
-import { colorSource } from "../../system-look.js";
+import { resolveSurfaceStyle, translucent } from "../../surface.js";
+import { colorSource, surfaceColor } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
-import { AccentPicker, ColorSourcePicker, MonitorPicker, PositionPicker, ScenarioPicker, TintPicker } from "../controls.jsx";
+import { AccentPicker, ColorSourcePicker, MonitorPicker, PositionPicker, ScenarioPicker, SurfaceColorPicker } from "../controls.jsx";
 import { CollapsibleSection, PageHeader, Row, SegmentedControl, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
@@ -21,7 +21,8 @@ export function DockPage({ cfg, set }) {
   const afterPlacement = { flush: true, afterSave: () => dockApi.notchPreview() };
   const afterSurface = { flush: true, afterSave: () => dockApi.notchPreview() };
   const hides = (cfg.autoHideMode || "smart") !== "off";
-  const glass = resolveSurfaceStyle(cfg) === "glass" && !cfg.reduceTransparency;
+  const style = resolveSurfaceStyle(cfg);
+  const seeThrough = translucent(cfg);
 
   return <>
     <PageHeader title={t("tab.dock")}>{t("dock.pageHint")}</PageHeader>
@@ -61,13 +62,18 @@ export function DockPage({ cfg, set }) {
         <SegmentedControl value={cfg.theme || "system"} onChange={(v) => set({ theme: v })}
           options={["system", "light", "dark", "auto"].map((value) => ({ value, label: t(`theme.${value}`) }))} />
       </Row>
-      <Row label={t("look.source")} hint={t("look.sourceHint")} stack><ColorSourcePicker cfg={cfg} set={set} /></Row>
-      {colorSource(cfg) === "custom" && <Row label={t("ap.accent")} hint={t("ap.accentHint")} stack><AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} /></Row>}
-      <div className="row-block"><FinishPicker cfg={cfg} set={(patch) => set(patch, afterSurface)} /></div>
-      {glass && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
+      <Row label={t("finish.title")} stack><FinishPicker cfg={cfg} set={(patch) => set(patch, afterSurface)} /></Row>
+      {style === "taskbar"
+        ? <div className="row-block"><p className="swatch-caption look-now"><span className="look-now-dot" aria-hidden="true" />{t("surface.taskbarNote")}</p></div>
+        : <Row label={t("surface.color")} hint={t("surface.colorHint")} stack><SurfaceColorPicker value={surfaceColor(cfg)} onChange={(v) => set({ surfaceColor: v, surfaceTint: "" }, afterSurface)} /></Row>}
+      {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
       </Row>}
-      {glass && colorSource(cfg) === "custom" && <Row label={t("ap.surfaceTint")} hint={t("ap.surfaceTintHint")} stack><TintPicker value={cfg.surfaceTint || ""} onChange={(v) => set({ surfaceTint: v }, afterSurface)} /></Row>}
+      <Row label={t("look.source")} hint={t("look.sourceHint")} stack>
+        <ColorSourcePicker cfg={cfg} set={set}>
+          {colorSource(cfg) === "custom" && <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />}
+        </ColorSourcePicker>
+      </Row>
       <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
     </SettingsSection>
 
@@ -105,7 +111,7 @@ export function DockPage({ cfg, set }) {
         </Row>
         <Toggle label={t("be.taskbarHoldHover")} hint={t("be.taskbarHoldHoverHint")} checked={cfg.taskbarHoldWhileHover !== false} onChange={(v) => set({ taskbarHoldWhileHover: v })} />
       </>}
-      {resolveSurfaceStyle(cfg) === "glass" && !cfg.reduceTransparency && <Toggle label={t("ap.nativeMaterial")} hint={t("ap.nativeMaterialHint")}
+      {seeThrough && <Toggle label={t("ap.nativeMaterial")} hint={t("ap.nativeMaterialHint")}
         checked={cfg.nativeMaterial !== false} onChange={(v) => set({ nativeMaterial: v }, afterSurface)} />}
     </CollapsibleSection>
   </>;

@@ -42,10 +42,10 @@ test('finish presets preserve pins and the library fits a narrow Settings window
   const cfg = makeConfig({ pinned: [{ id: 'editor', name: 'Editor', kind: 'app', path: 'C:/editor.exe' }] });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 520, height: 680 } });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('radio', { name: /^Dark glass/ }).click();
+  await page.getByRole('radio', { name: /^Clear glass/ }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
-  assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'glass'); assert.equal(saved.surfaceTint, '#000000');
+  assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'clear');
   await mockApps(page); await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
   await page.locator('.app-library-card').first().waitFor();
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);

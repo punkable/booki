@@ -70,17 +70,19 @@ body.edge-left.slot-start, body.edge-right.slot-start { align-items: flex-start;
 body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; padding-bottom: 12%; }
 
 /* Surface tokens live on body so dock, notch, flyouts and menus share one
-   finish. surface.js sets the class and --glass-alpha / --glass-tint /
-   --wall-tint; nothing else decides how a surface is filled. */
+   style. surface.js sets body.surface-glass (any translucent style) or
+   body.surface-solid, body.look-<style>, and --glass-alpha / --panel-alpha /
+   --glass-tint; nothing else decides how a surface is filled.
+
+   No sheen, no gloss gradient, no inner highlight band: like Windows 11
+   acrylic, a surface is the blurred backdrop, one tint and one hairline. */
 body {
   --surf-fill: var(--glass-tint, var(--surface-tint));
   --surf-blur: 0px;
   --surf-sat: 100%;
   --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.08);
-  --surf-inset-shade: rgba(0, 0, 0, 0.06);
-  --surf-sheen: 0;
-  --surf-sheen-dir: 180deg;
+  --surf-inset-lit: transparent;
+  --surf-inset-shade: transparent;
   --panel-blur: 0px;
   --panel-sat: 100%;
   --panel-fill: var(--surf-fill);
@@ -88,25 +90,22 @@ body {
   --lit-x: 0; --lit-y: 1px;
   --shade-x: 0; --shade-y: -1px;
 }
-/* Glass: Windows blurs what is behind (material.js); the page adds the
-   translucent fill and a CSS blur only as a fallback before that lands. */
+/* Translucent styles: Windows blurs what is behind (material.js); the page
+   adds the tint, and a CSS blur only as a fallback before that lands. */
 body.surface-glass {
   --surf-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--glass-alpha, 0.6) * 100%), transparent);
   --surf-blur: 30px;
-  --surf-sat: 150%;
-  --surf-stroke: color-mix(in srgb, var(--stroke-light) 60%, transparent);
-  --surf-inset-lit: rgba(255, 255, 255, 0.2);
-  --surf-sheen: 0.4;
+  --surf-sat: 125%;
+  --surf-stroke: color-mix(in srgb, var(--stroke-light) 55%, transparent);
   --panel-blur: 30px;
-  --panel-sat: 150%;
-  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(min(1, var(--glass-alpha, 0.6) + 0.18) * 100%), transparent);
+  --panel-sat: 125%;
+  --panel-fill: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) calc(var(--panel-alpha, 0.85) * 100%), transparent);
 }
 body.surface-glass.native-material { --surf-blur: 0px; --panel-blur: 0px; }
-/* Mica: opaque, lightly tinted by the wallpaper like Windows 11 windows. */
-body.surface-mica {
-  --surf-fill: color-mix(in srgb, var(--wall-tint, var(--surface-tint)) 14%, var(--glass-tint, var(--surface-tint)));
-  --surf-inset-lit: rgba(255, 255, 255, 0.1);
-}
+/* The taskbar's own hairline: barely there, like the line above the taskbar. */
+body.look-taskbar { --surf-stroke: color-mix(in srgb, var(--ink) 9%, transparent); }
+/* Clear glass shows the blurred desktop, so its edge carries the shape. */
+body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
 /* Solid needs no rule: it is the body default. */
 
 :root { --surface-ink: var(--ink); }
@@ -147,18 +146,6 @@ body:not(.surface-glass) .dock {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-/* Sheen from the free (lit) edge — not always CSS top. */
-.dock::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: max(0px, calc(var(--dock-r) - 1px));
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-  background: linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, 0.18), transparent 48%);
-  opacity: var(--surf-sheen);
-}
 .dock > * { position: relative; z-index: 1; }
 
 /* Light catches the edge facing the desktop interior. */
@@ -166,25 +153,21 @@ body.edge-bottom .dock {
   --sh-x: 0; --sh-y: 6px;
   --lit-x: 0; --lit-y: 1px;
   --shade-x: 0; --shade-y: -1px;
-  --surf-sheen-dir: 180deg;
 }
 body.edge-top .dock {
   --sh-x: 0; --sh-y: -6px;
   --lit-x: 0; --lit-y: -1px;
   --shade-x: 0; --shade-y: 1px;
-  --surf-sheen-dir: 0deg;
 }
 body.edge-left .dock {
   --sh-x: -6px; --sh-y: 0;
   --lit-x: 1px; --lit-y: 0;
   --shade-x: -1px; --shade-y: 0;
-  --surf-sheen-dir: 90deg;
 }
 body.edge-right .dock {
   --sh-x: 6px; --sh-y: 0;
   --lit-x: -1px; --lit-y: 0;
   --shade-x: 1px; --shade-y: 0;
-  --surf-sheen-dir: 270deg;
 }
 body.edge-bottom .dock, body.edge-top .dock { flex-direction: row; align-items: center; }
 /* Vertical: center every child (app icons AND widget cards) so the side bar
@@ -670,9 +653,7 @@ body.notch-body.vertical { align-items: center; }
   padding: 0;
   cursor: pointer;
   border-radius: 999px;
-  background:
-    linear-gradient(var(--surf-sheen-dir, 180deg), rgba(255, 255, 255, calc(var(--surf-sheen) * 0.28)), transparent 55%),
-    var(--surf-fill);
+  background: var(--surf-fill);
   -webkit-backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
   backdrop-filter: blur(var(--surf-blur)) saturate(var(--surf-sat));
   border: 1px solid var(--surf-stroke);
@@ -692,8 +673,11 @@ body.notch-body.vertical { align-items: center; }
     translate var(--dur-3) var(--ease-out),
     border-color var(--dur-3) var(--ease-out);
 }
+/* `backwards` only: once the entrance ends it must stop holding opacity at
+   1, or the tab could never fade out of the way ("away" below) and would
+   slide out of its window half visible, cut by the window edge. */
 .notch-pill.notch-enter {
-  animation: notch-enter var(--dur-4) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
+  animation: notch-enter var(--dur-4) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) backwards;
 }
 @keyframes notch-enter {
   /* Grow out of the dock's genie collapse — keep volume, arrive soft. */
@@ -707,8 +691,10 @@ body.notch-body.vertical { align-items: center; }
    tucks into its edge and fades; the backend brings it back on approach. */
 body.notch-body.away .notch-pill {
   opacity: 0;
+  visibility: hidden;
   translate: 0 70%;
-  transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out);
+  animation: none;
+  transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out), visibility 0s linear var(--dur-4);
 }
 body.notch-body.away.edge-top .notch-pill { translate: 0 -70%; }
 body.notch-body.away.edge-left .notch-pill { translate: -70% 0; }
@@ -717,12 +703,7 @@ body.notch-body.away.edge-right .notch-pill { translate: 70% 0; }
   body.notch-body.away .notch-pill { translate: none; }
 }
 @media (hover: hover) and (pointer: fine) {
-  .notch-pill:hover {
-    scale: var(--pill-gx) var(--pill-gy);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, var(--surf-inset-lit) 120%, #fff),
-      inset 0 -1px 0 var(--surf-inset-shade);
-  }
+  .notch-pill:hover { scale: var(--pill-gx) var(--pill-gy); }
 }
 .notch-pill:active { cursor: grabbing; scale: 1 0.88; }
 .notch-pill:hover:active { scale: var(--pill-gx) calc(var(--pill-gy) * 0.88); }
@@ -874,9 +855,7 @@ body.notch-body.toast { padding: 4px; }
   gap: 10px;
   padding: 9px 14px 9px 12px;
   border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, calc(var(--surf-sheen, 0.55) * 0.16)), transparent 55%),
-    var(--surf-fill, var(--layer-strong));
+  background: var(--surf-fill, var(--layer-strong));
   border: 1px solid var(--surf-stroke, var(--stroke-light));
   box-shadow:
     0 6px 18px color-mix(in srgb, #000 18%, transparent),
@@ -959,7 +938,7 @@ body.notch-body.peekable .notch-pill {
     opacity var(--dur-2) var(--ease-out),
     translate var(--dur-3) var(--ease-out);
 }
-body.notch-body.peekable.away .notch-pill { transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out); }
+body.notch-body.peekable.away .notch-pill { transition: opacity var(--dur-4) var(--ease-out), translate var(--dur-4) var(--ease-out), visibility 0s linear var(--dur-4); }
 @media (hover: hover) and (pointer: fine) {
   body.notch-body.peekable .notch-pill:hover { scale: none; }
 }
@@ -1026,8 +1005,7 @@ body.notch-body.smart.peekable.live .notch-pill { width: 112px; height: 24px; }
 body.notch-body.smart.peekable.card .notch-pill { width: 300px; height: 54px; border-radius: 22px; }
 /* The tab, the live capsule and the dot are too small for Windows' blur
    (notch.js reports it only for the card), so they take the bar's denser
-   panel fill. No top sheen either: on a 12–18px shape it read as the pill
-   cut in half. */
+   panel fill. */
 body.notch-body:not(.card) .notch-pill {
   --glass: var(--panel-fill);
   background: var(--glass);
@@ -2322,115 +2300,6 @@ body.settings-body::before {
   to { opacity: 1; scale: 1; }
 }
 
-/* Notch style chips: mini pill previews. */
-/* Unified surface picker — compact chips, press feedback (Emil). */
-.surface-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  width: min(100%, 420px);
-  justify-content: flex-end;
-}
-.surface-row-compact {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  width: 100%;
-}
-.surface-row-compact .surface-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 64px;
-  padding: 10px 6px;
-  text-align: center;
-}
-.surface-row-compact .surface-chip strong {
-  font: 650 11.5px/1.2 var(--font);
-}
-@media (max-width: 560px) {
-  .surface-row-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-.surface-chip {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 10px;
-  text-align: left;
-  cursor: pointer;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--layer-strong) 74%, transparent);
-  border: 1px solid var(--stroke);
-  border-radius: 10px;
-  transition:
-    transform 100ms var(--ease-out),
-    border-color 110ms var(--ease-out),
-    background 110ms var(--ease-out),
-    box-shadow 110ms var(--ease-out);
-}
-.surface-chip:active { transform: scale(0.97); }
-.surface-chip.active {
-  border-color: color-mix(in srgb, var(--accent) 65%, var(--stroke));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.surface-swatch {
-  width: 36px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  /* Checker under translucent fills so acrylic reads as glass, not a flat chip. */
-  background-image:
-    linear-gradient(45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.08) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(0, 0, 0, 0.08) 75%);
-  background-size: 8px 8px;
-  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
-}
-.surface-mica .surface-swatch {
-  background-image: none;
-  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 92%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-.surface-acrylic .surface-swatch {
-  background-color: color-mix(in srgb, var(--glass-tint, var(--surface-tint)) 48%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-.surface-tinted .surface-swatch {
-  background-color: color-mix(in srgb, var(--glass-tint, #000) 88%, transparent);
-  border-color: rgba(255, 255, 255, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-.surface-solid .surface-swatch {
-  background-image: none;
-  background-color: var(--glass-tint, var(--surface-tint));
-  border-radius: 4px;
-}
-.surface-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.surface-meta strong {
-  font: 650 12px/1.2 var(--font);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.surface-meta small {
-  font: 500 10.5px/1.25 var(--font);
-  color: var(--ink-2);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-@media (max-width: 560px) {
-  .surface-row { grid-template-columns: 1fr; width: 100%; }
-}
 /* Full address {
   font-size: 11.5px; color: var(--ink); line-height: 1.5;
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;

@@ -96,6 +96,10 @@ fn default_material() -> u32 {
     // Glass intensity: frosted enough to read over any wallpaper.
     60
 }
+fn default_surface_color() -> String {
+    // "auto": the style's own neutral fill for the current theme.
+    "auto".into()
+}
 fn default_surface_tint() -> String {
     // Empty = auto (black for tinted). User can pick any hex in Appearance.
     String::new()
@@ -214,9 +218,9 @@ pub struct Config {
     /// "system" | "light" | "dark" | "auto" (light by day, dark by night).
     #[serde(default = "default_theme")]
     pub theme: String,
-    /// Where Booki's colours come from: "custom" (the accent and glass colour
-    /// chosen in Settings), "windows" (the Windows accent, and the taskbar's
-    /// colour for the glass) or "wallpaper" (sampled from the wallpaper).
+    /// Where the accent comes from: "custom" (picked in Settings), "windows"
+    /// (the Windows accent) or "wallpaper" (sampled from the wallpaper). The
+    /// dock's fill has its own setting, `surface_color`, since rev 11.
     #[serde(default = "default_color_source")]
     pub color_source: String,
     #[serde(default = "default_icon_size")]
@@ -258,7 +262,8 @@ pub struct Config {
     /// activities). It always follows the dock's edge.
     #[serde(default = "default_notch_mode")]
     pub notch_mode: String,
-    /// Unified dock + notch surface: "glass" | "mica" | "solid".
+    /// Unified dock + notch style: "taskbar" (the Windows taskbar's look),
+    /// "glass" (tinted acrylic), "clear" (barely tinted acrylic) or "solid".
     #[serde(default = "default_surface_style")]
     pub surface_style: String,
     /// Real blurred material behind the dock and notch (win/material.rs).
@@ -289,9 +294,14 @@ pub struct Config {
     /// Glass solidity 0–100 (higher = more opaque fill; blur stays).
     #[serde(default = "default_material")]
     pub material_strength: u32,
-    /// Optional glass fill color (hex). Empty → auto per surface (black for tinted).
+    /// Before rev 11, the glass fill colour (hex, empty = auto). Read once by
+    /// the migration into `surface_color`, then left empty.
     #[serde(default = "default_surface_tint")]
     pub surface_tint: String,
+    /// The dock's fill: "auto", "wallpaper", "accent" or a "#rrggbb" colour.
+    /// The "taskbar" style ignores it and takes the taskbar's colour.
+    #[serde(default = "default_surface_color")]
+    pub surface_color: String,
     /// Start with Windows.
     #[serde(default)]
     pub autostart: bool,
@@ -450,6 +460,7 @@ impl Default for Config {
             reduce_transparency: false,
             material_strength: default_material(),
             surface_tint: default_surface_tint(),
+            surface_color: default_surface_color(),
             autostart: false,
             context_menu: true,
             edge_gap: default_edge_gap(),
@@ -615,7 +626,7 @@ fn load_from_disk() -> Config {
 }
 
 /// Latest config schema revision written by this build.
-pub const SETTINGS_REV: u32 = 10;
+pub const SETTINGS_REV: u32 = 11;
 
 /// Bring a config from any older build up to `SETTINGS_REV`. Pure, so the
 /// same steps run on load and on restored profiles and backups. Returns
@@ -662,6 +673,10 @@ pub fn migrate(cfg: &mut Config) -> bool {
     if cfg.settings_rev < 10 {
         cfg.focus_if_running = true;
     }
+    // rev 11: the dock's style and fill are chosen apart from the accent.
+    if cfg.settings_rev < 11 {
+        migrate_look_v11(cfg);
+    }
     cfg.legacy = Legacy::default();
     cfg.settings_rev = SETTINGS_REV;
     true
@@ -683,6 +698,54 @@ fn migrate_surface_v9(cfg: &mut Config) {
         _ => "glass",
     }
     .into();
+}
+
+/// Split "where colours come from" into the dock's style, its fill and the
+/// accent. "Like Windows" used to paint the dock like the taskbar, so it
+/// becomes the taskbar style; "wallpaper" used to tint the glass, so the fill
+/// follows the wallpaper; a hand-picked glass colour becomes the fill. Mica
+/// was an opaque surface tinted by the wallpaper: solid with that fill.
+fn migrate_look_v11(cfg: &mut Config) {
+    let tint = cfg.surface_tint.trim().to_ascii_lowercase();
+    let picked = tint.len() == 7 && tint.starts_with('#');
+    cfg.surface_color = match cfg.color_source.as_str() {
+        "wallpaper" => "wallpaper".into(),
+        _ if picked => tint,
+        _ => "auto".into(),
+    };
+    if cfg.surface_style == "mica" {
+        cfg.surface_style = "solid".into();
+        if cfg.surface_color == "auto" {
+            cfg.surface_color = "wallpaper".into();
+        }
+    }
+    if cfg.color_source == "windows" {
+        cfg.surface_style = "taskbar".into();
+    }
+    cfg.surface_tint = String::new();
+    canonical_look(cfg);
+}
+
+/// Only known styles and fills reach disk, whatever an older frontend sent.
+pub fn canonical_look(cfg: &mut Config) {
+    let style = cfg.surface_style.trim().to_ascii_lowercase();
+    if !matches!(style.as_str(), "taskbar" | "glass" | "clear" | "solid") {
+        migrate_surface_v9(cfg);
+        if cfg.surface_style == "mica" {
+            cfg.surface_style = "solid".into();
+        }
+    } else {
+        cfg.surface_style = style;
+    }
+    let color = cfg.surface_color.trim().to_ascii_lowercase();
+    let hex = color.len() == 7
+        && color.starts_with('#')
+        && color[1..].chars().all(|c| c.is_ascii_hexdigit());
+    cfg.surface_color = if hex || matches!(color.as_str(), "auto" | "wallpaper" | "accent") {
+        color
+    } else {
+        "auto".into()
+    };
 }
 
 /// CPU, RAM, disk and network become one "system" widget showing exactly
@@ -828,9 +891,7 @@ fn save_locked(config: &Config) -> Result<(), String> {
     if !matches!(to_write.notch_mode.trim(), "floating" | "smart") {
         to_write.notch_mode = "attached".into();
     }
-    if !matches!(to_write.surface_style.as_str(), "glass" | "mica" | "solid") {
-        migrate_surface_v9(&mut to_write);
-    }
+    canonical_look(&mut to_write);
     // The cache mirrors what is on disk, so it answers this without a read.
     let existing = CACHE
         .read()
@@ -989,13 +1050,13 @@ mod migration_tests {
     }
 
     #[test]
-    fn finishes_map_to_glass_mica_solid() {
-        for (old, tint, want, want_tint) in [
-            ("acrylic", "", "glass", ""),
+    fn old_finishes_become_a_style_and_a_fill() {
+        for (old, tint, want, want_color) in [
+            ("acrylic", "", "glass", "auto"),
             ("tinted", "", "glass", "#000000"),
             ("tinted", "#0b1a2a", "glass", "#0b1a2a"),
-            ("mica", "", "mica", ""),
-            ("solid", "", "solid", ""),
+            ("mica", "", "solid", "wallpaper"),
+            ("solid", "", "solid", "auto"),
         ] {
             let mut cfg = Config {
                 settings_rev: 8,
@@ -1005,13 +1066,68 @@ mod migration_tests {
             };
             assert!(migrate(&mut cfg));
             assert_eq!(
-                (cfg.surface_style.as_str(), cfg.surface_tint.as_str()),
-                (want, want_tint),
+                (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
+                (want, want_color),
                 "{old}"
             );
+            assert!(cfg.surface_tint.is_empty());
             assert_eq!(cfg.settings_rev, SETTINGS_REV);
             assert!(!migrate(&mut cfg));
         }
+    }
+
+    #[test]
+    fn colour_sources_split_into_style_fill_and_accent_at_rev_11() {
+        let rev10 = |source: &str, style: &str, tint: &str| Config {
+            settings_rev: 10,
+            color_source: source.into(),
+            surface_style: style.into(),
+            surface_tint: tint.into(),
+            ..Config::default()
+        };
+        // "Like Windows" painted the dock like the taskbar.
+        let mut cfg = rev10("windows", "glass", "#000000");
+        migrate(&mut cfg);
+        assert_eq!(cfg.surface_style, "taskbar");
+        assert_eq!(
+            cfg.color_source, "windows",
+            "the accent keeps following Windows"
+        );
+        // "Wallpaper" tinted the glass with the wallpaper.
+        let mut cfg = rev10("wallpaper", "glass", "");
+        migrate(&mut cfg);
+        assert_eq!(
+            (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
+            ("glass", "wallpaper")
+        );
+        // A hand-picked colour stays the fill.
+        let mut cfg = rev10("custom", "solid", "#223344");
+        migrate(&mut cfg);
+        assert_eq!(
+            (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
+            ("solid", "#223344")
+        );
+    }
+
+    #[test]
+    fn unknown_styles_and_fills_never_reach_disk() {
+        let mut cfg = Config {
+            surface_style: "Mica".into(),
+            surface_color: "rainbow".into(),
+            ..Config::default()
+        };
+        canonical_look(&mut cfg);
+        assert_eq!(
+            (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
+            ("solid", "auto")
+        );
+        cfg.surface_style = "CLEAR".into();
+        cfg.surface_color = "#AABBCC".into();
+        canonical_look(&mut cfg);
+        assert_eq!(
+            (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
+            ("clear", "#aabbcc")
+        );
     }
 
     #[test]
@@ -1033,6 +1149,7 @@ mod migration_tests {
         let mut cfg = Config::default();
         migrate(&mut cfg);
         assert_eq!(cfg.surface_style, "glass");
+        assert_eq!(cfg.surface_color, "auto");
         assert!(cfg.surface_tint.is_empty());
     }
 }
