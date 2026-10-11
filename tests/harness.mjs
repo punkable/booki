@@ -278,7 +278,7 @@ async function waitForBoot(page, name) {
     // Two frames so layout and effects queued on mount settle.
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.waitForTimeout(100);
-  } catch (_) { /* not ready within the old budget: carry on as before */ }
+  } catch { /* not ready within the old budget: carry on as before */ }
 }
 
 /* Prefer a browser the environment already provides (BOOKI_CHROMIUM, or the
