@@ -151,6 +151,8 @@ npm run tauri:dev    # native app on Windows with Rust installed
 npm run tauri:build  # Windows packages
 ```
 
+Before contributing, read [AGENTS.md](AGENTS.md) (architecture, commands and working rules), the [handoff notes](docs/HANDOFF.md) (current state and what is pending) and the [visual identity and design system](docs/brand/README.md).
+
 The images and film are rebuilt from the real frontend by [tools/presentation](tools/presentation/README.md); finished media live in `docs/presentation/`. Older native Windows captures and PNG brand exports are kept in `docs/`.
 
 To audit the current public release without running its installers:
