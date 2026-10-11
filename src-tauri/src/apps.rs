@@ -65,6 +65,14 @@ pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
     shell_open(path, args)
 }
 
+/// Launch with the shell's "runas" verb: Windows shows the UAC prompt and the
+/// app runs as administrator. ShellExecuteW waits for the prompt, so callers
+/// keep this off the UI thread.
+pub fn launch_elevated(path: &str, args: &[String]) -> Result<(), String> {
+    let path = validate_launch_target(path)?;
+    shell_execute(path, args, Some("runas"))
+}
+
 /// Open the file's containing folder in the file manager (selecting it on Windows).
 pub fn reveal(path: &str) -> Result<(), String> {
     #[cfg(windows)]
@@ -96,6 +104,11 @@ pub fn reveal(path: &str) -> Result<(), String> {
 
 #[cfg(windows)]
 fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
+    shell_execute(path, args, None)
+}
+
+#[cfg(windows)]
+fn shell_execute(path: &str, args: &[String], verb: Option<&str>) -> Result<(), String> {
     // ShellExecuteW resolves shortcuts, folders, documents and URLs directly —
     // no cmd.exe in between, so paths/URLs can never be re-parsed as shell
     // syntax (%VAR% expansion, metacharacters), and no console can flash.
@@ -121,10 +134,23 @@ fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
         .collect::<Vec<_>>()
         .join(" ");
     let wparams = wide(&params);
+    let wverb = verb.map(wide);
+    // A verb launch runs on a worker thread; ShellExecuteW may hand the work
+    // to shell extensions, which expect COM on the calling thread. Only the
+    // reference taken here is released.
+    let com = verb.is_some()
+        && unsafe {
+            use windows::Win32::System::Com::{
+                CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+            };
+            CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).is_ok()
+        };
     let code = unsafe {
         ShellExecuteW(
             None,
-            PCWSTR::null(),
+            wverb
+                .as_ref()
+                .map_or(PCWSTR::null(), |verb| PCWSTR(verb.as_ptr())),
             PCWSTR(wpath.as_ptr()),
             if args.is_empty() {
                 PCWSTR::null()
@@ -135,12 +161,20 @@ fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
             SW_SHOWNORMAL,
         )
     };
+    if com {
+        unsafe { windows::Win32::System::Com::CoUninitialize() };
+    }
     // Per the API contract, values > 32 mean success.
     if code.0 as isize > 32 {
         Ok(())
     } else {
         Err(format!("failed to open {path} (code {})", code.0 as isize))
     }
+}
+
+#[cfg(not(windows))]
+fn shell_execute(_path: &str, _args: &[String], _verb: Option<&str>) -> Result<(), String> {
+    Err("running as administrator is only available on Windows".into())
 }
 
 #[cfg(not(windows))]

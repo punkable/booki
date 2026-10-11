@@ -211,6 +211,18 @@ async function boot() {
       nativeSupport = support;
       if (windowsChanged && !hiddenState) startRunningPoll();
     });
+    // Display power, Energy Saver and taskbar attention (Windows only; the
+    // listeners are inert elsewhere). Resume implies the display is on, so a
+    // missed display-on can never leave the polls stopped.
+    dockApi.onSystemChange("display-off", () => onDisplayPower(false));
+    dockApi.onSystemChange("display-on", () => onDisplayPower(true));
+    dockApi.onSystemChange("resume", () => onDisplayPower(true));
+    dockApi.onSystemChange("energy-saver", (event) => onEnergySaver(!!event?.payload));
+    dockApi.onSystemChange("attention", (event) => setAttention(event?.payload));
+    if (isTauri) {
+      dockApi.powerStatus().then((s) => { if (s) { onEnergySaver(!!s.energySaver); onDisplayPower(s.displayOn !== false); } }).catch(() => {});
+      dockApi.attentionWindows().then(setAttention).catch(() => {});
+    }
     onOcclusion(onOcclusionSignal);
     onDesktop(onDesktopSignal);
     onFullscreen(onFullscreenSignal);
@@ -387,8 +399,18 @@ function positionPreview() {
   }, 2600);
 }
 
+// The tray menu and the Settings title are drawn by Rust; tell it which
+// language the pages resolved ("system" included) whenever that changes.
+let nativeLang = null;
+function syncNativeLanguage() {
+  if (!isTauri || curLang() === nativeLang) return;
+  nativeLang = curLang();
+  dockApi.syncNativeLanguage(nativeLang).catch(() => { nativeLang = null; });
+}
+
 function applyAll() {
   setLang(cfg.language);
+  syncNativeLanguage();
   // The two strings baked into index.html were Spanish, which no language
   // setting could reach — a German user dragging a file onto the bar was told
   // "Suelta para anclar a Booki". They live in the dictionary now and are
@@ -1204,6 +1226,25 @@ function stopPolls() {
   pollTimer = null;
   pollsActive = false;
 }
+// Display power and Energy Saver, as Windows reports them. With the display
+// off nothing on screen can change for anyone, so every poll stops; turning
+// it back on restarts them through startPolls, which still honours a
+// tucked-away dock. Energy Saver doubles the cadence of everything but the
+// clock, which has to tick on time.
+let displayOff = false;
+let energySaver = false;
+function pollSlowdown() { return energySaver ? 2 : 1; }
+function onDisplayPower(on) {
+  if (displayOff === !on) return;
+  displayOff = !on;
+  if (displayOff) stopPolls();
+  else startPolls();
+}
+function onEnergySaver(on) {
+  if (energySaver === !!on) return;
+  energySaver = !!on;
+  if (pollsActive) startPolls(); // pick up the new cadence
+}
 function pollKinds() {
   return {
     clock: widgetPresent(["clock", "focus"]),
@@ -1226,7 +1267,7 @@ function paintPolls(k) {
    the set of live widget kinds changed; otherwise it just repaints the new
    cards (and running-app dots) and keeps every poll's cadence. */
 function syncPolls({ repaint = true } = {}) {
-  if (hiddenState) return;
+  if (hiddenState || displayOff) return;
   const kinds = pollKinds();
   if (!pollsActive || JSON.stringify(kinds) !== pollKey) { startPolls(); return; }
   if (!repaint) return;
@@ -1236,7 +1277,7 @@ function syncPolls({ repaint = true } = {}) {
 function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
-  if (hiddenState) return; // tucked away → stay idle until revealed
+  if (hiddenState || displayOff) return; // tucked away or screen off → stay idle
   startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const k = pollKinds();
   pollKey = JSON.stringify(k);
@@ -1248,18 +1289,19 @@ function startPolls() {
   // schedule each poll a full interval out (no wasteful double-poll at start).
   paintPolls(k);
   const t0 = Date.now();
-  pollDue = { stats: t0 + 2400, media: t0 + 3000, volume: t0 + 4000, clipboard: t0 + 4000 };
+  const slow = pollSlowdown();
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 : 60000;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : 60000;
   widgetPollTimer = setInterval(() => {
-    if (hiddenState) return; // don't poll a tucked-away dock
+    if (hiddenState || displayOff) return; // don't poll a tucked-away dock
     const now = Date.now();
     if (hasClock || hasLocal) tickClocks();
-    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400; pollStats(); }
-    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000); pollMedia(); }
-    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000); pollVolume(); }
-    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000; pollClipboard(); }
+    if (hasStats && now >= pollDue.stats) { pollDue.stats = now + 2400 * slow; pollStats(); }
+    if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(nativeSupport, "media", 3000) * slow; pollMedia(); }
+    if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(nativeSupport, "volume", 4000) * slow; pollVolume(); }
+    if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
@@ -1415,7 +1457,14 @@ async function editNote(item) {
 
 // ─────────────────────────── Launch ───────────────────────────
 
-function launch(el, item) {
+/** Taskbar modifiers on a click: Shift opens a new instance, Ctrl+Shift runs
+   the app as administrator. */
+function launchModifiers(e) {
+  const shift = !!e?.shiftKey, ctrl = !!(e?.ctrlKey || e?.metaKey);
+  return { admin: shift && ctrl, newInstance: shift && !ctrl };
+}
+
+function launch(el, item, mods = {}) {
   if (item.kind === "action") { if (item.action === "settings") dockApi.openSettings(); return; }
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
@@ -1440,8 +1489,16 @@ function launch(el, item) {
   // Launcher + switcher: when "focus if running" is on (the default)
   // and the app already has a window, bring it to the front instead of
   // launching a new instance. With several windows, let the user pick one.
+  clearAttention(el, item); // the user answered whichever window was waiting
+  if (mods.admin && item.kind === "app" && item.path) {
+    pinnedReveal = false;
+    scheduleHide();
+    markLaunching(el);
+    dockApi.launch(item.path, item.args || [], "runas");
+    return;
+  }
   const hwnd = el.dataset.hwnd;
-  const switching = cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
+  const switching = !mods.newInstance && cfg.focusIfRunning !== false && el.dataset.running === "true" && hwnd;
   const wins = switching ? windowsFor(item) : [];
   // A tucked-away dock (Alt+N while hidden) can't show a picker: go to the first.
   if (wins.length > 1 && !hiddenState) { openWindowPicker(el, item, wins); return; }
@@ -1791,16 +1848,18 @@ dockEl.addEventListener("dblclick", (e) => {
   if (tile.classList.contains("widget")) dockApi.openSettingsTab("widgets");
 });
 
-// Middle-click an app/folder/file pin → open its location in Explorer.
+// Middle-click works like the taskbar: an app opens a new instance and a
+// folder opens a new Explorer window. Ctrl+middle-click opens the location.
 dockEl.addEventListener("auxclick", (e) => {
   if (e.button !== 1) return;
   const tile = closestSel(e.target, ".tile");
   if (!tile || !tile.dataset.id) return;
   const item = cfg.pinned.find((p) => p.id === tile.dataset.id);
-  if (item && item.path && (item.kind === "app" || item.kind === "folder")) {
-    e.preventDefault();
-    dockApi.openLocation(item.path);
-  }
+  if (!item || !item.path || (item.kind !== "app" && item.kind !== "folder")) return;
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) dockApi.openLocation(item.path);
+  else if (item.kind === "app") launch(tile, item, { newInstance: true });
+  else dockApi.launch(item.path, []);
 });
 
 // Drag the empty bar to MOVE the dock to another edge — with a live preview so
@@ -2243,7 +2302,7 @@ function flipReorder(mutate) {
   }
 }
 
-async function onPressUp() {
+async function onPressUp(e) {
   window.removeEventListener("pointermove", onPressMove);
   cancelAnimationFrame(pressMoveRaf);
   pressMoveRaf = 0;
@@ -2296,7 +2355,7 @@ async function onPressUp() {
     return;
   }
   if (!p.moved && !editMode && p.item.kind !== "separator") {
-    launch(p.el, p.item);
+    launch(p.el, p.item, launchModifiers(e));
   }
 }
 
@@ -2341,7 +2400,7 @@ dockEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault(); // Space would otherwise scroll the bar
     if (editMode) exitEdit();
-    else launch(tile, item);
+    else launch(tile, item, launchModifiers(e));
     return;
   }
   // The menu key and Shift+F10 are what a keyboard user presses for a context
@@ -2795,6 +2854,7 @@ function openMenu(e, item) {
   if (item.kind === "app") {
     if (wins.length) add("plus", t("m.newWindow"), () => dockApi.launch(item.path, item.args || []));
     else add("app", t("m.open"), () => dockApi.launch(item.path, item.args || []));
+    if (isTauri && item.path) add("shield", t("m.runAsAdmin"), () => dockApi.launch(item.path, item.args || [], "runas"));
   } else if (item.kind === "folder" || item.kind === "group") {
     add("folder", t("m.open"), () => {
       // Always open (never toggle-close) — right-click → Open should reveal.
@@ -3627,6 +3687,7 @@ if (dockApi.onCursorInside)
     if (v === pointerInside) return;
     pointerInside = v;
     if (v) {
+      if (displayOff) onDisplayPower(true); // a pointer on the dock means the screen is on
       if (pinnedReveal) pinTouched = true;
       if (!hiddenState) clearTimeout(hideTimer);
     } else {
@@ -4259,14 +4320,43 @@ function windowsFor(pin, wins = lastWindows) {
   return matchPinWindows(pin, wins);
 }
 
+// Windows flashing on the taskbar (asking for attention). The backend keeps
+// the list and drops a window once it comes to the front; a tile shows the
+// state when any of its windows is in it.
+let attentionHwnds = new Set();
+function setAttention(list) {
+  attentionHwnds = new Set((Array.isArray(list) ? list : []).map(Number));
+  paintAttention();
+}
+function paintAttention() {
+  dockEl.querySelectorAll(".tile[data-id]").forEach((tile) => {
+    const item = cfg?.pinned.find((p) => p.id === tile.dataset.id);
+    const waiting = !!item && item.kind === "app" && attentionHwnds.size > 0 &&
+      windowsFor(item).some((w) => attentionHwnds.has(Number(w.hwnd)));
+    if (waiting === tile.classList.contains("attention")) return;
+    tile.classList.toggle("attention", waiting);
+    if (waiting) tile.setAttribute("aria-description", t("dock.attention"));
+    else tile.removeAttribute("aria-description");
+  });
+}
+function clearAttention(el, item) {
+  if (!el?.classList.contains("attention")) return;
+  const hwnds = windowsFor(item).map((w) => Number(w.hwnd)).filter((h) => attentionHwnds.has(h));
+  for (const h of hwnds) attentionHwnds.delete(h);
+  el.classList.remove("attention");
+  el.removeAttribute("aria-description");
+  if (hwnds.length) dockApi.dismissAttention(hwnds).catch(() => {});
+}
+
 let pollTimer = null;
 function startRunningPoll() {
   if (!isTauri) return;
   clearInterval(pollTimer); // never stack two running-app polls
   pollTimer = null;
+  if (displayOff) return; // nobody can see the dots; display-on restarts it
   const tick = singleFlight(async (refreshTrash = true) => {
     // Don't poll while tucked into the notch — saves CPU/IPC when idle.
-    if (hiddenState) return;
+    if (hiddenState || displayOff) return;
     // Cheap, no-IPC guard that repositions the dock if the screen changed.
     checkScreenChange();
     // Keep the trash badge in sync with deletions made outside Booki.
@@ -4304,6 +4394,7 @@ function startRunningPoll() {
           else t.removeAttribute("aria-description");
         }
       });
+      paintAttention();
       // Mirror running state onto open group flyout cells.
       if (stackOpen && stackItemId) {
         const grp = cfg.pinned.find((p) => p.id === stackItemId);
@@ -4321,7 +4412,7 @@ function startRunningPoll() {
   });
   appPollTick = tick;
   tick();
-  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000));
+  pollTimer = setInterval(tick, recoveryInterval(nativeSupport, "windows", 5000) * pollSlowdown());
 }
 
 // ─────────────────── Folder stacks (flyout) ───────────────────

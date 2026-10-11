@@ -17,6 +17,8 @@
   ; A real uninstall must not leave a broken startup target. Updates retain it.
   ${If} $UpdateMode <> 1
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Booki"
+    ; Task Manager's on/off switch for that entry.
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "Booki"
   ${EndIf}
 
   ; Wipe per-user data only when the uninstaller checkbox is checked.

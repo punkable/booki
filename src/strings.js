@@ -4,6 +4,8 @@ export const STRINGS = {
   es: {
     "settings.loadError": "No se pudieron cargar los ajustes. Booki sigue funcionando y tu configuración no ha cambiado.",
     "be.reveal": "Para sacar el dock",
+    "m.runAsAdmin": "Ejecutar como administrador",
+    "dock.attention": "Pide tu atención",
     "be.revealClick": "Clic en el notch",
     "be.revealHover": "Pasar el cursor",
     "be.revealHint": "Con «Pasar el cursor» también sale al llevar el puntero al borde de la pantalla.",
@@ -180,6 +182,8 @@ export const STRINGS = {
   en: {
     "settings.loadError": "Settings couldn’t load. Booki is still running and your configuration hasn’t changed.",
     "be.reveal": "To bring the dock back",
+    "m.runAsAdmin": "Run as administrator",
+    "dock.attention": "Wants your attention",
     "be.revealClick": "Click the notch",
     "be.revealHover": "Hover",
     "be.revealHint": "With Hover, pushing the pointer against the screen edge also brings it back.",
@@ -356,6 +360,8 @@ export const STRINGS = {
   pt: {
     "settings.loadError": "Não foi possível carregar as configurações. O Booki continua em execução e sua configuração não mudou.",
     "be.reveal": "Para trazer o dock",
+    "m.runAsAdmin": "Executar como administrador",
+    "dock.attention": "Pede a sua atenção",
     "be.revealClick": "Clicar no notch",
     "be.revealHover": "Passar o cursor",
     "be.revealHint": "Com «Passar o cursor», levar o ponteiro até a borda da tela também o traz.",
@@ -532,6 +538,8 @@ export const STRINGS = {
   fr: {
     "settings.loadError": "Impossible de charger les réglages. Booki fonctionne toujours et votre configuration n’a pas changé.",
     "be.reveal": "Pour faire revenir le dock",
+    "m.runAsAdmin": "Exécuter en tant qu’administrateur",
+    "dock.attention": "Demande votre attention",
     "be.revealClick": "Clic sur le notch",
     "be.revealHover": "Survol",
     "be.revealHint": "Avec Survol, pousser le pointeur contre le bord de l'écran le fait aussi revenir.",
@@ -708,6 +716,8 @@ export const STRINGS = {
   de: {
     "settings.loadError": "Die Einstellungen konnten nicht geladen werden. Booki läuft weiter und deine Konfiguration ist unverändert.",
     "be.reveal": "Dock zurückholen",
+    "m.runAsAdmin": "Als Administrator ausführen",
+    "dock.attention": "Braucht Aufmerksamkeit",
     "be.revealClick": "Notch anklicken",
     "be.revealHover": "Darüberfahren",
     "be.revealHint": "Mit Darüberfahren holt ihn auch der Zeiger am Bildschirmrand zurück.",

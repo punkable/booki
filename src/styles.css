@@ -1322,6 +1322,26 @@ body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; t
 body.edge-top .tile[data-running="true"]::after { bottom: auto; top: -5px; }
 body.edge-left .tile[data-running="true"]::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile[data-running="true"]::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
+/* A window of this app is flashing on the taskbar: the running pill widens,
+   turns amber and breathes until that window comes to the front or the tile
+   is clicked (dock.js paintAttention). It stays visible even when running
+   indicators are hidden, because it asks for something. */
+.tile.attention { --attention: #f59e0b; }
+.tile.attention[data-running="true"]::after,
+body.hide-running-indicators .tile.attention[data-running="true"]::after {
+  display: block;
+  width: 14px;
+  background: var(--attention);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--attention) 55%, transparent);
+  animation: attention-pulse 1.6s ease-in-out infinite;
+}
+body.edge-left .tile.attention[data-running="true"]::after,
+body.edge-right .tile.attention[data-running="true"]::after { width: 3px; height: 14px; }
+@keyframes attention-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .tile.attention[data-running="true"]::after { animation: none; }
+}
+:root[data-reduce-motion] .tile.attention[data-running="true"]::after { animation: none; }
 /* Pin / unpin: tiles fade+scale in when added and out when removed. */
 .tile.tile-in { animation: tile-in var(--dur-2) var(--ease); }
 .tile.tile-out { animation: tile-out var(--dur-2) var(--ease) forwards; pointer-events: none; }

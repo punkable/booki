@@ -1058,8 +1058,106 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Add or remove the "start with Windows" registry entry for this exe.
+/// Task Manager's Startup apps page keeps its own on/off switch for each Run
+/// entry here, as a binary value named like the entry. The first byte is even
+/// when enabled (02) and odd when the user turned it off (03).
+const STARTUP_APPROVED_KEY: &str =
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
+
+/// True when the user turned Booki off in Task Manager (or Settings > Apps >
+/// Startup). The Run entry is still there in that case, but Windows skips it.
+pub fn autostart_disabled_by_user() -> bool {
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_BINARY};
+    let key = wide(STARTUP_APPROVED_KEY);
+    let value = wide(RUN_VALUE);
+    let mut data = [0u8; 64];
+    let mut size = data.len() as u32;
+    let found = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            RRF_RT_REG_BINARY,
+            None,
+            Some(data.as_mut_ptr().cast()),
+            Some(&mut size),
+        )
+        .is_ok()
+    };
+    found && size >= 1 && data[0] & 1 == 1
+}
+
+/// Turning autostart on in Booki is a fresh choice, so it also clears a
+/// "disabled" mark Task Manager left behind; turning it off removes the mark.
+fn write_startup_approved(enabled: bool) -> Result<(), String> {
+    use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
+        KEY_SET_VALUE, REG_BINARY, REG_OPTION_NON_VOLATILE,
+    };
+    let key_path = wide(STARTUP_APPROVED_KEY);
+    let value_name = wide(RUN_VALUE);
+    unsafe {
+        let mut key = HKEY::default();
+        let opened = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(key_path.as_ptr()),
+            0,
+            None,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            None,
+            &mut key,
+            None,
+        );
+        if opened.is_err() {
+            return Err(format!(
+                "could not open the StartupApproved key ({opened:?})"
+            ));
+        }
+        let result = if enabled {
+            // 02 followed by zeros: "enabled", with no disable time stamp.
+            let mut blob = [0u8; 12];
+            blob[0] = 0x02;
+            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_BINARY, Some(&blob));
+            if r.is_err() {
+                Err(format!("could not write the StartupApproved value ({r:?})"))
+            } else {
+                Ok(())
+            }
+        } else {
+            let r = RegDeleteValueW(key, PCWSTR(value_name.as_ptr()));
+            if r.is_err() && r != ERROR_FILE_NOT_FOUND {
+                Err(format!(
+                    "could not delete the StartupApproved value ({r:?})"
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        let _ = RegCloseKey(key);
+        result
+    }
+}
+
+/// Add or remove the "start with Windows" entry for this exe, as the user
+/// asked in Booki.
 pub fn set_autostart(enabled: bool, exe: &str) -> Result<(), String> {
+    write_run_value(enabled, exe)?;
+    write_startup_approved(enabled)
+}
+
+/// Point an existing autostart entry at this exe (after a move or reinstall)
+/// without overriding the user: when they turned Booki off in Task Manager,
+/// nothing is written.
+pub fn repair_autostart(exe: &str) -> Result<(), String> {
+    if autostart_disabled_by_user() {
+        return Ok(());
+    }
+    write_run_value(true, exe)
+}
+
+fn write_run_value(enabled: bool, exe: &str) -> Result<(), String> {
     use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
     use windows::Win32::System::Registry::{
         RegCloseKey, RegCreateKeyExW, RegDeleteValueW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
@@ -1314,12 +1412,13 @@ pub fn sync_context_menu(
     Ok(())
 }
 
-/// True when the "start with Windows" registry entry exists.
+/// True when the "start with Windows" entry exists and the user has not
+/// turned it off in Task Manager.
 pub fn get_autostart() -> bool {
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
     let key_path = wide(RUN_KEY);
     let value_name = wide(RUN_VALUE);
-    unsafe {
+    let registered = unsafe {
         RegGetValueW(
             HKEY_CURRENT_USER,
             PCWSTR(key_path.as_ptr()),
@@ -1330,7 +1429,8 @@ pub fn get_autostart() -> bool {
             None,
         )
         .is_ok()
-    }
+    };
+    registered && !autostart_disabled_by_user()
 }
 
 /// Quiet NSIS updates are safe only for the registered per-user installation.

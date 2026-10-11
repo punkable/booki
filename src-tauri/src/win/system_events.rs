@@ -1,11 +1,11 @@
 //! Native change notifications. Callbacks only enqueue; queries run elsewhere.
 use std::sync::{
-    atomic::{AtomicBool, AtomicIsize, Ordering},
+    atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering},
     mpsc::{sync_channel, SyncSender},
-    Arc, OnceLock,
+    Arc, Mutex, OnceLock,
 };
 use std::time::{Duration, Instant};
-use windows::core::{implement, PCWSTR};
+use windows::core::{implement, GUID, PCWSTR};
 use windows::Foundation::{EventRegistrationToken, TypedEventHandler};
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session,
@@ -20,6 +20,9 @@ use windows::Win32::Media::Audio::{
     IMMNotificationClient_Impl, MMDeviceEnumerator, AUDIO_VOLUME_NOTIFICATION_DATA, DEVICE_STATE,
 };
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
+use windows::Win32::System::Power::{
+    RegisterPowerSettingNotification, UnregisterPowerSettingNotification,
+};
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
 use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
@@ -30,7 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 /// resume or display signal: the old queue carried the kinds themselves and
 /// dropped whatever arrived while its 32 slots were full.
 static QUEUE: OnceLock<SyncSender<()>> = OnceLock::new();
-const KINDS: [&str; 11] = [
+const KINDS: [&str; 15] = [
     "ready",
     "windows",
     "clipboard",
@@ -42,6 +45,10 @@ const KINDS: [&str; 11] = [
     "volume",
     "device",
     "catalog",
+    "display-off",
+    "display-on",
+    "energy-saver",
+    "attention",
 ];
 static PENDING: [AtomicBool; KINDS.len()] = [const { AtomicBool::new(false) }; KINDS.len()];
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
@@ -52,6 +59,106 @@ pub static CATALOG: AtomicBool = AtomicBool::new(false);
 /// The last window outside Booki that came to the foreground (the hook skips
 /// our own process), so a dock click can tell which app was in front.
 pub static LAST_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+
+// ─────────────── Display power and Energy Saver ───────────────
+
+/// GUID_CONSOLE_DISPLAY_STATE: 0 off, 1 on, 2 dimmed.
+const CONSOLE_DISPLAY_STATE: GUID = GUID::from_u128(0x6fe69556_704a_47a0_8f24_c28d936fda47);
+/// GUID_ENERGY_SAVER_STATUS (Windows 11 24H2+): 0 off, 1 standard, 2 high savings.
+const ENERGY_SAVER_STATUS: GUID = GUID::from_u128(0x550e8400_e29b_41d4_a716_446655440000);
+/// GUID_POWER_SAVING_STATUS (Battery saver on older builds): 0 off, 1 on.
+const POWER_SAVING_STATUS: GUID = GUID::from_u128(0xe00958c0_c213_4ace_ac77_fecced2eeea5);
+/// The console display is on (or dimmed). Windows sends the current state as
+/// soon as the notification is registered.
+pub static DISPLAY_ON: AtomicBool = AtomicBool::new(true);
+static ENERGY_SAVER_NEW: AtomicBool = AtomicBool::new(false);
+static ENERGY_SAVER_OLD: AtomicBool = AtomicBool::new(false);
+/// Energy Saver (or, before 24H2, Battery saver) is on. Both settings are
+/// watched, because registering the newer one can succeed on a build that
+/// never reports it.
+pub fn energy_saver() -> bool {
+    ENERGY_SAVER_NEW.load(Ordering::Relaxed) || ENERGY_SAVER_OLD.load(Ordering::Relaxed)
+}
+
+unsafe fn power_setting_changed(lp: windows::Win32::Foundation::LPARAM) {
+    use windows::Win32::System::Power::POWERBROADCAST_SETTING;
+    let setting = lp.0 as *const POWERBROADCAST_SETTING;
+    if setting.is_null() || (*setting).DataLength < 4 {
+        return;
+    }
+    let guid = (*setting).PowerSetting;
+    let value = std::ptr::read_unaligned((*setting).Data.as_ptr() as *const u32);
+    if guid == CONSOLE_DISPLAY_STATE {
+        DISPLAY_ON.store(value != 0, Ordering::Relaxed);
+        signal(if value == 0 {
+            "display-off"
+        } else {
+            "display-on"
+        });
+    } else if guid == ENERGY_SAVER_STATUS {
+        ENERGY_SAVER_NEW.store(value != 0, Ordering::Relaxed);
+        signal("energy-saver");
+    } else if guid == POWER_SAVING_STATUS {
+        ENERGY_SAVER_OLD.store(value != 0, Ordering::Relaxed);
+        signal("energy-saver");
+    }
+}
+
+// ─────────────── Windows asking for attention ───────────────
+
+/// The shell hook message id, from RegisterWindowMessageW("SHELLHOOK").
+static SHELL_HOOK_MESSAGE: AtomicU32 = AtomicU32::new(0);
+const HSHELL_WINDOWDESTROYED: usize = 2;
+const HSHELL_WINDOWACTIVATED: usize = 4;
+const HSHELL_RUDEAPPACTIVATED: usize = 0x8004;
+const HSHELL_FLASH: usize = 0x8006;
+/// Windows flashing on the taskbar (asking for attention), newest last.
+static ATTENTION: Mutex<Vec<isize>> = Mutex::new(Vec::new());
+
+fn attention_list() -> std::sync::MutexGuard<'static, Vec<isize>> {
+    ATTENTION.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+pub fn attention_windows() -> Vec<isize> {
+    attention_list().clone()
+}
+
+/// The user answered these windows (clicked their tile).
+pub fn dismiss_attention(hwnds: &[isize]) {
+    attention_list().retain(|hwnd| !hwnds.contains(hwnd));
+}
+
+fn flash(hwnd: isize) {
+    let mut list = attention_list();
+    if hwnd == 0 || list.contains(&hwnd) {
+        return;
+    }
+    if list.len() >= 32 {
+        list.remove(0);
+    }
+    list.push(hwnd);
+    drop(list);
+    signal("attention");
+}
+
+fn answered(hwnd: isize) {
+    let mut list = attention_list();
+    let before = list.len();
+    list.retain(|known| *known != hwnd);
+    let changed = list.len() != before;
+    drop(list);
+    if changed {
+        signal("attention");
+    }
+}
+
+fn shell_hook(code: usize, hwnd: isize) {
+    match code {
+        HSHELL_FLASH => flash(hwnd),
+        HSHELL_WINDOWACTIVATED | HSHELL_RUDEAPPACTIVATED | HSHELL_WINDOWDESTROYED => answered(hwnd),
+        _ => {}
+    }
+}
 /// Mark `kind` pending and wake the delivery thread. If the flag was already
 /// set, the delivery that clears it is still ahead and covers this signal too.
 /// If the wake can't be queued, a wake is already waiting, and the drain it
@@ -185,6 +292,8 @@ unsafe extern "system" fn window_event(
 ) {
     if event == EVENT_SYSTEM_FOREGROUND {
         LAST_FOREGROUND.store(hwnd.0 as isize, Ordering::Relaxed);
+        // A window that asked for attention got it.
+        answered(hwnd.0 as isize);
     }
     if event == EVENT_SYSTEM_FOREGROUND
         || (object == 0
@@ -203,8 +312,13 @@ unsafe extern "system" fn platform_message(
     wp: windows::Win32::Foundation::WPARAM,
     lp: windows::Win32::Foundation::LPARAM,
 ) -> windows::Win32::Foundation::LRESULT {
+    let shell = SHELL_HOOK_MESSAGE.load(Ordering::Relaxed);
+    if shell != 0 && message == shell {
+        shell_hook(wp.0, lp.0);
+    }
     match message {
         WM_CLIPBOARDUPDATE => signal("clipboard"),
+        WM_POWERBROADCAST if wp.0 == PBT_POWERSETTINGCHANGE as usize => power_setting_changed(lp),
         // The accent colour (and with it, an automatic accent following a new
         // wallpaper) arrives as WM_DWMCOLORIZATIONCOLORCHANGED (0x0320).
         WM_SETTINGCHANGE | WM_THEMECHANGED | 0x0320 => signal("preferences"),
@@ -251,6 +365,28 @@ fn watch_windows() {
         .ok();
         let registered = observer.is_some_and(|hwnd| AddClipboardFormatListener(hwnd).is_ok());
         CLIPBOARD.store(registered, Ordering::Relaxed);
+        // Display power and Energy Saver arrive as WM_POWERBROADCAST /
+        // PBT_POWERSETTINGCHANGE on this hidden top-level window.
+        let mut power = Vec::new();
+        if let Some(hwnd) = observer {
+            let recipient = windows::Win32::Foundation::HANDLE(hwnd.0);
+            for guid in [
+                CONSOLE_DISPLAY_STATE,
+                ENERGY_SAVER_STATUS,
+                POWER_SAVING_STATUS,
+            ] {
+                if let Ok(handle) =
+                    RegisterPowerSettingNotification(recipient, &guid, DEVICE_NOTIFY_WINDOW_HANDLE)
+                {
+                    power.push(handle);
+                }
+            }
+            // Taskbar-style notifications, including HSHELL_FLASH.
+            let id = RegisterWindowMessageW(w!("SHELLHOOK"));
+            if id != 0 && RegisterShellHookWindow(hwnd).as_bool() {
+                SHELL_HOOK_MESSAGE.store(id, Ordering::Relaxed);
+            }
+        }
         let flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
         let foreground = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
@@ -280,7 +416,12 @@ fn watch_windows() {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
+        for handle in power {
+            let _ = UnregisterPowerSettingNotification(handle);
+        }
         if let Some(hwnd) = observer {
+            SHELL_HOOK_MESSAGE.store(0, Ordering::Relaxed);
+            let _ = DeregisterShellHookWindow(hwnd);
             let _ = RemoveClipboardFormatListener(hwnd);
             let _ = DestroyWindow(hwnd);
         }
@@ -421,6 +562,14 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
             let mut batch = take_pending();
             if batch.is_empty() {
                 continue;
+            }
+            // Off and on inside one window: only the state it ended in counts.
+            if batch.remove("display-off") | batch.remove("display-on") {
+                batch.insert(if DISPLAY_ON.load(Ordering::Relaxed) {
+                    "display-on"
+                } else {
+                    "display-off"
+                });
             }
             if batch.remove("session") {
                 media = manager.as_ref().and_then(media_lease);

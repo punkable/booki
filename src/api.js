@@ -472,7 +472,8 @@ export const config = {
 const icons = createAsyncCache((path) => invoke("app_icon", { path }));
 
 export const dock = {
-  launch: (path, args = []) => invoke("launch_app", { path, args }),
+  /** verb "runas" runs the app as administrator (Windows asks first). */
+  launch: (path, args = [], verb) => invoke("launch_app", verb ? { path, args, verb } : { path, args }),
   appIcon: (path) => icons.get(path),
   invalidateIcons: () => icons.clear(),
   readNoteDraft: (id) => invoke("read_note_draft", { id }),
@@ -616,6 +617,13 @@ export const dock = {
     return T.event.listen(`booki://${kind}-changed`, callback);
   },
   frequentApps: (limit = 12) => invoke("frequent_apps", { limit }),
+  /** Tell the backend which language the pages resolved, for the tray menu and the Settings title. */
+  syncNativeLanguage: (language) => invoke("sync_native_language", { language }),
+  /** { displayOn, energySaver } as Windows last reported them. */
+  powerStatus: () => invoke("power_status"),
+  /** Window handles flashing for attention on the taskbar. */
+  attentionWindows: () => invoke("attention_windows"),
+  dismissAttention: (hwnds) => invoke("dismiss_attention", { hwnds }),
 };
 
 /** Listen for "switch to a pending settings tab" (settings re-asks the backend). */
