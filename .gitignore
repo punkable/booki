@@ -27,3 +27,11 @@ src-tauri/gen/
 # Presentation: generated capture fixtures and temporary render bundles
 tools/presentation/public/
 tools/presentation/.remotion/
+
+# Local notes and AI agent instructions (kept outside the public repo)
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+.agents/
+.claude/
+docs/HANDOFF.md

@@ -108,7 +108,7 @@ npm run dev
 npm run check:all
 ```
 
-Para contribuir o retomar el proyecto, lee [AGENTS.md](AGENTS.md) (arquitectura, comandos y reglas de trabajo), las [notas de traspaso](docs/HANDOFF.md) (estado actual y pendientes) y la [identidad visual y sistema de diseño](docs/brand/README.md).
+Los cambios de interfaz siguen la [identidad visual y sistema de diseño](docs/brand/README.md).
 
 El [README en inglés](README.md) incluye instrucciones de compilación, auditoría de releases, donaciones y créditos. Las imágenes y el video se regeneran desde la interfaz real con [tools/presentation](tools/presentation/README.md).
 
