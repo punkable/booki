@@ -249,4 +249,4 @@ Interaction preferences that are part of the identity:
 - It works with high contrast, reduced transparency and reduced motion.
 - Keyboard focus is visible (`:focus-visible` outline in `--ink`).
 - New colours come from the tokens or palettes above. New surfaces reuse `--surf-*` / `--panel-*`.
-- Load the Anti Slop skills listed in `AGENTS.md` as a quality filter; this page and the shipped identity take precedence over generic advice.
+- This page and the shipped identity take precedence over generic design advice.
