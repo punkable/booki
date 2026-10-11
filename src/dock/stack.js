@@ -126,8 +126,7 @@ export async function openStack(tileEl, item) {
     stackEl.style.setProperty("--group-color", look.color || "");
     stackEl.classList.toggle("tinted", !!look.color);
   } else {
-    stackEl.style.removeProperty("--group-color");
-    stackEl.classList.remove("tinted");
+    clearStackTint();
   }
   if (isGroup) {
     const prevName = item.name || t("group.new");
@@ -521,8 +520,16 @@ export function placeStackNear(tileEl) {
 function flattenPinned(items) {
   return (items || []).flatMap((it) => [it, ...flattenPinned(it.children)]);
 }
+/** Drop a group's colour so the next flyout (clipboard, add, launcher)
+    doesn't inherit it. */
+export function clearStackTint() {
+  stackEl.style.removeProperty("--group-color");
+  stackEl.classList.remove("tinted");
+}
+
 export function openAddPanel(anchorEl = dockEl, tab = "apps") {
   if (S.stackOpen) closeStack();
+  clearStackTint();
   S.stackItemId = "__add";
   stackEl.classList.add("add-mode");
   stackEl.setAttribute("aria-label", t("add.title"));
@@ -569,6 +576,7 @@ export function openLauncher() {
   if (S.stackOpen && S.stackItemId === "__launcher") { closeStack(); return; }
   if (S.stackOpen) closeStack();
   closeMenu();
+  clearStackTint();
   S.stackItemId = "__launcher";
   stackEl.classList.add("add-mode", "launcher-mode");
   stackEl.setAttribute("aria-label", t("launcher.title"));

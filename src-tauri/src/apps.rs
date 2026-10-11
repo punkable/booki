@@ -50,10 +50,11 @@ pub fn launch(path: &str, args: &[String]) -> Result<(), String> {
             }
             cmd.arg(a);
         }
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        // No CREATE_NO_WINDOW: it hid console programs (cmd, PowerShell, CLI
+        // tools), which then ran with no window at all. Start in the app's own
+        // folder, as Explorer does, not in Booki's (System32 at sign-in).
+        if let Some(dir) = Path::new(path).parent().filter(|d| d.is_dir()) {
+            cmd.current_dir(dir);
         }
         return cmd
             .spawn()

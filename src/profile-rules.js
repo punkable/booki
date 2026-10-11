@@ -14,6 +14,18 @@ export const DEFAULT_RULES = Object.freeze({
   otherProfile: "",
 });
 
+/** Rules with defaults filled in. Configs saved by Rust carry empty strings
+ * and no days until a schedule is chosen, which used to blank the 09:00–18:00,
+ * Monday–Friday defaults and make the schedule never match. */
+export function withRuleDefaults(rules) {
+  const r = { ...DEFAULT_RULES, ...(rules || {}) };
+  if (!r.scheduleFrom) r.scheduleFrom = DEFAULT_RULES.scheduleFrom;
+  if (!r.scheduleTo) r.scheduleTo = DEFAULT_RULES.scheduleTo;
+  // Days stay empty only when the user cleared them for a chosen schedule.
+  if (!r.scheduleProfile && !r.scheduleDays?.length) r.scheduleDays = [...DEFAULT_RULES.scheduleDays];
+  return r;
+}
+
 /** Minutes after midnight for "HH:MM", or null. */
 export function parseClock(text) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(String(text || "").trim());
@@ -38,7 +50,7 @@ export function inSchedule(rules, now) {
 /** The profile the rules want now: an external monitor first, then the
     schedule, then the fallback. Only names in `available` count. */
 export function desiredProfile(rules, { now = new Date(), monitors = 1, available = [] } = {}) {
-  const r = { ...DEFAULT_RULES, ...(rules || {}) };
+  const r = withRuleDefaults(rules);
   if (!r.enabled) return "";
   const known = (name) => !!name && available.includes(name);
   if (monitors >= 2 && known(r.monitorProfile)) return r.monitorProfile;

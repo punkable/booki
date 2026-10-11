@@ -12,7 +12,9 @@ const TEXT_ENTRY = "input, textarea, select, [contenteditable]:not([contentedita
  * @param {Element} root @returns {HTMLElement[]} */
 export function rovingTiles(root) {
   return /** @type {HTMLElement[]} */ ([...root.children]).filter(
-    (el) => el.classList.contains("tile") && !el.classList.contains("separator") && !el.classList.contains("drag-clone") && !el.hidden
+    (el) => el.classList.contains("tile") && !el.classList.contains("separator") && !el.classList.contains("drag-clone")
+      // A widget hidden while unavailable is display:none, not [hidden].
+      && !el.hidden && !el.classList.contains("conditionally-hidden")
   );
 }
 

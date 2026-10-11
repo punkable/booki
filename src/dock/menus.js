@@ -103,7 +103,8 @@ export function openMenu(e, item) {
 
   if (item.kind !== "separator" && item.kind !== "trash") {
     sep();
-    add("pencil", t("apps.rename"), () => promptRename(item));
+    // A widget's tile always shows its own label, so renaming it would do nothing.
+    if (item.kind !== "widget") add("pencil", t("apps.rename"), () => promptRename(item));
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card).
     if (item.kind === "app" || item.kind === "folder") {

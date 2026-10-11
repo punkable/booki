@@ -159,7 +159,7 @@ fn default_hide_in_fullscreen() -> bool {
 
 /// Automatic profile switching. The dock evaluates these (it already knows
 /// the clock and the monitors); an empty profile name means "no rule".
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ProfileRules {
     pub enabled: bool,
@@ -174,6 +174,22 @@ pub struct ProfileRules {
     pub schedule_days: Vec<u8>,
     /// Profile when no rule above matches.
     pub other_profile: String,
+}
+
+/// A fresh schedule is 09:00–18:00, Monday to Friday, like the Settings
+/// defaults; missing fields in a saved file get these too.
+impl Default for ProfileRules {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            monitor_profile: String::new(),
+            schedule_profile: String::new(),
+            schedule_from: "09:00".into(),
+            schedule_to: "18:00".into(),
+            schedule_days: vec![1, 2, 3, 4, 5],
+            other_profile: String::new(),
+        }
+    }
 }
 
 /// Full dock configuration.

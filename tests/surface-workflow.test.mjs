@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { serveDist, launchBrowser, openPage as openHarnessPage, makeConfig } from './harness.mjs';
 import { surfaceAlpha } from '../src/surface.js';
+import { canonicalPins } from '../src/pins.js';
 
 const { srv, port } = await serveDist();
 const browser = await launchBrowser();
@@ -294,8 +295,9 @@ test('creating a Settings group commits its members together and cancel preserve
   await page.waitForTimeout(200);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
   assert.equal(saved.pinned.length, 2);
-  assert.deepEqual(saved.pinned[0].children, pins.slice(0, 2));
-  assert.deepEqual(saved.pinned[1], pins[2]);
+  // Settings saves pins in the shape Rust stores them, defaults included.
+  assert.deepEqual(saved.pinned[0].children, canonicalPins(pins.slice(0, 2)));
+  assert.deepEqual(saved.pinned[1], canonicalPins([pins[2]])[0]);
   assert.deepEqual(errors, []);
   await page.close();
 });

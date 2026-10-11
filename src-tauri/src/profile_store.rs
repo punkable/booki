@@ -74,6 +74,26 @@ pub fn copy(root: &Path, source: &str, destination: &str) -> Result<(), String> 
     Ok(())
 }
 
+/// Rename that only changes letter case ("work" → "Work"). Windows file
+/// names ignore case, so copy() sees the target as taken; move the files
+/// through a temporary name instead.
+pub fn rename_case(root: &Path, source: &str, destination: &str) -> Result<(), String> {
+    preview(root, source)?; // the source must be a readable profile
+    let from = path(root, source)?;
+    let to = path(root, destination)?;
+    for (a, b) in [
+        (from.clone(), to.clone()),
+        (from.with_extension("bak"), to.with_extension("bak")),
+    ] {
+        if a.exists() {
+            let tmp = a.with_extension("renaming");
+            fs::rename(&a, &tmp).map_err(|e| e.to_string())?;
+            fs::rename(&tmp, &b).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Deleted {
@@ -227,6 +247,23 @@ mod tests {
         assert!(path(&root, "COM¹").is_err());
         assert!(path(&root, "LPT²").is_err());
         assert!(path(&root, "É".repeat(40).as_str()).is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn renaming_only_the_letter_case_keeps_the_profile() {
+        let root = std::env::temp_dir().join(format!("booki-profiles-case-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let cfg = Config {
+            theme: "light".into(),
+            ..Config::default()
+        };
+        let text = serde_json::to_string(&cfg).unwrap();
+        snapshot::write(&path(&root, "work").unwrap(), &text).unwrap();
+        snapshot::write(&path(&root, "work").unwrap().with_extension("bak"), &text).unwrap();
+        rename_case(&root, "work", "Work").unwrap();
+        assert_eq!(preview(&root, "Work").unwrap().config.theme, "light");
+        assert!(path(&root, "Work").unwrap().with_extension("bak").exists());
+        assert!(rename_case(&root, "missing", "Missing").is_err());
         fs::remove_dir_all(root).unwrap();
     }
     #[test]

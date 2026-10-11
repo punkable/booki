@@ -10,9 +10,11 @@ import { parseConfigConflict } from "./config-conflicts.js";
 import { applyTheme } from "../theme.js";
 import { applySurfaceVars } from "../surface.js";
 import { paintedLook } from "../system-look.js";
-import { normalizeGroups as normalizePinned } from "../pins.js";
+import { normalizeGroups, canonicalPins } from "../pins.js";
 import { updates } from "../update.js";
 import { setLang, ensureLang } from "../i18n.js";
+
+const normalizePinned = (pinned) => canonicalPins(normalizeGroups(pinned));
 
 function paint(cfg) {
   applyTheme(cfg);

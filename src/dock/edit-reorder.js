@@ -299,8 +299,11 @@ async function onPressUp(e) {
 export async function cancelDrag() {
   if (!S.press && !S.dragging) return;
   window.removeEventListener("pointermove", onPressMove);
+  window.removeEventListener("pointerup", onPressUp);
   cancelAnimationFrame(pressMoveRaf);
   pressMoveRaf = 0;
+  // A cancelled long-press must not switch on edit mode a moment later.
+  clearTimeout(S.press?.longTimer);
   if (S.press) { try { S.press.el.releasePointerCapture(S.press.pointerId); } catch (_) {} }
   const wasDragging = S.dragging;
   S.press = null;

@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="docs/releases/v0.83.0.md"><b>What's new in 0.83</b></a> ·
+  <a href="docs/releases/v0.84.0.md"><b>What's new in 0.84</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
@@ -80,6 +80,13 @@
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
+### New in 0.84
+
+- **Keyboard and clicks like the taskbar** — arrow keys move along the dock; Shift+click opens another window and Ctrl+Shift+click runs as administrator.
+- **More at home in Windows** — native notifications, each app's recent files in its menu, high contrast, and apps asking for attention marked in the dock.
+- **The dock wears the taskbar's color** in every finish, and groups open in place in Settings.
+- **Many fixes** found in a full review of the dock, Settings and the native core.
+
 ### New in 0.83
 
 - **Colors like Windows** — follow the Windows accent and taskbar, or tint the dock with your wallpaper.
@@ -94,7 +101,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 - **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
 - **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [complete 0.83 release notes](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 

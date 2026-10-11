@@ -116,6 +116,7 @@ function computeHomeFrame() {
 
 let lastFrameEdge = null;
 export function applyFrame() {
+  if (!S.cfg) return; // still booting: nothing to frame yet
   const full = computeFrame();
   const home = computeHomeFrame();
   // Skip the native resize when the change is small: the transparent SHADOW_PAD

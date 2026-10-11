@@ -1,6 +1,7 @@
 /* Files dragged in from Explorer: drop targets, the insertion gap and the hint. */
 
-import { onFileDrop } from "../api.js";
+import { onFileDrop, dock as dockApi } from "../api.js";
+import { kindForPath } from "../pins.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { uid, isVertical, baseName, menuPinTitle } from "./helpers.js";
@@ -202,7 +203,7 @@ export function setupFileDrop() {
             name: baseName(pth).replace(/\.lnk$/i, ""),
             path: pth,
             args: [],
-            kind: "app",
+            kind: await kindForPath(pth, (p) => dockApi.isDir(p)),
           });
         }
         if (!(await persist())) return;
