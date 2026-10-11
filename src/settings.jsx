@@ -138,6 +138,9 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [showChangelog, store.close]);
 
+  // A close problem is reported at the top of the page; bring it into view.
+  useEffect(() => { if (closeError && main.current) main.current.scrollTop = 0; }, [closeError]);
+
   if (!cfg) return <div className="settings" aria-busy="true"><aside className="sidebar" /><main className="settings-main" /></div>;
 
   const select = (item) => { navigate(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); };
@@ -171,8 +174,11 @@ function App() {
         {configConflict && <div className="notice notice-error conflict-error" role="alert"><span>{t("workspace.conflict")}</span>
           <button type="button" className="button" onClick={() => store.resolveConfigConflict(true)}>{t("workspace.keepMine")}</button>
           <button type="button" className="button" onClick={() => store.resolveConfigConflict(false)}>{t("workspace.useOther")}</button></div>}
-        {closeError && <div className="notice notice-error close-error" role="alert"><span>{t("workspace.closeFailed")}</span>
-          <button type="button" className="button" onClick={store.close}>{t("focus.retry")}</button></div>}
+        {closeError === "failed" && <div className="notice notice-error close-error" role="alert"><span>{t("workspace.closeFailed")}</span>
+          <button type="button" className="button" onClick={() => store.close()}>{t("focus.retry")}</button></div>}
+        {closeError === "unsaved" && <div className="notice notice-error close-error" role="alert"><span>{t("workspace.closeUnsaved")}</span>
+          <button type="button" className="button" onClick={() => store.close()}>{t("focus.retry")}</button>
+          <button type="button" className="button" onClick={() => store.close({ discard: true })}>{t("workspace.closeDiscard")}</button></div>}
         <NativeBackdrop cfg={cfg} />
         <RecoveryNotice revision={cfg.revision} onProfiles={() => navigate("system")} onStartFresh={store.startFresh} />
         <SettingsBoundary key={page} onHome={() => navigate("home")}>

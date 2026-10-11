@@ -154,6 +154,46 @@ test('a failed window close explains the failure and can be retried', async () =
   await page.close();
 });
 
+test('a close that cannot save the last edit says so, and closing again discards it', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__closed = 0;
+    window.__TAURI__.core.invoke = (cmd, args) => {
+      if (cmd === 'plugin:window|destroy') { window.__closed++; return Promise.resolve(); }
+      if (cmd === 'save_config') return Promise.reject(new Error('disk full'));
+      return old(cmd, args);
+    };
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
+  await page.getByRole('radio', { name: /^Dark glass/ }).click();
+  await page.evaluate(() => window.__nativeCloseRequested({ preventDefault() {} }));
+  await page.locator('.close-error').getByRole('button', { name: 'Close without saving' }).waitFor();
+  assert.equal(await page.evaluate(() => window.__closed), 0);
+  await page.evaluate(() => window.__nativeCloseRequested({ preventDefault() {} }));
+  await page.waitForFunction(() => window.__closed === 1);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('placement changes in Settings never move the Settings window', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html');
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__calls = [];
+    window.__TAURI__.core.invoke = (cmd, args) => { window.__calls.push(cmd); return old(cmd, args); };
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
+  await page.getByRole('radio', { name: 'Top', exact: true }).click();
+  await page.waitForFunction(() => window.__calls.includes('notch_preview'));
+  const calls = await page.evaluate(() => window.__calls);
+  assert.ok(calls.includes('save_config'));
+  for (const cmd of ['reposition_dock', 'set_dock_frame', 'dock_cover_workarea']) assert.ok(!calls.includes(cmd), cmd);
+  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).edge, 'top');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test('releasing a group drag removes its floating hint', async () => {
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: pins, magnification: false, magnify: false }) });
   const one = await page.locator('.tile[data-id="Editor"]').boundingBox();

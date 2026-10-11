@@ -15,8 +15,9 @@ const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 ==
 export function DockPage({ cfg, set }) {
   const [monitors, setMonitors] = useState([]);
   useEffect(() => { dockApi.listMonitors().then((m) => setMonitors(m || [])).catch(() => {}); }, []);
-  // Placement changes move native windows once the value is on disk.
-  const afterPlacement = { flush: true, afterSave: () => { dockApi.reposition(cfg.edge || "bottom").catch(() => {}); dockApi.notchPreview(); } };
+  // The dock re-places itself when the saved config arrives; Settings only
+  // flashes the notch so its new spot is visible.
+  const afterPlacement = { flush: true, afterSave: () => dockApi.notchPreview() };
   const afterSurface = { flush: true, afterSave: () => dockApi.notchPreview() };
   const hides = (cfg.autoHideMode || "smart") !== "off";
   const glass = resolveSurfaceStyle(cfg) === "glass" && !cfg.reduceTransparency;

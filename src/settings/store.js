@@ -21,7 +21,10 @@ function paint(cfg) {
 export function useSettingsStore() {
   const [cfg, setCfg] = useState(null);
   const [saveState, setSaveState] = useState("idle");
-  const [closeError, setCloseError] = useState(false);
+  // null, "unsaved" (the last edit failed to save) or "failed" (the window refused to close).
+  const [closeError, setCloseErrorState] = useState(null);
+  const closeErrorRef = useRef(null);
+  const setCloseError = (value) => { closeErrorRef.current = value; setCloseErrorState(value); };
   const [configConflict, setConfigConflict] = useState(null);
   const cfgRef = useRef(null);
   const saveTimer = useRef(null);
@@ -58,6 +61,7 @@ export function useSettingsStore() {
       setCfg((prev) => (!prev ? toSave : dirtyKeys.current.size ? prev : { ...prev, ...toSave }));
       setSaveState("saved");
       setConfigConflict(null);
+      if (closeErrorRef.current === "unsaved" && !dirtyKeys.current.size) setCloseError(null);
       if (typeof cb === "function") cb(toSave);
     } catch (error) {
       const conflict = parseConfigConflict(error);
@@ -111,13 +115,25 @@ export function useSettingsStore() {
   const finishClose = async () => {
     if (closing.current) return;
     closing.current = true;
-    setCloseError(false);
+    setCloseError(null);
     const keepAlive = ["downloading", "ready", "installing"].includes(updates.snapshot().phase);
     try { await closeSelf({ keepAlive }); }
-    catch (_) { setCloseError(true); }
+    catch (_) { setCloseError("failed"); }
     finally { closing.current = false; }
   };
-  const close = async () => { if (await settled()) finishClose(); };
+  /** Close once pending edits are on disk. If they can't be saved, say so
+      instead of ignoring the click; closing again (or `discard`) drops them. */
+  const close = async ({ discard = false } = {}) => {
+    if (discard) {
+      clearTimeout(saveTimer.current);
+      dirtyKeys.current.clear();
+      dirtyBase.current.clear();
+    } else if (!(await settled())) {
+      setCloseError("unsaved");
+      return;
+    }
+    finishClose();
+  };
 
   const resolveConfigConflict = async (keepMine) => {
     if (!configConflict) return;
@@ -185,7 +201,8 @@ export function useSettingsStore() {
     let unlisten;
     onCloseRequest((event) => {
       event.preventDefault();
-      flushSave().then(() => { if (!dirtyKeys.current.size) finishClose(); });
+      // A second close while the save error is showing means "close anyway".
+      close({ discard: closeErrorRef.current === "unsaved" });
     }).then((un) => { if (disposed) un(); else unlisten = un; });
     return () => {
       disposed = true;

@@ -685,9 +685,8 @@ fn handle_pin_argv(app: &AppHandle, argv: &[String]) -> bool {
 #[tauri::command]
 async fn open_changelog(app: AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
-        let _ = w.show();
         let _ = app.emit("booki://show-changelog", ());
-        let _ = w.set_focus();
+        bring_settings_forward(&w);
     } else {
         PENDING_CHANGELOG.store(true, Ordering::Relaxed);
         open_settings_window(&app);
@@ -705,9 +704,8 @@ fn take_pending_changelog() -> bool {
 async fn open_settings_tab(app: AppHandle, tab: String) {
     *PENDING_TAB.lock().unwrap() = Some(tab);
     if let Some(w) = app.get_webview_window("settings") {
-        let _ = w.show();
         let _ = app.emit("booki://show-tab", ());
-        let _ = w.set_focus();
+        bring_settings_forward(&w);
     } else {
         open_settings_window(&app);
     }
@@ -1003,15 +1001,37 @@ fn open_settings_window(app: &AppHandle) {
     open_settings_url(app, "settings.html");
 }
 
+/// Bring an existing Settings window forward. `show` alone leaves a minimized
+/// window on the taskbar, so opening Settings again looked like it did nothing.
+fn bring_settings_forward(window: &WebviewWindow) {
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+/// Default Settings size, shrunk to fit small or scaled screens so the title
+/// bar and its close button never open off-screen.
+fn settings_size(app: &AppHandle) -> (f64, f64) {
+    let (mut w, mut h) = (960.0, 760.0);
+    if let Some(monitor) = app.primary_monitor().ok().flatten() {
+        let scale = monitor.scale_factor().max(1.0);
+        let area = monitor.work_area().size;
+        // Leave room for the native frame and a little air around it.
+        w = f64::min(w, area.width as f64 / scale - 48.0);
+        h = f64::min(h, area.height as f64 / scale - 64.0);
+    }
+    (w.max(520.0), h.max(480.0))
+}
+
 fn open_settings_url(app: &AppHandle, url: &str) {
     if let Some(existing) = app.get_webview_window("settings") {
-        let _ = existing.show();
-        let _ = existing.set_focus();
+        bring_settings_forward(&existing);
         return;
     }
+    let (width, height) = settings_size(app);
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App(url.into()))
         .title("Booki — Ajustes")
-        .inner_size(960.0, 760.0)
+        .inner_size(width, height)
         .min_inner_size(520.0, 480.0)
         .resizable(true)
         .center()
