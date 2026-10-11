@@ -711,6 +711,7 @@
 .recovery-notice h2, .settings-recovery h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .recovery-notice p, .settings-recovery p { margin: 0; }
 .settings-recovery > .button { align-self: flex-start; }
+.settings-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* ── Other dialogs ──────────────────────────────────────────────────────── */
 .modal-scrim-locked { cursor: default; }
