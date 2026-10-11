@@ -11,7 +11,9 @@
 //! version used a single window the size of the whole stage and clipped it
 //! with a region; acrylic ignores window regions, so it painted a tinted box
 //! across the entire screen edge. Sizing each window to its shape means the
-//! worst case is a square-cornered bar, never a giant box. Corners follow a region built from the four CSS corner radii.
+//! worst case is a square-cornered bar, never a giant box. The blur ignores
+//! window regions too, so each window is also inset from the rounded corners
+//! (`surface_geometry::blur_insets`); a region still trims where it is honoured.
 //! System corner rounding and borders are disabled to avoid a second outline.
 //!
 //! The material windows never take input (`WM_NCHITTEST` → `HTTRANSPARENT`)
@@ -214,7 +216,18 @@ pub fn apply(
     for (piece, &(x, y, w, h, tl, tr, br, bl)) in surface.pieces.iter_mut().zip(shapes) {
         let hwnd = HWND(piece.hwnd as *mut c_void);
         let (x, y, w, h) = crate::surface_geometry::physical_bounds(x, y, w, h, dpr);
-        let r = [tl, tr, br, bl].map(|v| px(v).max(0));
+        let radii = [tl, tr, br, bl].map(|v| px(v).max(0));
+        // The blur ignores the region below, so keep its square corners
+        // inside the rounded shape; the CSS fill still covers the edge.
+        let [il, it, ir, ib] = crate::surface_geometry::blur_insets(w, h, radii);
+        let (x, y, w, h) = (x + il, y + it, w - il - ir, h - it - ib);
+        let r = [
+            radii[0] - il.max(it),
+            radii[1] - ir.max(it),
+            radii[2] - ir.max(ib),
+            radii[3] - il.max(ib),
+        ]
+        .map(|v| v.max(0));
         let rect = (origin.left + x, origin.top + y, w, h, r);
         // Color/opacity are CSS-only; do not reset the compositor effect
         // on every tint or opacity edit.

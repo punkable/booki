@@ -73,7 +73,7 @@ body.edge-left.slot-end, body.edge-right.slot-end { align-items: flex-end; paddi
    finish. surface.js sets the class and --glass-alpha / --glass-tint /
    --wall-tint; nothing else decides how a surface is filled. */
 body {
-  --surf-fill: var(--surface-tint);
+  --surf-fill: var(--glass-tint, var(--surface-tint));
   --surf-blur: 0px;
   --surf-sat: 100%;
   --surf-stroke: color-mix(in srgb, var(--stroke) 85%, transparent);
@@ -104,7 +104,7 @@ body.surface-glass {
 body.surface-glass.native-material { --surf-blur: 0px; --panel-blur: 0px; }
 /* Mica: opaque, lightly tinted by the wallpaper like Windows 11 windows. */
 body.surface-mica {
-  --surf-fill: color-mix(in srgb, var(--wall-tint, var(--surface-tint)) 14%, var(--surface-tint));
+  --surf-fill: color-mix(in srgb, var(--wall-tint, var(--surface-tint)) 14%, var(--glass-tint, var(--surface-tint)));
   --surf-inset-lit: rgba(255, 255, 255, 0.1);
 }
 /* Solid needs no rule: it is the body default. */
@@ -2650,7 +2650,7 @@ textarea {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  .dock, .notch-pill { background: var(--surface-tint); }
+  .dock, .notch-pill { background: var(--glass-tint, var(--surface-tint)); }
   .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .undo-toast, .coach, .note-editor,
   .tile .label, .modal, .s-sidebar, .s-content { background: var(--bg); }
 }

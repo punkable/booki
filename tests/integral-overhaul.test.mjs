@@ -132,6 +132,8 @@ test('a late profile preview never replaces the latest selection', async () => {
   await page.getByRole('navigation').getByRole('button',{name:'System',exact:true}).click();
   await page.getByRole('button',{name:'First',exact:true}).click();
   await page.waitForFunction(()=>typeof window.__finishFirst==='function');
+  // A chosen profile takes the list's place; going back shows the list again.
+  await page.locator('.profile-inspector .inspector-back').click();
   await page.getByRole('button',{name:'Second',exact:true}).click();
   await page.locator('.profile-inspector').getByRole('button',{name:'Apply',exact:true}).waitFor();
   await page.evaluate(()=>window.__finishFirst());
@@ -156,9 +158,10 @@ test('a partial profile operation refreshes recoverable documents and retains it
   await panel.locator('.profile-manage summary').click();
   await panel.getByRole('textbox',{name:'Rename profile',exact:true}).fill('Recovered');
   await panel.getByRole('button',{name:'Rename profile',exact:true}).click();
-  await page.getByRole('button',{name:'Recovered',exact:true}).waitFor();
   await page.getByRole('alert').waitFor();
   assert.equal(await panel.getByRole('textbox',{name:'Rename profile',exact:true}).inputValue(),'Recovered');
   assert.equal(await panel.locator('h3').textContent(),'Work');
+  await panel.locator('.inspector-back').click();
+  await page.getByRole('button',{name:'Recovered',exact:true}).waitFor();
   assert.deepEqual(errors,[]);await page.close();
 });

@@ -22,14 +22,18 @@ test("following Windows takes its accent, mode and taskbar colour", () => {
   const plain = resolveLook(cfg, { platform: { accent: "#0078D4", accentOnTaskbar: false, systemLight: false } });
   assert.equal(plain.accent, "#0078d4");
   assert.equal(plain.theme, "dark", "the dock follows the Windows mode, like the taskbar");
-  assert.equal(plain.surfaceTint, "", "a plain taskbar keeps the theme's glass");
+  assert.equal(plain.surfaceTint, "#1f1f1f", "a plain taskbar paints the dock like the dark taskbar");
+  assert.equal(plain.surfaceFollows, true, "the taskbar colour fills every finish");
+  const light = resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: false, systemLight: true } });
+  assert.equal(light.surfaceTint, "#eeeeee");
   const tinted = resolveLook(cfg, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
   assert.match(tinted.surfaceTint, /^#[0-9a-f]{6}$/);
   assert.notEqual(tinted.surfaceTint, "#0078d4", "an accent taskbar uses a deep shade");
-  // An explicit theme and an explicit glass colour stay the user's.
+  // An explicit theme stays the user's, but the taskbar owns the dock's
+  // colour, even over the black of the Dark glass finish.
   const mine = resolveLook({ ...cfg, theme: "light", surfaceTint: "#000000" }, { platform: { accent: "#0078d4", accentOnTaskbar: true, systemLight: false } });
   assert.equal(mine.theme, "light");
-  assert.equal(mine.surfaceTint, "#000000");
+  assert.equal(mine.surfaceTint, tinted.surfaceTint);
   // No Windows accent: fall back to the wallpaper, then to the picked accent.
   assert.equal(resolveLook(cfg, { platform: { accent: null }, wallpaper: "#336699" }).accent, "#336699");
   assert.equal(resolveLook(cfg, { platform: null }).accent, "#dfaa75");
@@ -43,6 +47,13 @@ test("following the wallpaper tints the glass for the current theme", () => {
   const lum = (hex) => [1, 3, 5].reduce((sum, i) => sum + parseInt(hex.slice(i, i + 2), 16), 0);
   assert.ok(lum(dark.surfaceTint) < lum("#3366cc"), "darker on a dark theme");
   assert.ok(lum(light.surfaceTint) > lum("#3366cc"), "lighter on a light theme");
+});
+
+test("a colour that follows Windows fills solid and Mica finishes too", async () => {
+  const { resolveGlassTint } = await import("../src/surface.js");
+  const followed = { surfaceStyle: "solid", surfaceTint: "#1f1f1f", surfaceFollows: true };
+  assert.equal(resolveGlassTint(followed), "#1f1f1f");
+  assert.equal(resolveGlassTint({ ...followed, surfaceFollows: false }), "");
 });
 
 test("the suggested palette is unique, valid and led by Booki's tan", () => {
@@ -94,28 +105,32 @@ test("choosing 'Like Windows' hides the palette and paints the Windows accent", 
   await page.close();
 });
 
-test("resting on a group opens it, and an app drops between its members", async () => {
+test("resting on a group opens it in place, and an app drops between its members", async () => {
   const group = { id: "g", kind: "group", name: "Work", path: "", args: [], children: [app("a", "Alpha"), app("b", "Beta")] };
   const { page, errors } = await openPage(browser, port, "settings.html", { cfg: makeConfig({ pinned: [group, app("c", "Gamma")] }), viewport: { width: 1200, height: 800 } });
   await page.getByRole("navigation").getByRole("button", { name: "Apps & folders", exact: true }).click();
   const source = page.locator(".library-pin").filter({ hasText: "Gamma" });
-  const groupPin = page.locator(".library-pin").filter({ has: page.locator(".library-group-drop") });
-  // Hold over the group: its members show up in the inspector.
+  const groupPin = page.locator(".library-pin").filter({ has: page.locator(".library-group-count") });
+  // Hold over the group: the strip itself turns into the group's members.
   const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
   await source.dispatchEvent("dragstart", { dataTransfer });
   const box = await groupPin.boundingBox();
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12 && !(await page.locator(".library-pin-strip.in-group").count()); i++) {
     await groupPin.dispatchEvent("dragover", { dataTransfer, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 });
     await page.waitForTimeout(100);
   }
-  const beta = page.locator(".library-group-member").filter({ hasText: "Beta" });
-  await beta.waitFor();
+  await page.locator(".library-pin-strip.in-group").waitFor();
+  assert.equal(await page.locator(".library-inspector .library-group-members").count(), 0, "nothing unfolds below the strip");
+  const beta = page.locator(".library-pin-strip.in-group .library-pin").filter({ hasText: "Beta" });
   const target = await beta.boundingBox();
-  await beta.dispatchEvent("dragover", { dataTransfer, clientX: target.x + 20, clientY: target.y + 4 });
-  await beta.dispatchEvent("drop", { dataTransfer, clientX: target.x + 20, clientY: target.y + 4 });
+  await beta.dispatchEvent("dragover", { dataTransfer, clientX: target.x + 4, clientY: target.y + 20 });
+  await beta.dispatchEvent("drop", { dataTransfer, clientX: target.x + 4, clientY: target.y + 20 });
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned.length === 1);
   const rows = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned);
   assert.deepEqual(rows[0].children.map((p) => p.id), ["a", "c", "b"]);
+  // Back to the dock: the strip shows the dock's pins again.
+  await page.getByRole("button", { name: "In your dock" }).click();
+  await page.locator(".library-pin-strip:not(.in-group)").waitFor();
   assert.deepEqual(errors, []);
   await page.close();
 });
