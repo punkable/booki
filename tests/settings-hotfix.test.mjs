@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { serveDist, launchBrowser, openPage, makeConfig } from './harness.mjs';
-import { previousReleases } from '../src/release-notes.js';
+import { formatReleaseDate, previousReleases } from '../src/release-notes.js';
 import { WIDGET_ORDER } from '../src/widgets-meta.js';
 
 const { srv, port } = await serveDist();
@@ -122,6 +122,33 @@ test('native blur keeps the configured dock fill and single CSS outline', async 
   assert.equal(after.border, '1px');
   assert.equal(after.radius, before.radius);
   assert.equal(after.shadow.includes('inset'), false);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test('release dates follow the reader\'s language and keep text that does not parse', () => {
+  assert.equal(formatReleaseDate('2026-10-05', 'en'), 'Oct 5, 2026');
+  assert.equal(formatReleaseDate('2 jul 2026', 'en'), 'Jul 2, 2026');
+  assert.match(formatReleaseDate('26 sept 2026', 'de'), /^26\. Sep/);
+  assert.equal(formatReleaseDate('soon', 'en'), 'soon');
+});
+
+test('a failed first config read shows an error with Retry instead of an empty window', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', { initScript: `
+    const invoke = window.__TAURI__.core.invoke;
+    window.__configReads = 0;
+    window.__TAURI__.core.invoke = (cmd, args) => {
+      if (cmd === 'get_config' && ++window.__configReads === 1) return Promise.reject(new Error('backend not ready'));
+      return invoke(cmd, args);
+    };` });
+  const alert = page.getByRole('alert');
+  await alert.waitFor();
+  assert.match(await alert.innerText(), /Settings couldn’t load/);
+  const retry = alert.getByRole('button', { name: 'Retry', exact: true });
+  assert.equal(await retry.evaluate((el) => el === document.activeElement), true, 'Retry has focus');
+  await retry.click();
+  await page.locator('.home-hero').waitFor();
+  assert.equal(await page.getByRole('alert').count(), 0);
   assert.deepEqual(errors, []);
   await page.close();
 });
