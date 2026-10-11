@@ -16,6 +16,7 @@ jobs:
     name: Package Windows ${{ matrix.arch }} (not runtime verification)
     needs: checks
     runs-on: windows-2022
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -32,10 +33,12 @@ jobs:
         with:
           node-version-file: package.json
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
+          # Pinned by SHA, so name the toolchain the @stable ref used to imply.
+          toolchain: stable
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
           key: ${{ matrix.target }}
