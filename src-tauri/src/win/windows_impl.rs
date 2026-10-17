@@ -1197,7 +1197,8 @@ fn write_run_value(enabled: bool, exe: &str) -> Result<(), String> {
         }
         let result = if enabled {
             // Quote the path so spaces in the install dir can't break the command.
-            let cmd = wide(&format!("\"{exe}\""));
+            // --autostart tells Booki it was started at sign-in (lib.rs).
+            let cmd = wide(&format!("\"{exe}\" --autostart"));
             let bytes = std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
             let r = RegSetValueExW(
                 key,
@@ -1255,6 +1256,21 @@ pub fn known_folders() -> Vec<(String, String)> {
         }
     }
     out
+}
+
+/// Below-normal CPU priority while Windows signs in, normal afterwards.
+pub fn set_background_priority(on: bool) {
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, SetPriorityClass, BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
+    };
+    let class = if on {
+        BELOW_NORMAL_PRIORITY_CLASS
+    } else {
+        NORMAL_PRIORITY_CLASS
+    };
+    unsafe {
+        let _ = SetPriorityClass(GetCurrentProcess(), class);
+    }
 }
 
 /// Atomically resize + move a window in one SetWindowPos call (no intermediate

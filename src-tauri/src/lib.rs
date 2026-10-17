@@ -535,6 +535,18 @@ fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
     }
 }
 
+/// Set when Windows started Booki at sign-in (the Run entry passes
+/// `--autostart`), so the first minute can stay out of the way of
+/// everything else that is starting.
+static LAUNCHED_AT_LOGIN: AtomicBool = AtomicBool::new(false);
+
+/// Did Windows start this Booki at sign-in? The dock defers its own
+/// non-urgent work (update check, catalog scans) when it did.
+#[tauri::command]
+fn launched_at_login() -> bool {
+    LAUNCHED_AT_LOGIN.load(Ordering::Relaxed)
+}
+
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -1293,6 +1305,20 @@ fn install_panic_hook() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
+    if std::env::args().any(|arg| arg == "--autostart") {
+        LAUNCHED_AT_LOGIN.store(true, Ordering::Relaxed);
+        // Sign-in is the busiest minute Windows has. Show the dock at once,
+        // but let every other startup app and Explorer win any contest for
+        // the CPU until things settle, then return to normal priority.
+        #[cfg(windows)]
+        {
+            win::set_background_priority(true);
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                win::set_background_priority(false);
+            });
+        }
+    }
     // Before any window exists: taskbar grouping and toasts follow this ID,
     // which the installers also stamp on the Start-menu shortcut. The logger
     // is not up yet; a failure shows up later as a `notify` error.
@@ -1379,6 +1405,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            launched_at_login,
             quiet_update_supported,
             acquire_update_lock,
             release_update_lock,
