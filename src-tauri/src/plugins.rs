@@ -90,7 +90,7 @@ fn read_limited(
     Ok(bytes)
 }
 
-/// The Windows archive of the pinned release and its published SHA-256.
+/// The portable Windows executable of the pinned release and its published SHA-256.
 fn release_asset(plugin: &Plugin) -> Result<(String, String), String> {
     let url = format!(
         "https://api.github.com/repos/{}/releases/tags/{}",
@@ -107,11 +107,11 @@ fn release_asset(plugin: &Plugin) -> Result<(String, String), String> {
     pick_asset(&json).ok_or_else(|| "this release has no verified Windows download".into())
 }
 
-/// The first .zip asset naming Windows that carries a sha256 digest.
+/// Select the portable x64 executable, never the installer or another platform.
 fn pick_asset(release: &Value) -> Option<(String, String)> {
     release.get("assets")?.as_array()?.iter().find_map(|asset| {
         let name = asset.get("name")?.as_str()?.to_ascii_lowercase();
-        if !(name.ends_with(".zip") && (name.contains("windows") || name.contains("win64"))) {
+        if name != "headsetcontrol-windows-x86_64.exe" {
             return None;
         }
         let digest = asset.get("digest")?.as_str()?.strip_prefix("sha256:")?;
@@ -142,7 +142,7 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
     let staging = target.with_extension("partial");
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
-    unpack(&archive, &staging)?;
+    std::fs::write(staging.join(plugin.exe), &archive).map_err(|e| e.to_string())?;
     if !staging.join(plugin.exe).is_file() {
         let _ = std::fs::remove_dir_all(&staging);
         return Err("the download did not contain the expected program".into());
@@ -151,32 +151,6 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
     let _ = std::fs::remove_dir_all(&target);
     std::fs::rename(&staging, &target).map_err(|e| e.to_string())?;
     Ok(plugin.tag.to_string())
-}
-
-/// Unpack every file flat into `into`: the program and the libraries next to
-/// it. Paths inside the archive are never trusted as paths.
-fn unpack(archive: &[u8], into: &std::path::Path) -> Result<(), String> {
-    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(archive))
-        .map_err(|_| "the download is not a valid archive".to_string())?;
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
-        if file.is_dir() {
-            continue;
-        }
-        let Some(name) = file
-            .enclosed_name()
-            .and_then(|p| p.file_name().map(|n| n.to_owned()))
-        else {
-            continue;
-        };
-        let mut bytes = Vec::new();
-        file.by_ref()
-            .take(64 * 1024 * 1024)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        std::fs::write(into.join(name), bytes).map_err(|e| e.to_string())?;
-    }
-    Ok(())
 }
 
 pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
@@ -195,39 +169,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn picks_the_windows_zip_with_a_digest() {
+    fn picks_the_portable_windows_executable_with_a_digest() {
         let release = serde_json::json!({ "assets": [
             { "name": "headsetcontrol-linux.zip", "digest": "sha256:aa", "browser_download_url": "https://x/linux.zip" },
             { "name": "headsetcontrol-windows.zip", "browser_download_url": "https://x/nodigest.zip" },
-            { "name": "HeadsetControl-Windows-x64.zip", "digest": "sha256:ABCD", "browser_download_url": "https://x/win.zip" }
+            { "name": "headsetcontrol-windows-x86_64-setup.exe", "digest": "sha256:aaaa", "browser_download_url": "https://x/setup.exe" },
+            { "name": "headsetcontrol-windows-x86_64.exe.asc", "digest": "sha256:bbbb", "browser_download_url": "https://x/signature" },
+            { "name": "headsetcontrol-windows-x86_64.exe", "digest": "sha256:ABCD", "browser_download_url": "https://x/win.exe" }
         ]});
         assert_eq!(
             pick_asset(&release),
-            Some(("https://x/win.zip".to_string(), "abcd".to_string()))
+            Some(("https://x/win.exe".to_string(), "abcd".to_string()))
         );
         assert_eq!(pick_asset(&serde_json::json!({})), None);
     }
 
-    #[test]
-    fn unpack_flattens_and_ignores_paths() {
-        let mut buffer = std::io::Cursor::new(Vec::new());
-        {
-            let mut zip = zip::ZipWriter::new(&mut buffer);
-            let options = zip::write::SimpleFileOptions::default();
-            zip.start_file("bin/headsetcontrol.exe", options).unwrap();
-            std::io::Write::write_all(&mut zip, b"exe").unwrap();
-            zip.start_file("../evil.txt", options).unwrap();
-            std::io::Write::write_all(&mut zip, b"x").unwrap();
-            zip.finish().unwrap();
-        }
-        let dir = std::env::temp_dir().join(format!("booki-unpack-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        unpack(buffer.get_ref(), &dir).unwrap();
-        assert_eq!(
-            std::fs::read(dir.join("headsetcontrol.exe")).unwrap(),
-            b"exe"
-        );
-        assert!(!dir.parent().unwrap().join("evil.txt").exists());
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
 }
