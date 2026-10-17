@@ -1954,8 +1954,18 @@ pub fn run() {
                                                 }
                                             }
                                             // Snappy while the cursor is over Booki,
-                                            // lighter while the window is click-through.
-                                            next_ms = next_ms.min(if inside { 30 } else { 80 });
+                                            // lighter while the window is click-through,
+                                            // and lighter still while the cursor is
+                                            // nowhere near the window: it cannot reach
+                                            // a hit area before the next look.
+                                            let ms = if inside {
+                                                30
+                                            } else if win::cursor_near_window(t.hwnd, 96) {
+                                                80
+                                            } else {
+                                                180
+                                            };
+                                            next_ms = next_ms.min(ms);
                                         }
                                     }
                                 }
