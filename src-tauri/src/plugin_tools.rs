@@ -104,7 +104,7 @@ pub async fn plugin_open(id: String, profile: Option<String>) -> Result<(), Stri
                             || !file.is_file()
                             || file
                                 .extension()
-                                .is_none_or(|ext| !ext.eq_ignore_ascii_case("orp"))
+                                .map_or(true, |ext| !ext.eq_ignore_ascii_case("orp"))
                         {
                             return Err("choose an OpenRGB .orp profile".into());
                         }
