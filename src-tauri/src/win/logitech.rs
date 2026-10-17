@@ -57,7 +57,11 @@ pub fn batteries() -> Vec<DeviceBattery> {
 fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
     let level = unified_battery(device, slot).or_else(|| battery_status(device, slot))?;
     let name = device_name(device, slot).unwrap_or_else(|| "Logitech".to_string());
-    Some(DeviceBattery { name, level })
+    Some(DeviceBattery {
+        name,
+        level,
+        source: "logitech",
+    })
 }
 
 /// Feature 0x1004, get_status: state of charge in percent.

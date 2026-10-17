@@ -134,6 +134,7 @@ const pollStats = singleFlight(async () => {
 
 // Headsets, earbuds, mice and keyboards that report a battery to Windows.
 // The card shows the one closest to running out; its hint lists them all.
+const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
 const pollDevices = singleFlight(async () => {
   let list = [];
   try { list = (await dockApi.deviceBatteries()) || []; } catch (_) { list = []; }
@@ -142,7 +143,9 @@ const pollDevices = singleFlight(async () => {
     if (!list.length) { setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
     const low = list[0];
     setMetric(el, low.name, low.level);
-    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%`).join("\n"));
+    // Readings that came through a plugin say so, e.g. "via HeadsetControl".
+    const via = (d) => (PLUGIN_NAMES[d.source] ? ` · ${t("w.devicesVia").replace("{plugin}", () => PLUGIN_NAMES[d.source])}` : "");
+    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${via(d)}`).join("\n"));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", low.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
   });
 });

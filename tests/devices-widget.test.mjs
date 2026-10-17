@@ -17,13 +17,14 @@ test("the devices widget shows the lowest battery and lists every device in its 
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [widget] }),
     initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "device_batteries"
-      ? Promise.resolve([{ name: "Arctis Nova 7", level: 15 }, { name: "MX Master 3S", level: 60 }]) : old(c, a); }`,
+      ? Promise.resolve([{ name: "Arctis Nova 7", level: 15, source: "headsetcontrol" }, { name: "MX Master 3S", level: 60, source: "logitech" }]) : old(c, a); }`,
   });
   const card = page.locator('.tile[data-id="dev"]');
   await card.locator(".w-ring-num", { hasText: "15" }).waitFor();
   assert.equal((await card.locator(".w-label").textContent()).trim(), "Arctis Nova 7");
   const hint = await card.getAttribute("aria-label");
   assert.ok(String(hint).includes("MX Master 3S · 60%"), `hint lists every device: ${hint}`);
+  assert.ok(String(hint).includes("Arctis Nova 7 · 15% · via HeadsetControl"), `plugin readings say where they came from: ${hint}`);
   assert.deepEqual(errors, []);
   await page.close();
 });

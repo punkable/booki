@@ -56,6 +56,7 @@ function PluginCard({ id, name, repo, license, open }) {
     </div>
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
     <p className="plugin-desc plugin-fine">{t("plugins.howItWorks")}</p>
+    <p className="plugin-feeds"><Icon name="battery" />{t(`plugins.${id}.feeds`)}{state.installed ? ` · ${t("plugins.active")}` : ""}</p>
     {error && <p className="plugin-desc save-status is-error" role="alert">{t("plugins.failed")} {error}</p>}
     <div className="plugin-actions">
       {state.installed

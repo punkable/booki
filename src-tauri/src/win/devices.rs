@@ -18,6 +18,9 @@ const NAME: &str = "System.ItemNameDisplay";
 pub struct DeviceBattery {
     pub name: String,
     pub level: u8,
+    /// Where the reading came from: "bluetooth", "logitech" or a plugin id
+    /// such as "headsetcontrol", so the widget can say so.
+    pub source: &'static str,
 }
 
 /// Connected devices that report a battery level, lowest first, one entry
@@ -77,6 +80,7 @@ fn parse_headsetcontrol(text: &str) -> Vec<DeviceBattery> {
             ((0..=100).contains(&level) && !name.is_empty()).then_some(DeviceBattery {
                 name,
                 level: level as u8,
+                source: "headsetcontrol",
             })
         })
         .collect()
@@ -127,7 +131,11 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
         if name.trim().is_empty() {
             continue;
         }
-        out.push(DeviceBattery { name, level });
+        out.push(DeviceBattery {
+            name,
+            level,
+            source: "bluetooth",
+        });
     }
     Ok(out)
 }
@@ -162,6 +170,7 @@ mod tests {
         let d = |name: &str, level| DeviceBattery {
             name: name.into(),
             level,
+            source: "bluetooth",
         };
         let merged = merge(vec![d("Buds", 80), d("Mouse", 40), d("Buds", 75)]);
         assert_eq!(merged, vec![d("Mouse", 40), d("Buds", 75)]);
