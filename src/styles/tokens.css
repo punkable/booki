@@ -12,6 +12,7 @@
   --accent: var(--booki-tan);
   --accent-contrast: #2a2118;
   --danger: #c42b1c;
+  --danger-text: #c42b1c;
 
   /* Neutrals: light */
   --bg: #f3f3f3;
@@ -57,12 +58,16 @@
   --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%,
     1.067, 1.099 24.3%, 1.108 26%, 1.101 28.4%, 1.041 34.8%, 1.013 38.9%, 0.998 43.7%, 0.993 48.4%, 1.001 63.5%, 1);
   --dur-spring: 0.52s;
+  /* Windows' focus visual: the ink colour, not the accent, so it reads on any
+     fill. Used for every keyboard focus ring. */
+  --focus-ring: var(--ink);
 }
 
 /* Dark values, for the system preference and for an explicit choice. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #202020;
+    --danger-text: #ff99a4;
     --layer: rgba(255, 255, 255, 0.0512);
     --layer-strong: rgba(44, 44, 44, 0.96);
     --stroke: rgba(255, 255, 255, 0.0698);
@@ -82,6 +87,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #202020;
+  --danger-text: #ff99a4;
   --layer: rgba(255, 255, 255, 0.0512);
   --layer-strong: rgba(44, 44, 44, 0.96);
   --stroke: rgba(255, 255, 255, 0.0698);
@@ -107,7 +113,7 @@ html, body {
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

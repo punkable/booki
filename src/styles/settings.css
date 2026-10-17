@@ -88,7 +88,7 @@
 /* On Mica the page shows the system material; cards stay solid. */
 .settings-body.settings-mica { --page-bg: transparent; --side-bg: transparent; background: transparent; }
 .settings-body ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
-.settings-body :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-control); }
+.settings-body :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-control); }
 .settings-body input, .settings-body textarea, .settings-body .selectable { -webkit-user-select: text; user-select: text; }
 .muted { color: var(--ink-2); }
 .only-dark { display: none; }
@@ -145,7 +145,7 @@
 .ui-page-head p { margin: 6px 0 0; color: var(--ink-2); font-size: calc(14.5px * var(--os-text-scale, 1)); }
 .ui-page-meta { display: flex; gap: 8px; }
 .save-status { position: absolute; top: 40px; right: 40px; margin: 0; color: var(--ink-3); font-size: calc(12px * var(--os-text-scale, 1)); }
-.save-status.is-error { color: var(--danger); }
+.save-status.is-error { color: var(--danger-text); }
 
 .ui-group-wrap { margin: 0 0 28px; }
 .ui-group-title { display: flex; align-items: center; gap: 10px; margin: 0 0 10px 2px; font-size: calc(15px * var(--os-text-scale, 1)); line-height: calc(20px * var(--os-text-scale, 1)); font-weight: 650; }
@@ -406,7 +406,7 @@
 .widgets-in-dock ul { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .widgets-in-dock-item { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; color: var(--ink); font: inherit; text-align: left; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
 .widgets-in-dock-item:hover { background: var(--card-hover); }
-.widgets-in-dock-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.widgets-in-dock-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .widgets-in-dock-item > span:nth-child(2) { flex: 1; font-weight: 600; }
 .widgets-in-dock-item .catalog-icon { width: 28px; height: 28px; }
 
@@ -474,7 +474,7 @@
 .faq-item[open] summary .ui-icon { transform: rotate(180deg); }
 .faq-item p { margin: 0 0 14px; color: var(--ink-2); line-height: calc(20px * var(--os-text-scale, 1)); }
 .update-error { margin: 0; padding: 10px 16px; font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
-.update-error { color: var(--danger); }
+.update-error { color: var(--danger-text); }
 .update-notes { padding: 0 16px 12px; }
 .update-notes summary { padding: 10px 0; cursor: pointer; }
 .update-notes pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: calc(12px * var(--os-text-scale, 1)); color: var(--ink-2); }
@@ -710,7 +710,7 @@
 .profile-manage-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .profile-manage-controls .text-field { flex: 1 1 160px; width: auto; }
 .profile-empty, .profile-error { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
-.profile-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger); }
+.profile-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger-text); }
 .prof-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; border-top: 1px solid var(--divider); }
 .profile-backup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; margin-top: 10px; padding: 12px 18px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .profile-backup h2 { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 500; line-height: calc(20px * var(--os-text-scale, 1)); }

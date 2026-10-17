@@ -242,8 +242,8 @@
 .w-ctl svg { display: block; }
 .w-ctl:hover { background: var(--w-track); }
 .w-ctl:active { transform: scale(0.88); }
-.w-ctl-toggle { width: calc(var(--size) * 0.56); height: calc(var(--size) * 0.56); color: #fff; background: #0a84ff; }
-.w-ctl-toggle:hover { background: #0a84ff; filter: brightness(1.1); }
+.w-ctl-toggle { width: calc(var(--size) * 0.56); height: calc(var(--size) * 0.56); color: var(--accent-contrast, #fff); background: var(--accent); }
+.w-ctl-toggle:hover { background: var(--accent); filter: brightness(1.1); }
 /* Previous / next only while the pointer is on the card. */
 .tile.widget.media:not(:hover) .w-ctl:not(.w-ctl-toggle) { width: 0; opacity: 0; pointer-events: none; }
 
@@ -334,7 +334,7 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .weather-search-go { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: 9px; color: var(--ink); background: transparent; cursor: pointer; }
 .weather-search-go svg { width: 16px; height: 16px; }
 .weather-search-go:hover { background: var(--hover); }
-.weather-search-go:focus-visible, .weather-result:focus-visible, .weather-units button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.weather-search-go:focus-visible, .weather-result:focus-visible, .weather-units button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .weather-results { margin-top: 6px; }
 .weather-results-note { padding: 8px 10px; font-size: 12px; color: var(--ink-2); }
 .weather-result { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; text-align: left; font: inherit; color: var(--ink); background: transparent; cursor: pointer; }
@@ -421,4 +421,4 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .focus-calendar > * { display: grid; place-items: center; height: 32px; font-size: 12px; }
 .focus-calendar > strong { height: 24px; font-size: 11px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; }
 .focus-calendar .today { justify-self: center; width: 32px; border-radius: 999px; background: var(--accent); color: #161618; font-weight: 700; }
-.focus-month .stack-close:focus-visible, .focus-today:focus-visible, .focus-primary:focus-visible, .focus-stepper button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.focus-month .stack-close:focus-visible, .focus-today:focus-visible, .focus-primary:focus-visible, .focus-stepper button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

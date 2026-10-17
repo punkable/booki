@@ -502,7 +502,7 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   transition: opacity var(--dur-4) var(--ease), transform var(--dur-4) var(--ease);
 }
 
-.trash-pop > svg { flex: 0 0 auto; color: var(--danger); }
+.trash-pop > svg { flex: 0 0 auto; color: var(--danger-text); }
 .tp-emoji { font-size: 18px; }
 .tp-col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .tp-sub { font-size: 0.6875rem; font-weight: 500; color: var(--ink-2); white-space: normal; max-width: 340px; }
@@ -961,7 +961,7 @@ body.notch-body.act-done .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-done .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 body.notch-body.act-battery .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-battery .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
-body.notch-body.act-battery .nl-text { color: var(--danger); }
+body.notch-body.act-battery .nl-text { color: var(--danger-text); }
 
 /* Smart notch: a quiet dot at rest that becomes a capsule for an activity
    and a card on hover — the same morph as the tab, from a smaller start. */
@@ -1500,7 +1500,7 @@ body.edge-right .stack.open { transform: none; }
 .stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
 .stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: 8px; font: inherit; font-size: 0.75rem; color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
-.stack-breadcrumbs button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.stack-breadcrumbs button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .stack-rename {
   flex: 1; min-width: 0; font: inherit; font-size: 0.8125rem; font-weight: 700;
   color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px;
@@ -1549,7 +1549,7 @@ body.edge-right .stack.open { transform: none; }
 /* Keyboard: the button appears while its cell (or itself) has focus. */
 .stack-cell:has(:focus-visible) .stack-rm,
 .stack-widget:has(:focus-visible) .stack-rm { opacity: 1; pointer-events: auto; }
-.stack-rm:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.stack-rm:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .stack-rm:hover {
   color: var(--ink);
   background: var(--layer-strong);
@@ -1735,7 +1735,7 @@ body.edge-right .stack.open { transform: none; }
 .add-utilities { border-top: 1px solid var(--stroke); margin-top: 8px; }
 .add-utilities > summary { padding: 10px 6px; color: var(--ink-2); font: 600 0.6875rem var(--font); cursor: pointer; }
 .add-utilities > summary:hover { color: var(--ink); }
-.add-utilities > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.add-utilities > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: 6px; }
 .add-row {
   width: 100%;
   display: flex;
@@ -2024,7 +2024,7 @@ body.edge-right .stack.open { transform: none; }
   border-radius: 6px;
   transition: background var(--dur-2) ease, color var(--dur-2) ease;
 }
-.clip-clear:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--stroke)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.clip-clear:hover { color: var(--danger-text); border-color: color-mix(in srgb, var(--danger) 45%, var(--stroke)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .clip-meta {
   margin-top: 6px;
   text-align: center;
@@ -2406,7 +2406,7 @@ body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill { box-sh
 .stack-folder-sort { flex: 0 1 130px; max-width: 100%; }
 .stack-folder-search, .stack-folder-sort { min-height: 34px; padding: 6px 9px; border: 1px solid var(--stroke); border-radius: 8px; font: inherit; font-size: 0.75rem; color: var(--ink); background: var(--layer-strong); }
 .stack-folder-sort option { color: var(--ink); background: var(--bg); }
-.stack-folder-tools :is(input,select,button):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stack-folder-tools :is(input,select,button):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .stack-grid[aria-busy="true"] { opacity: .65; }
 
 /* Hiding the dots never disables the launcher/switcher or cached app hints. */
