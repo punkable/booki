@@ -91,7 +91,6 @@
 .settings-body :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-control); }
 .settings-body input, .settings-body textarea, .settings-body .selectable { -webkit-user-select: text; user-select: text; }
 .muted { color: var(--ink-2); }
-.booki-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .only-dark { display: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .only-dark { display: inline; } :root:not([data-theme="light"]) .only-light { display: none; } }
 :root[data-theme="dark"] .only-dark { display: inline; }
@@ -474,9 +473,8 @@
 .faq-item summary .ui-icon { transition: transform var(--dur-3) var(--ease); }
 .faq-item[open] summary .ui-icon { transform: rotate(180deg); }
 .faq-item p { margin: 0 0 14px; color: var(--ink-2); line-height: calc(20px * var(--os-text-scale, 1)); }
-.update-error, .update-explanation { margin: 0; padding: 10px 16px; font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
+.update-error { margin: 0; padding: 10px 16px; font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
 .update-error { color: var(--danger); }
-.update-explanation { color: var(--ink-2); }
 .update-notes { padding: 0 16px 12px; }
 .update-notes summary { padding: 10px 0; cursor: pointer; }
 .update-notes pre { margin: 0; white-space: pre-wrap; font: inherit; font-size: calc(12px * var(--os-text-scale, 1)); color: var(--ink-2); }

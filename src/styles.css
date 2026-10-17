@@ -359,12 +359,6 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
 }
 
 .web-add { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.web-url, .web-name {
-  flex: 1; min-width: 0; font: inherit; font-size: 0.8125rem; padding: 8px 11px;
-  color: var(--ink); background: var(--layer-strong);
-  border: 1px solid var(--stroke); border-radius: 6px;
-}
-.web-name { flex: 0 1 160px; }
 
 /* About: beta badge, credits {
   display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800;
@@ -2198,7 +2192,6 @@ body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; 
 }
 .undo-toast button:active { transform: scale(0.97); }
 /* Update controls (settings) */
-.upd-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .upd-bar { flex: 1; min-width: 140px; height: 8px; border-radius: var(--r-pill); background: var(--hover); overflow: hidden; }
 .upd-bar i { display: block; height: 100%; width: 100%; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform var(--dur-4) linear; }
 
@@ -2351,14 +2344,6 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-toast-mar
 /* The user's shell folders (Documents, Pictures { font-size: 11.5px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 6px; }
 /* Plain dropdown (used by the language picker — too many options for a segmented). */
 
-/* Lighter chevron in dark mode so it doesn't vanish on the dark field. */
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .s-select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c7c7c7' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  }
-}
-
 /* Icon-picker modal */
 .modal-scrim {
   position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
@@ -2393,139 +2378,8 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-toast-mar
 }
 .icon-cell:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke)); background: var(--hover); }
 .icon-cell img { width: 34px; height: 34px; }
-@media (hover: hover) and (pointer: fine) {
-  .surface-chip:hover {
-    border-color: color-mix(in srgb, var(--accent) 36%, var(--stroke));
-  }
-}
 /* Quit sits in the corner every time Settings opens; it only turns red once
    the pointer is on it { background: transparent; color: var(--ink-2); border: 1px solid transparent; box-shadow: none; }
-
-.widget-store-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-.widget-store-card {
-  display: grid;
-  grid-template-rows: 1fr auto auto;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
-  background: color-mix(in srgb, var(--layer-strong) 58%, transparent);
-  box-shadow: none;
-  transition: background 110ms var(--ease), border-color 110ms var(--ease);
-}
-.widget-store-card:hover {
-  border-color: color-mix(in srgb, var(--widget-accent) 28%, var(--stroke));
-  background: color-mix(in srgb, var(--layer-strong) 78%, transparent);
-  box-shadow: none;
-  transform: none;
-}
-.widget-store-card.pinned {
-  border-color: color-mix(in srgb, var(--widget-accent) 28%, var(--stroke));
-  background: color-mix(in srgb, var(--widget-accent) 7%, var(--layer-strong));
-}
-.widget-store-top { display: flex; align-items: flex-start; gap: 9px; min-width: 0; }
-.widget-store-ico {
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--widget-accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--widget-accent) 18%, var(--stroke));
-}
-.widget-store-ico img.emo { width: 24px; height: 24px; }
-.widget-store-badge {
-  margin-left: auto;
-  flex: 0 0 auto;
-  font: 600 10.5px var(--font);
-  color: var(--ink-2);
-  background: var(--hover);
-  border: 1px solid var(--stroke);
-  border-radius: var(--r-pill);
-  padding: 2px 7px;
-}
-.widget-store-body { flex: 1 1 auto; min-width: 0; }
-.widget-store-body strong { display: block; font-size: 0.8125rem; margin-bottom: 2px; }
-.widget-store-body p {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.35;
-}
-.widget-store-caps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.widget-store-caps span {
-  font: 600 10.5px var(--font);
-  color: var(--ink-2);
-  background: transparent;
-  border: 1px solid var(--stroke);
-  border-radius: 7px;
-  padding: 2px 7px;
-}
-.widget-store-caps span + span::before { content: none; }
-.widget-store-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  width: 100%;
-  min-width: 0;
-}
-.widget-modal {
-  display: flex;
-  flex-direction: column;
-  width: min(620px, calc(100vw - 28px));
-  max-height: min(86vh, 760px);
-  padding: 0;
-  overflow: hidden;
-}
-.widget-modal .modal-head {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--stroke-light);
-}
-.widget-modal-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  padding: 14px 16px 12px;
-}
-.widget-modal-footer {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--stroke-light);
-  background: color-mix(in srgb, var(--layer-strong) 90%, transparent);
-}
-.widget-modal-hero {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  margin: 0 0 14px;
-  padding: 0 0 12px;
-  border-radius: 10px;
-  border: 0;
-  border-bottom: 1px solid var(--stroke-light);
-  background: transparent;
-}
-.widget-modal-hero > div { min-width: 0; }
-.widget-modal-hero strong { display: block; font-size: 0.875rem; margin-bottom: 2px; }
-.widget-modal-hero p { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.4; }
 
 /* ═══════════════════════════ Premium polish ═══════════════════════════ */
 /* Subtle, additive refinements (depth, accent touches) over the base. */
@@ -2536,24 +2390,15 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-toast-mar
 
 /* Type scale normalization: keep Settings, dock menus and widget surfaces on a
    small Fluent-like ladder instead of one-off sizes per component. */
-.widget-store-body strong,
 .stack-title{
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.22;
 }
-.muted,
-.widget-store-body p,
-.widget-modal-hero p {
+.muted {
   font-size: 0.75rem;
   font-weight: 400;
   line-height: 1.42;
-}
-.widget-store-badge,
-.widget-store-caps span {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0;
 }
 
 body,
@@ -2566,8 +2411,7 @@ textarea {
 }
 .dock,
 .menu,
-.stack,
-.widget-modal{
+.stack {
   font-family: var(--font);
 }
 .stack-name{
@@ -2580,14 +2424,13 @@ textarea {
    background to opaque and drop the blur on every translucent surface. */
 @media (prefers-reduced-transparency: reduce) {
   .dock, .notch-pill, .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .undo-toast,
-  .coach, .note-editor, .tile .label,
-  .s-sidebar, .s-content, .modal {
+  .coach, .note-editor, .tile .label, .modal {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   .dock, .notch-pill { background: var(--glass-tint, var(--surface-tint)); }
   .notch-toast, .stack, .menu, .dock-tip, .trash-pop, .undo-toast, .coach, .note-editor,
-  .tile .label, .modal, .s-sidebar, .s-content { background: var(--bg); }
+  .tile .label, .modal { background: var(--bg); }
 }
 /* High contrast: solid surfaces with a clearly defined border. */
 @media (prefers-contrast: more) {
@@ -2602,9 +2445,7 @@ textarea {
    motion. Functional hover reveals (media controls, tile labels) are kept:
    on touch they are the only way to reach those controls. */
 @media (hover: none), (pointer: coarse) {
-  .preset-chip:hover, .s-link:hover, .pin-card:hover,
-  .pin-kid:hover, .kf-chip:hover:not(:disabled), .sugg-item:hover,
-  .icon-cell:hover, .accent-sw:hover, .accent-custom:hover, .accent-src:hover,
+  .icon-cell:hover,
   .tile:hover .glyph, .tile.hint:hover .hint-plus,
   .tile.hint:hover .hint-plus-badge { transform: none; }
 }
