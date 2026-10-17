@@ -21,7 +21,58 @@ pub struct DeviceBattery {
 /// Connected devices that report a battery level, lowest first, one entry
 /// per name (a device can appear once per profile, such as LE and Classic).
 pub fn device_batteries() -> Vec<DeviceBattery> {
-    query().unwrap_or_default()
+    let mut list = query().unwrap_or_default();
+    list.extend(headsetcontrol());
+    merge(list)
+}
+
+/// Wireless headsets on a USB dongle (SteelSeries Arctis, Logitech G,
+/// Corsair, HyperX…) never show up as Bluetooth. When the open-source
+/// HeadsetControl tool is installed, Booki asks it, as a separate program,
+/// for their battery. Nothing is asked when it is not on the PATH.
+fn headsetcontrol() -> Vec<DeviceBattery> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(output) = std::process::Command::new("headsetcontrol")
+        .args(["-b", "-o", "json"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    else {
+        return Vec::new();
+    };
+    parse_headsetcontrol(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// HeadsetControl's JSON: `{"devices": [{"device"|"product": name,
+/// "battery": {"status": "BATTERY_AVAILABLE"|"BATTERY_CHARGING"…, "level": n}}]}`.
+fn parse_headsetcontrol(text: &str) -> Vec<DeviceBattery> {
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(text) else {
+        return Vec::new();
+    };
+    let Some(devices) = json.get("devices").and_then(|d| d.as_array()) else {
+        return Vec::new();
+    };
+    devices
+        .iter()
+        .filter_map(|device| {
+            let battery = device.get("battery")?;
+            let status = battery.get("status")?.as_str()?;
+            if !matches!(status, "BATTERY_AVAILABLE" | "BATTERY_CHARGING") {
+                return None;
+            }
+            let level = battery.get("level")?.as_i64()?;
+            let name = device
+                .get("device")
+                .or_else(|| device.get("product"))?
+                .as_str()?
+                .trim()
+                .to_string();
+            ((0..=100).contains(&level) && !name.is_empty()).then_some(DeviceBattery {
+                name,
+                level: level as u8,
+            })
+        })
+        .collect()
 }
 
 fn query() -> windows::core::Result<Vec<DeviceBattery>> {
@@ -71,7 +122,7 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
         }
         out.push(DeviceBattery { name, level });
     }
-    Ok(merge(out))
+    Ok(out)
 }
 
 /// One entry per device name, keeping the lowest reading, lowest first.
@@ -85,6 +136,19 @@ fn merge(mut list: Vec<DeviceBattery>) -> Vec<DeviceBattery> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn headsetcontrol_json_gives_available_and_charging_levels() {
+        let json = r#"{"devices":[
+            {"device":"SteelSeries Arctis Nova 7","battery":{"status":"BATTERY_AVAILABLE","level":62}},
+            {"product":"G Pro X","battery":{"status":"BATTERY_CHARGING","level":30}},
+            {"device":"Off","battery":{"status":"BATTERY_UNAVAILABLE","level":-1}}]}"#;
+        let list = parse_headsetcontrol(json);
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].name, "SteelSeries Arctis Nova 7");
+        assert_eq!(list[1].level, 30);
+        assert!(parse_headsetcontrol("not json").is_empty());
+    }
 
     #[test]
     fn merge_keeps_one_lowest_reading_per_device() {
