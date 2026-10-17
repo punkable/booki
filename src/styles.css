@@ -138,8 +138,10 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
     opacity var(--dur-3) var(--ease-out),
     background var(--dur-4) var(--ease-out),
     border-color var(--dur-4) var(--ease-out),
-    box-shadow var(--dur-4) var(--ease-out),
-    backdrop-filter var(--dur-4) var(--ease-out);
+    box-shadow var(--dur-4) var(--ease-out);
+  /* No backdrop-filter transition: when the native blur steps aside for an
+     animation, the CSS blur must take over at once. Fading it in left the bar
+     briefly unblurred, which read as a flash on every reveal and tuck. */
   isolation: isolate;
 }
 body:not(.surface-glass) .dock {
