@@ -752,8 +752,3 @@ export async function onNotchToastOut(cb) {
   return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
-/** Listen for the active foreground app changing (multi-notch intelligence). */
-export async function onActiveApp(cb) {
-  if (!(T && T.event && T.event.listen)) return () => {};
-  return T.event.listen("booki://active-app", (e) => cb(e.payload || { app: "", dot: false }));
-}

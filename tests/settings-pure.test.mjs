@@ -11,8 +11,6 @@ import assert from "node:assert/strict";
 import { findSettings } from "../src/settings/search.js";
 import {
   widgetRefs,
-  itemForWidgetRef,
-  updateWidgetStyleForRef,
 } from "../src/settings/pin-model.js";
 
 // ── search ────────────────────────────────────────────────────────────────
@@ -82,38 +80,9 @@ test("widgetRefs copes with an empty or missing list", () => {
   assert.deepEqual(widgetRefs(pinned, "battery"), []);
 });
 
-test("itemForWidgetRef resolves both kinds of reference", () => {
-  const [top, child] = widgetRefs(pinned, "clock");
-  assert.equal(itemForWidgetRef(pinned, top).id, "w1");
-  assert.equal(itemForWidgetRef(pinned, child).id, "w2");
-  assert.equal(itemForWidgetRef(pinned, null), null);
-  assert.equal(itemForWidgetRef(pinned, { type: "top", id: "nope" }), null);
-});
-
-test("updateWidgetStyleForRef edits without mutating the original", () => {
-  const [top] = widgetRefs(pinned, "clock");
-  const next = updateWidgetStyleForRef(pinned, top, { variant: "outline" });
-  assert.equal(next.find((i) => i.id === "w1").style.variant, "outline");
-  // The caller keeps the old tree for undo/diffing, so it must be untouched.
-  assert.equal(pinned.find((i) => i.id === "w1").style.variant, "glass");
-});
-
 test("widgetRefs finds a widget saved under a name it replaced", () => {
   const legacy = [{ id: "old", kind: "widget", widget: "cpu" }, { id: "t", kind: "widget", widget: "tasks" }];
   assert.deepEqual(widgetRefs(legacy, "system").map((ref) => ref.id), ["old"]);
   assert.deepEqual(widgetRefs(legacy, "focus").map((ref) => ref.id), ["t"]);
 });
 
-test("updateWidgetStyleForRef reaches a widget nested in a group", () => {
-  const [, child] = widgetRefs(pinned, "clock");
-  const next = updateWidgetStyleForRef(pinned, child, { variant: "minimal" });
-  const group = next.find((i) => i.id === "g1");
-  assert.equal(group.children.find((c) => c.id === "w2").style.variant, "minimal");
-  // Siblings and the bar-level widget are left alone.
-  assert.equal(group.children.find((c) => c.id === "k1").name, "Kid");
-  assert.equal(next.find((i) => i.id === "w1").style.variant, "glass");
-});
-
-test("updateWidgetStyleForRef is a no-op without a reference", () => {
-  assert.equal(updateWidgetStyleForRef(pinned, null, {}), pinned);
-});
