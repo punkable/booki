@@ -305,6 +305,8 @@ let volumeFlash = null; // { level, muted, until } after a volume change
 let activityTick = null;
 let activityExpiry = null;
 const VOLUME_FLASH_MS = 2000;
+const CHARGE_FLASH_MS = 2500;
+let chargeFlash = null;
 const FOCUS_DONE_MS = 60000;
 const ringEl = document.getElementById("nl-ring");
 const lText = document.getElementById("nl-text");
@@ -320,6 +322,7 @@ function focusTimersOf(items = []) {
 
 function currentActivity(now = Date.now()) {
   if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
+  if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
@@ -349,11 +352,11 @@ function paintActivity() {
   // A timer that just ended or a battery that just ran low is worth a glance
   // even while the tab is out of the way.
   if (kind !== lastActivityKind) {
-    if (lastActivityKind === "timer" || kind === "battery") nudgePresence();
+    if (lastActivityKind === "timer" || kind === "battery" || kind === "charging") nudgePresence();
     lastActivityKind = kind;
   }
   document.body.classList.toggle("live", !!activity);
-  for (const name of ["timer", "done", "volume", "media", "battery"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  for (const name of ["timer", "done", "volume", "media", "battery", "charging"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
     lText.textContent = mmss(activity.left);
     ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
@@ -362,7 +365,7 @@ function paintActivity() {
     ringEl.style.strokeDashoffset = String(100 - (activity.muted ? 0 : activity.level));
   } else if (kind === "done") {
     lText.textContent = t("notch.focusDone");
-  } else if (kind === "battery") {
+  } else if (kind === "battery" || kind === "charging") {
     lText.textContent = `${activity.level}%`;
   }
   // Tick once a second only while a timer is visible; a passing state
@@ -377,12 +380,15 @@ function paintActivity() {
 const pollBattery = singleFlight(async () => {
   clearTimeout(batteryTimer);
   if (!canPeek || !inTauri) return;
+  const before = battery;
   try {
     const stats = await invoke("system_stats");
     battery = stats && stats.battery >= 0 ? { level: Math.round(stats.battery), charging: !!stats.charging } : null;
   } catch (_) {
     battery = null;
   }
+  // Plugging the charger in gets a short confirmation, like a phone's.
+  if (before && !before.charging && battery?.charging) chargeFlash = { level: battery.level, until: Date.now() + CHARGE_FLASH_MS };
   paintActivity();
   // A desktop has no battery: stop asking.
   if (battery) batteryTimer = setTimeout(pollBattery, 60000);
@@ -429,9 +435,9 @@ function paintCard() {
     document.body.classList.add("card-clock");
     return;
   }
-  if (activity?.kind === "battery") {
+  if (activity?.kind === "battery" || activity?.kind === "charging") {
     cTitle.textContent = `${activity.level}%`;
-    cSub.textContent = t("notch.batteryLow");
+    cSub.textContent = t(activity.kind === "charging" ? "notch.charging" : "notch.batteryLow");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -491,7 +497,7 @@ const readVolume = singleFlight(async () => {
   paintActivity();
 });
 
-observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume }, (support) => { nativeSupport = support; });
+observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 520) { // --dur-spring

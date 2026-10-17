@@ -949,9 +949,11 @@ body.notch-body.peekable.live:not(.card) .nl { opacity: 1; }
 .nl-ring-fill { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 1s linear; }
 .nl-text { font: 650 11px/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--ink); }
 body.notch-body.act-timer .nl-art, body.notch-body.act-timer .nl-eq,
-body.notch-body.act-battery .nl-art, body.notch-body.act-battery .nl-eq { display: none; }
+body.notch-body.act-battery .nl-art, body.notch-body.act-battery .nl-eq,
+body.notch-body.act-charging .nl-art, body.notch-body.act-charging .nl-eq { display: none; }
 body.notch-body.act-timer .nl-ring, body.notch-body.act-timer .nl-text,
-body.notch-body.act-battery .nl-text { display: block; }
+body.notch-body.act-battery .nl-text,
+body.notch-body.act-charging .nl-text { display: block; }
 body.notch-body.act-volume .nl-art, body.notch-body.act-volume .nl-eq,
 body.notch-body.act-done .nl-art, body.notch-body.act-done .nl-eq { display: none; }
 body.notch-body.act-volume .nl-ring, body.notch-body.act-volume .nl-text,
@@ -962,6 +964,9 @@ body.notch-body.act-done .nl::before { content: ""; width: 6px; height: 6px; bor
 body.notch-body.act-battery .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-battery .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
 body.notch-body.act-battery .nl-text { color: var(--danger-text); }
+/* Charger plugged in: Windows' success green, for a moment. */
+body.notch-body.act-charging .nl { justify-content: center; gap: 6px; }
+body.notch-body.act-charging .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #6ccb5f; }
 
 /* Smart notch: a quiet dot at rest that becomes a capsule for an activity
    and a card on hover — the same morph as the tab, from a smaller start. */

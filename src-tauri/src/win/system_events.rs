@@ -33,7 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 /// resume or display signal: the old queue carried the kinds themselves and
 /// dropped whatever arrived while its 32 slots were full.
 static QUEUE: OnceLock<SyncSender<()>> = OnceLock::new();
-const KINDS: [&str; 15] = [
+const KINDS: [&str; 16] = [
     "ready",
     "windows",
     "clipboard",
@@ -49,6 +49,7 @@ const KINDS: [&str; 15] = [
     "display-on",
     "energy-saver",
     "attention",
+    "power",
 ];
 static PENDING: [AtomicBool; KINDS.len()] = [const { AtomicBool::new(false) }; KINDS.len()];
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
@@ -68,6 +69,8 @@ const CONSOLE_DISPLAY_STATE: GUID = GUID::from_u128(0x6fe69556_704a_47a0_8f24_c2
 const ENERGY_SAVER_STATUS: GUID = GUID::from_u128(0x550e8400_e29b_41d4_a716_446655440000);
 /// GUID_POWER_SAVING_STATUS (Battery saver on older builds): 0 off, 1 on.
 const POWER_SAVING_STATUS: GUID = GUID::from_u128(0xe00958c0_c213_4ace_ac77_fecced2eeea5);
+/// GUID_ACDC_POWER_SOURCE: 0 plugged in, 1 on battery, 2 short-term (UPS).
+const POWER_SOURCE: GUID = GUID::from_u128(0x5d3e9a59_e9d5_4b00_a6bd_ff34ff516548);
 /// The console display is on (or dimmed). Windows sends the current state as
 /// soon as the notification is registered.
 pub static DISPLAY_ON: AtomicBool = AtomicBool::new(true);
@@ -101,6 +104,10 @@ unsafe fn power_setting_changed(lp: windows::Win32::Foundation::LPARAM) {
     } else if guid == POWER_SAVING_STATUS {
         ENERGY_SAVER_OLD.store(value != 0, Ordering::Relaxed);
         signal("energy-saver");
+    } else if guid == POWER_SOURCE {
+        // The charger went in or out: the notch re-reads the battery now
+        // instead of on its next minute.
+        signal("power");
     }
 }
 
@@ -374,6 +381,7 @@ fn watch_windows() {
                 CONSOLE_DISPLAY_STATE,
                 ENERGY_SAVER_STATUS,
                 POWER_SAVING_STATUS,
+                POWER_SOURCE,
             ] {
                 if let Ok(handle) =
                     RegisterPowerSettingNotification(recipient, &guid, DEVICE_NOTIFY_WINDOW_HANDLE)
