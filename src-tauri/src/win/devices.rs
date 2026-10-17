@@ -1,6 +1,8 @@
 //! Battery levels of connected devices: Bluetooth headsets, earbuds, mice,
 //! keyboards and controllers that report one to Windows. This is the same
-//! value Settings > Bluetooth & devices shows next to each device.
+//! value Settings > Bluetooth & devices shows next to each device. Logitech
+//! receivers (win/logitech.rs) and wireless headsets through HeadsetControl
+//! join the same list.
 
 use windows::core::{Interface, HSTRING};
 use windows::Devices::Enumeration::Pnp::{PnpObject, PnpObjectType};
@@ -23,6 +25,7 @@ pub struct DeviceBattery {
 pub fn device_batteries() -> Vec<DeviceBattery> {
     let mut list = query().unwrap_or_default();
     list.extend(headsetcontrol());
+    list.extend(super::logitech::batteries());
     merge(list)
 }
 

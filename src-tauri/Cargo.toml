@@ -45,6 +45,8 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]
 png = "0.18"
+# Logitech HID++ battery over Bolt/Unifying receivers (win/logitech.rs).
+hidapi = { version = "2.6", default-features = false, features = ["windows-native"] }
 windows-dpapi = "0.2"
 # Decode the desktop wallpaper to derive an accent color from it.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }

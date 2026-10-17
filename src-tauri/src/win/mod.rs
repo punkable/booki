@@ -21,6 +21,8 @@ pub struct WindowInfo {
 #[cfg(windows)]
 pub mod devices;
 #[cfg(windows)]
+mod logitech;
+#[cfg(windows)]
 pub mod material;
 #[cfg(windows)]
 pub mod platform;
