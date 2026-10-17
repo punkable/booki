@@ -183,5 +183,4 @@ mod tests {
         );
         assert_eq!(pick_asset(&serde_json::json!({})), None);
     }
-
 }
