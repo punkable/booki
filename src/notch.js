@@ -328,8 +328,12 @@ function currentActivity(now = Date.now()) {
     const next = (Array.isArray(ended.tasks) ? ended.tasks : []).find((task) => !task.done)?.text || "";
     return { kind: "done", next, until: Number(ended.endsAt) + FOCUS_DONE_MS };
   }
+  // Urgency decides the order: a nearly flat battery outranks the music, a
+  // merely low one waits behind it.
+  const low = battery && !battery.charging && battery.level >= 0 ? battery.level : 101;
+  if (low <= 10) return { kind: "battery", level: low };
   if (media?.playing) return { kind: "media" };
-  if (battery && !battery.charging && battery.level >= 0 && battery.level <= 15) return { kind: "battery", level: battery.level };
+  if (low <= 15) return { kind: "battery", level: low };
   return null;
 }
 
