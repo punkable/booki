@@ -141,12 +141,12 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
 
     <h2 className="ui-group-title home-subtitle">{t("home.atGlance")}</h2>
     <div className="quick-grid">
-      <QuickTile glyph="eye" hue="#5e7bff" label={t("dock.behavior")} value={t(scenario?.title || "overhaul.smart")} onClick={toDock("dock.behavior")} />
-      <QuickTile glyph="palette" hue="#ff4f7b" label={t("finish.title")} value={t(`finish.${activeFinish(cfg)}`)} onClick={toDock("tab.appearance")} />
-      <QuickTile glyph="sun" hue="#ff9a2e" label={t("ap.theme")} value={t(`theme.${cfg.theme || "system"}`)} onClick={toDock("ap.theme")} />
-      <QuickTile glyph="app" hue="#30b0c7" label={t("be.position")} value={t(`edge.${cfg.edge || "bottom"}`)} onClick={toDock("be.position")} />
-      <QuickTile glyph="sparkles" hue="#a35bff" label={t("be.notchMode")} value={t(NOTCH_LABELS[resolveNotchMode(cfg)])} onClick={toDock("be.notchMode")} />
-      <QuickTile glyph="grid" hue="#34c759" label={t("ap.iconSize")} value={`${cfg.iconSize ?? 48} px`} onClick={toDock("ap.iconSize")} />
+      <QuickTile glyph="eye" hue="#6b69d6" label={t("dock.behavior")} value={t(scenario?.title || "overhaul.smart")} onClick={toDock("dock.behavior")} />
+      <QuickTile glyph="palette" hue="#e3008c" label={t("finish.title")} value={t(`finish.${activeFinish(cfg)}`)} onClick={toDock("tab.appearance")} />
+      <QuickTile glyph="sun" hue="#f7630c" label={t("ap.theme")} value={t(`theme.${cfg.theme || "system"}`)} onClick={toDock("ap.theme")} />
+      <QuickTile glyph="app" hue="#00b7c3" label={t("be.position")} value={t(`edge.${cfg.edge || "bottom"}`)} onClick={toDock("be.position")} />
+      <QuickTile glyph="sparkles" hue="#8764b8" label={t("be.notchMode")} value={t(NOTCH_LABELS[resolveNotchMode(cfg)])} onClick={toDock("be.notchMode")} />
+      <QuickTile glyph="grid" hue="#13a10e" label={t("ap.iconSize")} value={`${cfg.iconSize ?? 48} px`} onClick={toDock("ap.iconSize")} />
     </div>
 
     <UsageCard />

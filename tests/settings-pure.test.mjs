@@ -86,3 +86,11 @@ test("widgetRefs finds a widget saved under a name it replaced", () => {
   assert.deepEqual(widgetRefs(legacy, "focus").map((ref) => ref.id), ["t"]);
 });
 
+
+test("groups saved with the old Apple palette show the matching Windows shade", async () => {
+  const { groupAppearance, GROUP_PALETTE } = await import("../src/group-style.js");
+  assert.equal(groupAppearance({ style: { color: "#0A84FF" } }).color, "#0078d4");
+  assert.equal(groupAppearance({ style: { color: "#123456" } }).color, "#123456");
+  const shades = GROUP_PALETTE.flatMap(([, s]) => s);
+  for (const old of ["#8fc2ff", "#ff453a", "#3a3a3c"]) assert.ok(shades.includes(groupAppearance({ style: { color: old } }).color));
+});

@@ -178,7 +178,7 @@
   justify-content: center;
   font: 800 9.5px var(--font);
   color: #fff;
-  background: #ff453a;
+  background: var(--danger);
   box-shadow: 0 0 0 1.5px color-mix(in srgb, #000 25%, transparent);
   border-radius: 999px;
 }
