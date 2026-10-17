@@ -273,8 +273,8 @@ body.dock-body.reveal-morph:not(.tucked) .dock {
 }
 body.dock-body.reveal-morph:not(.morph-start) .dock {
   transition:
-    clip-path 0.46s cubic-bezier(0.32, 0.72, 0, 1),
-    translate 0.46s cubic-bezier(0.32, 0.72, 0, 1),
+    clip-path var(--dur-spring) var(--spring),
+    translate var(--dur-spring) var(--spring),
     opacity var(--dur-1) var(--ease-out);
 }
 body.dock-body.reveal-morph.morph-start .dock { transition: none !important; }
@@ -925,15 +925,11 @@ body.notch-body.toast.toast-out .notch-toast {
    Width/height ride a spring curve so the morph overshoots a hair and
    settles, the way a physical thing would. Hover no longer scales the tab
    when it can open into a card: the card IS the hover response. */
-body.notch-body {
-  --notch-spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%,
-    1.067, 1.099 24.3%, 1.108 26%, 1.101 28.4%, 1.041 34.8%, 1.013 38.9%, 0.998 43.7%, 0.993 48.4%, 1.001 63.5%, 1);
-}
 .nl, .nc { position: absolute; inset: 0; display: flex; align-items: center; opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out); }
 body.notch-body.peekable .notch-pill {
   transition:
-    width 0.52s var(--notch-spring),
-    height 0.52s var(--notch-spring),
+    width var(--dur-spring) var(--spring),
+    height var(--dur-spring) var(--spring),
     border-radius 0.4s var(--ease-out),
     background var(--dur-3) var(--ease-out),
     box-shadow var(--dur-3) var(--ease-out),

@@ -50,6 +50,13 @@
   --dur-3: 0.18s;
   --dur-4: 0.22s;
   --dur-5: 0.28s;
+  /* One spring for every shape change between the notch and the dock: the
+     notch growing into a live capsule or card, and the dock opening out of
+     that capsule. It overshoots a hair and settles. The genie from an idle
+     notch and plain fades keep the ease-out above. */
+  --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%,
+    1.067, 1.099 24.3%, 1.108 26%, 1.101 28.4%, 1.041 34.8%, 1.013 38.9%, 0.998 43.7%, 0.993 48.4%, 1.001 63.5%, 1);
+  --dur-spring: 0.52s;
 }
 
 /* Dark values, for the system preference and for an explicit choice. */

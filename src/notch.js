@@ -487,7 +487,7 @@ const readVolume = singleFlight(async () => {
 observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
-function followMorph(ms = 420) {
+function followMorph(ms = 520) { // --dur-spring
   followFrames(reportNotchHitRects, ms);
 }
 

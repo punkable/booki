@@ -114,7 +114,8 @@ export function hideMode() {
 // genie rising from the edge. The notch reports its settled shape.
 let notchShape = null;
 onNotchShape((shape) => { notchShape = shape; });
-const MORPH_MS = 460;
+// Matches --dur-spring: the bar opens with the same spring the notch grew with.
+const MORPH_MS = 520;
 let morphTimer = null;
 
 function endMorph() {
