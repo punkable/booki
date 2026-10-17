@@ -147,6 +147,35 @@ const pollDevices = singleFlight(async () => {
   });
 });
 
+// Plan usage of the AI services signed in on this PC (Claude Code, Codex).
+// The card shows the window closest to its limit; the hint lists them all
+// with when each resets. Asked every five minutes, only while pinned.
+const resetClock = (seconds) => seconds > 0
+  ? new Date(seconds * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" })
+  : "";
+const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
+const pollAi = singleFlight(async () => {
+  let providers = [];
+  try { providers = (await dockApi.aiUsage()) || []; } catch (_) { providers = []; }
+  const windows = providers.flatMap((p) => (p.windows || []).map((w) => ({ ...w, provider: p.name })));
+  eachWidget("ai", (el) => {
+    setWidgetAvailable(el, windows.length > 0);
+    if (!windows.length) {
+      const signin = providers.some((p) => p.error === "signin");
+      setText(el, t("w.ai"), "—");
+      setTileLabel(el, t(!providers.length ? "w.aiNone" : signin ? "w.aiSignin" : "w.aiUnavailable"));
+      return;
+    }
+    const top = windows.reduce((a, b) => (b.percent > a.percent ? b : a));
+    setMetric(el, `${top.provider} · ${windowName(top.label)}`, Math.round(top.percent));
+    setTileLabel(el, windows.map((w) => {
+      const reset = resetClock(w.resets_at);
+      return `${w.provider} ${windowName(w.label)} · ${Math.round(w.percent)}%${reset ? ` · ${t("w.aiResets").replace("{time}", () => reset)}` : ""}`;
+    }).join("\n"));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", top.percent >= 80 ? BATTERY_LOW : RING_DEFAULTS.ai);
+  });
+});
+
 function setWidgetAvailable(el, available) {
   const item = findWidgetPin(el.dataset.id);
   const hide = !!item?.style?.hideWhenUnavailable && !available;
@@ -328,6 +357,7 @@ function pollKinds() {
     volume: widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume),
     clipboard: widgetPresent("clipboard"),
     devices: widgetPresent("devices"),
+    ai: widgetPresent("ai"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -338,6 +368,7 @@ function paintPolls(k) {
   if (k.volume) pollVolume();
   if (k.clipboard) pollClipboard();
   if (k.devices) pollDevices();
+  if (k.ai) pollAi();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new
@@ -358,19 +389,19 @@ export function startPolls() {
   const k = pollKinds();
   pollKey = JSON.stringify(k);
   pollsActive = true;
-  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices } = k;
+  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices, ai: hasAi } = k;
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
   paintPolls(k);
   const t0 = Date.now();
   const slow = pollSlowdown();
   // Device batteries change slowly and the query walks Windows' device list.
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow };
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices ? 15000 : 60000;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices || hasAi ? 15000 : 60000;
   widgetPollTimer = setInterval(() => {
     if (S.hiddenState || S.displayOff) return; // don't poll a tucked-away dock
     const now = Date.now();
@@ -380,6 +411,7 @@ export function startPolls() {
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(S.nativeSupport, "volume", 4000) * slow; pollVolume(); }
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
     if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
+    if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).

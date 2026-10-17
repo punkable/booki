@@ -85,7 +85,7 @@ export function clockParts(now, lang) {
    is deliberately not on this list: announcing the time every minute, forever,
    is noise, not information. Neither are System (CPU every couple of seconds)
    nor Clipboard (it would read copied text aloud, which may be private). */
-export const LIVE_WIDGETS = ["battery", "devices", "media", "volume"];
+export const LIVE_WIDGETS = ["battery", "devices", "ai", "media", "volume"];
 
 /** A cell's icon: a quiet line glyph, falling back to the Fluent emoji for any
     widget that has no glyph yet. */

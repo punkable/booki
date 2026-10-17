@@ -35,3 +35,32 @@ test("with no device reporting a battery the widget says so instead of a number"
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+const ai = { id: "ai", name: "AI", path: "", args: [], kind: "widget", widget: "ai" };
+
+test("the AI widget shows the window closest to its limit and lists every window", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [ai] }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "ai_usage"
+      ? Promise.resolve([
+          { id: "claude", name: "Claude", windows: [{ label: "5h", percent: 42.4, resets_at: 0 }, { label: "week", percent: 81, resets_at: 0 }], error: null },
+          { id: "chatgpt", name: "ChatGPT", windows: [{ label: "5h", percent: 12, resets_at: 0 }], error: null }])
+      : old(c, a); }`,
+  });
+  const card = page.locator('.tile[data-id="ai"]');
+  await card.locator(".w-ring-num", { hasText: "81" }).waitFor();
+  assert.match((await card.locator(".w-label").textContent()).trim(), /^Claude · /);
+  const hint = await card.getAttribute("aria-label");
+  assert.ok(hint.includes("Claude 5h · 42%") && hint.includes("ChatGPT 5h · 12%"), hint);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("the AI widget explains what to do when nothing is signed in", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [ai] }) });
+  const card = page.locator('.tile[data-id="ai"]');
+  await card.locator(".w-ring-num", { hasText: "—" }).waitFor();
+  assert.match(await card.getAttribute("aria-label"), /Claude Code|Codex/);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

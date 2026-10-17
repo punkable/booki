@@ -3,6 +3,7 @@
 //! Owns the frameless always-on-top dock window, the system-tray icon, config
 //! persistence, app launching and (on Windows) native window management.
 
+mod ai_usage;
 mod app_catalog;
 mod apps;
 mod clipboard;
@@ -566,6 +567,15 @@ async fn device_batteries() -> Vec<serde_json::Value> {
     {
         Vec::new()
     }
+}
+
+/// Plan usage of the AI services signed in on this PC, for the AI widget.
+/// The dock only asks while that widget is pinned.
+#[tauri::command]
+async fn ai_usage() -> Vec<ai_usage::ProviderUsage> {
+    tauri::async_runtime::spawn_blocking(ai_usage::usage)
+        .await
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1428,6 +1438,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             launched_at_login,
             device_batteries,
+            ai_usage,
             quiet_update_supported,
             acquire_update_lock,
             release_update_lock,
