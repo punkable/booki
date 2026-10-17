@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - shell: bash
@@ -48,10 +48,10 @@ jobs:
     # No dependency caches here: the job that holds the signing key builds
     # from a clean toolchain and registry, never from restored cache entries.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version-file: package.json
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
@@ -95,7 +95,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       - name: Verify signatures and prepare complete updater manifest
         run: node scripts/prepare-release.mjs
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: booki-signed-release
           path: dist/release-assets/*
@@ -104,7 +104,7 @@ jobs:
       # the release assets so publishing is unchanged.
       - name: Prepare winget manifests
         run: node scripts/winget-manifest.mjs
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: booki-winget-manifests
           path: dist/winget/
