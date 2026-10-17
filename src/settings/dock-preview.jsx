@@ -1,5 +1,5 @@
 import { groupAppearance } from "../group-style.js";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { widgetCardHTML, setText, setMetric, setSystem, clockParts } from "../dock/widget-view.js";
 import { widgetWidth } from "../dock/layout-model.js";
 import { WIDGET_META, WIDGET_GLYPHS, RING_WIDGETS, PREVIEW_WIDGETS, widgetDisplayName, canonicalWidget } from "../widgets-meta.js";
@@ -16,7 +16,12 @@ import { onLookChange, paintedLook } from "../system-look.js";
    clipboard contents never appear in a preview or diagnostic screenshot. */
 const SAMPLE_STATS = { cpu: 28, mem: 62, disk: 41, net_down_kbps: 2458, net_up_kbps: 128 };
 export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, gap = 6 }) {
-  const style = rawStyle && typeof rawStyle === "object" && !Array.isArray(rawStyle) ? rawStyle : {};
+  // Memoised: a fresh {} for a missing style re-ran the layout effect below on
+  // every render, rewriting the card's markup each time.
+  const style = useMemo(
+    () => (rawStyle && typeof rawStyle === "object" && !Array.isArray(rawStyle) ? rawStyle : {}),
+    [rawStyle]
+  );
   const widget = canonicalWidget(rawWidget) || "clock";
   const ref = useRef(null);
   useLayoutEffect(() => {
