@@ -1234,10 +1234,10 @@ fn open_settings_url(app: &AppHandle, url: &str) {
         // moves apps in and out of groups with it and takes no file drops.
         .disable_drag_drop_handler()
         .build();
-    // NOTE: the settings window is deliberately NOT transparent. A transparent
-    // WebView2 window rendered blank/see-through on real Windows (the page never
-    // painted). An opaque window always paints; the modern look comes from the
-    // floating acrylic-style panels in CSS over a solid background.
+    // NOTE: the settings window is never built transparent: a transparent
+    // WebView2 window rendered blank on real Windows. Mica comes afterwards
+    // instead (settings_backdrop): DWM's system backdrop behind the window,
+    // then only the WebView background is cleared, with a solid fallback.
     #[cfg(windows)]
     if let Ok(w) = &built {
         // Defeat the WebView2 initial-size race: on first paint the webview can
