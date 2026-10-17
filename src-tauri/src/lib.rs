@@ -1712,9 +1712,6 @@ pub fn run() {
                 #[cfg(windows)]
                 if let Ok(h) = notch.hwnd() {
                     win::set_capture_visible(h.0 as isize, cfg.capture_visible);
-                    let raw = h.0 as isize;
-                    let drop_window = dock.clone();
-                    let _ = dock.with_webview(move |_| win::link_drop::install(raw, drop_window));
                 }
             }
             // Position and reveal the dock.

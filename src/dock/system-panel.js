@@ -68,10 +68,16 @@ export function buildSystemPanel(item, { close }) {
       });
     });
     const apps = section(t("plugins.audioApps"));
-    load(apps, api.appVolumes, (sessions) => {
-      if (!Array.isArray(sessions) || !sessions.length) { apps.append(text("p", t("plugins.noSessions"))); return; }
-      for (const session of sessions) volumeRow(apps, session.name, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted));
-    });
+    const sessionList = document.createElement("div"); apps.append(sessionList);
+    const refresh = () => {
+      sessionList.replaceChildren();
+      return load(sessionList, api.appVolumes, (sessions) => {
+        if (!Array.isArray(sessions) || !sessions.length) { sessionList.append(text("p", t("plugins.noSessions"))); return; }
+        for (const session of sessions) volumeRow(sessionList, session.name, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted));
+      });
+    };
+    button(apps, t("plugins.refresh"), refresh);
+    refresh();
   }
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
@@ -128,7 +134,7 @@ export function buildSystemPanel(item, { close }) {
     show().catch((error) => { if (!disposed) { state.textContent = `${t("plugins.failed")} ${String(error)}`; button(controls, t("focus.retry"), show); } });
   }
   function volumeRow(container, name, percent, muted, save) {
-    const row = document.createElement("label"); row.className = "app-volume-row";
+    const row = document.createElement("div"); row.className = "app-volume-row";
     const input = document.createElement("input"); input.type = "range"; input.min = "0"; input.max = "100"; input.value = String(percent); input.setAttribute("aria-label", name);
     const value = text("output", `${percent}%`); input.addEventListener("input", () => { value.textContent = `${input.value}%`; });
     // Commit on release/keyboard change. Serialize volume and mute writes so

@@ -92,7 +92,11 @@ impl Target {
                 return Vec::new();
             };
             let drop = HDROP(medium.u.hGlobal.0);
-            let count = DragQueryFileW(drop, u32::MAX, None).min(256);
+            let count = DragQueryFileW(drop, u32::MAX, None);
+            if count > 256 {
+                ReleaseStgMedium(&mut medium);
+                return Vec::new();
+            }
             let mut paths = Vec::new();
             for i in 0..count {
                 let len = DragQueryFileW(drop, i, None) as usize;

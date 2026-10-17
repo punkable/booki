@@ -96,24 +96,21 @@ pub async fn plugin_open(id: String, profile: Option<String>) -> Result<(), Stri
     util::blocking(move || {
         let path = executable(&id)?;
         match id.as_str() {
-            "openrgb" => {
-                let args = match profile {
-                    Some(profile) => {
-                        let file = Path::new(&profile);
-                        if !file.is_absolute()
-                            || !file.is_file()
-                            || file
-                                .extension()
-                                .map_or(true, |ext| !ext.eq_ignore_ascii_case("orp"))
-                        {
-                            return Err("choose an OpenRGB .orp profile".into());
-                        }
-                        vec!["--profile".into(), profile]
+            "openrgb" => match profile {
+                Some(profile) => {
+                    let file = Path::new(&profile);
+                    if !file.is_absolute()
+                        || !file.is_file()
+                        || file
+                            .extension()
+                            .map_or(true, |ext| !ext.eq_ignore_ascii_case("orp"))
+                    {
+                        return Err("choose an OpenRGB .orp profile".into());
                     }
-                    None => vec!["--gui".into()],
-                };
-                apps::launch(&path.to_string_lossy(), &args)
-            }
+                    capture(&path, &["--profile", &profile], 60).map(|_| ())
+                }
+                None => apps::launch(&path.to_string_lossy(), &["--gui".into()]),
+            },
             // Elevate only this explicitly requested helper. Booki stays a
             // normal user process. Never disable Defender or install a driver.
             "librehardwaremonitor" => apps::launch_elevated(&path.to_string_lossy(), &[]),
@@ -137,6 +134,10 @@ pub async fn plugin_download(url: String, directory: String) -> Result<(), Strin
         return Err("choose an existing download folder".into());
     }
     util::blocking(move || {
+        static DOWNLOAD_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _turn = DOWNLOAD_TURN
+            .try_lock()
+            .map_err(|_| "a download is already running")?;
         capture(
             &executable("yt-dlp")?,
             &[

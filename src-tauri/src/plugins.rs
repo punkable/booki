@@ -142,6 +142,13 @@ fn pick_asset(release: &Value, expected_name: &str) -> Option<(String, String)> 
     })
 }
 
+struct StagingCleanup(PathBuf);
+impl Drop for StagingCleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 static INSTALL_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn install(plugin: &Plugin) -> Result<String, String> {
@@ -172,6 +179,7 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
     }
     let target = dir(plugin).ok_or("no local app data folder")?;
     let staging = target.with_extension("partial");
+    let _cleanup = StagingCleanup(staging.clone());
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
     if plugin.asset.ends_with(".zip") {
