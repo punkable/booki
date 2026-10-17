@@ -117,6 +117,12 @@ html, body {
 }
 :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
+/* Windows 11's thin scrollbar: a slim ink thumb on no track, everywhere. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 38%, transparent) transparent;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
