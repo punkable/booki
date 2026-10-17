@@ -21,6 +21,7 @@ mod native_text;
 mod notch_window;
 mod note_journal;
 mod notifications;
+mod plugins;
 mod profile_store;
 mod profiles;
 mod recent_files;
@@ -576,6 +577,26 @@ async fn ai_usage() -> Vec<ai_usage::ProviderUsage> {
     tauri::async_runtime::spawn_blocking(ai_usage::usage)
         .await
         .unwrap_or_default()
+}
+
+/// Installed state of an optional plugin (Settings > Plugins).
+#[tauri::command]
+fn plugin_status(id: String) -> Result<plugins::Status, String> {
+    Ok(plugins::status(plugins::find(&id).ok_or("unknown plugin")?))
+}
+
+/// Download, verify and install a plugin the person chose in Settings.
+#[tauri::command]
+async fn plugin_install(id: String) -> Result<String, String> {
+    let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    tauri::async_runtime::spawn_blocking(move || plugins::install(plugin))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn plugin_uninstall(id: String) -> Result<(), String> {
+    plugins::uninstall(plugins::find(&id).ok_or("unknown plugin")?)
 }
 
 #[tauri::command]
@@ -1439,6 +1460,9 @@ pub fn run() {
             launched_at_login,
             device_batteries,
             ai_usage,
+            plugin_status,
+            plugin_install,
+            plugin_uninstall,
             quiet_update_supported,
             acquire_update_lock,
             release_update_lock,

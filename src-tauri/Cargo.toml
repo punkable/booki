@@ -38,6 +38,9 @@ log = "0.4"
 sysinfo = "0.39"
 # Tiny HTTP client to fetch a website's favicon when pinning it as a widget.
 ureq = "3"
+# Verify and unpack optional plugins (plugins.rs).
+sha2 = "0.10"
+zip = { version = "4", default-features = false, features = ["deflate"] }
 
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]

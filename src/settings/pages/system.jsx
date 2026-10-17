@@ -32,6 +32,40 @@ function Autostart({ cfg, set }) {
   }} />;
 }
 
+/** An optional open-source tool Booki can download into its own folder. It
+ *  says what it adds, who makes it, its licence and where its source is,
+ *  before anything is installed. */
+function PluginCard({ id, name, repo, license, open }) {
+  const [state, setState] = useState({ installed: false, version: null });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const refresh = () => dockApi.pluginStatus(id)
+    .then((status) => setState({ installed: !!status?.installed, version: status?.version || null }))
+    .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh(); }, [id]);
+  const run = async (action) => {
+    setBusy(true); setError("");
+    try { await action(); } catch (e) { setError(String(e || "")); }
+    await refresh(); setBusy(false);
+  };
+  return <div className="row-block plugin-card">
+    <div className="plugin-head">
+      <strong>{name}</strong>
+      <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span>
+    </div>
+    <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
+    <p className="plugin-desc plugin-fine">{t("plugins.howItWorks")}</p>
+    {error && <p className="plugin-desc save-status is-error" role="alert">{t("plugins.failed")} {error}</p>}
+    <div className="plugin-actions">
+      {state.installed
+        ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
+        : <button type="button" className="button button-accent" disabled={busy} onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
+      <button type="button" className="link" onClick={() => open(`https://github.com/${repo}`)}>{t("plugins.source")}<Icon name="external" /></button>
+    </div>
+  </div>;
+}
+
 function Diagnostics() {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -102,6 +136,10 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
 
     <SettingsSection icon="refresh" title={t("ab.updates")} hint={t("premium.updateExplanation")}>
       <UpdatesCard beforeApply={store.prepareConfigOperation} />
+    </SettingsSection>
+
+    <SettingsSection icon="sparkles" title={t("plugins.title")} hint={t("plugins.hint")}>
+      <PluginCard id="headsetcontrol" name="HeadsetControl" repo="Sapd/HeadsetControl" license="GPL-3.0" open={open} />
     </SettingsSection>
 
     <section className="ui-group-wrap profiles-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>

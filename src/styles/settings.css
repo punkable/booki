@@ -907,3 +907,11 @@
   background: Canvas;
   -webkit-mask: none;
 }
+
+/* Settings > Plugins: one card per optional tool. */
+.plugin-card { display: grid; gap: 6px; }
+.plugin-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.plugin-meta { font-size: 0.75rem; color: var(--ink-2); }
+.plugin-desc { margin: 0; color: var(--ink-2); line-height: 1.45; }
+.plugin-fine { font-size: 0.75rem; }
+.plugin-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }

@@ -33,7 +33,11 @@ pub fn device_batteries() -> Vec<DeviceBattery> {
 fn headsetcontrol() -> Vec<DeviceBattery> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let Ok(output) = std::process::Command::new("headsetcontrol")
+    // The copy installed from Settings comes first, then one on the PATH.
+    let program = crate::plugins::executable(&crate::plugins::HEADSETCONTROL)
+        .map(|p| p.into_os_string())
+        .unwrap_or_else(|| "headsetcontrol".into());
+    let Ok(output) = std::process::Command::new(program)
         .args(["-b", "-o", "json"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()

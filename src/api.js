@@ -575,6 +575,9 @@ export const dock = {
   /** True when Windows started Booki at sign-in. */
   deviceBatteries: () => invoke("device_batteries"),
   aiUsage: () => invoke("ai_usage"),
+  pluginStatus: (id) => invoke("plugin_status", { id }),
+  pluginInstall: (id) => invoke("plugin_install", { id }),
+  pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
   launchedAtLogin: () => invoke("launched_at_login").then(Boolean).catch(() => false),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
