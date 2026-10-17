@@ -21,6 +21,8 @@ pub struct WindowInfo {
 #[cfg(windows)]
 pub mod devices;
 #[cfg(windows)]
+pub mod link_drop;
+#[cfg(windows)]
 mod logitech;
 #[cfg(windows)]
 pub mod material;
@@ -71,3 +73,13 @@ pub use stub::{
 pub use stub::{
     app_id_known_folders, jump_list_recent, set_app_user_model_id, shortcut_app_id, show_toast,
 };
+
+#[derive(serde::Serialize)]
+pub struct AppVolume {
+    pub id: String,
+    pub name: String,
+    pub percent: u32,
+    pub muted: bool,
+}
+#[cfg(windows)]
+pub use windows_impl::{app_volume_set, app_volumes};

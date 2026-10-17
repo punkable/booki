@@ -1,6 +1,7 @@
 /* Thin wrapper over the Tauri bridge with browser fallbacks, so the UI can be
    previewed with `vite` in a normal browser during development. */
 
+import PLUGINS from "./plugin-catalog.json";
 import { createAsyncCache } from "./dock/async-cache.js";
 import { version as appVersion } from "../package.json";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
@@ -404,6 +405,10 @@ export async function pickSavePath(defaultName) {
 }
 
 /** Pick a JSON file (for importing config). */
+export function pickRgbProfile() {
+  return pickFile([{ name: "OpenRGB", extensions: ["orp"] }]);
+}
+
 export function pickJsonFile() {
   return pickFile([{ name: "JSON", extensions: ["json"] }]);
 }
@@ -575,6 +580,12 @@ export const dock = {
   /** True when Windows started Booki at sign-in. */
   deviceBatteries: () => invoke("device_batteries"),
   aiUsage: () => invoke("ai_usage"),
+  pluginCatalog: () => isTauri ? invoke("plugin_catalog") : Promise.resolve(PLUGINS),
+  appVolumes: () => invoke("app_volumes"),
+  appVolumeSet: (id, percent, muted) => invoke("app_volume_set", { id, percent, muted }),
+  pluginRead: (id) => invoke("plugin_read", { id }),
+  pluginOpen: (id, profile = null) => invoke("plugin_open", { id, profile }),
+  pluginDownload: (url, directory) => invoke("plugin_download", { url, directory }),
   pluginStatus: (id) => invoke("plugin_status", { id }),
   pluginInstall: (id) => invoke("plugin_install", { id }),
   pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
@@ -759,3 +770,8 @@ export async function onNotchToastOut(cb) {
   return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
+
+export async function onLinkDrop(callback) {
+  if (!(T?.event?.listen)) return () => {};
+  return T.event.listen("booki://link-drop", (event) => callback(event.payload));
+}

@@ -2,6 +2,7 @@
 
 import { dock as dockApi } from "../api.js";
 import { setTileLabel } from "./tooltip.js";
+import { buildSystemPanel } from "./system-panel.js";
 import { buildProductivityPanel } from "./productivity-panel.js";
 import { createDraftSaver } from "./draft-saver.js";
 import { icon } from "../icons.js";
@@ -40,6 +41,13 @@ export function openProductivity(item, tile) {
       tickProductivity();
     }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
   });
+  mountWidgetPanel(item, tile, panel);
+}
+export function openSystemPanel(item, tile) {
+  closeProductivityPanel();
+  mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
+}
+function mountWidgetPanel(item, tile, panel) {
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
   const place = () => {

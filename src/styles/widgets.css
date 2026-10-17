@@ -422,3 +422,20 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .focus-calendar > strong { height: 24px; font-size: 11px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; }
 .focus-calendar .today { justify-self: center; width: 32px; border-radius: 999px; background: var(--accent); color: #161618; font-weight: 700; }
 .focus-month .stack-close:focus-visible, .focus-today:focus-visible, .focus-primary:focus-visible, .focus-stepper button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Widget details keep native readings and optional providers together. */
+.system-widget-sections { max-height: min(65vh, 520px); overflow-y: auto; }
+.system-widget-sections p { margin: 8px 0; line-height: 1.5; color: var(--ink-2); }
+.system-widget-readings { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; }
+.system-widget-readings dt { overflow-wrap: anywhere; }
+.system-widget-readings dd { margin: 0; font-variant-numeric: tabular-nums; }
+.app-volume-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(70px, 1fr) 42px auto 18px; gap: 8px; align-items: center; margin: 14px 0; font-size: 12px; }
+.app-volume-row > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.app-volume-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.app-volume-row .plugin-action-error { grid-column: 1 / -1; }
+.plugin-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.plugin-panel-actions input[type="url"] { width: 100%; padding: 8px; border-radius: var(--r-control); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink); }
+.plugin-panel-actions small { width: 100%; color: var(--ink-2); }
+.plugin-warning { padding: 10px; border-radius: var(--r-card); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink) !important; line-height: 1.5; }
+.plugin-result { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; font: 12px/1.5 var(--font); }
+.plugin-action-error { color: var(--danger-text); }

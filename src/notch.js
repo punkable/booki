@@ -131,6 +131,7 @@ function shareShape() {
     // Screen x of the capsule's centre (CSS px), so the dock can grow out of
     // the notch where it actually sits, also when it lives off-centre.
     cx: Math.round(window.screenX + pill.offsetLeft + pill.offsetWidth / 2),
+    cy: Math.round(window.screenY + pill.offsetTop + pill.offsetHeight / 2),
     attached: body.contains("peek"),
   };
   const sig = JSON.stringify(shape);

@@ -81,3 +81,28 @@ pub(crate) async fn volume_mute() -> Result<bool, String> {
     })
     .await?
 }
+
+#[tauri::command]
+pub(crate) async fn app_volumes() -> Result<Vec<win::AppVolume>, String> {
+    #[cfg(windows)]
+    {
+        util::blocking(win::app_volumes).await?
+    }
+    #[cfg(not(windows))]
+    {
+        Err("Core Audio requires Windows".into())
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn app_volume_set(id: String, percent: u32, muted: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        util::blocking(move || win::app_volume_set(&id, percent, muted)).await?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (id, percent, muted);
+        Err("Core Audio requires Windows".into())
+    }
+}

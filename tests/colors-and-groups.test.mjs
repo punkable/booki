@@ -16,7 +16,7 @@ test("the accent comes from its own source and never decides the dock's fill", (
   const cfg = { colorSource: "custom", accent: "#a47864", theme: "dark", surfaceStyle: "glass", surfaceColor: "auto" };
   const custom = resolveLook(cfg, { platform: PLATFORM({ accentOnTaskbar: true }), wallpaper: "#336699" });
   assert.equal(custom.accent, "#a47864");
-  assert.equal(custom.glassTint, "#1c1c1c", "glass keeps its neutral tint");
+  assert.equal(custom.glassTint, "#2c2c2c", "glass keeps its neutral tint");
   const windows = resolveLook({ ...cfg, colorSource: "windows" }, { platform: PLATFORM({ accentOnTaskbar: true }) });
   assert.equal(windows.accent, "#0078d4");
   assert.equal(windows.glassTint, custom.glassTint, "following the Windows accent leaves the fill alone");
@@ -60,7 +60,7 @@ test("the fill can follow the wallpaper, the accent or a picked colour", () => {
   assert.ok(lum(accent) < lum("#3366cc"));
   assert.equal(resolveLook({ ...cfg, surfaceColor: "#223344" }, {}).glassTint, "#223344");
   // Before the wallpaper is sampled, the style's own tint stands in.
-  assert.equal(resolveLook({ ...cfg, surfaceColor: "wallpaper" }, {}).glassTint, "#1c1c1c");
+  assert.equal(resolveLook({ ...cfg, surfaceColor: "wallpaper" }, {}).glassTint, "#2c2c2c");
   // Configs from before rev 11 carry the picked colour in surfaceTint.
   assert.equal(surfaceColor({ surfaceTint: "#0B1A2A" }), "#0b1a2a");
   assert.equal(surfaceColor({ surfaceColor: "nonsense" }), "auto");

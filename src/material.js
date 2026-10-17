@@ -16,7 +16,7 @@ let retryAfter = 0;
 let retryTimer = null;
 let inFlight = false;
 let desired = null;
-let tint = "#161618b8";
+let tint = "#2c2c2cb8";
 let enabled = true;
 
 /** Four CSS corner radii, in window CSS pixels, or null when native blur
@@ -64,7 +64,7 @@ export function isDark() {
  * in deduplicated reports; native blur does not add a second fill.
  */
 export function materialTint(cfg, dark = isDark()) {
-  const base = resolveGlassTint(cfg) || (dark ? "#161618" : "#f4f4f7");
+  const base = resolveGlassTint(cfg) || (dark ? "#2c2c2c" : "#f4f4f7");
   const alpha = surfaceAlpha(cfg);
   return base + Math.round(alpha * 255).toString(16).padStart(2, "0");
 }

@@ -6,11 +6,10 @@ import { menuActions } from "./context-menu.js";
 import { S } from "./state.js";
 import { menuPinTitle } from "./helpers.js";
 import { ctxMenu } from "./dom.js";
-import { refreshMedia, refreshVolume } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { addMenuHead, placeMenu, closeMenu } from "./menu-core.js";
 import { windowsFor, clearAttention } from "./running-windows.js";
-import { openProductivity, editNote } from "./widget-editors.js";
+import { openProductivity, openSystemPanel, editNote } from "./widget-editors.js";
 import { toggleStack } from "./stack.js";
 import { toggleClipboardStack } from "./clipboard-stack.js";
 
@@ -33,8 +32,7 @@ export function launch(el, item, mods = {}) {
   // Widgets aren't launchers — except the media card, where a click is
   // play/pause. Others do nothing on click.
   if (item.kind === "widget") {
-    if (item.widget === "media") dockApi.mediaToggle().then(refreshMedia, () => {});
-    if (item.widget === "volume") dockApi.volumeMute().then(refreshVolume, () => {});
+    if (["volume", "devices", "system", "media", "ai", "battery"].includes(item.widget)) openSystemPanel(item, el);
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
     if (["clock", "focus", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
