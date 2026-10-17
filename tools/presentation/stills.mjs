@@ -44,14 +44,15 @@ const LIBRARY = ['browser', 'chat', 'editor', 'files', 'mail', 'music', 'photos'
 const PINNED = [
   ...['files', 'browser', 'mail', 'music', 'photos', 'editor'].map(app),
   separator('sep-apps'),
-  group('grp-work', 'Work', '#5e5ce6', 'zap', ['terminal', 'chat', 'notes', 'calendar']),
-  group('grp-play', 'Play', '#ff9f0a', 'gamepad', ['videos', 'camera', 'music']),
+  group('grp-work', 'Work', '#6b69d6', 'zap', ['terminal', 'chat', 'notes', 'calendar']),
+  group('grp-play', 'Play', '#f7630c', 'gamepad', ['videos', 'camera', 'music']),
   separator('sep-widgets'),
   widget('clock'),
   widget('weather', { city: 'Lisboa', latitude: 38.72, longitude: -9.14 }),
   widget('system', { metrics: ['cpu', 'ram'] }),
   widget('focus', FOCUS),
   widget('media'),
+  widget('devices'),
 ];
 
 /* Sample answers on top of fixtures.mjs: the track and the app library. */
@@ -60,6 +61,7 @@ const stillsPatch = `(() => { const old = window.__TAURI__.core.invoke;
   window.__TAURI__.core.invoke = (cmd, args = {}) => {
     if (cmd === 'media_info') return Promise.resolve({ title: 'Sunset', artist: 'Sample Artist', album: 'Example', playing: true });
     if (cmd === 'running_windows' || cmd === 'list_windows') return Promise.resolve([]);
+    if (cmd === 'device_batteries') return Promise.resolve([{ name: 'Headphones', level: 72 }, { name: 'Keyboard', level: 90 }]);
     if (cmd === 'list_installed_apps') return Promise.resolve([{ name: 'Examples', items: library }]);
     if (cmd === 'frequent_apps') return Promise.resolve(library.slice(0, 4).map((item, i) => ({ ...item, runs: 40 - i * 8, focus_ms: (40 - i * 8) * 20000 })));
     return old(cmd, args);
@@ -125,6 +127,8 @@ async function shootSettings(locale, theme, pageName) {
     // Select the Work group, then open its icon picker.
     await page.locator('.library-pin-strip button[aria-label="Work"]').click();
     await page.waitForTimeout(400);
+    // Opening a group shows its members; the crumb opens its inspector.
+    if (!(await page.locator('.group-look').count())) { await page.locator('.library-crumb-group').click(); await page.waitForTimeout(400); }
     await page.locator('.group-look .look-trigger').nth(1).click();
     await page.waitForTimeout(300);
   }

@@ -114,13 +114,14 @@ export function hideMode() {
 // genie rising from the edge. The notch reports its settled shape.
 let notchShape = null;
 onNotchShape((shape) => { notchShape = shape; });
-const MORPH_MS = 460;
+// Matches --dur-spring: the bar opens with the same spring the notch grew with.
+const MORPH_MS = 520;
 let morphTimer = null;
 
 function endMorph() {
   clearTimeout(morphTimer);
   document.body.classList.remove("reveal-morph", "morph-start");
-  for (const name of ["--morph-clip", "--morph-shift"]) document.body.style.removeProperty(name);
+  for (const name of ["--morph-clip", "--morph-wide", "--morph-shift"]) document.body.style.removeProperty(name);
 }
 
 /** Put the tucked bar at the notch capsule's size, ready to grow. Returns
@@ -137,15 +138,23 @@ function prepareMorph() {
   if (r.width < 1 || r.height < 1) { endMorph(); return false; }
   const w = Math.min(r.width, Math.max(1, notchShape.width));
   const h = Math.min(r.height, Math.max(1, notchShape.height));
-  const side = (r.width - w) / 2;
+  // Start where the notch really is: its screen centre, mapped into this
+  // window and kept inside the bar.
+  const centre = Number.isFinite(notchShape.cx) ? notchShape.cx - window.screenX : r.left + r.width / 2;
+  const left = Math.min(r.width - w, Math.max(0, centre - r.left - w / 2));
+  const right = r.width - w - left;
   const radius = Math.min(h / 2, 18);
-  const clip = edge === "bottom"
-    ? `inset(${r.height - h}px ${side}px 0px ${side}px round ${radius}px)`
-    : `inset(0px ${side}px ${r.height - h}px ${side}px round ${radius}px)`;
+  const top = edge === "bottom" ? r.height - h : 0;
+  const bottom = edge === "bottom" ? 0 : r.height - h;
+  // Two beats (styles.css, dock-morph): the capsule first stretches sideways
+  // to the bar's full width at its own height, then takes the bar's height.
+  // It reads as the notch widening into the dock, not a dock rising from
+  // the edge.
+  body.style.setProperty("--morph-clip", `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`);
+  body.style.setProperty("--morph-wide", `inset(${top}px 0px ${bottom}px 0px round ${radius}px)`);
   // An attached tab sits on the screen edge; a floating pill or dot already
   // shares the bar's gap.
   const gap = edge === "bottom" ? innerHeight - r.bottom : -r.top;
-  body.style.setProperty("--morph-clip", clip);
   body.style.setProperty("--morph-shift", `0px ${notchShape.attached ? gap : 0}px`);
   void dockEl.offsetWidth;
   body.classList.remove("morph-start");

@@ -24,24 +24,24 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
-  // Strip license/legal comment blocks from the bundled output (they're kept in
-  // the repo's LICENSE files) — a small, safe size trim.
-  esbuild: { legalComments: "none" },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
     // Tauri uses Chromium on Windows (WebView2 / Edge) — target evergreen
     target: "es2021",
-    minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
-    cssMinify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
+    minify: !process.env.TAURI_ENV_DEBUG,
+    cssMinify: !process.env.TAURI_ENV_DEBUG,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         dock: resolve(process.cwd(), "src/index.html"),
         settings: resolve(process.cwd(), "src/settings.html"),
         notch: resolve(process.cwd(), "src/notch.html"),
       },
       output: {
+        // Strip license/legal comment blocks from the bundled output (they're
+        // kept in the repo's LICENSE files) — a small, safe size trim.
+        comments: { legal: false },
         // Keep React out of the dock/notch bundles and cache it separately.
         manualChunks(id) {
           if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) {

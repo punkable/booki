@@ -202,6 +202,3 @@ export function icon(name) {
   return fn();
 }
 
-export function hasIcon(name) {
-  return Object.prototype.hasOwnProperty.call(iconMap, name);
-}

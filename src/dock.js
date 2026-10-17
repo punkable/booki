@@ -169,15 +169,17 @@ async function boot() {
     });
     // Keep the Explorer "Add to Booki" right-click menu in step with the
     // current groups + language (deferred: registry writes aren't urgent).
-    setTimeout(maybeSyncCtxMenu, 2500);
-    // Defer the update check (a network round-trip) a few seconds so it doesn't
-    // compete with first paint / icon extraction during startup.
-    setTimeout(checkUpdates, 4000);
+    // At sign-in Windows is starting everything at once: the dock is up, but
+    // registry writes, the network update check and What's new wait until the
+    // rush is over. A normal launch only waits for first paint.
+    const atLogin = await dockApi.launchedAtLogin();
+    setTimeout(maybeSyncCtxMenu, atLogin ? 30000 : 2500);
+    setTimeout(checkUpdates, atLogin ? 90000 : 4000);
     // First-run tips first; changelog only after the user is past onboarding.
     setTimeout(() => {
       if (!S.cfg.onboarded) maybeOnboard();
       else checkChangelog();
-    }, 800);
+    }, atLogin ? 20000 : 800);
     logMessage("info", `dock booted ok (pinned=${S.cfg.pinned.length})`);
   } catch (err) {
     logMessage("error", `boot failed: ${err}`);

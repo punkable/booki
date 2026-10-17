@@ -18,11 +18,3 @@ export function emo(name, size = 20) {
   return `<img class="emo" src="/emoji/${name}.png" alt="" width="${size}" height="${size}" draggable="false" onerror="this.remove()" />`;
 }
 
-/** URL of a bundled emoji image (for React <img src>). */
-export function emoSrc(name) {
-  return NAME_SET.has(name) ? `/emoji/${name}.png` : "";
-}
-
-export function hasEmoji(name) {
-  return NAME_SET.has(name);
-}

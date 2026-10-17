@@ -55,7 +55,7 @@ for (const file of files) {
   }
 }
 
-const emoCall = /(?:emo|emoSrc)\(\s*["']([a-z0-9-]+)["']/g;
+const emoCall = /emo\(\s*["']([a-z0-9-]+)["']/g;
 for (const file of files) {
   const text = fs.readFileSync(file, "utf8");
   for (const m of text.matchAll(emoCall)) {

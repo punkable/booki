@@ -98,6 +98,8 @@ function useRevealSetting(page, target) {
 
 function App() {
   const store = useSettingsStore();
+  const closeRef = useRef(store.close);
+  closeRef.current = store.close;
   const { cfg, set, saveState, configConflict, closeError } = store;
   const main = useRef(null);
   const [version, setVersion] = useState(null);
@@ -137,11 +139,11 @@ function App() {
     const onKey = (e) => {
       if (e.defaultPrevented || e.key !== "Escape") return;
       if (showChangelog) setShowChangelog(false);
-      else store.close();
+      else closeRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [showChangelog, store.close]);
+  }, [showChangelog]);
 
   // A close problem is reported at the top of the page; bring it into view.
   useEffect(() => { if (closeError && main.current) main.current.scrollTop = 0; }, [closeError]);

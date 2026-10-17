@@ -6,12 +6,13 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 use windows::core::{implement, GUID, PCWSTR};
-use windows::Foundation::{EventRegistrationToken, TypedEventHandler};
+use windows::Foundation::TypedEventHandler;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session,
     GlobalSystemMediaTransportControlsSessionManager as Sessions,
 };
-use windows::Win32::Foundation::{HMODULE, HWND};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Media::Audio::Endpoints::{
     IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl,
 };
@@ -25,7 +26,6 @@ use windows::Win32::System::Power::{
 };
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
-use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 /// Wakes the delivery thread. The signals themselves live in PENDING, one flag
@@ -33,7 +33,7 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 /// resume or display signal: the old queue carried the kinds themselves and
 /// dropped whatever arrived while its 32 slots were full.
 static QUEUE: OnceLock<SyncSender<()>> = OnceLock::new();
-const KINDS: [&str; 15] = [
+const KINDS: [&str; 16] = [
     "ready",
     "windows",
     "clipboard",
@@ -49,6 +49,7 @@ const KINDS: [&str; 15] = [
     "display-on",
     "energy-saver",
     "attention",
+    "power",
 ];
 static PENDING: [AtomicBool; KINDS.len()] = [const { AtomicBool::new(false) }; KINDS.len()];
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
@@ -68,6 +69,8 @@ const CONSOLE_DISPLAY_STATE: GUID = GUID::from_u128(0x6fe69556_704a_47a0_8f24_c2
 const ENERGY_SAVER_STATUS: GUID = GUID::from_u128(0x550e8400_e29b_41d4_a716_446655440000);
 /// GUID_POWER_SAVING_STATUS (Battery saver on older builds): 0 off, 1 on.
 const POWER_SAVING_STATUS: GUID = GUID::from_u128(0xe00958c0_c213_4ace_ac77_fecced2eeea5);
+/// GUID_ACDC_POWER_SOURCE: 0 plugged in, 1 on battery, 2 short-term (UPS).
+const POWER_SOURCE: GUID = GUID::from_u128(0x5d3e9a59_e9d5_4b00_a6bd_ff34ff516548);
 /// The console display is on (or dimmed). Windows sends the current state as
 /// soon as the notification is registered.
 pub static DISPLAY_ON: AtomicBool = AtomicBool::new(true);
@@ -101,6 +104,10 @@ unsafe fn power_setting_changed(lp: windows::Win32::Foundation::LPARAM) {
     } else if guid == POWER_SAVING_STATUS {
         ENERGY_SAVER_OLD.store(value != 0, Ordering::Relaxed);
         signal("energy-saver");
+    } else if guid == POWER_SOURCE {
+        // The charger went in or out: the notch re-reads the battery now
+        // instead of on its next minute.
+        signal("power");
     }
 }
 
@@ -248,8 +255,8 @@ fn volume_lease(enumerator: &IMMDeviceEnumerator) -> Option<VolumeLease> {
 }
 struct MediaLease {
     session: Session,
-    properties: EventRegistrationToken,
-    playback: EventRegistrationToken,
+    properties: i64,
+    playback: i64,
 }
 impl Drop for MediaLease {
     fn drop(&mut self) {
@@ -359,7 +366,7 @@ fn watch_windows() {
             0,
             None,
             None,
-            instance.unwrap_or_default(),
+            Some(instance.unwrap_or_default().into()),
             None,
         )
         .ok();
@@ -374,6 +381,7 @@ fn watch_windows() {
                 CONSOLE_DISPLAY_STATE,
                 ENERGY_SAVER_STATUS,
                 POWER_SAVING_STATUS,
+                POWER_SOURCE,
             ] {
                 if let Ok(handle) =
                     RegisterPowerSettingNotification(recipient, &guid, DEVICE_NOTIFY_WINDOW_HANDLE)
@@ -391,7 +399,7 @@ fn watch_windows() {
         let foreground = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
             EVENT_SYSTEM_FOREGROUND,
-            HMODULE::default(),
+            None,
             Some(window_event),
             0,
             0,
@@ -400,7 +408,7 @@ fn watch_windows() {
         let objects = SetWinEventHook(
             EVENT_OBJECT_CREATE,
             EVENT_OBJECT_HIDE,
-            HMODULE::default(),
+            None,
             Some(window_event),
             0,
             0,
@@ -412,7 +420,7 @@ fn watch_windows() {
         );
         signal("ready");
         let mut message = MSG::default();
-        while GetMessageW(&mut message, HWND::default(), 0, 0).0 > 0 {
+        while GetMessageW(&mut message, None, 0, 0).0 > 0 {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -497,7 +505,7 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         }
         let manager = Sessions::RequestAsync()
             .ok()
-            .and_then(|task| task.get().ok());
+            .and_then(|task| task.join().ok());
         let session_token = manager.as_ref().and_then(|manager| {
             manager
                 .CurrentSessionChanged(&TypedEventHandler::new(|_, _| {
@@ -522,10 +530,13 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         let _install_token = package_catalog.as_ref().and_then(|catalog| {
             catalog
                 .PackageInstalling(&TypedEventHandler::new(
-                    |_, args: &Option<windows::ApplicationModel::PackageInstallingEventArgs>| {
+                    |_,
+                     args: windows::core::Ref<
+                        windows::ApplicationModel::PackageInstallingEventArgs,
+                    >| {
                         if args
-                            .as_ref()
-                            .is_some_and(|args| args.IsComplete().unwrap_or(false))
+                            .ok()
+                            .is_ok_and(|args| args.IsComplete().unwrap_or(false))
                         {
                             signal("catalog");
                         }
@@ -537,10 +548,13 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         let _remove_token = package_catalog.as_ref().and_then(|catalog| {
             catalog
                 .PackageUninstalling(&TypedEventHandler::new(
-                    |_, args: &Option<windows::ApplicationModel::PackageUninstallingEventArgs>| {
+                    |_,
+                     args: windows::core::Ref<
+                        windows::ApplicationModel::PackageUninstallingEventArgs,
+                    >| {
                         if args
-                            .as_ref()
-                            .is_some_and(|args| args.IsComplete().unwrap_or(false))
+                            .ok()
+                            .is_ok_and(|args| args.IsComplete().unwrap_or(false))
                         {
                             signal("catalog");
                         }

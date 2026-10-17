@@ -6,9 +6,9 @@ use std::ffi::c_void;
 use std::path::Path;
 
 use base64::Engine;
-use windows::core::{Interface, PCWSTR};
+use windows::core::{Interface, BOOL, PCWSTR};
 use windows::Win32::Foundation::POINT;
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, RECT, TRUE, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetMonitorInfoW, GetObjectW,
     MonitorFromPoint, MonitorFromWindow, BITMAP, BITMAPINFO, BITMAPINFOHEADER, BI_RGB,
@@ -473,7 +473,7 @@ pub fn assoc_executable(ext: &str) -> Option<String> {
             ASSOCSTR_EXECUTABLE,
             PCWSTR(w.as_ptr()),
             PCWSTR::null(),
-            PWSTR(buf.as_mut_ptr()),
+            Some(PWSTR(buf.as_mut_ptr())),
             &mut len,
         );
         if hr.is_err() || len == 0 {
@@ -508,12 +508,12 @@ pub fn set_clipboard_text(text: &str) -> bool {
                 std::ptr::copy_nonoverlapping(wide.as_ptr(), p, wide.len());
                 let _ = GlobalUnlock(h);
                 // The clipboard owns the memory after a successful set.
-                ok = SetClipboardData(CF_UNICODETEXT, HANDLE(h.0)).is_ok();
+                ok = SetClipboardData(CF_UNICODETEXT, Some(HANDLE(h.0))).is_ok();
                 if !ok {
-                    let _ = windows::Win32::Foundation::GlobalFree(h);
+                    let _ = windows::Win32::Foundation::GlobalFree(Some(h));
                 }
             } else {
-                let _ = windows::Win32::Foundation::GlobalFree(h);
+                let _ = windows::Win32::Foundation::GlobalFree(Some(h));
             }
         }
         let _ = CloseClipboard();
@@ -1012,7 +1012,15 @@ pub fn unprotect_data(data: &[u8]) -> Option<Vec<u8>> {
 /// Ask a window to close, exactly like its title-bar X: the app can still
 /// prompt to save. Posted, so a busy app never blocks the dock.
 pub fn close_window(hwnd: isize) -> bool {
-    unsafe { PostMessageW(HWND(hwnd as *mut c_void), WM_CLOSE, WPARAM(0), LPARAM(0)).is_ok() }
+    unsafe {
+        PostMessageW(
+            Some(HWND(hwnd as *mut c_void)),
+            WM_CLOSE,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .is_ok()
+    }
 }
 
 /// Bring a window to the foreground, restoring it if minimized.
@@ -1102,7 +1110,7 @@ fn write_startup_approved(enabled: bool) -> Result<(), String> {
         let opened = RegCreateKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(key_path.as_ptr()),
-            0,
+            Some(0),
             None,
             REG_OPTION_NON_VOLATILE,
             KEY_SET_VALUE,
@@ -1119,7 +1127,13 @@ fn write_startup_approved(enabled: bool) -> Result<(), String> {
             // 02 followed by zeros: "enabled", with no disable time stamp.
             let mut blob = [0u8; 12];
             blob[0] = 0x02;
-            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_BINARY, Some(&blob));
+            let r = RegSetValueExW(
+                key,
+                PCWSTR(value_name.as_ptr()),
+                Some(0),
+                REG_BINARY,
+                Some(&blob),
+            );
             if r.is_err() {
                 Err(format!("could not write the StartupApproved value ({r:?})"))
             } else {
@@ -1170,7 +1184,7 @@ fn write_run_value(enabled: bool, exe: &str) -> Result<(), String> {
         let opened = RegCreateKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(key_path.as_ptr()),
-            0,
+            Some(0),
             None,
             REG_OPTION_NON_VOLATILE,
             KEY_SET_VALUE,
@@ -1183,9 +1197,16 @@ fn write_run_value(enabled: bool, exe: &str) -> Result<(), String> {
         }
         let result = if enabled {
             // Quote the path so spaces in the install dir can't break the command.
-            let cmd = wide(&format!("\"{exe}\""));
+            // --autostart tells Booki it was started at sign-in (lib.rs).
+            let cmd = wide(&format!("\"{exe}\" --autostart"));
             let bytes = std::slice::from_raw_parts(cmd.as_ptr() as *const u8, cmd.len() * 2);
-            let r = RegSetValueExW(key, PCWSTR(value_name.as_ptr()), 0, REG_SZ, Some(bytes));
+            let r = RegSetValueExW(
+                key,
+                PCWSTR(value_name.as_ptr()),
+                Some(0),
+                REG_SZ,
+                Some(bytes),
+            );
             if r.is_err() {
                 Err(format!("could not write the Run registry value ({r:?})"))
             } else {
@@ -1237,6 +1258,21 @@ pub fn known_folders() -> Vec<(String, String)> {
     out
 }
 
+/// Below-normal CPU priority while Windows signs in, normal afterwards.
+pub fn set_background_priority(on: bool) {
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, SetPriorityClass, BELOW_NORMAL_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
+    };
+    let class = if on {
+        BELOW_NORMAL_PRIORITY_CLASS
+    } else {
+        NORMAL_PRIORITY_CLASS
+    };
+    unsafe {
+        let _ = SetPriorityClass(GetCurrentProcess(), class);
+    }
+}
+
 /// Atomically resize + move a window in one SetWindowPos call (no intermediate
 /// resized-but-not-yet-moved frame — that intermediate paint was the dock's
 /// "blink" whenever a flyout or menu grew/shrank the window).
@@ -1245,6 +1281,28 @@ pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
     let handle = HWND(hwnd as *mut c_void);
     unsafe {
         let _ = SetWindowPos(handle, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+/// Put a topmost window back on top of the topmost band without ever leaving
+/// it. Toggling always-on-top off and on (the only way to make the window
+/// layer re-apply it) dropped the window into the normal band for a moment,
+/// so the dock blinked behind the active app every few seconds.
+pub fn raise_topmost(hwnd: isize) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+    };
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let _ = SetWindowPos(
+            handle,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+        );
     }
 }
 
@@ -1313,7 +1371,7 @@ pub fn sync_context_menu(
         };
         let wval = wide(value);
         let bytes = std::slice::from_raw_parts(wval.as_ptr() as *const u8, wval.len() * 2);
-        let r = unsafe { RegSetValueExW(key, name_ptr, 0, REG_SZ, Some(bytes)) };
+        let r = unsafe { RegSetValueExW(key, name_ptr, Some(0), REG_SZ, Some(bytes)) };
         if r.is_err() {
             Err(format!("reg set failed ({r:?})"))
         } else {
@@ -1336,7 +1394,7 @@ pub fn sync_context_menu(
             RegCreateKeyExW(
                 HKEY_CURRENT_USER,
                 PCWSTR(wpath.as_ptr()),
-                0,
+                Some(0),
                 None,
                 REG_OPTION_NON_VOLATILE,
                 KEY_SET_VALUE,
@@ -1523,11 +1581,10 @@ pub fn trash_is_empty() -> bool {
 
 /// Empty the Recycle Bin (Booki's UI asks for confirmation first).
 pub fn empty_trash() -> Result<(), String> {
-    use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::Shell::{SHEmptyRecycleBinW, SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI};
     unsafe {
         SHEmptyRecycleBinW(
-            HWND::default(),
+            None,
             PCWSTR::null(),
             SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI,
         )
@@ -1614,7 +1671,7 @@ fn media_session() -> Option<windows::Media::Control::GlobalSystemMediaTransport
     use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
     let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
         .ok()?
-        .get()
+        .join()
         .ok()?;
     mgr.GetCurrentSession().ok()
 }
@@ -1624,7 +1681,7 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
     use windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status;
     use windows::Storage::Streams::DataReader;
     let session = media_session()?;
-    let info = session.TryGetMediaPropertiesAsync().ok()?.get().ok()?;
+    let info = session.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
     let title = info.Title().map(|s| s.to_string()).unwrap_or_default();
     let artist = info.Artist().map(|s| s.to_string()).unwrap_or_default();
     if title.is_empty() && artist.is_empty() {
@@ -1636,7 +1693,7 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         .map(|s| s == Status::Playing)
         .unwrap_or(false);
     let thumb = (|| {
-        let stream = info.Thumbnail().ok()?.OpenReadAsync().ok()?.get().ok()?;
+        let stream = info.Thumbnail().ok()?.OpenReadAsync().ok()?.join().ok()?;
         let size = stream.Size().unwrap_or(0);
         if size > 2_000_000 {
             return None; // unreasonably big for album art
@@ -1645,7 +1702,7 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         // Some sources (e.g. browser tabs) report Size()==0 — ask for a chunk
         // and read whatever actually arrived.
         let want: u32 = if size == 0 { 500_000 } else { size as u32 };
-        reader.LoadAsync(want).ok()?.get().ok()?;
+        reader.LoadAsync(want).ok()?.join().ok()?;
         let got = reader.UnconsumedBufferLength().ok()? as usize;
         if got == 0 {
             return None;
@@ -1675,7 +1732,7 @@ pub fn media_toggle() -> bool {
     let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TryTogglePlayPauseAsync().ok())
-        .and_then(|op| op.get().ok())
+        .and_then(|op| op.join().ok())
         .unwrap_or(false)
 }
 
@@ -1684,7 +1741,7 @@ pub fn media_next() -> bool {
     let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TrySkipNextAsync().ok())
-        .and_then(|op| op.get().ok())
+        .and_then(|op| op.join().ok())
         .unwrap_or(false)
 }
 
@@ -1693,7 +1750,7 @@ pub fn media_prev() -> bool {
     let _runtime = MediaRuntime::new();
     media_session()
         .and_then(|s| s.TrySkipPreviousAsync().ok())
-        .and_then(|op| op.get().ok())
+        .and_then(|op| op.join().ok())
         .unwrap_or(false)
 }
 

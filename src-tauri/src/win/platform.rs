@@ -2,7 +2,8 @@
 use serde::Serialize;
 use std::ffi::c_void;
 use windows::core::w;
-use windows::Win32::Foundation::{BOOL, HWND};
+use windows::core::BOOL;
+use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE, DWMWA_SYSTEMBACKDROP_TYPE,
     DWMWA_USE_IMMERSIVE_DARK_MODE,

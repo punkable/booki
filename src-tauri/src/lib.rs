@@ -3,6 +3,7 @@
 //! Owns the frameless always-on-top dock window, the system-tray icon, config
 //! persistence, app launching and (on Windows) native window management.
 
+mod ai_usage;
 mod app_catalog;
 mod apps;
 mod clipboard;
@@ -20,6 +21,7 @@ mod native_text;
 mod notch_window;
 mod note_journal;
 mod notifications;
+mod plugins;
 mod profile_store;
 mod profiles;
 mod recent_files;
@@ -533,6 +535,68 @@ fn set_always_on_top(app: AppHandle, value: bool) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+/// Set when Windows started Booki at sign-in (the Run entry passes
+/// `--autostart`), so the first minute can stay out of the way of
+/// everything else that is starting.
+static LAUNCHED_AT_LOGIN: AtomicBool = AtomicBool::new(false);
+
+/// Did Windows start this Booki at sign-in? The dock defers its own
+/// non-urgent work (update check, catalog scans) when it did.
+#[tauri::command]
+fn launched_at_login() -> bool {
+    LAUNCHED_AT_LOGIN.load(Ordering::Relaxed)
+}
+
+/// Battery of connected Bluetooth devices (headsets, mice, keyboards…), for
+/// the Devices widget. Empty where Windows reports none.
+#[tauri::command]
+async fn device_batteries() -> Vec<serde_json::Value> {
+    #[cfg(windows)]
+    {
+        tauri::async_runtime::spawn_blocking(|| {
+            win::devices::device_batteries()
+                .into_iter()
+                .filter_map(|d| serde_json::to_value(d).ok())
+                .collect()
+        })
+        .await
+        .unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// Plan usage of the AI services signed in on this PC, for the AI widget.
+/// The dock only asks while that widget is pinned.
+#[tauri::command]
+async fn ai_usage() -> Vec<ai_usage::ProviderUsage> {
+    tauri::async_runtime::spawn_blocking(ai_usage::usage)
+        .await
+        .unwrap_or_default()
+}
+
+/// Installed state of an optional plugin (Settings > Plugins).
+#[tauri::command]
+fn plugin_status(id: String) -> Result<plugins::Status, String> {
+    Ok(plugins::status(plugins::find(&id).ok_or("unknown plugin")?))
+}
+
+/// Download, verify and install a plugin the person chose in Settings.
+#[tauri::command]
+async fn plugin_install(id: String) -> Result<String, String> {
+    let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    tauri::async_runtime::spawn_blocking(move || plugins::install(plugin))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn plugin_uninstall(id: String) -> Result<(), String> {
+    plugins::uninstall(plugins::find(&id).ok_or("unknown plugin")?)
 }
 
 #[tauri::command]
@@ -1222,10 +1286,10 @@ fn open_settings_url(app: &AppHandle, url: &str) {
         // moves apps in and out of groups with it and takes no file drops.
         .disable_drag_drop_handler()
         .build();
-    // NOTE: the settings window is deliberately NOT transparent. A transparent
-    // WebView2 window rendered blank/see-through on real Windows (the page never
-    // painted). An opaque window always paints; the modern look comes from the
-    // floating acrylic-style panels in CSS over a solid background.
+    // NOTE: the settings window is never built transparent: a transparent
+    // WebView2 window rendered blank on real Windows. Mica comes afterwards
+    // instead (settings_backdrop): DWM's system backdrop behind the window,
+    // then only the WebView background is cleared, with a solid fallback.
     #[cfg(windows)]
     if let Ok(w) = &built {
         // Defeat the WebView2 initial-size race: on first paint the webview can
@@ -1293,6 +1357,20 @@ fn install_panic_hook() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
+    if std::env::args().any(|arg| arg == "--autostart") {
+        LAUNCHED_AT_LOGIN.store(true, Ordering::Relaxed);
+        // Sign-in is the busiest minute Windows has. Show the dock at once,
+        // but let every other startup app and Explorer win any contest for
+        // the CPU until things settle, then return to normal priority.
+        #[cfg(windows)]
+        {
+            win::set_background_priority(true);
+            std::thread::spawn(|| {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                win::set_background_priority(false);
+            });
+        }
+    }
     // Before any window exists: taskbar grouping and toasts follow this ID,
     // which the installers also stamp on the Start-menu shortcut. The logger
     // is not up yet; a failure shows up later as a `notify` error.
@@ -1379,6 +1457,12 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            launched_at_login,
+            device_batteries,
+            ai_usage,
+            plugin_status,
+            plugin_install,
+            plugin_uninstall,
             quiet_update_supported,
             acquire_update_lock,
             release_update_lock,
@@ -1693,8 +1777,9 @@ pub fn run() {
                                 // and can slide above the dock/notch. Re-assert topmost
                                 // status every few seconds so both stay reachable.
                                 if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
-                                    let _ = watch.set_always_on_top(false);
-                                    let _ = watch.set_always_on_top(true);
+                                    if let Ok(h) = watch.hwnd() {
+                                        win::raise_topmost(h.0 as isize);
+                                    }
                                 }
                                 // Only while it is actually on screen. This used
                                 // to run unconditionally, so a hidden notch —
@@ -1703,8 +1788,9 @@ pub fn run() {
                                 // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
                                     if notch.is_visible().unwrap_or(false) {
-                                        let _ = notch.set_always_on_top(false);
-                                        let _ = notch.set_always_on_top(true);
+                                        if let Ok(h) = notch.hwnd() {
+                                            win::raise_topmost(h.0 as isize);
+                                        }
                                     }
                                 }
                             }
@@ -1925,8 +2011,18 @@ pub fn run() {
                                                 }
                                             }
                                             // Snappy while the cursor is over Booki,
-                                            // lighter while the window is click-through.
-                                            next_ms = next_ms.min(if inside { 30 } else { 80 });
+                                            // lighter while the window is click-through,
+                                            // and lighter still while the cursor is
+                                            // nowhere near the window: it cannot reach
+                                            // a hit area before the next look.
+                                            let ms = if inside {
+                                                30
+                                            } else if win::cursor_near_window(t.hwnd, 96) {
+                                                80
+                                            } else {
+                                                180
+                                            };
+                                            next_ms = next_ms.min(ms);
                                         }
                                     }
                                 }

@@ -110,14 +110,14 @@ export function openMenu(e, item) {
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card).
     if (item.kind === "app" || item.kind === "folder") {
-      add("palette", t("m.changeIcon"), () => changeIcon(item));
+      add("image", t("m.changeIcon"), () => changeIcon(item));
       if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
     }
     if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
   }
   sep();
   add("plus", t("add.open"), () => openAddPanel(dockEl));
-  add("grid", t("m.addSep"), () => addSeparatorAfter(item.id));
+  add("minus", t("m.addSep"), () => addSeparatorAfter(item.id));
   sep();
   add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   sep();

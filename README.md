@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="docs/releases/v0.84.0.md"><b>What's new in 0.84</b></a> ·
+  <a href="docs/releases/v0.86.0.md"><b>What's new in 0.86</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
@@ -70,7 +70,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><sub>Images show the actual Booki 0.81 interface with example data and generic sample icons.</sub></p>
+<p align="center"><sub>Images show the actual Booki 0.86 interface with example data and generic sample icons.</sub></p>
 
 ## Get started
 
@@ -79,6 +79,16 @@
 3. Drag an app or folder onto the dock, or right-click the dock to add items.
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
+
+### New in 0.86
+
+- **Feels like Windows 11** — WinUI-style menus, Windows' accent colours, 4/8 px corners, Windows type sizes and motion steps, taskbar-style hints and thin scrollbars.
+- **A live notch widens into the dock** from wherever it sits, with one spring for the whole move, and the dock no longer blinks behind the active app.
+- **Devices widget** — battery of Bluetooth headphones, mice and keyboards, Logitech devices on a Bolt or Unifying receiver, and wireless headsets through the optional HeadsetControl plugin.
+- **AI usage widget (opt-in)** — your Claude and ChatGPT/Codex limits, read from the sign-in those apps already keep on your PC.
+- **Plugins** — optional open-source tools you install from Settings, verified before they run.
+- **Smarter start with Windows** — the dock appears at once while Booki stays out of the way during sign-in.
+- **A first dock that already looks like yours**, a simpler Dock page with More settings, a "Charging" moment on the notch, and many fixes.
 
 ### New in 0.85
 
@@ -114,7 +124,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 - **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
 - **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
 
-See the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+See the [0.86 release notes](docs/releases/v0.86.0.md), the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
 
 ## Everyday controls
 
@@ -129,11 +139,15 @@ See the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/
 | `Alt` + `1…9` | Launch the corresponding pin; the modifier is configurable |
 | Push the cursor to the edge | Reveal a hidden dock when edge/hover behavior is enabled |
 | Wheel over Media, if enabled | Change system volume |
+| Hover a widget | Its hint lists the details (every device's battery, every AI usage window and when it resets) |
 
 ## Privacy and your data
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
-- Network requests are limited to update checks/downloads and website favicons, plus optional Open-Meteo weather after choosing a city, without device-location access.
+- Network requests are limited to update checks/downloads and website favicons, plus three things that happen only when you turn them on: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official GitHub releases (checked against GitHub's SHA-256 digest), and the AI usage widget.
+- The AI usage widget reads the sign-in Claude Code (`~/.claude`) and Codex (`~/.codex`) already keep on your PC and sends each only to its own service (Anthropic or OpenAI) to read your plan's usage. Booki never stores, logs or forwards it, and asks only while the widget is on the dock.
+- Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
+- Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder.
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
 - Clipboard history is local. Restart persistence is off by default; when enabled, it is protected for your Windows user and can expire.
 - Compatible captures hide the dock by default. Enable **Visible in captures** in Settings when recording it.

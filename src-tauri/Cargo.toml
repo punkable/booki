@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.85.0"
+version = "0.86.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -38,19 +38,25 @@ log = "0.4"
 sysinfo = "0.39"
 # Tiny HTTP client to fetch a website's favicon when pinning it as a widget.
 ureq = "3"
+# Verify and unpack optional plugins (plugins.rs).
+sha2 = "0.10"
+zip = { version = "4", default-features = false, features = ["deflate"] }
 
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]
 png = "0.18"
+# Logitech HID++ battery over Bolt/Unifying receivers (win/logitech.rs).
+hidapi = { version = "2.6", default-features = false, features = ["windows-native"] }
 windows-dpapi = "0.2"
 # Decode the desktop wallpaper to derive an accent color from it.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }
 
 [target.'cfg(windows)'.dependencies.windows]
-version = "0.58"
+version = "0.62"
 features = [
-    "implement",
     "ApplicationModel",
+    # Battery of Bluetooth headsets, mice and keyboards (win/devices.rs).
+    "Devices_Enumeration_Pnp",
     "Win32_UI_Accessibility",
     "Win32_UI_Shell_Common",
     "Win32_UI_Shell_PropertiesSystem",
@@ -88,7 +94,15 @@ features = [
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]
-version = "0.58"
+version = "0.62"
+
+# Split out of `windows` in 0.62: Vector2 for the composition backdrop.
+# IIterable from a Vec, for WinRT device property queries.
+[target.'cfg(windows)'.dependencies.windows-collections]
+version = "0.3"
+
+[target.'cfg(windows)'.dependencies.windows-numerics]
+version = "0.3"
 
 [profile.release]
 panic = "abort"

@@ -224,7 +224,7 @@ test('app source filters keep selection and searching reaches the whole library'
     };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  await page.getByRole('group', { name: 'App sources' }).getByRole('button', { name: 'Most used' }).click();
+  await page.getByRole('tablist', { name: 'App sources' }).getByRole('tab', { name: 'Most used' }).click();
   await page.getByRole('checkbox', { name: 'Select app: Editor' }).check();
   assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Calculator' }).count(), 0);
   await page.getByRole('searchbox', { name: 'Search apps…' }).fill('Calculator');
@@ -258,7 +258,7 @@ test('the dock app panel retries failed sources and supports keyboard tabs', asy
   await tabs.getByRole('tab', { name: 'Apps', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await tabs.getByRole('tab', { name: 'Widgets', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('.add-wcell').count(), 10);
+  assert.equal(await page.locator('.add-wcell').count(), 12);
   await page.locator('.add-head').getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await page.locator('#stack.open').count(), 0);
   assert.deepEqual(errors, []);

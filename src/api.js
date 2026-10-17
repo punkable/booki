@@ -572,6 +572,13 @@ export const dock = {
   openDataDir: () => invoke("open_data_dir"),
   setDockEdge: (edge) => invoke("set_dock_edge", { edge }),
   appVersion: () => invoke("app_version"),
+  /** True when Windows started Booki at sign-in. */
+  deviceBatteries: () => invoke("device_batteries"),
+  aiUsage: () => invoke("ai_usage"),
+  pluginStatus: (id) => invoke("plugin_status", { id }),
+  pluginInstall: (id) => invoke("plugin_install", { id }),
+  pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
+  launchedAtLogin: () => invoke("launched_at_login").then(Boolean).catch(() => false),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),
   applyHotkeys: (toggle, positions, modifier, launcher) =>
@@ -752,8 +759,3 @@ export async function onNotchToastOut(cb) {
   return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
-/** Listen for the active foreground app changing (multi-notch intelligence). */
-export async function onActiveApp(cb) {
-  if (!(T && T.event && T.event.listen)) return () => {};
-  return T.event.listen("booki://active-app", (e) => cb(e.payload || { app: "", dot: false }));
-}

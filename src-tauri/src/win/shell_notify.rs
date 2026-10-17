@@ -9,13 +9,14 @@
 
 use windows::core::{Interface, HSTRING, PCWSTR, PWSTR};
 use windows::Data::Xml::Dom::XmlDocument;
+use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, IPersistFile,
     CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, STGM_READ,
 };
 use windows::Win32::UI::Shell::Common::IObjectArray;
-use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, PROPERTYKEY};
+use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::Shell::{
     ApplicationDocumentLists, FOLDERID_LocalAppData, FOLDERID_ProgramFilesCommonX64,
     FOLDERID_ProgramFilesCommonX86, FOLDERID_ProgramFilesX64, FOLDERID_ProgramFilesX86,

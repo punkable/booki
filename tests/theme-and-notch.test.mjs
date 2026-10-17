@@ -82,7 +82,24 @@ test("the notch tells the dock its settled live shape", async () => {
   await event(page, "booki://media-changed", null);
   await waitForAsyncCondition(page, () => window.__shapes.at(-1)?.active === true);
   const shape = await page.evaluate(() => window.__shapes.at(-1));
-  assert.deepEqual(shape, { active: true, width: 150, height: 18, attached: true });
+  const { cx, ...size } = shape;
+  assert.deepEqual(size, { active: true, width: 150, height: 18, attached: true });
+  assert.ok(Number.isFinite(cx), "reports where the capsule sits on screen");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("a live notch off to one side opens the dock from where it sits", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ autoHideMode: "edge", pinned: everyKindPinned().slice(0, 6) }),
+    viewport: { width: 1200, height: 300 },
+  });
+  await waitForAsyncCondition(page, () => document.body.classList.contains("tucked"));
+  await event(page, "booki://notch-shape", { active: true, width: 150, height: 18, attached: true, cx: 0 });
+  await event(page, "booki://reveal", null);
+  const clip = await page.evaluate(() => document.body.style.getPropertyValue("--morph-clip"));
+  // Pinned to the bar's left end: no left inset, the rest cut from the right.
+  assert.match(clip, /^inset\(\S+ [1-9][\d.]*px \S+ 0px round /);
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -103,6 +120,8 @@ test("a live notch opens the dock by stretching into it, not rising from the edg
   assert.match(start.clip, /^inset\(/, "starts clipped to the capsule");
   assert.equal(start.transform, "none", "no genie squash or rise");
   assert.equal(start.opacity, "1");
+  // Widening first: the middle beat is full width at the capsule's height.
+  assert.match(await page.evaluate(() => document.body.style.getPropertyValue("--morph-wide")), /^inset\(\S+ 0px \S+ 0px round /);
   await waitForAsyncCondition(page, () => !document.body.classList.contains("reveal-morph") && !document.body.classList.contains("tucked"));
   assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("dock")).clipPath), "none");
   assert.deepEqual(errors, []);

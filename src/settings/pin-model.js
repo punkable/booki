@@ -18,23 +18,3 @@ export function widgetRefs(pinned, widget) {
   return refs;
 }
 
-export function itemForWidgetRef(pinned, ref) {
-  if (!ref) return null;
-  if (ref.type === "top") {
-    return (pinned || []).find((item) => item.id === ref.id) || null;
-  }
-  const group = (pinned || []).find((item) => item.id === ref.groupId);
-  return (group?.children || []).find((child) => child.id === ref.id) || null;
-}
-
-export function updateWidgetStyleForRef(pinned, ref, value) {
-  if (!ref) return pinned;
-  if (ref.type === "top") {
-    return pinned.map((item) => (item.id === ref.id ? { ...item, style: value } : item));
-  }
-  return pinned.map((item) =>
-    item.id === ref.groupId
-      ? { ...item, children: (item.children || []).map((child) => (child.id === ref.id ? { ...child, style: value } : child)) }
-      : item
-  );
-}

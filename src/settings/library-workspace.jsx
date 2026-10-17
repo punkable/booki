@@ -209,7 +209,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   };
   const hasSettings = (items) => items.some((item) => item.kind === 'action' && item.action === 'settings' || hasSettings(item.children || []));
   return <>
-    <PageHeader title={t('overhaul.appsFolders')}>{t('next.selectionHint')}</PageHeader>
+    <PageHeader title={t('overhaul.appsFolders')}>{t('library.pageHint')}</PageHeader>
     <section className={'library-dock-editor' + (openGroup ? ' group-open' : '')} aria-label={openGroup ? `${t('apps.inDock')}: ${pinLabel(openGroup)}` : t('workspace.pinned')}
       onDragOver={dragOver} onDrop={(event) => drop(event, openGroup ? { beforeId: afterGroup(openGroup.id) } : {})}
       onKeyDown={(event) => { if (event.key === 'Escape' && openGroup && !event.defaultPrevented) { event.preventDefault(); leave(); } }}>
@@ -274,7 +274,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     <div className="library-workspace">
       <div className="library-catalog">
         <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }}
-          destination={<label className="library-destination">{t('next.destination')}<select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label>}
+          destination={<label className="library-destination"><span>{t('library.addingTo')}</span><select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label>}
           webPanel={<div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="button button-accent" disabled={webBusy || !webUrl.trim()} onClick={async () => {
       if (webBusy) return;
       try {

@@ -260,7 +260,7 @@ pub fn frequent_apps(limit: usize) -> Vec<UsedApp> {
             RegOpenKeyExW(
                 HKEY_CURRENT_USER,
                 PCWSTR(wide.as_ptr()),
-                0,
+                Some(0),
                 KEY_READ,
                 &mut hkey,
             )
@@ -279,7 +279,7 @@ pub fn frequent_apps(limit: usize) -> Vec<UsedApp> {
                 RegEnumValueW(
                     hkey,
                     index,
-                    windows::core::PWSTR(name.as_mut_ptr()),
+                    Some(windows::core::PWSTR(name.as_mut_ptr())),
                     &mut name_len,
                     None,
                     None,

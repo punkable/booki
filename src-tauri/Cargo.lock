@@ -320,15 +320,17 @@ dependencies = [
 
 [[package]]
 name = "booki-dock"
-version = "0.85.0"
+version = "0.86.0"
 dependencies = [
  "base64 0.23.1",
  "dirs",
+ "hidapi",
  "image",
  "log",
  "png 0.18.1",
  "serde",
  "serde_json",
+ "sha2",
  "sysinfo",
  "tauri",
  "tauri-build",
@@ -340,9 +342,12 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "ureq",
- "windows 0.58.0",
- "windows-core 0.58.0",
+ "windows 0.62.2",
+ "windows-collections",
+ "windows-core 0.62.2",
  "windows-dpapi",
+ "windows-numerics",
+ "zip",
 ]
 
 [[package]]
@@ -1613,6 +1618,19 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hidapi"
+version = "2.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "818c0e1d27887aaf76fe737042e27a66b796a7b099e6d2e1a72d106c2dff3fa6"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "pkg-config",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "html5ever"
@@ -5088,16 +5106,6 @@ dependencies = [
 
 [[package]]
 name = "windows"
-version = "0.58.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
-dependencies = [
- "windows-core 0.58.0",
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows"
 version = "0.62.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580"
@@ -5852,8 +5860,10 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
+ "flate2",
  "indexmap 2.14.2",
  "memchr",
+ "zopfli",
 ]
 
 [[package]]
@@ -5867,6 +5877,18 @@ name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zopfli"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf7fc5d30c28483d93805c4a5e12b05bbb52407fa67c5f8bd552374cd01fb11"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
+]
 
 [[package]]
 name = "zune-core"
