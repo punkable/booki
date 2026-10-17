@@ -18,8 +18,10 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
   const content = document.createElement('span'); content.className = 'dock-tip-content';
   content.append(name, detail); tip.append(mark, content); document.body.append(tip);
   let anchor = null, timer = 0;
+  let warmUntil = 0;
   function hide() {
     clearTimeout(timer); timer = 0;
+    if (tip.classList.contains('show')) warmUntil = performance.now() + 500;
     if (anchor) {
       delete anchor.dataset.hintOpen;
       const ids = (anchor.getAttribute('aria-describedby') || '').split(/\s+/).filter(id => id && id !== tip.id);
@@ -66,7 +68,10 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
     const tile = event.target.closest?.('.tile[data-id]');
     if (!tile || !root.contains(tile) || tile.classList.contains('separator') || blocked() || tile === anchor) return;
     hide(); anchor = tile;
-    timer = setTimeout(show, event.type === 'focusin' ? 0 : 340);
+    // Like the taskbar: the first hint waits for a deliberate hover; while
+    // one was just open, sliding to the next tile shows its hint at once.
+    const warm = performance.now() < warmUntil;
+    timer = setTimeout(show, event.type === 'focusin' ? 0 : warm ? 40 : 400);
   }
   function leave(event) {
     if (anchor && (!event.relatedTarget || !anchor.contains(event.relatedTarget))) hide();
