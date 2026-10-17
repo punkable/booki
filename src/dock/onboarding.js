@@ -8,6 +8,32 @@ import { reframe } from "./frame.js";
 import { setHidden, scheduleHide } from "./autohide.js";
 import { dismissPop, placePop } from "./popovers.js";
 import { persist } from "./config-sync.js";
+import { uid, widgetLabel } from "./helpers.js";
+import { render } from "./render.js";
+import { firstDockApps } from "./first-dock.js";
+
+/** A first dock that already looks like yours: the apps you use most, a
+ *  clock and the trash, instead of an empty bar asking to be filled. Only on
+ *  a true first run, and only from Windows' own usage count when usage
+ *  suggestions are allowed. Returns whether anything was added. */
+async function seedFirstDock() {
+  if (S.cfg.pinned.some((p) => p.kind !== "separator")) return false;
+  if (S.cfg.usageRecommendationsEnabled === false) return false;
+  let used = [];
+  try { used = (await dockApi.frequentApps(24)) || []; } catch (_) { return false; }
+  const apps = firstDockApps(used).map((app) => ({ id: uid(), name: app.name, path: app.path, args: [], kind: "app" }));
+  if (!apps.length) return false;
+  S.cfg.pinned = [
+    ...apps,
+    { id: uid(), name: "", path: "", args: [], kind: "separator" },
+    { id: uid(), name: widgetLabel("clock"), path: "", args: [], kind: "widget", widget: "clock" },
+    { id: uid(), name: t("trash.name"), path: "", args: [], kind: "trash" },
+  ];
+  if (!(await persist())) return false;
+  await render();
+  reframe();
+  return true;
+}
 
 // Show the changelog the first time the app opens after an update.
 export async function checkChangelog() {
@@ -29,6 +55,7 @@ export async function checkChangelog() {
 // First-run tips: three small coach bubbles, shown once ever.
 export async function maybeOnboard() {
   if (S.cfg.onboarded) return;
+  await seedFirstDock();
   const steps = [
     { emoji: emo("pointer", 22), text: t("ob.step1") },
     { emoji: emo("card", 22), text: t("ob.step2") },
