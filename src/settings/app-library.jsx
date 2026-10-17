@@ -51,6 +51,9 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
     onIdentities?.(identities);
     setData({ ...next, identities }); setFailed(result.map((r, i) => r.status === 'rejected' ? i : -1).filter((i) => i >= 0)); setLoading(false);
   };
+  // Reloads only when the recommendations switch flips; bumping the live
+  // generation on cleanup is what drops a load still in flight.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); return () => { generation.current++; }; }, [cfg.usageRecommendationsEnabled]);
   const reload = useRef(load); reload.current = load;
   useEffect(() => {

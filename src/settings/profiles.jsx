@@ -39,6 +39,8 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
   };
   useEffect(() => {
     alive.current = true; refresh().catch(() => { if (alive.current) setError(t("overhaul.failed")); });
+    // Bumping the live id on unmount drops a refresh still in flight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => { alive.current = false; refreshId.current++; };
   }, []);
   useEffect(() => {

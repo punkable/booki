@@ -230,8 +230,12 @@ export function useSettingsStore() {
       disposed = true;
       unlisten?.();
       clearTimeout(saveTimer.current);
+      // Read at teardown on purpose: these are the edits still unsaved then.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       if (dirtyKeys.current.size) flushSave();
     };
+    // Registered once; close and flushSave only read refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reflect dock-side changes without clobbering in-progress edits. One-way
