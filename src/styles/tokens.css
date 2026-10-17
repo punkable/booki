@@ -41,16 +41,18 @@
   --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
 
-  /* Motion: strong ease-out, five durations by how much of the screen moves. */
+  /* Motion: strong ease-out, five durations by how much of the screen moves,
+     on Windows' own steps: 83ms for pointer feedback, 167ms for controls,
+     250ms for panels and 333ms for the largest moves. */
   --ease: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-bounce: cubic-bezier(0.34, 1.25, 0.5, 1);
-  --dur-1: 0.12s;
-  --dur-2: 0.15s;
-  --dur-3: 0.18s;
-  --dur-4: 0.22s;
-  --dur-5: 0.28s;
+  --dur-1: 0.083s;
+  --dur-2: 0.167s;
+  --dur-3: 0.2s;
+  --dur-4: 0.25s;
+  --dur-5: 0.333s;
   /* One spring for every shape change between the notch and the dock: the
      notch growing into a live capsule or card, and the dock opening out of
      that capsule. It overshoots a hair and settles. The genie from an idle
