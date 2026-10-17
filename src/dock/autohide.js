@@ -120,18 +120,18 @@ let morphTimer = null;
 
 function endMorph() {
   clearTimeout(morphTimer);
-  document.body.classList.remove("reveal-morph", "morph-start");
-  for (const name of ["--morph-clip", "--morph-wide", "--morph-shift"]) document.body.style.removeProperty(name);
+  document.body.classList.remove("reveal-morph", "morph-start", "morph-closing");
+  for (const name of ["--morph-clip", "--morph-shift"]) document.body.style.removeProperty(name);
 }
 
 /** Put the tucked bar at the notch capsule's size, ready to grow. Returns
  *  false (and the genie stays) when the notch is idle or motion is reduced. */
-function prepareMorph() {
+function prepareMorph(opening = true) {
   endMorph();
   const edge = S.cfg.edge || "bottom";
   const body = document.body;
-  if (!notchShape?.active || reduceMotion() || !body.classList.contains("tucked")) return false;
-  if (edge !== "bottom" && edge !== "top") return false;
+  if (!notchShape?.active || reduceMotion() || (opening && !body.classList.contains("tucked"))) return false;
+  const vertical = edge === "left" || edge === "right";
   // The window is still hidden here, so these steps never show.
   body.classList.add("reveal-morph", "morph-start");
   const r = dockEl.getBoundingClientRect();
@@ -141,21 +141,20 @@ function prepareMorph() {
   // Start where the notch really is: its screen centre, mapped into this
   // window and kept inside the bar.
   const centre = Number.isFinite(notchShape.cx) ? notchShape.cx - window.screenX : r.left + r.width / 2;
-  const left = Math.min(r.width - w, Math.max(0, centre - r.left - w / 2));
+  const left = vertical ? (edge === "right" ? r.width - w : 0) : Math.min(r.width - w, Math.max(0, centre - r.left - w / 2));
   const right = r.width - w - left;
   const radius = Math.min(h / 2, 18);
-  const top = edge === "bottom" ? r.height - h : 0;
-  const bottom = edge === "bottom" ? 0 : r.height - h;
-  // Two beats (styles.css, dock-morph): the capsule first stretches sideways
-  // to the bar's full width at its own height, then takes the bar's height.
-  // It reads as the notch widening into the dock, not a dock rising from
-  // the edge.
+  const cy = Number.isFinite(notchShape.cy) ? notchShape.cy - window.screenY : r.top + r.height / 2;
+  const top = vertical ? Math.min(r.height - h, Math.max(0, cy - r.top - h / 2)) : edge === "bottom" ? r.height - h : 0;
+  const bottom = r.height - h - top;
+  // Position and both dimensions interpolate together with the shared spring.
   body.style.setProperty("--morph-clip", `inset(${top}px ${right}px ${bottom}px ${left}px round ${radius}px)`);
-  body.style.setProperty("--morph-wide", `inset(${top}px 0px ${bottom}px 0px round ${radius}px)`);
   // An attached tab sits on the screen edge; a floating pill or dot already
   // shares the bar's gap.
-  const gap = edge === "bottom" ? innerHeight - r.bottom : -r.top;
-  body.style.setProperty("--morph-shift", `0px ${notchShape.attached ? gap : 0}px`);
+  const gap = vertical ? (edge === "right" ? innerWidth - r.right : -r.left) : edge === "bottom" ? innerHeight - r.bottom : -r.top;
+  const shift = notchShape.attached ? gap : 0;
+  body.style.setProperty("--morph-shift", vertical ? `${shift}px 0px` : `0px ${shift}px`);
+  body.classList.toggle("morph-closing", !opening);
   void dockEl.offsetWidth;
   body.classList.remove("morph-start");
   return true;
@@ -172,13 +171,13 @@ export function setHidden(v) {
     // The window is about to go away — the pointer can't be "inside" anymore.
     // (Windows won't fire pointerout for a window that hides under the cursor.)
     S.pointerInside = false;
-    endMorph();
+    const morph = prepareMorph(false);
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
     document.body.classList.add("tucked");
     setTimeout(() => {
-      if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
-    }, 190); // match genie (~170ms) + a frame
+      if (S.hiddenState) { dockApi.hideDock(S.cfg.edge); endMorph(); }
+    }, morph ? MORPH_MS + 60 : 190); // match genie (~170ms) + a frame
   } else {
     // Show the dock window (and hide the notch), make sure it's sized to the full
     // bar, then slide the bar back in. Force the stage fully interactive during
@@ -194,7 +193,7 @@ export function setHidden(v) {
     setTimeout(() => {
       document.body.classList.remove("revealing");
       reportHitRects();
-    }, 380);
+    }, morph ? 40 + MORPH_MS + 60 : 380);
   }
 }
 

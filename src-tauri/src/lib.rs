@@ -21,6 +21,7 @@ mod native_text;
 mod notch_window;
 mod note_journal;
 mod notifications;
+mod plugin_tools;
 mod plugins;
 mod profile_store;
 mod profiles;
@@ -579,6 +580,11 @@ async fn ai_usage() -> Vec<ai_usage::ProviderUsage> {
         .unwrap_or_default()
 }
 
+#[tauri::command]
+fn plugin_catalog() -> &'static [plugins::Plugin] {
+    plugins::catalog()
+}
+
 /// Installed state of an optional plugin (Settings > Plugins).
 #[tauri::command]
 fn plugin_status(id: String) -> Result<plugins::Status, String> {
@@ -595,8 +601,9 @@ async fn plugin_install(id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn plugin_uninstall(id: String) -> Result<(), String> {
-    plugins::uninstall(plugins::find(&id).ok_or("unknown plugin")?)
+async fn plugin_uninstall(id: String) -> Result<(), String> {
+    let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    util::blocking(move || plugins::uninstall(plugin)).await?
 }
 
 #[tauri::command]
@@ -1460,6 +1467,10 @@ pub fn run() {
             launched_at_login,
             device_batteries,
             ai_usage,
+            plugin_catalog,
+            plugin_tools::plugin_read,
+            plugin_tools::plugin_open,
+            plugin_tools::plugin_download,
             plugin_status,
             plugin_install,
             plugin_uninstall,
@@ -1509,7 +1520,10 @@ pub fn run() {
             profile_deleted,
             profile_restore,
             volume_info,
+            app_volumes,
+            app_volume_set,
             volume_set,
+            volume_set_state,
             volume_mute,
             set_dock_edge,
             open_changelog,
@@ -1714,6 +1728,9 @@ pub fn run() {
                 #[cfg(windows)]
                 if let Ok(h) = dock.hwnd() {
                     win::set_capture_visible(h.0 as isize, cfg.capture_visible);
+                    let raw = h.0 as isize;
+                    let drop_window = dock.clone();
+                    let _ = dock.with_webview(move |_| win::link_drop::install(raw, drop_window));
                 }
 
                 // Register the global hotkey, if configured.

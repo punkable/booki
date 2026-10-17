@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar para Windows</b></a> ·
-  <a href="docs/releases/v0.86.0.md"><b>Novedades de 0.86</b></a> ·
+  <a href="docs/releases/v0.87.0.md"><b>Novedades de 0.87</b></a> ·
   <a href="README.md">English</a>
 </p>
 
@@ -79,6 +79,14 @@
 3. Arrastra una app o carpeta al dock, o haz clic derecho en el dock para añadir elementos.
 
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
+
+## Novedades de 0.87
+
+- Un catálogo común para HeadsetControl, yt-dlp, OpenRGB, Rclone y LibreHardwareMonitor, más consultas mediante el winget administrado por App Installer de Windows.
+- Paneles de detalles de widgets y un mezclador nativo de Windows por aplicación.
+- Grises por capas de WinUI en los temas claro y oscuro, y una transición continua con resorte entre el notch dinámico y el dock en ambos sentidos.
+
+Consulta los requisitos de configuración y los límites de validación en las [notas de 0.87](docs/releases/v0.87.0.md).
 
 ## Novedades de 0.86
 

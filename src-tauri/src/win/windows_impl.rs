@@ -1864,6 +1864,129 @@ pub fn volume_mute_toggle() -> Result<bool, String> {
     }
 }
 
+/// Mixer edits keep the requested mute state throughout a level change.
+/// The ordinary wheel command still unmutes, like Windows' volume keys.
+pub fn volume_set_state(pct: u32, muted: bool) -> Result<(), String> {
+    let _runtime = AudioRuntime::new();
+    unsafe {
+        let volume = endpoint_volume()?;
+        if muted {
+            volume
+                .SetMute(true, std::ptr::null())
+                .map_err(|e| e.to_string())?;
+        }
+        volume
+            .SetMasterVolumeLevelScalar(pct.min(100) as f32 / 100.0, std::ptr::null())
+            .map_err(|e| e.to_string())?;
+        if !muted {
+            volume
+                .SetMute(false, std::ptr::null())
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
+/// Core Audio sessions on the default output. The instance identifier (not
+/// just the PID) distinguishes multiple sessions owned by the same app.
+pub fn app_volumes() -> Result<Vec<super::AppVolume>, String> {
+    use windows::core::Interface;
+    use windows::Win32::Media::Audio::{IAudioSessionControl2, ISimpleAudioVolume};
+    let _runtime = AudioRuntime::new();
+    unsafe {
+        let sessions = audio_sessions()?;
+        let mut result = Vec::new();
+        for i in 0..sessions.GetCount().map_err(|e| e.to_string())?.min(256) {
+            let Ok(session) = sessions.GetSession(i) else {
+                continue;
+            };
+            let Ok(control) = session.cast::<IAudioSessionControl2>() else {
+                continue;
+            };
+            let Ok(volume) = session.cast::<ISimpleAudioVolume>() else {
+                continue;
+            };
+            let pid = control.GetProcessId().unwrap_or(0);
+            let Ok(id) = control.GetSessionInstanceIdentifier() else {
+                continue;
+            };
+            let key = id.to_string().unwrap_or_default();
+            windows::Win32::System::Com::CoTaskMemFree(Some(id.0.cast()));
+            if key.is_empty() {
+                continue;
+            }
+            let name = process_image_path(pid)
+                .and_then(|path| {
+                    std::path::Path::new(&path)
+                        .file_stem()
+                        .map(|n| n.to_string_lossy().into_owned())
+                })
+                .unwrap_or_else(|| {
+                    if pid == 0 {
+                        "Windows".into()
+                    } else {
+                        format!("PID {pid}")
+                    }
+                });
+            result.push(super::AppVolume {
+                id: key,
+                name,
+                percent: (volume.GetMasterVolume().unwrap_or(0.0) * 100.0).round() as u32,
+                muted: volume.GetMute().map(|v| v.as_bool()).unwrap_or(false),
+            });
+        }
+        result.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(result)
+    }
+}
+
+unsafe fn audio_sessions() -> Result<windows::Win32::Media::Audio::IAudioSessionEnumerator, String>
+{
+    use windows::Win32::Media::Audio::IAudioSessionManager2;
+    let enumerator: IMMDeviceEnumerator =
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| e.to_string())?;
+    let device = enumerator
+        .GetDefaultAudioEndpoint(eRender, eConsole)
+        .map_err(|e| e.to_string())?;
+    let manager = device
+        .Activate::<IAudioSessionManager2>(CLSCTX_ALL, None)
+        .map_err(|e| e.to_string())?;
+    manager.GetSessionEnumerator().map_err(|e| e.to_string())
+}
+
+pub fn app_volume_set(id: &str, percent: u32, muted: bool) -> Result<(), String> {
+    use windows::core::Interface;
+    use windows::Win32::Media::Audio::{IAudioSessionControl2, ISimpleAudioVolume};
+    let _runtime = AudioRuntime::new();
+    unsafe {
+        let sessions = audio_sessions()?;
+        for i in 0..sessions.GetCount().map_err(|e| e.to_string())?.min(256) {
+            let session = sessions.GetSession(i).map_err(|e| e.to_string())?;
+            let control = session
+                .cast::<IAudioSessionControl2>()
+                .map_err(|e| e.to_string())?;
+            let key = control
+                .GetSessionInstanceIdentifier()
+                .map_err(|e| e.to_string())?;
+            let matches = key.to_string().unwrap_or_default() == id;
+            windows::Win32::System::Com::CoTaskMemFree(Some(key.0.cast()));
+            if !matches {
+                continue;
+            }
+            let volume = session
+                .cast::<ISimpleAudioVolume>()
+                .map_err(|e| e.to_string())?;
+            volume
+                .SetMasterVolume(percent.min(100) as f32 / 100.0, std::ptr::null())
+                .map_err(|e| e.to_string())?;
+            return volume
+                .SetMute(muted, std::ptr::null())
+                .map_err(|e| e.to_string());
+        }
+    }
+    Err("audio session ended; refresh the mixer".into())
+}
+
 // ─────────────────────────── Hot edge (cursor) ───────────────────────────
 
 /// True when the cursor is pressed against the given screen edge, within the

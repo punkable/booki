@@ -2,8 +2,8 @@
 //! folder when the person asks, from Settings. Nothing is bundled and
 //! nothing runs until it is installed.
 //!
-//! Each plugin is pinned to one release of its official GitHub repository.
-//! The download is checked against the SHA-256 digest GitHub publishes for
+//! Each downloadable plugin is pinned to an official release.
+//! The download is checked against its published or catalog-pinned SHA-256 for
 //! that file before anything is unpacked, and it lives under
 //! %LOCALAPPDATA%\Booki\plugins\<id>, so removing it is deleting a folder.
 use serde_json::Value;
@@ -11,28 +11,39 @@ use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::PathBuf;
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Plugin {
-    pub id: &'static str,
+    pub external: bool,
+    pub name: String,
+    pub license: String,
+    pub source: String,
+    pub feeds: String,
+    pub asset: String,
+    pub archive_root: String,
+    pub url: String,
+    pub sha256: String,
+    pub id: String,
     /// Owner/repository on GitHub.
-    pub repo: &'static str,
+    pub repo: String,
     /// The pinned release tag.
-    pub tag: &'static str,
+    pub tag: String,
     /// The executable the plugin provides, found anywhere in the archive.
-    pub exe: &'static str,
+    pub exe: String,
 }
 
 /// HeadsetControl (GPL-3.0): battery of wireless headsets on a USB dongle
 /// (SteelSeries Arctis, Logitech G, Corsair, HyperX…). Booki runs it as a
 /// separate program and links none of its code.
-pub const HEADSETCONTROL: Plugin = Plugin {
-    id: "headsetcontrol",
-    repo: "Sapd/HeadsetControl",
-    tag: "4.1.0",
-    exe: "headsetcontrol.exe",
-};
+pub fn catalog() -> &'static [Plugin] {
+    static CATALOG: std::sync::OnceLock<Vec<Plugin>> = std::sync::OnceLock::new();
+    CATALOG.get_or_init(|| {
+        serde_json::from_str(include_str!("../../src/plugin-catalog.json"))
+            .expect("bundled plugin catalog must be valid")
+    })
+}
 
 pub fn find(id: &str) -> Option<&'static Plugin> {
-    [&HEADSETCONTROL].into_iter().find(|p| p.id == id)
+    catalog().iter().find(|p| p.id == id)
 }
 
 fn dir(plugin: &Plugin) -> Option<PathBuf> {
@@ -40,13 +51,17 @@ fn dir(plugin: &Plugin) -> Option<PathBuf> {
         dirs::data_local_dir()?
             .join("Booki")
             .join("plugins")
-            .join(plugin.id),
+            .join(&plugin.id),
     )
 }
 
 /// The installed executable, if the plugin is installed.
 pub fn executable(plugin: &Plugin) -> Option<PathBuf> {
-    let path = dir(plugin)?.join(plugin.exe);
+    let path = if plugin.external {
+        dirs::data_local_dir()?.join("Microsoft/WindowsApps/winget.exe")
+    } else {
+        dir(plugin)?.join(&plugin.exe)
+    };
     path.is_file().then_some(path)
 }
 
@@ -90,8 +105,11 @@ fn read_limited(
     Ok(bytes)
 }
 
-/// The Windows archive of the pinned release and its published SHA-256.
+/// The portable Windows executable of the pinned release and its published SHA-256.
 fn release_asset(plugin: &Plugin) -> Result<(String, String), String> {
+    if !plugin.url.is_empty() {
+        return Ok((plugin.url.to_string(), plugin.sha256.to_string()));
+    }
     let url = format!(
         "https://api.github.com/repos/{}/releases/tags/{}",
         plugin.repo, plugin.tag
@@ -104,28 +122,49 @@ fn release_asset(plugin: &Plugin) -> Result<(String, String), String> {
         .map_err(|_| "could not reach GitHub".to_string())?;
     let json: Value = serde_json::from_slice(&read_limited(&mut response, 1024 * 1024)?)
         .map_err(|_| "unexpected answer from GitHub".to_string())?;
-    pick_asset(&json).ok_or_else(|| "this release has no verified Windows download".into())
+    pick_asset(&json, &plugin.asset)
+        .ok_or_else(|| "this release has no verified Windows download".into())
 }
 
-/// The first .zip asset naming Windows that carries a sha256 digest.
-fn pick_asset(release: &Value) -> Option<(String, String)> {
+/// Select the portable x64 executable, never the installer or another platform.
+fn pick_asset(release: &Value, expected_name: &str) -> Option<(String, String)> {
     release.get("assets")?.as_array()?.iter().find_map(|asset| {
         let name = asset.get("name")?.as_str()?.to_ascii_lowercase();
-        if !(name.ends_with(".zip") && (name.contains("windows") || name.contains("win64"))) {
+        if name != expected_name.to_ascii_lowercase() {
             return None;
         }
         let digest = asset.get("digest")?.as_str()?.strip_prefix("sha256:")?;
+        if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
         let url = asset.get("browser_download_url")?.as_str()?;
         Some((url.to_string(), digest.to_ascii_lowercase()))
     })
 }
 
+struct StagingCleanup(PathBuf);
+impl Drop for StagingCleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+static INSTALL_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub fn install(plugin: &Plugin) -> Result<String, String> {
+    if plugin.external {
+        return Err("winget is managed by Microsoft App Installer".into());
+    }
+    let _turn = INSTALL_TURN
+        .try_lock()
+        .map_err(|_| "another plugin operation is in progress")?;
     let (url, expected) = release_asset(plugin)?;
-    if !url.starts_with(&format!(
-        "https://github.com/{}/releases/download/",
-        plugin.repo
-    )) {
+    if url != plugin.url
+        && !url.starts_with(&format!(
+            "https://github.com/{}/releases/download/",
+            plugin.repo
+        ))
+    {
         return Err("unexpected download address".into());
     }
     let mut response = agent()
@@ -133,53 +172,58 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
         .header("User-Agent", "Booki")
         .call()
         .map_err(|_| "download failed".to_string())?;
-    let archive = read_limited(&mut response, 32 * 1024 * 1024)?;
+    let archive = read_limited(&mut response, 128 * 1024 * 1024)?;
     let actual = format!("{:x}", Sha256::digest(&archive));
     if actual != expected {
         return Err("the download did not match its published checksum".into());
     }
     let target = dir(plugin).ok_or("no local app data folder")?;
     let staging = target.with_extension("partial");
+    let _cleanup = StagingCleanup(staging.clone());
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(|e| e.to_string())?;
-    unpack(&archive, &staging)?;
-    if !staging.join(plugin.exe).is_file() {
+    if plugin.asset.ends_with(".zip") {
+        unpack(&archive, &staging, &plugin.archive_root)?;
+    } else {
+        std::fs::write(staging.join(&plugin.exe), &archive).map_err(|e| e.to_string())?;
+    }
+    if !staging.join(&plugin.exe).is_file() {
         let _ = std::fs::remove_dir_all(&staging);
         return Err("the download did not contain the expected program".into());
     }
-    std::fs::write(staging.join("VERSION"), plugin.tag).map_err(|e| e.to_string())?;
-    let _ = std::fs::remove_dir_all(&target);
-    std::fs::rename(&staging, &target).map_err(|e| e.to_string())?;
+    std::fs::write(staging.join("VERSION"), &plugin.tag).map_err(|e| e.to_string())?;
+    commit_install(&target, &staging)?;
     Ok(plugin.tag.to_string())
 }
 
-/// Unpack every file flat into `into`: the program and the libraries next to
-/// it. Paths inside the archive are never trusted as paths.
-fn unpack(archive: &[u8], into: &std::path::Path) -> Result<(), String> {
-    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(archive))
-        .map_err(|_| "the download is not a valid archive".to_string())?;
-    for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
-        if file.is_dir() {
-            continue;
+fn commit_install(target: &std::path::Path, staging: &std::path::Path) -> Result<(), String> {
+    let backup = target.with_extension("previous");
+    if backup.exists() {
+        std::fs::remove_dir_all(&backup).map_err(|e| e.to_string())?;
+    }
+    let had_previous = target.exists();
+    if had_previous {
+        std::fs::rename(target, &backup).map_err(|e| e.to_string())?;
+    }
+    if let Err(error) = std::fs::rename(staging, target) {
+        if had_previous {
+            let _ = std::fs::rename(&backup, target);
         }
-        let Some(name) = file
-            .enclosed_name()
-            .and_then(|p| p.file_name().map(|n| n.to_owned()))
-        else {
-            continue;
-        };
-        let mut bytes = Vec::new();
-        file.by_ref()
-            .take(64 * 1024 * 1024)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        std::fs::write(into.join(name), bytes).map_err(|e| e.to_string())?;
+        return Err(error.to_string());
+    }
+    if had_previous {
+        let _ = std::fs::remove_dir_all(backup);
     }
     Ok(())
 }
 
 pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
+    if plugin.external {
+        return Err("winget is managed by Microsoft App Installer".into());
+    }
+    let _turn = INSTALL_TURN
+        .try_lock()
+        .map_err(|_| "another plugin operation is in progress")?;
     let Some(target) = dir(plugin) else {
         return Ok(());
     };
@@ -190,44 +234,112 @@ pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
     }
 }
 
+/// Keep relative directories (Qt plugins, sensor libraries), strip only the
+/// known release root. Bound total output and reject traversal and symlinks.
+fn unpack(archive: &[u8], into: &std::path::Path, root: &str) -> Result<(), String> {
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(archive)).map_err(|e| e.to_string())?;
+    let mut total = 0u64;
+    for i in 0..zip.len() {
+        let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
+        if file
+            .unix_mode()
+            .is_some_and(|mode| mode & 0o170000 == 0o120000)
+        {
+            return Err("archive contains a symbolic link".into());
+        }
+        let path = file.enclosed_name().ok_or("unsafe archive path")?;
+        let relative = if root.is_empty() {
+            path.as_path()
+        } else {
+            path.strip_prefix(root)
+                .map_err(|_| "unexpected archive root")?
+        };
+        if relative.as_os_str().is_empty() {
+            continue;
+        }
+        let target = into.join(relative);
+        if file.is_dir() {
+            std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+            continue;
+        }
+        total = total.checked_add(file.size()).ok_or("archive too large")?;
+        if total > 512 * 1024 * 1024 {
+            return Err("archive too large".into());
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let mut output = std::fs::File::create(target).map_err(|e| e.to_string())?;
+        let copied = std::io::copy(&mut file.by_ref().take(512 * 1024 * 1024 + 1), &mut output)
+            .map_err(|e| e.to_string())?;
+        if copied > 512 * 1024 * 1024 {
+            return Err("archive too large".into());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn picks_the_windows_zip_with_a_digest() {
-        let release = serde_json::json!({ "assets": [
-            { "name": "headsetcontrol-linux.zip", "digest": "sha256:aa", "browser_download_url": "https://x/linux.zip" },
-            { "name": "headsetcontrol-windows.zip", "browser_download_url": "https://x/nodigest.zip" },
-            { "name": "HeadsetControl-Windows-x64.zip", "digest": "sha256:ABCD", "browser_download_url": "https://x/win.zip" }
+    fn portable_executable_not_setup_or_signature() {
+        let headset = find("headsetcontrol").unwrap();
+        let digest = format!("sha256:{}", "ab".repeat(32));
+        let release = serde_json::json!({"assets": [
+            {"name":"headsetcontrol-windows-x86_64-setup.exe", "digest":digest, "browser_download_url":"setup"},
+            {"name":"headsetcontrol-windows-x86_64.exe.asc", "digest":digest, "browser_download_url":"signature"},
+            {"name":"headsetcontrol-windows-x86_64.exe", "digest":digest, "browser_download_url":"portable"}
         ]});
         assert_eq!(
-            pick_asset(&release),
-            Some(("https://x/win.zip".to_string(), "abcd".to_string()))
+            pick_asset(&release, &headset.asset),
+            Some(("portable".into(), "ab".repeat(32)))
         );
-        assert_eq!(pick_asset(&serde_json::json!({})), None);
-    }
-
-    #[test]
-    fn unpack_flattens_and_ignores_paths() {
-        let mut buffer = std::io::Cursor::new(Vec::new());
-        {
-            let mut zip = zip::ZipWriter::new(&mut buffer);
-            let options = zip::write::SimpleFileOptions::default();
-            zip.start_file("bin/headsetcontrol.exe", options).unwrap();
-            std::io::Write::write_all(&mut zip, b"exe").unwrap();
-            zip.start_file("../evil.txt", options).unwrap();
-            std::io::Write::write_all(&mut zip, b"x").unwrap();
-            zip.finish().unwrap();
-        }
-        let dir = std::env::temp_dir().join(format!("booki-unpack-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        unpack(buffer.get_ref(), &dir).unwrap();
         assert_eq!(
-            std::fs::read(dir.join("headsetcontrol.exe")).unwrap(),
-            b"exe"
+            pick_asset(
+                &serde_json::json!({"assets":[{"name":&headset.asset,"digest":"sha256:bad","browser_download_url":"bad"}]}),
+                &headset.asset
+            ),
+            None
         );
-        assert!(!dir.parent().unwrap().join("evil.txt").exists());
-        std::fs::remove_dir_all(&dir).unwrap();
+    }
+    #[test]
+    fn archives_preserve_runtime_subdirectories_and_reject_traversal() {
+        let dir = std::env::temp_dir().join(format!("booki-plugin-archive-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let archive = |names: &[&str]| {
+            let mut data = std::io::Cursor::new(Vec::new());
+            {
+                let mut zip = zip::ZipWriter::new(&mut data);
+                for name in names {
+                    zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                        .unwrap();
+                    std::io::Write::write_all(&mut zip, b"test").unwrap();
+                }
+                zip.finish().unwrap();
+            }
+            data.into_inner()
+        };
+        unpack(
+            &archive(&["root/OpenRGB.exe", "root/platforms/qwindows.dll"]),
+            &dir,
+            "root",
+        )
+        .unwrap();
+        assert!(dir.join("OpenRGB.exe").is_file());
+        assert!(dir.join("platforms/qwindows.dll").is_file());
+        assert!(unpack(&archive(&["../outside.dll"]), &dir, "").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn failed_install_commit_restores_previous_copy() {
+        let root =
+            std::env::temp_dir().join(format!("booki-plugin-rollback-{}", std::process::id()));
+        let target = root.join("plugin");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("keep.exe"), b"old").unwrap();
+        assert!(commit_install(&target, &root.join("missing-staging")).is_err());
+        assert_eq!(std::fs::read(target.join("keep.exe")).unwrap(), b"old");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

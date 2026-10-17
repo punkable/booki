@@ -20,8 +20,8 @@ const HEX = /^#[0-9a-f]{6}$/i;
 export const TASKBAR_DARK = "#202020";
 export const TASKBAR_LIGHT = "#eeeeee";
 // Neutral acrylic tints (the "auto" fill) for the glass styles.
-const GLASS_AUTO = { dark: "#1c1c1c", light: "#f3f3f3" };
-const CLEAR_AUTO = { dark: "#0a0a0a", light: "#ffffff" };
+const GLASS_AUTO = { dark: "#2c2c2c", light: "#f3f3f3" };
+const CLEAR_AUTO = { dark: "#2c2c2c", light: "#f3f3f3" };
 
 export function colorSource(cfg) {
   return COLOR_SOURCES.includes(cfg?.colorSource) ? cfg.colorSource : "custom";
@@ -88,8 +88,8 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
   else {
     const fill = surfaceColor(cfg);
     if (HEX.test(fill)) glassTint = fill;
-    else if (fill === "wallpaper" && wall) glassTint = dark ? mixHex(wall, "#000000", 0.6) : mixHex(wall, "#ffffff", 0.72);
-    else if (fill === "accent" && HEX.test(accent || "")) glassTint = dark ? mixHex(accent, "#000000", 0.55) : mixHex(accent, "#ffffff", 0.7);
+    else if (fill === "wallpaper" && wall) glassTint = dark ? mixHex(wall, "#202020", 0.72) : mixHex(wall, "#ffffff", 0.72);
+    else if (fill === "accent" && HEX.test(accent || "")) glassTint = dark ? mixHex(accent, "#202020", 0.72) : mixHex(accent, "#ffffff", 0.7);
     else if (style === "glass") glassTint = GLASS_AUTO[tone];
     else if (style === "clear") glassTint = CLEAR_AUTO[tone];
   }

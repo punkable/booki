@@ -256,11 +256,8 @@ body.autohide.tucked.genie-right .dock {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
 }
 
-/* Opening from a live notch (autohide.js): the bar starts as the notch's
-   capsule, clipped to its size where the notch sits. It first stretches
-   sideways to full width at the capsule's height, then takes the bar's
-   height, so the notch reads as widening into the dock. No genie squash or
-   rise; the icons fade in as it widens. */
+/* One uninterrupted shape interpolation: width, height, corners and position
+   move together on the display's animation clock. No vertical second stage. */
 body.dock-body.tucked.reveal-morph .dock {
   transform: none;
   opacity: 1;
@@ -269,22 +266,30 @@ body.dock-body.tucked.reveal-morph .dock {
   translate: var(--morph-shift, 0px 0px);
 }
 body.dock-body.reveal-morph:not(.tucked) .dock {
-  /* A little past the bar so its shadow is back before the clip goes away. */
   clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px));
   translate: 0px 0px;
   transform: none;
-  animation: dock-morph var(--dur-spring) both;
+  animation: dock-morph var(--dur-spring) var(--spring) both;
+}
+body.dock-body.tucked.reveal-morph.morph-closing .dock {
+  animation: dock-morph var(--dur-spring) var(--spring) reverse both;
+}
+body.dock-body.tucked.reveal-morph.morph-closing .dock > * {
+  animation: morph-content 0.14s var(--ease-out) reverse both;
 }
 body.dock-body.reveal-morph.morph-start .dock { transition: none !important; animation: none; }
 @keyframes dock-morph {
-  0% { clip-path: var(--morph-clip); translate: var(--morph-shift, 0px 0px); animation-timing-function: var(--ease-out); }
-  55% { clip-path: var(--morph-wide); translate: var(--morph-shift, 0px 0px); animation-timing-function: var(--ease-out); }
-  100% { clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px)); translate: 0px 0px; }
+  from { clip-path: var(--morph-clip); translate: var(--morph-shift, 0px 0px); }
+  to { clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px)); translate: 0px 0px; }
 }
+body.dock-body.reveal-morph .dock > * { opacity: 0; }
 body.dock-body.reveal-morph:not(.tucked) .dock > * {
-  animation: morph-content 0.26s var(--ease-out) 0.14s both;
+  animation: morph-content 0.24s var(--ease-out) 0.08s both;
 }
-@keyframes morph-content { from { opacity: 0; } to { opacity: 1; } }
+@keyframes morph-content {
+  from { opacity: 0; transform: translateY(3px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
 
 /* Edge change: hide the bar instantly while its window teleports to the new
    edge, then pop it back in (the class is removed a beat later in dock.js). */
