@@ -33,7 +33,6 @@ use std::ffi::c_void;
 use std::sync::{Mutex, OnceLock};
 
 use windows::core::Interface;
-use windows::Foundation::Numerics::Vector2;
 use windows::System::{DispatcherQueue, DispatcherQueueController};
 use windows::Win32::System::WinRT::Composition::ICompositorDesktopInterop;
 use windows::Win32::System::WinRT::{
@@ -41,9 +40,11 @@ use windows::Win32::System::WinRT::{
 };
 use windows::UI::Composition::Desktop::DesktopWindowTarget;
 use windows::UI::Composition::{CompositionRoundedRectangleGeometry, Compositor, SpriteVisual};
+use windows_numerics::Vector2;
 
+use windows::core::BOOL;
 use windows::core::{s, w};
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_USE_HOSTBACKDROPBRUSH,
     DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
@@ -126,7 +127,7 @@ fn create_window(composed: bool) -> Option<HWND> {
             1,
             None,
             None,
-            instance,
+            Some(instance.into()),
             None,
         )
         .ok()?;
@@ -374,7 +375,7 @@ pub fn apply(
     surface.owner = owner;
     let owner_hwnd = HWND(owner as *mut c_void);
     let visible =
-        unsafe { IsWindow(owner_hwnd).as_bool() && IsWindowVisible(owner_hwnd).as_bool() };
+        unsafe { IsWindow(Some(owner_hwnd)).as_bool() && IsWindowVisible(owner_hwnd).as_bool() };
     let mut origin = RECT::default();
     if !visible || unsafe { GetWindowRect(owner_hwnd, &mut origin) }.is_err() {
         surface.pieces.iter_mut().for_each(hide);
@@ -437,7 +438,7 @@ pub fn apply(
                     .collect::<Vec<_>>();
                 let region = CreatePolygonRgn(&points, ALTERNATE);
                 // The window owns the region after this call.
-                if region.0.is_null() || SetWindowRgn(hwnd, region, true) == 0 {
+                if region.0.is_null() || SetWindowRgn(hwnd, Some(region), true) == 0 {
                     let _ = DeleteObject(HGDIOBJ(region.0));
                     surface.pieces.iter_mut().for_each(hide);
                     return false;
@@ -446,7 +447,7 @@ pub fn apply(
             // Inserting "after" the owner puts the material directly below it.
             if SetWindowPos(
                 hwnd,
-                owner_hwnd,
+                Some(owner_hwnd),
                 rect.0,
                 rect.1,
                 w,
@@ -483,7 +484,8 @@ pub fn sync() {
         };
         for surface in map.values_mut() {
             let owner = HWND(surface.owner as *mut c_void);
-            let visible = unsafe { IsWindow(owner).as_bool() && IsWindowVisible(owner).as_bool() };
+            let visible =
+                unsafe { IsWindow(Some(owner)).as_bool() && IsWindowVisible(owner).as_bool() };
             // apply() inserts each piece below the owner, leaving the last
             // piece closest to it. Preserve that order instead of making all
             // pieces fight for the same Z position on every watcher tick.
@@ -521,7 +523,7 @@ pub fn sync() {
             SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_ASYNCWINDOWPOS | SWP_HIDEWINDOW
         };
         unsafe {
-            let _ = SetWindowPos(window, after, 0, 0, 0, 0, flags);
+            let _ = SetWindowPos(window, Some(after), 0, 0, 0, 0, flags);
         }
     }
 }

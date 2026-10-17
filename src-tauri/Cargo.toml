@@ -47,9 +47,8 @@ windows-dpapi = "0.2"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "bmp"] }
 
 [target.'cfg(windows)'.dependencies.windows]
-version = "0.58"
+version = "0.62"
 features = [
-    "implement",
     "ApplicationModel",
     "Win32_UI_Accessibility",
     "Win32_UI_Shell_Common",
@@ -88,7 +87,11 @@ features = [
 ]
 
 [target.'cfg(windows)'.dependencies.windows-core]
-version = "0.58"
+version = "0.62"
+
+# Split out of `windows` in 0.62: Vector2 for the composition backdrop.
+[target.'cfg(windows)'.dependencies.windows-numerics]
+version = "0.3"
 
 [profile.release]
 panic = "abort"

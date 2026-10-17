@@ -6,12 +6,13 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 use windows::core::{implement, GUID, PCWSTR};
-use windows::Foundation::{EventRegistrationToken, TypedEventHandler};
+use windows::Foundation::TypedEventHandler;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session,
     GlobalSystemMediaTransportControlsSessionManager as Sessions,
 };
-use windows::Win32::Foundation::{HMODULE, HWND};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Media::Audio::Endpoints::{
     IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl,
 };
@@ -25,7 +26,6 @@ use windows::Win32::System::Power::{
 };
 use windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
 use windows::Win32::UI::Accessibility::{SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK};
-use windows::Win32::UI::Shell::PropertiesSystem::PROPERTYKEY;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 /// Wakes the delivery thread. The signals themselves live in PENDING, one flag
@@ -248,8 +248,8 @@ fn volume_lease(enumerator: &IMMDeviceEnumerator) -> Option<VolumeLease> {
 }
 struct MediaLease {
     session: Session,
-    properties: EventRegistrationToken,
-    playback: EventRegistrationToken,
+    properties: i64,
+    playback: i64,
 }
 impl Drop for MediaLease {
     fn drop(&mut self) {
@@ -359,7 +359,7 @@ fn watch_windows() {
             0,
             None,
             None,
-            instance.unwrap_or_default(),
+            Some(instance.unwrap_or_default().into()),
             None,
         )
         .ok();
@@ -391,7 +391,7 @@ fn watch_windows() {
         let foreground = SetWinEventHook(
             EVENT_SYSTEM_FOREGROUND,
             EVENT_SYSTEM_FOREGROUND,
-            HMODULE::default(),
+            None,
             Some(window_event),
             0,
             0,
@@ -400,7 +400,7 @@ fn watch_windows() {
         let objects = SetWinEventHook(
             EVENT_OBJECT_CREATE,
             EVENT_OBJECT_HIDE,
-            HMODULE::default(),
+            None,
             Some(window_event),
             0,
             0,
@@ -412,7 +412,7 @@ fn watch_windows() {
         );
         signal("ready");
         let mut message = MSG::default();
-        while GetMessageW(&mut message, HWND::default(), 0, 0).0 > 0 {
+        while GetMessageW(&mut message, None, 0, 0).0 > 0 {
             let _ = TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -497,7 +497,7 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         }
         let manager = Sessions::RequestAsync()
             .ok()
-            .and_then(|task| task.get().ok());
+            .and_then(|task| task.join().ok());
         let session_token = manager.as_ref().and_then(|manager| {
             manager
                 .CurrentSessionChanged(&TypedEventHandler::new(|_, _| {
@@ -522,10 +522,13 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         let _install_token = package_catalog.as_ref().and_then(|catalog| {
             catalog
                 .PackageInstalling(&TypedEventHandler::new(
-                    |_, args: &Option<windows::ApplicationModel::PackageInstallingEventArgs>| {
+                    |_,
+                     args: windows::core::Ref<
+                        windows::ApplicationModel::PackageInstallingEventArgs,
+                    >| {
                         if args
-                            .as_ref()
-                            .is_some_and(|args| args.IsComplete().unwrap_or(false))
+                            .ok()
+                            .is_ok_and(|args| args.IsComplete().unwrap_or(false))
                         {
                             signal("catalog");
                         }
@@ -537,10 +540,13 @@ pub fn start(deliver: Arc<dyn Fn(&str) + Send + Sync>) {
         let _remove_token = package_catalog.as_ref().and_then(|catalog| {
             catalog
                 .PackageUninstalling(&TypedEventHandler::new(
-                    |_, args: &Option<windows::ApplicationModel::PackageUninstallingEventArgs>| {
+                    |_,
+                     args: windows::core::Ref<
+                        windows::ApplicationModel::PackageUninstallingEventArgs,
+                    >| {
                         if args
-                            .as_ref()
-                            .is_some_and(|args| args.IsComplete().unwrap_or(false))
+                            .ok()
+                            .is_ok_and(|args| args.IsComplete().unwrap_or(false))
                         {
                             signal("catalog");
                         }
