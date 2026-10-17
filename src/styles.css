@@ -347,41 +347,13 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
   .edge-zone, .edge-ghost, .edge-zone-dot { transition: none; }
 }
 
-/* Settings section headers: compact, scannable {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 26px 0 8px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--ink);
-  letter-spacing: 0;
-}
-
 .web-add { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-
-/* About: beta badge, credits {
-  display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800;
-  letter-spacing: 0.06em; padding: 1px 7px; border-radius: 999px;
-  color: var(--accent-contrast); background: var(--accent);
-}
-@keyframes capy-spin { to { transform: rotate(360deg) scale(1.1); } }
-@keyframes capy-fall { to { transform: translateY(112vh) rotate(360deg); } }
 
 /* Dock party mode (Konami code): a hue cycle + a little tile bounce. */
 body.party .dock { animation: party-hue 1.5s linear infinite; }
 body.party .tile { animation: party-bounce 0.6s var(--ease-bounce) 3; }
 @keyframes party-hue { to { filter: hue-rotate(360deg); } }
 @keyframes party-bounce { 0%, 100% { transform: translateY(0); } 42% { transform: translateY(-14px); } }
-
-/* Public-beta banner at the top of the changelog — sets expectations for
-   testers (this is beta software, feedback wanted) on every open {
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--stroke));
-}
 
 /* ─────────────── Drag clone (the tile that follows the pointer) ─────────────── */
 .tile.drag-clone {
@@ -2222,14 +2194,6 @@ body.settings-body::before {
   animation: skel-shimmer 1.15s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
-/* The real wordmark from the brand kit — black on light { width: auto; height: 17px; }
-.word-white { display: none; }
-[data-theme="dark"] .word-black { display: none; }
-[data-theme="dark"] .word-white { display: inline; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) .word-black { display: none; }
-  :root:not([data-theme]) .word-white { display: inline; }
-}
 /* "More options" dropdown next to "+ Add app" (Pinned apps tab). */
 
 @starting-style {
@@ -2277,31 +2241,6 @@ body.settings-body::before {
 /* Notch position picker: a mini screen with clickable tab slots on ALL FOUR
    edges (3 per edge). One click = edge + position. The strip marks where the
    dock currently lives. */
-/* ── Position picker: dock edge + notch placement + live mini bar { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-/* The dock in miniature {
-  position: absolute;
-  display: flex;
-  gap: 3px;
-  padding: 3px 5px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ink) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  pointer-events: none;
-  animation: pospick-in var(--dur-5) var(--ease);
-}
-@keyframes pospick-in {
-  from { opacity: 0; scale: 0.7; }
-  to { opacity: 1; scale: 1; }
-}
-
-/* Full address {
-  font-size: 11.5px; color: var(--ink); line-height: 1.5;
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  word-break: break-all; user-select: all; cursor: text;
-  background: var(--layer-strong, var(--hover)); border: 1px solid var(--stroke);
-  border-radius: 7px; padding: 4px 7px;
-}
-
 /* Bundled Fluent emoji images (crisp, aligned with the text baseline). The
    explicit sizes beat the generic `.tile img` icon rules — emojis inside
    widget cards / flyouts must stay small, never balloon to app-icon size. */
@@ -2330,19 +2269,6 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-toast-mar
     linear-gradient(160deg, color-mix(in srgb, #223044 84%, var(--accent)), #171c29);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-/* Open group: children are calm tiles — take-out on hover {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-  gap: 8px; width: 100%; margin-top: 10px; padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--stroke) 55%, transparent);
-  border-radius: 0; transition: box-shadow var(--dur-2) ease, background var(--dur-2) ease;
-}
-@keyframes kidmenu-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
-
-/* Installed-app suggestions */
-/* Modern search: magnifier icon inside, clear button { position: relative; margin: 6px 0 12px; }
-
-/* The user's shell folders (Documents, Pictures { font-size: 11.5px; font-weight: 700; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0 6px; }
-/* Plain dropdown (used by the language picker — too many options for a segmented). */
 
 /* Icon-picker modal */
 .modal-scrim {
@@ -2378,9 +2304,6 @@ img.emo, .emo img, .w-ico img, .coach-emoji img, .tp-emoji img, .notch-toast-mar
 }
 .icon-cell:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 50%, var(--stroke)); background: var(--hover); }
 .icon-cell img { width: 34px; height: 34px; }
-/* Quit sits in the corner every time Settings opens; it only turns red once
-   the pointer is on it { background: transparent; color: var(--ink-2); border: 1px solid transparent; box-shadow: none; }
-
 /* ═══════════════════════════ Premium polish ═══════════════════════════ */
 /* Subtle, additive refinements (depth, accent touches) over the base. */
 .tile img,
