@@ -193,13 +193,16 @@ pub(crate) fn notch_reveal(app: AppHandle) {
         return;
     }
     let cfg = config::load();
-    if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
-    }
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
         lift_dock_window(&dock);
+    }
+    // Hide the notch only once the dock is up: the other order left a
+    // frame with neither on screen, a blink right where the dock grows
+    // out of the notch.
+    if let Some(notch) = app.get_webview_window("notch") {
+        let _ = notch.hide();
     }
     let _ = app.emit("booki://reveal", ());
 }
