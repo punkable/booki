@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="docs/releases/v0.86.0.md"><b>What's new in 0.86</b></a> ·
+  <a href="docs/releases/v0.87.0.md"><b>What's new in 0.87</b></a> ·
   <a href="README.es.md">Español</a>
 </p>
 
@@ -79,6 +79,14 @@
 3. Drag an app or folder onto the dock, or right-click the dock to add items.
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
+
+### New in 0.87
+
+- A shared catalog for HeadsetControl, yt-dlp, OpenRGB, Rclone and LibreHardwareMonitor, plus checks through the winget managed by Windows App Installer.
+- Widget detail panels and a native Windows volume mixer for individual apps.
+- Layered light/dark WinUI neutrals and a continuous dynamic-notch/dock spring transition in both directions.
+
+See the [0.87 release notes](docs/releases/v0.87.0.md) for setup requirements and validation limits.
 
 ### New in 0.86
 
