@@ -128,6 +128,9 @@ function shareShape() {
     active: !body.contains("away") && !body.contains("toast") && (body.contains("live") || body.contains("card")),
     width: pill.offsetWidth,
     height: pill.offsetHeight,
+    // Screen x of the capsule's centre (CSS px), so the dock can grow out of
+    // the notch where it actually sits, also when it lives off-centre.
+    cx: Math.round(window.screenX + pill.offsetLeft + pill.offsetWidth / 2),
     attached: body.contains("peek"),
   };
   const sig = JSON.stringify(shape);

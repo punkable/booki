@@ -257,8 +257,10 @@ body.autohide.tucked.genie-right .dock {
 }
 
 /* Opening from a live notch (autohide.js): the bar starts as the notch's
-   capsule, clipped to its size where the notch sits, and stretches to full
-   size. No genie squash or rise; the icons fade in as it opens. */
+   capsule, clipped to its size where the notch sits. It first stretches
+   sideways to full width at the capsule's height, then takes the bar's
+   height, so the notch reads as widening into the dock. No genie squash or
+   rise; the icons fade in as it widens. */
 body.dock-body.tucked.reveal-morph .dock {
   transform: none;
   opacity: 1;
@@ -270,16 +272,17 @@ body.dock-body.reveal-morph:not(.tucked) .dock {
   /* A little past the bar so its shadow is back before the clip goes away. */
   clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px));
   translate: 0px 0px;
+  transform: none;
+  animation: dock-morph var(--dur-spring) both;
 }
-body.dock-body.reveal-morph:not(.morph-start) .dock {
-  transition:
-    clip-path var(--dur-spring) var(--spring),
-    translate var(--dur-spring) var(--spring),
-    opacity var(--dur-1) var(--ease-out);
+body.dock-body.reveal-morph.morph-start .dock { transition: none !important; animation: none; }
+@keyframes dock-morph {
+  0% { clip-path: var(--morph-clip); translate: var(--morph-shift, 0px 0px); animation-timing-function: var(--ease-out); }
+  55% { clip-path: var(--morph-wide); translate: var(--morph-shift, 0px 0px); animation-timing-function: var(--ease-out); }
+  100% { clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px)); translate: 0px 0px; }
 }
-body.dock-body.reveal-morph.morph-start .dock { transition: none !important; }
 body.dock-body.reveal-morph:not(.tucked) .dock > * {
-  animation: morph-content 0.3s var(--ease-out) 0.12s both;
+  animation: morph-content 0.26s var(--ease-out) 0.14s both;
 }
 @keyframes morph-content { from { opacity: 0; } to { opacity: 1; } }
 
