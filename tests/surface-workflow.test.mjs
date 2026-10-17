@@ -224,7 +224,7 @@ test('app source filters keep selection and searching reaches the whole library'
     };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  await page.getByRole('group', { name: 'App sources' }).getByRole('button', { name: 'Most used' }).click();
+  await page.getByRole('tablist', { name: 'App sources' }).getByRole('tab', { name: 'Most used' }).click();
   await page.getByRole('checkbox', { name: 'Select app: Editor' }).check();
   assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Calculator' }).count(), 0);
   await page.getByRole('searchbox', { name: 'Search apps…' }).fill('Calculator');

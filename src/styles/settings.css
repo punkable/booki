@@ -629,18 +629,11 @@
 .group-glyph[aria-checked="true"] { color: var(--group-ink); background: var(--group-color); }
 
 .app-library-section { display: flex; flex-direction: column; gap: 12px; }
-.app-library-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.app-library-search { position: relative; flex: 1 1 220px; display: flex; align-items: center; }
 .app-library-search .ui-icon { position: absolute; left: 12px; color: var(--ink-2); pointer-events: none; }
 .app-library-search input { width: 100%; height: 36px; padding: 0 12px 0 36px; color: var(--ink); font: inherit; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-control); outline: none; }
 .app-library-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-.library-refresh { width: 36px; padding: 0; }
 .library-destination { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); }
 .library-destination select { height: 32px; padding: 0 30px 0 10px; color: var(--ink); font: inherit; font-size: calc(13px * var(--os-text-scale, 1)); background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; border: 1px solid var(--control-stroke); border-radius: var(--r-control); appearance: none; cursor: pointer; }
-.app-library-filters { display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; width: fit-content; max-width: 100%; background: var(--subtle-pressed); border-radius: var(--r-control); }
-.app-library-filters button { min-height: 30px; padding: 0 14px; color: var(--ink-2); font: inherit; font-size: calc(13px * var(--os-text-scale, 1)); font-weight: 500; background: transparent; border: 0; border-radius: 8px; cursor: pointer; }
-.app-library-filters button:hover { color: var(--ink); }
-.app-library-filters button[aria-pressed="true"] { color: var(--ink); background: var(--card); box-shadow: 0 1px 3px #0002; }
 .app-library-selection { display: flex; gap: 8px; }
 .app-library-heading { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 600; }
 .app-library-heading span, .app-library-utilities summary span { color: var(--ink-2); font-weight: 400; font-size: calc(12px * var(--os-text-scale, 1)); }
@@ -798,7 +791,7 @@
   }
   .nav-item[aria-current="page"],
   .search-results button[aria-selected="true"],
-  .app-library-filters button[aria-pressed="true"],
+  .app-library-filters button[aria-selected="true"],
   .ui-seg-item.on {
     color: HighlightText;
     background: Highlight;
@@ -833,7 +826,7 @@
      paints a Canvas backplate behind the text and hides it. */
   .nav-item[aria-current="page"],
   .search-results button[aria-selected="true"],
-  .app-library-filters button[aria-pressed="true"],
+  .app-library-filters button[aria-selected="true"],
   .ui-seg-item.on,
   .button-accent,
   .chip[aria-pressed="true"],
@@ -879,7 +872,7 @@
 }
 :root[data-high-contrast] .nav-item[aria-current="page"],
 :root[data-high-contrast] .search-results button[aria-selected="true"],
-:root[data-high-contrast] .app-library-filters button[aria-pressed="true"],
+:root[data-high-contrast] .app-library-filters button[aria-selected="true"],
 :root[data-high-contrast] .ui-seg-item.on {
   color: HighlightText;
   background: Highlight;
@@ -915,3 +908,27 @@
 .plugin-desc { margin: 0; color: var(--ink-2); line-height: 1.45; }
 .plugin-fine { font-size: 0.75rem; }
 .plugin-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+
+/* Apps & folders catalog, in the order you decide: a header that says what
+   happens and where (destination), the source as a WinUI SelectorBar, then
+   one search field with its refresh built in and a quiet "choose a file". */
+.library-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+.library-heading h2 { margin: 0; font: 600 calc(20px * var(--os-text-scale, 1)) / 1.3 var(--font-display); color: var(--ink); }
+.library-heading p { margin: 4px 0 0; max-width: 56ch; font-size: calc(13px * var(--os-text-scale, 1)); line-height: 1.45; color: var(--ink-2); }
+.library-destination { display: inline-flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; font-size: calc(13px * var(--os-text-scale, 1)); color: var(--ink-2); background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-control); }
+.library-destination select { min-height: 28px; font-weight: 600; color: var(--ink); }
+
+.app-library-filters { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; border-bottom: 1px solid var(--card-stroke); }
+.app-library-filters button { position: relative; min-height: 36px; padding: 0 12px; color: var(--ink-2); font: inherit; font-size: calc(14px * var(--os-text-scale, 1)); background: transparent; border: 0; border-radius: var(--r-control) var(--r-control) 0 0; cursor: pointer; }
+.app-library-filters button:hover { color: var(--ink); background: var(--hover); }
+.app-library-filters button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+/* SelectorBar: a short accent pill under the chosen source. */
+.app-library-filters button[aria-selected="true"]::after { content: ""; position: absolute; left: 50%; bottom: -1px; width: 16px; height: 3px; translate: -50% 0; border-radius: 2px; background: var(--accent); }
+
+.app-library-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.app-library-search { position: relative; flex: 1 1 260px; display: flex; align-items: center; }
+.app-library-search input { padding-right: 40px; }
+.library-refresh { position: absolute; right: 4px; display: grid; place-items: center; width: 30px; height: 28px; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: var(--r-control); cursor: pointer; }
+.library-refresh:hover { color: var(--ink); background: var(--hover); }
+.library-refresh:disabled { opacity: 0.5; cursor: default; }
+.library-browse { color: var(--ink-2); }

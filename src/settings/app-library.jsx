@@ -91,13 +91,24 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
   const showAll = searching || filter === 'all';
   const panel = searching ? 'apps' : filter;
   return <section aria-label={t('workspace.library')} className="app-library-section">
-    <div className="app-library-tools"><span className="app-library-search"><Icon name="search" /><input type="search" aria-label={t('apps.search')} placeholder={t('apps.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} /></span>
-      <button type="button" className="button library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
-      {browseFile && <button type="button" className="button" onClick={browseFile}><Icon name="app" />{t('add.browse')}</button>}
+    {/* Top to bottom, in the order you decide: where it goes, what kind of
+        thing, then narrow it down. */}
+    <header className="library-header">
+      <div className="library-heading">
+        <h2>{t('library.title')}</h2>
+        <p>{t('library.hint')}</p>
+      </div>
       {destination}
+    </header>
+    <div className="app-library-filters" role="tablist" aria-label={t('workspace.sources')}>
+      {[['all', 'apps.tabApps'], ['frequent', 'add.frequent'], ['running', 'add.running'], ['folders', 'apps.tabFolders'], ...(webPanel ? [['web', 'apps.web']] : [])].map(([value, key]) => <button type="button" role="tab" key={value} aria-selected={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
     </div>
-    <div className="app-library-filters" role="group" aria-label={t('workspace.sources')}>
-      {[['all', 'apps.tabApps'], ['frequent', 'add.frequent'], ['running', 'add.running'], ['folders', 'apps.tabFolders'], ...(webPanel ? [['web', 'apps.web']] : [])].map(([value, key]) => <button type="button" key={value} aria-pressed={!searching && filter === value} onClick={() => { setFilter(value); setQuery(''); setPage(0); }}>{t(key)}</button>)}
+    <div className="app-library-tools">
+      <span className="app-library-search"><Icon name="search" />
+        <input type="search" aria-label={t('apps.search')} placeholder={t('apps.search')} value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} />
+        <button type="button" className="library-refresh" aria-label={t('apps.refresh')} title={t('apps.refresh')} disabled={loading} onClick={() => load(true)}><Icon name="refresh" /></button>
+      </span>
+      {browseFile && <button type="button" className="button library-browse" onClick={browseFile}><Icon name="file" />{t('add.browse')}</button>}
     </div>
     <div role="status" aria-live="polite">{message}</div>
     {chosen.length > 0 && <div className="app-library-selection"><button className="button button-accent" onClick={() => add(chosen)}>{t('premium.addSelected')} ({chosen.length})</button><button className="button" onClick={() => setSelected({})}>{t('trash.cancel')}</button></div>}
