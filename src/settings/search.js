@@ -13,7 +13,7 @@ const SEARCH_INDEX = [
   ["be.position", "dock"], ["be.monitor", "dock"], ["be.edgeGap", "dock"],
   ["tab.appearance", "dock"], ["ap.theme", "dock"], ["look.source", "dock"], ["dock.intensity", "dock"], ["finish.title", "dock"], ["surface.color", "dock"], ["overhaul.reduceTransparency", "dock"],
   ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"], ["ap.compact", "dock"],
-  ["gp.interaction", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
+  ["dock.more", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
   ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
   ["be.taskbarFollow", "dock"], ["be.taskbarSettle", "dock"], ["be.taskbarHoldHover", "dock"], ["ap.nativeMaterial", "dock"],
   ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],

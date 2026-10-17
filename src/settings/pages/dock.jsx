@@ -28,6 +28,8 @@ export function DockPage({ cfg, set }) {
     <PageHeader title={t("tab.dock")}>{t("dock.pageHint")}</PageHeader>
     <div className="sticky-preview"><DockPreview cfg={cfg} stage /></div>
 
+    {/* What most people change, in the order they reach for it. Everything
+        else is one disclosure away, so the page reads at a glance. */}
     <SettingsSection icon="eye" title={t("dock.behavior")}>
       <div className="row-block"><ScenarioPicker cfg={cfg} set={set} /></div>
       {hides && <Row label={t("be.reveal")} hint={cfg.notchTrigger === "hover" ? t("be.revealHint") : undefined}>
@@ -38,12 +40,6 @@ export function DockPage({ cfg, set }) {
         <SegmentedControl value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
           options={[{ value: "attached", label: t("be.notchModeAttached") }, { value: "floating", label: t("be.notchModeFloating") }, { value: "smart", label: t("be.notchModeSmart") }]} />
       </Row>}
-      {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
-        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
-      {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
-        <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
-      </Row>}
-      <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
     </SettingsSection>
 
     <SettingsSection icon="app" title={t("be.position")}>
@@ -52,9 +48,6 @@ export function DockPage({ cfg, set }) {
         <MonitorPicker value={cfg.monitor ?? -1} monitors={monitors}
           onChange={(v) => set({ monitor: v, monitorName: v < 0 ? "" : monitors.find((m) => m.index === v)?.name || "" }, afterPlacement)} />
       </Row>}
-      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-        <Slider value={cfg.edgeGap ?? 12} min={0} max={72} step={2} fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)} onChange={(v) => set({ edgeGap: v }, afterPlacement)} />
-      </Row>
     </SettingsSection>
 
     <SettingsSection icon="palette" title={t("tab.appearance")}>
@@ -66,25 +59,34 @@ export function DockPage({ cfg, set }) {
       {style === "taskbar"
         ? <div className="row-block"><p className="swatch-caption look-now"><span className="look-now-dot" aria-hidden="true" />{t("surface.taskbarNote")}</p></div>
         : <Row label={t("surface.color")} hint={t("surface.colorHint")} stack><SurfaceColorPicker value={surfaceColor(cfg)} onChange={(v) => set({ surfaceColor: v, surfaceTint: "" }, afterSurface)} /></Row>}
-      {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
-        <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
-      </Row>}
       <Row label={t("look.source")} hint={t("look.sourceHint")} stack>
         <ColorSourcePicker cfg={cfg} set={set}>
           {colorSource(cfg) === "custom" && <AccentPicker value={cfg.accent} onChange={(v) => set({ accent: v })} />}
         </ColorSourcePicker>
       </Row>
-      <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
     </SettingsSection>
 
     <SettingsSection icon="sliders" title={t("gp.size")}>
       <Row label={t("ap.iconSize")}><Slider value={cfg.iconSize ?? 48} min={28} max={80} step={4} fmt={(v) => `${v}px`} onChange={(v) => set({ iconSize: v })} /></Row>
+    </SettingsSection>
+
+    <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
+      {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
+        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
+      {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
+        <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
+      </Row>}
+      <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
+      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+        <Slider value={cfg.edgeGap ?? 12} min={0} max={72} step={2} fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)} onChange={(v) => set({ edgeGap: v }, afterPlacement)} />
+      </Row>
+      {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
+        <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
+      </Row>}
+      <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
       <Row label={t("ap.spacing")}><Slider value={cfg.spacing ?? 6} min={0} max={20} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ spacing: v })} /></Row>
       <Row label={t("ap.radius")} hint={t("ap.radiusHint")}><Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ cornerRadius: v })} /></Row>
       <Toggle label={t("ap.compact")} hint={t("ap.compactHint")} checked={!!cfg.compact} onChange={(v) => set({ compact: v })} />
-    </SettingsSection>
-
-    <CollapsibleSection title={t("gp.interaction")} hint={t("dock.interactionHint")}>
       <Toggle label={t("be.magnify")} checked={cfg.magnification !== false} onChange={(v) => set({ magnification: v })} />
       {cfg.magnification !== false && <>
         <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
