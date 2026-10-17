@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar para Windows</b></a> ·
-  <a href="docs/releases/v0.84.0.md"><b>Novedades de 0.84</b></a> ·
+  <a href="docs/releases/v0.86.0.md"><b>Novedades de 0.86</b></a> ·
   <a href="README.md">English</a>
 </p>
 
@@ -70,7 +70,7 @@
 
 <p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
-<p align="center"><sub>Las imágenes muestran la interfaz real de Booki 0.81 con datos y app de ejemplo.</sub></p>
+<p align="center"><sub>Las imágenes muestran la interfaz real de Booki 0.86 con datos y app de ejemplo.</sub></p>
 
 ## Instalar y empezar
 
@@ -79,6 +79,18 @@
 3. Arrastra una app o carpeta al dock, o haz clic derecho en el dock para añadir elementos.
 
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
+
+## Novedades de 0.86
+
+- **Se siente como Windows 11**: menús al estilo WinUI, colores de acento de Windows, esquinas de 4/8 px, tamaños de texto y ritmos de animación de Windows, avisos como los de la barra de tareas y barras de desplazamiento finas.
+- **El notch en vivo se estira hasta ser el dock** desde donde esté, con un solo muelle para todo el movimiento, y el dock ya no parpadea detrás de la app activa.
+- **Widget Dispositivos**: batería de audífonos, mouse y teclados Bluetooth, de dispositivos Logitech con receptor Bolt o Unifying y de audífonos inalámbricos con el complemento opcional HeadsetControl.
+- **Widget Uso de IA (opcional)**: tus límites de Claude y ChatGPT/Codex, leídos de la sesión que esas apps ya guardan en tu PC.
+- **Complementos**: herramientas de código abierto opcionales que instalas desde Ajustes y que se verifican antes de usarse.
+- **Inicio con Windows más inteligente**: el dock aparece al instante y Booki no compite con el resto de programas al iniciar sesión.
+- **Un primer dock que ya se parece a ti**, una página Dock más simple con "Más ajustes", un aviso de "Cargando" en el notch y muchos arreglos.
+
+Detalles en las [notas de 0.86](docs/releases/v0.86.0.md).
 
 ## Uso diario
 
@@ -96,7 +108,11 @@ Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así q
 
 No hay cuentas, telemetría ni sincronización en la nube. La configuración y las recomendaciones de uso permanecen en tu equipo, en `%APPDATA%\Booki`. El portapapeles persistente está desactivado inicialmente y, al activarlo, se protege para tu usuario de Windows.
 
-Las consultas de red se usan para actualizaciones y favicons, además del clima opcional mediante Open-Meteo al elegir una ciudad, sin pedir la ubicación del dispositivo. La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
+Las consultas de red se usan para actualizaciones y favicons, más tres cosas que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su release oficial en GitHub (verificada con la firma SHA-256 que publica GitHub) y el widget Uso de IA.
+
+El widget Uso de IA lee la sesión que Claude Code (`~/.claude`) y Codex (`~/.codex`) ya guardan en tu PC y la envía solo a su propio servicio (Anthropic u OpenAI) para consultar el uso de tu plan. Booki nunca la guarda, registra ni reenvía, y solo consulta mientras el widget está en el dock. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta.
+
+La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
 
 ## Desarrollo y soporte
 
