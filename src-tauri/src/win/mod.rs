@@ -82,4 +82,4 @@ pub struct AppVolume {
     pub muted: bool,
 }
 #[cfg(windows)]
-pub use windows_impl::{app_volume_set, app_volumes};
+pub use windows_impl::{app_volume_set, app_volumes, volume_set_state};

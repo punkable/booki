@@ -34,10 +34,12 @@ export function buildSystemPanel(item, { close }) {
     for (const [label, value] of rows) dl.append(text("dt", label), text("dd", value));
     container.append(dl);
   };
+  const reads = new WeakMap();
   const load = async (container, action, paint) => {
+    const request = Symbol(); reads.set(container, request);
     const loading = text("p", t("overhaul.loading")); container.append(loading);
-    try { const data = await action(); if (!disposed) { loading.remove(); paint(data); } }
-    catch (error) { if (!disposed) { loading.textContent = `${t("plugins.failed")} ${String(error)}`; loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
+    try { const data = await action(); if (!disposed && reads.get(container) === request) { loading.remove(); paint(data); } }
+    catch (error) { if (!disposed && reads.get(container) === request) { loading.textContent = `${t("plugins.failed")} ${String(error)}`; loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
   };
   if (item.widget === "media") {
     const transport = section(t("w.media"));
@@ -61,11 +63,7 @@ export function buildSystemPanel(item, { close }) {
     const master = section(t("w.volume"));
     load(master, api.volumeInfo, (value) => {
       if (!Array.isArray(value)) { master.append(text("p", t("plugins.noData"))); return; }
-      volumeRow(master, t("w.volume"), value[0], value[1], async (percent, muted) => {
-        await api.volumeSet(percent);
-        const current = await api.volumeInfo();
-        if (Array.isArray(current) && !!current[1] !== muted) await api.volumeMute();
-      });
+      volumeRow(master, t("w.volume"), value[0], value[1], (percent, muted) => api.masterVolumeSet(percent, muted));
     });
     const apps = section(t("plugins.audioApps"));
     const sessionList = document.createElement("div"); apps.append(sessionList);

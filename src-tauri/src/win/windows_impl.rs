@@ -1864,6 +1864,29 @@ pub fn volume_mute_toggle() -> Result<bool, String> {
     }
 }
 
+/// Mixer edits keep the requested mute state throughout a level change.
+/// The ordinary wheel command still unmutes, like Windows' volume keys.
+pub fn volume_set_state(pct: u32, muted: bool) -> Result<(), String> {
+    let _runtime = AudioRuntime::new();
+    unsafe {
+        let volume = endpoint_volume()?;
+        if muted {
+            volume
+                .SetMute(true, std::ptr::null())
+                .map_err(|e| e.to_string())?;
+        }
+        volume
+            .SetMasterVolumeLevelScalar(pct.min(100) as f32 / 100.0, std::ptr::null())
+            .map_err(|e| e.to_string())?;
+        if !muted {
+            volume
+                .SetMute(false, std::ptr::null())
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
 /// Core Audio sessions on the default output. The instance identifier (not
 /// just the PID) distinguishes multiple sessions owned by the same app.
 pub fn app_volumes() -> Result<Vec<super::AppVolume>, String> {

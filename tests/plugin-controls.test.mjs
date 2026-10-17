@@ -82,3 +82,40 @@ test("late native responses cannot resurrect a closed widget panel", async () =>
   assert.equal(await page.locator(".system-widget-panel").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
+
+
+test("the master mixer preserves mute in one native edit", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("volume")] }),
+    initScript: `window.__masterWrites=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{
+      if(cmd==="volume_info")return Promise.resolve([40,true]);
+      if(cmd==="volume_set_state"){window.__masterWrites.push(args);return Promise.resolve();}
+      if(cmd==="volume_set"||cmd==="volume_mute")throw new Error("mixer must not transiently unmute");
+      return invoke(cmd,args);
+    };`,
+  });
+  await page.locator('.tile[data-id="volume"]').click();
+  const slider = page.getByRole("slider", { name: "Volume", exact: true });
+  await slider.waitFor();
+  await slider.evaluate((el) => { el.value="55";el.dispatchEvent(new Event("change",{bubbles:true})); });
+  await waitForAsyncCondition(page, () => window.__masterWrites.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__masterWrites[0]), {percent:55,muted:true});
+  assert.deepEqual(errors, []); await page.close();
+});
+
+
+test("refreshing the mixer ignores an older in-flight session list", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("volume")] }),
+    initScript: `window.__sessionReads=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_volumes"?new Promise((resolve)=>window.__sessionReads.push(resolve)):invoke(cmd,args);`,
+  });
+  await page.locator('.tile[data-id="volume"]').click();
+  await waitForAsyncCondition(page, () => window.__sessionReads.length === 1);
+  await page.getByRole("button", {name:"Refresh data",exact:true}).click();
+  await waitForAsyncCondition(page, () => window.__sessionReads.length === 2);
+  await page.evaluate(() => window.__sessionReads[1]([{id:"new",name:"New app",percent:50,muted:false}]));
+  await page.getByRole("slider", {name:"New app",exact:true}).waitFor();
+  await page.evaluate(() => window.__sessionReads[0]([{id:"old",name:"Old app",percent:20,muted:false}]));
+  assert.equal(await page.getByRole("slider", {name:"Old app",exact:true}).count(),0);
+  assert.deepEqual(errors,[]);await page.close();
+});

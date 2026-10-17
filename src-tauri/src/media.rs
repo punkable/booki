@@ -60,14 +60,24 @@ pub(crate) async fn volume_info() -> Option<(u32, bool)> {
 // once, so changes take turns and each applies the newest requested level:
 // the last one to run always leaves the newest level set.
 static VOLUME_TURN: Mutex<()> = Mutex::new(());
-static VOLUME_WANTED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static VOLUME_WANTED: Mutex<(u32, Option<bool>)> = Mutex::new((0, None));
+
+fn apply_volume_request() -> Result<(), String> {
+    let (percent, muted) = *VOLUME_WANTED.lock().unwrap_or_else(|e| e.into_inner());
+    #[cfg(windows)]
+    if let Some(muted) = muted {
+        return win::volume_set_state(percent, muted);
+    }
+    let _ = muted;
+    win::volume_set(percent)
+}
 
 #[tauri::command]
 pub(crate) async fn volume_set(pct: u32) -> Result<(), String> {
-    VOLUME_WANTED.store(pct, Ordering::SeqCst);
+    *VOLUME_WANTED.lock().unwrap_or_else(|e| e.into_inner()) = (pct, None);
     util::blocking(|| {
         let _turn = VOLUME_TURN.lock().unwrap_or_else(|e| e.into_inner());
-        win::volume_set(VOLUME_WANTED.load(Ordering::SeqCst))
+        apply_volume_request()
     })
     .await?
 }
@@ -103,6 +113,24 @@ pub(crate) async fn app_volume_set(id: String, percent: u32, muted: bool) -> Res
     #[cfg(not(windows))]
     {
         let _ = (id, percent, muted);
+        Err("Core Audio requires Windows".into())
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn volume_set_state(percent: u32, muted: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        *VOLUME_WANTED.lock().unwrap_or_else(|e| e.into_inner()) = (percent, Some(muted));
+        util::blocking(|| {
+            let _turn = VOLUME_TURN.lock().unwrap_or_else(|e| e.into_inner());
+            apply_volume_request()
+        })
+        .await?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (percent, muted);
         Err("Core Audio requires Windows".into())
     }
 }

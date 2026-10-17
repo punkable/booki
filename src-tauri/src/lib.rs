@@ -1523,6 +1523,7 @@ pub fn run() {
             app_volumes,
             app_volume_set,
             volume_set,
+            volume_set_state,
             volume_mute,
             set_dock_edge,
             open_changelog,

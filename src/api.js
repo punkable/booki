@@ -581,6 +581,7 @@ export const dock = {
   deviceBatteries: () => invoke("device_batteries"),
   aiUsage: () => invoke("ai_usage"),
   pluginCatalog: () => isTauri ? invoke("plugin_catalog") : Promise.resolve(PLUGINS),
+  masterVolumeSet: (percent, muted) => invoke("volume_set_state", { percent, muted }),
   appVolumes: () => invoke("app_volumes"),
   appVolumeSet: (id, percent, muted) => invoke("app_volume_set", { id, percent, muted }),
   pluginRead: (id) => invoke("plugin_read", { id }),
