@@ -1,4 +1,4 @@
-/* Booki Settings: a sidebar with five pages and a search box.
+/* Booki Settings: a sidebar with dedicated pages and a search box.
    State lives in settings/store.js; each page is its own module. */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -17,6 +17,7 @@ import { HomePage } from "./settings/pages/home.jsx";
 import { DockPage } from "./settings/pages/dock.jsx";
 import { WidgetsPage } from "./settings/pages/widgets.jsx";
 import { AppsPage } from "./settings/pages/apps.jsx";
+import { PluginsPage } from "./settings/pages/plugins.jsx";
 import { SystemPage } from "./settings/pages/system.jsx";
 
 // [id, label, glyph, tile colour]
@@ -25,6 +26,7 @@ const PAGES = [
   ["dock", "tab.dock", "app", "#5e7bff"],
   ["widgets", "tab.widgets", "zap", "#ff4f7b"],
   ["apps", "overhaul.appsFolders", "folder", "#ff9a2e"],
+  ["plugins", "plugins.title", "sparkles", "#409c91"],
   ["system", "overhaul.system", "settings", "#8d8a93"],
 ];
 const PAGE_IDS = PAGES.map(([id]) => id);
@@ -199,6 +201,7 @@ function App() {
           {page === "dock" && <DockPage {...pageProps} />}
           {page === "widgets" && <WidgetsPage {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}
+          {page === "plugins" && <PluginsPage />}
           {page === "system" && <SystemPage {...pageProps} version={version} store={store} onWhatsNew={() => setShowChangelog(true)} />}
         </SettingsBoundary>
       </div>

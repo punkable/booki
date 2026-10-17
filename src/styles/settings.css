@@ -85,8 +85,8 @@
   --ink-3: #9a9a9a;
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
-/* On Mica the page shows the system material; cards stay solid. */
-.settings-body.settings-mica { --page-bg: transparent; --side-bg: transparent; background: transparent; }
+/* Keep a painted surface even when DWM accepts Mica: WebView/DWM can
+   otherwise expose a black composition surface on Windows. */
 .settings-body ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 .settings-body :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-control); }
 .settings-body input, .settings-body textarea, .settings-body .selectable { -webkit-user-select: text; user-select: text; }
@@ -101,6 +101,7 @@
 .page-dock { --page-hue: #5e7bff; }
 .page-widgets { --page-hue: #ff4f7b; }
 .page-apps { --page-hue: #ff9a2e; }
+.page-plugins { --page-hue: #409c91; }
 .page-system { --page-hue: #8d8a93; }
 
 /* ── Shell ──────────────────────────────────────────────────────────────── */
@@ -110,7 +111,7 @@
 .brand > img:first-child { width: 30px; height: 30px; }
 .brand-word { height: 18px; }
 .brand-version { margin-left: auto; padding: 2px 8px; color: var(--ink-2); font-size: calc(11px * var(--os-text-scale, 1)); font-weight: 600; background: var(--subtle-hover); border-radius: 999px; }
-.settings-main { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+.settings-main { background: var(--page-bg); flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
 .page { position: relative; max-width: 960px; margin: 0 auto; padding: 32px 40px 48px; container: page / inline-size; }
 
 /* Search */
@@ -532,7 +533,7 @@
 /* ── Apps & folders ─────────────────────────────────────────────────────── */
 /* The dock being edited stays in view while the catalog below scrolls. */
 /* ── Apps: the dock being edited, the library, the inspector ─────────────── */
-.library-dock-editor { position: sticky; top: 8px; z-index: 6; margin: 0 0 20px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
+.library-dock-editor { position: relative; margin: 0 0 20px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .library-dock-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-bottom: 1px solid var(--divider); }
 .library-dock-head > strong { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; font-size: calc(15px * var(--os-text-scale, 1)); font-weight: 600; }
 .library-count { min-width: 22px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); font-weight: 600; background: var(--subtle-pressed); border-radius: 999px; }
@@ -906,10 +907,11 @@
 /* Settings > Plugins: one card per optional tool. */
 .plugin-card { display: grid; gap: 6px; }
 .plugin-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.plugin-action-error { color: var(--danger-text); }
 .plugin-meta { font-size: 0.75rem; color: var(--ink-2); }
 .plugin-desc { margin: 0; color: var(--ink-2); line-height: 1.45; }
 .plugin-fine { font-size: 0.75rem; }
-.plugin-actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.plugin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 4px; }
 
 /* Apps & folders catalog, in the order you decide: a header that says what
    happens and where (destination), the source as a WinUI SelectorBar, then

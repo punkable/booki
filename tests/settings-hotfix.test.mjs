@@ -188,3 +188,40 @@ test('shortcut fields show localized key names, store English ones and always of
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+for (const [theme, color] of [['dark', 'rgb(32, 32, 32)'], ['light', 'rgb(243, 243, 243)']]) {
+  test(`Settings keeps a painted ${theme} surface when Windows accepts Mica`, async () => {
+    const { page, errors } = await openPage(browser, port, 'settings.html', {
+      cfg: makeConfig({ theme }), viewport: { width: 950, height: 790 },
+      initScript: `const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='platform_capabilities'?Promise.resolve({systemBackdrop:true,transparency:true,animations:true,highContrast:false}):cmd==='settings_backdrop'?Promise.resolve(true):old(cmd,args);`,
+    });
+    await page.waitForFunction(() => document.body.classList.contains('settings-mica'));
+    await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+    assert.equal(await page.locator('.settings-main').evaluate(el => getComputedStyle(el).backgroundColor), color);
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), color);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+}
+
+test('plugins have their own searchable page and installation stays deliberate', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', {
+    initScript: `const old=window.__TAURI__.core.invoke;window.__pluginInstalls=[];window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='plugin_status')return Promise.resolve({installed:false});if(cmd==='plugin_install'){window.__pluginInstalls.push(args.id);return Promise.reject('Download unavailable');}return old(cmd,args);};`,
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  assert.equal(await page.locator('.plugin-card').count(), 0);
+  await page.getByRole('combobox', { name: 'Search settings…' }).fill('HeadsetControl');
+  await page.getByRole('option').filter({ hasText: 'Plugins' }).click();
+  await page.locator('.page-plugins').waitFor();
+  assert.equal(await page.locator('.plugin-card').count(), 6);
+  assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
+  const section = page.locator('.ui-group-wrap').filter({ has: page.getByRole('heading', { name: 'HeadsetControl', exact: true }) });
+  await section.getByRole('button', { name: 'Download and install', exact: true }).click();
+  const error = section.getByRole('alert');
+  await error.waitFor();
+  assert.match(await error.innerText(), /Download unavailable/);
+  assert.equal(await error.evaluate(el => getComputedStyle(el).position), 'static');
+  assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), ['headsetcontrol']);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

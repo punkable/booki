@@ -312,7 +312,7 @@ test('widget filtering preserves a customized draft and keeps the inspector in v
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('the editable dock stays in view while a populated library scrolls, without covering the selection', async () => {
+test('the dock editor scrolls away while browsing a populated library, without covering the selection', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:720},initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:Array.from({length:70},(_,i)=>({name:'App '+i,path:'C:/Apps/app'+i+'.exe'}))}]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   await page.locator('.app-library-card').first().waitFor();
@@ -320,7 +320,7 @@ test('the editable dock stays in view while a populated library scrolls, without
   await main.evaluate(element=>element.scrollTop=element.scrollHeight);
   assert.ok(await main.evaluate(element=>element.scrollTop>0),'The catalog is long enough to scroll');
   const editor=await page.locator('.library-dock-editor').boundingBox();
-  assert.ok(editor.y>=-1 && editor.y<60,'The dock being edited stays at the top while the catalog scrolls');
+  assert.ok(editor.y+editor.height<=0,'The full editor leaves the viewport while browsing the catalog');
   const overlap=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
   await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
   await page.getByRole('button',{name:'Item details: App 69',exact:true}).click();

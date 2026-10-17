@@ -2,6 +2,10 @@
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
   es: {
+    "release871.headline": "Ajustes más cómodos, con fondo corregido y complementos en su propia categoría.",
+    "release871.plugins": "Complementos tiene su propia pestaña y aparece en el buscador. Reúne instalaciones, retirada y controles de OpenRGB y LibreHardwareMonitor.",
+    "release871.surface": "El fondo de Ajustes conserva su gris de WinUI también cuando Windows activa Mica; ya no queda transparente sobre una superficie negra.",
+    "release871.scroll": "En Apps y carpetas, el editor completo del dock se desplaza con la página y deja de tapar el catálogo.",
     "release87.headline": "Herramientas opcionales, widgets con controles, temas más cómodos y un notch más fluido.",
     "release87.plugins": "HeadsetControl ya se descarga correctamente. El catálogo común añade descargas con yt-dlp, búsqueda de actualizaciones con winget, perfiles OpenRGB, transferencias Rclone y sensores LibreHardwareMonitor. Cada herramienta administrada se verifica antes de instalarla.",
     "release87.panels": "Haz clic en Sistema, Volumen, Dispositivos, Batería, IA o Multimedia para ver detalles y controles. Volumen incluye un mezclador nativo por app. Los proveedores ausentes ofrecen un botón de instalación; soltar un enlace de video pide una carpeta antes de descargar.",
@@ -274,6 +278,10 @@ export const STRINGS = {
     "a11y.runningWindows": "En ejecución · {n} ventanas",
   },
   en: {
+    "release871.headline": "More comfortable Settings, with corrected backgrounds and a dedicated Plugins page.",
+    "release871.plugins": "Plugins has its own searchable tab for installation, removal and OpenRGB and LibreHardwareMonitor controls.",
+    "release871.surface": "Settings retains its WinUI gray when Windows enables Mica, instead of exposing a black composition surface.",
+    "release871.scroll": "In Apps & folders, the full dock editor scrolls with the page and no longer covers the catalog.",
     "release87.headline": "Optional tools, widgets you can control, calmer themes and a smoother notch.",
     "release87.plugins": "HeadsetControl downloads correctly. The shared catalog adds yt-dlp downloads, winget app-update checks, OpenRGB profiles, Rclone transfer status and LibreHardwareMonitor sensors. Each managed tool is verified before installation.",
     "release87.panels": "Click System, Volume, Devices, Battery, AI or Media for details and controls. Volume includes a native Windows app mixer. Missing providers offer an install button; dropping a video link asks for a folder before downloading.",
@@ -546,6 +554,10 @@ export const STRINGS = {
     "a11y.runningWindows": "Running · {n} windows",
   },
   pt: {
+    "release871.headline": "Ajustes mais confortáveis, com fundo corrigido e uma página de complementos.",
+    "release871.plugins": "Complementos tem sua própria aba na busca, com instalação, remoção e controles do OpenRGB e LibreHardwareMonitor.",
+    "release871.surface": "Os Ajustes mantêm o cinza WinUI quando o Windows ativa Mica, sem expor uma superfície preta.",
+    "release871.scroll": "Em Apps e pastas, o editor completo do dock rola com a página e não cobre mais o catálogo.",
     "release87.headline": "Ferramentas opcionais, widgets com controles, temas mais confortáveis e um notch mais fluido.",
     "release87.plugins": "O download do HeadsetControl foi corrigido. O catálogo comum adiciona downloads com yt-dlp, verificação de atualizações com winget, perfis OpenRGB, transferências Rclone e sensores LibreHardwareMonitor. As ferramentas gerenciadas são verificadas antes da instalação.",
     "release87.panels": "Clique em Sistema, Volume, Dispositivos, Bateria, IA ou Mídia para ver detalhes e controles. Volume inclui um mixer nativo por app. Os provedores ausentes oferecem um botão de instalação; soltar um link de vídeo pede uma pasta antes de baixar.",
@@ -818,6 +830,10 @@ export const STRINGS = {
     "a11y.runningWindows": "Em execução · {n} janelas",
   },
   fr: {
+    "release871.headline": "Des réglages plus confortables, avec un fond corrigé et une page Modules dédiée.",
+    "release871.plugins": "Modules dispose de son propre onglet dans la recherche, avec installation, suppression et commandes OpenRGB et LibreHardwareMonitor.",
+    "release871.surface": "Les réglages gardent leur gris WinUI lorsque Windows active Mica, sans exposer une surface noire.",
+    "release871.scroll": "Dans Apps et dossiers, l’éditeur complet du dock défile avec la page et ne masque plus le catalogue.",
     "release87.headline": "Outils facultatifs, widgets interactifs, thèmes plus confortables et notch plus fluide.",
     "release87.plugins": "Le téléchargement de HeadsetControl est corrigé. Le catalogue ajoute yt-dlp, les mises à jour winget, les profils OpenRGB, les transferts Rclone et les capteurs LibreHardwareMonitor. Chaque outil géré est vérifié avant son installation.",
     "release87.panels": "Cliquez sur Système, Volume, Appareils, Batterie, IA ou Multimédia pour les détails et commandes. Volume intègre le mélangeur Windows par application. Les outils manquants proposent leur installation ; un lien vidéo demande un dossier avant le téléchargement.",
@@ -1090,6 +1106,10 @@ export const STRINGS = {
     "a11y.runningWindows": "En cours · {n} fenêtres",
   },
   de: {
+    "release871.headline": "Angenehmere Einstellungen mit korrigiertem Hintergrund und eigener Erweiterungsseite.",
+    "release871.plugins": "Erweiterungen haben einen eigenen durchsuchbaren Tab für Installation, Entfernen sowie OpenRGB- und LibreHardwareMonitor-Steuerung.",
+    "release871.surface": "Die Einstellungen behalten bei aktiviertem Windows-Mica ihr WinUI-Grau, statt eine schwarze Fläche freizulegen.",
+    "release871.scroll": "Unter Apps und Ordner scrollt der vollständige Dock-Editor mit der Seite und verdeckt den Katalog nicht mehr.",
     "release87.headline": "Optionale Werkzeuge, bedienbare Widgets, angenehmere Designs und flüssigere Notch.",
     "release87.plugins": "HeadsetControl wird korrekt heruntergeladen. Der Katalog ergänzt yt-dlp-Downloads, winget-Updateprüfungen, OpenRGB-Profile, Rclone-Übertragungen und LibreHardwareMonitor-Sensoren. Verwaltete Werkzeuge werden vor der Installation geprüft.",
     "release87.panels": "Klicke auf System, Lautstärke, Geräte, Akku, KI oder Medien für Details und Steuerung. Lautstärke bietet einen nativen App-Mixer. Fehlende Anbieter lassen sich installieren; ein abgelegter Videolink fragt vor dem Download nach einem Ordner.",
