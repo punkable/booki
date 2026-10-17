@@ -62,6 +62,8 @@ function WidgetFields({ item, cfg, set, onChange }) {
     </Row>}
     {item.widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(v) => patch({ scrollVolume: v })} />}
     {["media", "battery", "devices"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!style.hideWhenUnavailable} onChange={(v) => patch({ hideWhenUnavailable: v })} />}
+    {item.widget === "ai" && <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p>}
+    {item.widget === "devices" && <p className="inline-note"><Icon name="info" />{t("widget.devicesNote")}</p>}
     {["focus", "calendar", "weather", "clock"].includes(item.widget) && <p className="inline-note"><Icon name="info" />{t("widgets.openFromDock")}</p>}
     <Row label={t("w.variant")}>
       <SegmentedControl value={["glass", "solid", "minimal"].includes(style.variant) ? style.variant : "glass"} onChange={(v) => patch({ variant: v })}

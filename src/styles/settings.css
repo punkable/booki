@@ -350,7 +350,9 @@
 .preview-static { position: relative !important; flex: none; display: inline-flex; padding: 0 !important; border: 0; transform: none !important; transition: none !important; cursor: default; }
 .preview-edit-pin { display: inline-flex; padding: 0; color: inherit; background: none; border: 0; border-radius: var(--r-card); cursor: pointer; transition: transform var(--dur-2) var(--ease); }
 .preview-edit-pin:hover { transform: translateY(-2px); }
-.sticky-preview { position: sticky; top: -28px; z-index: 5; margin: -8px 0 16px; padding-top: 8px; background: linear-gradient(var(--page-bg) 80%, transparent); }
+/* The bottom 20px fade content out before it slides under the preview, so a
+   section title is never left half-hidden behind it. */
+.sticky-preview { position: sticky; top: -28px; z-index: 5; margin: -8px 0 0; padding: 8px 0 20px; background: linear-gradient(var(--page-bg) calc(100% - 20px), transparent); }
 .settings-mica .sticky-preview { background: transparent; backdrop-filter: blur(20px); -webkit-mask: linear-gradient(#000 85%, transparent); }
 
 /* ── Stage: the dock on a small desktop ─────────────────────────────────── */

@@ -36,7 +36,7 @@ export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, g
       el.querySelector(".w-pv-title").textContent = widgetDisplayName(widget, t);
       el.querySelector(".w-pv-sub").textContent = t(widget === "notes" ? "w.notesEmpty" : "clip.empty");
     } else if (RING_WIDGETS.includes(widget)) {
-      setMetric(el, widgetDisplayName(widget, t), { battery: 78, volume: 55 }[widget] || 0);
+      setMetric(el, widgetDisplayName(widget, t), { battery: 78, devices: 72, ai: 42, volume: 55 }[widget] || 0);
     } else if (widget === "clock") {
       const parts = clockParts(new Date(), curLang());
       setText(el, parts.date, parts.time);
