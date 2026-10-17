@@ -573,6 +573,7 @@ export const dock = {
   setDockEdge: (edge) => invoke("set_dock_edge", { edge }),
   appVersion: () => invoke("app_version"),
   /** True when Windows started Booki at sign-in. */
+  deviceBatteries: () => invoke("device_batteries"),
   launchedAtLogin: () => invoke("launched_at_login").then(Boolean).catch(() => false),
   openLocation: (path) => invoke("open_location", { path }),
   setHotkey: (accelerator) => invoke("set_hotkey", { accelerator }),

@@ -61,7 +61,7 @@ function WidgetFields({ item, cfg, set, onChange }) {
       <input className="text-field" type="text" value={style.note || ""} placeholder={t("w.notesEmpty")} onChange={(e) => patch({ note: e.target.value })} />
     </Row>}
     {item.widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(v) => patch({ scrollVolume: v })} />}
-    {["media", "battery"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!style.hideWhenUnavailable} onChange={(v) => patch({ hideWhenUnavailable: v })} />}
+    {["media", "battery", "devices"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!style.hideWhenUnavailable} onChange={(v) => patch({ hideWhenUnavailable: v })} />}
     {["focus", "calendar", "weather", "clock"].includes(item.widget) && <p className="inline-note"><Icon name="info" />{t("widgets.openFromDock")}</p>}
     <Row label={t("w.variant")}>
       <SegmentedControl value={["glass", "solid", "minimal"].includes(style.variant) ? style.variant : "glass"} onChange={(v) => patch({ variant: v })}

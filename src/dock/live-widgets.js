@@ -132,6 +132,21 @@ const pollStats = singleFlight(async () => {
   });
 });
 
+// Headsets, earbuds, mice and keyboards that report a battery to Windows.
+// The card shows the one closest to running out; its hint lists them all.
+const pollDevices = singleFlight(async () => {
+  let list = [];
+  try { list = (await dockApi.deviceBatteries()) || []; } catch (_) { list = []; }
+  eachWidget("devices", (el) => {
+    setWidgetAvailable(el, list.length > 0);
+    if (!list.length) { setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
+    const low = list[0];
+    setMetric(el, low.name, low.level);
+    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%`).join("\n"));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", low.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
+  });
+});
+
 function setWidgetAvailable(el, available) {
   const item = findWidgetPin(el.dataset.id);
   const hide = !!item?.style?.hideWhenUnavailable && !available;
@@ -312,6 +327,7 @@ function pollKinds() {
     media: widgetPresent("media"),
     volume: widgetPresent("volume") || anyPinnedWidget((item) => item.widget === "media" && !!item.style?.scrollVolume),
     clipboard: widgetPresent("clipboard"),
+    devices: widgetPresent("devices"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -321,6 +337,7 @@ function paintPolls(k) {
   if (k.media) pollMedia();
   if (k.volume) pollVolume();
   if (k.clipboard) pollClipboard();
+  if (k.devices) pollDevices();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new
@@ -341,18 +358,19 @@ export function startPolls() {
   const k = pollKinds();
   pollKey = JSON.stringify(k);
   pollsActive = true;
-  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard } = k;
+  const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices } = k;
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
   paintPolls(k);
   const t0 = Date.now();
   const slow = pollSlowdown();
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow };
+  // Device batteries change slowly and the query walks Windows' device list.
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
-  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : 60000;
+  const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices ? 15000 : 60000;
   widgetPollTimer = setInterval(() => {
     if (S.hiddenState || S.displayOff) return; // don't poll a tucked-away dock
     const now = Date.now();
@@ -361,6 +379,7 @@ export function startPolls() {
     if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(S.nativeSupport, "media", 3000) * slow; pollMedia(); }
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(S.nativeSupport, "volume", 4000) * slow; pollVolume(); }
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
+    if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).

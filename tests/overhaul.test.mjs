@@ -19,8 +19,8 @@ test("dashboard applies scenarios without replacing pins and stays inside a smal
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
   await page.getByRole("navigation").getByRole("button", { name: "Home", exact: true }).click();
   await page.getByRole("button", { name: /^Add widget/ }).click();
-  assert.equal(await page.locator(".catalog-card").count(), 10);
-  assert.equal(await page.locator(".catalog-preview .w-card").count(), 10);
+  assert.equal(await page.locator(".catalog-card").count(), 11);
+  assert.equal(await page.locator(".catalog-preview .w-card").count(), 11);
   assert.deepEqual(errors, []); await page.close();
 });
 

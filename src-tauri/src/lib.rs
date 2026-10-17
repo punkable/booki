@@ -547,6 +547,27 @@ fn launched_at_login() -> bool {
     LAUNCHED_AT_LOGIN.load(Ordering::Relaxed)
 }
 
+/// Battery of connected Bluetooth devices (headsets, mice, keyboards…), for
+/// the Devices widget. Empty where Windows reports none.
+#[tauri::command]
+async fn device_batteries() -> Vec<serde_json::Value> {
+    #[cfg(windows)]
+    {
+        tauri::async_runtime::spawn_blocking(|| {
+            win::devices::device_batteries()
+                .into_iter()
+                .filter_map(|d| serde_json::to_value(d).ok())
+                .collect()
+        })
+        .await
+        .unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
@@ -1406,6 +1427,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             launched_at_login,
+            device_batteries,
             quiet_update_supported,
             acquire_update_lock,
             release_update_lock,

@@ -50,6 +50,8 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 version = "0.62"
 features = [
     "ApplicationModel",
+    # Battery of Bluetooth headsets, mice and keyboards (win/devices.rs).
+    "Devices_Enumeration_Pnp",
     "Win32_UI_Accessibility",
     "Win32_UI_Shell_Common",
     "Win32_UI_Shell_PropertiesSystem",
@@ -90,6 +92,10 @@ features = [
 version = "0.62"
 
 # Split out of `windows` in 0.62: Vector2 for the composition backdrop.
+# IIterable from a Vec, for WinRT device property queries.
+[target.'cfg(windows)'.dependencies.windows-collections]
+version = "0.3"
+
 [target.'cfg(windows)'.dependencies.windows-numerics]
 version = "0.3"
 
