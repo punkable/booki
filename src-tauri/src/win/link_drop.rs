@@ -2,8 +2,8 @@
 //! formats in the dock, retaining Explorer targeting and physical coordinates.
 use std::cell::Cell;
 use tauri::Emitter;
-use windows::core::{implement, w, Ref};
-use windows::Win32::Foundation::{BOOL, HWND, LPARAM, POINT, POINTL};
+use windows::core::{implement, w, Ref, BOOL};
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, POINTL};
 use windows::Win32::Graphics::Gdi::ScreenToClient;
 use windows::Win32::System::Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL};
 use windows::Win32::System::DataExchange::RegisterClipboardFormatW;

@@ -120,6 +120,7 @@ test("a live notch opens the dock by stretching into it, not rising from the edg
   assert.match(start.clip, /^inset\(/, "starts clipped to the capsule");
   assert.equal(start.transform, "none", "no genie squash or rise");
   assert.equal(start.opacity, "1");
+  await waitForAsyncCondition(page, () => !document.body.classList.contains("tucked"));
   const frames = await page.evaluate(() => document.getElementById("dock").getAnimations().find((a) => a.animationName === "dock-morph")?.effect.getKeyframes());
   assert.equal(frames?.length, 2, "one continuous shape interpolation without a vertical second stage");
   await waitForAsyncCondition(page, () => !document.body.classList.contains("reveal-morph") && !document.body.classList.contains("tucked"));

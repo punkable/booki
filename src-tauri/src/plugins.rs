@@ -2,8 +2,8 @@
 //! folder when the person asks, from Settings. Nothing is bundled and
 //! nothing runs until it is installed.
 //!
-//! Each plugin is pinned to one release of its official GitHub repository.
-//! The download is checked against the SHA-256 digest GitHub publishes for
+//! Each downloadable plugin is pinned to an official release.
+//! The download is checked against its published or catalog-pinned SHA-256 for
 //! that file before anything is unpacked, and it lives under
 //! %LOCALAPPDATA%\Booki\plugins\<id>, so removing it is deleting a folder.
 use serde_json::Value;
@@ -184,24 +184,29 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
         return Err("the download did not contain the expected program".into());
     }
     std::fs::write(staging.join("VERSION"), &plugin.tag).map_err(|e| e.to_string())?;
+    commit_install(&target, &staging)?;
+    Ok(plugin.tag.to_string())
+}
+
+fn commit_install(target: &std::path::Path, staging: &std::path::Path) -> Result<(), String> {
     let backup = target.with_extension("previous");
     if backup.exists() {
         std::fs::remove_dir_all(&backup).map_err(|e| e.to_string())?;
     }
     let had_previous = target.exists();
     if had_previous {
-        std::fs::rename(&target, &backup).map_err(|e| e.to_string())?;
+        std::fs::rename(target, &backup).map_err(|e| e.to_string())?;
     }
-    if let Err(error) = std::fs::rename(&staging, &target) {
+    if let Err(error) = std::fs::rename(staging, target) {
         if had_previous {
-            let _ = std::fs::rename(&backup, &target);
+            let _ = std::fs::rename(&backup, target);
         }
         return Err(error.to_string());
     }
     if had_previous {
         let _ = std::fs::remove_dir_all(backup);
     }
-    Ok(plugin.tag.to_string())
+    Ok(())
 }
 
 pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
@@ -289,5 +294,44 @@ mod tests {
             ),
             None
         );
+    }
+    #[test]
+    fn archives_preserve_runtime_subdirectories_and_reject_traversal() {
+        let dir = std::env::temp_dir().join(format!("booki-plugin-archive-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let archive = |names: &[&str]| {
+            let mut data = std::io::Cursor::new(Vec::new());
+            {
+                let mut zip = zip::ZipWriter::new(&mut data);
+                for name in names {
+                    zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                        .unwrap();
+                    std::io::Write::write_all(&mut zip, b"test").unwrap();
+                }
+                zip.finish().unwrap();
+            }
+            data.into_inner()
+        };
+        unpack(
+            &archive(&["root/OpenRGB.exe", "root/platforms/qwindows.dll"]),
+            &dir,
+            "root",
+        )
+        .unwrap();
+        assert!(dir.join("OpenRGB.exe").is_file());
+        assert!(dir.join("platforms/qwindows.dll").is_file());
+        assert!(unpack(&archive(&["../outside.dll"]), &dir, "").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn failed_install_commit_restores_previous_copy() {
+        let root =
+            std::env::temp_dir().join(format!("booki-plugin-rollback-{}", std::process::id()));
+        let target = root.join("plugin");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("keep.exe"), b"old").unwrap();
+        assert!(commit_install(&target, &root.join("missing-staging")).is_err());
+        assert_eq!(std::fs::read(target.join("keep.exe")).unwrap(), b"old");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
