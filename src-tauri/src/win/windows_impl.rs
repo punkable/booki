@@ -1248,6 +1248,28 @@ pub fn move_window(hwnd: isize, x: i32, y: i32, w: i32, h: i32) {
     }
 }
 
+/// Put a topmost window back on top of the topmost band without ever leaving
+/// it. Toggling always-on-top off and on (the only way to make the window
+/// layer re-apply it) dropped the window into the normal band for a moment,
+/// so the dock blinked behind the active app every few seconds.
+pub fn raise_topmost(hwnd: isize) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+    };
+    let handle = HWND(hwnd as *mut c_void);
+    unsafe {
+        let _ = SetWindowPos(
+            handle,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+        );
+    }
+}
+
 /// Is the OS cursor inside any of the given window-relative CSS-px rects?
 /// `all` short-circuits to "the whole window is interactive" (used during
 /// internal drags and the edge-move overlay). Returns None while the window

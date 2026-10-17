@@ -1693,8 +1693,9 @@ pub fn run() {
                                 // and can slide above the dock/notch. Re-assert topmost
                                 // status every few seconds so both stay reachable.
                                 if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
-                                    let _ = watch.set_always_on_top(false);
-                                    let _ = watch.set_always_on_top(true);
+                                    if let Ok(h) = watch.hwnd() {
+                                        win::raise_topmost(h.0 as isize);
+                                    }
                                 }
                                 // Only while it is actually on screen. This used
                                 // to run unconditionally, so a hidden notch —
@@ -1703,8 +1704,9 @@ pub fn run() {
                                 // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
                                     if notch.is_visible().unwrap_or(false) {
-                                        let _ = notch.set_always_on_top(false);
-                                        let _ = notch.set_always_on_top(true);
+                                        if let Ok(h) = notch.hwnd() {
+                                            win::raise_topmost(h.0 as isize);
+                                        }
                                     }
                                 }
                             }

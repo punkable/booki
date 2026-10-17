@@ -293,8 +293,11 @@ pub(crate) fn reveal_dock(app: AppHandle) {
 pub(crate) fn lift_dock_window(dock: &tauri::WebviewWindow) {
     let cfg = config::load();
     if cfg.always_on_top {
-        let _ = dock.set_always_on_top(false);
         let _ = dock.set_always_on_top(true);
+        #[cfg(windows)]
+        if let Ok(h) = dock.hwnd() {
+            win::raise_topmost(h.0 as isize);
+        }
     } else {
         let _ = dock.set_always_on_top(false);
     }
