@@ -17,15 +17,33 @@ import { reframe, applyFrame } from "./frame.js";
 import { eachWidget, tickProductivity } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { persist } from "./config-sync.js";
+import { closeStack } from "./stack.js";
+import { closeMenu } from "./menu-core.js";
 
 export function closeProductivityPanel() {
   // Give keyboard focus back to the tile that opened the panel.
   const panel = S.productivityPanel;
   if (panel?._opener?.isConnected && panel.contains(document.activeElement)) panel._opener.focus();
-  S.productivityPanel?.dispose?.();
-  S.productivityPanel?.remove(); S.productivityPanel = null; S.pinnedReveal = false; reframe(); scheduleHide();
+  panel?.dispose?.();
+  S.productivityPanel = null; S.pinnedReveal = false;
+  if (!panel) { reframe(); scheduleHide(); return; }
+  // Leave the way a folder flyout leaves, then shrink the window.
+  dismissFlyout(panel, () => { reframe(); scheduleHide(); });
+}
+/** Fade a flyout out along its entry path, then remove it. */
+function dismissFlyout(panel, done) {
+  panel.classList.remove("is-open"); panel.classList.add("is-closing");
+  // Gone for keyboards and screen readers at once; only its fade remains.
+  panel.inert = true; panel.setAttribute("aria-hidden", "true");
+  setTimeout(() => { panel.remove(); done?.(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 170);
+}
+/** True when a pointer event landed on the open widget panel or the tile that opened it. */
+export function insideWidgetPanel(target) {
+  const panel = S.productivityPanel;
+  return !!panel && (panel.contains(target) || !!panel._opener?.contains?.(target));
 }
 export function openProductivity(item, tile) {
+  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   const panel = buildProductivityPanel(item, {
     save: async (draft, previous) => {
@@ -47,11 +65,15 @@ export function openProductivity(item, tile) {
   mountWidgetPanel(item, tile, panel);
 }
 export function openSystemPanel(item, tile) {
+  // A second click on the tile that opened the panel closes it, as with a folder.
+  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
 }
 function mountWidgetPanel(item, tile, panel) {
-  panel._opener = tile;
+  // One flyout at a time: a widget panel replaces an open folder or menu.
+  closeStack(); closeMenu();
+  panel._opener = tile; panel._itemId = item.id;
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
   const place = () => {
@@ -62,7 +84,7 @@ function mountWidgetPanel(item, tile, panel) {
   const dispose = panel.dispose;
   const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
+  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
 }
 
 // Notes use a serialized autosave and keep their draft visible on failure.
@@ -72,13 +94,14 @@ async function closeNoteEditor() {
   if (!editor) return true;
   if (!(await editor.flush())) return false;
   if (noteEditor !== editor) return true;
-  editor.dispose(); editor.remove(); noteEditor = null;
-  S.pinnedReveal = false; reframe(); scheduleHide();
+  editor.dispose(); noteEditor = null;
+  S.pinnedReveal = false;
+  dismissFlyout(editor, () => { reframe(); scheduleHide(); });
   return true;
 }
 export async function editNote(item) {
   if (!(await closeNoteEditor())) return;
-  closeProductivityPanel();
+  closeProductivityPanel(); closeStack(); closeMenu();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
   if (!tile) return;
   const panel = document.createElement("section");
@@ -167,5 +190,5 @@ export async function editNote(item) {
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); if (ta.disabled) panel.focus(); else ta.focus(); });
+  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); if (ta.disabled) panel.focus(); else ta.focus(); });
 }

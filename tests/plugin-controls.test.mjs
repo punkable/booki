@@ -28,7 +28,7 @@ test("native mixer targets session identifiers and commits volume and mute", asy
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 2);
   assert.equal(await page.evaluate(() => window.__audioWrites.at(-1).muted), true);
   await page.keyboard.press("Escape");
-  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -74,7 +74,7 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await emit(page, "booki://link-drop", "file:///C:/private.txt");
-  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -148,7 +148,7 @@ test("a click on the volume card mutes; its panel is one right-click away", asyn
   await page.locator('.tile[data-id="volume"]').click();
   await waitForAsyncCondition(page, () => window.__vol.length === 1);
   assert.deepEqual(await page.evaluate(() => window.__vol[0]), { percent: 40, muted: true });
-  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -162,7 +162,7 @@ test("late native responses cannot resurrect a closed widget panel", async () =>
   await waitForAsyncCondition(page, () => typeof window.__finishSessions === "function");
   await page.keyboard.press("Escape");
   await page.evaluate(() => window.__finishSessions([{ id: "late", name: "Late", percent: 10, muted: false }]));
-  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
 

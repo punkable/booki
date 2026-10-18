@@ -223,6 +223,9 @@ function groupTile(item) {
     if (child.kind === "widget") {
       // A grouped widget previews as its emoji (it only goes live inside the group).
       mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
+    } else if (child.kind === "action" && !child.icon) {
+      // Booki's Settings pin keeps its gear inside a group.
+      mini.innerHTML = icon("settings");
     } else {
       const now = syncIcon(child);
       if (now) {

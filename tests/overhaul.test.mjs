@@ -52,7 +52,7 @@ test("local timer and task panel persist and Escape closes the panel", async () 
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await page.waitForTimeout(250);
   let saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config")); assert.ok(saved.pinned[0].style.endsAt > Date.now());
-  await page.keyboard.press("Escape"); assert.equal(await page.locator(".productivity-panel").count(), 0);
+  await page.keyboard.press("Escape"); assert.equal(await page.locator(".productivity-panel:not(.is-closing)").count(), 0);
   await page.locator('#dock > [data-widget="focus"]').click();
   await page.getByRole("textbox", { name: "Add task" }).fill('<img src=x onerror=alert(1)>');
   await page.getByRole("button", { name: "Add task" }).click();

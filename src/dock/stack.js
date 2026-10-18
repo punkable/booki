@@ -12,13 +12,14 @@ import { createFolderNavigation } from "./folder-navigation.js";
 import { buildAddPanel } from "./add-panel.js";
 import { buildLauncher } from "./launcher.js";
 import { S } from "./state.js";
-import { isVertical, widgetLabel, syncIcon, resolveIcon } from "./helpers.js";
+import { isVertical, widgetLabel, syncIcon, resolveIcon, menuPinTitle } from "./helpers.js";
 import { dockEl, esc, stackEl } from "./dom.js";
 import { reframe, applyFrame } from "./frame.js";
 import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
+import { closeProductivityPanel } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -89,6 +90,7 @@ export async function toggleStack(tileEl, item) {
 export async function openStack(tileEl, item) {
   if (S.stackOpen && S.stackItemId === item.id) return;
   if (S.stackOpen) closeStack();
+  if (S.productivityPanel) closeProductivityPanel();
   const isGroup = item.kind === "group";
   const folderNavigation = createFolderNavigation({ path: item.path, name: item.name });
   let navigateFolder = null;
@@ -246,7 +248,16 @@ export async function openStack(tileEl, item) {
           : `<span class="stack-glyph skel"></span>`) +
         `<span class="stack-name">${esc(it.name)}</span>`;
       cell.title = it.name || "";
-      if (!now) {
+      // Booki's own Settings pin reads and looks like Settings inside a group,
+      // not like a folder called "Booki".
+      const settingsPin = isGroup && it.kind === "action" && !it.icon;
+      if (isGroup && it.kind === "action") {
+        const title = menuPinTitle(it);
+        cell.title = title;
+        cell.querySelector(".stack-name").textContent = title;
+      }
+      if (settingsPin) cell.querySelector(".stack-glyph, img").outerHTML = `<span class="stack-glyph action-glyph">${icon("settings")}</span>`;
+      else if (!now) {
         const setImg = (src, isThumb) => {
           const holder = cell.querySelector(".stack-glyph.skel");
           if (holder)

@@ -83,7 +83,7 @@ import {
   persist,
   wireConfigSync,
 } from "./dock/config-sync.js";
-import { closeProductivityPanel } from "./dock/widget-editors.js";
+import { closeProductivityPanel, insideWidgetPanel } from "./dock/widget-editors.js";
 import { removeItem } from "./dock/pin-ops.js";
 import { openAddPanel, openLauncher, closeStack, wireStack } from "./dock/stack.js";
 import { launchModifiers, launch, wireLaunch } from "./dock/launch.js";
@@ -387,6 +387,7 @@ window.addEventListener("click", closeMenu);
 window.addEventListener("blur", () => {
   closeMenu();
   closeStack();
+  if (S.productivityPanel) closeProductivityPanel();
   // Focus moved to another app → release a pinned reveal so the dock can tuck
   // back into the notch instead of lingering on top of whatever the user opened.
   if (S.pinnedReveal) {
@@ -588,16 +589,15 @@ const dockTooltip = createDockTooltip(dockEl, {
   describe: (el) => {
     const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
     if (!pin) return null;
+    // A Windows tooltip: the name, and a second line only when it adds
+    // something the tile can't show (text it cuts off, several windows).
     let name = pin.name || el.getAttribute("aria-label");
-    let detail = t("hint.launch");
-    if (pin.kind === "group") detail = t((pin.children || []).length === 1 ? "hint.groupSingle" : "hint.group").replace("{n}", (pin.children || []).length);
-    else if (pin.kind === "folder") detail = t("hint.folder");
-    else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name) || t("hint.widget"); }
-    else if (pin.kind === "action") { name = el.getAttribute("aria-label"); detail = t("hint.settings"); }
-    else if (pin.kind === "trash") detail = t("hint.trash");
-    else if (el.dataset.running === "true") {
+    let detail = "";
+    if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name); }
+    else if (pin.kind === "action" || pin.kind === "trash") name = el.getAttribute("aria-label") || name;
+    else if (el.dataset.running === "true" && S.cfg.focusIfRunning !== false) {
       const count = windowsFor(pin).length;
-      detail = S.cfg.focusIfRunning === false ? t("hint.running") : count > 1 ? t("hint.pickWindow").replace("{n}", String(count)) : t("hint.switch");
+      if (count > 1) detail = t("hint.pickWindow").replace("{n}", String(count));
     }
     return { name, detail };
   },
@@ -615,9 +615,14 @@ function clippedText(el, name) {
   return text.length > 140 ? `${text.slice(0, 139)}…` : text;
 }
 
+// Every flyout dismisses the same way: a press anywhere outside it, Escape, or
+// switching to another app closes it. The context menu sits outside #stack;
+// its items act on the open flyout, so pressing it never counts as outside.
 window.addEventListener("pointerdown", (e) => {
-  // The context menu sits outside #stack; its items act on the open flyout.
-  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, "#ctx-menu") && !closestSel(e.target, ".tile")) closeStack();
+  if (closestSel(e.target, "#ctx-menu")) return;
+  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
+  if (S.productivityPanel && !insideWidgetPanel(e.target)) closeProductivityPanel();
+  if (S.trashPop && !S.trashPop.contains(e.target)) { closeTrashPop(); S.pinnedReveal = false; scheduleHide(); }
 });
 
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.

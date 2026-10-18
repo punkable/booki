@@ -89,42 +89,27 @@ test("the notch tells the dock its settled live shape", async () => {
   await page.close();
 });
 
-test("a live notch off to one side opens the dock from where it sits", async () => {
+test("the dock slides out of its edge without clipping or deforming, live notch or not", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ autoHideMode: "edge", pinned: everyKindPinned().slice(0, 6) }),
     viewport: { width: 1200, height: 300 },
   });
   await waitForAsyncCondition(page, () => document.body.classList.contains("tucked"));
-  await event(page, "booki://notch-shape", { active: true, width: 150, height: 18, attached: true, cx: 0 });
-  await event(page, "booki://reveal", null);
-  const clip = await page.evaluate(() => document.body.style.getPropertyValue("--morph-clip"));
-  // Pinned to the bar's left end: no left inset, the rest cut from the right.
-  assert.match(clip, /^inset\(\S+ [1-9][\d.]*px \S+ 0px round /);
-  assert.deepEqual(errors, []);
-  await page.close();
-});
-
-test("a live notch opens the dock by stretching into it, not rising from the edge", async () => {
-  const { page, errors } = await openPage(browser, port, "index.html", {
-    cfg: makeConfig({ autoHideMode: "edge", pinned: everyKindPinned().slice(0, 6) }),
-    viewport: { width: 1200, height: 300 },
+  const tucked = await page.evaluate(() => {
+    const style = getComputedStyle(document.getElementById("dock"));
+    return { transform: new DOMMatrix(style.transform), clip: style.clipPath, filter: style.filter };
   });
-  await waitForAsyncCondition(page, () => document.body.classList.contains("tucked"));
+  assert.equal(tucked.transform.a, 1, "no horizontal squash");
+  assert.equal(tucked.transform.d, 1, "no vertical squash");
+  assert.equal(tucked.transform.b + tucked.transform.c, 0, "no skew");
+  assert.ok(tucked.transform.f > 0, "tucked below its bottom edge");
+  assert.equal(tucked.clip, "none");
+  assert.equal(tucked.filter, "none");
   await event(page, "booki://notch-shape", { active: true, width: 150, height: 18, attached: true });
   await event(page, "booki://reveal", null);
-  const start = await page.evaluate(() => {
-    const style = getComputedStyle(document.getElementById("dock"));
-    return { morph: document.body.classList.contains("reveal-morph"), clip: style.clipPath, transform: style.transform, opacity: style.opacity };
-  });
-  assert.equal(start.morph, true);
-  assert.match(start.clip, /^inset\(/, "starts clipped to the capsule");
-  assert.equal(start.transform, "none", "no genie squash or rise");
-  assert.equal(start.opacity, "1");
-  await waitForAsyncCondition(page, () => !document.body.classList.contains("tucked"));
-  const frames = await page.evaluate(() => document.getElementById("dock").getAnimations().find((a) => a.animationName === "dock-morph")?.effect.getKeyframes());
-  assert.equal(frames?.length, 2, "one continuous shape interpolation without a vertical second stage");
-  await waitForAsyncCondition(page, () => !document.body.classList.contains("reveal-morph") && !document.body.classList.contains("tucked"));
-  assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("dock")).clipPath), "none");
+  assert.equal(await page.evaluate(() => document.body.classList.contains("reveal-morph")), false);
+  await waitForAsyncCondition(page, () => !document.body.classList.contains("tucked") && !document.body.classList.contains("revealing"));
+  await page.waitForFunction(() => getComputedStyle(document.getElementById("dock")).transform === "none" || new DOMMatrix(getComputedStyle(document.getElementById("dock")).transform).isIdentity);
   assert.deepEqual(errors, []);
   await page.close();
 });

@@ -215,80 +215,27 @@ body.compact .dock { padding: 4px 6px; gap: calc(var(--gap) * 0.6); }
 body.compact.edge-left .dock, body.compact.edge-right .dock { padding: 6px 4px; }
 /* Keep --w-chrome in step with the padding, or the artwork overflows again. */
 
-/* Auto-hide "genie": the bar squashes and funnels toward the notch (macOS-style
-   suck-in, approximated with anchored scale + skew). --genie-ox points at where
-   the notch sits along its edge, and the genie-* class (set in dock.js) at the
-   EDGE the notch lives on — which may differ from the dock's own edge. */
-body.autohide.tucked .dock { opacity: 0; filter: blur(1.2px); }
-/* Reveal is ease-out and quick: the dock appears instantly and decelerates
-   into place — it shows dozens of times a day, so it must never crawl. */
-/* Genie: readable suck (not scale≈0), opacity trails transform so shape remains. */
+/* Auto-hide moves like the Windows taskbar and its flyouts: the bar slides
+   into its edge and back out of it. No scaling, skewing or blur — the shape
+   never deforms, it only travels. Leaving accelerates and is quicker than
+   arriving, which decelerates into place (Fluent's exit/entrance curves). */
+body.autohide.tucked .dock { opacity: 0; transform: translateY(calc(100% + 12px)); }
+body.autohide.tucked.edge-top .dock { transform: translateY(calc(-100% - 12px)); }
+body.autohide.tucked.edge-left .dock { transform: translateX(calc(-100% - 12px)); }
+body.autohide.tucked.edge-right .dock { transform: translateX(calc(100% + 12px)); }
 body.autohide .dock {
   transition:
-    transform 0.17s var(--ease-out),
-    opacity var(--dur-1) var(--ease-out) 0.04s,
-    filter var(--dur-2) var(--ease-out);
+    transform var(--dur-2) cubic-bezier(0.7, 0, 1, 0.5),
+    opacity var(--dur-1) linear var(--dur-1);
 }
 body.autohide:not(.tucked) .dock,
 body.autohide.revealing:not(.tucked) .dock {
   transition:
-    transform var(--dur-4) var(--ease-out),
-    opacity var(--dur-2) var(--ease-out),
-    filter var(--dur-2) var(--ease-out);
-}
-body.autohide.tucked.genie-bottom .dock {
-  transform-origin: var(--genie-ox, 50%) 100%;
-  transform: translateY(38%) scale(0.42, 0.2) skewX(calc((50 - var(--genie-oxn, 50)) * 0.1deg));
-}
-body.autohide.tucked.genie-top .dock {
-  transform-origin: var(--genie-ox, 50%) 0%;
-  transform: translateY(-38%) scale(0.42, 0.2) skewX(calc((var(--genie-oxn, 50) - 50) * 0.1deg));
-}
-body.autohide.tucked.genie-left .dock {
-  transform-origin: 0% var(--genie-ox, 50%);
-  transform: translateX(-38%) scale(0.2, 0.42) skewY(calc((var(--genie-oxn, 50) - 50) * 0.1deg));
-}
-body.autohide.tucked.genie-right .dock {
-  transform-origin: 100% var(--genie-ox, 50%);
-  transform: translateX(38%) scale(0.2, 0.42) skewY(calc((50 - var(--genie-oxn, 50)) * 0.1deg));
+    transform var(--dur-4) cubic-bezier(0, 0, 0, 1),
+    opacity var(--dur-1) linear;
 }
 @media (prefers-reduced-motion: reduce) {
   body.autohide.tucked .dock { transform: none !important; filter: none; }
-}
-
-/* One uninterrupted shape interpolation: width, height, corners and position
-   move together on the display's animation clock. No vertical second stage. */
-body.dock-body.tucked.reveal-morph .dock {
-  transform: none;
-  opacity: 1;
-  filter: none;
-  clip-path: var(--morph-clip);
-  translate: var(--morph-shift, 0px 0px);
-}
-body.dock-body.reveal-morph:not(.tucked) .dock {
-  clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px));
-  translate: 0px 0px;
-  transform: none;
-  animation: dock-morph var(--dur-spring) var(--spring) both;
-}
-body.dock-body.tucked.reveal-morph.morph-closing .dock {
-  animation: dock-morph var(--dur-spring) var(--spring) reverse both;
-}
-body.dock-body.tucked.reveal-morph.morph-closing .dock > * {
-  animation: morph-content 0.14s var(--ease-out) reverse both;
-}
-body.dock-body.reveal-morph.morph-start .dock { transition: none !important; animation: none; }
-@keyframes dock-morph {
-  from { clip-path: var(--morph-clip); translate: var(--morph-shift, 0px 0px); }
-  to { clip-path: inset(-16px round calc(var(--dock-r, 18px) + 16px)); translate: 0px 0px; }
-}
-body.dock-body.reveal-morph .dock > * { opacity: 0; }
-body.dock-body.reveal-morph:not(.tucked) .dock > * {
-  animation: morph-content 0.24s var(--ease-out) 0.08s both;
-}
-@keyframes morph-content {
-  from { opacity: 0; transform: translateY(3px) scale(0.98); }
-  to { opacity: 1; transform: none; }
 }
 
 /* Edge change: hide the bar instantly while its window teleports to the new
@@ -653,12 +600,12 @@ body.notch-body.vertical { align-items: center; }
    1, or the tab could never fade out of the way ("away" below) and would
    slide out of its window half visible, cut by the window edge. */
 .notch-pill.notch-enter {
-  animation: notch-enter var(--dur-4) var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) backwards;
+  animation: notch-enter var(--dur-2) linear backwards;
 }
 @keyframes notch-enter {
-  /* Grow out of the dock's genie collapse — keep volume, arrive soft. */
-  from { opacity: 0; transform: scale(0.78); filter: blur(0.6px); }
-  to { opacity: 1; transform: scale(1); filter: none; }
+  /* The bar has slid into its edge; the tab simply fades in where it sits. */
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .notch-pill.notch-enter { animation: none; }
@@ -802,8 +749,11 @@ body.notch-body.floating .notch-pill {
   width: 128px;
   height: 16px;
   border-radius: 999px;
+  /* Its window is only a few pixels larger than the pill: a wide drop
+     shadow was cut off by the window edge and showed as a hard band below
+     it. A short, tight shadow fits, and the outline carries the edge. */
   box-shadow:
-    0 4px 14px color-mix(in srgb, #000 22%, transparent),
+    0 1px 3px color-mix(in srgb, #000 20%, transparent),
     inset 0 1px 0 var(--surf-inset-lit),
     inset 0 -1px 0 var(--surf-inset-shade);
 }
@@ -834,7 +784,7 @@ body.notch-body.toast { padding: 4px; }
   background: var(--surf-fill, var(--layer-strong));
   border: 1px solid var(--surf-stroke, var(--stroke-light));
   box-shadow:
-    0 6px 18px color-mix(in srgb, #000 18%, transparent),
+    0 1px 3px color-mix(in srgb, #000 16%, transparent),
     inset 0 1px 0 var(--surf-inset-lit, rgba(255, 255, 255, 0.18));
   -webkit-backdrop-filter: blur(var(--surf-blur, 20px)) saturate(var(--surf-sat, 150%));
   backdrop-filter: blur(var(--surf-blur, 20px)) saturate(var(--surf-sat, 150%));
@@ -1619,6 +1569,7 @@ body.edge-right .stack.open { transform: none; }
   to { opacity: 1; transform: none; }
 }
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.stack-item .action-glyph svg { width: 26px; height: 26px; }
 /* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
 .stack-item .stack-glyph {
   font-size: 18px;
@@ -2095,19 +2046,20 @@ body.edge-right .stack.open { transform: none; }
    from JS; fades in softly. */
 .dock-tip {
   position: fixed; top: 0; left: 0; z-index: 60;
-  display: flex; align-items: center; gap: 10px;
-  width: max-content; max-width: min(300px, calc(100vw - 16px));
-  padding: 10px 12px; font-size: 0.75rem; line-height: 1.4;
+  display: flex; align-items: center; gap: 8px;
+  width: max-content; max-width: min(260px, calc(100vw - 16px));
+  /* Windows 11 tooltip: small, one line, 4px corners, a hairline and a soft shadow. */
+  padding: 5px 9px; font-size: 0.75rem; line-height: 1.35;
   color: var(--ink); background: var(--layer-strong);
-  border: 1px solid var(--stroke); border-radius: var(--r-control);
-  box-shadow: 0 4px 16px rgb(0 0 0 / .1);
+  border: 1px solid var(--stroke); border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / .14);
   pointer-events: none; opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
 .dock-tip-content { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
-.dock-tip-content strong { font-weight: 600; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.dock-tip-content strong { font-weight: 400; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .dock-tip-detail { font-size: 0.6875rem; color: var(--ink-2); margin-top: 2px; }
-.dock-tip-mark { flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
+.dock-tip-mark { display: none !important; flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
 .dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
 .dock-tip-mark svg { width: 22px; height: 22px; }
 .dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: linear-gradient(180deg, var(--fb-color), var(--fb-deep)); color: var(--fb-ink); font-size: 13px; font-weight: 650; }
