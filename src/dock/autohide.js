@@ -7,7 +7,6 @@ import { S } from "./state.js";
 import { reportHitRects } from "./hit-regions.js";
 import { applyFrame } from "./frame.js";
 import { stopPolls, startPolls } from "./live-widgets.js";
-import { dockEl } from "./dom.js";
 import { reduceMotion } from "./motion.js";
 
 // ───────────────────────── Auto-hide ─────────────────────────
