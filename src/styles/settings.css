@@ -931,8 +931,16 @@
 }
 
 /* Settings > Plugins: one card per optional tool. */
-.plugin-card { display: grid; gap: 6px; }
-.plugin-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+/* Plugins: one terms card, then a grid of compact cards like the widget catalog. */
+.plugin-terms { display: grid; gap: 8px; padding: 14px 16px; margin: 0 0 16px; }
+.plugin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-items: stretch; margin-bottom: 28px; }
+.plugin-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; min-width: 0; }
+.plugin-card .plugin-actions { margin-top: auto; padding-top: 6px; }
+.plugin-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plugin-name { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 600; }
+.plugin-badge { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--r-pill); font-size: 0.6875rem; font-weight: 600; color: var(--success-text, #0f7b0f); background: color-mix(in srgb, var(--success-text, #0f7b0f) 12%, transparent); }
+.plugin-badge .ui-icon { width: 12px; height: 12px; }
+.plugin-source { margin-inline-start: auto; }
 .plugin-action-error { color: var(--danger-text); }
 .plugin-meta { font-size: 0.75rem; color: var(--ink-2); }
 .plugin-desc { margin: 0; color: var(--ink-2); line-height: 1.45; }
