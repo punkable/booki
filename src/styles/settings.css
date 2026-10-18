@@ -300,54 +300,48 @@
 .finish-sample-bar i:nth-of-type(3) { background: #22c55e; }
 
 /* Position */
-.position-picker { display: grid; grid-template-columns: minmax(200px, 340px) auto; align-items: center; gap: 16px 24px; }
-.position-picker > .monitor-picker { grid-column: 1 / -1; }
-.position-fields { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: start; gap: 8px 14px; }
-.position-field-label { color: var(--ink-2); font-size: calc(12.5px * var(--os-text-scale, 1)); }
-.position-fields .screen-caption { grid-column: 1 / -1; }
-@media (max-width: 720px) { .position-picker { grid-template-columns: 1fr; } }
-/* A miniature of the screen. Each edge holds three spots; the chosen one
-   holds the dock in the accent color, a hovered one shows a ghost of it. */
+/* Position: a picture of the screen; click where the dock should go. */
+.position-picker { display: grid; justify-items: center; gap: 12px; padding: 4px 0; }
+.position-screen { display: flex; justify-content: center; }
+.position-screen .ui-select select { min-width: 220px; }
+.monitor-art { display: grid; justify-items: center; width: min(100%, 380px); }
 .screen-map {
-  position: relative; width: 100%; border-radius: 10px; overflow: hidden;
+  position: relative; width: 100%; border-radius: 12px; overflow: hidden;
   background:
-    radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, var(--accent) 38%, transparent), transparent 60%),
-    radial-gradient(90% 80% at 100% 100%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
-    var(--page-bg);
-  border: 1px solid var(--control-stroke);
-  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--ink) 6%, transparent);
+    radial-gradient(110% 90% at 15% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 62%),
+    radial-gradient(90% 80% at 100% 100%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 70%),
+    color-mix(in srgb, var(--ink) 8%, var(--page-bg));
+  border: 6px solid color-mix(in srgb, var(--ink) 14%, var(--page-bg));
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 22%, transparent);
 }
+/* The stand makes it read as a screen at a glance. */
+.monitor-stand { width: 22%; height: 16px; margin-top: -1px; background: color-mix(in srgb, var(--ink) 14%, var(--page-bg)); clip-path: polygon(30% 0, 70% 0, 82% 100%, 18% 100%); border-radius: 0 0 4px 4px; }
 .screen-spot { position: absolute; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: 6px; }
-.screen-spot.at-top, .screen-spot.at-bottom { width: 33.33%; height: 26%; }
-.screen-spot.at-left, .screen-spot.at-right { width: 18%; height: 33.33%; }
+.screen-spot.at-top, .screen-spot.at-bottom { width: 33.33%; height: 24%; }
+/* Sides share the band between the top and bottom rows, so no spot overlaps. */
+.screen-spot.at-left, .screen-spot.at-right { width: 16%; height: 17.33%; }
 .screen-spot.at-top { top: 0; } .screen-spot.at-bottom { bottom: 0; }
 .screen-spot.at-left { left: 0; } .screen-spot.at-right { right: 0; }
 .screen-spot.at-top.slot-start, .screen-spot.at-bottom.slot-start { left: 0; }
 .screen-spot.at-top.slot-center, .screen-spot.at-bottom.slot-center { left: 33.33%; }
 .screen-spot.at-top.slot-end, .screen-spot.at-bottom.slot-end { right: 0; }
-.screen-spot.at-left.slot-start, .screen-spot.at-right.slot-start { top: 0; }
-.screen-spot.at-left.slot-center, .screen-spot.at-right.slot-center { top: 33.33%; }
-.screen-spot.at-left.slot-end, .screen-spot.at-right.slot-end { bottom: 0; }
-/* Corners belong to the top and bottom spots, which sit above the sides. */
-.screen-spot.at-top, .screen-spot.at-bottom { z-index: 1; }
-.screen-spot.at-left .screen-dock, .screen-spot.at-right .screen-dock { height: 62%; }
-.screen-dock { position: absolute; border-radius: 4px; background: var(--ink); opacity: 0; transform: scale(0.9); transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), background var(--dur-2) var(--ease); }
-.screen-spot.at-top .screen-dock, .screen-spot.at-bottom .screen-dock { width: 64%; height: 9px; }
-.screen-spot.at-left .screen-dock, .screen-spot.at-right .screen-dock { width: 9px; }
+.screen-spot.at-left.slot-start, .screen-spot.at-right.slot-start { top: 24%; }
+.screen-spot.at-left.slot-center, .screen-spot.at-right.slot-center { top: 41.33%; }
+.screen-spot.at-left.slot-end, .screen-spot.at-right.slot-end { bottom: 24%; }
+/* Every spot shows a faint slot, so the choices are visible before hovering. */
+.screen-dock { position: absolute; border-radius: 4px; background: color-mix(in srgb, var(--ink) 22%, transparent); transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease); }
+.screen-spot.at-top .screen-dock, .screen-spot.at-bottom .screen-dock { width: 58%; height: 6px; }
+.screen-spot.at-left .screen-dock, .screen-spot.at-right .screen-dock { width: 6px; height: 80%; }
 .screen-spot.at-top .screen-dock { top: 8px; } .screen-spot.at-bottom .screen-dock { bottom: 8px; }
 .screen-spot.at-left .screen-dock { left: 8px; } .screen-spot.at-right .screen-dock { right: 8px; }
-.screen-spot:hover .screen-dock { opacity: 0.35; transform: none; }
-.screen-spot[aria-pressed="true"] .screen-dock { opacity: 1; transform: none; background: var(--accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent); }
+.screen-spot:hover .screen-dock { background: color-mix(in srgb, var(--ink) 55%, transparent); }
+.screen-spot[aria-checked="true"] .screen-dock { background: var(--accent); box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 55%, transparent); }
+.screen-spot.at-top[aria-checked="true"] .screen-dock, .screen-spot.at-bottom[aria-checked="true"] .screen-dock { height: 10px; }
+.screen-spot.at-left[aria-checked="true"] .screen-dock, .screen-spot.at-right[aria-checked="true"] .screen-dock { width: 10px; }
 .screen-spot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.screen-caption { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 0; font-size: calc(12.5px * var(--os-text-scale, 1)); color: var(--ink-2); }
-.screen-caption strong { color: var(--ink); font-weight: 600; }
+.screen-caption { margin: 0; font-size: calc(13px * var(--os-text-scale, 1)); font-weight: 600; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .screen-dock { transition: none; } }
 
-.monitor-picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.monitor-stage { position: relative; }
-.monitor-box { position: absolute; display: grid; place-items: center; color: var(--ink); font: inherit; font-weight: 600; background: var(--control); border: 1px solid var(--control-stroke); border-radius: var(--r-control); cursor: pointer; }
-.monitor-box[aria-pressed="true"] { color: var(--accent-contrast); background: var(--accent); }
-.monitor-main { position: absolute; bottom: 4px; left: 50%; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: currentColor; opacity: 0.7; }
 
 /* Notices */
 .notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; padding: 12px 16px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); }
@@ -861,7 +855,7 @@
   .ui-seg-item.on,
   .button-accent,
   .chip[aria-pressed="true"],
-  .monitor-box[aria-pressed="true"],
+
   .look-auto[aria-pressed="true"],
   .seg-mini.active {
     forced-color-adjust: none;

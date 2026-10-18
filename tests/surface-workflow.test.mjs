@@ -210,7 +210,7 @@ test('placement changes in Settings never move the Settings window', async () =>
     window.__TAURI__.core.invoke = (cmd, args) => { window.__calls.push(cmd); return old(cmd, args); };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('radio', { name: 'Top', exact: true }).click();
+  await page.getByRole('radio', { name: 'Top · Center', exact: true }).click();
   await page.waitForFunction(() => window.__calls.includes('notch_preview'));
   const calls = await page.evaluate(() => window.__calls);
   assert.ok(calls.includes('save_config'));

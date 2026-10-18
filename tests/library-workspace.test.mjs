@@ -372,8 +372,7 @@ test('native icon refresh retries extraction while utilities remain searchable i
 test('dock position exposes labelled edges and alignment even when auto-hide is off', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({autoHideMode:'off'}),viewport:{width:520,height:780}});
   await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
-  await page.getByRole('radiogroup',{name:'Edge',exact:true}).getByRole('radio',{name:'Left',exact:true}).click();
-  await page.getByRole('radiogroup',{name:'Alignment',exact:true}).getByRole('radio',{name:'End',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Position',exact:true}).getByRole('radio',{name:'Left · End',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);await page.close();
