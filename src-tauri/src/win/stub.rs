@@ -58,7 +58,7 @@ pub fn foreground_occludes(_dl: i32, _dt: i32, _dr: i32, _db: i32, _self_hwnd: i
     false
 }
 
-pub fn is_fullscreen() -> bool {
+pub fn is_fullscreen_on(_dock: isize) -> bool {
     false
 }
 
@@ -182,7 +182,7 @@ pub fn desktop_foreground() -> bool {
     false
 }
 
-pub fn foreground_maximized() -> bool {
+pub fn foreground_maximized_on(_notch: isize) -> bool {
     false
 }
 

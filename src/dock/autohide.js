@@ -117,6 +117,9 @@ onNotchShape((shape) => { notchShape = shape; });
 // Matches --dur-spring: the bar opens with the same spring the notch grew with.
 const MORPH_MS = 520;
 let morphTimer = null;
+// Hand-off timers of the latest hide/reveal; a newer one cancels them so a
+// stale timer cannot cut the next animation short.
+let handoffTimer = null; let revealTimer = null;
 
 function endMorph() {
   clearTimeout(morphTimer);
@@ -163,6 +166,8 @@ function prepareMorph(opening = true) {
 export function setHidden(v) {
   if (v === S.hiddenState) return;
   S.hiddenState = v;
+  clearTimeout(handoffTimer); clearTimeout(revealTimer);
+  if (v) document.body.classList.remove("revealing");
   // Fully STOP the widget poll while tucked away (not just skip it) — a truly
   // idle dock burns no timer wakeups; it resumes the moment it reappears.
   if (v) stopPolls();
@@ -175,7 +180,7 @@ export function setHidden(v) {
     // Slide/fade the bar out, then hand off to the notch window (and hide the
     // dock window) once the animation has played.
     document.body.classList.add("tucked");
-    setTimeout(() => {
+    handoffTimer = setTimeout(() => {
       if (S.hiddenState) { dockApi.hideDock(S.cfg.edge); endMorph(); }
     }, morph ? MORPH_MS + 60 : 190); // match genie (~170ms) + a frame
   } else {
@@ -190,7 +195,7 @@ export function setHidden(v) {
       if (!S.hiddenState) document.body.classList.remove("tucked");
     }, 40);
     if (morph) morphTimer = setTimeout(endMorph, 40 + MORPH_MS + 60);
-    setTimeout(() => {
+    revealTimer = setTimeout(() => {
       document.body.classList.remove("revealing");
       reportHitRects();
     }, morph ? 40 + MORPH_MS + 60 : 380);

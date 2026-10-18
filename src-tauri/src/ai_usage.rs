@@ -84,9 +84,13 @@ fn failure(status: u16) -> &'static str {
 
 // ───────────────────────────── Claude ─────────────────────────────
 
-/// Claude Code keeps its sign-in in ~/.claude/.credentials.json.
+/// Claude Code keeps its sign-in in $CLAUDE_CONFIG_DIR/.credentials.json
+/// (~/.claude by default).
 fn claude_token() -> Option<String> {
-    let json = read_json(dirs::home_dir()?.join(".claude").join(".credentials.json"))?;
+    let home = std::env::var_os("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
+    let json = read_json(home.join(".credentials.json"))?;
     let token = json.get("claudeAiOauth")?.get("accessToken")?.as_str()?;
     (!token.is_empty()).then(|| token.to_string())
 }
@@ -122,8 +126,19 @@ fn parse_claude(json: &Value) -> Vec<UsageWindow> {
     [("five_hour", "5h"), ("seven_day", "week")]
         .iter()
         .filter_map(|(key, label)| {
+            // An idle window comes back as null or without utilization: 0%.
             let window = json.get(*key)?;
-            let percent = window.get("utilization")?.as_f64()?;
+            if window.is_null() {
+                return Some(UsageWindow {
+                    label: (*label).into(),
+                    percent: 0.0,
+                    resets_at: 0,
+                });
+            }
+            let percent = window
+                .get("utilization")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
             let resets_at = window
                 .get("resets_at")
                 .and_then(Value::as_str)
@@ -287,6 +302,15 @@ mod tests {
         assert_eq!(w[1].label, "week");
         assert_eq!(w[1].percent, 100.0);
         assert_eq!(w[1].resets_at, 0);
+    }
+
+    #[test]
+    fn idle_claude_windows_read_as_zero() {
+        let json: Value =
+            serde_json::from_str(r#"{"five_hour":null,"seven_day":{"utilization":null}}"#).unwrap();
+        let w = parse_claude(&json);
+        assert_eq!(w.len(), 2);
+        assert!(w.iter().all(|w| w.percent == 0.0));
     }
 
     #[test]

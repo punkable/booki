@@ -37,7 +37,8 @@ export function placeUndoToast() {
 export function showUndoToast(item, index) {
   if (!undoToast) return;
   clearTimeout(undoRemovalTimer);
-  undoRemoval = { item: structuredClone(item), index };
+  // Remember the neighbour too: a reorder in between must not shift the spot.
+  undoRemoval = { item: structuredClone(item), index, afterId: S.cfg?.pinned[index - 1]?.id ?? null };
   undoToast.innerHTML = `<span>${esc(item.name || baseName(item.path || "Booki"))}</span><button type="button">${esc(t("act.undo"))}</button>`;
   undoToast.classList.remove("hidden");
   placeUndoToast();
@@ -57,11 +58,23 @@ export function showErrorToast(message) {
 
 async function undoLastRemoval() {
   if (!undoRemoval || !S.cfg) return;
-  const { item, index } = undoRemoval;
+  const { item, index, afterId } = undoRemoval;
   hideUndoToast();
   if (S.cfg.pinned.some((entry) => entry.id === item.id)) return;
-  S.cfg.pinned.splice(Math.min(index, S.cfg.pinned.length), 0, item);
+  const after = afterId ? S.cfg.pinned.findIndex((entry) => entry.id === afterId) : -1;
+  const at = afterId === null ? 0 : after >= 0 ? after + 1 : Math.min(index, S.cfg.pinned.length);
+  S.cfg.pinned.splice(at, 0, item);
   if (!(await deps.persist())) return;
   await render();
   reframe();
+}
+
+/** A short notice beside the bar (download finished, battery low). */
+export function showNoticeToast(title, detail = "") {
+  if (!undoToast) return;
+  hideUndoToast();
+  undoToast.innerHTML = `<span class="notice-copy"><strong>${esc(title)}</strong>${detail ? `<small>${esc(detail)}</small>` : ""}</span>`;
+  undoToast.classList.remove("hidden");
+  placeUndoToast();
+  undoRemovalTimer = setTimeout(hideUndoToast, 4000);
 }

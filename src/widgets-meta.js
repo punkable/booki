@@ -1,13 +1,13 @@
 /* Shared widget catalog: the dock, the add panel and Settings read it.
 
-   Twelve widgets. CPU, RAM, disk and network live in one "system" widget that
+   Sixteen widgets. CPU, RAM, disk and network live in one "system" widget that
    shows the metrics you choose; timer and tasks live in "focus". Configs from
    older builds are migrated by the backend (config rev 9); canonicalWidget()
    lets previews of old profiles and backups render before that happens. */
 
 export const WIDGET_ORDER = [
   "clock", "calendar", "weather", "system", "battery", "devices",
-  "ai", "media", "volume", "notes", "clipboard", "focus",
+  "ai", "media", "volume", "notes", "clipboard", "focus", "collector", "updates", "cloud", "lighting",
 ];
 
 /** Old widget names → the widget that replaced them (null = retired). */
@@ -28,14 +28,14 @@ export function systemMetrics(style) {
 export const WIDGET_ICONS = {
   clock: "clock", calendar: "clock", weather: "antenna", system: "brain",
   battery: "battery", devices: "battery", ai: "sparkles", media: "notes", volume: "speaker", notes: "memo",
-  clipboard: "clipboard", focus: "stopwatch",
+  clipboard: "clipboard", focus: "stopwatch", collector: "folder", updates: "sparkles", cloud: "floppy", lighting: "picture",
 };
 
 /** Line glyph (icons.js) drawn in the dock cell and the add panel. */
 export const WIDGET_GLYPHS = {
   clock: "clock", calendar: "calendar", weather: "cloud-sun", system: "cpu",
   battery: "battery", devices: "battery", ai: "sparkles", media: "music", volume: "volume", notes: "note",
-  clipboard: "clipboard", focus: "timer",
+  clipboard: "clipboard", focus: "timer", collector: "download", updates: "refresh", cloud: "cloud", lighting: "lightbulb",
   // Metric glyphs inside the system widget.
   cpu: "cpu", ram: "memory", disk: "disk", net: "activity",
 };
@@ -43,7 +43,7 @@ export const WIDGET_GLYPHS = {
 export const WIDGET_VARIANTS = ["glass", "solid", "minimal"];
 
 export const STAT_WIDGETS = ["system", "battery"];
-export const RING_WIDGETS = ["battery", "devices", "ai", "volume"];
+export const RING_WIDGETS = ["battery", "devices", "ai", "volume", "collector", "updates", "cloud"];
 export const PREVIEW_WIDGETS = ["notes", "clipboard"];
 
 /** Gauge colours: the iOS system palette, vivid on any plate. */
@@ -56,6 +56,9 @@ export const RING_DEFAULTS = {
   devices: "#0078d4",
   ai: "#8764b8",
   volume: "#00b7c3",
+  collector: "#0f6cbd",
+  updates: "#30a46c",
+  cloud: "#0078d4",
 };
 
 /** Catalog cards in Settings: accent and description key. */
@@ -72,6 +75,10 @@ export const WIDGET_META = {
   notes: { accent: "#ffb900", desc: "widget.notesDesc", category: "tools" },
   clipboard: { accent: "#8764b8", desc: "widget.clipboardDesc", category: "tools" },
   focus: { accent: "#f7630c", desc: "widget.focusDesc", category: "tools" },
+  collector: { accent: "#0f6cbd", desc: "widget.collectorDesc", category: "tools", plugin: "yt-dlp" },
+  updates: { accent: "#30a46c", desc: "widget.updatesDesc", category: "system", plugin: "winget" },
+  cloud: { accent: "#0078d4", desc: "widget.cloudDesc", category: "system", plugin: "rclone" },
+  lighting: { accent: "#e3008c", desc: "widget.lightingDesc", category: "system", plugin: "openrgb" },
 };
 
 /** Localized display name. Pass t() from i18n. */

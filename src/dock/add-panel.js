@@ -126,7 +126,7 @@ export function buildAddPanel(root, deps) {
   };
   foot.append(
     footBtn("folder-plus", t("m.addFolder"), () => deps.browseFolder()),
-    footBtn("app", t("add.browse"), () => deps.browseFile()),
+    footBtn("file", t("add.browse"), () => deps.browseFile()),
   );
   root.append(head, tabs, body, foot);
 
@@ -188,11 +188,15 @@ export function buildAddPanel(root, deps) {
     const top = sections.frequent, open = sections.running;
     const all = sections.installed.filter(item => appCategory(item, identities) !== 'utilities');
     const utilities = sections.utilities;
-    if (failures) { const note = emptyNote(t("overhaul.partialApps")); note.setAttribute("role", "status"); body.appendChild(note); }
     if (!top.length && !open.length && !all.length && !utilities.length) {
-      body.appendChild(emptyNote(t("add.none")));
+      // The box searches widgets too: no app match but a widget match → show it.
+      if (query.trim() && WIDGET_ORDER.some((w) => matchScore(deps.widgetLabel(w), query) > 0)) { tab = "widgets"; return draw(); }
+      const note = emptyNote(t(failures ? "overhaul.partialApps" : "add.none"));
+      if (failures) { note.setAttribute("role", "status"); note.classList.add("add-error"); }
+      body.appendChild(note);
       return;
     }
+    if (failures) { const note = emptyNote(t("overhaul.partialApps")); note.setAttribute("role", "status"); note.classList.add("add-error"); body.appendChild(note); }
     let budget = rowLimit;
     if (top.length) {
       body.appendChild(label(t("add.frequent")));

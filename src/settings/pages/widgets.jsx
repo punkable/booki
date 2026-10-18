@@ -26,14 +26,13 @@ function ClipboardPolicy({ cfg, set }) {
   }, [cfg.clipboardPersist]);
   return <>
     {storageFailed && <p className="notice notice-error" role="alert">{t("clip.storageFailed")}</p>}
-    <p className="inline-note"><Icon name="shield" />{t("clip.privacyBody")}</p>
     <Toggle label={t("clip.memory")} hint={t("clip.memoryHint")} checked={!!cfg.clipboardPersist} onChange={(v) => set({ clipboardPersist: v })} />
     <Toggle label={t("clip.sensitive")} hint={t("clip.sensitiveHint")} checked={cfg.clipboardSensitiveGuard !== false} onChange={(v) => set({ clipboardSensitiveGuard: v })} />
     <Toggle label={t("clip.compact")} hint={t("clip.compactHint")} checked={!!cfg.clipboardCompact} onChange={(v) => set({ clipboardCompact: v })} />
-    <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
+    <Row label={t("clip.retention")} hint={t("clip.retentionHint")} stack>
       <Slider value={cfg.clipboardRetentionDays ?? 7} min={1} max={90} step={1} fmt={(v) => t("clip.days").replace("{n}", v)} onChange={(v) => set({ clipboardRetentionDays: v })} />
     </Row>
-    <Row label={t("clip.limit")} hint={t("clip.limitHint")}>
+    <Row label={t("clip.limit")} hint={t("clip.limitHint")} stack>
       <Slider value={cfg.clipboardHistoryLimit ?? 60} min={10} max={200} step={10} fmt={(v) => t("clip.items").replace("{n}", v)} onChange={(v) => set({ clipboardHistoryLimit: v })} />
     </Row>
     <Row label={t("clip.clear")}><button type="button" className="button" onClick={() => dockApi.clipboardClear()}>{t("clip.clear")}</button></Row>
@@ -71,7 +70,7 @@ function WidgetFields({ item, cfg, set, onChange }) {
     </Row>
     {item.widget !== "system" && <Row label={t("overhaul.widgetSize")}>
       <SegmentedControl value={String(style.span || "auto")} onChange={(v) => patch({ span: v === "auto" ? null : Number(v) })}
-        options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: `${n}×` }))]} />
+        options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: t(`w.span${n}`) }))]} />
     </Row>}
     <Row label={t("w.color")} stack><AccentPicker sources value={style.color || WIDGET_META[item.widget]?.accent || cfg.accent} onChange={(v) => patch({ color: v })} /></Row>
     {item.widget === "clipboard" && <CollapsibleSection title={t("clip.privacyTitle")}><ClipboardPolicy cfg={cfg} set={set} /></CollapsibleSection>}
@@ -80,12 +79,12 @@ function WidgetFields({ item, cfg, set, onChange }) {
 
 function CatalogCard({ widget, pinned, selected, style, onInspect }) {
   const meta = WIDGET_META[widget];
-  return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${t("next.inspector")}: ${name(widget)}`} title={pinned ? t("widget.pinned") : undefined}
+  return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} title={pinned ? t("widget.pinned") : undefined}
     style={{ "--widget-accent": meta.accent }} onClick={onInspect}>
     <span className="catalog-head">
       <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
       <span className="catalog-text"><span className="catalog-name">{name(widget)}</span><span className="catalog-desc">{t(meta.desc)}</span></span>
-      {pinned && <Icon name="check" className="catalog-pinned" />}
+      {pinned && <span className="catalog-badge">{t("widget.pinned")}</span>}
     </span>
     <span className="catalog-preview" aria-hidden="true"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span>
   </button>;
@@ -120,7 +119,9 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const selected = saved?.kind === "widget" ? saved : draft;
   const inspect = (widget) => {
     origin.current = document.activeElement;
-    const ref = widgetRefs(cfg.pinned, widget)[0];
+    // A widget pinned twice: each click on its card reaches the next copy.
+    const refs = widgetRefs(cfg.pinned, widget);
+    const ref = refs.find((r) => r.id !== selectedId) || refs[0];
     selectId(ref?.id || null);
     setDraft(ref ? null : { id: crypto.randomUUID(), kind: "widget", widget, name: name(widget), path: "", args: [], style: {} });
   };
@@ -135,8 +136,8 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   return <>
     <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
     <div className="toolbar">
-      <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} /></label>
-      <div className="chips" role="group" aria-label={t("workspace.sources")}>
+      <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} /></label>
+      <div className="chips" role="group" aria-label={t("tab.widgets")}>
         {CATEGORIES.map(([value, key]) => <button key={value} type="button" className="chip" aria-pressed={category === value} onClick={() => setCategory(value)}>{t(key)}</button>)}
       </div>
     </div>
@@ -158,7 +159,7 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
           <WidgetFields item={selected} cfg={cfg} set={set} onChange={change} />
           <div className="inspector-actions">
             {saved
-              ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button>
+              ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); if (origin.current?.isConnected) origin.current.focus(); }}>{t("apps.remove")}</button>
               : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
           </div>
         </> : <InDock cfg={cfg} onInspect={inspect} />}

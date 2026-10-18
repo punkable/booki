@@ -1574,7 +1574,17 @@ body.edge-right .stack.open { transform: none; }
   cursor: pointer; color: var(--ink); overflow: visible;
   transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
-.stack-item .stack-name { overflow: hidden; max-width: 100%; }
+/* Names wrap to two lines and then ellipsize, inside their own cell: a long
+   name never runs into its neighbor. The full name is the cell's tooltip. */
+.stack-item .stack-name {
+  width: 100%; max-width: 100%; overflow: hidden; text-align: center;
+  white-space: normal; overflow-wrap: anywhere; display: -webkit-box;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  min-height: 2.5em;
+}
+.stack-grid > * { min-width: 0; }
+.stack-head-add { margin-left: -4px; }
+.stack-head-add + .stack-head-add { margin-left: -6px; }
 .stack-item[data-running="true"]::after {
   content: "";
   position: absolute;
@@ -1620,9 +1630,6 @@ body.edge-right .stack.open { transform: none; }
 }
 .stack-name { font-size: 0.6875rem; font-weight: 500; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* In-flyout "add app to folder" cell — optimized for adding several programs. */
-.stack-item.stack-add { color: var(--ink-2); border: 1.5px dashed color-mix(in srgb, var(--ink) 18%, transparent); }
-.stack-item.stack-add .stack-glyph { font-size: 24px; color: var(--ink-2); background: transparent; border: 0; }
-.stack-item.stack-add:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
 /* Hover actions on a flyout file cell: copy path · Explorer · open with. */
 .stack-acts { position: absolute; top: 3px; left: 3px; display: none; gap: 3px; z-index: 2; }
 @media (hover: hover) and (pointer: fine) {
@@ -1902,6 +1909,7 @@ body.edge-right .stack.open { transform: none; }
   margin: 0 0 8px;
 }
 .clip-guide {
+  background: var(--layer) !important; border: 1px solid var(--stroke) !important;
   display: grid;
   gap: 4px;
   margin: -2px 0 9px;
@@ -2607,3 +2615,10 @@ body.hide-running-indicators .tile.launching::after { display: none; }
   color: HighlightText;
   background: Highlight;
 }
+/* Notices share the undo toast: a bold line and an optional detail. */
+.undo-toast .notice-copy { display: grid; gap: 2px; min-width: 0; }
+.undo-toast .notice-copy small { opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+.add-error { color: var(--ink-2); font-size: 0.75rem; padding: 6px 12px; text-align: start; }
+
+/* One overlay radius for every flyout and panel. */
+.stack, .productivity-panel { border-radius: var(--r-overlay) !important; }

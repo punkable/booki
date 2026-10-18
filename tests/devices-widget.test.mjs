@@ -24,7 +24,23 @@ test("the devices widget shows the lowest battery and lists every device in its 
   assert.equal((await card.locator(".w-label").textContent()).trim(), "Arctis Nova 7");
   const hint = await card.getAttribute("aria-label");
   assert.ok(String(hint).includes("MX Master 3S · 60%"), `hint lists every device: ${hint}`);
-  assert.ok(String(hint).includes("Arctis Nova 7 · 15% · via HeadsetControl"), `plugin readings say where they came from: ${hint}`);
+  assert.ok(String(hint).includes("Arctis Nova 7 · 15%") && !String(hint).includes("HeadsetControl"), `the hint names devices, not plugins: ${hint}`);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("the devices widget turns to the next device with its kind icon", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [widget] }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "device_batteries"
+      ? Promise.resolve([{ name: "Arctis Nova 7", level: 15, source: "headsetcontrol", kind: "headset" }, { name: "MX Master 3S", level: 60, source: "logitech", kind: "mouse" }]) : old(c, a); }`,
+  });
+  const card = page.locator('.tile[data-id="dev"]');
+  await card.locator(".w-ring-num", { hasText: "15" }).waitFor();
+  assert.equal(await card.getAttribute("data-glyph"), "device-headset");
+  await page.mouse.move(0, 0);
+  await card.locator(".w-ring-num", { hasText: "60" }).waitFor({ timeout: 8000 });
+  assert.equal(await card.getAttribute("data-glyph"), "device-mouse");
   assert.deepEqual(errors, []);
   await page.close();
 });

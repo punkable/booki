@@ -102,6 +102,54 @@ pub(crate) fn notch_toast(app: AppHandle, title: String, detail: Option<String>)
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
     }
+    show_toast_frame(&app, title, detail);
+}
+
+/// A short notice (download finished, battery low) on the notch while the
+/// dock is tucked away. Unlike `notch_toast` it never hides the dock or
+/// starts a fullscreen blackout, and the notch returns to its own shape
+/// after a few seconds. Returns false when the dock is out: the dock then
+/// shows the notice itself.
+#[tauri::command]
+pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>) -> bool {
+    let dock_out = app
+        .get_webview_window("dock")
+        .map(|d| d.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+    if dock_out {
+        return false;
+    }
+    // Nothing over a fullscreen game; the notice is simply skipped.
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return true;
+    }
+    static NOTICE_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let generation = NOTICE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let was_visible = app
+        .get_webview_window("notch")
+        .map(|n| n.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+    show_toast_frame(&app, title, detail);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(3600));
+        // A newer notice or a fullscreen toast owns the notch now.
+        if NOTICE_GEN.load(Ordering::Relaxed) != generation
+            || FULLSCREEN_BLACKOUT.load(Ordering::Relaxed)
+        {
+            return;
+        }
+        if let Some(notch) = app.get_webview_window("notch") {
+            let _ = position_notch(&notch, &config::load().edge);
+            if !was_visible {
+                let _ = notch.hide();
+            }
+        }
+    });
+    true
+}
+
+fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
     if let Some(notch) = app.get_webview_window("notch") {
         if let Ok(Some(mon)) = notch.current_monitor() {
             let dpr = notch.scale_factor().unwrap_or(1.0);
@@ -223,8 +271,19 @@ pub(crate) fn notch_reveal_for_menu(app: AppHandle) -> bool {
 /// the notch each time it is shown, so it can start out of the way instead of
 /// waiting for the next change event from the watcher.
 #[tauri::command]
-pub(crate) fn notch_screen_busy() -> bool {
-    win::foreground_maximized() || win::is_fullscreen()
+pub(crate) fn notch_screen_busy(app: AppHandle) -> bool {
+    #[cfg(windows)]
+    let notch = app
+        .get_webview_window("notch")
+        .and_then(|n| n.hwnd().ok())
+        .map(|h| h.0 as isize)
+        .unwrap_or(0);
+    #[cfg(not(windows))]
+    let notch = {
+        let _ = &app;
+        0
+    };
+    win::foreground_maximized_on(notch) || win::is_fullscreen_on(notch)
 }
 
 /// Interactive regions of the notch window (window-relative CSS px). Same

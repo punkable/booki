@@ -9,7 +9,7 @@ import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
 import { COLOR_SOURCES, SURFACE_COLORS, colorSource } from "../system-look.js";
-import { Icon, SegmentedControl } from "./ui.jsx";
+import { Icon, SegmentedControl, Select } from "./ui.jsx";
 
 export const LANG_OPTIONS = [
   { value: "system", key: "lang.system" },
@@ -103,37 +103,52 @@ export function ScenarioPicker({ cfg, set }) {
 }
 
 /** Edge and alignment, with a tiny screen showing where the bar goes. */
-export function PositionPicker({ cfg, set, afterPlacement }) {
-  const edge = cfg.edge || "bottom";
-  const slot = cfg.notchPosition || "center";
-  return <div className="position-picker">
-    <div className="screen-mock" aria-hidden="true"><span className={`screen-bar at-${edge} slot-${slot}`} /></div>
-    <div className="position-fields">
-      <span className="position-field-label" aria-hidden="true">{t("be.edgeSide")}</span>
-      <SegmentedControl label={t("be.edgeSide")} value={edge} onChange={(value) => set({ edge: value }, afterPlacement)}
-        options={["top", "bottom", "left", "right"].map((value) => ({ value, label: t(`edge.${value}`) }))} />
-      <span className="position-field-label" aria-hidden="true">{t("design.alignment")}</span>
-      <SegmentedControl label={t("design.alignment")} value={slot} onChange={(value) => set({ notchPosition: value }, afterPlacement)}
-        options={["start", "center", "end"].map((value) => ({ value, label: t(`be.notch${value[0].toUpperCase()}${value.slice(1)}`) }))} />
-    </div>
-  </div>;
-}
+const EDGES = ["top", "bottom", "left", "right"];
+const SLOTS = ["start", "center", "end"];
+const slotLabel = (slot) => t(`be.notch${slot[0].toUpperCase()}${slot.slice(1)}`);
 
-/** Pick a monitor from boxes scaled to their real geometry. */
-export function MonitorPicker({ value, monitors, onChange }) {
-  const minX = Math.min(...monitors.map((m) => m.x));
-  const minY = Math.min(...monitors.map((m) => m.y));
-  const width = Math.max(...monitors.map((m) => m.x + m.w)) - minX || 1;
-  const height = Math.max(...monitors.map((m) => m.y + m.h)) - minY || 1;
-  const scale = Math.min(200 / width, 84 / height);
-  return <div className="monitor-picker">
-    <button type="button" className="chip" aria-pressed={value === -1} onClick={() => onChange(-1)}>{t("mon.auto")}</button>
-    <div className="monitor-stage" style={{ width: width * scale, height: height * scale }}>
-      {monitors.map((m) => <button key={m.index} type="button" className="monitor-box" aria-pressed={value === m.index} title={m.name}
-        aria-label={`${t("be.monitor")} ${m.index + 1}${m.primary ? ` · ${t("mon.primary")}` : ""}`}
-        style={{ left: (m.x - minX) * scale + 2, top: (m.y - minY) * scale + 2, width: m.w * scale - 4, height: m.h * scale - 4 }}
-        onClick={() => onChange(m.index)}>{m.index + 1}</button>)}
+/** Where the dock lives: one picture of the screen, and you click where the
+ *  dock should go. The twelve spots are one radio group (arrow keys walk
+ *  them); the chosen one holds the dock, a hovered one previews it. With
+ *  several screens, a menu above says which screen the picture is. */
+export function PositionPicker({ cfg, set, afterPlacement, monitors = [] }) {
+  const edge = EDGES.includes(cfg.edge) ? cfg.edge : "bottom";
+  const slot = SLOTS.includes(cfg.notchPosition) ? cfg.notchPosition : "center";
+  const chosen = cfg.monitor ?? -1;
+  const screen = monitors.find((m) => m.index === chosen) || monitors.find((m) => m.primary) || monitors[0];
+  const ratio = screen ? Math.min(2.4, Math.max(1.25, screen.w / screen.h)) : 16 / 10;
+  const spots = EDGES.flatMap((e) => SLOTS.map((s) => ({ e, s })));
+  const current = spots.findIndex((p) => p.e === edge && p.s === slot);
+  const pick = (p) => set({ edge: p.e, notchPosition: p.s }, afterPlacement);
+  const name = (p) => `${t(`edge.${p.e}`)} · ${slotLabel(p.s)}`;
+  const walk = (event) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = spots[(current + step + spots.length) % spots.length];
+    pick(next);
+    requestAnimationFrame(() => event.currentTarget?.querySelector?.(`[data-spot="${next.e}-${next.s}"]`)?.focus());
+  };
+  const screenName = (m) => `${t("be.monitor")} ${m.index + 1} · ${m.w}×${m.h}${m.primary ? ` · ${t("mon.primary")}` : ""}`;
+  return <div className="position-picker">
+    {monitors.length > 1 && <div className="position-screen">
+      <Select label={t("be.monitor")} value={String(chosen)}
+        options={[{ value: "-1", label: t("mon.auto") }, ...monitors.map((m) => ({ value: String(m.index), label: screenName(m) }))]}
+        onChange={(v) => { const n = Number(v); set({ monitor: n, monitorName: n < 0 ? "" : monitors.find((m) => m.index === n)?.name || "" }, afterPlacement); }} />
+    </div>}
+    <div className="monitor-art">
+      <div className="screen-map" style={{ aspectRatio: String(ratio) }} role="radiogroup" aria-label={t("be.position")} onKeyDown={walk}>
+        {spots.map((p) => {
+          const on = p.e === edge && p.s === slot;
+          return <button key={`${p.e}-${p.s}`} data-spot={`${p.e}-${p.s}`} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
+            className={`screen-spot at-${p.e} slot-${p.s}`} aria-label={name(p)} title={name(p)} onClick={() => pick(p)}>
+            <span className="screen-dock" />
+          </button>;
+        })}
+      </div>
+      <span className="monitor-stand" aria-hidden="true" />
     </div>
+    <p className="screen-caption" aria-live="polite">{name({ e: edge, s: slot })}</p>
   </div>;
 }
 

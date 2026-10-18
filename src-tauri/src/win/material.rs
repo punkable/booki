@@ -78,6 +78,10 @@ struct Piece {
 struct Surface {
     owner: isize,
     pieces: Vec<Piece>,
+    /// Where the owner was when the pieces were placed. A window that came
+    /// back somewhere else keeps its blur hidden until the page reports again,
+    /// instead of showing a ghost at the old spot.
+    owner_at: Option<(i32, i32)>,
 }
 
 fn surfaces() -> &'static Mutex<HashMap<String, Surface>> {
@@ -369,6 +373,7 @@ pub fn apply(
 ) -> bool {
     let mut map = surfaces().lock().unwrap();
     let surface = map.entry(key.to_string()).or_insert_with(|| Surface {
+        owner_at: None,
         owner,
         pieces: Vec::new(),
     });
@@ -403,6 +408,10 @@ pub fn apply(
             crate::surface_geometry::blur_insets(w, h, radii)
         };
         let (x, y, w, h) = (x + il, y + it, w - il - ir, h - it - ib);
+        if w <= 0 || h <= 0 {
+            // Too small to hold a blur once inset: leave this piece out.
+            continue;
+        }
         let r = [
             radii[0] - il.max(it),
             radii[1] - ir.max(it),
@@ -462,6 +471,7 @@ pub fn apply(
         }
         piece.placed = Some(rect);
     }
+    surface.owner_at = Some((origin.left, origin.top));
     surface.pieces.iter_mut().skip(shapes.len()).for_each(hide);
     true
 }
@@ -484,8 +494,11 @@ pub fn sync() {
         };
         for surface in map.values_mut() {
             let owner = HWND(surface.owner as *mut c_void);
-            let visible =
-                unsafe { IsWindow(Some(owner)).as_bool() && IsWindowVisible(owner).as_bool() };
+            let mut at = RECT::default();
+            let moved = unsafe { GetWindowRect(owner, &mut at) }.is_ok()
+                && surface.owner_at.is_some_and(|p| p != (at.left, at.top));
+            let visible = !moved
+                && unsafe { IsWindow(Some(owner)).as_bool() && IsWindowVisible(owner).as_bool() };
             // apply() inserts each piece below the owner, leaving the last
             // piece closest to it. Preserve that order instead of making all
             // pieces fight for the same Z position on every watcher tick.

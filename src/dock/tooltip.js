@@ -76,6 +76,8 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
   function leave(event) {
     if (anchor && (!event.relatedTarget || !anchor.contains(event.relatedTarget))) hide();
   }
+  // A click opens the tile's panel or flyout; the hint makes way at once.
+  root.addEventListener('pointerdown', hide);
   root.addEventListener('pointerover', enter); root.addEventListener('pointerout', leave);
   root.addEventListener('focusin', enter); root.addEventListener('focusout', leave);
   root.addEventListener('pointerdown', hide, true);

@@ -79,6 +79,7 @@ const DEMO_CONFIG = {
   clipboardSensitiveGuard: true,
   clipboardCompact: false,
   captureVisible: false,
+  pluginTerms: 0,
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
@@ -580,13 +581,19 @@ export const dock = {
   /** True when Windows started Booki at sign-in. */
   deviceBatteries: () => invoke("device_batteries"),
   aiUsage: () => invoke("ai_usage"),
+  appUpdates: () => invoke("app_updates"),
+  appUpdate: (id = null) => invoke("app_update", { id }),
+  cloudSpace: () => invoke("cloud_space"),
+  cloudSetup: () => invoke("cloud_setup"),
+  rgbProfiles: () => invoke("rgb_profiles"),
+  rgbApply: (profile = null) => invoke("rgb_apply", { profile }),
   pluginCatalog: () => isTauri ? invoke("plugin_catalog") : Promise.resolve(PLUGINS),
   masterVolumeSet: (percent, muted) => invoke("volume_set_state", { percent, muted }),
   appVolumes: () => invoke("app_volumes"),
   appVolumeSet: (id, percent, muted) => invoke("app_volume_set", { id, percent, muted }),
   pluginRead: (id) => invoke("plugin_read", { id }),
   pluginOpen: (id, profile = null) => invoke("plugin_open", { id, profile }),
-  pluginDownload: (url, directory) => invoke("plugin_download", { url, directory }),
+  pluginDownload: (url, directory = null, format = "video") => invoke("plugin_download", { url, directory, format }),
   pluginStatus: (id) => invoke("plugin_status", { id }),
   pluginInstall: (id) => invoke("plugin_install", { id }),
   pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
@@ -771,6 +778,12 @@ export async function onNotchToastOut(cb) {
   return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
+
+/** Progress of a yt-dlp download: { state, percent, title, path }. */
+export async function onDownloadEvent(callback) {
+  if (!(T?.event?.listen)) return () => {};
+  return T.event.listen("plugin-download", (event) => callback(event.payload));
+}
 
 export async function onLinkDrop(callback) {
   if (!(T?.event?.listen)) return () => {};

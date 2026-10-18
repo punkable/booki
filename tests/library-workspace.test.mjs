@@ -46,7 +46,7 @@ test('folder navigation stays inside Booki and back restores the previous direct
 test('widget gallery previews a draft and commits its appearance only when added', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html', { viewport: { width: 520, height: 720 } });
   await page.getByRole('navigation').getByRole('button', { name: 'Widgets', exact: true }).click();
-  await page.getByRole('button', { name: 'Item details: Clock', exact: true }).click();
+  await page.locator('.catalog-card', { hasText: 'Clock' }).first().click();
   assert.equal(await page.locator('.modal[role="dialog"]').count(), 0);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
   await page.locator('.inspector').getByRole('radio', { name: 'Solid', exact: true }).click();
@@ -298,7 +298,7 @@ test('widget filtering preserves a customized draft and keeps the inspector in v
   const search=page.getByRole('searchbox',{name:'Search widgets',exact:true});
   await search.fill('focus');
   assert.equal(await page.locator('.catalog-card').count(),1);
-  await page.getByRole('button',{name:'Item details: Focus',exact:true}).click();
+  await page.locator('.catalog-card',{hasText:'Focus'}).first().click();
   await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).click();
   await search.fill('not-a-widget');
   await page.getByRole('status').filter({hasText:'No results'}).waitFor();
@@ -312,7 +312,7 @@ test('widget filtering preserves a customized draft and keeps the inspector in v
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('the editable dock stays in view while a populated library scrolls, without covering the selection', async () => {
+test('the dock editor scrolls away while browsing a populated library, without covering the selection', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:720},initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:Array.from({length:70},(_,i)=>({name:'App '+i,path:'C:/Apps/app'+i+'.exe'}))}]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   await page.locator('.app-library-card').first().waitFor();
@@ -320,7 +320,7 @@ test('the editable dock stays in view while a populated library scrolls, without
   await main.evaluate(element=>element.scrollTop=element.scrollHeight);
   assert.ok(await main.evaluate(element=>element.scrollTop>0),'The catalog is long enough to scroll');
   const editor=await page.locator('.library-dock-editor').boundingBox();
-  assert.ok(editor.y>=-1 && editor.y<60,'The dock being edited stays at the top while the catalog scrolls');
+  assert.ok(editor.y+editor.height<=0,'The full editor leaves the viewport while browsing the catalog');
   const overlap=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
   await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
   await page.getByRole('button',{name:'Item details: App 69',exact:true}).click();
@@ -372,8 +372,7 @@ test('native icon refresh retries extraction while utilities remain searchable i
 test('dock position exposes labelled edges and alignment even when auto-hide is off', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({autoHideMode:'off'}),viewport:{width:520,height:780}});
   await page.getByRole('navigation').getByRole('button',{name:'Dock',exact:true}).click();
-  await page.getByRole('radiogroup',{name:'Edge',exact:true}).getByRole('radio',{name:'Left',exact:true}).click();
-  await page.getByRole('radiogroup',{name:'Alignment',exact:true}).getByRole('radio',{name:'End',exact:true}).click();
+  await page.getByRole('radiogroup',{name:'Position',exact:true}).getByRole('radio',{name:'Left · End',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.edge==='left'&&cfg.notchPosition==='end';});
   assert.equal(await page.evaluate(()=>document.body.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);await page.close();
@@ -460,7 +459,7 @@ test('durable empty groups remain recognizable and custom group icons have a use
   await custom.locator('img').evaluate(img=>img.dispatchEvent(new Event('error')));
   assert.equal(await custom.locator('svg').count(),1);
   await page.locator('.tile[data-id="empty"]').click();await page.locator('#stack.open').waitFor();
-  assert.equal(await page.locator('.stack-add').count(),2);
+  assert.equal(await page.locator('.stack-head-add').count(),2);
   assert.deepEqual((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned,pins);
   assert.deepEqual(errors,[]);await page.close();
 });

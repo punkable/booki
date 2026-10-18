@@ -6,8 +6,8 @@
     "feeds": "devices",
     "asset": "headsetcontrol-windows-x86_64.exe",
     "archive_root": "",
-    "url": "",
-    "sha256": "",
+    "url": "https://github.com/Sapd/HeadsetControl/releases/download/4.1.0/headsetcontrol-windows-x86_64.exe",
+    "sha256": "047f0ae26a06d86f6ec5a543166df20ccd47ee07148c915221aa08b97bc190dd",
     "id": "headsetcontrol",
     "repo": "Sapd/HeadsetControl",
     "tag": "4.1.0",
@@ -25,9 +25,13 @@
     "exe": "yt-dlp.exe",
     "asset": "yt-dlp.exe",
     "archive_root": "",
-    "url": "",
-    "sha256": "",
-    "external": false
+    "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+    "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+    "external": false,
+    "companions": [
+      "ffmpeg",
+      "gallery-dl"
+    ]
   },
   {
     "id": "rclone",
@@ -40,8 +44,8 @@
     "exe": "rclone.exe",
     "asset": "rclone-v1.75.2-windows-amd64.zip",
     "archive_root": "rclone-v1.75.2-windows-amd64",
-    "url": "",
-    "sha256": "",
+    "url": "https://github.com/rclone/rclone/releases/download/v1.75.2/rclone-v1.75.2-windows-amd64.zip",
+    "sha256": "8a9db2bad1dc79a65b3348fd857069598e2aab7cf4d118b77b1df23055aff818",
     "external": false
   },
   {
@@ -70,8 +74,8 @@
     "exe": "LibreHardwareMonitor.exe",
     "asset": "LibreHardwareMonitor.zip",
     "archive_root": "",
-    "url": "",
-    "sha256": "",
+    "url": "https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/releases/download/v0.9.6/LibreHardwareMonitor.zip",
+    "sha256": "086d9f1b5a99e643edc2cfaaac16051685b551e4c5ac0b32a57c58c0e529c001",
     "external": false
   },
   {
@@ -88,5 +92,37 @@
     "url": "",
     "sha256": "",
     "external": true
+  },
+  {
+    "id": "ffmpeg",
+    "name": "FFmpeg",
+    "license": "GPL-3.0",
+    "source": "https://www.gyan.dev/ffmpeg/builds/",
+    "feeds": "downloads",
+    "repo": "GyanD/codexffmpeg",
+    "tag": "9.0.2",
+    "exe": "bin/ffmpeg.exe",
+    "asset": "ffmpeg-9.0.2-essentials_build.zip",
+    "archive_root": "ffmpeg-9.0.2-essentials_build",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+    "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+    "external": false,
+    "companion": true
+  },
+  {
+    "id": "gallery-dl",
+    "name": "gallery-dl",
+    "license": "GPL-2.0",
+    "source": "https://codeberg.org/mikf/gallery-dl",
+    "feeds": "downloads",
+    "repo": "mikf/gallery-dl",
+    "tag": "v1.32.17",
+    "exe": "gallery-dl.exe",
+    "asset": "gallery-dl.exe",
+    "archive_root": "",
+    "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.17/gallery-dl.exe",
+    "sha256": "77c8f4c6808cf1044a54ec7187b548f5977f7c304d5432b63cf6cfdfe70ffc12",
+    "external": false,
+    "companion": true
   }
 ]

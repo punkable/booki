@@ -392,6 +392,9 @@ pub struct Config {
     /// Whether Booki should be visible in screen captures / recordings.
     #[serde(default)]
     pub capture_visible: bool,
+    /// Version of the plugin terms (TERMS.md) the person accepted; 0 = none.
+    #[serde(default)]
+    pub plugin_terms: u32,
     /// Settings from older builds, read only so `migrate` can convert them
     /// and never written back.
     #[serde(flatten, skip_serializing)]
@@ -487,6 +490,7 @@ impl Default for Config {
             clipboard_sensitive_guard: default_clipboard_sensitive_guard(),
             clipboard_compact: false,
             capture_visible: false,
+            plugin_terms: 0,
         }
     }
 }

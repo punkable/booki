@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -111,9 +111,24 @@ function release86() {
   ] };
 }
 
-export function currentRelease() {
+function release87() {
   return { version: "0.87.0", date: "2026-10-17", headline: t("release87.headline"), sections: [
     { icon: "settings", title: t("release86.widgetsTitle"), notes: [t("release87.plugins"), t("release87.panels"), t("release87.sensor")] },
     { icon: "sparkles", title: t("release86.windowsTitle"), notes: [t("release87.theme"), t("release87.motion")] },
+  ] };
+}
+
+function release871() {
+  return { version: "0.87.1", date: "2026-10-17", headline: t("release871.headline"), sections: [
+    { icon: "settings", title: t("plugins.title"), notes: [t("release871.plugins")] },
+    { icon: "sparkles", title: t("release86.windowsTitle"), notes: [t("release871.surface"), t("release871.scroll")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.88.0", date: "2026-10-18", headline: t("release88.headline"), sections: [
+    { icon: "sparkles", title: t("release86.widgetsTitle"), notes: [t("release88.collector"), t("release88.widgets"), t("release88.devices"), t("release88.ai"), t("release88.notices")] },
+    { icon: "settings", title: t("release86.easierTitle"), notes: [t("release88.position"), t("release88.folders")] },
+    { icon: "performance", title: t("plugins.title"), notes: [t("release88.trust"), t("release88.fixes")] },
   ] };
 }

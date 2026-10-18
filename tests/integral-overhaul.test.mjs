@@ -72,7 +72,7 @@ test('an accepted native backdrop follows system appearance and returns to solid
 test('widget inspector options stay readable and support radio-group keyboard navigation', async () => {
   const {page,errors} = await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
-  await page.getByRole('button',{name:'Item details: Focus',exact:true}).click();
+  await page.locator('.catalog-card',{hasText:'Focus'}).first().click();
   const group = page.getByRole('radiogroup',{name:'Look',exact:true});
   assert.equal(await group.getByRole('radio',{name:'Minimal',exact:true}).locator('span').evaluate(el=>el.scrollWidth <= el.clientWidth + 1),true);
   await group.getByRole('radio',{name:'Glass',exact:true}).focus(); await page.keyboard.press('ArrowRight');

@@ -27,9 +27,11 @@ export function shapeOf(el, radius) {
   if (r.width < 1 || r.height < 1) return null;
   const cs = getComputedStyle(el);
   if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) < 0.999) return null;
-  // Independent native windows cannot share WebView opacity, skew or a
-  // compositor animation. Keep them hidden until the shape has settled.
-  const geometryKeys = ["transform", "scale", "rotate", "translate", "width", "height", "borderRadius", "opacity", "filter", "clipPath"];
+  // A native blur cannot fade, clip or filter with the WebView, so a surface
+  // animating those waits until it settles. Size, radius, translation and
+  // uniform scale are measured per frame below and followed instead: hiding
+  // the blur for every hover or resize is what made a sheet blink in and out.
+  const geometryKeys = ["rotate", "opacity", "filter"];
   if (el.getAnimations().some((animation) => animation.playState === "running" &&
     animation.effect?.getKeyframes().some((frame) => geometryKeys.some((key) => key in frame)))) return null;
   const matrix = new DOMMatrixReadOnly(cs.transform === "none" ? undefined : cs.transform);
@@ -46,6 +48,24 @@ export function shapeOf(el, radius) {
     return Math.abs(x - y) < 0.01 ? Math.max(0, x) : NaN;
   });
   if (radii.some((value) => !Number.isFinite(value))) return null;
+  // The notch-to-dock morph is a rounded inset clip. Follow it frame by frame
+  // so the blur grows with the shape instead of vanishing until it settles.
+  if (cs.clipPath && cs.clipPath !== "none") {
+    const clip = /^inset\(([^)]*?)(?:\s+round\s+([^)]*))?\)$/.exec(cs.clipPath.trim());
+    if (!clip) return null;
+    const px = (part) => (part.endsWith("px") || part === "0" ? parseFloat(part) * scale : NaN);
+    const sides = clip[1].trim().split(/\s+/).map(px);
+    const [t, rr = t, b = t, l = rr] = sides;
+    const corner = clip[2] ? px(clip[2].trim().split(/\s+/)[0]) : 0;
+    if (![t, rr, b, l, corner].every(Number.isFinite)) return null;
+    const [ct, cr, cb, cl] = [t, rr, b, l].map((v) => Math.max(0, v));
+    if (ct || cr || cb || cl) {
+      const w = r.width - cl - cr, h = r.height - ct - cb;
+      if (w < 1 || h < 1) return null;
+      const round = Math.min(Math.max(0, corner), w / 2, h / 2);
+      return [r.left + cl, r.top + ct, w, h, round, round, round, round];
+    }
+  }
   // Preserve subpixels until the native side rounds physical edges at the
   // current DPI. Rounding CSS first can move corners by several pixels.
   return [r.left, r.top, r.width, r.height, ...radii];
@@ -103,7 +123,11 @@ function pumpMaterial() {
   invoke("set_material", { shapes: list, tint: color })
     .then((ok) => {
       if (revision !== generation) return;
-      document.body.classList.toggle("native-material", !!ok && enabled && list.length > 0);
+      // An empty report while enabled is a surface in motion or away for a
+      // moment: keep the CSS in native mode so its fallback blur does not
+      // flash in and out between frames.
+      if (!enabled || (!ok && list.length)) document.body.classList.remove("native-material");
+      else if (list.length) document.body.classList.add("native-material");
       if (!ok && list.length) {
         lastSig = "";
         retryAfter = Date.now() + 5000;

@@ -103,7 +103,8 @@ pub(crate) fn dock_xy(
     // notch and push the dock inward by the notch's painted depth + air — so
     // they stack (edge → notch → dock) instead of colliding. The slider still
     // goes to 0; clearance is additive, not a silent floor replacing the value.
-    let dpr = window.scale_factor().unwrap_or(1.0);
+    // The target monitor's scale, not the one the window is leaving.
+    let dpr = monitor.scale_factor();
     let gap = cfg.edge_gap.min(96);
     let margin: i32 = ((gap.saturating_sub(18) as f64) * dpr).round() as i32;
 
@@ -222,7 +223,7 @@ pub(crate) fn dock_cover_workarea(window: WebviewWindow) -> Result<(f64, f64), S
     let monitor = pick_monitor(&window).ok_or_else(|| "no monitor found".to_string())?;
     let mpos = monitor.position();
     let msize = monitor.size();
-    let dpr = window.scale_factor().unwrap_or(1.0);
+    let dpr = monitor.scale_factor();
     let (ax, ay, aw, ah) = win::work_area(
         mpos.x + msize.width as i32 / 2,
         mpos.y + msize.height as i32 / 2,

@@ -16,7 +16,7 @@ const SEARCH_INDEX = [
   ["dock.more", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
   ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
   ["be.taskbarFollow", "dock"], ["be.taskbarSettle", "dock"], ["be.taskbarHoldHover", "dock"], ["ap.nativeMaterial", "dock"],
-  ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
+  ["plugins.title", "plugins"], ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
   ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.launcher", "system"], ["autoProf.title", "system"], ["sc.positions", "system"],
   ["ab.updates", "system"], ["tab.profiles", "system"], ["gen.captureVisible", "system"], ["gen.ctxMenu", "system"],
   ["overhaul.diagnostics", "system"], ["faq.title", "system"], ["ab.title", "system"], ["act.reset", "system"],
@@ -33,9 +33,10 @@ export const SEARCH_PARENT = {
   "be.taskbarSettle": "be.taskbarFollow", "be.taskbarHoldHover": "be.taskbarFollow",
 };
 
-const PAGE_LABELS = { home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
+const PAGE_LABELS = { plugins: "plugins.title", home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
 
 const SEARCH_ALIASES = {
+  "plugins.title": "plugins complementos instalar quitar configurar headsetcontrol audio yt-dlp descargas winget actualizaciones openrgb iluminacion rclone sincronizacion librehardwaremonitor sensores temperaturas",
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper pantone paleta palette",
   "look.source": "color colour windows barra tareas taskbar fondo pantalla wallpaper acento accent automatico automatic tema theme",
@@ -93,7 +94,9 @@ export function findSettings(query) {
       let score = normalizedLabel === normalizedQuery ? 200 : normalizedLabel.startsWith(normalizedQuery) ? 140 : 0;
       for (const term of terms) {
         const position = searchable.indexOf(term);
-        const termScore = position >= 0 ? 70 - Math.min(position, 45) : fuzzySearchScore(searchable, term);
+        // Typos are forgiven against the setting name only; across the page and
+        // aliases, letters-in-order matched almost anything.
+        const termScore = position >= 0 ? 70 - Math.min(position, 45) : term.length > 2 ? fuzzySearchScore(normalizedLabel, term) : 0;
         if (!termScore) return null;
         score += termScore;
       }

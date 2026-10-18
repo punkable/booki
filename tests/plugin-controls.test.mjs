@@ -18,12 +18,13 @@ test("native mixer targets session identifiers and commits volume and mute", asy
         return invoke(cmd,args);
       };`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => !!document.querySelector('input[aria-label="Browser"]'));
   await page.getByRole("slider", { name: "Browser", exact: true }).evaluate((el) => { el.value = "27"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 1);
   assert.deepEqual(await page.evaluate(() => window.__audioWrites[0]), { id: "session-42-A", percent: 27, muted: false });
-  await page.getByRole("checkbox", { name: "Browser · Muted" }).check();
+  await page.getByRole("button", { name: "Browser · Muted" }).click();
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 2);
   assert.equal(await page.evaluate(() => window.__audioWrites.at(-1).muted), true);
   await page.keyboard.press("Escape");
@@ -42,11 +43,14 @@ test("an unavailable device provider installs only after its inline button is pr
       };`,
   });
   await page.locator('.tile[data-id="devices"]').click();
-  await page.getByRole("button", { name: "Install plugin", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Turn on", exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
-  await page.getByRole("button", { name: "Install plugin", exact: true }).click();
-  await waitForAsyncCondition(page, () => document.querySelector(".system-widget-panel")?.textContent.includes("via HeadsetControl"));
+  assert.equal(await page.getByRole("button", { name: "Turn on", exact: true }).isDisabled(), true, "nothing installs before the terms are accepted");
+  await page.getByRole("checkbox", { name: /I accept the plugin terms/ }).check();
+  await page.getByRole("button", { name: "Turn on", exact: true }).click();
+  await waitForAsyncCondition(page, () => !document.querySelector(".system-widget-panel .device-offer"));
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), ["headsetcontrol"]);
+  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke("get_config"))).pluginTerms, 1);
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -61,11 +65,89 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
       };`,
   });
   await emit(page, "booki://link-drop", "https://example.com/video");
-  await page.getByRole("button", { name: "Download video…" }).waitFor();
-  assert.equal(await page.getByRole("textbox", { name: "Video link (HTTP or HTTPS)" }).inputValue(), "https://example.com/video");
+  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  assert.equal(await page.getByRole("textbox", { name: "Paste a link" }).inputValue(), "https://example.com/video");
   assert.deepEqual(await page.evaluate(() => window.__downloadRequests), [], "a drop must never start a download or execute a tool");
+  await page.getByRole("button", { name: "Audio only", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 1);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[0].format), "audio");
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await emit(page, "booki://link-drop", "file:///C:/private.txt");
+  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("the Collector picks the tool from the link: files and galleries start, videos ask", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("collector")] }),
+    initScript: `window.__downloadRequests=[]; const invoke=window.__TAURI__.core.invoke;
+      window.__TAURI__.core.invoke=(cmd,args)=> {
+        if(cmd==="plugin_status") return Promise.resolve({installed:true,version:"test"});
+        if(cmd==="plugin_download") {window.__downloadRequests.push(args);return Promise.resolve("C:/Users/me/Downloads/x");}
+        return invoke(cmd,args);
+      };`,
+  });
+  await emit(page, "booki://link-drop", "https://example.com/files/report.pdf");
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 1);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[0].format), "file");
+  await page.keyboard.press("Escape");
+  await emit(page, "booki://link-drop", "https://www.pinterest.com/pin/123/");
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 2);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[1].format), "gallery");
+  await page.keyboard.press("Escape");
+  await emit(page, "booki://link-drop", "https://www.youtube.com/watch?v=abc");
+  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__downloadRequests.length), 2);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("a device crossing 10% is announced once beside the dock", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("devices")] }),
+    initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="device_batteries"?Promise.resolve([{name:"MX Master 3S",level:8,source:"logitech",kind:"mouse",charging:false}]):invoke(cmd,args);`,
+  });
+  const toast = page.locator(".undo-toast .notice-copy");
+  await toast.waitFor();
+  assert.match(await toast.innerText(), /Low battery[\s\S]*MX Master 3S · 8%/);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("Updates counts apps with an update and updates them all from its panel", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("updates")] }),
+    initScript: `window.__updates=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_updates"?Promise.resolve([{name:"Firefox",id:"Mozilla.Firefox",current:"130",available:"131"},{name:"7-Zip",id:"7zip.7zip",current:"23",available:"24"}]):cmd==="app_update"?(window.__updates.push(args),Promise.resolve()):invoke(cmd,args);`,
+  });
+  const card = page.locator('.tile[data-id="updates"]');
+  await card.locator(".w-ring-num", { hasText: "2" }).waitFor();
+  await card.click();
+  await page.getByRole("button", { name: "Update all", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__updates.length === 1);
+  assert.equal(await page.evaluate(() => window.__updates[0].id), null);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("Cloud shows the fullest remote and every remote's space in its panel", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("cloud")] }),
+    initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="plugin_status"?Promise.resolve({installed:true}):cmd==="cloud_space"?Promise.resolve([{name:"drive",used:75*2**30,total:100*2**30,error:false},{name:"onedrive",used:2**30,total:5*2**30,error:false}]):invoke(cmd,args);`,
+  });
+  const card = page.locator('.tile[data-id="cloud"]');
+  await card.locator(".w-ring-num", { hasText: "75" }).waitFor();
+  await card.click();
+  await page.locator(".reading-card", { hasText: "onedrive" }).waitFor();
+  assert.match(await page.locator(".reading-card", { hasText: "drive" }).first().innerText(), /75 GB of 100 GB/);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("a click on the volume card mutes; its panel is one right-click away", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("volume")] }),
+    initScript: `window.__vol=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="volume_info"?Promise.resolve([40,false]):cmd==="volume_set_state"?(window.__vol.push(args),Promise.resolve(true)):invoke(cmd,args);`,
+  });
+  await page.locator('.tile[data-id="volume"]').click();
+  await waitForAsyncCondition(page, () => window.__vol.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__vol[0]), { percent: 40, muted: true });
   assert.equal(await page.locator(".system-widget-panel").count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
@@ -75,7 +157,8 @@ test("late native responses cannot resurrect a closed widget panel", async () =>
     cfg: makeConfig({ pinned: [pin("volume")] }),
     initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_volumes"?new Promise((resolve)=>{window.__finishSessions=resolve;}):invoke(cmd,args);`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => typeof window.__finishSessions === "function");
   await page.keyboard.press("Escape");
   await page.evaluate(() => window.__finishSessions([{ id: "late", name: "Late", percent: 10, muted: false }]));
@@ -94,7 +177,8 @@ test("the master mixer preserves mute in one native edit", async () => {
       return invoke(cmd,args);
     };`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   const slider = page.getByRole("slider", { name: "Volume", exact: true });
   await slider.waitFor();
   await slider.evaluate((el) => { el.value="55";el.dispatchEvent(new Event("change",{bubbles:true})); });
@@ -109,7 +193,8 @@ test("refreshing the mixer ignores an older in-flight session list", async () =>
     cfg: makeConfig({ pinned: [pin("volume")] }),
     initScript: `window.__sessionReads=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_volumes"?new Promise((resolve)=>window.__sessionReads.push(resolve)):invoke(cmd,args);`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => window.__sessionReads.length === 1);
   await page.getByRole("button", {name:"Refresh data",exact:true}).click();
   await waitForAsyncCondition(page, () => window.__sessionReads.length === 2);

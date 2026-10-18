@@ -103,13 +103,13 @@ test('a late material reply cannot re-enable glass after the user disables it', 
   await page.close();
 });
 
-test('an injected Home render failure preserves navigation without rewriting settings', async () => {
-  // A pinned list that is not a list makes Home's summary throw while rendering.
+test('a pinned list that is not a list renders Home without rewriting settings', async () => {
+  // Read as an empty dock instead of throwing while rendering.
   const cfg = makeConfig({ pinned: { invalid: true } });
   const { page } = await openPage(browser, port, 'settings.html', { cfg });
-  await page.locator('.settings-recovery').waitFor();
-  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.locator('.home-hero').waitFor();
   assert.equal(await page.locator('.settings-recovery').count(), 0);
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
   assert.deepEqual(await page.evaluate(() => window.__TAURI__.core.invoke('get_config')), cfg);
   await page.close();
 });
@@ -185,6 +185,47 @@ test('shortcut fields show localized key names, store English ones and always of
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).hotkey === 'Ctrl+Shift+K');
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
   assert.equal(saved.launcherHotkey, 'Ctrl+Shift+Space');
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+for (const theme of ['dark', 'light']) {
+  test(`Settings shows Mica behind the ${theme} page once Windows applies it, with solid cards`, async () => {
+    const { page, errors } = await openPage(browser, port, 'settings.html', {
+      cfg: makeConfig({ theme }), viewport: { width: 950, height: 790 },
+      initScript: `const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='platform_capabilities'?Promise.resolve({systemBackdrop:true,transparency:true,animations:true,highContrast:false}):cmd==='settings_backdrop'?Promise.resolve(true):old(cmd,args);`,
+    });
+    await page.waitForFunction(() => document.body.classList.contains('settings-mica'));
+    await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+    const clear = 'rgba(0, 0, 0, 0)';
+    assert.equal(await page.locator('.settings-main').evaluate(el => getComputedStyle(el).backgroundColor), clear);
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), clear);
+    assert.notEqual(await page.locator('.ui-group').first().evaluate(el => getComputedStyle(el).backgroundColor), clear);
+    assert.deepEqual(errors, []);
+    await page.close();
+  });
+}
+
+test('plugins have their own searchable page and installation stays deliberate', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', {
+    initScript: `const old=window.__TAURI__.core.invoke;window.__pluginInstalls=[];window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='plugin_status')return Promise.resolve({installed:false});if(cmd==='plugin_install'){window.__pluginInstalls.push(args.id);return Promise.reject('Download unavailable');}return old(cmd,args);};`,
+  });
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  assert.equal(await page.locator('.plugin-card').count(), 0);
+  await page.getByRole('combobox', { name: 'Search settings…' }).fill('HeadsetControl');
+  await page.getByRole('option').filter({ hasText: 'Plugins' }).click();
+  await page.locator('.page-plugins').waitFor();
+  assert.equal(await page.locator('.plugin-card').count(), 6);
+  assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
+  const section = page.locator('.ui-group-wrap').filter({ has: page.getByRole('heading', { name: 'HeadsetControl', exact: true }) });
+  assert.equal(await section.getByRole('button', { name: 'Download and install', exact: true }).isDisabled(), true);
+  await section.getByRole('checkbox', { name: /I accept the plugin terms/ }).check();
+  await section.getByRole('button', { name: 'Download and install', exact: true }).click();
+  const error = section.getByRole('alert');
+  await error.waitFor();
+  assert.match(await error.innerText(), /Download unavailable/);
+  assert.equal(await error.evaluate(el => getComputedStyle(el).position), 'static');
+  assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), ['headsetcontrol']);
   assert.deepEqual(errors, []);
   await page.close();
 });

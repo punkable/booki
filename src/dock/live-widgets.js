@@ -6,12 +6,15 @@ import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
+import { paintDownloads } from "./collector.js";
+import { notify } from "./notices.js";
+import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
-import { STAT_WIDGETS, RING_DEFAULTS } from "../widgets-meta.js";
+import { icon } from "../icons.js";
+import { STAT_WIDGETS } from "../widgets-meta.js";
 import {
   MEDIA_SVG,
-  BATTERY_LOW,
   dockPreviewSnippet,
   clockParts,
   volumeStep,
@@ -20,6 +23,7 @@ import {
   setMediaText,
   setPreviewSubText,
   setSystem,
+  widgetGlyph,
 } from "./widget-view.js";
 import { S } from "./state.js";
 import { dockKeys } from "./dom.js";
@@ -123,32 +127,81 @@ const pollStats = singleFlight(async () => {
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
     setMetric(el, t("w.battery"), s.battery);
     el.classList.toggle("charging", !!s.charging);
-    // A ring left at its default color (never manually re-colored) turns red
-    // when running low and unplugged — the same "pay attention" cue Windows
-    // itself uses, without overriding a color the user picked on purpose.
-    if (el.dataset.autoAccent) {
-      el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
-    }
+    // A ring left at its default color (never manually re-colored) follows
+    // the charge: green, amber, red, and pulses near empty while unplugged.
+    // A color the user picked on purpose is kept; the pulse still applies.
+    const tone = batteryTone(s.battery, !!s.charging);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", !s.charging && s.battery >= 0 && s.battery <= 10);
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 });
 
 // Headsets, earbuds, mice and keyboards that report a battery to Windows.
-// The card shows the one closest to running out; its hint lists them all.
-const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
-const pollDevices = singleFlight(async () => {
-  let list = [];
-  try { list = (await dockApi.deviceBatteries()) || []; } catch (_) { list = []; }
+// The card takes each device in turn (about every 6 s, lowest first) with an
+// icon for its kind; its hint lists them all.
+const KIND_ICON = { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" };
+let deviceTurn = 0;
+function setCornerGlyph(el, name, key) {
+  // The ring's own glyph becomes the device kind or provider logo.
+  const glyph = el.querySelector(".w-ring-ico") || el.querySelector(".w-ico");
+  if (!glyph || glyph.dataset.key === key) return;
+  glyph.dataset.key = key; glyph.innerHTML = icon(name);
+  glyph.classList.remove("w-glyph-swap"); void glyph.offsetWidth; glyph.classList.add("w-glyph-swap");
+  el.dataset.glyph = key;
+}
+function resetGlyph(el, type) {
+  const glyph = el.querySelector(".w-ring-ico");
+  if (!glyph?.dataset.key) return;
+  delete glyph.dataset.key; delete el.dataset.glyph; glyph.innerHTML = widgetGlyph(type, 14);
+}
+// One timer turns every rotating card; it repaints cached readings only.
+let rotationTimer = 0;
+function syncRotation() {
+  // Only cards still on the dock rotate; unpinning one lets the timer go.
+  const devices = widgetPresent("devices") && (deviceReading.last || []).length > 1;
+  const ai = widgetPresent("ai") && (aiReading.last || []).filter((p) => (p.windows || []).length).length > 1;
+  if (!devices && !ai) { clearInterval(rotationTimer); rotationTimer = 0; return; }
+  if (rotationTimer) return;
+  rotationTimer = setInterval(() => {
+    if (S.hiddenState || S.displayOff) return;
+    // Hold still while the pointer rests on the card, so it can be read.
+    if (document.querySelector('.tile.widget[data-widget="devices"]:hover, .tile.widget[data-widget="ai"]:hover')) return;
+    deviceTurn++; aiTurn++;
+    paintDevices(deviceReading.last || []); paintAi(aiReading.last || []);
+  }, 6000);
+}
+function paintDevices(list) {
   eachWidget("devices", (el) => {
     setWidgetAvailable(el, list.length > 0);
-    if (!list.length) { setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
-    const low = list[0];
-    setMetric(el, low.name, low.level);
-    // Readings that came through a plugin say so, e.g. "via HeadsetControl".
-    const via = (d) => (PLUGIN_NAMES[d.source] ? ` · ${t("w.devicesVia").replace("{plugin}", () => PLUGIN_NAMES[d.source])}` : "");
-    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${via(d)}`).join("\n"));
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", low.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
+    if (!list.length) { resetGlyph(el, "devices"); setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
+    const shown = list[deviceTurn % list.length];
+    setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
+    setMetric(el, shown.name, shown.level);
+    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
+    // The ring speaks the battery: green, amber, red; it pulses when a device
+    // is about to die (any of them, not only the one on screen).
+    const tone = batteryTone(shown.level, shown.charging);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", list.some((d) => !d.charging && d.level <= 10));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
+}
+const pollDevices = singleFlight(async () => {
+  let list = [];
+  try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
+  paintDevices(list); syncRotation(); warnLowDevices(list);
 });
+
+// One notice per device when it crosses 10%, not again until it recovers.
+const warnedDevices = new Set();
+function warnLowDevices(list) {
+  for (const d of list) {
+    if (!d.charging && d.level <= 10) {
+      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`); }
+    } else if (d.charging || d.level > 15) warnedDevices.delete(d.name);
+  }
+}
 
 // Plan usage of the AI services signed in on this PC (Claude Code, Codex).
 // The card shows the window closest to its limit; the hint lists them all
@@ -157,27 +210,89 @@ const resetClock = (seconds) => seconds > 0
   ? new Date(seconds * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" })
   : "";
 const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
-const pollAi = singleFlight(async () => {
-  let providers = [];
-  try { providers = (await dockApi.aiUsage()) || []; } catch (_) { providers = []; }
+// Every signed-in provider takes a turn on the card (about every 6 s) with its
+// own isotype and fullest window; rotating repaints the cached reading, it
+// never asks the services again.
+let aiTurn = 0;
+const PROVIDER_ICON = { claude: "ai-claude", codex: "ai-openai" };
+function paintAi(providers) {
   const windows = providers.flatMap((p) => (p.windows || []).map((w) => ({ ...w, provider: p.name })));
+  const shown = providers.filter((p) => (p.windows || []).length);
   eachWidget("ai", (el) => {
     setWidgetAvailable(el, windows.length > 0);
     if (!windows.length) {
       const signin = providers.some((p) => p.error === "signin");
+      resetGlyph(el, "ai");
       setText(el, t("w.ai"), "—");
       setTileLabel(el, t(!providers.length ? "w.aiNone" : signin ? "w.aiSignin" : "w.aiUnavailable"));
       return;
     }
-    const top = windows.reduce((a, b) => (b.percent > a.percent ? b : a));
-    setMetric(el, `${top.provider} · ${windowName(top.label)}`, Math.round(top.percent));
+    const current = shown[aiTurn % shown.length];
+    const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
+    setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
+    setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
     setTileLabel(el, windows.map((w) => {
       const reset = resetClock(w.resets_at);
       return `${w.provider} ${windowName(w.label)} · ${Math.round(w.percent)}%${reset ? ` · ${t("w.aiResets").replace("{time}", () => reset)}` : ""}`;
-    }).join("\n"));
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", top.percent >= 80 ? BATTERY_LOW : RING_DEFAULTS.ai);
+    }).concat(providers.filter((p) => !(p.windows || []).length).map((p) => `${p.name} · ${t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable")}`)).join("\n"));
+    const tone = usageTone(top.percent);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", windows.some((w) => w.percent >= 95));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
+  });
+}
+const pollAi = singleFlight(async () => {
+  let providers = [];
+  try { providers = (await aiReading.refresh()) || []; } catch (_) { providers = []; }
+  paintAi(providers); syncRotation();
+});
+
+// Updates (winget): how many apps have an update; asked every six hours.
+// A rise in the count is announced once.
+let lastUpdateCount = -1;
+const pollUpdates = singleFlight(async () => {
+  let list = null;
+  try { list = (await updatesReading.fresh(6 * 3600000)) || []; } catch (_) { list = null; }
+  eachWidget("updates", (el) => {
+    setWidgetAvailable(el, list !== null);
+    if (list === null) { setText(el, t("w.updates"), "—"); setTileLabel(el, t("perr.appInstaller")); return; }
+    setText(el, list.length ? t("up.some").replace("{n}", () => list.length) : t("up.none"), String(list.length));
+    setTileLabel(el, list.length ? list.slice(0, 12).map((u) => `${u.name} · ${u.current} → ${u.available}`).join("\n") : t("up.none"));
+    el.dataset.tone = list.length ? "fair" : "good";
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[list.length ? "fair" : "good"]);
+  });
+  if (list && list.length > lastUpdateCount && lastUpdateCount >= 0) notify(t("up.found").replace("{n}", () => list.length));
+  if (list) lastUpdateCount = list.length;
+});
+
+// Cloud (rclone): the fullest remote on the card; every remote in the hint.
+const pollCloud = singleFlight(async () => {
+  let list = [];
+  try { list = (await cloudReading.fresh(30 * 60000)) || []; } catch (_) { list = []; }
+  const known = list.filter((c) => c.total > 0);
+  eachWidget("cloud", (el) => {
+    setWidgetAvailable(el, known.length > 0);
+    if (!known.length) { setText(el, t("w.cloud"), "—"); setTileLabel(el, t("cl.none")); return; }
+    const full = known.reduce((a, b) => (b.used / b.total > a.used / a.total ? b : a));
+    const percent = Math.round((full.used / full.total) * 100);
+    setMetric(el, full.name, percent);
+    setTileLabel(el, known.map((c) => `${c.name} · ${t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total))}`).join("\n"));
+    const tone = usageTone(percent);
+    el.dataset.tone = tone;
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 });
+
+// Lighting (OpenRGB): the card names the profile last applied from Booki.
+export function paintLighting() {
+  let current = "";
+  try { current = localStorage.getItem("booki.rgbProfile") || ""; } catch (_) { current = ""; }
+  if (current === "\u0000off") current = t("rgb.off");
+  eachWidget("lighting", (el) => {
+    setText(el, t("w.lighting"), current || "—");
+    setTileLabel(el, current ? `${t("w.lighting")} · ${current}` : t("widget.lightingDesc"));
+  });
+}
 
 function setWidgetAvailable(el, available) {
   const item = findWidgetPin(el.dataset.id);
@@ -212,7 +327,7 @@ const pollMedia = singleFlight(async () => {
       return;
     }
     setMediaText(el, m.artist || t("w.media"), m.title || "—");
-    setTileLabel(el, `${m.title} — ${m.artist}`);
+    setTileLabel(el, [m.title, m.artist].filter(Boolean).join(" — ") || t("w.media"));
     el.classList.toggle("playing", !!m.playing);
     setMediaToggle(toggle, !!m.playing);
     if (art && m.thumb) {
@@ -327,6 +442,9 @@ let pollsActive = false;
 export function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  // The device/AI rotation sleeps with the polls too.
+  clearInterval(rotationTimer);
+  rotationTimer = 0;
   // Also stop the running-app/trash poll so a tucked-away dock burns zero timer
   // wakeups (not just early-returns). Resumed by startPolls on reveal.
   clearInterval(S.pollTimer);
@@ -361,6 +479,10 @@ function pollKinds() {
     clipboard: widgetPresent("clipboard"),
     devices: widgetPresent("devices"),
     ai: widgetPresent("ai"),
+    collector: widgetPresent("collector"),
+    updates: widgetPresent("updates"),
+    cloud: widgetPresent("cloud"),
+    lighting: widgetPresent("lighting"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -372,6 +494,11 @@ function paintPolls(k) {
   if (k.clipboard) pollClipboard();
   if (k.devices) pollDevices();
   if (k.ai) pollAi();
+  if (!k.devices && !k.ai) syncRotation();
+  if (k.collector) paintDownloads();
+  if (k.updates) pollUpdates();
+  if (k.cloud) pollCloud();
+  if (k.lighting) paintLighting();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new
@@ -393,15 +520,21 @@ export function startPolls() {
   pollKey = JSON.stringify(k);
   pollsActive = true;
   const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices, ai: hasAi } = k;
+  // The Collector is event-driven: repaint rebuilt cards, no timer needed.
+  if (k.collector) paintDownloads();
+  if (k.lighting) paintLighting();
+  // Updates and Cloud reuse their reading until it is 6 h / 30 min old, so a
+  // check every ten minutes costs nothing until then.
+  const hasSlow = k.updates || k.cloud;
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi && !hasSlow) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
   paintPolls(k);
   const t0 = Date.now();
   const slow = pollSlowdown();
   // Device batteries change slowly and the query walks Windows' device list.
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow };
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow, slow: t0 + 600000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
   const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices || hasAi ? 15000 : 60000;
@@ -415,9 +548,13 @@ export function startPolls() {
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
     if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
     if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
+    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); if (k.cloud) pollCloud(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
 export function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(S.nativeSupport, "media", 3000); if (!S.hiddenState) pollMedia(); }
 export function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(S.nativeSupport, "volume", 4000); if (!S.hiddenState) pollVolume(); }
 export function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
+
+/** After updating apps from the panel, read the list again. */
+export function refreshUpdates() { updatesReading.refreshAfter().catch(() => {}).finally(() => pollUpdates()); }

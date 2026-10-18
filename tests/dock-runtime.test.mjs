@@ -154,7 +154,7 @@ test("Settings mounts and every tab renders", async () => {
   });
 
   const tabs = await page.$$(".nav .nav-item");
-  assert.equal(tabs.length, 5, `expected five pages, got ${tabs.length}`);
+  assert.equal(tabs.length, 6, `expected six pages, got ${tabs.length}`);
   for (let i = 0; i < tabs.length; i++) {
     await tabs[i].click();
     await page.waitForTimeout(350);

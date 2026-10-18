@@ -6,7 +6,7 @@ import { onFileDrop, onLinkDrop, dock as dockApi } from "../api.js";
 import { kindForPath } from "../pins.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
-import { uid, isVertical, baseName, menuPinTitle } from "./helpers.js";
+import { uid, isVertical, baseName, menuPinTitle, findWidgetPin } from "./helpers.js";
 import { dockEl, dropOverlay } from "./dom.js";
 import { reframe } from "./frame.js";
 import { setHidden, scheduleHide } from "./autohide.js";
@@ -144,21 +144,17 @@ function setDropTarget(el) {
 }
 
 export function setupFileDrop() {
-  onLinkDrop((value) => { const url = videoUrl(String(value || "")); if (url) openSystemPanel({ widget: "media", url }, dockEl); });
-  // External browser links carry text/uri-list. Native Explorer file drops
-  // retain their existing Tauri path; never mistake a File for a link.
-  dockEl.addEventListener("dragover", (event) => {
-    const types = Array.from(event.dataTransfer?.types || []);
-    if (!types.includes("Files") && (types.includes("text/uri-list") || types.includes("text/plain"))) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; }
-  });
-  dockEl.addEventListener("drop", (event) => {
-    if (event.dataTransfer?.files?.length) return;
-    const raw = event.dataTransfer?.getData("text/uri-list") || event.dataTransfer?.getData("text/plain") || "";
-    const url = videoUrl(raw.split(/\r?\n/).find((line) => line.trim() && !line.startsWith("#")) || "");
+  // A dropped link asks Video or Audio only in the Downloads panel, by the
+  // Downloads card when one is pinned.
+  onLinkDrop((value) => {
+    const url = videoUrl(String(value || ""));
     if (!url) return;
-    event.preventDefault(); event.stopPropagation();
-    openSystemPanel({ widget: "media", url }, dockEl);
+    const card = dockEl.querySelector('.tile.widget[data-widget="collector"]');
+    const pinned = card ? findWidgetPin(card.dataset.id) : null;
+    openSystemPanel({ ...(pinned || { id: "collector", kind: "widget" }), widget: "collector", url }, card || dockEl);
   });
+  // Browser links arrive through the native drop bridge (link_drop.rs), which
+  // replaces WebView2's drop target, so the DOM never sees them.
   onFileDrop({
     onEnter: () => {
       // A file drag is aimed at the dock: force it open and PIN it open for the
@@ -185,7 +181,13 @@ export function setupFileDrop() {
       showDropHint(null);
       scheduleHide();
     },
+    // A drop ends the drag without a drag-leave, so the dock is tucked again
+    // here (after whatever the drop opened) like it is on leave.
     onDrop: async (paths, position) => {
+      try { await dropFiles(paths, position); } finally { scheduleHide(); }
+    },
+  });
+  async function dropFiles(paths, position) {
       S.draggingFile = false;
       S.pinnedReveal = false;
       dropOverlay.classList.remove("active");
@@ -213,9 +215,9 @@ export function setupFileDrop() {
       }
       // Dropped onto a dock folder (group) → pin the files inside it.
       if (item && item.kind === "group") {
+        const added = [];
         for (const pth of paths) {
-          item.children = item.children || [];
-          item.children.push({
+          added.push({
             id: uid(),
             name: baseName(pth).replace(/\.lnk$/i, ""),
             path: pth,
@@ -223,13 +225,15 @@ export function setupFileDrop() {
             kind: await kindForPath(pth, (p) => dockApi.isDir(p)),
           });
         }
-        if (!(await persist())) return;
+        // Only keep the new children once they are saved.
+        const before = item.children || [];
+        item.children = [...before, ...added];
+        if (!(await persist())) { item.children = before; return; }
         await render();
         reframe();
         return;
       }
       // Otherwise pin them exactly where the gap showed.
       await addPaths(paths, null, spot.index);
-    },
-  });
+  }
 }

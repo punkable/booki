@@ -135,6 +135,10 @@ export const ALL_WIDGETS = [
   "notes",
   "clipboard",
   "focus",
+  "collector",
+  "updates",
+  "cloud",
+  "lighting",
 ];
 
 export function everyKindPinned() {

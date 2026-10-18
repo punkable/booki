@@ -72,6 +72,15 @@
 
 <p align="center"><sub>Images show the actual Booki 0.86 interface with example data and generic sample icons.</sub></p>
 
+## What's new in 0.88
+
+- **Collector**: drop a link on the dock to save video or audio only from hundreds of sites, image galleries or files.
+- **Devices** rotates through headset, mouse and keyboard with their icons; color shows the battery and pulses when it needs charging.
+- **AI usage** with official Claude and ChatGPT logos, in turn, and when each limit resets.
+- **Updates**, **Cloud** and **Lighting** widgets (winget, rclone, OpenRGB), and notices that never cover the dock.
+- **Position** picked with one click on a drawing of your screen; folders without overlapping names.
+- Plugins pinned to SHA-256 checksums, with [terms of use](TERMS.md).
+
 ## Get started
 
 1. Open [Releases](https://github.com/punkable/booki/releases/latest) and pick `Booki_*_x64-setup.exe` (Intel/AMD) or `Booki_*_arm64-setup.exe` (Windows on ARM). An x64 MSI is also available.
@@ -152,10 +161,10 @@ See the [0.86 release notes](docs/releases/v0.86.0.md), the [0.85 release notes]
 ## Privacy and your data
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
-- Network requests are limited to update checks/downloads and website favicons, plus three things that happen only when you turn them on: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official GitHub releases (checked against GitHub's SHA-256 digest), and the AI usage widget.
+- Network requests are limited to update checks/downloads and website favicons, plus three things that happen only when you turn them on: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source), and the AI usage widget.
 - The AI usage widget reads the sign-in Claude Code (`~/.claude`) and Codex (`~/.codex`) already keep on your PC and sends each only to its own service (Anthropic or OpenAI) to read your plan's usage. Booki never stores, logs or forwards it, and asks only while the widget is on the dock.
 - Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
-- Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder.
+- Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
 - Clipboard history is local. Restart persistence is off by default; when enabled, it is protected for your Windows user and can expire.
 - Compatible captures hide the dock by default. Enable **Visible in captures** in Settings when recording it.
@@ -202,9 +211,9 @@ Releases are built from version tags through [release.yml](.github/workflows/rel
 
 ## License and credits
 
-[MIT](LICENSE). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
+[MIT](LICENSE) · [Terms of use and plugin notice](TERMS.md). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
 
-Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).
+Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. AI provider logos: [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT); the marks belong to their owners. Device glyphs: [Lucide](https://lucide.dev/) (ISC). Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).
 
 ### Quality and design
 

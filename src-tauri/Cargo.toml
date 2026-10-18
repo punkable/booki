@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.87.0"
+version = "0.88.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -58,6 +58,7 @@ features = [
     # Battery of Bluetooth headsets, mice and keyboards (win/devices.rs).
     "Devices_Enumeration_Pnp",
     "Win32_UI_Accessibility",
+    "Win32_UI_Controls",
     "Win32_UI_Shell_Common",
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_System_WinRT",

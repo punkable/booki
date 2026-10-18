@@ -479,7 +479,7 @@ materialObserver.observe(dockEl, { attributes: true, attributeFilter: ["class", 
 // follow window, and native geometry must resume only after it settles.
 for (const event of ["transitionrun", "transitionend", "transitioncancel", "animationstart", "animationend", "animationcancel"]) {
   document.body.addEventListener(event, (e) => {
-    if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial);
+    if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial, 700);
   });
 }
 
@@ -584,7 +584,7 @@ window.addEventListener("pointerdown", (e) => {
 // ─────────────────────── Booki tooltips ───────────────────────
 const dockTooltip = createDockTooltip(dockEl, {
   edge: () => S.cfg.edge,
-  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !ctxMenu.classList.contains("hidden"),
+  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
     const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
     if (!pin) return null;
@@ -652,7 +652,7 @@ function partyMode() {
 wireLiveWidgets({ startRunningPoll });
 wireRender({ onPointerDown, openMenu, openBackgroundMenu, removeItem, openAddPanel });
 wireUndoToast({ persist });
-wireConfigSync({ hideTip, closeStack });
+wireConfigSync({ hideTip, closeStack, cancelDrag });
 wireStack({ takeOutButton, wireStackDragOut, openFileMenu, addToFolderFromDock });
 wireLaunch({ hideTip });
 

@@ -113,6 +113,31 @@ test('native blur stays hidden through a long nonuniform reveal then resumes at 
   await page.close();
 });
 
+test('native blur follows the notch-to-dock clip instead of blinking off', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: pins }) });
+  await page.evaluate(() => {
+    const old = window.__TAURI__.core.invoke;
+    window.__nativeReports = [];
+    window.__TAURI__.core.invoke = (cmd, args) => {
+      if (cmd === 'set_material') { window.__nativeReports.push(args); return Promise.resolve(true); }
+      return old(cmd, args);
+    };
+    const style = document.createElement('style');
+    style.textContent = '@keyframes test-morph { from { clip-path: inset(10px 120px 0px 120px round 8px); } to { clip-path: inset(-16px round 34px); } } .dock.test-morph { animation: test-morph 900ms linear; }';
+    document.head.append(style);
+    document.querySelector('.dock').classList.add('test-morph');
+  });
+  await patch(page, { surfaceColor: '#556677' });
+  await page.waitForFunction(() => window.__nativeReports.some((r) => r.shapes.length));
+  const full = await page.evaluate(() => document.querySelector('.dock').getBoundingClientRect().width);
+  await page.waitForTimeout(150);
+  const widths = await page.evaluate(() => window.__nativeReports.filter((r) => r.shapes.length).map((r) => r.shapes[0][2]));
+  assert.ok(widths.some((w) => w < full - 1), `the blur takes the clipped width mid-morph: ${widths} < ${full}`);
+  assert.equal(await page.locator('body.native-material').count(), 1);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test('closing Settings waits for the final edit and uses the Settings-only destroy permission', async () => {
   const capability = JSON.parse(readFileSync(new URL('../src-tauri/capabilities/settings-window.json', import.meta.url)));
   assert.deepEqual(capability.windows, ['settings']);
@@ -185,7 +210,7 @@ test('placement changes in Settings never move the Settings window', async () =>
     window.__TAURI__.core.invoke = (cmd, args) => { window.__calls.push(cmd); return old(cmd, args); };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('radio', { name: 'Top', exact: true }).click();
+  await page.getByRole('radio', { name: 'Top · Center', exact: true }).click();
   await page.waitForFunction(() => window.__calls.includes('notch_preview'));
   const calls = await page.evaluate(() => window.__calls);
   assert.ok(calls.includes('save_config'));
@@ -258,7 +283,7 @@ test('the dock app panel retries failed sources and supports keyboard tabs', asy
   await tabs.getByRole('tab', { name: 'Apps', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await tabs.getByRole('tab', { name: 'Widgets', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('.add-wcell').count(), 12);
+  assert.equal(await page.locator('.add-wcell').count(), 16);
   await page.locator('.add-head').getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await page.locator('#stack.open').count(), 0);
   assert.deepEqual(errors, []);

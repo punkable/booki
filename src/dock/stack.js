@@ -150,6 +150,15 @@ export async function openStack(tileEl, item) {
     });
     input.addEventListener("blur", () => renameGroup(item, input.value, { commit: true }));
     head.appendChild(input);
+    // Adding lives in the header, as quiet icon buttons, so the grid holds
+    // only the group's own apps and nothing competes with them.
+    for (const [glyphName, label, kind] of [["plus", t("apps.addToFolder"), "app"], ["folder-plus", t("m.addFolder"), "folder"]]) {
+      const add = document.createElement("button");
+      add.type = "button"; add.className = "stack-close stack-head-add";
+      add.innerHTML = icon(glyphName); add.title = label; add.setAttribute("aria-label", label);
+      add.addEventListener("click", (ev) => { ev.stopPropagation(); deps.addToFolderFromDock(item, kind); });
+      head.appendChild(add);
+    }
   } else {
     const name = document.createElement("span");
     name.className = "stack-title";
@@ -236,6 +245,7 @@ export async function openStack(tileEl, item) {
           ? `<img${cachedThumb ? ' class="thumb"' : ""} src="${esc(now)}" alt="" />`
           : `<span class="stack-glyph skel"></span>`) +
         `<span class="stack-name">${esc(it.name)}</span>`;
+      cell.title = it.name || "";
       if (!now) {
         const setImg = (src, isThumb) => {
           const holder = cell.querySelector(".stack-glyph.skel");
@@ -315,24 +325,7 @@ export async function openStack(tileEl, item) {
       }
       grid.appendChild(holder || cell);
     }
-    // Quick add cells — app and folder — so filling a group is one tap each.
-    if (isGroup) {
-      const mkAdd = (label, kind) => {
-        const addCell = document.createElement("button");
-        addCell.className = "stack-item stack-add";
-        addCell.title = label;
-        const glyph = kind === "folder" ? icon("folder") : "＋";
-        addCell.innerHTML =
-          `<span class="stack-glyph">${glyph}</span><span class="stack-name">${esc(label)}</span>`;
-        addCell.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          deps.addToFolderFromDock(item, kind);
-        });
-        grid.appendChild(addCell);
-      };
-      mkAdd(t("apps.addToFolder"), "app");
-      mkAdd(t("m.addFolder"), "folder");
-    } else if (items.length >= 80) {
+    if (!isGroup && items.length >= 80) {
       // Legacy listing clients may still hand back a capped slice.
       const more = document.createElement("button");
       more.className = "stack-more";

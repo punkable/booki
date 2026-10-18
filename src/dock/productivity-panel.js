@@ -84,7 +84,8 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
         progress.style.strokeDashoffset = String((ring * (1 - Math.min(1, left / total))).toFixed(2));
       };
       paint();
-      if (running) timer = setInterval(() => { if (!panel.isConnected) { clearInterval(timer); return; } paint(); if (timerSeconds(st) === 0) draw(); }, 1000);
+      if (running) timer = setInterval(() => { if (!panel.isConnected) { clearInterval(timer); return; } paint(); if (timerSeconds(st) === 0) { clearInterval(timer); // Typing a task: finish the redraw when the field is left, not mid-word.
+if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () => draw(), { once: true }); else draw(); } }, 1000);
       const row = document.createElement("div"); row.className = "focus-actions focus-timer-actions"; body.appendChild(row);
       const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "focus-primary";
       toggle.innerHTML = icon(running ? "pause" : "play"); toggle.append(text("span", "", t(running ? "focus.pause" : "focus.start")));
@@ -120,7 +121,7 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
         checkbox.setAttribute("aria-label", task.text);
         checkbox.addEventListener("change", () => { const done = checkbox.checked; update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, done } : entry) })); });
         const edit = document.createElement("button"); edit.type = "button"; edit.className = "task-edit"; edit.textContent = task.text; edit.setAttribute("aria-label", `${t("apps.rename")}: ${task.text}`);
-        edit.addEventListener("click", (event) => { event.preventDefault(); const input = document.createElement("input"); input.className = "task-rename"; input.value = task.text; input.maxLength = 200; input.setAttribute("aria-label", t("apps.rename")); edit.replaceWith(input); input.focus(); let done = false; const commit = () => { if (done) return; done = true; if (!input.value.trim()) return draw(); update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, text: input.value.trim() } : entry) })); }; input.addEventListener("blur", commit); input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { done = true; draw(); } }); }); label.append(checkbox, edit); row.appendChild(label);
+        edit.addEventListener("click", (event) => { event.preventDefault(); const input = document.createElement("input"); input.className = "task-rename"; input.value = task.text; input.maxLength = 200; input.setAttribute("aria-label", t("apps.rename")); edit.replaceWith(input); input.focus(); let done = false; const commit = () => { if (done) return; done = true; if (!input.value.trim()) return draw(); update((current) => ({ tasks: (current.tasks || []).map((entry) => entry.id === task.id ? { ...entry, text: input.value.trim() } : entry) })); }; input.addEventListener("blur", commit); input.addEventListener("keydown", (e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done = true; draw(); } }); }); label.append(checkbox, edit); row.appendChild(label);
         const remove = document.createElement("button"); remove.type = "button"; remove.className = "stack-close focus-task-remove"; remove.innerHTML = icon("x");
         remove.title = t("apps.remove"); remove.setAttribute("aria-label", `${t("apps.remove")}: ${task.text}`);
         remove.addEventListener("click", () => update((current) => ({ tasks: (current.tasks || []).filter((entry) => entry.id !== task.id) }))); row.appendChild(remove);

@@ -75,8 +75,12 @@ export async function reloadConfig({ afterSaves = true } = {}) {
   // the queued save writes back the backend copy, losing the dock's edit.
   // A save that reloads from inside the queue must skip this, or it waits on itself.
   if (afterSaves) await persistQueue;
+  const queued = persistQueue;
   const next = await configApi.get();
   if (request !== configReloadGeneration) return;
+  // A dock edit saved while this read was in flight: read again after it,
+  // or the older snapshot would put the edit back.
+  if (afterSaves && queued !== persistQueue) return reloadConfig({ afterSaves });
   const prev = S.cfg;
   S.cfg = next;
   // If the language changed, make sure its dictionary is loaded before re-render.
@@ -100,6 +104,8 @@ export async function reloadConfig({ afterSaves = true } = {}) {
   if (languageChanged) { closeMenu(); closeTrashPop(); deps.hideTip(); }
   const pinsChanged = languageChanged || !prev || JSON.stringify(prev.pinned) !== JSON.stringify(S.cfg.pinned);
   if (pinsChanged) {
+    // A drag in flight holds tiles this render would replace.
+    if (S.dragging || S.press) await deps.cancelDrag?.();
     // Stale flyout handlers hold old children — close rather than lie.
     const keepCatalog = S.stackOpen && S.stackItemId === "__add";
     if (S.stackOpen && !keepCatalog) deps.closeStack();

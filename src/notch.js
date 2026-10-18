@@ -532,14 +532,18 @@ pill.addEventListener("pointerleave", () => {
   cardTimer = setTimeout(closeCard, 220);
 });
 
+// Keyboard: focusing the pill opens the same card, so play/pause is reachable.
+pill.addEventListener("focus", () => { clearTimeout(cardTimer); openCard(); });
+pill.addEventListener("blur", (e) => { if (!pill.contains(e.relatedTarget)) { clearTimeout(cardTimer); cardTimer = setTimeout(closeCard, 220); } });
+
 cPlay.addEventListener("pointerdown", (e) => e.stopPropagation());
 cPlay.addEventListener("click", async (e) => {
   e.stopPropagation();
   try {
     await invoke("media_toggle");
-  } catch (_) {}
-  if (media) media.playing = !media.playing;
-  paintMedia();
+    if (media) media.playing = !media.playing;
+    paintMedia();
+  } catch (_) { /* the session is gone; the poll below tells the truth */ }
   setTimeout(pollMedia, 400);
 });
 
@@ -569,7 +573,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => invoke("reveal_dock"), 90);
+  hoverTimer = setTimeout(() => invoke("reveal_dock").catch(() => {}), 90);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 

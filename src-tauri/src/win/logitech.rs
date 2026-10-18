@@ -57,10 +57,13 @@ pub fn batteries() -> Vec<DeviceBattery> {
 fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
     let level = unified_battery(device, slot).or_else(|| battery_status(device, slot))?;
     let name = device_name(device, slot).unwrap_or_else(|| "Logitech".to_string());
+    let kind = device_type(device, slot).unwrap_or_else(|| super::devices::kind_from_name(&name));
     Some(DeviceBattery {
         name,
         level,
         source: "logitech",
+        kind,
+        charging: false,
     })
 }
 
@@ -95,6 +98,18 @@ fn device_name(device: &HidDevice, slot: u8) -> Option<String> {
         .trim()
         .to_string();
     (!name.is_empty()).then_some(name)
+}
+
+/// DeviceTypeAndName, getDeviceType: 0 keyboard, 2 numpad, 3 mouse,
+/// 4 trackpad, 5 trackball, 8 headset.
+fn device_type(device: &HidDevice, slot: u8) -> Option<&'static str> {
+    let index = feature_index(device, slot, DEVICE_NAME)?;
+    match request(device, slot, index, 2, &[])?[4] {
+        0 | 2 => Some("keyboard"),
+        3..=5 => Some("mouse"),
+        8 => Some("headset"),
+        _ => None,
+    }
 }
 
 /// Root feature, getFeature: where a feature lives on this device (None

@@ -29,3 +29,28 @@ export function createAsyncCache(fetcher, { maximum = 256, ttl = 300000, negativ
   };
   return { get, clear: () => entries.clear() };
 }
+
+/* Last reading of a slow native query, shared by the card and its panel: a
+   reader gets the cached value at once and an in-flight query is joined, not
+   repeated. `fresh(ms)` resolves to a reading no older than `ms`. */
+export function sharedReading(fetcher) {
+  let value; let at = 0; let pending = null;
+  const listeners = new Set();
+  const refresh = () => {
+    if (pending) return pending;
+    pending = Promise.resolve().then(fetcher).then((next) => {
+      value = next; at = Date.now();
+      for (const fn of listeners) { try { fn(next); } catch (_) { /* a closed panel */ } }
+      return next;
+    }).finally(() => { pending = null; });
+    return pending;
+  };
+  return {
+    refresh,
+    /** A new read even if one is in flight (it may predate a change). */
+    refreshAfter: () => (pending ? pending.catch(() => {}).then(refresh) : refresh()),
+    fresh: (ms) => (at && Date.now() - at < ms ? Promise.resolve(value) : refresh()),
+    get last() { return at ? value : undefined; },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+}

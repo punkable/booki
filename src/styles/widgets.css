@@ -429,19 +429,95 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .system-widget-readings { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; }
 .system-widget-readings dt { overflow-wrap: anywhere; }
 .system-widget-readings dd { margin: 0; font-variant-numeric: tabular-nums; }
+/* Device and AI readings as cards: one per device or provider. */
+.reading-cards { display: grid; gap: 8px; }
+.reading-card { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--card-bg, rgba(255, 255, 255, 0.06)); border: 1px solid var(--card-stroke, rgba(255, 255, 255, 0.08)); }
+.reading-card-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.reading-card-glyph { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 6px; background: rgba(255, 255, 255, 0.08); }
+.reading-card-glyph svg { width: 16px; height: 16px; }
+.reading-card-names { display: grid; min-width: 0; flex: 1; }
+.reading-card-names strong, .reading-card-names small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.reading-card-names strong { font-size: 0.875rem; font-weight: 600; }
+.reading-card-value { font-size: 0.875rem !important; }
+.reading-card-names small, .reading-card-note { opacity: 0.7; font-size: 12px; }
+.reading-bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 12px; }
+.reading-bar-value { font-variant-numeric: tabular-nums; }
+.reading-card-value { margin-left: auto; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value { color: #ff8b8f; }
+.reading-bar-track { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.reading-bar-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transition: width 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
+.reading-bar-track i[data-tone="good"], .reading-bar-track i[data-tone="charging"] { background: #30a46c; }
+.reading-bar-track i[data-tone="fair"] { background: #f5a524; }
+.reading-bar-track i[data-tone="low"], .reading-bar-track i[data-tone="critical"] { background: #e5484d; }
+.reading-bar-track i[data-tone="critical"] { animation: tone-blink 1.2s ease-in-out infinite; }
+.reading-bar-track i[data-tone="charging"] { background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); background-size: 40px 100%; background-repeat: no-repeat; animation: tone-sweep 1.6s linear infinite; background-color: #30a46c; }
+.reading-card[data-tone="critical"] { border-color: color-mix(in srgb, #e5484d 55%, transparent); }
+.reading-card-names small { font-variant-numeric: tabular-nums; }
+.reading-card[data-tone="low"] .reading-card-names small, .reading-card[data-tone="critical"] .reading-card-names small { color: #ff8b8f; opacity: 1; }
+/* A widget that needs attention breathes its ring until it is dealt with. */
+.tile.widget.needs-attention .w-ring svg { animation: tone-blink 1.2s ease-in-out infinite; }
+@keyframes tone-blink { 50% { opacity: 0.35; } }
+@keyframes tone-sweep { from { background-position: -40px 0; } to { background-position: 140% 0; } }
+.device-offer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); font-size: 0.8125rem; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .tile.widget.needs-attention .w-ring svg, .reading-bar-track i { animation: none !important; } }
+/* Rotating cards (Devices, AI): the ring glyph turns into the device kind or
+   provider logo and eases in as the card moves to the next one. */
+.w-ring-ico.w-glyph-swap { animation: w-glyph-in 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
+@keyframes w-glyph-in { from { opacity: 0; transform: scale(0.8); } }
+@media (prefers-reduced-motion: reduce) { .w-ring-ico.w-glyph-swap { animation: none; } }
+
 .system-widget-panel { width: min(400px, calc(100vw - 24px)); }
 .app-volume-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px auto 20px; gap: 6px 10px; align-items: center; margin: 16px 0; font-size: 12px; }
 .app-volume-row > span:first-child { grid-column: 1 / 3; grid-row: 1; }
-.app-volume-row > span:nth-last-child(2) { grid-column: 3; grid-row: 1; }
-.app-volume-row input[type="checkbox"] { grid-column: 4; grid-row: 1; width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+.app-volume-row .mute-toggle { grid-column: 4; grid-row: 1 / 3; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink-2); cursor: pointer; }
+.app-volume-row .mute-toggle:hover { background: var(--hover); color: var(--ink); }
+.app-volume-row .mute-toggle[aria-pressed="true"] { color: #e5484d; }
+.app-volume-row .mute-toggle svg { width: 16px; height: 16px; }
 .app-volume-row input[type="range"] { grid-column: 1 / 3; grid-row: 2; padding: 0; border: 0; }
-.app-volume-row output { grid-column: 3 / 5; grid-row: 2; text-align: right; font-variant-numeric: tabular-nums; }
+.app-volume-row output { grid-column: 3; grid-row: 2; text-align: right; font-variant-numeric: tabular-nums; min-width: 4ch; }
 .app-volume-row > span:first-child { overflow: hidden; text-overflow: ellipsis; }
-.app-volume-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.app-volume-row input[type="range"] { width: 100%; height: 4px; appearance: none; -webkit-appearance: none; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pct, 0%), color-mix(in srgb, var(--ink) 18%, transparent) var(--pct, 0%)); }
+.app-volume-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--layer-strong, #fff); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent); }
 .app-volume-row .plugin-action-error { grid-column: 1 / -1; }
 .plugin-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .plugin-panel-actions input[type="url"] { width: 100%; padding: 8px; border-radius: var(--r-control); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink); }
 .plugin-panel-actions small { width: 100%; color: var(--ink-2); }
-.plugin-warning { padding: 10px; border-radius: var(--r-card); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink) !important; line-height: 1.5; }
+.plugin-warning { padding: 8px 10px; border-radius: var(--r-card); border: 1px solid color-mix(in srgb, #f7c948 45%, transparent); background: color-mix(in srgb, #f7c948 12%, transparent); color: var(--ink) !important; font-size: 0.75rem; line-height: 1.4; }
 .plugin-result { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; font: 12px/1.5 var(--font); }
 .plugin-action-error { color: var(--danger-text); }
+/* Plugin blurbs under a widget's readings are secondary: body-small, muted. */
+.system-widget-panel .productivity-section > p { margin: 4px 0 10px; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2); }
+.system-widget-panel .productivity-section > strong { display: block; margin-bottom: 8px; font-size: 0.8125rem; }
+
+/* Downloads panel: the link, then the two choices, then progress. */
+.download-form { display: grid; gap: 10px; }
+.download-ask { margin: 0; font-weight: 600; color: var(--ink); }
+.download-form input[type="url"] { width: 100%; padding: 8px 10px; border-radius: var(--r-control); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink); font: inherit; }
+.download-form .productivity-button.primary { background: var(--accent); color: var(--accent-contrast, #fff); }
+.download-status { display: grid; gap: 8px; margin-top: 12px; }
+.download-status:empty { display: none; }
+.device-offer-copy { display: grid; gap: 4px; min-width: 0; }
+.device-offer-copy small { font-size: 0.75rem; line-height: 1.35; opacity: 0.8; }
+.device-offer-copy .link { justify-self: start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.terms-check { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
+.terms-check .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.rgb-profiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.reading-card:has(> .plugin-panel-actions) { grid-template-columns: 1fr auto; align-items: center; }
+.reading-card > .plugin-panel-actions { grid-column: 2; grid-row: 1; }
+.system-widget-panel .productivity-section > .plugin-panel-actions + .reading-cards { margin-top: 8px; }
+.system-widget-panel .productivity-button.primary { background: var(--accent); color: var(--accent-contrast, #fff); }
+
+/* ── Wide gauge (2×1, 3×1): the ring on the left, its name beside it ─────── */
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-card { justify-content: flex-start; gap: calc(var(--size) * 0.16); padding-inline: calc(var(--size) * 0.12) calc(var(--size) * 0.2); }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-ring { flex: 0 0 auto; width: calc(var(--size) * 0.8); height: calc(var(--size) * 0.8); }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: flex; flex: 1 1 auto; }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-label { order: 0; font-size: calc(var(--size) * 0.21); color: var(--w-ink); white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
+/* Lighting reads as a short name, not a giant figure. */
+.tile.widget[data-widget="lighting"] .w-value { font-size: calc(var(--size) * 0.24); font-family: var(--font); font-weight: 650; }
+.system-widget-panel .productivity-section > strong { font-size: 1rem; font-weight: 600; }
+.download-form input[type="url"]:focus { outline: none; }
+.download-form input[type="url"]:focus-visible { border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+.download-ask { font-weight: 400; font-size: 0.8125rem; color: var(--ink-2); }
+.rgb-profiles > .productivity-button:nth-last-child(2) { margin-inline-start: auto; }
+.tile.widget .w-label { text-overflow: ellipsis; }

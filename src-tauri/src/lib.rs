@@ -188,22 +188,27 @@ fn get_config() -> Config {
     config::load()
 }
 
+// Async so the fsync'd write never stalls the dock's UI thread (Settings
+// saves on every slider step).
 #[tauri::command]
-fn save_config(
+async fn save_config(
     app: AppHandle,
     config: Option<Config>,
     patch: Option<serde_json::Value>,
     base: Option<serde_json::Value>,
     expected_revision: Option<u64>,
 ) -> Result<Config, String> {
-    let config = if let Some(patch) = patch {
-        config::patch_checked(patch, base.as_ref(), expected_revision)?
-    } else if let Some(config) = config {
-        config::save(&config)?;
-        config::load()
-    } else {
-        return Err("missing config or patch".into());
-    };
+    let config = util::blocking(move || {
+        if let Some(patch) = patch {
+            config::patch_checked(patch, base.as_ref(), expected_revision)
+        } else if let Some(config) = config {
+            config::save(&config)?;
+            Ok(config::load())
+        } else {
+            Err("missing config or patch".into())
+        }
+    })
+    .await??;
     {
         clip_apply_config(&config);
         apply_always_on_top(&app);
@@ -587,14 +592,19 @@ fn plugin_catalog() -> &'static [plugins::Plugin] {
 
 /// Installed state of an optional plugin (Settings > Plugins).
 #[tauri::command]
-fn plugin_status(id: String) -> Result<plugins::Status, String> {
-    Ok(plugins::status(plugins::find(&id).ok_or("unknown plugin")?))
+async fn plugin_status(id: String) -> Result<plugins::Status, String> {
+    let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    util::blocking(move || plugins::status(plugin)).await
 }
 
 /// Download, verify and install a plugin the person chose in Settings.
 #[tauri::command]
 async fn plugin_install(id: String) -> Result<String, String> {
     let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    // Nothing third-party is fetched before the person accepts the terms.
+    if config::load().plugin_terms < plugins::TERMS_VERSION {
+        return Err("accept the plugin terms first".into());
+    }
     tauri::async_runtime::spawn_blocking(move || plugins::install(plugin))
         .await
         .map_err(|e| e.to_string())?
@@ -698,7 +708,14 @@ fn sync_context_menu(enabled: bool, label_pin: String, label_group: String) -> R
         let groups: Vec<(String, String)> = cfg
             .pinned
             .iter()
-            .filter(|p| p.kind == "group")
+            // Ids go into a registry command line: only plain ids qualify.
+            .filter(|p| {
+                p.kind == "group"
+                    && !p.id.is_empty()
+                    && p.id
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            })
             .map(|p| (p.id.clone(), label_group.replace("{name}", &p.name)))
             .collect();
         win::sync_context_menu(enabled, &exe, &label_pin, &groups)
@@ -849,6 +866,11 @@ fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Resu
     let mut cfg = read_reviewed_import(&path, expected.as_ref())?;
     cfg.monitor = -1;
     cfg.monitor_name.clear();
+    // Automatic profile rules belong to this PC, as with profile_apply; an
+    // old backup must not silently replace or disable them.
+    let live = config::load();
+    cfg.profile_rules = live.profile_rules;
+    cfg.last_profile = live.last_profile;
     apply_config_snapshot(&app, cfg)
 }
 
@@ -867,8 +889,9 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     let mut cfg = cfg;
     config::migrate(&mut cfg);
     // Apply general preferences as well as the visual layout. A failed OS
-    // operation leaves the previous persisted profile active.
-    config::backup_for_update()?;
+    // operation leaves the previous persisted profile active. (The save keeps
+    // config.bak.json; update-backups/ is only written before an update, so
+    // frequent automatic profile switches never push those out.)
     let previous = config::load();
     let previous_autostart = get_autostart();
     // Only a profile that changes the choice touches the registry. Applying
@@ -892,7 +915,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
         return Err(error);
     }
     let autostart_result = if touch_autostart {
-        set_autostart(cfg.autostart)
+        apply_autostart(cfg.autostart)
     } else {
         Ok(())
     };
@@ -908,7 +931,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     }
     if let Err(error) = config::save_replacement(&cfg) {
         if touch_autostart {
-            let _ = set_autostart(previous_autostart);
+            let _ = apply_autostart(previous_autostart);
         }
         let _ = hotkeys_apply(
             app,
@@ -955,7 +978,11 @@ fn clear_fullscreen_blackout() {
 }
 
 #[tauri::command]
-fn set_autostart(enabled: bool) -> Result<(), String> {
+async fn set_autostart(enabled: bool) -> Result<(), String> {
+    util::blocking(move || apply_autostart(enabled)).await?
+}
+
+fn apply_autostart(enabled: bool) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let result = win::set_autostart(enabled, &exe.to_string_lossy());
     if let Err(e) = &result {
@@ -1388,7 +1415,6 @@ pub fn run() {
         // (e.g. clicking the icon while the autostart copy is alive) just brings
         // the existing dock to the front and exits, instead of duplicating
         // everything. Windows startup then never ends up with two docks.
-        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // A context-menu "Add to Booki" click launches a second instance
             // with --pin args: apply them here, then surface the dock so the
@@ -1396,6 +1422,7 @@ pub fn run() {
             let _ = handle_pin_argv(app, &argv);
             reveal_running_dock(app);
         }))
+        .plugin(tauri_plugin_drag::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -1471,6 +1498,12 @@ pub fn run() {
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,
             plugin_tools::plugin_download,
+            plugin_tools::app_updates,
+            plugin_tools::app_update,
+            plugin_tools::cloud_space,
+            plugin_tools::cloud_setup,
+            plugin_tools::rgb_profiles,
+            plugin_tools::rgb_apply,
             plugin_status,
             plugin_install,
             plugin_uninstall,
@@ -1507,6 +1540,7 @@ pub fn run() {
             notch_screen_busy,
             notch_toast,
             notch_toast_dismiss,
+            notch_notice,
             notch_preview,
             hide_all,
             clear_fullscreen_blackout,
@@ -1598,6 +1632,11 @@ pub fn run() {
             frontend_log,
         ])
         .on_window_event(|window, event| {
+            // An update started from Settings must not stay locked after the
+            // Settings window that held the lock is gone.
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "settings" {
+                UPDATE_LOCK.store(false, Ordering::SeqCst);
+            }
             // A monitor's scale can change (Settings > Display > Scale) with
             // no display change, so the "display" signal never fires; the
             // dock and notch would keep their old physical size and position.
@@ -1793,7 +1832,14 @@ pub fn run() {
                                 // Some apps create their own topmost window after Booki
                                 // and can slide above the dock/notch. Re-assert topmost
                                 // status every few seconds so both stay reachable.
-                                if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
+                                // Never lift Booki over a fullscreen game or movie.
+                                let busy = FULLSCREEN_BLACKOUT
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    || win::is_fullscreen_on(self_hwnd);
+                                if cfg_cache.always_on_top
+                                    && !busy
+                                    && watch.is_visible().unwrap_or(false)
+                                {
                                     if let Ok(h) = watch.hwnd() {
                                         win::raise_topmost(h.0 as isize);
                                     }
@@ -1804,7 +1850,7 @@ pub fn run() {
                                 // SetWindowPos calls every three seconds, waking
                                 // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
-                                    if notch.is_visible().unwrap_or(false) {
+                                    if !busy && notch.is_visible().unwrap_or(false) {
                                         if let Ok(h) = notch.hwnd() {
                                             win::raise_topmost(h.0 as isize);
                                         }
@@ -1817,7 +1863,8 @@ pub fn run() {
                             // foreground_occludes = "the user is in an app". Smart
                             // auto-hide and the smart notch both consume this.
                             if cfg_cache.auto_hide_mode == "smart" {
-                                let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
+                                let (dl, dt, dr, db) =
+                                    *DOCK_HOME_RECT.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(v) = debounce(
                                     &mut occ,
                                     win::foreground_occludes(dl, dt, dr, db, self_hwnd),
@@ -1832,7 +1879,8 @@ pub fn run() {
                             // Feeding `false` instead still sends the "fullscreen
                             // ended" edge, so turning the option off mid-game
                             // can't leave the dock blacked out.
-                            let fullscreen = cfg_cache.hide_in_fullscreen && win::is_fullscreen();
+                            let fullscreen =
+                                cfg_cache.hide_in_fullscreen && win::is_fullscreen_on(self_hwnd);
                             if let Some(v) = debounce(&mut fs, fullscreen) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }
@@ -1849,9 +1897,15 @@ pub fn run() {
                                     // The notch forgets the pointer when it hides.
                                     near_last = false;
                                 } else {
-                                    if let Some(v) =
-                                        debounce(&mut busy, win::foreground_maximized())
-                                    {
+                                    let notch_hwnd = notch
+                                        .as_ref()
+                                        .and_then(|n| n.hwnd().ok())
+                                        .map(|h| h.0 as isize)
+                                        .unwrap_or(0);
+                                    if let Some(v) = debounce(
+                                        &mut busy,
+                                        win::foreground_maximized_on(notch_hwnd),
+                                    ) {
                                         let _ = handle.emit("booki://screen-busy", v);
                                     }
                                     let near = notch

@@ -5,8 +5,8 @@ use windows::core::w;
 use windows::core::BOOL;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::Graphics::Dwm::{
-    DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE, DWMWA_SYSTEMBACKDROP_TYPE,
-    DWMWA_USE_IMMERSIVE_DARK_MODE,
+    DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE,
+    DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
 };
 use windows::Win32::System::Registry::{
     RegGetValueW, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
@@ -160,5 +160,16 @@ pub fn settings_backdrop(hwnd: isize, enabled: bool, dark: bool) -> bool {
         )
         .is_ok()
     };
-    allowed && applied
+    // A system backdrop only shows through the client area where the frame
+    // is extended into it; without this a cleared WebView reads as black.
+    let inset = if allowed && applied { -1 } else { 0 };
+    let margins = windows::Win32::UI::Controls::MARGINS {
+        cxLeftWidth: inset,
+        cxRightWidth: inset,
+        cyTopHeight: inset,
+        cyBottomHeight: inset,
+    };
+    let extended =
+        unsafe { DwmExtendFrameIntoClientArea(HWND(hwnd as *mut c_void), &margins).is_ok() };
+    allowed && applied && extended
 }
