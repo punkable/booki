@@ -103,18 +103,39 @@ export function ScenarioPicker({ cfg, set }) {
 }
 
 /** Edge and alignment, with a tiny screen showing where the bar goes. */
-export function PositionPicker({ cfg, set, afterPlacement }) {
-  const edge = cfg.edge || "bottom";
-  const slot = cfg.notchPosition || "center";
+const EDGES = ["top", "bottom", "left", "right"];
+const SLOTS = ["start", "center", "end"];
+const slotLabel = (slot) => t(`be.notch${slot[0].toUpperCase()}${slot.slice(1)}`);
+
+/** Where the dock lives, on a miniature of the chosen screen: every edge
+ *  and alignment is a spot to click, the current one holds the dock, and a
+ *  hovered one previews it. With several screens, each is drawn to its real
+ *  shape and position, numbered, with the main one marked. */
+export function PositionPicker({ cfg, set, afterPlacement, monitors = [] }) {
+  const edge = EDGES.includes(cfg.edge) ? cfg.edge : "bottom";
+  const slot = SLOTS.includes(cfg.notchPosition) ? cfg.notchPosition : "center";
+  const chosen = cfg.monitor ?? -1;
+  const screen = monitors.find((m) => m.index === chosen) || monitors.find((m) => m.primary) || monitors[0];
+  const ratio = screen ? Math.min(2.4, Math.max(1.2, screen.w / screen.h)) : 16 / 10;
   return <div className="position-picker">
-    <div className="screen-mock" aria-hidden="true"><span className={`screen-bar at-${edge} slot-${slot}`} /></div>
+    {monitors.length > 1 && <MonitorPicker value={chosen} monitors={monitors}
+      onChange={(v) => set({ monitor: v, monitorName: v < 0 ? "" : monitors.find((m) => m.index === v)?.name || "" }, afterPlacement)} />}
+    <div className="screen-map" style={{ aspectRatio: String(ratio) }} aria-hidden="true">
+      {EDGES.flatMap((e) => SLOTS.map((s) => {
+        const on = e === edge && s === slot;
+        return <button key={`${e}-${s}`} type="button" className={`screen-spot at-${e} slot-${s}`} aria-pressed={on} tabIndex={-1}
+          aria-label={`${t(`edge.${e}`)} · ${slotLabel(s)}`} title={`${t(`edge.${e}`)} · ${slotLabel(s)}`}
+          onClick={() => set({ edge: e, notchPosition: s }, afterPlacement)}><span className="screen-dock" /></button>;
+      }))}
+    </div>
     <div className="position-fields">
       <span className="position-field-label" aria-hidden="true">{t("be.edgeSide")}</span>
       <SegmentedControl label={t("be.edgeSide")} value={edge} onChange={(value) => set({ edge: value }, afterPlacement)}
-        options={["top", "bottom", "left", "right"].map((value) => ({ value, label: t(`edge.${value}`) }))} />
+        options={EDGES.map((value) => ({ value, label: t(`edge.${value}`) }))} />
       <span className="position-field-label" aria-hidden="true">{t("design.alignment")}</span>
       <SegmentedControl label={t("design.alignment")} value={slot} onChange={(value) => set({ notchPosition: value }, afterPlacement)}
-        options={["start", "center", "end"].map((value) => ({ value, label: t(`be.notch${value[0].toUpperCase()}${value.slice(1)}`) }))} />
+        options={SLOTS.map((value) => ({ value, label: slotLabel(value) }))} />
+      {screen && <p className="screen-caption">{chosen < 0 ? t("mon.auto") : `${t("be.monitor")} ${screen.index + 1}`} · {screen.w}×{screen.h}{screen.primary ? ` · ${t("mon.primary")}` : ""}</p>}
     </div>
   </div>;
 }
@@ -125,14 +146,14 @@ export function MonitorPicker({ value, monitors, onChange }) {
   const minY = Math.min(...monitors.map((m) => m.y));
   const width = Math.max(...monitors.map((m) => m.x + m.w)) - minX || 1;
   const height = Math.max(...monitors.map((m) => m.y + m.h)) - minY || 1;
-  const scale = Math.min(200 / width, 84 / height);
+  const scale = Math.min(260 / width, 72 / height);
   return <div className="monitor-picker">
     <button type="button" className="chip" aria-pressed={value === -1} onClick={() => onChange(-1)}>{t("mon.auto")}</button>
     <div className="monitor-stage" style={{ width: width * scale, height: height * scale }}>
-      {monitors.map((m) => <button key={m.index} type="button" className="monitor-box" aria-pressed={value === m.index} title={m.name}
-        aria-label={`${t("be.monitor")} ${m.index + 1}${m.primary ? ` · ${t("mon.primary")}` : ""}`}
+      {monitors.map((m) => <button key={m.index} type="button" className="monitor-box" aria-pressed={value === m.index} title={`${m.name} · ${m.w}×${m.h}`}
+        aria-label={`${t("be.monitor")} ${m.index + 1}${m.primary ? ` · ${t("mon.primary")}` : ""} · ${m.w}×${m.h}`}
         style={{ left: (m.x - minX) * scale + 2, top: (m.y - minY) * scale + 2, width: m.w * scale - 4, height: m.h * scale - 4 }}
-        onClick={() => onChange(m.index)}>{m.index + 1}</button>)}
+        onClick={() => onChange(m.index)}><b>{m.index + 1}</b>{m.primary && <span className="monitor-main" aria-hidden="true" />}</button>)}
     </div>
   </div>;
 }

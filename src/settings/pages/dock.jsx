@@ -8,7 +8,7 @@ import { resolveSurfaceStyle, translucent } from "../../surface.js";
 import { colorSource, surfaceColor } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
-import { AccentPicker, ColorSourcePicker, MonitorPicker, PositionPicker, ScenarioPicker, SurfaceColorPicker } from "../controls.jsx";
+import { AccentPicker, ColorSourcePicker, PositionPicker, ScenarioPicker, SurfaceColorPicker } from "../controls.jsx";
 import { CollapsibleSection, PageHeader, Row, SegmentedControl, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
@@ -43,11 +43,7 @@ export function DockPage({ cfg, set }) {
     </SettingsSection>
 
     <SettingsSection icon="app" title={t("be.position")}>
-      <div className="row-block"><PositionPicker cfg={cfg} set={set} afterPlacement={afterPlacement} /></div>
-      {monitors.length > 1 && <Row label={t("be.monitor")}>
-        <MonitorPicker value={cfg.monitor ?? -1} monitors={monitors}
-          onChange={(v) => set({ monitor: v, monitorName: v < 0 ? "" : monitors.find((m) => m.index === v)?.name || "" }, afterPlacement)} />
-      </Row>}
+      <div className="row-block"><PositionPicker cfg={cfg} set={set} afterPlacement={afterPlacement} monitors={monitors} /></div>
     </SettingsSection>
 
     <SettingsSection icon="palette" title={t("tab.appearance")}>
