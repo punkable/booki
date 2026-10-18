@@ -88,7 +88,7 @@
 /* On Mica the page shows the system material; cards stay solid. The class
    is set only once DWM has applied Mica with the frame extended into the
    client area (settings_backdrop), so the page never reads as black. */
-.settings-body.settings-mica { --page-bg: transparent; --side-bg: transparent; background: transparent; }
+:root .settings-body.settings-mica.settings-mica { --page-bg: transparent; --side-bg: transparent; background: transparent; }
 .settings-body ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 .settings-body :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-control); }
 .settings-body input, .settings-body textarea, .settings-body .selectable { -webkit-user-select: text; user-select: text; }

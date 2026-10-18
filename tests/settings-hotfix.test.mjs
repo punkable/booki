@@ -189,16 +189,18 @@ test('shortcut fields show localized key names, store English ones and always of
   await page.close();
 });
 
-for (const [theme, color] of [['dark', 'rgb(32, 32, 32)'], ['light', 'rgb(243, 243, 243)']]) {
-  test(`Settings keeps a painted ${theme} surface when Windows accepts Mica`, async () => {
+for (const theme of ['dark', 'light']) {
+  test(`Settings shows Mica behind the ${theme} page once Windows applies it, with solid cards`, async () => {
     const { page, errors } = await openPage(browser, port, 'settings.html', {
       cfg: makeConfig({ theme }), viewport: { width: 950, height: 790 },
       initScript: `const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='platform_capabilities'?Promise.resolve({systemBackdrop:true,transparency:true,animations:true,highContrast:false}):cmd==='settings_backdrop'?Promise.resolve(true):old(cmd,args);`,
     });
     await page.waitForFunction(() => document.body.classList.contains('settings-mica'));
     await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
-    assert.equal(await page.locator('.settings-main').evaluate(el => getComputedStyle(el).backgroundColor), color);
-    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), color);
+    const clear = 'rgba(0, 0, 0, 0)';
+    assert.equal(await page.locator('.settings-main').evaluate(el => getComputedStyle(el).backgroundColor), clear);
+    assert.equal(await page.locator('body').evaluate(el => getComputedStyle(el).backgroundColor), clear);
+    assert.notEqual(await page.locator('.ui-group').first().evaluate(el => getComputedStyle(el).backgroundColor), clear);
     assert.deepEqual(errors, []);
     await page.close();
   });
