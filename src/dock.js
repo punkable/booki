@@ -479,7 +479,7 @@ materialObserver.observe(dockEl, { attributes: true, attributeFilter: ["class", 
 // follow window, and native geometry must resume only after it settles.
 for (const event of ["transitionrun", "transitionend", "transitioncancel", "animationstart", "animationend", "animationcancel"]) {
   document.body.addEventListener(event, (e) => {
-    if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial);
+    if (e.target.matches?.(`.dock, .stack, ${MATERIAL_PANELS}`)) followFrames(reportDockMaterial, 700);
   });
 }
 
