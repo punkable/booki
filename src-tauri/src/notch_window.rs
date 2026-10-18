@@ -271,8 +271,13 @@ pub(crate) fn notch_reveal_for_menu(app: AppHandle) -> bool {
 /// the notch each time it is shown, so it can start out of the way instead of
 /// waiting for the next change event from the watcher.
 #[tauri::command]
-pub(crate) fn notch_screen_busy() -> bool {
-    win::foreground_maximized() || win::is_fullscreen()
+pub(crate) fn notch_screen_busy(app: AppHandle) -> bool {
+    let notch = app
+        .get_webview_window("notch")
+        .and_then(|n| n.hwnd().ok())
+        .map(|h| h.0 as isize)
+        .unwrap_or(0);
+    win::foreground_maximized_on(notch) || win::is_fullscreen_on(notch)
 }
 
 /// Interactive regions of the notch window (window-relative CSS px). Same

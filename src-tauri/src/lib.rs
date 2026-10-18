@@ -1879,9 +1879,15 @@ pub fn run() {
                                     // The notch forgets the pointer when it hides.
                                     near_last = false;
                                 } else {
-                                    if let Some(v) =
-                                        debounce(&mut busy, win::foreground_maximized())
-                                    {
+                                    let notch_hwnd = notch
+                                        .as_ref()
+                                        .and_then(|n| n.hwnd().ok())
+                                        .map(|h| h.0 as isize)
+                                        .unwrap_or(0);
+                                    if let Some(v) = debounce(
+                                        &mut busy,
+                                        win::foreground_maximized_on(notch_hwnd),
+                                    ) {
                                         let _ = handle.emit("booki://screen-busy", v);
                                     }
                                     let near = notch

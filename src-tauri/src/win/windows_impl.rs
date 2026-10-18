@@ -844,7 +844,10 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
 /// window is maximized, or snapped to cover its monitor's whole work area.
 /// The smart notch steps aside for these instead of sitting over a browser
 /// or an editor. The desktop, the shell and Booki's own windows never count.
-pub fn foreground_maximized() -> bool {
+/// Like `foreground_maximized`, only for the monitor `notch` is on (0 = any).
+pub fn foreground_maximized_on(notch: isize) -> bool {
+    let notch_mon = (notch != 0)
+        .then(|| unsafe { MonitorFromWindow(HWND(notch as *mut _), MONITOR_DEFAULTTONEAREST) });
     use windows::Win32::UI::WindowsAndMessaging::IsZoomed;
     unsafe {
         let hwnd = GetForegroundWindow();
@@ -871,6 +874,9 @@ pub fn foreground_maximized() -> bool {
             return false;
         }
         if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
+            return false;
+        }
+        if notch_mon.is_some_and(|m| MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != m) {
             return false;
         }
         if IsZoomed(hwnd).as_bool() {
@@ -917,10 +923,6 @@ pub fn cursor_near_window(hwnd: isize, pad: i32) -> bool {
 
 /// True if a fullscreen game / movie / presentation is running — so Booki can get
 /// completely out of the way (e.g. not cover subtitles or a game).
-pub fn is_fullscreen() -> bool {
-    is_fullscreen_on(0)
-}
-
 /// Like `is_fullscreen`, but only for the monitor `dock` is on (0 = any): a
 /// game on another screen must not black out the dock.
 pub fn is_fullscreen_on(dock: isize) -> bool {
