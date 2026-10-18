@@ -71,7 +71,7 @@ function WidgetFields({ item, cfg, set, onChange }) {
     </Row>
     {item.widget !== "system" && <Row label={t("overhaul.widgetSize")}>
       <SegmentedControl value={String(style.span || "auto")} onChange={(v) => patch({ span: v === "auto" ? null : Number(v) })}
-        options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: `${n}×` }))]} />
+        options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: t(`w.span${n}`) }))]} />
     </Row>}
     <Row label={t("w.color")} stack><AccentPicker sources value={style.color || WIDGET_META[item.widget]?.accent || cfg.accent} onChange={(v) => patch({ color: v })} /></Row>
     {item.widget === "clipboard" && <CollapsibleSection title={t("clip.privacyTitle")}><ClipboardPolicy cfg={cfg} set={set} /></CollapsibleSection>}

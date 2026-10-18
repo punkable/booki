@@ -499,3 +499,12 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .rgb-profiles { display: flex; flex-wrap: wrap; gap: 8px; }
 .reading-card .plugin-panel-actions { justify-content: flex-end; }
 .system-widget-panel .productivity-button.primary { background: var(--accent); color: var(--accent-contrast, #fff); }
+
+/* ── Wide gauge (2×1, 3×1): the ring on the left, its name beside it ─────── */
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-card { justify-content: flex-start; gap: calc(var(--size) * 0.16); padding-inline: calc(var(--size) * 0.12) calc(var(--size) * 0.2); }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-ring { flex: 0 0 auto; width: calc(var(--size) * 0.8); height: calc(var(--size) * 0.8); }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: flex; flex: 1 1 auto; }
+.tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-label { order: 0; font-size: calc(var(--size) * 0.21); color: var(--w-ink); white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
+/* Lighting reads as a short name, not a giant figure. */
+.tile.widget[data-widget="lighting"] .w-value { font-size: calc(var(--size) * 0.24); font-family: var(--font); font-weight: 650; }
