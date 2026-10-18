@@ -31,11 +31,12 @@ export function buildSystemPanel(item, { close }) {
   const button = (container, label, action) => {
     const b = text("button", label, "productivity-button"); b.type = "button";
     b.addEventListener("click", async () => {
+      const original = b.innerHTML;
       b.disabled = true;
       const previous = container.querySelector(":scope > .plugin-action-error"); previous?.remove();
       try { await action(); }
       catch (error) { if (!disposed) { const message = text("p", pluginError(error), "plugin-action-error"); message.setAttribute("role", "alert"); container.append(message); } }
-      finally { if (!disposed) b.disabled = false; }
+      finally { if (!disposed) { b.disabled = false; b.innerHTML = original; } }
     }); container.append(b); return b;
   };
   // Installing anything third-party first asks once for the plugin terms:
@@ -202,7 +203,7 @@ export function buildSystemPanel(item, { close }) {
         box.append(offer); return;
       }
       showForm();
-    }).catch(() => showForm());
+    }).catch(() => { if (!disposed) showForm(); });
     const showForm = () => {
       const form = document.createElement("div"); form.className = "download-form";
       const input = document.createElement("input"); input.type = "url"; input.placeholder = t("dl.paste"); input.setAttribute("aria-label", t("dl.paste")); input.value = item.url || "";
@@ -230,7 +231,7 @@ export function buildSystemPanel(item, { close }) {
       form.append(ask, input, choices); box.append(form, status);
       const kind = shape();
       // A dropped file or gallery link starts at once: nothing to choose.
-      if (item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
+      if (!disposed && item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
       if (!item.url) requestAnimationFrame(() => input.focus());
       paintStatus();
     };
@@ -286,7 +287,7 @@ export function buildSystemPanel(item, { close }) {
         const actions = document.createElement("div"); actions.className = "rgb-profiles"; box.append(actions);
         const apply = (name) => async () => {
           await api.rgbApply(name);
-          try { localStorage.setItem("booki.rgbProfile", name || t("rgb.off")); } catch (_) { /* private mode */ }
+          try { localStorage.setItem("booki.rgbProfile", name || "\u0000off"); } catch (_) { /* private mode */ }
           paintLighting(); notify(t("rgb.applied"), name || t("rgb.off"));
         };
         if (!Array.isArray(profiles) || !profiles.length) box.insertBefore(text("p", t("rgb.none")), actions);

@@ -287,6 +287,7 @@ const pollCloud = singleFlight(async () => {
 export function paintLighting() {
   let current = "";
   try { current = localStorage.getItem("booki.rgbProfile") || ""; } catch (_) { current = ""; }
+  if (current === "\u0000off") current = t("rgb.off");
   eachWidget("lighting", (el) => {
     setText(el, t("w.lighting"), current || "—");
     setTileLabel(el, current ? `${t("w.lighting")} · ${current}` : t("widget.lightingDesc"));
@@ -556,4 +557,4 @@ export function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval
 export function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
 
 /** After updating apps from the panel, read the list again. */
-export function refreshUpdates() { updatesReading.refresh().catch(() => {}).finally(() => pollUpdates()); }
+export function refreshUpdates() { updatesReading.refreshAfter().catch(() => {}).finally(() => pollUpdates()); }

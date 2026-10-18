@@ -85,10 +85,13 @@ fn capture_lines(
     if status.success() {
         Ok(output)
     } else {
-        Err(if error.trim().is_empty() {
-            format!("tool exited with {status}")
-        } else {
+        Err(if !error.trim().is_empty() {
             error
+        } else if !output.trim().is_empty() {
+            // Some tools (winget) explain a non-zero exit on stdout.
+            output
+        } else {
+            format!("tool exited with {status}")
         })
     }
 }
@@ -103,7 +106,8 @@ fn winget() -> Result<PathBuf, String> {
     let path = dirs::data_local_dir()
         .ok_or("no local app data folder")?
         .join("Microsoft/WindowsApps/winget.exe");
-    if path.is_file() {
+    // An App Execution Alias cannot be opened as a file; ask for its link.
+    if std::fs::symlink_metadata(&path).is_ok() {
         Ok(path)
     } else {
         Err("Install Microsoft App Installer to use winget".into())
@@ -167,7 +171,10 @@ pub struct AppUpdate {
 /// Works on any display language because it never matches header words,
 /// only the dashed separator line and the column gaps above it.
 fn parse_winget(text: &str) -> Vec<AppUpdate> {
-    let lines: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
+    let lines: Vec<&str> = text
+        .lines()
+        .map(|l| l.trim_end_matches('\r').rsplit('\r').next().unwrap_or(l))
+        .collect();
     let Some(sep) = lines
         .iter()
         .position(|l| l.trim_start().starts_with("---") && l.trim().chars().all(|c| c == '-'))
@@ -323,11 +330,15 @@ pub async fn cloud_space() -> Result<Vec<CloudSpace>, String> {
 pub async fn cloud_setup() -> Result<(), String> {
     util::blocking(|| {
         let rclone = executable("rclone")?;
-        let mut command = Command::new("cmd");
-        command
-            .args(["/c", "start", "rclone config", "cmd", "/k"])
-            .arg(&rclone)
-            .arg("config");
+        // rclone's own interactive setup in a new console. No shell in
+        // between, so no path character can turn into a second command.
+        let mut command = Command::new(&rclone);
+        command.arg("config");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x0000_0010); // CREATE_NEW_CONSOLE
+        }
         command.spawn().map(|_| ()).map_err(|e| e.to_string())
     })
     .await?
@@ -677,7 +688,7 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
         }
         std::io::Write::write_all(&mut file, &buffer[..n]).map_err(|e| e.to_string())?;
         if let Some(percent) = (done * 100).checked_div(total) {
-            let percent = percent as i64;
+            let percent = (percent as i64).min(99);
             if percent != last {
                 last = percent;
                 emit("progress", percent as f64, name.clone(), String::new());

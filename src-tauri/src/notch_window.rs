@@ -119,12 +119,31 @@ pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>
     if dock_out {
         return false;
     }
+    // Nothing over a fullscreen game; the notice is simply skipped.
+    if FULLSCREEN_BLACKOUT.load(Ordering::Relaxed) {
+        return true;
+    }
+    static NOTICE_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let generation = NOTICE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let was_visible = app
+        .get_webview_window("notch")
+        .map(|n| n.is_visible().unwrap_or(false))
+        .unwrap_or(false);
     show_toast_frame(&app, title, detail);
     let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(3600));
+        // A newer notice or a fullscreen toast owns the notch now.
+        if NOTICE_GEN.load(Ordering::Relaxed) != generation
+            || FULLSCREEN_BLACKOUT.load(Ordering::Relaxed)
+        {
+            return;
+        }
         if let Some(notch) = app.get_webview_window("notch") {
             let _ = position_notch(&notch, &config::load().edge);
+            if !was_visible {
+                let _ = notch.hide();
+            }
         }
     });
     true

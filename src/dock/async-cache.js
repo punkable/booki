@@ -47,6 +47,8 @@ export function sharedReading(fetcher) {
   };
   return {
     refresh,
+    /** A new read even if one is in flight (it may predate a change). */
+    refreshAfter: () => (pending ? pending.catch(() => {}).then(refresh) : refresh()),
     fresh: (ms) => (at && Date.now() - at < ms ? Promise.resolve(value) : refresh()),
     get last() { return at ? value : undefined; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },

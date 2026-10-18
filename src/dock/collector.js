@@ -42,6 +42,8 @@ onDownloadEvent((event) => {
 
 /** Start a download; resolves with the saved path or throws. */
 export async function startDownload(url, format) {
+  // One at a time: a second click must not reset the one in progress.
+  if (download.state === "start" || download.state === "progress") throw new Error(t("perr.busy"));
   Object.assign(download, { state: "start", percent: 0, title: "", path: "", error: "" });
   changed();
   try {
