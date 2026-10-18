@@ -2619,3 +2619,6 @@ body.hide-running-indicators .tile.launching::after { display: none; }
 .undo-toast .notice-copy { display: grid; gap: 2px; min-width: 0; }
 .undo-toast .notice-copy small { opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
 .add-error { color: var(--ink-2); font-size: 0.75rem; padding: 6px 12px; text-align: start; }
+
+/* One overlay radius for every flyout and panel. */
+.stack, .productivity-panel { border-radius: var(--r-overlay) !important; }
