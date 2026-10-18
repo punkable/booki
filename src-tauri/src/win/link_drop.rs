@@ -1,5 +1,7 @@
 //! WebView2's file-drop interceptor discards browser links. Accept both OLE
 //! formats in the dock, retaining Explorer targeting and physical coordinates.
+//! The notch gets the same target: the dock is tucked away most of the time,
+//! so a link dragged onto the notch reveals the dock and lands there.
 use std::cell::Cell;
 use tauri::Emitter;
 use windows::core::{implement, w, Ref, BOOL};
@@ -22,13 +24,20 @@ struct Position {
     y: i32,
 }
 #[derive(Clone, serde::Serialize)]
+struct LinkPayload {
+    url: String,
+    position: Position,
+}
+#[derive(Clone, serde::Serialize)]
 struct Payload {
     position: Position,
     paths: Vec<String>,
 }
 
 /// Call on the WebView's apartment thread after its child windows exist.
-pub fn install(hwnd: isize, window: tauri::WebviewWindow) {
+/// `host` is the window whose WebView children get the target; events go to
+/// the dock (`window`) with positions in the dock's client area (`dock`).
+pub fn install(host: isize, dock: isize, window: tauri::WebviewWindow) {
     struct Install {
         window: tauri::WebviewWindow,
         root: isize,
@@ -49,10 +58,10 @@ pub fn install(hwnd: isize, window: tauri::WebviewWindow) {
         }
         true.into()
     }
-    let state = Install { window, root: hwnd };
+    let state = Install { window, root: dock };
     unsafe {
         let _ = EnumChildWindows(
-            Some(HWND(hwnd as _)),
+            Some(HWND(host as _)),
             Some(visit),
             LPARAM(&state as *const _ as isize),
         );
@@ -242,7 +251,14 @@ impl IDropTarget_Impl for Target_Impl {
                 }
             } else if let Some(url) = Target::link(data) {
                 let _ = self.window.emit("tauri://drag-leave", ());
-                let _ = self.window.emit("booki://link-drop", url);
+                // Where it landed: on the Collector card it starts at once.
+                let _ = self.window.emit(
+                    "booki://link-drop",
+                    LinkPayload {
+                        url,
+                        position: self.position(point),
+                    },
+                );
                 unsafe {
                     *effect = DROPEFFECT_COPY;
                 }

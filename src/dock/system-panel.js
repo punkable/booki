@@ -229,6 +229,8 @@ export function buildSystemPanel(item, { close }) {
       form.append(ask, input, choices); box.append(form, status);
       const kind = shape();
       // A dropped file or gallery link starts at once: nothing to choose.
+      // So does a link dropped right on the Collector card (video for a page).
+      if (!disposed && item.url && item.autoStart && kind === "media" && download.state !== "start" && download.state !== "progress") go("video")().catch(() => {});
       if (!disposed && item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
       if (!item.url) requestAnimationFrame(() => input.focus());
       paintStatus();

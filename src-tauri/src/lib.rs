@@ -1800,7 +1800,32 @@ pub fn run() {
                     win::set_capture_visible(h.0 as isize, cfg.capture_visible);
                     let raw = h.0 as isize;
                     let drop_window = dock.clone();
-                    let _ = dock.with_webview(move |_| win::link_drop::install(raw, drop_window));
+                    let _ =
+                        dock.with_webview(move |_| win::link_drop::install(raw, raw, drop_window));
+                    // WebView2 may create its child windows after this point, and a
+                    // missed one keeps WebView2's own target, which discards browser
+                    // links. Register again once they surely exist, on the dock and
+                    // on the notch (a link dragged there reveals the dock).
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        for delay in [1500u64, 6000] {
+                            std::thread::sleep(std::time::Duration::from_millis(delay));
+                            let Some(dock) = handle.get_webview_window("dock") else {
+                                return;
+                            };
+                            for label in ["dock", "notch"] {
+                                let Some(host) = handle.get_webview_window(label) else {
+                                    continue;
+                                };
+                                let Ok(host_hwnd) = host.hwnd() else { continue };
+                                let host_raw = host_hwnd.0 as isize;
+                                let target = dock.clone();
+                                let _ = host.with_webview(move |_| {
+                                    win::link_drop::install(host_raw, raw, target)
+                                });
+                            }
+                        }
+                    });
                 }
 
                 // Register the global hotkey, if configured.
