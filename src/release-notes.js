@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -125,10 +125,17 @@ function release871() {
   ] };
 }
 
-export function currentRelease() {
+function release88() {
   return { version: "0.88.0", date: "2026-10-18", headline: t("release88.headline"), sections: [
     { icon: "sparkles", title: t("release86.widgetsTitle"), notes: [t("release88.collector"), t("release88.widgets"), t("release88.devices"), t("release88.ai"), t("release88.notices")] },
     { icon: "settings", title: t("release86.easierTitle"), notes: [t("release88.position"), t("release88.folders")] },
     { icon: "performance", title: t("plugins.title"), notes: [t("release88.trust"), t("release88.fixes")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.88.1", date: "2026-10-18", headline: t("release881.headline"), sections: [
+    { icon: "sparkles", title: t("release86.windowsTitle"), notes: [t("release881.motion"), t("release881.panels")] },
+    { icon: "performance", title: t("plugins.title"), notes: [t("release881.plugins"), t("release881.fixes")] },
   ] };
 }
