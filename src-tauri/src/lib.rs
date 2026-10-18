@@ -188,22 +188,27 @@ fn get_config() -> Config {
     config::load()
 }
 
+// Async so the fsync'd write never stalls the dock's UI thread (Settings
+// saves on every slider step).
 #[tauri::command]
-fn save_config(
+async fn save_config(
     app: AppHandle,
     config: Option<Config>,
     patch: Option<serde_json::Value>,
     base: Option<serde_json::Value>,
     expected_revision: Option<u64>,
 ) -> Result<Config, String> {
-    let config = if let Some(patch) = patch {
-        config::patch_checked(patch, base.as_ref(), expected_revision)?
-    } else if let Some(config) = config {
-        config::save(&config)?;
-        config::load()
-    } else {
-        return Err("missing config or patch".into());
-    };
+    let config = util::blocking(move || {
+        if let Some(patch) = patch {
+            config::patch_checked(patch, base.as_ref(), expected_revision)
+        } else if let Some(config) = config {
+            config::save(&config)?;
+            Ok(config::load())
+        } else {
+            Err("missing config or patch".into())
+        }
+    })
+    .await??;
     {
         clip_apply_config(&config);
         apply_always_on_top(&app);
@@ -587,8 +592,9 @@ fn plugin_catalog() -> &'static [plugins::Plugin] {
 
 /// Installed state of an optional plugin (Settings > Plugins).
 #[tauri::command]
-fn plugin_status(id: String) -> Result<plugins::Status, String> {
-    Ok(plugins::status(plugins::find(&id).ok_or("unknown plugin")?))
+async fn plugin_status(id: String) -> Result<plugins::Status, String> {
+    let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    util::blocking(move || plugins::status(plugin)).await
 }
 
 /// Download, verify and install a plugin the person chose in Settings.
@@ -896,7 +902,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
         return Err(error);
     }
     let autostart_result = if touch_autostart {
-        set_autostart(cfg.autostart)
+        apply_autostart(cfg.autostart)
     } else {
         Ok(())
     };
@@ -912,7 +918,7 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     }
     if let Err(error) = config::save_replacement(&cfg) {
         if touch_autostart {
-            let _ = set_autostart(previous_autostart);
+            let _ = apply_autostart(previous_autostart);
         }
         let _ = hotkeys_apply(
             app,
@@ -959,7 +965,11 @@ fn clear_fullscreen_blackout() {
 }
 
 #[tauri::command]
-fn set_autostart(enabled: bool) -> Result<(), String> {
+async fn set_autostart(enabled: bool) -> Result<(), String> {
+    util::blocking(move || apply_autostart(enabled)).await?
+}
+
+fn apply_autostart(enabled: bool) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let result = win::set_autostart(enabled, &exe.to_string_lossy());
     if let Err(e) = &result {

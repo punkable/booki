@@ -250,6 +250,7 @@ fn remove_one(plugin: &Plugin) -> Result<(), String> {
 fn unpack(archive: &[u8], into: &std::path::Path, root: &str) -> Result<(), String> {
     let mut zip = zip::ZipArchive::new(std::io::Cursor::new(archive)).map_err(|e| e.to_string())?;
     let mut total = 0u64;
+    let mut written = 0u64;
     for i in 0..zip.len() {
         let mut file = zip.by_index(i).map_err(|e| e.to_string())?;
         if file
@@ -281,9 +282,12 @@ fn unpack(archive: &[u8], into: &std::path::Path, root: &str) -> Result<(), Stri
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         let mut output = std::fs::File::create(target).map_err(|e| e.to_string())?;
-        let copied = std::io::copy(&mut file.by_ref().take(512 * 1024 * 1024 + 1), &mut output)
-            .map_err(|e| e.to_string())?;
-        if copied > 512 * 1024 * 1024 {
+        // Count what is really written, not what the archive claims.
+        let room = (512 * 1024 * 1024u64).saturating_sub(written) + 1;
+        let copied =
+            std::io::copy(&mut file.by_ref().take(room), &mut output).map_err(|e| e.to_string())?;
+        written += copied;
+        if written > 512 * 1024 * 1024 {
             return Err("archive too large".into());
         }
     }

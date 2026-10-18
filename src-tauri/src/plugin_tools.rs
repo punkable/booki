@@ -65,6 +65,15 @@ fn capture_lines(
             break status;
         }
         if started.elapsed() > Duration::from_secs(seconds) {
+            // yt-dlp may have started ffmpeg: end the whole tree, not one process.
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                let _ = Command::new("taskkill")
+                    .args(["/T", "/F", "/PID", &child.id().to_string()])
+                    .creation_flags(0x08000000)
+                    .status();
+            }
             let _ = child.kill();
             let _ = child.wait();
             return Err("the tool took too long; try again".into());
@@ -340,6 +349,19 @@ fn gallery(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
     Ok(if last.is_empty() { target } else { last })
 }
 
+fn reserved_name(name: &str) -> bool {
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.len() == 4
+            && stem.as_bytes()[3].is_ascii_digit())
+}
+
 /// A direct link to a file (a PDF, an archive, an image…), fetched by Booki
 /// itself with the same bounds as plugin downloads.
 fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
@@ -352,7 +374,10 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
                 .filter(|c| c.is_alphanumeric() || "._- ".contains(*c))
                 .collect::<String>()
         })
-        .filter(|n| !n.is_empty() && !n.starts_with('.'))
+        // Windows trims trailing dots and spaces, and device names (CON,
+        // NUL, COM1…) are not files: neither may become the name.
+        .map(|n| n.trim_end_matches(['.', ' ']).to_string())
+        .filter(|n| !n.is_empty() && !n.starts_with('.') && !reserved_name(n))
         .unwrap_or_else(|| "download".into());
     let mut path = folder.join(&name);
     let (stem, ext) = match name.rsplit_once('.') {
@@ -366,6 +391,8 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
     }
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
+        // A server that stops sending must not hold the download turn forever.
+        .timeout_recv_body(Some(Duration::from_secs(60)))
         .build()
         .into();
     let mut response = agent
@@ -380,8 +407,13 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(0);
     const LIMIT: u64 = 4 * 1024 * 1024 * 1024;
-    let partial = path.with_extension("part");
-    let mut file = std::fs::File::create(&partial).map_err(|e| e.to_string())?;
+    // A suffix, not a new extension, and never over an existing file.
+    let partial = PathBuf::from(format!("{}.booki-part", path.to_string_lossy()));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&partial)
+        .map_err(|e| e.to_string())?;
     let mut reader = response.body_mut().as_reader();
     let mut buffer = vec![0u8; 256 * 1024];
     let (mut done, mut last) = (0u64, -1i64);
@@ -416,7 +448,16 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
 
 #[cfg(test)]
 mod download_tests {
-    use super::progress_line;
+    use super::{progress_line, reserved_name};
+    #[test]
+    fn device_names_are_not_file_names() {
+        assert!(reserved_name("CON") && reserved_name("nul.txt") && reserved_name("com3.log"));
+        assert!(
+            !reserved_name("report.pdf")
+                && !reserved_name("COMMA.txt")
+                && !reserved_name("console")
+        );
+    }
     #[test]
     fn progress_lines_give_percent_and_title() {
         assert_eq!(
