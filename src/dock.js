@@ -83,7 +83,7 @@ import {
   persist,
   wireConfigSync,
 } from "./dock/config-sync.js";
-import { closeProductivityPanel } from "./dock/widget-editors.js";
+import { closeProductivityPanel, insideWidgetPanel } from "./dock/widget-editors.js";
 import { removeItem } from "./dock/pin-ops.js";
 import { openAddPanel, openLauncher, closeStack, wireStack } from "./dock/stack.js";
 import { launchModifiers, launch, wireLaunch } from "./dock/launch.js";
@@ -387,6 +387,7 @@ window.addEventListener("click", closeMenu);
 window.addEventListener("blur", () => {
   closeMenu();
   closeStack();
+  if (S.productivityPanel) closeProductivityPanel();
   // Focus moved to another app → release a pinned reveal so the dock can tuck
   // back into the notch instead of lingering on top of whatever the user opened.
   if (S.pinnedReveal) {
@@ -615,9 +616,14 @@ function clippedText(el, name) {
   return text.length > 140 ? `${text.slice(0, 139)}…` : text;
 }
 
+// Every flyout dismisses the same way: a press anywhere outside it, Escape, or
+// switching to another app closes it. The context menu sits outside #stack;
+// its items act on the open flyout, so pressing it never counts as outside.
 window.addEventListener("pointerdown", (e) => {
-  // The context menu sits outside #stack; its items act on the open flyout.
-  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, "#ctx-menu") && !closestSel(e.target, ".tile")) closeStack();
+  if (closestSel(e.target, "#ctx-menu")) return;
+  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
+  if (S.productivityPanel && !insideWidgetPanel(e.target)) closeProductivityPanel();
+  if (S.trashPop && !S.trashPop.contains(e.target)) { closeTrashPop(); S.pinnedReveal = false; scheduleHide(); }
 });
 
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.

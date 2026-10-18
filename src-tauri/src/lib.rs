@@ -198,21 +198,52 @@ async fn save_config(
     base: Option<serde_json::Value>,
     expected_revision: Option<u64>,
 ) -> Result<Config, String> {
-    let config = util::blocking(move || {
-        if let Some(patch) = patch {
+    let (before, config) = util::blocking(move || {
+        let before = config::load();
+        let after = if let Some(patch) = patch {
             config::patch_checked(patch, base.as_ref(), expected_revision)
         } else if let Some(config) = config {
-            config::save(&config)?;
-            Ok(config::load())
+            config::save(&config).map(|_| config::load())
         } else {
             Err("missing config or patch".into())
-        }
+        };
+        after.map(|after| (before, after))
     })
     .await??;
-    {
+    // Settings saves on every toggle and slider step. Touch the windows and the
+    // clipboard file only when a setting they depend on changed: each of these
+    // runs on the UI thread or rewrites a file, and doing all of them on every
+    // save made Settings and the dock stall.
+    let clip = |c: &Config| {
+        (
+            c.clipboard_persist,
+            c.clipboard_retention_days,
+            c.clipboard_history_limit,
+            c.clipboard_sensitive_guard,
+        )
+    };
+    if clip(&before) != clip(&config) {
         clip_apply_config(&config);
+    }
+    if before.always_on_top != config.always_on_top {
         apply_always_on_top(&app);
+    }
+    if before.capture_visible != config.capture_visible {
         apply_capture_policy(&app, config.capture_visible);
+    }
+    let place = |c: &Config| {
+        (
+            c.edge.clone(),
+            c.monitor,
+            c.monitor_name.clone(),
+            c.edge_gap,
+            c.notch_position.clone(),
+            c.notch_mode.clone(),
+            c.legacy.notch_edge.clone(),
+            c.legacy.notch_style.clone(),
+        )
+    };
+    if place(&before) != place(&config) {
         // Keep notch window geometry + visibility in sync with settings.
         if let Some(notch) = app.get_webview_window("notch") {
             let _ = position_notch(&notch, &config.edge);

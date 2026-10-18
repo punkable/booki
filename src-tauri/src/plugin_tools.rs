@@ -23,7 +23,12 @@ fn capture_lines(
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        // yt-dlp and gallery-dl are Python: piped, they print in the ANSI code
+        // page, which garbled non-English titles and folder names (a user
+        // folder like C:\Users\José) and broke "Show in folder".
+        .env("PYTHONIOENCODING", "utf-8")
+        .env("PYTHONUTF8", "1");
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -117,8 +122,8 @@ fn winget() -> Result<PathBuf, String> {
 #[tauri::command]
 pub async fn plugin_read(id: String) -> Result<String, String> {
     util::blocking(move || match id.as_str() {
-        "winget" => capture(&winget()?, &["upgrade", "--disable-interactivity"], 60),
-        "rclone" => capture(&executable("rclone")?, &["rc", "core/stats", "--url", "http://127.0.0.1:5572", "--json"], 10),
+        "winget" => capture(&winget()?, &["upgrade", "--accept-source-agreements", "--disable-interactivity"], 60),
+        "rclone" => capture(&executable("rclone")?, &["rc", "core/stats", "--url", "http://127.0.0.1:5572"], 10),
         "librehardwaremonitor" => {
             // Reading requires the person to enable LHM's local web server.
             let mut response = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(3))).build().new_agent().get("http://127.0.0.1:8085/data.json").call().map_err(|_| "Open LibreHardwareMonitor and enable Options > Remote Web Server on localhost:8085")?;
@@ -525,6 +530,10 @@ fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, S
         "--no-overwrites",
         "--restrict-filenames",
         "--newline",
+        "--encoding",
+        "utf-8",
+        // --print implies --quiet, which hides the progress lines the card follows.
+        "--progress",
         "--progress-template",
         "download:booki:%(progress._percent_str)s|%(info.title)s",
         "--print",
@@ -649,8 +658,10 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
     }
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        // A server that stops sending must not hold the download turn forever.
-        .timeout_recv_body(Some(Duration::from_secs(60)))
+        .timeout_recv_response(Some(Duration::from_secs(30)))
+        // A whole-body budget, not a stall check: a minute failed every large
+        // file. Four hours still frees the download turn from a dead server.
+        .timeout_global(Some(Duration::from_secs(4 * 3600)))
         .build()
         .into();
     let mut response = agent

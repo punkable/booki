@@ -19,6 +19,7 @@ import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
+import { closeProductivityPanel } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -89,6 +90,7 @@ export async function toggleStack(tileEl, item) {
 export async function openStack(tileEl, item) {
   if (S.stackOpen && S.stackItemId === item.id) return;
   if (S.stackOpen) closeStack();
+  if (S.productivityPanel) closeProductivityPanel();
   const isGroup = item.kind === "group";
   const folderNavigation = createFolderNavigation({ path: item.path, name: item.name });
   let navigateFolder = null;

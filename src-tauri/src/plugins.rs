@@ -78,7 +78,13 @@ pub struct Status {
 }
 
 pub fn status(plugin: &Plugin) -> Status {
-    let installed = executable(plugin).is_some();
+    // A plugin counts as installed only with every companion in place, so an
+    // install from before the companions existed offers to complete itself.
+    let installed = executable(plugin).is_some()
+        && plugin
+            .companions
+            .iter()
+            .all(|id| find(id).is_some_and(|c| executable(c).is_some()));
     let version = installed
         .then(|| dir(plugin))
         .flatten()
@@ -89,7 +95,12 @@ pub fn status(plugin: &Plugin) -> Status {
 
 fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
-        .timeout_global(Some(std::time::Duration::from_secs(60)))
+        // Plugins are up to ~115 MB (FFmpeg): a whole-download cap of a minute
+        // failed every slow connection. Connecting and the first response
+        // stay short; the body may take as long as a slow link needs.
+        .timeout_connect(Some(std::time::Duration::from_secs(20)))
+        .timeout_recv_response(Some(std::time::Duration::from_secs(30)))
+        .timeout_global(Some(std::time::Duration::from_secs(30 * 60)))
         .build()
         .into()
 }
