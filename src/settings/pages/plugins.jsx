@@ -1,4 +1,5 @@
 /* Optional tools live together, independently from Booki's system settings. */
+import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
 import { dock as dockApi, pickRgbProfile } from "../../api.js";
@@ -19,7 +20,7 @@ function PluginCard({ id, repo, source, external, license, open }) {
   useEffect(() => { refresh(); }, [id]);
   const run = async (action) => {
     setBusy(true); setError("");
-    try { await action(); } catch (e) { setError(String(e || "")); }
+    try { await action(); } catch (e) { setError(pluginError(e)); }
     await refresh(); setBusy(false);
   };
   return <div className="row-block plugin-card">
@@ -30,7 +31,7 @@ function PluginCard({ id, repo, source, external, license, open }) {
     <p className="plugin-desc plugin-fine">{t(external ? "plugins.winget.managed" : "plugins.howItWorks")}</p>
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
     <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}{state.installed ? ` · ${t("plugins.active")}` : ""}</p>
-    {error && <p className="plugin-desc plugin-action-error" role="alert">{t("plugins.failed")} {error}</p>}
+    {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}
     <div className="plugin-actions">
       {state.installed && ["openrgb", "librehardwaremonitor"].includes(id) && <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginOpen(id))}>{t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open")}</button>}
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}

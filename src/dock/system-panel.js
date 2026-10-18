@@ -4,6 +4,7 @@ import { dock as api, pickFolder, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
+import { pluginError } from "../plugin-errors.js";
 import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
 
 function text(tag, value, className = "") {
@@ -26,7 +27,7 @@ export function buildSystemPanel(item, { close }) {
       b.disabled = true;
       const previous = container.querySelector(":scope > .plugin-action-error"); previous?.remove();
       try { await action(); }
-      catch (error) { if (!disposed) { const message = text("p", `${t("plugins.failed")} ${String(error)}`, "plugin-action-error"); message.setAttribute("role", "alert"); container.append(message); } }
+      catch (error) { if (!disposed) { const message = text("p", pluginError(error), "plugin-action-error"); message.setAttribute("role", "alert"); container.append(message); } }
       finally { if (!disposed) b.disabled = false; }
     }); container.append(b); return b;
   };
@@ -41,7 +42,7 @@ export function buildSystemPanel(item, { close }) {
     const request = Symbol(); reads.set(container, request);
     const loading = text("p", t("overhaul.loading")); container.append(loading);
     try { const data = await action(); if (!disposed && reads.get(container) === request) { loading.remove(); paint(data); } }
-    catch (error) { if (!disposed && reads.get(container) === request) { loading.textContent = `${t("plugins.failed")} ${String(error)}`; loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
+    catch (error) { if (!disposed && reads.get(container) === request) { loading.textContent = pluginError(error); loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
   };
   // Cards from a shared reading: the last value paints at once (no "Loading"
   // on reopen), then a fresh one replaces it when it lands.
@@ -190,7 +191,7 @@ export function buildSystemPanel(item, { close }) {
         });
       }
     };
-    show().catch((error) => { if (!disposed) { state.textContent = `${t("plugins.failed")} ${String(error)}`; button(controls, t("focus.retry"), show); } });
+    show().catch((error) => { if (!disposed) { state.textContent = pluginError(error); button(controls, t("focus.retry"), show); } });
   }
   function volumeRow(container, name, percent, muted, save) {
     const row = document.createElement("div"); row.className = "app-volume-row";
@@ -203,7 +204,7 @@ export function buildSystemPanel(item, { close }) {
     const commit = () => {
       const wanted = [Number(input.value), mute.checked];
       queue = queue.catch(() => {}).then(() => save(...wanted)).catch((error) => {
-        if (!disposed) { row.querySelector(".plugin-action-error")?.remove(); const message = text("span", `${t("plugins.failed")} ${String(error)}`, "plugin-action-error"); message.setAttribute("role", "alert"); row.append(message); }
+        if (!disposed) { row.querySelector(".plugin-action-error")?.remove(); const message = text("span", pluginError(error), "plugin-action-error"); message.setAttribute("role", "alert"); row.append(message); }
       });
     };
     input.addEventListener("change", commit); mute.addEventListener("change", commit);
@@ -220,7 +221,10 @@ export function formatPluginResult(id, value) {
   if (id === "winget") return String(value || t("plugins.noData"));
   let data;
   try { data = typeof value === "string" ? JSON.parse(value) : value; } catch { return t("plugins.noData"); }
-  if (id === "rclone") return `${data?.bytes ?? 0} B · ${Math.round(data?.speed ?? 0)} B/s · ${data?.transfers ?? 0} · ${data?.errors ?? 0} errors`;
+  if (id === "rclone") {
+    const size = (n) => { const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; n = Number(n) || 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return `${n.toFixed(i ? 1 : 0)} ${u[i]}`; };
+    return [`${size(data?.bytes)} · ${size(data?.speed)}/s`, t("rclone.transfers").replace("{n}", () => data?.transfers ?? 0), t("rclone.errors").replace("{n}", () => data?.errors ?? 0)].join(" · ");
+  }
   const rows = [];
   function visit(node, depth = 0) {
     if (!node || depth > 32 || rows.length >= 128) return;
