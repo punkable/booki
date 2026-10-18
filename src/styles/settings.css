@@ -964,3 +964,4 @@
 .library-browse { color: var(--ink-2); }
 .plugin-feeds { display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin: 2px 0 0; padding: 3px 10px; font-size: 0.75rem; color: var(--ink); background: var(--subtle-pressed, var(--hover)); border-radius: var(--r-pill); }
 .plugin-feeds .ui-icon { width: 14px; height: 14px; }
+.plugin-actions .terms-check { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: calc(12.5px * var(--os-text-scale, 1)); cursor: pointer; }

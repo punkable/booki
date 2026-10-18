@@ -494,3 +494,5 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .device-offer-copy { display: grid; gap: 4px; min-width: 0; }
 .device-offer-copy small { font-size: 0.75rem; line-height: 1.35; opacity: 0.8; }
 .device-offer-copy .link { justify-self: start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.75rem; cursor: pointer; }
+.terms-check { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
+.terms-check .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }

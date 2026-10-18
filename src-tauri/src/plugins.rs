@@ -131,6 +131,9 @@ impl Drop for StagingCleanup {
     }
 }
 
+/// Bumped when TERMS.md changes in a way that needs a new acceptance.
+pub const TERMS_VERSION: u32 = 1;
+
 static INSTALL_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn install(plugin: &Plugin) -> Result<String, String> {

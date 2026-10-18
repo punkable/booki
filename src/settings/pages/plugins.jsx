@@ -20,6 +20,8 @@ function PluginCard({ id, repo, source, external, license, open, cfg, set, compa
   const [state, setState] = useState({ installed: false, version: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [agree, setAgree] = useState(false);
+  const termsOk = (cfg?.pluginTerms || 0) >= 1;
   const refresh = () => dockApi.pluginStatus(id)
     .then((status) => setState({ installed: !!status?.installed, version: status?.version || null }))
     .catch(() => {});
@@ -46,7 +48,11 @@ function PluginCard({ id, repo, source, external, license, open, cfg, set, compa
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}
       {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.installed
         ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
-        : <button type="button" className="button button-accent" disabled={busy} onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
+        : <>
+          {!termsOk && <label className="terms-check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />{t("plugins.acceptTerms")}</label>}
+          <button type="button" className="button button-accent" disabled={busy || (!termsOk && !agree)}
+            onClick={() => run(async () => { if (!termsOk) await new Promise((resolve) => set({ pluginTerms: 1 }, { flush: true, afterSave: resolve })); await dockApi.pluginInstall(id); })}>{busy ? t("plugins.installing") : t("plugins.install")}</button>
+        </>}
       {state.installed && widgetFor(id) && cfg && !pinnedWidget(cfg.pinned, widgetFor(id)) && <button type="button" className="button button-accent"
         onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget: widgetFor(id), name: widgetDisplayName(widgetFor(id), t), path: "", args: [], style: {} }] })}>
         <Icon name="plus" />{t("dl.addWidget")}</button>}

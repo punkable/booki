@@ -218,6 +218,8 @@ test('plugins have their own searchable page and installation stays deliberate',
   assert.equal(await page.locator('.plugin-card').count(), 6);
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
   const section = page.locator('.ui-group-wrap').filter({ has: page.getByRole('heading', { name: 'HeadsetControl', exact: true }) });
+  assert.equal(await section.getByRole('button', { name: 'Download and install', exact: true }).isDisabled(), true);
+  await section.getByRole('checkbox', { name: /I accept the plugin terms/ }).check();
   await section.getByRole('button', { name: 'Download and install', exact: true }).click();
   const error = section.getByRole('alert');
   await error.waitFor();

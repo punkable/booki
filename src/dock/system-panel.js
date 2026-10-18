@@ -5,6 +5,8 @@ import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
 import { pluginError } from "../plugin-errors.js";
+import { S } from "./state.js";
+import { persist } from "./config-sync.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
 import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
 
@@ -31,6 +33,27 @@ export function buildSystemPanel(item, { close }) {
       catch (error) { if (!disposed) { const message = text("p", pluginError(error), "plugin-action-error"); message.setAttribute("role", "alert"); container.append(message); } }
       finally { if (!disposed) b.disabled = false; }
     }); container.append(b); return b;
+  };
+  // Installing anything third-party first asks once for the plugin terms:
+  // a checkbox beside the button, and the button waits for it.
+  const TERMS_URL = "https://github.com/punkable/booki/blob/main/TERMS.md";
+  const installButton = (container, label, id, after) => {
+    const accepted = () => (S.cfg?.pluginTerms || 0) >= 1;
+    let box = null;
+    if (!accepted()) {
+      const row = document.createElement("label"); row.className = "terms-check";
+      box = document.createElement("input"); box.type = "checkbox";
+      const link = text("button", t("plugins.termsLink"), "link"); link.type = "button";
+      link.addEventListener("click", (e) => { e.preventDefault(); api.launch(TERMS_URL, []); });
+      row.append(box, text("span", t("plugins.acceptTerms")), link);
+      container.append(row);
+    }
+    const b = button(container, label, async () => {
+      if (!accepted()) { await persist({ pluginTerms: 1 }); S.cfg.pluginTerms = 1; }
+      await api.pluginInstall(id); await after?.();
+    });
+    if (box) { b.disabled = true; box.addEventListener("change", () => { b.disabled = !box.checked; }); }
+    return b;
   };
   const section = (title) => { const el = document.createElement("section"); el.className = "productivity-section"; if (title !== t(`w.${item.widget}`)) el.append(text("strong", title)); body.append(el); return el; };
   const list = (container, rows) => {
@@ -168,7 +191,7 @@ export function buildSystemPanel(item, { close }) {
         const terms = text("button", t("plugins.termsLink"), "link"); terms.type = "button";
         terms.addEventListener("click", () => api.launch("https://github.com/punkable/booki/blob/main/TERMS.md", []));
         copy.append(terms); offer.append(copy);
-        button(offer, t("dev.enable"), async () => { await api.pluginInstall("yt-dlp"); offer.remove(); showForm(); });
+        installButton(offer, t("dev.enable"), "yt-dlp", () => { offer.remove(); showForm(); });
         box.append(offer); return;
       }
       showForm();
@@ -213,7 +236,7 @@ export function buildSystemPanel(item, { close }) {
     api.pluginStatus("headsetcontrol").then((status) => {
       if (disposed || status?.installed) return;
       offer.append(text("span", t("dev.missingHeadset")));
-      button(offer, t("dev.enable"), async () => { await api.pluginInstall("headsetcontrol"); offer.remove(); deviceReading.refresh().catch(() => {}); });
+      installButton(offer, t("dev.enable"), "headsetcontrol", () => { offer.remove(); deviceReading.refresh().catch(() => {}); });
       body.append(offer);
     }).catch(() => {});
   }
@@ -229,10 +252,9 @@ export function buildSystemPanel(item, { close }) {
       if (disposed) return;
       controls.replaceChildren();
       if (!status?.installed) {
-        button(controls, t(plugin.external ? "plugins.appInstaller" : "plugins.installForWidget"), async () => {
-          if (plugin.external) { await api.launch("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", []); return; }
-          await api.pluginInstall(id); await show();
-        }); return;
+        if (plugin.external) button(controls, t("plugins.appInstaller"), () => api.launch("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", []));
+        else installButton(controls, t("plugins.installForWidget"), id, show);
+        return;
       }
       controls.append(text("small", via(plugin.name)));
       if (["winget", "rclone", "librehardwaremonitor"].includes(id)) button(controls, t("plugins.refresh"), async () => {

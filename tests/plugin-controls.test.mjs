@@ -45,9 +45,12 @@ test("an unavailable device provider installs only after its inline button is pr
   await page.locator('.tile[data-id="devices"]').click();
   await page.getByRole("button", { name: "Turn on", exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
+  assert.equal(await page.getByRole("button", { name: "Turn on", exact: true }).isDisabled(), true, "nothing installs before the terms are accepted");
+  await page.getByRole("checkbox", { name: /I accept the plugin terms/ }).check();
   await page.getByRole("button", { name: "Turn on", exact: true }).click();
   await waitForAsyncCondition(page, () => !document.querySelector(".system-widget-panel .device-offer"));
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), ["headsetcontrol"]);
+  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke("get_config"))).pluginTerms, 1);
   assert.deepEqual(errors, []); await page.close();
 });
 

@@ -595,6 +595,10 @@ fn plugin_status(id: String) -> Result<plugins::Status, String> {
 #[tauri::command]
 async fn plugin_install(id: String) -> Result<String, String> {
     let plugin = plugins::find(&id).ok_or("unknown plugin")?;
+    // Nothing third-party is fetched before the person accepts the terms.
+    if config::load().plugin_terms < plugins::TERMS_VERSION {
+        return Err("accept the plugin terms first".into());
+    }
     tauri::async_runtime::spawn_blocking(move || plugins::install(plugin))
         .await
         .map_err(|e| e.to_string())?
