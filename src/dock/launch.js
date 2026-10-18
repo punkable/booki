@@ -11,6 +11,7 @@ import { addMenuHead, placeMenu, closeMenu } from "./menu-core.js";
 import { windowsFor, clearAttention } from "./running-windows.js";
 import { openProductivity, openSystemPanel, editNote } from "./widget-editors.js";
 import { toggleStack } from "./stack.js";
+import { refreshMedia, refreshVolume } from "./live-widgets.js";
 import { toggleClipboardStack } from "./clipboard-stack.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -29,10 +30,16 @@ export function launchModifiers(e) {
 
 export function launch(el, item, mods = {}) {
   if (item.kind === "action") { if (item.action === "settings") dockApi.openSettings(); return; }
-  // Widgets aren't launchers — except the media card, where a click is
-  // play/pause. Others do nothing on click.
+  // Widgets: the media card plays/pauses and the volume card mutes on a
+  // click, like the keys on a keyboard; their panel is on right-click or a
+  // long press. The other live cards open their panel.
   if (item.kind === "widget") {
-    if (["volume", "devices", "system", "media", "ai", "battery"].includes(item.widget)) openSystemPanel(item, el);
+    if (item.widget === "media") { dockApi.mediaToggle().catch(() => {}).finally(refreshMedia); return; }
+    if (item.widget === "volume") {
+      dockApi.volumeInfo().then((v) => Array.isArray(v) && dockApi.masterVolumeSet(v[0], !v[1])).catch(() => {}).finally(refreshVolume);
+      return;
+    }
+    if (["devices", "system", "ai", "battery"].includes(item.widget)) openSystemPanel(item, el);
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
     if (["clock", "focus", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);

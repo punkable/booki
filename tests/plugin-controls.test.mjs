@@ -18,7 +18,8 @@ test("native mixer targets session identifiers and commits volume and mute", asy
         return invoke(cmd,args);
       };`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => !!document.querySelector('input[aria-label="Browser"]'));
   await page.getByRole("slider", { name: "Browser", exact: true }).evaluate((el) => { el.value = "27"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 1);
@@ -70,12 +71,25 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
   assert.deepEqual(errors, []); await page.close();
 });
 
+test("a click on the volume card mutes; its panel is one right-click away", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("volume")] }),
+    initScript: `window.__vol=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="volume_info"?Promise.resolve([40,false]):cmd==="volume_set_state"?(window.__vol.push(args),Promise.resolve(true)):invoke(cmd,args);`,
+  });
+  await page.locator('.tile[data-id="volume"]').click();
+  await waitForAsyncCondition(page, () => window.__vol.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__vol[0]), { percent: 40, muted: true });
+  assert.equal(await page.locator(".system-widget-panel").count(), 0);
+  assert.deepEqual(errors, []); await page.close();
+});
+
 test("late native responses cannot resurrect a closed widget panel", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),
     initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_volumes"?new Promise((resolve)=>{window.__finishSessions=resolve;}):invoke(cmd,args);`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => typeof window.__finishSessions === "function");
   await page.keyboard.press("Escape");
   await page.evaluate(() => window.__finishSessions([{ id: "late", name: "Late", percent: 10, muted: false }]));
@@ -94,7 +108,8 @@ test("the master mixer preserves mute in one native edit", async () => {
       return invoke(cmd,args);
     };`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   const slider = page.getByRole("slider", { name: "Volume", exact: true });
   await slider.waitFor();
   await slider.evaluate((el) => { el.value="55";el.dispatchEvent(new Event("change",{bubbles:true})); });
@@ -109,7 +124,8 @@ test("refreshing the mixer ignores an older in-flight session list", async () =>
     cfg: makeConfig({ pinned: [pin("volume")] }),
     initScript: `window.__sessionReads=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_volumes"?new Promise((resolve)=>window.__sessionReads.push(resolve)):invoke(cmd,args);`,
   });
-  await page.locator('.tile[data-id="volume"]').click();
+  await page.locator('.tile[data-id="volume"]').click({ button: "right" });
+  await page.locator("#ctx-menu").getByText("Controls", { exact: true }).click();
   await waitForAsyncCondition(page, () => window.__sessionReads.length === 1);
   await page.getByRole("button", {name:"Refresh data",exact:true}).click();
   await waitForAsyncCondition(page, () => window.__sessionReads.length === 2);

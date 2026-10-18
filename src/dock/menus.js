@@ -15,7 +15,7 @@ import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
 import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
 import { paintedLook } from "../system-look.js";
-import { openProductivity } from "./widget-editors.js";
+import { openProductivity, openSystemPanel } from "./widget-editors.js";
 import {
   promptRename,
   relocateShortcut,
@@ -77,7 +77,7 @@ export function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
-  if (item.kind === "widget") { add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
+  if (item.kind === "widget") { if (["media", "volume"].includes(item.widget)) add("sliders", t("m.details"), () => openSystemPanel(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
   if (isTauri && item.kind === "app" && /\.lnk$/i.test(item.path || "")) {
     add("folder", t("shortcut.store"), () => relocateShortcut(item, false));
