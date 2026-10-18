@@ -77,6 +77,7 @@
 - **Collector**: drop a link on the dock to save video or audio only from hundreds of sites, image galleries or files.
 - **Devices** rotates through headset, mouse and keyboard with their icons; color shows the battery and pulses when it needs charging.
 - **AI usage** with official Claude and ChatGPT logos, in turn, and when each limit resets.
+- **Updates**, **Cloud** and **Lighting** widgets (winget, rclone, OpenRGB), and notices that never cover the dock.
 - **Position** picked with one click on a drawing of your screen; folders without overlapping names.
 - Plugins pinned to SHA-256 checksums, with [terms of use](TERMS.md).
 

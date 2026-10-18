@@ -127,7 +127,7 @@ function release871() {
 
 export function currentRelease() {
   return { version: "0.88.0", date: "2026-10-18", headline: t("release88.headline"), sections: [
-    { icon: "sparkles", title: t("release86.widgetsTitle"), notes: [t("release88.collector"), t("release88.devices"), t("release88.ai")] },
+    { icon: "sparkles", title: t("release86.widgetsTitle"), notes: [t("release88.collector"), t("release88.widgets"), t("release88.devices"), t("release88.ai"), t("release88.notices")] },
     { icon: "settings", title: t("release86.easierTitle"), notes: [t("release88.position"), t("release88.folders")] },
     { icon: "performance", title: t("plugins.title"), notes: [t("release88.trust"), t("release88.fixes")] },
   ] };
