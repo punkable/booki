@@ -27,6 +27,9 @@ pub(crate) fn along_offset(start: i32, span: i32, win: i32, position: &str) -> i
     want.max(lo).min(hi)
 }
 
+/// Padding around the floating pill inside its window (`body.notch-body.floating`).
+const FLOATING_PAD: u32 = 6;
+
 /// Place the small notch window centered on the dock's anchored edge.
 pub(crate) fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), String> {
     let monitor = pick_monitor(notch).ok_or_else(|| "no monitor found".to_string())?;
@@ -71,10 +74,14 @@ pub(crate) fn position_notch(notch: &WebviewWindow, edge: &str) -> Result<(), St
     // Floating / smart: sit at the user's edge gap (0 = glued). When the dock
     // is also visible (always-visible notch), the dock stacks inward via
     // notch_stack_depth_css — the notch keeps the outer slot so they don't collide.
+    // The floating pill sits 6 px inside its window (notch CSS padding), and
+    // the dock bar sits exactly edge_gap from the edge: take that padding off
+    // so the pill's outer edge lines up with the dock's instead of floating
+    // above it.
     let margin: i32 = if attached {
         0
     } else {
-        ((cfg.edge_gap.min(96) as f64) * dpr).round() as i32
+        ((cfg.edge_gap.min(96).saturating_sub(FLOATING_PAD) as f64) * dpr).round() as i32
     };
 
     let along = |start: i32, span: i32, win: i32| {

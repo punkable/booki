@@ -740,6 +740,7 @@ body.notch-body.peek.edge-right .notch-pill::after { display: none; }
 
 /* Floating notch: inset capsule with soft depth — not glued to the edge. */
 body.notch-body.floating, body.notch-body.smart {
+  /* FLOATING_PAD in notch_window.rs takes this off the window's margin. */
   padding: 6px;
 }
 body.notch-body.floating.edge-top, body.notch-body.smart.edge-top { align-items: flex-start; }
@@ -2366,7 +2367,7 @@ body.native-material .dock-tip {
 
 /* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
-body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill { box-shadow: 0 4px 14px #0003; }
+body.notch-body.floating .notch-pill, body.notch-body.smart .notch-pill { box-shadow: 0 1px 3px #0003; }
 
 .tile .action-icon { display: flex; align-items: center; justify-content: center; width: 82%; height: 82%; pointer-events: none; }
 .tile .action-icon svg { width: 76%; height: 76%; }
