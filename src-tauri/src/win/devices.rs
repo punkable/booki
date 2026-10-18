@@ -26,6 +26,8 @@ pub struct DeviceBattery {
     /// What the device is, for its icon: "headset", "mouse", "keyboard",
     /// "gamepad" or "other".
     pub kind: &'static str,
+    /// Charging right now, when the source says so (HeadsetControl does).
+    pub charging: bool,
 }
 
 /// The kind from a Bluetooth class of device: major class 4 is audio,
@@ -161,6 +163,7 @@ fn parse_headsetcontrol(text: &str) -> Vec<DeviceBattery> {
                 level: level as u8,
                 source: "headsetcontrol",
                 kind: "headset",
+                charging: status == "BATTERY_CHARGING",
             })
         })
         .collect()
@@ -221,6 +224,7 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
             level,
             source: "bluetooth",
             kind,
+            charging: false,
         });
     }
     Ok(out)
@@ -258,6 +262,7 @@ mod tests {
             level,
             source: "bluetooth",
             kind: "other",
+            charging: false,
         };
         let merged = merge(vec![d("Buds", 80), d("Mouse", 40), d("Buds", 75)]);
         assert_eq!(merged, vec![d("Mouse", 40), d("Buds", 75)]);

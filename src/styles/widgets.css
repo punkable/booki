@@ -440,9 +440,24 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .reading-card-names small, .reading-card-note { opacity: 0.7; font-size: 12px; }
 .reading-bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 12px; }
 .reading-bar-value { font-variant-numeric: tabular-nums; }
+.reading-card-value { margin-left: auto; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value { color: #ff8b8f; }
 .reading-bar-track { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .reading-bar-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transition: width 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
-.reading-bar-track i.warn { background: #ff99a4; }
+.reading-bar-track i[data-tone="good"], .reading-bar-track i[data-tone="charging"] { background: #30a46c; }
+.reading-bar-track i[data-tone="fair"] { background: #f5a524; }
+.reading-bar-track i[data-tone="low"], .reading-bar-track i[data-tone="critical"] { background: #e5484d; }
+.reading-bar-track i[data-tone="critical"] { animation: tone-blink 1.2s ease-in-out infinite; }
+.reading-bar-track i[data-tone="charging"] { background-image: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); background-size: 40px 100%; background-repeat: no-repeat; animation: tone-sweep 1.6s linear infinite; background-color: #30a46c; }
+.reading-card[data-tone="critical"] { border-color: color-mix(in srgb, #e5484d 55%, transparent); }
+.reading-card-names small { font-variant-numeric: tabular-nums; }
+.reading-card[data-tone="low"] .reading-card-names small, .reading-card[data-tone="critical"] .reading-card-names small { color: #ff8b8f; opacity: 1; }
+/* A widget that needs attention breathes its ring until it is dealt with. */
+.tile.widget.needs-attention .w-ring svg { animation: tone-blink 1.2s ease-in-out infinite; }
+@keyframes tone-blink { 50% { opacity: 0.35; } }
+@keyframes tone-sweep { from { background-position: -40px 0; } to { background-position: 140% 0; } }
+.device-offer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); font-size: 0.8125rem; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .tile.widget.needs-attention .w-ring svg, .reading-bar-track i { animation: none !important; } }
 /* Rotating cards (Devices, AI): the ring glyph turns into the device kind or
    provider logo and eases in as the card moves to the next one. */
 .w-ring-ico.w-glyph-swap { animation: w-glyph-in 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }

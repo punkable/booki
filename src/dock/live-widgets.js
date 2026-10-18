@@ -6,14 +6,13 @@ import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
-import { deviceReading, aiReading } from "./readings.js";
+import { deviceReading, aiReading, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
-import { STAT_WIDGETS, RING_DEFAULTS } from "../widgets-meta.js";
+import { STAT_WIDGETS } from "../widgets-meta.js";
 import {
   MEDIA_SVG,
-  BATTERY_LOW,
   dockPreviewSnippet,
   clockParts,
   volumeStep,
@@ -126,19 +125,19 @@ const pollStats = singleFlight(async () => {
     if (s.battery < 0) { setText(el, t("w.battery"), "—"); return; }
     setMetric(el, t("w.battery"), s.battery);
     el.classList.toggle("charging", !!s.charging);
-    // A ring left at its default color (never manually re-colored) turns red
-    // when running low and unplugged — the same "pay attention" cue Windows
-    // itself uses, without overriding a color the user picked on purpose.
-    if (el.dataset.autoAccent) {
-      el.style.setProperty("--w-accent", !s.charging && s.battery <= 20 ? BATTERY_LOW : RING_DEFAULTS.battery);
-    }
+    // A ring left at its default color (never manually re-colored) follows
+    // the charge: green, amber, red, and pulses near empty while unplugged.
+    // A color the user picked on purpose is kept; the pulse still applies.
+    const tone = batteryTone(s.battery, !!s.charging);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", !s.charging && s.battery >= 0 && s.battery <= 10);
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 });
 
 // Headsets, earbuds, mice and keyboards that report a battery to Windows.
 // The card takes each device in turn (about every 6 s, lowest first) with an
 // icon for its kind; its hint lists them all.
-const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
 const KIND_ICON = { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" };
 let deviceTurn = 0;
 function setCornerGlyph(el, name, key) {
@@ -176,10 +175,13 @@ function paintDevices(list) {
     const shown = list[deviceTurn % list.length];
     setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
     setMetric(el, shown.name, shown.level);
-    // Readings that came through a plugin say so, e.g. "via HeadsetControl".
-    const via = (d) => (PLUGIN_NAMES[d.source] ? ` · ${t("w.devicesVia").replace("{plugin}", () => PLUGIN_NAMES[d.source])}` : "");
-    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${via(d)}`).join("\n"));
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", shown.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
+    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
+    // The ring speaks the battery: green, amber, red; it pulses when a device
+    // is about to die (any of them, not only the one on screen).
+    const tone = batteryTone(shown.level, shown.charging);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", list.some((d) => !d.charging && d.level <= 10));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }
 const pollDevices = singleFlight(async () => {
@@ -220,7 +222,10 @@ function paintAi(providers) {
       const reset = resetClock(w.resets_at);
       return `${w.provider} ${windowName(w.label)} · ${Math.round(w.percent)}%${reset ? ` · ${t("w.aiResets").replace("{time}", () => reset)}` : ""}`;
     }).concat(providers.filter((p) => !(p.windows || []).length).map((p) => `${p.name} · ${t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable")}`)).join("\n"));
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", top.percent >= 80 ? BATTERY_LOW : RING_DEFAULTS.ai);
+    const tone = usageTone(top.percent);
+    el.dataset.tone = tone;
+    el.classList.toggle("needs-attention", windows.some((w) => w.percent >= 95));
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }
 const pollAi = singleFlight(async () => {

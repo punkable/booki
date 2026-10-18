@@ -42,10 +42,10 @@ test("an unavailable device provider installs only after its inline button is pr
       };`,
   });
   await page.locator('.tile[data-id="devices"]').click();
-  await page.getByRole("button", { name: "Install plugin", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Turn on", exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
-  await page.getByRole("button", { name: "Install plugin", exact: true }).click();
-  await waitForAsyncCondition(page, () => document.querySelector(".system-widget-panel")?.textContent.includes("via HeadsetControl"));
+  await page.getByRole("button", { name: "Turn on", exact: true }).click();
+  await waitForAsyncCondition(page, () => !document.querySelector(".system-widget-panel .device-offer"));
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), ["headsetcontrol"]);
   assert.deepEqual(errors, []); await page.close();
 });

@@ -63,6 +63,7 @@ fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
         level,
         source: "logitech",
         kind,
+        charging: false,
     })
 }
 

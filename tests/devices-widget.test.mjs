@@ -24,7 +24,7 @@ test("the devices widget shows the lowest battery and lists every device in its 
   assert.equal((await card.locator(".w-label").textContent()).trim(), "Arctis Nova 7");
   const hint = await card.getAttribute("aria-label");
   assert.ok(String(hint).includes("MX Master 3S · 60%"), `hint lists every device: ${hint}`);
-  assert.ok(String(hint).includes("Arctis Nova 7 · 15% · via HeadsetControl"), `plugin readings say where they came from: ${hint}`);
+  assert.ok(String(hint).includes("Arctis Nova 7 · 15%") && !String(hint).includes("HeadsetControl"), `the hint names devices, not plugins: ${hint}`);
   assert.deepEqual(errors, []);
   await page.close();
 });

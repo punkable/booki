@@ -4,7 +4,7 @@ import { dock as api, pickFolder, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
-import { deviceReading, aiReading } from "./readings.js";
+import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
 
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
@@ -54,22 +54,23 @@ export function buildSystemPanel(item, { close }) {
   const cards = (container, rows) => {
     const grid = document.createElement("div"); grid.className = "reading-cards";
     for (const row of rows) {
-      const card = document.createElement("div"); card.className = "reading-card";
+      const card = document.createElement("div"); card.className = "reading-card"; if (row.tone) card.dataset.tone = row.tone;
       const top = document.createElement("div"); top.className = "reading-card-top";
       if (row.glyph) { const g = text("span", "", "reading-card-glyph"); g.innerHTML = icon(row.glyph); top.append(g); }
       const names = document.createElement("div"); names.className = "reading-card-names";
       names.append(text("strong", row.name)); if (row.sub) names.append(text("small", row.sub));
       top.append(names);
       if (row.error) top.append(text("span", row.error, "reading-card-note"));
+      if (row.value) top.append(text("span", row.value, "reading-card-value"));
       card.append(top);
       for (const bar of row.bars || []) {
         const line = document.createElement("div"); line.className = "reading-bar";
-        line.append(text("span", bar.label), text("span", `${Math.round(bar.percent)}%`, "reading-bar-value"));
+        if (bar.label) line.append(text("span", bar.label), text("span", `${Math.round(bar.percent)}%`, "reading-bar-value"));
         const track = document.createElement("div"); track.className = "reading-bar-track";
         track.setAttribute("role", "meter"); track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", "100");
-        track.setAttribute("aria-valuenow", String(Math.round(bar.percent))); track.setAttribute("aria-label", `${row.name} ${bar.label}`);
+        track.setAttribute("aria-valuenow", String(Math.round(bar.percent))); track.setAttribute("aria-label", `${row.name} ${bar.label || t("w.battery")}`);
         const fill = document.createElement("i"); fill.style.width = `${Math.max(0, Math.min(100, bar.percent))}%`;
-        if (bar.warn) fill.className = "warn";
+        if (bar.tone) fill.dataset.tone = bar.tone;
         track.append(fill); line.append(track); card.append(line);
       }
       grid.append(card);
@@ -97,9 +98,9 @@ export function buildSystemPanel(item, { close }) {
       cards(ai, all.map((p) => ({
         name: p.name, glyph: icons[p.id] || "sparkles",
         error: (p.windows || []).length ? "" : t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable"),
-        bars: (p.windows || []).map((w) => {
+        tone: usageTone(Math.max(0, ...(p.windows || []).map((w) => w.percent))), bars: (p.windows || []).map((w) => {
           const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
-          return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, warn: w.percent >= 80 };
+          return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, tone: usageTone(w.percent) };
         }),
       })));
     });
@@ -124,12 +125,11 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
-    const sources = { bluetooth: "Bluetooth", logitech: "Logitech", headsetcontrol: via("HeadsetControl") };
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       cards(devices, values.map((d) => ({
-        name: d.name, sub: sources[d.source] || "", glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
-        bars: [{ label: t("w.battery"), percent: d.level, warn: d.level <= 20 }],
+        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
+        value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
       })));
     });
   }
@@ -141,7 +141,18 @@ export function buildSystemPanel(item, { close }) {
     });
   }
   const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["winget", "librehardwaremonitor", "openrgb", "rclone"] : item.widget === "media" ? ["yt-dlp"] : [];
-  for (const id of ids) {
+  // Devices: support for USB headsets is a one-line offer while it is off,
+  // and invisible once it is on. No plugin name, no description.
+  if (item.widget === "devices") {
+    const offer = document.createElement("div"); offer.className = "device-offer";
+    api.pluginStatus("headsetcontrol").then((status) => {
+      if (disposed || status?.installed) return;
+      offer.append(text("span", t("dev.missingHeadset")));
+      button(offer, t("dev.enable"), async () => { await api.pluginInstall("headsetcontrol"); offer.remove(); deviceReading.refresh().catch(() => {}); });
+      body.append(offer);
+    }).catch(() => {});
+  }
+  for (const id of ids.filter((id) => id !== "headsetcontrol")) {
     const plugin = PLUGINS.find((p) => p.id === id);
     const box = section(plugin.name);
     box.append(text("p", t(`plugins.${id}.desc`)));
