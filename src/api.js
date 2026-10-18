@@ -586,7 +586,7 @@ export const dock = {
   appVolumeSet: (id, percent, muted) => invoke("app_volume_set", { id, percent, muted }),
   pluginRead: (id) => invoke("plugin_read", { id }),
   pluginOpen: (id, profile = null) => invoke("plugin_open", { id, profile }),
-  pluginDownload: (url, directory) => invoke("plugin_download", { url, directory }),
+  pluginDownload: (url, directory = null, format = "video") => invoke("plugin_download", { url, directory, format }),
   pluginStatus: (id) => invoke("plugin_status", { id }),
   pluginInstall: (id) => invoke("plugin_install", { id }),
   pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
@@ -771,6 +771,12 @@ export async function onNotchToastOut(cb) {
   return T.event.listen("booki://notch-toast-out", () => cb());
 }
 
+
+/** Progress of a yt-dlp download: { state, percent, title, path }. */
+export async function onDownloadEvent(callback) {
+  if (!(T?.event?.listen)) return () => {};
+  return T.event.listen("plugin-download", (event) => callback(event.payload));
+}
 
 export async function onLinkDrop(callback) {
   if (!(T?.event?.listen)) return () => {};

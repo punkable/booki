@@ -2,6 +2,7 @@
 import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
+import { WIDGET_META, widgetDisplayName } from "../../widgets-meta.js";
 import { dock as dockApi, pickRgbProfile } from "../../api.js";
 import { t } from "../../i18n.js";
 import { Icon, PageHeader, SettingsSection } from "../ui.jsx";
@@ -9,7 +10,11 @@ import { Icon, PageHeader, SettingsSection } from "../ui.jsx";
 /** An optional open-source tool Booki can download into its own folder. It
  *  says what it adds, who makes it, its licence and where its source is,
  *  before anything is installed. */
-function PluginCard({ id, repo, source, external, license, open }) {
+/** The dock widget a plugin brings, if any (yt-dlp → Downloads). */
+const widgetFor = (id) => Object.keys(WIDGET_META).find((w) => WIDGET_META[w].plugin === id);
+const pinnedWidget = (pins, widget) => (pins || []).some((p) => p.widget === widget || (p.children || []).some((c) => c.widget === widget));
+
+function PluginCard({ id, repo, source, external, license, open, cfg, set }) {
   const [state, setState] = useState({ installed: false, version: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -38,17 +43,20 @@ function PluginCard({ id, repo, source, external, license, open }) {
       {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.installed
         ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
         : <button type="button" className="button button-accent" disabled={busy} onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
+      {state.installed && widgetFor(id) && cfg && !pinnedWidget(cfg.pinned, widgetFor(id)) && <button type="button" className="button button-accent"
+        onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget: widgetFor(id), name: widgetDisplayName(widgetFor(id), t), path: "", args: [], style: {} }] })}>
+        <Icon name="plus" />{t("dl.addWidget")}</button>}
       <button type="button" className="link" onClick={() => open(source || `https://github.com/${repo}`)}>{t("plugins.source")}<Icon name="external" /></button>
     </div>
   </div>;
 }
 
 
-export function PluginsPage() {
+export function PluginsPage({ cfg, set }) {
   return <>
     <PageHeader title={t("plugins.title")}>{t("plugins.hint")}</PageHeader>
     {PLUGINS.map((plugin) => <SettingsSection key={plugin.id} icon="sparkles" title={plugin.name}>
-      <PluginCard {...plugin} open={(url) => dockApi.launch(url)} />
+      <PluginCard {...plugin} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />
     </SettingsSection>)}
   </>;
 }

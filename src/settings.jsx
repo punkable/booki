@@ -201,7 +201,7 @@ function App() {
           {page === "dock" && <DockPage {...pageProps} />}
           {page === "widgets" && <WidgetsPage {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}
-          {page === "plugins" && <PluginsPage />}
+          {page === "plugins" && <PluginsPage cfg={cfg} set={set} />}
           {page === "system" && <SystemPage {...pageProps} version={version} store={store} onWhatsNew={() => setShowChangelog(true)} />}
         </SettingsBoundary>
       </div>

@@ -6,7 +6,7 @@ import { onFileDrop, onLinkDrop, dock as dockApi } from "../api.js";
 import { kindForPath } from "../pins.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
-import { uid, isVertical, baseName, menuPinTitle } from "./helpers.js";
+import { uid, isVertical, baseName, menuPinTitle, findWidgetPin } from "./helpers.js";
 import { dockEl, dropOverlay } from "./dom.js";
 import { reframe } from "./frame.js";
 import { setHidden, scheduleHide } from "./autohide.js";
@@ -144,7 +144,15 @@ function setDropTarget(el) {
 }
 
 export function setupFileDrop() {
-  onLinkDrop((value) => { const url = videoUrl(String(value || "")); if (url) openSystemPanel({ widget: "media", url }, dockEl); });
+  // A dropped link asks Video or Audio only in the Downloads panel, by the
+  // Downloads card when one is pinned.
+  onLinkDrop((value) => {
+    const url = videoUrl(String(value || ""));
+    if (!url) return;
+    const card = dockEl.querySelector('.tile.widget[data-widget="downloads"]');
+    const pinned = card ? findWidgetPin(card.dataset.id) : null;
+    openSystemPanel({ ...(pinned || { id: "downloads", kind: "widget" }), widget: "downloads", url }, card || dockEl);
+  });
   // Browser links arrive through the native drop bridge (link_drop.rs), which
   // replaces WebView2's drop target, so the DOM never sees them.
   onFileDrop({

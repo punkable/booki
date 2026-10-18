@@ -62,9 +62,13 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
       };`,
   });
   await emit(page, "booki://link-drop", "https://example.com/video");
-  await page.getByRole("button", { name: "Download video…" }).waitFor();
-  assert.equal(await page.getByRole("textbox", { name: "Video link (HTTP or HTTPS)" }).inputValue(), "https://example.com/video");
+  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  assert.equal(await page.getByRole("textbox", { name: "Paste a link" }).inputValue(), "https://example.com/video");
   assert.deepEqual(await page.evaluate(() => window.__downloadRequests), [], "a drop must never start a download or execute a tool");
+  await page.getByRole("button", { name: "Audio only", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 1);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[0].format), "audio");
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await emit(page, "booki://link-drop", "file:///C:/private.txt");
   assert.equal(await page.locator(".system-widget-panel").count(), 0);

@@ -483,3 +483,11 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 /* Plugin blurbs under a widget's readings are secondary: body-small, muted. */
 .system-widget-panel .productivity-section > p { margin: 4px 0 10px; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2); }
 .system-widget-panel .productivity-section > strong { display: block; margin-bottom: 8px; font-size: 0.8125rem; }
+
+/* Downloads panel: the link, then the two choices, then progress. */
+.download-form { display: grid; gap: 10px; }
+.download-ask { margin: 0; font-weight: 600; color: var(--ink); }
+.download-form input[type="url"] { width: 100%; padding: 8px 10px; border-radius: var(--r-control); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink); font: inherit; }
+.download-form .productivity-button.primary { background: var(--accent); color: var(--accent-contrast, #fff); }
+.download-status { display: grid; gap: 8px; margin-top: 12px; }
+.download-status:empty { display: none; }

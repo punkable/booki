@@ -1,10 +1,11 @@
 /* Native widget details and optional providers. Every async result belongs to
    this panel instance; closing it prevents late results from repainting it. */
-import { dock as api, pickFolder, pickRgbProfile } from "../api.js";
+import { dock as api, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
 import { pluginError } from "../plugin-errors.js";
+import { download, startDownload, onDownloadChange } from "./downloads.js";
 import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
 
 function text(tag, value, className = "") {
@@ -141,7 +142,49 @@ export function buildSystemPanel(item, { close }) {
       list(native, [["CPU", `${Math.round(stats.cpu || 0)}%`], ["RAM", `${Math.round(stats.mem || 0)}%`]]);
     });
   }
-  const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["winget", "librehardwaremonitor", "openrgb", "rclone"] : item.widget === "media" ? ["yt-dlp"] : [];
+  if (item.widget === "downloads") {
+    const box = section(t("w.downloads"));
+    const status = document.createElement("div"); status.className = "download-status"; status.setAttribute("aria-live", "polite");
+    const paintStatus = () => {
+      status.replaceChildren();
+      if (download.state === "start" || download.state === "progress") {
+        cards(status, [{ name: download.title || t("w.downloads"), glyph: "download", value: `${Math.round(download.percent)}%`, bars: [{ label: "", percent: download.percent, tone: "charging" }] }]);
+      } else if (download.state === "done" && download.path) {
+        const name = download.path.split(/[\\/]/).pop();
+        cards(status, [{ name, sub: t("dl.done"), glyph: "download", tone: "good" }]);
+        button(status, t("dl.open"), () => api.openLocation(download.path));
+      } else if (download.state === "error") {
+        status.append(text("p", pluginError(download.error), "plugin-action-error"));
+      }
+    };
+    unsubscribe.push(onDownloadChange(() => { if (!disposed) paintStatus(); }));
+    api.pluginStatus("yt-dlp").then((state) => {
+      if (disposed) return;
+      if (!state?.installed) {
+        const offer = document.createElement("div"); offer.className = "device-offer";
+        offer.append(text("span", t("dl.needs")));
+        button(offer, t("dev.enable"), async () => { await api.pluginInstall("yt-dlp"); offer.remove(); showForm(); });
+        box.append(offer); return;
+      }
+      showForm();
+    }).catch(() => showForm());
+    const showForm = () => {
+      const form = document.createElement("div"); form.className = "download-form";
+      const input = document.createElement("input"); input.type = "url"; input.placeholder = t("dl.paste"); input.setAttribute("aria-label", t("dl.paste")); input.value = item.url || "";
+      const ask = text("p", item.url ? t("dl.ask") : t("dl.drop"), "download-ask");
+      const choices = document.createElement("div"); choices.className = "plugin-panel-actions";
+      const go = (format) => async () => {
+        const url = videoUrl(input.value); if (!url) throw new Error(t("perr.link"));
+        await startDownload(url, format);
+      };
+      button(choices, t("dl.video"), go("video")).classList.add("primary");
+      button(choices, t("dl.audio"), go("audio"));
+      form.append(ask, input, choices); box.append(form, status);
+      if (!item.url) requestAnimationFrame(() => input.focus());
+      paintStatus();
+    };
+  }
+  const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["winget", "librehardwaremonitor", "openrgb", "rclone"] : [];
   // Devices: support for USB headsets is a one-line offer while it is off,
   // and invisible once it is on. No plugin name, no description.
   if (item.widget === "devices") {
@@ -179,17 +222,6 @@ export function buildSystemPanel(item, { close }) {
       });
       if (["openrgb", "librehardwaremonitor"].includes(id)) button(controls, t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open"), () => api.pluginOpen(id));
       if (id === "openrgb") button(controls, t("plugins.profile"), async () => { const path = await pickRgbProfile(); if (path) await api.pluginOpen(id, path); });
-      if (id === "yt-dlp") {
-        const input = document.createElement("input"); input.type = "url"; input.placeholder = "https://"; input.setAttribute("aria-label", t("plugins.videoUrl")); input.value = item.url || ""; controls.append(input);
-        button(controls, t("plugins.download"), async () => {
-          const url = videoUrl(input.value); if (!url) throw new Error(t("plugins.videoUrl"));
-          const folder = await pickFolder(); if (!folder || disposed) return;
-          controls.querySelector(":scope > .plugin-download-status")?.remove();
-          const progress = text("p", t("plugins.downloadBusy"), "plugin-download-status"); progress.setAttribute("role", "status"); controls.append(progress);
-          try { await api.pluginDownload(url, folder); if (!disposed) progress.textContent = t("plugins.downloadDone"); }
-          catch (error) { progress.remove(); throw error; }
-        });
-      }
     };
     show().catch((error) => { if (!disposed) { state.textContent = pluginError(error); button(controls, t("focus.retry"), show); } });
   }
