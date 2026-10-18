@@ -58,6 +58,7 @@ features = [
     # Battery of Bluetooth headsets, mice and keyboards (win/devices.rs).
     "Devices_Enumeration_Pnp",
     "Win32_UI_Accessibility",
+    "Win32_UI_Controls",
     "Win32_UI_Shell_Common",
     "Win32_UI_Shell_PropertiesSystem",
     "Win32_System_WinRT",
