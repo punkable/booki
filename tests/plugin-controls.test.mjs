@@ -113,6 +113,33 @@ test("a device crossing 10% is announced once beside the dock", async () => {
   assert.deepEqual(errors, []); await page.close();
 });
 
+test("Updates counts apps with an update and updates them all from its panel", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("updates")] }),
+    initScript: `window.__updates=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="app_updates"?Promise.resolve([{name:"Firefox",id:"Mozilla.Firefox",current:"130",available:"131"},{name:"7-Zip",id:"7zip.7zip",current:"23",available:"24"}]):cmd==="app_update"?(window.__updates.push(args),Promise.resolve()):invoke(cmd,args);`,
+  });
+  const card = page.locator('.tile[data-id="updates"]');
+  await card.locator(".w-ring-num", { hasText: "2" }).waitFor();
+  await card.click();
+  await page.getByRole("button", { name: "Update all", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__updates.length === 1);
+  assert.equal(await page.evaluate(() => window.__updates[0].id), null);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("Cloud shows the fullest remote and every remote's space in its panel", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("cloud")] }),
+    initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="plugin_status"?Promise.resolve({installed:true}):cmd==="cloud_space"?Promise.resolve([{name:"drive",used:75*2**30,total:100*2**30,error:false},{name:"onedrive",used:2**30,total:5*2**30,error:false}]):invoke(cmd,args);`,
+  });
+  const card = page.locator('.tile[data-id="cloud"]');
+  await card.locator(".w-ring-num", { hasText: "75" }).waitFor();
+  await card.click();
+  await page.locator(".reading-card", { hasText: "onedrive" }).waitFor();
+  assert.match(await page.locator(".reading-card", { hasText: "drive" }).first().innerText(), /75 GB of 100 GB/);
+  assert.deepEqual(errors, []); await page.close();
+});
+
 test("a click on the volume card mutes; its panel is one right-click away", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),

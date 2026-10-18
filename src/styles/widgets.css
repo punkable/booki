@@ -496,3 +496,6 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .device-offer-copy .link { justify-self: start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.75rem; cursor: pointer; }
 .terms-check { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
 .terms-check .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.rgb-profiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.reading-card .plugin-panel-actions { justify-content: flex-end; }
+.system-widget-panel .productivity-button.primary { background: var(--accent); color: var(--accent-contrast, #fff); }

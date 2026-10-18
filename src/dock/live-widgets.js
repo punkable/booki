@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
+import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -247,6 +247,52 @@ const pollAi = singleFlight(async () => {
   paintAi(providers); syncRotation();
 });
 
+// Updates (winget): how many apps have an update; asked every six hours.
+// A rise in the count is announced once.
+let lastUpdateCount = -1;
+const pollUpdates = singleFlight(async () => {
+  let list = null;
+  try { list = (await updatesReading.fresh(6 * 3600000)) || []; } catch (_) { list = null; }
+  eachWidget("updates", (el) => {
+    setWidgetAvailable(el, list !== null);
+    if (list === null) { setText(el, t("w.updates"), "—"); setTileLabel(el, t("perr.appInstaller")); return; }
+    setText(el, list.length ? t("up.some").replace("{n}", () => list.length) : t("up.none"), String(list.length));
+    setTileLabel(el, list.length ? list.slice(0, 12).map((u) => `${u.name} · ${u.current} → ${u.available}`).join("\n") : t("up.none"));
+    el.dataset.tone = list.length ? "fair" : "good";
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[list.length ? "fair" : "good"]);
+  });
+  if (list && list.length > lastUpdateCount && lastUpdateCount >= 0) notify(t("up.found").replace("{n}", () => list.length));
+  if (list) lastUpdateCount = list.length;
+});
+
+// Cloud (rclone): the fullest remote on the card; every remote in the hint.
+const pollCloud = singleFlight(async () => {
+  let list = [];
+  try { list = (await cloudReading.fresh(30 * 60000)) || []; } catch (_) { list = []; }
+  const known = list.filter((c) => c.total > 0);
+  eachWidget("cloud", (el) => {
+    setWidgetAvailable(el, known.length > 0);
+    if (!known.length) { setText(el, t("w.cloud"), "—"); setTileLabel(el, t("cl.none")); return; }
+    const full = known.reduce((a, b) => (b.used / b.total > a.used / a.total ? b : a));
+    const percent = Math.round((full.used / full.total) * 100);
+    setMetric(el, full.name, percent);
+    setTileLabel(el, known.map((c) => `${c.name} · ${t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total))}`).join("\n"));
+    const tone = usageTone(percent);
+    el.dataset.tone = tone;
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
+  });
+});
+
+// Lighting (OpenRGB): the card names the profile last applied from Booki.
+export function paintLighting() {
+  let current = "";
+  try { current = localStorage.getItem("booki.rgbProfile") || ""; } catch (_) { current = ""; }
+  eachWidget("lighting", (el) => {
+    setText(el, t("w.lighting"), current || "—");
+    setTileLabel(el, current ? `${t("w.lighting")} · ${current}` : t("widget.lightingDesc"));
+  });
+}
+
 function setWidgetAvailable(el, available) {
   const item = findWidgetPin(el.dataset.id);
   const hide = !!item?.style?.hideWhenUnavailable && !available;
@@ -433,6 +479,9 @@ function pollKinds() {
     devices: widgetPresent("devices"),
     ai: widgetPresent("ai"),
     collector: widgetPresent("collector"),
+    updates: widgetPresent("updates"),
+    cloud: widgetPresent("cloud"),
+    lighting: widgetPresent("lighting"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -446,6 +495,9 @@ function paintPolls(k) {
   if (k.ai) pollAi();
   if (!k.devices && !k.ai) syncRotation();
   if (k.collector) paintDownloads();
+  if (k.updates) pollUpdates();
+  if (k.cloud) pollCloud();
+  if (k.lighting) paintLighting();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new
@@ -469,15 +521,19 @@ export function startPolls() {
   const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices, ai: hasAi } = k;
   // The Collector is event-driven: repaint rebuilt cards, no timer needed.
   if (k.collector) paintDownloads();
+  if (k.lighting) paintLighting();
+  // Updates and Cloud reuse their reading until it is 6 h / 30 min old, so a
+  // check every ten minutes costs nothing until then.
+  const hasSlow = k.updates || k.cloud;
   // Nothing live pinned → no timer at all (zero idle cost).
-  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi) return;
+  if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi && !hasSlow) return;
   // First paint immediately so cards aren't blank until the first tick, then
   // schedule each poll a full interval out (no wasteful double-poll at start).
   paintPolls(k);
   const t0 = Date.now();
   const slow = pollSlowdown();
   // Device batteries change slowly and the query walks Windows' device list.
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow };
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow, slow: t0 + 600000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
   const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices || hasAi ? 15000 : 60000;
@@ -491,9 +547,13 @@ export function startPolls() {
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
     if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
     if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
+    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); if (k.cloud) pollCloud(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
 export function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(S.nativeSupport, "media", 3000); if (!S.hiddenState) pollMedia(); }
 export function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(S.nativeSupport, "volume", 4000); if (!S.hiddenState) pollVolume(); }
 export function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
+
+/** After updating apps from the panel, read the list again. */
+export function refreshUpdates() { updatesReading.refresh().catch(() => {}).finally(() => pollUpdates()); }

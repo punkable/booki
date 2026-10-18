@@ -153,6 +153,253 @@ pub async fn plugin_open(id: String, profile: Option<String>) -> Result<(), Stri
     .await?
 }
 
+// ───────────────────── Updates (winget) ─────────────────────
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub struct AppUpdate {
+    pub name: String,
+    pub id: String,
+    pub current: String,
+    pub available: String,
+}
+
+/// The table `winget upgrade` prints, read by its header's column starts.
+/// Works on any display language because it never matches header words,
+/// only the dashed separator line and the column gaps above it.
+fn parse_winget(text: &str) -> Vec<AppUpdate> {
+    let lines: Vec<&str> = text.lines().map(|l| l.trim_end_matches('\r')).collect();
+    let Some(sep) = lines
+        .iter()
+        .position(|l| l.trim_start().starts_with("---") && l.trim().chars().all(|c| c == '-'))
+    else {
+        return Vec::new();
+    };
+    let Some(header) = sep.checked_sub(1).and_then(|i| lines.get(i)) else {
+        return Vec::new();
+    };
+    // Column starts: each position where a header word begins.
+    let chars: Vec<char> = header.chars().collect();
+    let mut starts = vec![0usize];
+    let mut i = 1;
+    while i < chars.len() {
+        if chars[i] != ' ' && chars[i - 1] == ' ' {
+            starts.push(i);
+        }
+        i += 1;
+    }
+    if starts.len() < 4 {
+        return Vec::new();
+    }
+    let cell = |row: &[char], col: usize| -> String {
+        let from = starts[col].min(row.len());
+        let to = starts
+            .get(col + 1)
+            .copied()
+            .unwrap_or(row.len())
+            .min(row.len());
+        row[from..to].iter().collect::<String>().trim().to_string()
+    };
+    lines[sep + 1..]
+        .iter()
+        .map(|l| l.chars().collect::<Vec<char>>())
+        .filter(|row| row.len() > starts[3])
+        .filter_map(|row| {
+            let update = AppUpdate {
+                name: cell(&row, 0),
+                id: cell(&row, 1),
+                current: cell(&row, 2),
+                available: cell(&row, 3),
+            };
+            (!update.id.is_empty() && !update.id.contains(' ') && !update.available.is_empty())
+                .then_some(update)
+        })
+        .take(200)
+        .collect()
+}
+
+fn winget_args<'a>(base: &[&'a str]) -> Vec<&'a str> {
+    let mut args = base.to_vec();
+    args.extend(["--accept-source-agreements", "--disable-interactivity"]);
+    args
+}
+
+/// Apps with an update, from winget (part of Windows' App Installer).
+#[tauri::command]
+pub async fn app_updates() -> Result<Vec<AppUpdate>, String> {
+    util::blocking(|| {
+        let output = capture(
+            &winget()?,
+            &winget_args(&["upgrade", "--include-unknown"]),
+            120,
+        )
+        .or_else(|e| {
+            if e.contains("No installed package") {
+                Ok(String::new())
+            } else {
+                Err(e)
+            }
+        })?;
+        Ok(parse_winget(&output))
+    })
+    .await?
+}
+
+/// Update one app by its winget id, or every app when `id` is None.
+#[tauri::command]
+pub async fn app_update(id: Option<String>) -> Result<(), String> {
+    if let Some(id) = &id {
+        if id.is_empty()
+            || id.len() > 128
+            || !id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "._-+".contains(c))
+        {
+            return Err("unknown package".into());
+        }
+    }
+    util::blocking(move || {
+        static UPDATE_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _turn = UPDATE_TURN
+            .try_lock()
+            .map_err(|_| "another plugin operation is in progress")?;
+        let target: Vec<&str> = match &id {
+            Some(id) => vec!["upgrade", "--id", id, "--exact"],
+            None => vec!["upgrade", "--all", "--include-unknown"],
+        };
+        let mut args = winget_args(&target);
+        args.extend(["--silent", "--accept-package-agreements"]);
+        capture(&winget()?, &args, 3600).map(|_| ())
+    })
+    .await?
+}
+
+// ───────────────────── Cloud (rclone) ─────────────────────
+
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+pub struct CloudSpace {
+    pub name: String,
+    pub used: u64,
+    pub total: u64,
+    pub error: bool,
+}
+
+/// Used and total space of every remote set up in rclone. Read-only.
+#[tauri::command]
+pub async fn cloud_space() -> Result<Vec<CloudSpace>, String> {
+    util::blocking(|| {
+        let rclone = executable("rclone")?;
+        let remotes = capture(&rclone, &["listremotes"], 30)?;
+        Ok(remotes
+            .lines()
+            .map(str::trim)
+            .filter(|r| r.ends_with(':') && r.len() > 1 && r.len() < 128)
+            .take(16)
+            .map(|remote| {
+                let about = capture(&rclone, &["about", remote, "--json"], 45)
+                    .ok()
+                    .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+                let num = |key: &str| {
+                    about
+                        .as_ref()
+                        .and_then(|j| j.get(key))
+                        .and_then(|v| v.as_u64())
+                };
+                let used = num("used").unwrap_or(0);
+                let total = num("total").unwrap_or(0);
+                CloudSpace {
+                    name: remote.trim_end_matches(':').to_string(),
+                    used,
+                    total,
+                    error: total == 0,
+                }
+            })
+            .collect())
+    })
+    .await?
+}
+
+/// Open rclone's interactive setup in a console window.
+#[tauri::command]
+pub async fn cloud_setup() -> Result<(), String> {
+    util::blocking(|| {
+        let rclone = executable("rclone")?;
+        let mut command = Command::new("cmd");
+        command
+            .args(["/c", "start", "rclone config", "cmd", "/k"])
+            .arg(&rclone)
+            .arg("config");
+        command.spawn().map(|_| ()).map_err(|e| e.to_string())
+    })
+    .await?
+}
+
+// ───────────────────── Lighting (OpenRGB) ─────────────────────
+
+/// The profiles saved in OpenRGB (its .orp files), by name.
+#[tauri::command]
+pub async fn rgb_profiles() -> Result<Vec<String>, String> {
+    util::blocking(|| {
+        executable("openrgb")?;
+        let mut names: Vec<String> = rgb_dirs()
+            .into_iter()
+            .filter_map(|d| std::fs::read_dir(d).ok())
+            .flatten()
+            .flatten()
+            .filter_map(|e| {
+                let path = e.path();
+                let orp = path
+                    .extension()
+                    .is_some_and(|x| x.eq_ignore_ascii_case("orp"));
+                orp.then(|| path.file_stem().map(|s| s.to_string_lossy().into_owned()))
+                    .flatten()
+            })
+            .collect();
+        names.sort_by_key(|n| n.to_lowercase());
+        names.dedup();
+        Ok(names)
+    })
+    .await?
+}
+
+fn rgb_dirs() -> Vec<PathBuf> {
+    let mut dirs_found = Vec::new();
+    if let Some(app_data) = dirs::config_dir() {
+        dirs_found.push(app_data.join("OpenRGB"));
+    }
+    if let Some(exe) = plugins::find("openrgb").and_then(plugins::executable) {
+        if let Some(dir) = exe.parent() {
+            dirs_found.push(dir.to_path_buf());
+        }
+    }
+    dirs_found
+}
+
+/// Apply a saved OpenRGB profile by name, or turn every light off.
+#[tauri::command]
+pub async fn rgb_apply(profile: Option<String>) -> Result<(), String> {
+    util::blocking(move || {
+        let openrgb = executable("openrgb")?;
+        match profile {
+            Some(name) => {
+                let known = rgb_dirs()
+                    .into_iter()
+                    .any(|d| d.join(format!("{name}.orp")).is_file());
+                if name.contains(['/', '\\', ':']) || !known {
+                    return Err("choose an OpenRGB .orp profile".into());
+                }
+                capture(&openrgb, &["--noautoconnect", "--profile", &name], 60).map(|_| ())
+            }
+            None => capture(
+                &openrgb,
+                &["--noautoconnect", "--mode", "static", "--color", "000000"],
+                60,
+            )
+            .map(|_| ()),
+        }
+    })
+    .await?
+}
+
 /// Progress of the one running download, sent to the dock as it happens.
 #[derive(serde::Serialize, Clone)]
 struct DownloadEvent {
@@ -448,7 +695,21 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
 
 #[cfg(test)]
 mod download_tests {
-    use super::{progress_line, reserved_name};
+    use super::{parse_winget, progress_line, reserved_name};
+    #[test]
+    fn winget_table_is_read_by_columns_in_any_language() {
+        let text = "Nombre              Id                       Versión   Disponible Origen\r\n\
+-----------------------------------------------------------------------------\r\n\
+Mozilla Firefox     Mozilla.Firefox          130.0     131.0.2    winget\r\n\
+7-Zip 23.01 (x64)   7zip.7zip                23.01     24.08      winget\r\n\
+2 actualizaciones disponibles.\r\n";
+        let list = parse_winget(text);
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].id, "Mozilla.Firefox");
+        assert_eq!(list[1].name, "7-Zip 23.01 (x64)");
+        assert_eq!(list[1].available, "24.08");
+        assert!(parse_winget("No installed package found matching input criteria.").is_empty());
+    }
     #[test]
     fn device_names_are_not_file_names() {
         assert!(reserved_name("CON") && reserved_name("nul.txt") && reserved_name("com3.log"));

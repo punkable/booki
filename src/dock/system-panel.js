@@ -8,7 +8,9 @@ import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { refreshUpdates, paintLighting } from "./live-widgets.js";
+import { notify } from "./notices.js";
 
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
@@ -228,7 +230,68 @@ export function buildSystemPanel(item, { close }) {
       paintStatus();
     };
   }
-  const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["winget", "librehardwaremonitor", "openrgb", "rclone"] : [];
+  // A widget whose plugin is missing offers it in one line, terms included.
+  const needsPlugin = (id, container, onReady) => api.pluginStatus(id).then((state) => {
+    if (disposed) return;
+    if (state?.installed) { onReady(); return; }
+    const offer = document.createElement("div"); offer.className = "device-offer";
+    offer.append(text("span", t(`widget.${item.widget}Desc`)));
+    installButton(offer, t("dev.enable"), id, () => { offer.remove(); onReady(); });
+    container.append(offer);
+  }).catch(() => onReady());
+  if (item.widget === "updates") {
+    const box = section(t("w.updates"));
+    const paint = (list) => {
+      box.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .plugin-panel-actions").forEach((el) => el.remove());
+      if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
+      if (!list.length) { box.append(text("p", t("up.none"))); return; }
+      const all = document.createElement("div"); all.className = "plugin-panel-actions";
+      button(all, t("up.all"), async () => { all.querySelector("button").textContent = t("up.working"); await api.appUpdate(null); notify(t("up.done")); refreshUpdates(); }).classList.add("primary");
+      box.append(all);
+      cards(box, list.map((u) => ({ name: u.name, sub: `${u.current} → ${u.available}`, glyph: "refresh" })));
+      box.querySelectorAll(".reading-card").forEach((card, i) => {
+        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
+        button(row, t("up.one"), async () => { row.querySelector("button").textContent = t("up.working"); await api.appUpdate(list[i].id); refreshUpdates(); });
+      });
+    };
+    live(box, updatesReading, 6 * 3600000, paint);
+  }
+  if (item.widget === "cloud") {
+    const box = section(t("w.cloud"));
+    needsPlugin("rclone", box, () => {
+      live(box, cloudReading, 30 * 60000, (list) => {
+        box.querySelectorAll(":scope > .plugin-panel-actions").forEach((el) => el.remove());
+        const known = (Array.isArray(list) ? list : []);
+        if (!known.length) box.append(text("p", t("cl.none")));
+        else cards(box, known.map((c) => ({
+          name: c.name, glyph: "cloud",
+          sub: c.total ? t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total)) : t("cl.unknown"),
+          value: c.total ? `${Math.round((c.used / c.total) * 100)}%` : "",
+          bars: c.total ? [{ label: "", percent: (c.used / c.total) * 100, tone: usageTone((c.used / c.total) * 100) }] : [],
+        })));
+        const actions = document.createElement("div"); actions.className = "plugin-panel-actions"; box.append(actions);
+        button(actions, t("cl.setup"), () => api.cloudSetup());
+      });
+    });
+  }
+  if (item.widget === "lighting") {
+    const box = section(t("w.lighting"));
+    needsPlugin("openrgb", box, () => {
+      load(box, api.rgbProfiles, (profiles) => {
+        const actions = document.createElement("div"); actions.className = "rgb-profiles"; box.append(actions);
+        const apply = (name) => async () => {
+          await api.rgbApply(name);
+          try { localStorage.setItem("booki.rgbProfile", name || t("rgb.off")); } catch (_) { /* private mode */ }
+          paintLighting(); notify(t("rgb.applied"), name || t("rgb.off"));
+        };
+        if (!Array.isArray(profiles) || !profiles.length) box.insertBefore(text("p", t("rgb.none")), actions);
+        else for (const name of profiles) button(actions, name, apply(name));
+        button(actions, t("rgb.off"), apply(null));
+        button(actions, t("rgb.open"), () => api.pluginOpen("openrgb"));
+      });
+    });
+  }
+  const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["librehardwaremonitor"] : [];
   // Devices: support for USB headsets is a one-line offer while it is off,
   // and invisible once it is on. No plugin name, no description.
   if (item.widget === "devices") {

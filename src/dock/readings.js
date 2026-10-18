@@ -15,3 +15,13 @@ export function usageTone(percent) {
   return percent >= 95 ? "critical" : percent >= 80 ? "low" : percent >= 50 ? "fair" : "good";
 }
 export const TONE_COLORS = { good: "#30a46c", fair: "#f5a524", low: "#e5484d", critical: "#e5484d", charging: "#30a46c" };
+export const updatesReading = sharedReading(() => api.appUpdates());
+export const cloudReading = sharedReading(() => api.cloudSpace());
+
+/** Bytes as KB/MB/GB/TB. */
+export function sizeText(n) {
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  let i = 0; n = Number(n) || 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(i && n < 10 ? 1 : 0)} ${units[i]}`;
+}
