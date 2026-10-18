@@ -8,7 +8,7 @@ import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -247,7 +247,10 @@ export function buildSystemPanel(item, { close }) {
   }).catch(() => onReady());
   if (item.widget === "updates") {
     const box = section(t("w.updates"));
-    const paint = (list) => {
+    let latest = null;
+    const paint = (raw) => {
+      latest = raw;
+      const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
       box.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .plugin-panel-actions").forEach((el) => el.remove());
       if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
       if (!list.length) { box.append(text("p", t("up.none"))); return; }
@@ -258,6 +261,13 @@ export function buildSystemPanel(item, { close }) {
       box.querySelectorAll(".reading-card").forEach((card, i) => {
         const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
         button(row, t("up.one"), async () => { row.querySelector("button").textContent = t("up.working"); await api.appUpdate(list[i].id); refreshUpdates(); });
+        // Not interested in this one: hide it until a newer version comes.
+        button(row, t("up.skip"), async () => {
+          const key = `${list[i].id}@${list[i].available}`;
+          const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
+          if (!(await persist({ ignoredUpdates: ignored }))) throw new Error(t("status.saveError"));
+          S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
+        });
       });
     };
     live(box, updatesReading, 6 * 3600000, paint);

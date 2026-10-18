@@ -16,6 +16,13 @@ export function usageTone(percent) {
 }
 export const TONE_COLORS = { good: "#30a46c", fair: "#f5a524", low: "#e5484d", critical: "#e5484d", charging: "#30a46c" };
 export const updatesReading = sharedReading(() => api.appUpdates());
+/** The updates still on offer: a dismissed one ("id@version") stays hidden
+ *  until a newer version of that package appears. */
+export function shownUpdates(list, ignored = []) {
+  if (!Array.isArray(list)) return list;
+  const skip = new Set(Array.isArray(ignored) ? ignored : []);
+  return list.filter((u) => !skip.has(`${u.id}@${u.available}`));
+}
 export const cloudReading = sharedReading(() => api.cloudSpace());
 
 /** Bytes as KB/MB/GB/TB. */

@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
+import { deviceReading, aiReading, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -252,7 +252,7 @@ const pollAi = singleFlight(async () => {
 let lastUpdateCount = -1;
 const pollUpdates = singleFlight(async () => {
   let list = null;
-  try { list = (await updatesReading.fresh(6 * 3600000)) || []; } catch (_) { list = null; }
+  try { list = shownUpdates((await updatesReading.fresh(6 * 3600000)) || [], S.cfg?.ignoredUpdates); } catch (_) { list = null; }
   eachWidget("updates", (el) => {
     setWidgetAvailable(el, list !== null);
     if (list === null) { setText(el, t("w.updates"), "—"); setTileLabel(el, t("perr.appInstaller")); return; }
