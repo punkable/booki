@@ -708,7 +708,14 @@ fn sync_context_menu(enabled: bool, label_pin: String, label_group: String) -> R
         let groups: Vec<(String, String)> = cfg
             .pinned
             .iter()
-            .filter(|p| p.kind == "group")
+            // Ids go into a registry command line: only plain ids qualify.
+            .filter(|p| {
+                p.kind == "group"
+                    && !p.id.is_empty()
+                    && p.id
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            })
             .map(|p| (p.id.clone(), label_group.replace("{name}", &p.name)))
             .collect();
         win::sync_context_menu(enabled, &exe, &label_pin, &groups)
@@ -859,6 +866,11 @@ fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Resu
     let mut cfg = read_reviewed_import(&path, expected.as_ref())?;
     cfg.monitor = -1;
     cfg.monitor_name.clear();
+    // Automatic profile rules belong to this PC, as with profile_apply; an
+    // old backup must not silently replace or disable them.
+    let live = config::load();
+    cfg.profile_rules = live.profile_rules;
+    cfg.last_profile = live.last_profile;
     apply_config_snapshot(&app, cfg)
 }
 
@@ -877,8 +889,9 @@ fn apply_config_snapshot(app: &AppHandle, cfg: Config) -> Result<Config, String>
     let mut cfg = cfg;
     config::migrate(&mut cfg);
     // Apply general preferences as well as the visual layout. A failed OS
-    // operation leaves the previous persisted profile active.
-    config::backup_for_update()?;
+    // operation leaves the previous persisted profile active. (The save keeps
+    // config.bak.json; update-backups/ is only written before an update, so
+    // frequent automatic profile switches never push those out.)
     let previous = config::load();
     let previous_autostart = get_autostart();
     // Only a profile that changes the choice touches the registry. Applying
@@ -1402,7 +1415,6 @@ pub fn run() {
         // (e.g. clicking the icon while the autostart copy is alive) just brings
         // the existing dock to the front and exits, instead of duplicating
         // everything. Windows startup then never ends up with two docks.
-        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // A context-menu "Add to Booki" click launches a second instance
             // with --pin args: apply them here, then surface the dock so the
@@ -1410,6 +1422,7 @@ pub fn run() {
             let _ = handle_pin_argv(app, &argv);
             reveal_running_dock(app);
         }))
+        .plugin(tauri_plugin_drag::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -1619,6 +1632,11 @@ pub fn run() {
             frontend_log,
         ])
         .on_window_event(|window, event| {
+            // An update started from Settings must not stay locked after the
+            // Settings window that held the lock is gone.
+            if matches!(event, tauri::WindowEvent::Destroyed) && window.label() == "settings" {
+                UPDATE_LOCK.store(false, Ordering::SeqCst);
+            }
             // A monitor's scale can change (Settings > Display > Scale) with
             // no display change, so the "display" signal never fires; the
             // dock and notch would keep their old physical size and position.

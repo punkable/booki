@@ -121,6 +121,14 @@ fn clip_write_disk(hist: &[ClipEntry], cfg: &Config) {
         .filter(|entry| !entry.private)
         .cloned()
         .collect();
+    // Nothing left to keep (cleared or last item deleted): remove the file,
+    // so a failed encryption can never bring deleted items back.
+    if persistable.is_empty() {
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(clip_legacy_history_path());
+        CLIP_STORAGE_FAILED.store(false, Ordering::Relaxed);
+        return;
+    }
     if let Ok(text) = serde_json::to_vec_pretty(&persistable) {
         let result = clipboard_storage::payload(&text, win::protect_data(&text), cfg!(windows))
             .map_err(str::to_string)
@@ -158,6 +166,11 @@ pub(crate) fn clip_load_from_disk() {
         let _ = fs::remove_file(clip_legacy_history_path());
         return;
     }
+    // A file that exists but can't be read now (DPAPI hiccup, mid-write) must
+    // not be overwritten with an empty list: keep it for the next start.
+    let unreadable = fs::read(clip_history_path())
+        .ok()
+        .is_some_and(|bytes| clip_parse_disk(&bytes).is_none());
     let (mut hist, loaded_legacy) = fs::read(clip_history_path())
         .ok()
         .and_then(|bytes| clip_parse_disk(&bytes).map(|hist| (hist, false)))
@@ -176,7 +189,7 @@ pub(crate) fn clip_load_from_disk() {
         .saturating_add(1);
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
     *CLIP_HISTORY.lock().unwrap() = hist;
-    if loaded_legacy || cfg.clipboard_persist {
+    if !unreadable && (loaded_legacy || cfg.clipboard_persist) {
         clip_persist(&cfg);
     }
 }
