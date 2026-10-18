@@ -1619,6 +1619,7 @@ body.edge-right .stack.open { transform: none; }
   to { opacity: 1; transform: none; }
 }
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.stack-item .action-glyph svg { width: 26px; height: 26px; }
 /* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
 .stack-item .stack-glyph {
   font-size: 18px;
