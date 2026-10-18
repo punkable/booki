@@ -26,14 +26,13 @@ function ClipboardPolicy({ cfg, set }) {
   }, [cfg.clipboardPersist]);
   return <>
     {storageFailed && <p className="notice notice-error" role="alert">{t("clip.storageFailed")}</p>}
-    <p className="inline-note"><Icon name="shield" />{t("clip.privacyBody")}</p>
     <Toggle label={t("clip.memory")} hint={t("clip.memoryHint")} checked={!!cfg.clipboardPersist} onChange={(v) => set({ clipboardPersist: v })} />
     <Toggle label={t("clip.sensitive")} hint={t("clip.sensitiveHint")} checked={cfg.clipboardSensitiveGuard !== false} onChange={(v) => set({ clipboardSensitiveGuard: v })} />
     <Toggle label={t("clip.compact")} hint={t("clip.compactHint")} checked={!!cfg.clipboardCompact} onChange={(v) => set({ clipboardCompact: v })} />
-    <Row label={t("clip.retention")} hint={t("clip.retentionHint")}>
+    <Row label={t("clip.retention")} hint={t("clip.retentionHint")} stack>
       <Slider value={cfg.clipboardRetentionDays ?? 7} min={1} max={90} step={1} fmt={(v) => t("clip.days").replace("{n}", v)} onChange={(v) => set({ clipboardRetentionDays: v })} />
     </Row>
-    <Row label={t("clip.limit")} hint={t("clip.limitHint")}>
+    <Row label={t("clip.limit")} hint={t("clip.limitHint")} stack>
       <Slider value={cfg.clipboardHistoryLimit ?? 60} min={10} max={200} step={10} fmt={(v) => t("clip.items").replace("{n}", v)} onChange={(v) => set({ clipboardHistoryLimit: v })} />
     </Row>
     <Row label={t("clip.clear")}><button type="button" className="button" onClick={() => dockApi.clipboardClear()}>{t("clip.clear")}</button></Row>
