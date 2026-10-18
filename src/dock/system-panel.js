@@ -196,9 +196,7 @@ export function buildSystemPanel(item, { close }) {
         const offer = document.createElement("div"); offer.className = "device-offer";
         const copy = document.createElement("div"); copy.className = "device-offer-copy";
         copy.append(text("span", t("dl.needs")), text("small", t("plugins.terms")));
-        const terms = text("button", t("plugins.termsLink"), "link"); terms.type = "button";
-        terms.addEventListener("click", () => api.launch("https://github.com/punkable/booki/blob/main/TERMS.md", []));
-        copy.append(terms); offer.append(copy);
+        offer.append(copy);
         installButton(offer, t("dev.enable"), "yt-dlp", () => { offer.remove(); showForm(); });
         box.append(offer); return;
       }

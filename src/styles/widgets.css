@@ -455,9 +455,9 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .system-widget-readings dd { margin: 0; font-variant-numeric: tabular-nums; }
 /* Device and AI readings as cards: one per device or provider. */
 .reading-cards { display: grid; gap: 8px; }
-.reading-card { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--card-bg, rgba(255, 255, 255, 0.06)); border: 1px solid var(--card-stroke, rgba(255, 255, 255, 0.08)); }
+.reading-card { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 4%, transparent); border: 1px solid color-mix(in srgb, var(--ink) 7%, transparent); }
 .reading-card-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.reading-card-glyph { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 6px; background: rgba(255, 255, 255, 0.08); }
+.reading-card-glyph { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 6px; background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .reading-card-glyph svg { width: 16px; height: 16px; }
 .reading-card-names { display: grid; min-width: 0; flex: 1; }
 .reading-card-names strong, .reading-card-names small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -482,7 +482,12 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .tile.widget.needs-attention .w-ring svg { animation: tone-blink 1.2s ease-in-out infinite; }
 @keyframes tone-blink { 50% { opacity: 0.35; } }
 @keyframes tone-sweep { from { background-position: -40px 0; } to { background-position: 140% 0; } }
-.device-offer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); font-size: 0.8125rem; color: var(--ink-2); }
+/* A plugin offer: what it adds on the first line, then the terms box and
+   the button on one row, the button never wrapping its label. */
+.device-offer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); font-size: 0.8125rem; color: var(--ink-2); }
+.device-offer > :first-child { grid-column: 1 / -1; }
+.device-offer > .terms-check { grid-column: 1; }
+.device-offer > button { grid-column: 2; justify-self: end; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .tile.widget.needs-attention .w-ring svg, .reading-bar-track i { animation: none !important; } }
 /* Rotating cards (Devices, AI): the ring glyph turns into the device kind or
    provider logo and eases in as the card moves to the next one. */
@@ -523,7 +528,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .device-offer-copy { display: grid; gap: 4px; min-width: 0; }
 .device-offer-copy small { font-size: 0.75rem; line-height: 1.35; opacity: 0.8; }
 .device-offer-copy .link { justify-self: start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.75rem; cursor: pointer; }
-.terms-check { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
+.terms-check { display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
 .terms-check .link { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 .rgb-profiles { display: flex; flex-wrap: wrap; gap: 8px; }
 .reading-card:has(> .plugin-panel-actions) { grid-template-columns: 1fr auto; align-items: center; }
