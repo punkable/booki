@@ -125,7 +125,7 @@ export function buildSystemPanel(item, { close }) {
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       cards(devices, values.map((d) => ({
-        name: d.name, sub: sources[d.source] || "", glyph: "battery",
+        name: d.name, sub: sources[d.source] || "", glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
         bars: [{ label: t("w.battery"), percent: d.level, warn: d.level <= 20 }],
       })));
     });

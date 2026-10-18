@@ -135,21 +135,50 @@ const pollStats = singleFlight(async () => {
 });
 
 // Headsets, earbuds, mice and keyboards that report a battery to Windows.
-// The card shows the one closest to running out; its hint lists them all.
+// The card takes each device in turn (about every 6 s, lowest first) with an
+// icon for its kind; its hint lists them all.
 const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
-const pollDevices = singleFlight(async () => {
-  let list = [];
-  try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
+const KIND_ICON = { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" };
+let deviceTurn = 0;
+function setCornerGlyph(el, name, key) {
+  const host = el.querySelector(".w-card") || el;
+  let glyph = host.querySelector(".w-glyph");
+  if (!glyph) { glyph = document.createElement("span"); glyph.className = "w-glyph"; glyph.setAttribute("aria-hidden", "true"); host.append(glyph); }
+  if (glyph.dataset.key !== key) { glyph.dataset.key = key; glyph.innerHTML = icon(name); }
+  el.dataset.glyph = key;
+}
+// One timer turns every rotating card; it repaints cached readings only.
+let rotationTimer = 0;
+function syncRotation() {
+  const devices = (deviceReading.last || []).length > 1;
+  const ai = (aiReading.last || []).filter((p) => (p.windows || []).length).length > 1;
+  if (!devices && !ai) { clearInterval(rotationTimer); rotationTimer = 0; return; }
+  if (rotationTimer) return;
+  rotationTimer = setInterval(() => {
+    if (S.hiddenState || S.displayOff) return;
+    // Hold still while the pointer rests on the card, so it can be read.
+    if (document.querySelector('.tile.widget[data-widget="devices"]:hover, .tile.widget[data-widget="ai"]:hover')) return;
+    deviceTurn++; aiTurn++;
+    paintDevices(deviceReading.last || []); paintAi(aiReading.last || []);
+  }, 6000);
+}
+function paintDevices(list) {
   eachWidget("devices", (el) => {
     setWidgetAvailable(el, list.length > 0);
-    if (!list.length) { setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
-    const low = list[0];
-    setMetric(el, low.name, low.level);
+    if (!list.length) { delete el.dataset.glyph; el.querySelector(".w-glyph")?.remove(); setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
+    const shown = list[deviceTurn % list.length];
+    setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
+    setMetric(el, shown.name, shown.level);
     // Readings that came through a plugin say so, e.g. "via HeadsetControl".
     const via = (d) => (PLUGIN_NAMES[d.source] ? ` · ${t("w.devicesVia").replace("{plugin}", () => PLUGIN_NAMES[d.source])}` : "");
     setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${via(d)}`).join("\n"));
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", low.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
+    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", shown.level <= 20 ? BATTERY_LOW : RING_DEFAULTS.devices);
   });
+}
+const pollDevices = singleFlight(async () => {
+  let list = [];
+  try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
+  paintDevices(list); syncRotation();
 });
 
 // Plan usage of the AI services signed in on this PC (Claude Code, Codex).
@@ -162,7 +191,7 @@ const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
 // Every signed-in provider takes a turn on the card (about every 6 s) with its
 // own isotype and fullest window; rotating repaints the cached reading, it
 // never asks the services again.
-let aiRotation = 0; let aiTurn = 0;
+let aiTurn = 0;
 const PROVIDER_ICON = { claude: "ai-claude", codex: "ai-openai" };
 function paintAi(providers) {
   const windows = providers.flatMap((p) => (p.windows || []).map((w) => ({ ...w, provider: p.name })));
@@ -171,17 +200,14 @@ function paintAi(providers) {
     setWidgetAvailable(el, windows.length > 0);
     if (!windows.length) {
       const signin = providers.some((p) => p.error === "signin");
-      delete el.dataset.provider;
+      delete el.dataset.glyph; el.querySelector(".w-glyph")?.remove();
       setText(el, t("w.ai"), "—");
       setTileLabel(el, t(!providers.length ? "w.aiNone" : signin ? "w.aiSignin" : "w.aiUnavailable"));
       return;
     }
     const current = shown[aiTurn % shown.length];
     const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
-    el.dataset.provider = current.id;
-    const host = el.querySelector(".w-card") || el;
-    const glyph = host.querySelector(".w-provider") || host.appendChild(Object.assign(document.createElement("span"), { className: "w-provider" }));
-    glyph.innerHTML = icon(PROVIDER_ICON[current.id] || "sparkles");
+    setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
     setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
     setTileLabel(el, windows.map((w) => {
       const reset = resetClock(w.resets_at);
@@ -189,16 +215,11 @@ function paintAi(providers) {
     }).concat(providers.filter((p) => !(p.windows || []).length).map((p) => `${p.name} · ${t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable")}`)).join("\n"));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", top.percent >= 80 ? BATTERY_LOW : RING_DEFAULTS.ai);
   });
-  clearInterval(aiRotation); aiRotation = 0;
-  if (shown.length > 1) aiRotation = setInterval(() => {
-    if (S.hiddenState || S.displayOff || !document.querySelector('.tile.widget[data-widget="ai"]')) return;
-    aiTurn++; paintAi(aiReading.last || []);
-  }, 6000);
 }
 const pollAi = singleFlight(async () => {
   let providers = [];
   try { providers = (await aiReading.refresh()) || []; } catch (_) { providers = []; }
-  paintAi(providers);
+  paintAi(providers); syncRotation();
 });
 
 function setWidgetAvailable(el, available) {

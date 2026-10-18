@@ -13,6 +13,8 @@ const BATTERY: &str = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2";
 /// DEVPKEY_Device_IsConnected: whether the device is connected right now.
 const CONNECTED: &str = "{83DA6326-97A6-4088-9453-A1923F573B29} 15";
 const NAME: &str = "System.ItemNameDisplay";
+/// DEVPKEY_Bluetooth_ClassOfDevice: the Bluetooth class of device (a u32).
+const CLASS_OF_DEVICE: &str = "{2BD67D8B-8BEB-48D5-87E0-6CDA3428040A} 10";
 
 #[derive(serde::Serialize, Clone, Debug, PartialEq)]
 pub struct DeviceBattery {
@@ -21,6 +23,82 @@ pub struct DeviceBattery {
     /// Where the reading came from: "bluetooth", "logitech" or a plugin id
     /// such as "headsetcontrol", so the widget can say so.
     pub source: &'static str,
+    /// What the device is, for its icon: "headset", "mouse", "keyboard",
+    /// "gamepad" or "other".
+    pub kind: &'static str,
+}
+
+/// The kind from a Bluetooth class of device: major class 4 is audio,
+/// 5 is a peripheral whose minor bits say keyboard (01) or pointer (10).
+pub fn kind_from_class(cod: u32) -> Option<&'static str> {
+    match (cod >> 8) & 0x1F {
+        4 => Some("headset"),
+        5 => match (cod >> 6) & 0x3 {
+            1 => Some("keyboard"),
+            2 => Some("mouse"),
+            _ => match (cod >> 2) & 0xF {
+                1 | 2 => Some("gamepad"),
+                _ => None,
+            },
+        },
+        _ => None,
+    }
+}
+
+/// The kind guessed from a device name, when the device does not say.
+pub fn kind_from_name(name: &str) -> &'static str {
+    let n = name.to_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| n.contains(w));
+    if has(&[
+        "headset",
+        "headphone",
+        "buds",
+        "airpods",
+        "earbud",
+        "arctis",
+        "audífono",
+        "auricular",
+        "wh-",
+        "wf-",
+        "jabra",
+        "bose",
+        "soundcore",
+    ]) {
+        "headset"
+    } else if has(&[
+        "keyboard",
+        "teclado",
+        "keys",
+        "mx mechanical",
+        "k380",
+        "k780",
+    ]) {
+        "keyboard"
+    } else if has(&[
+        "mouse",
+        "ratón",
+        "mx master",
+        "mx anywhere",
+        "trackball",
+        "trackpad",
+        "g pro wireless",
+        "g502",
+        "g305",
+    ]) {
+        "mouse"
+    } else if has(&[
+        "controller",
+        "gamepad",
+        "xbox",
+        "dualsense",
+        "dualshock",
+        "joy-con",
+        "mando",
+    ]) {
+        "gamepad"
+    } else {
+        "other"
+    }
 }
 
 /// Connected devices that report a battery level, lowest first, one entry
@@ -82,6 +160,7 @@ fn parse_headsetcontrol(text: &str) -> Vec<DeviceBattery> {
                 name,
                 level: level as u8,
                 source: "headsetcontrol",
+                kind: "headset",
             })
         })
         .collect()
@@ -92,6 +171,7 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
         HSTRING::from(BATTERY),
         HSTRING::from(CONNECTED),
         HSTRING::from(NAME),
+        HSTRING::from(CLASS_OF_DEVICE),
     ]
     .into();
     // Ask only for devices that carry a battery level. If this Windows build
@@ -132,10 +212,15 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
         if name.trim().is_empty() {
             continue;
         }
+        let kind = read(CLASS_OF_DEVICE)
+            .and_then(|v| v.cast::<IReference<u32>>().ok()?.Value().ok())
+            .and_then(kind_from_class)
+            .unwrap_or_else(|| kind_from_name(&name));
         out.push(DeviceBattery {
             name,
             level,
             source: "bluetooth",
+            kind,
         });
     }
     Ok(out)
@@ -172,8 +257,23 @@ mod tests {
             name: name.into(),
             level,
             source: "bluetooth",
+            kind: "other",
         };
         let merged = merge(vec![d("Buds", 80), d("Mouse", 40), d("Buds", 75)]);
         assert_eq!(merged, vec![d("Mouse", 40), d("Buds", 75)]);
+    }
+
+    #[test]
+    fn device_kinds_from_class_and_name() {
+        assert_eq!(kind_from_class(0x240404), Some("headset"));
+        assert_eq!(kind_from_class(0x002540), Some("keyboard"));
+        assert_eq!(kind_from_class(0x002580), Some("mouse"));
+        assert_eq!(kind_from_class(0x002508), Some("gamepad"));
+        assert_eq!(kind_from_class(0x000100), None);
+        assert_eq!(kind_from_name("Galaxy Buds2 Pro"), "headset");
+        assert_eq!(kind_from_name("MX Master 3S"), "mouse");
+        assert_eq!(kind_from_name("MX Keys S"), "keyboard");
+        assert_eq!(kind_from_name("Xbox Wireless Controller"), "gamepad");
+        assert_eq!(kind_from_name("Pixel Watch"), "other");
     }
 }
