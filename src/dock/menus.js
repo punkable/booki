@@ -48,7 +48,7 @@ export function openMenu(e, item) {
   ctxMenu.innerHTML = "";
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   const generation = ++S.menuGeneration;
-  addMenuHead(menuPinTitle(item), menuKindLabel(item));
+  addMenuHead(menuPinTitle(item), item.kind === "separator" ? "" : menuKindLabel(item));
 
   // Like the macOS dock: an app's open windows come first (the likeliest
   // reason to right-click a running app is to pick one of them), then what
@@ -106,20 +106,18 @@ export function openMenu(e, item) {
   if (item.kind !== "separator" && item.kind !== "trash") {
     sep();
     // A widget's tile always shows its own label, so renaming it would do nothing.
-    if (item.kind !== "widget") add("pencil", t("apps.rename"), () => promptRename(item));
+    if (item.kind !== "widget") add("pencil", `${t("apps.rename")}…`, () => promptRename(item));
     // A custom icon only makes sense for apps/folders (groups show a mini-grid,
     // widgets show their card).
     if (item.kind === "app" || item.kind === "folder") {
       add("image", t("m.changeIcon"), () => changeIcon(item));
-      if (item.icon) add("x", t("m.removeIcon"), () => clearIcon(item));
+      if (item.icon) add("undo", t("m.removeIcon"), () => clearIcon(item));
     }
-    if (item.kind === "group") add("grid", t("group.ungroup"), () => ungroup(item));
+    if (item.kind === "group") add("ungroup", t("group.ungroup"), () => ungroup(item));
   }
-  sep();
-  add("plus", t("add.open"), () => openAddPanel(dockEl));
-  add("minus", t("m.addSep"), () => addSeparatorAfter(item.id));
-  sep();
-  add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
+  // Adding things lives on the background menu and the empty hint; a pin's
+  // menu stays about that pin.
+  if (item.kind !== "separator") { sep(); add("minus", t("m.addSep"), () => addSeparatorAfter(item.id)); }
   sep();
   add(
     "trash",
@@ -187,7 +185,6 @@ export function openBackgroundMenu(e) {
   addStyleRow();
   sep();
   add("pencil", t("overhaul.editing"), enterEdit);
-  add("palette", t("m.appearance"), () => dockApi.openSettingsTab("dock"));
   add("settings", t("m.settings"), () => dockApi.openSettingsTab("home"));
   for (const el of dockEl.querySelectorAll(".conditionally-hidden")) {
     const item = findWidgetPin(el.dataset.id);

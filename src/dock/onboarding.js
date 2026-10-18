@@ -66,17 +66,23 @@ export async function maybeOnboard() {
   setHidden(false); // the tips are useless if the dock booted tucked away
   const pop = document.createElement("div");
   pop.className = "coach";
+  pop.setAttribute("role", "dialog");
   placePop(pop);
+  let btn = null;
+  // Escape ends the tour the same way the last button does.
+  pop.addEventListener("keydown", (e) => { if (e.key === "Escape" && btn) { i = steps.length - 1; btn.click(); } });
   const showStep = () => {
     const last = i === steps.length - 1;
     pop.innerHTML =
       `<span class="coach-emoji">${steps[i].emoji}</span>` +
       `<span class="coach-text">${steps[i].text}</span>` +
-      `<span class="coach-dots">${steps.map((_, k) => (k === i ? "●" : "○")).join(" ")}</span>`;
-    const btn = document.createElement("button");
+      `<span class="coach-dots" aria-hidden="true">${steps.map((_, k) => (k === i ? "●" : "○")).join(" ")}</span>`;
+    pop.setAttribute("aria-label", `${i + 1} / ${steps.length}`);
+    btn = document.createElement("button");
     btn.className = "coach-btn";
     btn.textContent = last ? t("ob.done") : t("ob.next");
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (e) => {
+      if (last) e.currentTarget.disabled = true; // a second click must not finish twice
       i += 1;
       if (i < steps.length) {
         showStep();
@@ -94,6 +100,7 @@ export async function maybeOnboard() {
       }
     });
     pop.appendChild(btn);
+    btn.focus();
   };
   showStep();
 }

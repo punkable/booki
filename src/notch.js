@@ -532,6 +532,10 @@ pill.addEventListener("pointerleave", () => {
   cardTimer = setTimeout(closeCard, 220);
 });
 
+// Keyboard: focusing the pill opens the same card, so play/pause is reachable.
+pill.addEventListener("focus", () => { clearTimeout(cardTimer); openCard(); });
+pill.addEventListener("blur", (e) => { if (!pill.contains(e.relatedTarget)) { clearTimeout(cardTimer); cardTimer = setTimeout(closeCard, 220); } });
+
 cPlay.addEventListener("pointerdown", (e) => e.stopPropagation());
 cPlay.addEventListener("click", async (e) => {
   e.stopPropagation();
