@@ -80,6 +80,14 @@
 
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
 
+## Novedades de 0.88
+
+- **Recolector**: suelta un enlace en el dock y guarda video o solo audio de cientos de sitios, galerías de imágenes o archivos.
+- **Dispositivos** rota entre audífonos, mouse y teclado con su icono; el color indica la batería y parpadea cuando hay que cargar.
+- **Uso de IA** con logos oficiales de Claude y ChatGPT, rotando, y hora de reinicio de cada límite.
+- **Posición** con un clic sobre un dibujo de tu pantalla; carpetas sin nombres solapados.
+- Complementos con huellas SHA-256 fijadas y [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
+
 ## Novedades de 0.87
 
 - Un catálogo común para HeadsetControl, yt-dlp, OpenRGB, Rclone y LibreHardwareMonitor, más consultas mediante el winget administrado por App Installer de Windows.

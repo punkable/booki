@@ -72,6 +72,14 @@
 
 <p align="center"><sub>Images show the actual Booki 0.86 interface with example data and generic sample icons.</sub></p>
 
+## What's new in 0.88
+
+- **Collector**: drop a link on the dock to save video or audio only from hundreds of sites, image galleries or files.
+- **Devices** rotates through headset, mouse and keyboard with their icons; color shows the battery and pulses when it needs charging.
+- **AI usage** with official Claude and ChatGPT logos, in turn, and when each limit resets.
+- **Position** picked with one click on a drawing of your screen; folders without overlapping names.
+- Plugins pinned to SHA-256 checksums, with [terms of use](TERMS.md).
+
 ## Get started
 
 1. Open [Releases](https://github.com/punkable/booki/releases/latest) and pick `Booki_*_x64-setup.exe` (Intel/AMD) or `Booki_*_arm64-setup.exe` (Windows on ARM). An x64 MSI is also available.
