@@ -103,7 +103,7 @@ version = "0.62"
 # Split out of `windows` in 0.62: Vector2 for the composition backdrop.
 # IIterable from a Vec, for WinRT device property queries.
 [target.'cfg(windows)'.dependencies.windows-collections]
-version = "0.3"
+version = "0.100"
 
 [target.'cfg(windows)'.dependencies.windows-numerics]
 version = "0.3"
