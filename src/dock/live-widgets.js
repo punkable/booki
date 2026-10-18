@@ -7,6 +7,7 @@ import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
+import { notify } from "./notices.js";
 import { deviceReading, aiReading, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
@@ -189,8 +190,18 @@ function paintDevices(list) {
 const pollDevices = singleFlight(async () => {
   let list = [];
   try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
-  paintDevices(list); syncRotation();
+  paintDevices(list); syncRotation(); warnLowDevices(list);
 });
+
+// One notice per device when it crosses 10%, not again until it recovers.
+const warnedDevices = new Set();
+function warnLowDevices(list) {
+  for (const d of list) {
+    if (!d.charging && d.level <= 10) {
+      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`); }
+    } else if (d.charging || d.level > 15) warnedDevices.delete(d.name);
+  }
+}
 
 // Plan usage of the AI services signed in on this PC (Claude Code, Codex).
 // The card shows the window closest to its limit; the hint lists them all

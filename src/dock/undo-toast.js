@@ -65,3 +65,13 @@ async function undoLastRemoval() {
   await render();
   reframe();
 }
+
+/** A short notice beside the bar (download finished, battery low). */
+export function showNoticeToast(title, detail = "") {
+  if (!undoToast) return;
+  hideUndoToast();
+  undoToast.innerHTML = `<span class="notice-copy"><strong>${esc(title)}</strong>${detail ? `<small>${esc(detail)}</small>` : ""}</span>`;
+  undoToast.classList.remove("hidden");
+  placeUndoToast();
+  undoRemovalTimer = setTimeout(hideUndoToast, 4000);
+}

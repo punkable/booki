@@ -1521,6 +1521,7 @@ pub fn run() {
             notch_screen_busy,
             notch_toast,
             notch_toast_dismiss,
+            notch_notice,
             notch_preview,
             hide_all,
             clear_fullscreen_blackout,

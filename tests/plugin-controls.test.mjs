@@ -102,6 +102,17 @@ test("the Collector picks the tool from the link: files and galleries start, vid
   assert.deepEqual(errors, []); await page.close();
 });
 
+test("a device crossing 10% is announced once beside the dock", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("devices")] }),
+    initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="device_batteries"?Promise.resolve([{name:"MX Master 3S",level:8,source:"logitech",kind:"mouse",charging:false}]):invoke(cmd,args);`,
+  });
+  const toast = page.locator(".undo-toast .notice-copy");
+  await toast.waitFor();
+  assert.match(await toast.innerText(), /Low battery[\s\S]*MX Master 3S · 8%/);
+  assert.deepEqual(errors, []); await page.close();
+});
+
 test("a click on the volume card mutes; its panel is one right-click away", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),

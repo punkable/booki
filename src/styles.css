@@ -2614,3 +2614,6 @@ body.hide-running-indicators .tile.launching::after { display: none; }
   color: HighlightText;
   background: Highlight;
 }
+/* Notices share the undo toast: a bold line and an optional detail. */
+.undo-toast .notice-copy { display: grid; gap: 2px; min-width: 0; }
+.undo-toast .notice-copy small { opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }

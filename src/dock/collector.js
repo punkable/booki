@@ -6,6 +6,7 @@ import { t } from "../i18n.js";
 import { eachWidget } from "./live-widgets.js";
 import { setMetric, setText } from "./widget-view.js";
 import { setTileLabel } from "./tooltip.js";
+import { notify } from "./notices.js";
 
 export const download = { state: "idle", percent: 0, title: "", path: "", error: "" };
 const listeners = new Set();
@@ -47,10 +48,12 @@ export async function startDownload(url, format) {
     const path = await api.pluginDownload(url, null, format);
     Object.assign(download, { state: "done", percent: 100, path: path || download.path });
     changed();
+    notify(t("dl.done"), baseName(download.path));
     return path;
   } catch (error) {
     Object.assign(download, { state: "error", error: String(error?.message ?? error ?? "") });
     changed();
+    notify(t("dl.failed"));
     throw error;
   }
 }

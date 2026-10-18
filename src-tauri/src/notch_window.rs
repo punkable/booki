@@ -102,6 +102,35 @@ pub(crate) fn notch_toast(app: AppHandle, title: String, detail: Option<String>)
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
     }
+    show_toast_frame(&app, title, detail);
+}
+
+/// A short notice (download finished, battery low) on the notch while the
+/// dock is tucked away. Unlike `notch_toast` it never hides the dock or
+/// starts a fullscreen blackout, and the notch returns to its own shape
+/// after a few seconds. Returns false when the dock is out: the dock then
+/// shows the notice itself.
+#[tauri::command]
+pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>) -> bool {
+    let dock_out = app
+        .get_webview_window("dock")
+        .map(|d| d.is_visible().unwrap_or(false))
+        .unwrap_or(false);
+    if dock_out {
+        return false;
+    }
+    show_toast_frame(&app, title, detail);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(3600));
+        if let Some(notch) = app.get_webview_window("notch") {
+            let _ = position_notch(&notch, &config::load().edge);
+        }
+    });
+    true
+}
+
+fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
     if let Some(notch) = app.get_webview_window("notch") {
         if let Ok(Some(mon)) = notch.current_monitor() {
             let dpr = notch.scale_factor().unwrap_or(1.0);
