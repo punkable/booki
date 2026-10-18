@@ -8,7 +8,7 @@ import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -123,14 +123,14 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
-    const icons = { claude: "ai-claude", codex: "ai-openai" };
+    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
     live(ai, aiReading, 60000, (providers) => {
       const all = Array.isArray(providers) ? providers : [];
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
       cards(ai, all.map((p) => ({
         name: p.name, glyph: icons[p.id] || "sparkles",
-        error: (p.windows || []).length ? "" : t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable"),
+        error: (p.windows || []).length ? "" : t(aiErrorKey(p.error)),
         tone: usageTone(Math.max(0, ...(p.windows || []).map((w) => w.percent))), bars: (p.windows || []).map((w) => {
           const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
           return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, tone: usageTone(w.percent) };

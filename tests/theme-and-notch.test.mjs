@@ -126,3 +126,12 @@ test("an idle notch keeps the usual reveal", async () => {
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("hovering an idle notch opens no card: a clock alone is not worth covering the screen", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchMode: "attached", notchPeek: true }) });
+  await page.hover("#notch-pill");
+  await page.waitForTimeout(700);
+  assert.equal(await page.evaluate(() => document.body.classList.contains("card")), false);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

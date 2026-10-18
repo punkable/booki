@@ -4,6 +4,8 @@ import { sharedReading } from "./async-cache.js";
 
 export const deviceReading = sharedReading(() => api.deviceBatteries());
 export const aiReading = sharedReading(() => api.aiUsage());
+// Why a provider has no usage windows, as a string key (see ai_usage.rs).
+export const aiErrorKey = (error) => ({ signin: "w.aiSignin", expired: "w.aiExpired", nocode: "w.aiNoCode" })[error] || "w.aiUnavailable";
 
 /* One meaning per color everywhere: good, fair, low, critical (blinks). */
 export function batteryTone(level, charging = false) {

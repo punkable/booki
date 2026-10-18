@@ -513,15 +513,29 @@ function followMorph(ms = 520) { // --dur-spring
   followFrames(reportNotchHitRects, ms);
 }
 
+/** Worth a card: something live, or media with a title. A clock alone is
+ *  not — the taskbar already shows it, and a big empty card just covers
+ *  what the person is working on. */
+function cardHasContent() {
+  return !!currentActivity() || !!(media && (media.title || media.artist));
+}
+let cardWatch = null;
 function openCard() {
-  if (!canPeek || cardOpen || drag) return;
+  if (!canPeek || cardOpen || drag || !cardHasContent()) return;
   paintCard();
+  // The window can turn click-through under a still pointer and never send
+  // pointerleave; close the card as soon as the pointer is really elsewhere.
+  clearInterval(cardWatch);
+  cardWatch = setInterval(() => {
+    if (cardOpen && !pill.matches(":hover") && !pill.contains(document.activeElement)) closeCard();
+  }, 1200);
   cardOpen = true;
   document.body.classList.add("card");
   followMorph();
 }
 function closeCard() {
   clearTimeout(cardTimer);
+  clearInterval(cardWatch);
   if (!cardOpen) return;
   cardOpen = false;
   document.body.classList.remove("card");
@@ -533,11 +547,11 @@ function closeCard() {
 // and leaving by a pixel does not snap it shut.
 pill.addEventListener("pointerenter", () => {
   clearTimeout(cardTimer);
-  cardTimer = setTimeout(openCard, 140);
+  cardTimer = setTimeout(openCard, 350);
 });
 pill.addEventListener("pointerleave", () => {
   clearTimeout(cardTimer);
-  cardTimer = setTimeout(closeCard, 220);
+  cardTimer = setTimeout(closeCard, 160);
 });
 
 // Keyboard: focusing the pill opens the same card, so play/pause is reachable.

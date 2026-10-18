@@ -2,6 +2,8 @@
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
   es: {
+    "w.aiExpired": "Abre Claude Code para renovar el inicio de sesión",
+    "w.aiNoCode": "Inicia sesión en Claude Code para ver el uso; la app de escritorio no lo comparte",
     "release871.headline": "Ajustes más cómodos, con fondo corregido y complementos en su propia categoría.",
     "release871.plugins": "Complementos tiene su propia pestaña y aparece en el buscador. Reúne instalaciones, retirada y controles de OpenRGB y LibreHardwareMonitor.",
     "release871.surface": "El fondo de Ajustes conserva su gris de WinUI también cuando Windows activa Mica; ya no queda transparente sobre una superficie negra.",
@@ -357,6 +359,8 @@ export const STRINGS = {
     "a11y.runningWindows": "En ejecución · {n} ventanas",
   },
   en: {
+    "w.aiExpired": "Open Claude Code to refresh sign-in",
+    "w.aiNoCode": "Sign in to Claude Code to see usage; the desktop app does not share it",
     "release871.headline": "More comfortable Settings, with corrected backgrounds and a dedicated Plugins page.",
     "release871.plugins": "Plugins has its own searchable tab for installation, removal and OpenRGB and LibreHardwareMonitor controls.",
     "release871.surface": "Settings retains its WinUI gray when Windows enables Mica, instead of exposing a black composition surface.",
@@ -712,6 +716,8 @@ export const STRINGS = {
     "a11y.runningWindows": "Running · {n} windows",
   },
   pt: {
+    "w.aiExpired": "Abra o Claude Code para renovar o login",
+    "w.aiNoCode": "Entre no Claude Code para ver o uso; o app para desktop não o compartilha",
     "release871.headline": "Ajustes mais confortáveis, com fundo corrigido e uma página de complementos.",
     "release871.plugins": "Complementos tem sua própria aba na busca, com instalação, remoção e controles do OpenRGB e LibreHardwareMonitor.",
     "release871.surface": "Os Ajustes mantêm o cinza WinUI quando o Windows ativa Mica, sem expor uma superfície preta.",
@@ -1067,6 +1073,8 @@ export const STRINGS = {
     "a11y.runningWindows": "Em execução · {n} janelas",
   },
   fr: {
+    "w.aiExpired": "Ouvrez Claude Code pour renouveler la connexion",
+    "w.aiNoCode": "Connectez-vous à Claude Code pour voir l’usage ; l’app de bureau ne le partage pas",
     "release871.headline": "Des réglages plus confortables, avec un fond corrigé et une page Modules dédiée.",
     "release871.plugins": "Modules dispose de son propre onglet dans la recherche, avec installation, suppression et commandes OpenRGB et LibreHardwareMonitor.",
     "release871.surface": "Les réglages gardent leur gris WinUI lorsque Windows active Mica, sans exposer une surface noire.",
@@ -1422,6 +1430,8 @@ export const STRINGS = {
     "a11y.runningWindows": "En cours · {n} fenêtres",
   },
   de: {
+    "w.aiExpired": "Öffne Claude Code, um die Anmeldung zu erneuern",
+    "w.aiNoCode": "Melde dich bei Claude Code an, um die Nutzung zu sehen; die Desktop-App teilt sie nicht",
     "release871.headline": "Angenehmere Einstellungen mit korrigiertem Hintergrund und eigener Erweiterungsseite.",
     "release871.plugins": "Erweiterungen haben einen eigenen durchsuchbaren Tab für Installation, Entfernen sowie OpenRGB- und LibreHardwareMonitor-Steuerung.",
     "release871.surface": "Die Einstellungen behalten bei aktiviertem Windows-Mica ihr WinUI-Grau, statt eine schwarze Fläche freizulegen.",

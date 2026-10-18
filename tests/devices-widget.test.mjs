@@ -73,6 +73,23 @@ test("the AI widget shows the window closest to its limit and lists every window
   await page.close();
 });
 
+test("the AI widget keeps Claude listed with a reason when its sign-in has lapsed", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [ai] }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "ai_usage"
+      ? Promise.resolve([
+          { id: "claude", name: "Claude", windows: [], error: "expired" },
+          { id: "chatgpt", name: "ChatGPT", windows: [{ label: "5h", percent: 12, resets_at: 0 }], error: null }])
+      : old(c, a); }`,
+  });
+  const card = page.locator('.tile[data-id="ai"]');
+  await card.locator(".w-ring-num", { hasText: "12" }).waitFor();
+  const hint = await card.getAttribute("aria-label");
+  assert.ok(hint.includes("ChatGPT 5h · 12%") && /Claude · .*Claude Code/.test(hint), hint);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("the AI widget explains what to do when nothing is signed in", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [ai] }) });
   const card = page.locator('.tile[data-id="ai"]');
