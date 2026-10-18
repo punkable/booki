@@ -40,7 +40,7 @@ sysinfo = "0.39"
 ureq = "3"
 # Verify and unpack optional plugins (plugins.rs).
 sha2 = "0.10"
-zip = { version = "4", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 # Windows-only native integration (Win32 bindings + icon encoding).
 [target.'cfg(windows)'.dependencies]
