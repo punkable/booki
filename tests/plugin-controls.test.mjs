@@ -24,7 +24,7 @@ test("native mixer targets session identifiers and commits volume and mute", asy
   await page.getByRole("slider", { name: "Browser", exact: true }).evaluate((el) => { el.value = "27"; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); });
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 1);
   assert.deepEqual(await page.evaluate(() => window.__audioWrites[0]), { id: "session-42-A", percent: 27, muted: false });
-  await page.getByRole("checkbox", { name: "Browser · Muted" }).check();
+  await page.getByRole("button", { name: "Browser · Muted" }).click();
   await waitForAsyncCondition(page, () => window.__audioWrites.length === 2);
   assert.equal(await page.evaluate(() => window.__audioWrites.at(-1).muted), true);
   await page.keyboard.press("Escape");

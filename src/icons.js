@@ -185,6 +185,7 @@ const iconMap = {
   disk: iconDisk,
   battery: iconBattery,
   volume: iconVolume,
+  "volume-x": () => S(`<path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5zM22 9l-6 6M16 9l6 6"/>`),
   play: iconPlay,
   pause: iconPause,
   "chevron-left": iconChevronLeft,

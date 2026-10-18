@@ -344,7 +344,12 @@ export function buildSystemPanel(item, { close }) {
     // Commit on release/keyboard change. Serialize volume and mute writes so
     // rapid input can never let an older request overwrite the newest one.
     let queue = Promise.resolve();
-    const mute = document.createElement("input"); mute.type = "checkbox"; mute.checked = muted; mute.setAttribute("aria-label", `${name} · ${t("w.muted")}`);
+    // Mute is a speaker toggle button, like the Windows volume mixer.
+    const mute = document.createElement("button"); mute.type = "button"; mute.className = "mute-toggle";
+    mute.checked = muted;
+    const paintMute = () => { mute.setAttribute("aria-pressed", String(mute.checked)); mute.innerHTML = icon(mute.checked ? "volume-x" : "volume"); mute.title = t("w.muted"); };
+    mute.setAttribute("aria-label", `${name} · ${t("w.muted")}`); paintMute();
+    mute.addEventListener("click", () => { mute.checked = !mute.checked; paintMute(); mute.dispatchEvent(new Event("change")); });
     const commit = () => {
       const wanted = [Number(input.value), mute.checked];
       queue = queue.catch(() => {}).then(() => save(...wanted)).catch((error) => {
@@ -352,8 +357,9 @@ export function buildSystemPanel(item, { close }) {
       });
     };
     input.addEventListener("change", commit); mute.addEventListener("change", commit);
-    const muteLabel = text("span", t("w.muted"));
-    row.append(text("span", name), input, value, muteLabel, mute); container.append(row);
+    const sync = () => input.style.setProperty("--pct", `${input.value}%`);
+    input.addEventListener("input", sync); sync();
+    row.append(text("span", name), input, value, mute); container.append(row);
   }
   return panel;
 }
