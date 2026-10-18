@@ -196,7 +196,7 @@ export function useSettingsStore() {
       await ensureLang(c.language);
       // A config-changed read may already have filled the window.
       if (seq !== loadSeq.current || cfgRef.current) return;
-      let next = c;
+      let next = Array.isArray(c.pinned) ? c : { ...c, pinned: [] };
       // Migrate the legacy localStorage intro flag into persisted config once.
       try {
         if (!c.settingsIntroSeen && localStorage.getItem("booki.introSeen") === "1") {
@@ -253,7 +253,7 @@ export function useSettingsStore() {
         // updaters twice, and painting or loading a language is a side effect.
         // cfgRef always holds the newest draft (set() writes it synchronously).
         const prev = cfgRef.current;
-        let next = c;
+        let next = Array.isArray(c.pinned) ? c : { ...c, pinned: [] };
         if (prev) {
           next = { ...c };
           for (const key of new Set([...savingKeys.current, ...dirtyKeys.current])) next[key] = prev[key];

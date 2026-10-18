@@ -94,7 +94,9 @@ export function findSettings(query) {
       let score = normalizedLabel === normalizedQuery ? 200 : normalizedLabel.startsWith(normalizedQuery) ? 140 : 0;
       for (const term of terms) {
         const position = searchable.indexOf(term);
-        const termScore = position >= 0 ? 70 - Math.min(position, 45) : fuzzySearchScore(searchable, term);
+        // Typos are forgiven against the setting name only; across the page and
+        // aliases, letters-in-order matched almost anything.
+        const termScore = position >= 0 ? 70 - Math.min(position, 45) : term.length > 2 ? fuzzySearchScore(normalizedLabel, term) : 0;
         if (!termScore) return null;
         score += termScore;
       }

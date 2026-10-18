@@ -965,3 +965,9 @@
 .plugin-feeds { display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin: 2px 0 0; padding: 3px 10px; font-size: 0.75rem; color: var(--ink); background: var(--subtle-pressed, var(--hover)); border-radius: var(--r-pill); }
 .plugin-feeds .ui-icon { width: 14px; height: 14px; }
 .plugin-actions .terms-check { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: calc(12.5px * var(--os-text-scale, 1)); cursor: pointer; }
+/* The inspector is narrow: rows stack their control under the label. */
+.inspector .ui-row:not(.ui-toggle-row) { flex-wrap: wrap; }
+.inspector .ui-row:not(.ui-toggle-row) > .ui-row-control { flex: 1 1 100%; justify-content: flex-start; }
+.inspector-actions { position: sticky; bottom: 0; background: var(--card); z-index: 1; }
+.catalog-desc { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.catalog-badge { flex: none; align-self: flex-start; padding: 2px 8px; border-radius: 999px; font-size: calc(11px * var(--os-text-scale, 1)); font-weight: 600; color: var(--accent-contrast, #fff); background: var(--accent); }

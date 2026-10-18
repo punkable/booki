@@ -80,12 +80,12 @@ function WidgetFields({ item, cfg, set, onChange }) {
 
 function CatalogCard({ widget, pinned, selected, style, onInspect }) {
   const meta = WIDGET_META[widget];
-  return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${t("next.inspector")}: ${name(widget)}`} title={pinned ? t("widget.pinned") : undefined}
+  return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} title={pinned ? t("widget.pinned") : undefined}
     style={{ "--widget-accent": meta.accent }} onClick={onInspect}>
     <span className="catalog-head">
       <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
       <span className="catalog-text"><span className="catalog-name">{name(widget)}</span><span className="catalog-desc">{t(meta.desc)}</span></span>
-      {pinned && <Icon name="check" className="catalog-pinned" />}
+      {pinned && <span className="catalog-badge">{t("widget.pinned")}</span>}
     </span>
     <span className="catalog-preview" aria-hidden="true"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span>
   </button>;
@@ -120,7 +120,9 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const selected = saved?.kind === "widget" ? saved : draft;
   const inspect = (widget) => {
     origin.current = document.activeElement;
-    const ref = widgetRefs(cfg.pinned, widget)[0];
+    // A widget pinned twice: each click on its card reaches the next copy.
+    const refs = widgetRefs(cfg.pinned, widget);
+    const ref = refs.find((r) => r.id !== selectedId) || refs[0];
     selectId(ref?.id || null);
     setDraft(ref ? null : { id: crypto.randomUUID(), kind: "widget", widget, name: name(widget), path: "", args: [], style: {} });
   };
@@ -135,8 +137,8 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   return <>
     <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
     <div className="toolbar">
-      <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} /></label>
-      <div className="chips" role="group" aria-label={t("workspace.sources")}>
+      <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} /></label>
+      <div className="chips" role="group" aria-label={t("tab.widgets")}>
         {CATEGORIES.map(([value, key]) => <button key={value} type="button" className="chip" aria-pressed={category === value} onClick={() => setCategory(value)}>{t(key)}</button>)}
       </div>
     </div>
@@ -158,7 +160,7 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
           <WidgetFields item={selected} cfg={cfg} set={set} onChange={change} />
           <div className="inspector-actions">
             {saved
-              ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); }}>{t("apps.remove")}</button>
+              ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); if (origin.current?.isConnected) origin.current.focus(); }}>{t("apps.remove")}</button>
               : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
           </div>
         </> : <InDock cfg={cfg} onInspect={inspect} />}

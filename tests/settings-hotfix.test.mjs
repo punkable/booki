@@ -103,13 +103,13 @@ test('a late material reply cannot re-enable glass after the user disables it', 
   await page.close();
 });
 
-test('an injected Home render failure preserves navigation without rewriting settings', async () => {
-  // A pinned list that is not a list makes Home's summary throw while rendering.
+test('a pinned list that is not a list renders Home without rewriting settings', async () => {
+  // Read as an empty dock instead of throwing while rendering.
   const cfg = makeConfig({ pinned: { invalid: true } });
   const { page } = await openPage(browser, port, 'settings.html', { cfg });
-  await page.locator('.settings-recovery').waitFor();
-  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.locator('.home-hero').waitFor();
   assert.equal(await page.locator('.settings-recovery').count(), 0);
+  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
   assert.deepEqual(await page.evaluate(() => window.__TAURI__.core.invoke('get_config')), cfg);
   await page.close();
 });

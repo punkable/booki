@@ -5,7 +5,7 @@ import { dock as dockApi } from "../../api.js";
 import { curLang, t } from "../../i18n.js";
 import { pinnedKeys, pathKey } from "../../dock/app-candidates.js";
 import { countContent, LAYOUT_SCENARIOS } from "../../dock/layout-model.js";
-import { activeFinish, FINISH_PRESETS } from "../../surface.js";
+import { activeFinish } from "../../surface.js";
 import { resolveNotchMode } from "../../notch-mode.js";
 import { currentRelease } from "../../release-notes.js";
 import { DockPreview } from "../dock-preview.jsx";
@@ -30,6 +30,7 @@ function SetupCard({ cfg, set, apps, navigate }) {
   const [autostart, setAutostart] = useState(null);
   const [frequent, setFrequent] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [startFailed, setStartFailed] = useState(false);
   const [dismissed, setDismissed] = useState(readDismissed);
   useEffect(() => { dockApi.getAutostart().then((v) => setAutostart(!!v)).catch(() => setAutostart(false)); }, []);
   useEffect(() => {
@@ -50,6 +51,7 @@ function SetupCard({ cfg, set, apps, navigate }) {
     await dockApi.setAutostart(true).catch(() => {});
     const real = !!(await dockApi.getAutostart().catch(() => false));
     setAutostart(real); set({ autostart: real }); setBusy(false);
+    setStartFailed(!real);
   };
   const dismiss = () => { setDismissed(true); try { localStorage.setItem(SETUP_DISMISSED, "1"); } catch (_) {} };
   return <section className="card setup-card" aria-labelledby="setup-title">
@@ -69,14 +71,8 @@ function SetupCard({ cfg, set, apps, navigate }) {
       <li data-done={!!autostart}>
         <Icon name={autostart ? "check" : "power"} className="setup-icon" />
         <span className="setup-text"><strong>{t("be.autostart")}</strong><span>{autostart ? t("setup.startDone") : t("setup.startHint")}</span></span>
-        {!autostart && <span className="setup-actions"><button type="button" className="button" disabled={busy} onClick={toggleStart}>{t("setup.startOn")}</button></span>}
-      </li>
-      <li>
-        <Icon name="palette" className="setup-icon" />
-        <span className="setup-text"><strong>{t("finish.title")}</strong><span>{t("setup.finishHint")}</span></span>
-        <span className="setup-actions chips" role="group" aria-label={t("finish.title")}>
-          {FINISH_PRESETS.map(({ id, patch }) => <button key={id} type="button" className="chip" aria-pressed={activeFinish(cfg) === id} onClick={() => set(patch)}>{t(`finish.${id}`)}</button>)}
-        </span>
+        {!autostart && <span className="setup-actions"><button type="button" className="button button-accent" disabled={busy} onClick={toggleStart}>{t("setup.startOn")}</button></span>}
+        {startFailed && <p className="notice-error" role="alert">{t("plugins.failed")}</p>}
       </li>
     </ol>
   </section>;
@@ -124,7 +120,7 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
     <SetupCard cfg={cfg} set={set} apps={counts.apps} navigate={navigate} />
 
     <section className="card home-hero" aria-label={t("overhaul.preview")}>
-      <DockPreview cfg={cfg} large stage onSelect={onSelect} />
+      <DockPreview cfg={cfg} large stage onSelect={counts.apps + counts.widgets + counts.groups > 0 ? onSelect : undefined} />
       <div className="home-hero-bar">
         {/* Label then count, so "1" never needs a plural in five languages. */}
         <div className="home-stats">
