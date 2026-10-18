@@ -21,7 +21,9 @@ for (const edge of ['bottom', 'top', 'left', 'right']) {
     assert.equal(await page.locator('.dock-tip-mark svg').count(), 0, 'the Remove control is not an app icon');
     assert.equal(await page.locator('.dock-tip-mark').textContent(), 'A');
     assert.equal(await tile.locator('.label').evaluate(el => getComputedStyle(el).opacity), '0');
-    assert.equal(await page.locator('.dock-tip-detail').textContent(), 'Open app');
+    // A Windows tooltip: just the name, no 'Open app' line and no icon.
+    assert.equal(await page.locator('.dock-tip-detail').isHidden(), true);
+    assert.equal(await page.locator('.dock-tip-mark').isHidden(), true);
     const r = await page.locator('.dock-tip').boundingBox();
     assert.ok(r.x >= 0 && r.y >= 0 && r.x + r.width <= 520 && r.y + r.height <= 600);
     assert.equal(await tile.getAttribute('aria-describedby'), 'booki-dock-tooltip');
@@ -40,11 +42,11 @@ test('keyboard hints describe running apps and groups without exposing private w
   const tile = page.locator('.tile[data-id="editor"]');
   await tile.evaluate(el => { el.dataset.running = 'true'; });
   await tile.focus(); await page.locator('.dock-tip.show').waitFor();
-  assert.equal(await page.locator('.dock-tip-detail').textContent(), 'Running · switch to window');
+  assert.equal(await page.locator('.dock-tip-detail').isHidden(), true, 'one window needs no second line');
   await page.locator('.tile[data-id="work"]').focus();
-  await page.waitForFunction(() => document.querySelector('.dock-tip-detail').textContent === '1 item · open group');
+  await page.waitForFunction(() => document.querySelector('.dock-tip strong').textContent === 'Work');
   await page.locator('.tile[data-id="notes"]').focus();
-  await page.waitForFunction(() => document.querySelector('.dock-tip-detail').textContent === 'Open widget');
+  await page.waitForFunction(() => document.querySelector('.dock-tip strong').textContent === 'Note');
   assert.equal((await page.locator('.dock-tip').textContent()).includes('Private draft'), false);
   assert.equal(await page.locator('.tile[data-id="notes"]').getAttribute('title'), null);
   await page.keyboard.press('Escape');
@@ -114,7 +116,7 @@ test('hiding running indicators retains cached hints and switches to the existin
   await page.waitForFunction(()=>document.querySelector('.tile[data-id="editor"]').dataset.running==='true');
   assert.equal(await tile.evaluate(el=>getComputedStyle(el,'::after').display),'none');
   await tile.hover();await page.locator('.dock-tip.show').waitFor();
-  assert.equal(await page.locator('.dock-tip-detail').textContent(),'Running · switch to window');
+  assert.equal(await page.locator('.dock-tip strong').textContent(),app.name);
   await tile.click();
   await page.waitForFunction(()=>window.activations.length>0);
   assert.deepEqual(await page.evaluate(()=>window.activations),[{cmd:'toggle_window',args:{hwnd:42}}]);

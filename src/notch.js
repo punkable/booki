@@ -291,6 +291,9 @@ const cTitle = document.getElementById("nc-title");
 const cSub = document.getElementById("nc-sub");
 const cPlay = document.getElementById("nc-play");
 let media = null; // { title, artist, playing, thumb } or null
+let mediaPeekUntil = 0;
+let mediaKey = "";
+const MEDIA_PEEK_MS = 5000;
 let mediaTimer = null;
 let cardTimer = null;
 let cardOpen = false;
@@ -339,7 +342,9 @@ function currentActivity(now = Date.now()) {
   // merely low one waits behind it.
   const low = battery && !battery.charging && battery.level >= 0 ? battery.level : 101;
   if (low <= 10) return { kind: "battery", level: low };
-  if (media?.playing) return { kind: "media" };
+  // Music opens the notch for a few seconds when it starts or the track
+  // changes, then lets it settle; it stays in the card on hover.
+  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   if (low <= 15) return { kind: "battery", level: low };
   return null;
 }
@@ -478,6 +483,9 @@ const pollMedia = singleFlight(async () => {
   } catch (_) {
     media = null;
   }
+  const key = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
+  if (key && key !== mediaKey) mediaPeekUntil = Date.now() + MEDIA_PEEK_MS;
+  mediaKey = key;
   paintMedia();
   mediaTimer = setTimeout(pollMedia, recoveryInterval(nativeSupport, "media", media && media.playing ? 2500 : 6000));
 });

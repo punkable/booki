@@ -589,16 +589,15 @@ const dockTooltip = createDockTooltip(dockEl, {
   describe: (el) => {
     const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
     if (!pin) return null;
+    // A Windows tooltip: the name, and a second line only when it adds
+    // something the tile can't show (text it cuts off, several windows).
     let name = pin.name || el.getAttribute("aria-label");
-    let detail = t("hint.launch");
-    if (pin.kind === "group") detail = t((pin.children || []).length === 1 ? "hint.groupSingle" : "hint.group").replace("{n}", (pin.children || []).length);
-    else if (pin.kind === "folder") detail = t("hint.folder");
-    else if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name) || t("hint.widget"); }
-    else if (pin.kind === "action") { name = el.getAttribute("aria-label"); detail = t("hint.settings"); }
-    else if (pin.kind === "trash") detail = t("hint.trash");
-    else if (el.dataset.running === "true") {
+    let detail = "";
+    if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name); }
+    else if (pin.kind === "action" || pin.kind === "trash") name = el.getAttribute("aria-label") || name;
+    else if (el.dataset.running === "true" && S.cfg.focusIfRunning !== false) {
       const count = windowsFor(pin).length;
-      detail = S.cfg.focusIfRunning === false ? t("hint.running") : count > 1 ? t("hint.pickWindow").replace("{n}", String(count)) : t("hint.switch");
+      if (count > 1) detail = t("hint.pickWindow").replace("{n}", String(count));
     }
     return { name, detail };
   },

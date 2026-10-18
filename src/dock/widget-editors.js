@@ -33,6 +33,8 @@ export function closeProductivityPanel() {
 /** Fade a flyout out along its entry path, then remove it. */
 function dismissFlyout(panel, done) {
   panel.classList.remove("is-open"); panel.classList.add("is-closing");
+  // Gone for keyboards and screen readers at once; only its fade remains.
+  panel.inert = true; panel.setAttribute("aria-hidden", "true");
   setTimeout(() => { panel.remove(); done?.(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 170);
 }
 /** True when a pointer event landed on the open widget panel or the tile that opened it. */
