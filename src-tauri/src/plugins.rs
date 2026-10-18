@@ -6,7 +6,6 @@
 //! The download is checked against its published or catalog-pinned SHA-256 for
 //! that file before anything is unpacked, and it lives under
 //! %LOCALAPPDATA%\Booki\plugins\<id>, so removing it is deleting a folder.
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::PathBuf;
@@ -105,41 +104,17 @@ fn read_limited(
     Ok(bytes)
 }
 
-/// The portable Windows executable of the pinned release and its published SHA-256.
+/// The pinned download and the SHA-256 Booki ships with. Both live in the
+/// catalog, so a replaced or re-tagged release upstream fails the check
+/// instead of being trusted.
 fn release_asset(plugin: &Plugin) -> Result<(String, String), String> {
-    if !plugin.url.is_empty() {
-        return Ok((plugin.url.to_string(), plugin.sha256.to_string()));
+    let pinned = plugin.url.starts_with("https://")
+        && plugin.sha256.len() == 64
+        && plugin.sha256.bytes().all(|b| b.is_ascii_hexdigit());
+    if !pinned {
+        return Err("this plugin has no pinned, verified download".into());
     }
-    let url = format!(
-        "https://api.github.com/repos/{}/releases/tags/{}",
-        plugin.repo, plugin.tag
-    );
-    let mut response = agent()
-        .get(&url)
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "Booki")
-        .call()
-        .map_err(|_| "could not reach GitHub".to_string())?;
-    let json: Value = serde_json::from_slice(&read_limited(&mut response, 1024 * 1024)?)
-        .map_err(|_| "unexpected answer from GitHub".to_string())?;
-    pick_asset(&json, &plugin.asset)
-        .ok_or_else(|| "this release has no verified Windows download".into())
-}
-
-/// Select the portable x64 executable, never the installer or another platform.
-fn pick_asset(release: &Value, expected_name: &str) -> Option<(String, String)> {
-    release.get("assets")?.as_array()?.iter().find_map(|asset| {
-        let name = asset.get("name")?.as_str()?.to_ascii_lowercase();
-        if name != expected_name.to_ascii_lowercase() {
-            return None;
-        }
-        let digest = asset.get("digest")?.as_str()?.strip_prefix("sha256:")?;
-        if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
-            return None;
-        }
-        let url = asset.get("browser_download_url")?.as_str()?;
-        Some((url.to_string(), digest.to_ascii_lowercase()))
-    })
+    Ok((plugin.url.to_string(), plugin.sha256.to_ascii_lowercase()))
 }
 
 struct StagingCleanup(PathBuf);
@@ -289,25 +264,16 @@ fn unpack(archive: &[u8], into: &std::path::Path, root: &str) -> Result<(), Stri
 mod tests {
     use super::*;
     #[test]
-    fn portable_executable_not_setup_or_signature() {
-        let headset = find("headsetcontrol").unwrap();
-        let digest = format!("sha256:{}", "ab".repeat(32));
-        let release = serde_json::json!({"assets": [
-            {"name":"headsetcontrol-windows-x86_64-setup.exe", "digest":digest, "browser_download_url":"setup"},
-            {"name":"headsetcontrol-windows-x86_64.exe.asc", "digest":digest, "browser_download_url":"signature"},
-            {"name":"headsetcontrol-windows-x86_64.exe", "digest":digest, "browser_download_url":"portable"}
-        ]});
-        assert_eq!(
-            pick_asset(&release, &headset.asset),
-            Some(("portable".into(), "ab".repeat(32)))
-        );
-        assert_eq!(
-            pick_asset(
-                &serde_json::json!({"assets":[{"name":&headset.asset,"digest":"sha256:bad","browser_download_url":"bad"}]}),
-                &headset.asset
-            ),
-            None
-        );
+    fn every_download_is_pinned_in_the_catalog() {
+        for plugin in catalog().iter().filter(|p| !p.external) {
+            let (url, sha) = release_asset(plugin).unwrap_or_else(|e| panic!("{}: {e}", plugin.id));
+            assert!(
+                url.ends_with(&plugin.asset),
+                "{}: url names the asset",
+                plugin.id
+            );
+            assert_eq!(sha.len(), 64);
+        }
     }
     #[test]
     fn archives_preserve_runtime_subdirectories_and_reject_traversal() {
