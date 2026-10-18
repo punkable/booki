@@ -15,6 +15,8 @@ import { notify } from "./notices.js";
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
 }
+// rclone remotes are named by the person; common ones read as their service.
+const CLOUD_NAMES = { drive: "Google Drive", gdrive: "Google Drive", onedrive: "OneDrive", dropbox: "Dropbox", box: "Box", mega: "MEGA", pcloud: "pCloud", icloud: "iCloud Drive", s3: "Amazon S3" };
 export function buildSystemPanel(item, { close }) {
   const panel = document.createElement("section"); panel.className = "productivity-panel system-widget-panel";
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t(`w.${item.widget}`));
@@ -113,7 +115,10 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "battery") {
     const battery = section(t("w.battery"));
-    load(battery, api.systemStats, (stats) => { list(battery, [[t("w.battery"), stats?.battery >= 0 ? `${stats.battery}%` : t("plugins.noData")]]); });
+    load(battery, api.systemStats, (stats) => {
+      if (!(stats?.battery >= 0)) { battery.append(text("p", t("plugins.noData"))); return; }
+      cards(battery, [{ name: t(stats.charging ? "dev.charging" : "w.battery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
+    });
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
@@ -264,7 +269,7 @@ export function buildSystemPanel(item, { close }) {
         const known = (Array.isArray(list) ? list : []);
         if (!known.length) box.append(text("p", t("cl.none")));
         else cards(box, known.map((c) => ({
-          name: c.name, glyph: "cloud",
+          name: CLOUD_NAMES[c.name.toLowerCase()] || c.name, glyph: "cloud",
           sub: c.total ? t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total)) : t("cl.unknown"),
           value: c.total ? `${Math.round((c.used / c.total) * 100)}%` : "",
           bars: c.total ? [{ label: "", percent: (c.used / c.total) * 100, tone: usageTone((c.used / c.total) * 100) }] : [],

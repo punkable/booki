@@ -1909,6 +1909,7 @@ body.edge-right .stack.open { transform: none; }
   margin: 0 0 8px;
 }
 .clip-guide {
+  background: var(--layer) !important; border: 1px solid var(--stroke) !important;
   display: grid;
   gap: 4px;
   margin: -2px 0 9px;
