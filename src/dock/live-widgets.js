@@ -157,8 +157,9 @@ function resetGlyph(el, type) {
 // One timer turns every rotating card; it repaints cached readings only.
 let rotationTimer = 0;
 function syncRotation() {
-  const devices = (deviceReading.last || []).length > 1;
-  const ai = (aiReading.last || []).filter((p) => (p.windows || []).length).length > 1;
+  // Only cards still on the dock rotate; unpinning one lets the timer go.
+  const devices = widgetPresent("devices") && (deviceReading.last || []).length > 1;
+  const ai = widgetPresent("ai") && (aiReading.last || []).filter((p) => (p.windows || []).length).length > 1;
   if (!devices && !ai) { clearInterval(rotationTimer); rotationTimer = 0; return; }
   if (rotationTimer) return;
   rotationTimer = setInterval(() => {
@@ -268,7 +269,7 @@ const pollMedia = singleFlight(async () => {
       return;
     }
     setMediaText(el, m.artist || t("w.media"), m.title || "—");
-    setTileLabel(el, `${m.title} — ${m.artist}`);
+    setTileLabel(el, [m.title, m.artist].filter(Boolean).join(" — ") || t("w.media"));
     el.classList.toggle("playing", !!m.playing);
     setMediaToggle(toggle, !!m.playing);
     if (art && m.thumb) {
@@ -383,6 +384,9 @@ let pollsActive = false;
 export function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  // The device/AI rotation sleeps with the polls too.
+  clearInterval(rotationTimer);
+  rotationTimer = 0;
   // Also stop the running-app/trash poll so a tucked-away dock burns zero timer
   // wakeups (not just early-returns). Resumed by startPolls on reveal.
   clearInterval(S.pollTimer);
@@ -429,6 +433,7 @@ function paintPolls(k) {
   if (k.clipboard) pollClipboard();
   if (k.devices) pollDevices();
   if (k.ai) pollAi();
+  if (!k.devices && !k.ai) syncRotation();
   if (k.collector) paintDownloads();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
@@ -451,6 +456,8 @@ export function startPolls() {
   pollKey = JSON.stringify(k);
   pollsActive = true;
   const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices, ai: hasAi } = k;
+  // The Collector is event-driven: repaint rebuilt cards, no timer needed.
+  if (k.collector) paintDownloads();
   // Nothing live pinned → no timer at all (zero idle cost).
   if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi) return;
   // First paint immediately so cards aren't blank until the first tick, then

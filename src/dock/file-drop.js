@@ -181,7 +181,13 @@ export function setupFileDrop() {
       showDropHint(null);
       scheduleHide();
     },
+    // A drop ends the drag without a drag-leave, so the dock is tucked again
+    // here (after whatever the drop opened) like it is on leave.
     onDrop: async (paths, position) => {
+      try { await dropFiles(paths, position); } finally { scheduleHide(); }
+    },
+  });
+  async function dropFiles(paths, position) {
       S.draggingFile = false;
       S.pinnedReveal = false;
       dropOverlay.classList.remove("active");
@@ -209,9 +215,9 @@ export function setupFileDrop() {
       }
       // Dropped onto a dock folder (group) → pin the files inside it.
       if (item && item.kind === "group") {
+        const added = [];
         for (const pth of paths) {
-          item.children = item.children || [];
-          item.children.push({
+          added.push({
             id: uid(),
             name: baseName(pth).replace(/\.lnk$/i, ""),
             path: pth,
@@ -219,13 +225,15 @@ export function setupFileDrop() {
             kind: await kindForPath(pth, (p) => dockApi.isDir(p)),
           });
         }
-        if (!(await persist())) return;
+        // Only keep the new children once they are saved.
+        const before = item.children || [];
+        item.children = [...before, ...added];
+        if (!(await persist())) { item.children = before; return; }
         await render();
         reframe();
         return;
       }
       // Otherwise pin them exactly where the gap showed.
       await addPaths(paths, null, spot.index);
-    },
-  });
+  }
 }
