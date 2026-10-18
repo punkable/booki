@@ -584,7 +584,7 @@ window.addEventListener("pointerdown", (e) => {
 // ─────────────────────── Booki tooltips ───────────────────────
 const dockTooltip = createDockTooltip(dockEl, {
   edge: () => S.cfg.edge,
-  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !ctxMenu.classList.contains("hidden"),
+  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
     const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
     if (!pin) return null;

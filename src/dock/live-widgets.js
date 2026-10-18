@@ -22,6 +22,7 @@ import {
   setMediaText,
   setPreviewSubText,
   setSystem,
+  widgetGlyph,
 } from "./widget-view.js";
 import { S } from "./state.js";
 import { dockKeys } from "./dom.js";
@@ -141,11 +142,17 @@ const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
 const KIND_ICON = { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" };
 let deviceTurn = 0;
 function setCornerGlyph(el, name, key) {
-  const host = el.querySelector(".w-card") || el;
-  let glyph = host.querySelector(".w-glyph");
-  if (!glyph) { glyph = document.createElement("span"); glyph.className = "w-glyph"; glyph.setAttribute("aria-hidden", "true"); host.append(glyph); }
-  if (glyph.dataset.key !== key) { glyph.dataset.key = key; glyph.innerHTML = icon(name); }
+  // The ring's own glyph becomes the device kind or provider logo.
+  const glyph = el.querySelector(".w-ring-ico") || el.querySelector(".w-ico");
+  if (!glyph || glyph.dataset.key === key) return;
+  glyph.dataset.key = key; glyph.innerHTML = icon(name);
+  glyph.classList.remove("w-glyph-swap"); void glyph.offsetWidth; glyph.classList.add("w-glyph-swap");
   el.dataset.glyph = key;
+}
+function resetGlyph(el, type) {
+  const glyph = el.querySelector(".w-ring-ico");
+  if (!glyph?.dataset.key) return;
+  delete glyph.dataset.key; delete el.dataset.glyph; glyph.innerHTML = widgetGlyph(type, 14);
 }
 // One timer turns every rotating card; it repaints cached readings only.
 let rotationTimer = 0;
@@ -165,7 +172,7 @@ function syncRotation() {
 function paintDevices(list) {
   eachWidget("devices", (el) => {
     setWidgetAvailable(el, list.length > 0);
-    if (!list.length) { delete el.dataset.glyph; el.querySelector(".w-glyph")?.remove(); setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
+    if (!list.length) { resetGlyph(el, "devices"); setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
     const shown = list[deviceTurn % list.length];
     setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
     setMetric(el, shown.name, shown.level);
@@ -200,7 +207,7 @@ function paintAi(providers) {
     setWidgetAvailable(el, windows.length > 0);
     if (!windows.length) {
       const signin = providers.some((p) => p.error === "signin");
-      delete el.dataset.glyph; el.querySelector(".w-glyph")?.remove();
+      resetGlyph(el, "ai");
       setText(el, t("w.ai"), "—");
       setTileLabel(el, t(!providers.length ? "w.aiNone" : signin ? "w.aiSignin" : "w.aiUnavailable"));
       return;

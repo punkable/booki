@@ -89,7 +89,7 @@ export const LIVE_WIDGETS = ["battery", "devices", "ai", "media", "volume"];
 
 /** A cell's icon: a quiet line glyph, falling back to the Fluent emoji for any
     widget that has no glyph yet. */
-function widgetGlyph(type, size) {
+export function widgetGlyph(type, size) {
   const glyph = WIDGET_GLYPHS[type];
   return glyph ? icon(glyph) : emo(WIDGET_ICONS[type] || "puzzle", size);
 }

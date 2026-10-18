@@ -30,7 +30,7 @@ export function buildSystemPanel(item, { close }) {
       finally { if (!disposed) b.disabled = false; }
     }); container.append(b); return b;
   };
-  const section = (title) => { const el = document.createElement("section"); el.className = "productivity-section"; el.append(text("strong", title)); body.append(el); return el; };
+  const section = (title) => { const el = document.createElement("section"); el.className = "productivity-section"; if (title !== t(`w.${item.widget}`)) el.append(text("strong", title)); body.append(el); return el; };
   const list = (container, rows) => {
     const dl = document.createElement("dl"); dl.className = "system-widget-readings";
     for (const [label, value] of rows) dl.append(text("dt", label), text("dd", value));

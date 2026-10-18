@@ -460,7 +460,7 @@ test('durable empty groups remain recognizable and custom group icons have a use
   await custom.locator('img').evaluate(img=>img.dispatchEvent(new Event('error')));
   assert.equal(await custom.locator('svg').count(),1);
   await page.locator('.tile[data-id="empty"]').click();await page.locator('#stack.open').waitFor();
-  assert.equal(await page.locator('.stack-add').count(),2);
+  assert.equal(await page.locator('.stack-head-add').count(),2);
   assert.deepEqual((await page.evaluate(()=>window.__TAURI__.core.invoke('get_config'))).pinned,pins);
   assert.deepEqual(errors,[]);await page.close();
 });

@@ -443,13 +443,11 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .reading-bar-track { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .reading-bar-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transition: width 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
 .reading-bar-track i.warn { background: #ff99a4; }
-/* Rotating cards (Devices, AI): the device kind or provider logo sits in the
-   corner and cross-fades as the card turns. */
-.tile.widget[data-glyph] .w-card { position: relative; }
-.tile.widget .w-glyph { position: absolute; top: 6px; right: 6px; width: 14px; height: 14px; pointer-events: none; color: var(--w-ink-2); animation: w-glyph-in 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
-.tile.widget .w-glyph svg { width: 14px; height: 14px; display: block; }
+/* Rotating cards (Devices, AI): the ring glyph turns into the device kind or
+   provider logo and eases in as the card moves to the next one. */
+.w-ring-ico.w-glyph-swap { animation: w-glyph-in 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
 @keyframes w-glyph-in { from { opacity: 0; transform: scale(0.8); } }
-@media (prefers-reduced-motion: reduce) { .tile.widget .w-glyph { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .w-ring-ico.w-glyph-swap { animation: none; } }
 
 .system-widget-panel { width: min(400px, calc(100vw - 24px)); }
 .app-volume-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px auto 20px; gap: 6px 10px; align-items: center; margin: 16px 0; font-size: 12px; }
@@ -467,3 +465,6 @@ body:not(.edge-left):not(.edge-right) .tile.widget { width: var(--widget-width, 
 .plugin-warning { padding: 10px; border-radius: var(--r-card); border: 1px solid var(--stroke-strong); background: var(--layer); color: var(--ink) !important; line-height: 1.5; }
 .plugin-result { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; font: 12px/1.5 var(--font); }
 .plugin-action-error { color: var(--danger-text); }
+/* Plugin blurbs under a widget's readings are secondary: body-small, muted. */
+.system-widget-panel .productivity-section > p { margin: 4px 0 10px; font-size: 0.8125rem; line-height: 1.4; color: var(--ink-2); }
+.system-widget-panel .productivity-section > strong { display: block; margin-bottom: 8px; font-size: 0.8125rem; }
