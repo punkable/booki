@@ -39,7 +39,7 @@ sysinfo = "0.39"
 # Tiny HTTP client to fetch a website's favicon when pinning it as a widget.
 ureq = "3"
 # Verify and unpack optional plugins (plugins.rs).
-sha2 = "0.10"
+sha2 = "0.11"
 zip = { version = "9", default-features = false, features = ["deflate"] }
 
 # Windows-only native integration (Win32 bindings + icon encoding).
