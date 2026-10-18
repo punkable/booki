@@ -375,7 +375,9 @@
 .preview-edit-pin:hover { transform: translateY(-2px); }
 /* The bottom 20px fade content out before it slides under the preview, so a
    section title is never left half-hidden behind it. */
-.sticky-preview { position: sticky; top: -28px; z-index: 5; margin: -8px 0 0; padding: 8px 0 20px; background: linear-gradient(var(--page-bg) calc(100% - 20px), transparent); }
+/* The page preview scrolls with the page: pinned, it was clipped at the top
+   and covered whatever was being edited under it. */
+.sticky-preview { margin: 0 0 20px; }
 
 /* ── Stage: the dock on a small desktop ─────────────────────────────────── */
 .live-preview-scene.stage {
@@ -778,6 +780,7 @@
 .library-empty { grid-column: 1 / -1; margin: 0; padding: 18px 4px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); text-align: center; }
 .sticky-preview .live-preview-scene.stage { min-height: 118px; padding: 18px 16px; border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .sticky-preview .live-preview-scene.stage .live-preview-caption { display: none; }
+
 
 /* ── Windows high contrast ──────────────────────────────────────────────
    forced-colors, repeated under [data-high-contrast] as a fallback (set by
