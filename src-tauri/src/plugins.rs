@@ -227,11 +227,17 @@ pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
     let Some(target) = dir(plugin) else {
         return Ok(());
     };
-    match std::fs::remove_dir_all(&target) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e.to_string()),
+    // Rename first: a running tool locks its exe, and deleting file by file
+    // would strip its libraries while leaving it "installed" and broken.
+    let doomed = target.with_extension("removing");
+    let _ = std::fs::remove_dir_all(&doomed);
+    match std::fs::rename(&target, &doomed) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(_) => return Err(format!("close {} first, then remove it", plugin.name)),
     }
+    let _ = std::fs::remove_dir_all(&doomed);
+    Ok(())
 }
 
 /// Keep relative directories (Qt plugins, sensor libraries), strip only the

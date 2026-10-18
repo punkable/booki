@@ -46,7 +46,7 @@ export function buildSystemPanel(item, { close }) {
   // Cards from a shared reading: the last value paints at once (no "Loading"
   // on reopen), then a fresh one replaces it when it lands.
   const live = (container, reading, maxAge, paint) => {
-    const draw = (data) => { if (!disposed) { container.querySelector(":scope > .reading-cards, :scope > p")?.remove(); paint(data); } };
+    const draw = (data) => { if (!disposed) { container.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .productivity-button").forEach((el) => el.remove()); paint(data); } };
     unsubscribe.push(reading.subscribe(draw));
     if (reading.last !== undefined) { draw(reading.last); reading.fresh(maxAge).catch(() => {}); }
     else load(container, () => reading.fresh(maxAge), () => {});
@@ -78,7 +78,7 @@ export function buildSystemPanel(item, { close }) {
   };
   if (item.widget === "media") {
     const transport = section(t("w.media"));
-    load(transport, api.mediaInfo, (media) => { transport.append(text("p", media?.title ? `${media.title} · ${media.artist || ""}` : t("plugins.noData"))); });
+    load(transport, api.mediaInfo, (media) => { transport.append(text("p", media?.title ? (media.artist ? `${media.title} · ${media.artist}` : media.title) : t("plugins.noData"))); });
     for (const [glyph, action] of [["chevron-left", api.mediaPrev], ["play", api.mediaToggle], ["chevron-right", api.mediaNext]]) {
       const control = button(transport, "", action); control.innerHTML = icon(glyph); control.setAttribute("aria-label", t(`w.${glyph === "play" ? "playPause" : glyph === "chevron-left" ? "prev" : "next"}`));
     }
@@ -172,7 +172,8 @@ export function buildSystemPanel(item, { close }) {
         button(controls, t("plugins.download"), async () => {
           const url = videoUrl(input.value); if (!url) throw new Error(t("plugins.videoUrl"));
           const folder = await pickFolder(); if (!folder || disposed) return;
-          const progress = text("p", t("plugins.downloadBusy")); progress.setAttribute("role", "status"); controls.append(progress);
+          controls.querySelector(":scope > .plugin-download-status")?.remove();
+          const progress = text("p", t("plugins.downloadBusy"), "plugin-download-status"); progress.setAttribute("role", "status"); controls.append(progress);
           try { await api.pluginDownload(url, folder); if (!disposed) progress.textContent = t("plugins.downloadDone"); }
           catch (error) { progress.remove(); throw error; }
         });
