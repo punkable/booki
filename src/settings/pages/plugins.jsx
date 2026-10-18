@@ -11,6 +11,8 @@ import { Icon, PageHeader, SettingsSection } from "../ui.jsx";
  *  says what it adds, who makes it, its licence and where its source is,
  *  before anything is installed. */
 /** The dock widget a plugin brings, if any (yt-dlp → Downloads). */
+export const TERMS_URL = "https://github.com/punkable/booki/blob/main/TERMS.md";
+
 const widgetFor = (id) => Object.keys(WIDGET_META).find((w) => WIDGET_META[w].plugin === id);
 const pinnedWidget = (pins, widget) => (pins || []).some((p) => p.widget === widget || (p.children || []).some((c) => c.widget === widget));
 
@@ -35,6 +37,7 @@ function PluginCard({ id, repo, source, external, license, open, cfg, set, compa
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
     {companions?.length > 0 && <p className="plugin-desc plugin-fine">{t("plugins.includes").replace("{list}", () => companions.map((c) => { const p = PLUGINS.find((x) => x.id === c); return p ? `${p.name} (${p.license})` : c; }).join(", "))}</p>}
     <p className="plugin-desc plugin-fine">{t(external ? "plugins.winget.managed" : "plugins.howItWorks")}</p>
+    {!external && <p className="plugin-desc plugin-fine">{t("plugins.terms")} <button type="button" className="link" onClick={() => open(TERMS_URL)}>{t("plugins.termsLink")}</button></p>}
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
     <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}{state.installed ? ` · ${t("plugins.active")}` : ""}</p>
     {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}

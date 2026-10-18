@@ -163,7 +163,11 @@ export function buildSystemPanel(item, { close }) {
       // A direct file link needs no tool; everything else needs the plugin.
       if (!state?.installed && !(item.url && classifyLink(item.url) === "file")) {
         const offer = document.createElement("div"); offer.className = "device-offer";
-        offer.append(text("span", t("dl.needs")));
+        const copy = document.createElement("div"); copy.className = "device-offer-copy";
+        copy.append(text("span", t("dl.needs")), text("small", t("plugins.terms")));
+        const terms = text("button", t("plugins.termsLink"), "link"); terms.type = "button";
+        terms.addEventListener("click", () => api.launch("https://github.com/punkable/booki/blob/main/TERMS.md", []));
+        copy.append(terms); offer.append(copy);
         button(offer, t("dev.enable"), async () => { await api.pluginInstall("yt-dlp"); offer.remove(); showForm(); });
         box.append(offer); return;
       }

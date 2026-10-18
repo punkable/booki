@@ -116,9 +116,9 @@ Detalles en las [notas de 0.86](docs/releases/v0.86.0.md).
 
 No hay cuentas, telemetría ni sincronización en la nube. La configuración y las recomendaciones de uso permanecen en tu equipo, en `%APPDATA%\Booki`. El portapapeles persistente está desactivado inicialmente y, al activarlo, se protege para tu usuario de Windows.
 
-Las consultas de red se usan para actualizaciones y favicons, más tres cosas que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su release oficial en GitHub (verificada con la firma SHA-256 que publica GitHub) y el widget Uso de IA.
+Las consultas de red se usan para actualizaciones y favicons, más tres cosas que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su página de versiones oficial (verificada con una suma SHA-256 fijada en el código de Booki) y el widget Uso de IA.
 
-El widget Uso de IA lee la sesión que Claude Code (`~/.claude`) y Codex (`~/.codex`) ya guardan en tu PC y la envía solo a su propio servicio (Anthropic u OpenAI) para consultar el uso de tu plan. Booki nunca la guarda, registra ni reenvía, y solo consulta mientras el widget está en el dock. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta.
+El widget Uso de IA lee la sesión que Claude Code (`~/.claude`) y Codex (`~/.codex`) ya guardan en tu PC y la envía solo a su propio servicio (Anthropic u OpenAI) para consultar el uso de tu plan. Booki nunca la guarda, registra ni reenvía, y solo consulta mientras el widget está en el dock. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta. Son herramientas independientes de terceros, con sus propias licencias, que solo se instalan si tú lo decides; usarlas conforme a la ley es tu responsabilidad. Consulta los [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
 
 La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
 
@@ -138,4 +138,4 @@ El [README en inglés](README.md) incluye instrucciones de compilación, auditor
 
 Problemas: [GitHub Issues](https://github.com/punkable/booki/issues) o [punkable@protonmail.com](mailto:punkable@protonmail.com). Seguridad: [SECURITY.md](SECURITY.md).
 
-Booki es libre y de código abierto, con licencia [MIT](LICENSE), creado por [Punkable](https://github.com/punkable). Se conservan las capturas anteriores y los originales de marca porque siguen siendo útiles.
+Booki es libre y de código abierto, con licencia [MIT](LICENSE) y [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos), creado por [Punkable](https://github.com/punkable). Se conservan las capturas anteriores y los originales de marca porque siguen siendo útiles.
