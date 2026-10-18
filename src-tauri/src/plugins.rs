@@ -61,8 +61,14 @@ fn dir(plugin: &Plugin) -> Option<PathBuf> {
     )
 }
 
-/// The installed executable, if the plugin is installed.
+/// The installed executable, if the plugin is installed: Booki's own copy
+/// first, else one the person already installed themselves.
 pub fn executable(plugin: &Plugin) -> Option<PathBuf> {
+    own_executable(plugin).or_else(|| system_executable(plugin))
+}
+
+/// The copy Booki downloaded and verified into its own folder.
+fn own_executable(plugin: &Plugin) -> Option<PathBuf> {
     let path = if plugin.external {
         dirs::data_local_dir()?.join("Microsoft/WindowsApps/winget.exe")
     } else {
@@ -71,10 +77,46 @@ pub fn executable(plugin: &Plugin) -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
+/// The same tool installed outside Booki: on PATH, or where winget, Scoop,
+/// Chocolatey or its own installer put it. Booki only runs it; it never
+/// updates or removes it.
+fn system_executable(plugin: &Plugin) -> Option<PathBuf> {
+    if plugin.external {
+        return None;
+    }
+    let file = std::path::Path::new(&plugin.exe)
+        .file_name()?
+        .to_os_string();
+    let mut places: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|path| std::env::split_paths(&path).collect())
+        .unwrap_or_default();
+    if let Some(local) = dirs::data_local_dir() {
+        places.push(local.join("Microsoft/WinGet/Links"));
+        places.push(local.join("Programs").join(&plugin.name));
+    }
+    if let Some(home) = dirs::home_dir() {
+        places.push(home.join("scoop/shims"));
+    }
+    if let Some(data) = std::env::var_os("ProgramData") {
+        places.push(PathBuf::from(data).join("chocolatey/bin"));
+    }
+    for root in ["ProgramFiles", "ProgramFiles(x86)"] {
+        if let Some(base) = std::env::var_os(root) {
+            places.push(PathBuf::from(base).join(&plugin.name));
+        }
+    }
+    places
+        .into_iter()
+        .map(|dir| dir.join(&file))
+        .find(|path| path.is_file())
+}
+
 #[derive(serde::Serialize)]
 pub struct Status {
     pub installed: bool,
     pub version: Option<String>,
+    /// "booki" for Booki's own copy, "system" for one already on the PC.
+    pub source: Option<&'static str>,
 }
 
 pub fn status(plugin: &Plugin) -> Status {
@@ -85,12 +127,18 @@ pub fn status(plugin: &Plugin) -> Status {
             .companions
             .iter()
             .all(|id| find(id).is_some_and(|c| executable(c).is_some()));
-    let version = installed
+    let own = own_executable(plugin).is_some();
+    let version = (installed && own)
         .then(|| dir(plugin))
         .flatten()
         .and_then(|d| std::fs::read_to_string(d.join("VERSION")).ok())
         .map(|v| v.trim().to_string());
-    Status { installed, version }
+    let source = installed.then_some(if own { "booki" } else { "system" });
+    Status {
+        installed,
+        version,
+        source,
+    }
 }
 
 fn agent() -> ureq::Agent {
