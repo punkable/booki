@@ -593,7 +593,7 @@ const dockTooltip = createDockTooltip(dockEl, {
     // something the tile can't show (text it cuts off, several windows).
     let name = pin.name || el.getAttribute("aria-label");
     let detail = "";
-    if (pin.kind === "widget") { name = widgetLabel(pin.widget); detail = clippedText(el, name); }
+    if (pin.kind === "widget") { name = pin.style?.device || widgetLabel(pin.widget); detail = clippedText(el, name); }
     else if (pin.kind === "action" || pin.kind === "trash") name = el.getAttribute("aria-label") || name;
     else if (el.dataset.running === "true" && S.cfg.focusIfRunning !== false) {
       const count = windowsFor(pin).length;

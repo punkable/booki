@@ -34,3 +34,12 @@ export function sizeText(n) {
   while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
   return `${n.toFixed(i && n < 10 ? 1 : 0)} ${units[i]}`;
 }
+
+// Brand words that say nothing on a small card: "SteelSeries Arctis Nova 7"
+// reads as "Arctis Nova 7", "Logitech G502 X" as "G502 X".
+const BRANDS = /^(logitech|logi|steelseries|razer|corsair|hyperx|sony|microsoft|apple|bose|jbl|samsung|sennheiser|jabra|asus|rog|msi|xbox|beats|anker|soundcore|keychron|nzxt|turtle beach)\s+/i;
+/** A device's short name for its own card. */
+export function shortDeviceName(name, max = 14) {
+  const plain = String(name || "").replace(BRANDS, "").replace(/\s*\((?:bluetooth|wireless|usb)\)$/i, "").trim() || String(name || "");
+  return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+}

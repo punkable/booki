@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
+import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -173,17 +173,25 @@ function syncRotation() {
 }
 function paintDevices(list) {
   eachWidget("devices", (el) => {
-    setWidgetAvailable(el, list.length > 0);
-    if (!list.length) { resetGlyph(el, "devices"); setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
-    const shown = list[deviceTurn % list.length];
+    // A card made for one device follows only that one, under its short name.
+    const own = findWidgetPin(el.dataset.id)?.style?.device;
+    const mine = own ? list.filter((d) => d.name === own) : list;
+    setWidgetAvailable(el, mine.length > 0);
+    if (!mine.length) {
+      resetGlyph(el, "devices");
+      setText(el, own ? shortDeviceName(own) : t("w.devices"), "—");
+      setTileLabel(el, own ? `${own} · ${t("w.devicesNone")}` : t("w.devicesNone"));
+      return;
+    }
+    const shown = own ? mine[0] : mine[deviceTurn % mine.length];
     setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
-    setMetric(el, shown.name, shown.level);
-    setTileLabel(el, list.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
+    setMetric(el, own ? shortDeviceName(shown.name) : shown.name, shown.level);
+    setTileLabel(el, mine.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
     // The ring speaks the battery: green, amber, red; it pulses when a device
     // is about to die (any of them, not only the one on screen).
     const tone = batteryTone(shown.level, shown.charging);
     el.dataset.tone = tone;
-    el.classList.toggle("needs-attention", list.some((d) => !d.charging && d.level <= 10));
+    el.classList.toggle("needs-attention", mine.some((d) => !d.charging && d.level <= 10));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }

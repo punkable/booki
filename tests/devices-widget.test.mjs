@@ -98,3 +98,22 @@ test("the AI widget explains what to do when nothing is signed in", async () => 
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("a device can get its own card that follows only it, under a short name", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [widget] }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "device_batteries"
+      ? Promise.resolve([{ name: "SteelSeries Arctis Nova 7", level: 15, kind: "headset" }, { name: "Logitech MX Master 3S", level: 60, kind: "mouse" }]) : old(c, a); }`,
+  });
+  await page.locator('.tile[data-id="dev"]').click();
+  const panel = page.locator(".system-widget-panel");
+  await panel.getByRole("button", { name: "Own card on the dock" }).first().waitFor();
+  await panel.locator(".reading-card", { hasText: "Logitech MX Master 3S" }).getByRole("button", { name: "Own card on the dock" }).click();
+  const own = page.locator('#dock > .tile[data-widget="devices"]').nth(1);
+  await own.locator(".w-ring-num", { hasText: "60" }).waitFor();
+  assert.equal((await own.locator(".w-label").textContent()).trim(), "MX Master 3S");
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
+  assert.equal(saved.pinned[1].style.device, "Logitech MX Master 3S", "placed beside the card it came from");
+  assert.deepEqual(errors, []);
+  await page.close();
+});
