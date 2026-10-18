@@ -272,11 +272,17 @@ pub(crate) fn notch_reveal_for_menu(app: AppHandle) -> bool {
 /// waiting for the next change event from the watcher.
 #[tauri::command]
 pub(crate) fn notch_screen_busy(app: AppHandle) -> bool {
+    #[cfg(windows)]
     let notch = app
         .get_webview_window("notch")
         .and_then(|n| n.hwnd().ok())
         .map(|h| h.0 as isize)
         .unwrap_or(0);
+    #[cfg(not(windows))]
+    let notch = {
+        let _ = &app;
+        0
+    };
     win::foreground_maximized_on(notch) || win::is_fullscreen_on(notch)
 }
 
