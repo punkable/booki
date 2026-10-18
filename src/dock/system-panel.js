@@ -1,7 +1,7 @@
 /* Native widget details and optional providers. Every async result belongs to
    this panel instance; closing it prevents late results from repainting it. */
 import { dock as api, pickFolder, pickRgbProfile } from "../api.js";
-import { t } from "../i18n.js";
+import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
 import { deviceReading, aiReading } from "./readings.js";
@@ -97,7 +97,10 @@ export function buildSystemPanel(item, { close }) {
       cards(ai, all.map((p) => ({
         name: p.name, glyph: icons[p.id] || "sparkles",
         error: (p.windows || []).length ? "" : t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable"),
-        bars: (p.windows || []).map((w) => ({ label: windowName(w.label), percent: w.percent, warn: w.percent >= 80 })),
+        bars: (p.windows || []).map((w) => {
+          const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+          return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, warn: w.percent >= 80 };
+        }),
       })));
     });
   }
