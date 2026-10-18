@@ -403,6 +403,10 @@ pub fn apply(
             crate::surface_geometry::blur_insets(w, h, radii)
         };
         let (x, y, w, h) = (x + il, y + it, w - il - ir, h - it - ib);
+        if w <= 0 || h <= 0 {
+            // Too small to hold a blur once inset: leave this piece out.
+            continue;
+        }
         let r = [
             radii[0] - il.max(it),
             radii[1] - ir.max(it),

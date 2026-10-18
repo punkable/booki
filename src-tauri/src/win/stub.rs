@@ -62,6 +62,10 @@ pub fn is_fullscreen() -> bool {
     false
 }
 
+pub fn is_fullscreen_on(_dock: isize) -> bool {
+    false
+}
+
 pub fn set_autostart(_enabled: bool, _exe: &str) -> Result<(), String> {
     Err("autostart is only available on Windows".into())
 }

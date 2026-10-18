@@ -1814,7 +1814,14 @@ pub fn run() {
                                 // Some apps create their own topmost window after Booki
                                 // and can slide above the dock/notch. Re-assert topmost
                                 // status every few seconds so both stay reachable.
-                                if cfg_cache.always_on_top && watch.is_visible().unwrap_or(false) {
+                                // Never lift Booki over a fullscreen game or movie.
+                                let busy = FULLSCREEN_BLACKOUT
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                    || win::is_fullscreen_on(self_hwnd);
+                                if cfg_cache.always_on_top
+                                    && !busy
+                                    && watch.is_visible().unwrap_or(false)
+                                {
                                     if let Ok(h) = watch.hwnd() {
                                         win::raise_topmost(h.0 as isize);
                                     }
@@ -1825,7 +1832,7 @@ pub fn run() {
                                 // SetWindowPos calls every three seconds, waking
                                 // DWM for a window nobody could see.
                                 if let Some(notch) = handle.get_webview_window("notch") {
-                                    if notch.is_visible().unwrap_or(false) {
+                                    if !busy && notch.is_visible().unwrap_or(false) {
                                         if let Ok(h) = notch.hwnd() {
                                             win::raise_topmost(h.0 as isize);
                                         }
@@ -1838,7 +1845,8 @@ pub fn run() {
                             // foreground_occludes = "the user is in an app". Smart
                             // auto-hide and the smart notch both consume this.
                             if cfg_cache.auto_hide_mode == "smart" {
-                                let (dl, dt, dr, db) = *DOCK_HOME_RECT.lock().unwrap();
+                                let (dl, dt, dr, db) =
+                                    *DOCK_HOME_RECT.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(v) = debounce(
                                     &mut occ,
                                     win::foreground_occludes(dl, dt, dr, db, self_hwnd),
@@ -1853,7 +1861,8 @@ pub fn run() {
                             // Feeding `false` instead still sends the "fullscreen
                             // ended" edge, so turning the option off mid-game
                             // can't leave the dock blacked out.
-                            let fullscreen = cfg_cache.hide_in_fullscreen && win::is_fullscreen();
+                            let fullscreen =
+                                cfg_cache.hide_in_fullscreen && win::is_fullscreen_on(self_hwnd);
                             if let Some(v) = debounce(&mut fs, fullscreen) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }

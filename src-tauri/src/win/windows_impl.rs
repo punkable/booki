@@ -918,7 +918,20 @@ pub fn cursor_near_window(hwnd: isize, pad: i32) -> bool {
 /// True if a fullscreen game / movie / presentation is running — so Booki can get
 /// completely out of the way (e.g. not cover subtitles or a game).
 pub fn is_fullscreen() -> bool {
+    is_fullscreen_on(0)
+}
+
+/// Like `is_fullscreen`, but only for the monitor `dock` is on (0 = any): a
+/// game on another screen must not black out the dock.
+pub fn is_fullscreen_on(dock: isize) -> bool {
     unsafe {
+        let dock_mon =
+            (dock != 0).then(|| MonitorFromWindow(HWND(dock as *mut _), MONITOR_DEFAULTTONEAREST));
+        let on_dock_screen = |w: HWND| {
+            dock_mon.map_or(true, |m| {
+                MonitorFromWindow(w, MONITOR_DEFAULTTONEAREST) == m
+            })
+        };
         // 1) The shell's own "user is busy" state: fullscreen DirectX game,
         // presentation mode, or a busy/fullscreen app (movies). This is exactly
         // what Windows uses to suppress its own notifications.
@@ -928,7 +941,9 @@ pub fn is_fullscreen() -> bool {
         if let Ok(state) = SHQueryUserNotificationState() {
             // Intentionally ignore QUNS_BUSY — Windows uses it for many
             // non-fullscreen "quiet" moments and it caused false Booki blackouts.
-            if state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE {
+            if (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE)
+                && on_dock_screen(GetForegroundWindow())
+            {
                 return true;
             }
         }
@@ -955,12 +970,16 @@ pub fn is_fullscreen() -> bool {
         {
             return false;
         }
+        if !on_dock_screen(hwnd) {
+            return false;
+        }
         // A normal MAXIMIZED window also covers the monitor when the taskbar is
         // set to auto-hide — so require the window to be borderless (no caption),
-        // which true fullscreen apps are but maximized ones aren't.
+        // which true fullscreen apps are but maximized ones aren't. A caption is
+        // both bits; a lone thin border (some players) is still borderless.
         use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, WS_CAPTION};
         let style = GetWindowLongW(hwnd, GWL_STYLE);
-        if (style & WS_CAPTION.0 as i32) != 0 {
+        if (style & WS_CAPTION.0 as i32) == WS_CAPTION.0 as i32 {
             return false;
         }
         let mut wr = RECT::default();
