@@ -1,4 +1,4 @@
-/* Downloads widget (yt-dlp): drop a link on the dock, pick Video or Audio
+/* Collector widget (yt-dlp, FFmpeg, gallery-dl): drop a link on the dock, pick Video or Audio
    only, and the card shows the progress; the panel shows the file when done.
    One download at a time; progress arrives as native events. */
 import { dock as api, onDownloadEvent } from "../api.js";
@@ -12,16 +12,16 @@ const listeners = new Set();
 const baseName = (path) => String(path || "").split(/[\\/]/).pop();
 
 export function paintDownloads() {
-  eachWidget("downloads", (el) => {
+  eachWidget("collector", (el) => {
     el.dataset.state = download.state;
     if (download.state === "progress" || download.state === "start") {
-      setMetric(el, download.title || t("w.downloads"), Math.round(download.percent));
-      setTileLabel(el, `${download.title || t("w.downloads")} · ${Math.round(download.percent)}%`);
+      setMetric(el, download.title || t("w.collector"), Math.round(download.percent));
+      setTileLabel(el, `${download.title || t("w.collector")} · ${Math.round(download.percent)}%`);
     } else if (download.state === "done") {
       setMetric(el, baseName(download.path) || t("dl.done"), 100);
       setTileLabel(el, `${t("dl.done")} · ${baseName(download.path)}`);
     } else {
-      setText(el, t("w.downloads"), "—");
+      setText(el, t("w.collector"), "—");
       setTileLabel(el, download.state === "error" ? t("dl.failed") : t("dl.drop"));
     }
   });
@@ -53,4 +53,22 @@ export async function startDownload(url, format) {
     changed();
     throw error;
   }
+}
+
+/** What a link most likely is, so only video pages ask Video or Audio:
+ *  "file" (a direct link to a document, archive, image…), "gallery" (image
+ *  posts and boards gallery-dl reads best) or "media" (anything else, for
+ *  yt-dlp's hundreds of sites). */
+const FILE_EXT = /\.(pdf|zip|7z|rar|tar|gz|exe|msi|iso|dmg|apk|png|jpe?g|gif|webp|avif|svg|bmp|mp3|wav|flac|ogg|m4a|mp4|mkv|mov|webm|docx?|xlsx?|pptx?|odt|txt|csv|epub|torrent)$/i;
+const GALLERY_HOSTS = /(^|\.)(pinterest\.[a-z.]+|pin\.it|imgur\.com|deviantart\.com|artstation\.com|flickr\.com|danbooru\.donmai\.us|e621\.net|pixiv\.net|behance\.net|tumblr\.com|bsky\.app)$/i;
+export function classifyLink(value) {
+  let url;
+  try { url = new URL(value); } catch (_) { return "media"; }
+  if (FILE_EXT.test(url.pathname)) return "file";
+  const host = url.hostname.replace(/^www\./, "");
+  if (GALLERY_HOSTS.test(host)) return "gallery";
+  if (/(^|\.)instagram\.com$/.test(host) && /^\/p\//.test(url.pathname)) return "gallery";
+  if (/(^|\.)reddit\.com$/.test(host) && /^\/gallery\//.test(url.pathname)) return "gallery";
+  if (/(^|\.)(x|twitter)\.com$/.test(host) && /\/photo\//.test(url.pathname)) return "gallery";
+  return "media";
 }

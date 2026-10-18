@@ -14,7 +14,7 @@ import { Icon, PageHeader, SettingsSection } from "../ui.jsx";
 const widgetFor = (id) => Object.keys(WIDGET_META).find((w) => WIDGET_META[w].plugin === id);
 const pinnedWidget = (pins, widget) => (pins || []).some((p) => p.widget === widget || (p.children || []).some((c) => c.widget === widget));
 
-function PluginCard({ id, repo, source, external, license, open, cfg, set }) {
+function PluginCard({ id, repo, source, external, license, open, cfg, set, companions }) {
   const [state, setState] = useState({ installed: false, version: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +33,7 @@ function PluginCard({ id, repo, source, external, license, open, cfg, set }) {
       <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span>
     </div>
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
+    {companions?.length > 0 && <p className="plugin-desc plugin-fine">{t("plugins.includes").replace("{list}", () => companions.map((c) => { const p = PLUGINS.find((x) => x.id === c); return p ? `${p.name} (${p.license})` : c; }).join(", "))}</p>}
     <p className="plugin-desc plugin-fine">{t(external ? "plugins.winget.managed" : "plugins.howItWorks")}</p>
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
     <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}{state.installed ? ` · ${t("plugins.active")}` : ""}</p>
@@ -55,7 +56,7 @@ function PluginCard({ id, repo, source, external, license, open, cfg, set }) {
 export function PluginsPage({ cfg, set }) {
   return <>
     <PageHeader title={t("plugins.title")}>{t("plugins.hint")}</PageHeader>
-    {PLUGINS.map((plugin) => <SettingsSection key={plugin.id} icon="sparkles" title={plugin.name}>
+    {PLUGINS.filter((plugin) => !plugin.companion).map((plugin) => <SettingsSection key={plugin.id} icon="sparkles" title={plugin.name}>
       <PluginCard {...plugin} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />
     </SettingsSection>)}
   </>;

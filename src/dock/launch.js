@@ -39,7 +39,7 @@ export function launch(el, item, mods = {}) {
       dockApi.volumeInfo().then((v) => Array.isArray(v) && dockApi.masterVolumeSet(v[0], !v[1])).catch(() => {}).finally(refreshVolume);
       return;
     }
-    if (["devices", "system", "ai", "battery", "downloads"].includes(item.widget)) openSystemPanel(item, el);
+    if (["devices", "system", "ai", "battery", "collector"].includes(item.widget)) openSystemPanel(item, el);
     if (item.widget === "notes") editNote(item);
     if (item.widget === "clipboard") toggleClipboardStack(el);
     if (["clock", "focus", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);

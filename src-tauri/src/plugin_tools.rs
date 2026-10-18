@@ -192,20 +192,15 @@ pub async fn plugin_download(
     if !folder.is_absolute() || !folder.is_dir() {
         return Err("choose an existing download folder".into());
     }
-    // Single files only: merging separate streams or converting audio would
-    // need ffmpeg, which Booki does not ship.
-    let selector = match format.as_deref() {
-        Some("audio") => "bestaudio[ext=m4a]/bestaudio",
-        _ => "best[ext=mp4]/best",
-    };
+    let format = format.unwrap_or_else(|| "video".into());
     util::blocking(move || {
         static DOWNLOAD_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _turn = DOWNLOAD_TURN
             .try_lock()
             .map_err(|_| "a download is already running")?;
-        let emit = {
+        let emit: Emit = {
             let app = app.clone();
-            move |state: &'static str, percent: f64, title: String, path: String| {
+            std::sync::Arc::new(move |state, percent, title, path| {
                 let _ = app.emit(
                     "plugin-download",
                     DownloadEvent {
@@ -215,52 +210,16 @@ pub async fn plugin_download(
                         path,
                     },
                 );
-            }
+            })
         };
         emit("start", 0.0, String::new(), String::new());
-        let progress = emit.clone();
-        let mut last = -1.0f64;
-        let result = capture_lines(
-            &executable("yt-dlp")?,
-            &[
-                "--ignore-config",
-                "--no-playlist",
-                "--no-overwrites",
-                "--restrict-filenames",
-                "--newline",
-                "--progress-template",
-                "download:booki:%(progress._percent_str)s|%(info.title)s",
-                "--print",
-                "after_move:filepath",
-                "--socket-timeout",
-                "20",
-                "-f",
-                selector,
-                "-P",
-                &folder.to_string_lossy(),
-                "--",
-                &url,
-            ],
-            1800,
-            Some(Box::new(move |line: &str| {
-                if let Some((percent, title)) = progress_line(line) {
-                    // One event per whole percent is plenty for a ring.
-                    if percent.floor() != last.floor() || percent >= 100.0 {
-                        last = percent;
-                        progress("progress", percent, title, String::new());
-                    }
-                }
-            })),
-        );
+        let result = match format.as_str() {
+            "file" => direct_file(&url, &folder, &emit),
+            "gallery" => gallery(&url, &folder, &emit),
+            _ => media(&url, &folder, format == "audio", &emit),
+        };
         match result {
-            Ok(output) => {
-                let path = output
-                    .lines()
-                    .rev()
-                    .find(|l| !l.starts_with("booki:") && !l.trim().is_empty())
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+            Ok(path) => {
                 emit("done", 100.0, String::new(), path.clone());
                 Ok(path)
             }
@@ -271,6 +230,188 @@ pub async fn plugin_download(
         }
     })
     .await?
+}
+
+type Emit = std::sync::Arc<dyn Fn(&'static str, f64, String, String) + Send + Sync>;
+
+/// The last printed path in a tool's output (the file it saved).
+fn last_path(output: &str) -> String {
+    output
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && !l.starts_with("booki:"))
+        .unwrap_or("")
+        .to_string()
+}
+
+/// Video or audio with yt-dlp. With FFmpeg alongside, the best video and
+/// audio streams are merged into an MP4 and audio becomes an MP3; without
+/// it, the best single file is kept.
+fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, String> {
+    let ffmpeg_dir = plugins::find("ffmpeg")
+        .and_then(plugins::executable)
+        .and_then(|p| p.parent().map(|d| d.to_string_lossy().into_owned()));
+    let mut args: Vec<String> = [
+        "--ignore-config",
+        "--no-playlist",
+        "--no-overwrites",
+        "--restrict-filenames",
+        "--newline",
+        "--progress-template",
+        "download:booki:%(progress._percent_str)s|%(info.title)s",
+        "--print",
+        "after_move:filepath",
+        "--socket-timeout",
+        "20",
+    ]
+    .map(String::from)
+    .to_vec();
+    let choice: &[&str] = match (&ffmpeg_dir, audio) {
+        (Some(_), true) => &["-f", "bestaudio/best", "-x", "--audio-format", "mp3"],
+        (Some(_), false) => &[
+            "-f",
+            "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/b",
+            "--merge-output-format",
+            "mp4",
+        ],
+        (None, true) => &["-f", "bestaudio[ext=m4a]/bestaudio"],
+        (None, false) => &["-f", "best[ext=mp4]/best"],
+    };
+    if let Some(dir) = &ffmpeg_dir {
+        args.extend(["--ffmpeg-location".to_string(), dir.clone()]);
+    }
+    args.extend(choice.iter().map(|s| s.to_string()));
+    args.extend([
+        "-P".into(),
+        folder.to_string_lossy().into_owned(),
+        "--".into(),
+        url.into(),
+    ]);
+    let argv: Vec<&str> = args.iter().map(String::as_str).collect();
+    let sink = emit.clone();
+    let mut last = -1.0f64;
+    let output = capture_lines(
+        &executable("yt-dlp")?,
+        &argv,
+        1800,
+        Some(Box::new(move |line: &str| {
+            if let Some((percent, title)) = progress_line(line) {
+                // One event per whole percent is plenty for a ring.
+                if percent.floor() != last.floor() || percent >= 100.0 {
+                    last = percent;
+                    sink("progress", percent, title, String::new());
+                }
+            }
+        })),
+    )?;
+    Ok(last_path(&output))
+}
+
+/// Image galleries and posts with gallery-dl, one file at a time; the count
+/// of saved files stands in for a percentage it cannot know in advance.
+fn gallery(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
+    let target = folder.to_string_lossy().into_owned();
+    let sink = emit.clone();
+    let mut saved = 0u32;
+    let output = capture_lines(
+        &executable("gallery-dl")?,
+        &["--config-ignore", "--no-input", "-D", &target, "--", url],
+        1800,
+        Some(Box::new(move |line: &str| {
+            let path = line.trim().trim_start_matches("# ");
+            if Path::new(path).is_absolute() {
+                saved += 1;
+                let shown = Path::new(path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                sink(
+                    "progress",
+                    (saved as f64 * 7.0).min(95.0),
+                    shown,
+                    String::new(),
+                );
+            }
+        })),
+    )?;
+    let last = last_path(&output);
+    let last = last.trim_start_matches("# ").to_string();
+    Ok(if last.is_empty() { target } else { last })
+}
+
+/// A direct link to a file (a PDF, an archive, an image…), fetched by Booki
+/// itself with the same bounds as plugin downloads.
+fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
+    let name = url
+        .split(['?', '#'])
+        .next()
+        .and_then(|u| u.rsplit('/').next())
+        .map(|n| {
+            n.chars()
+                .filter(|c| c.is_alphanumeric() || "._- ".contains(*c))
+                .collect::<String>()
+        })
+        .filter(|n| !n.is_empty() && !n.starts_with('.'))
+        .unwrap_or_else(|| "download".into());
+    let mut path = folder.join(&name);
+    let (stem, ext) = match name.rsplit_once('.') {
+        Some((s, e)) => (s.to_string(), format!(".{e}")),
+        None => (name.clone(), String::new()),
+    };
+    let mut n = 1;
+    while path.exists() {
+        path = folder.join(format!("{stem} ({n}){ext}"));
+        n += 1;
+    }
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_secs(20)))
+        .build()
+        .into();
+    let mut response = agent
+        .get(url)
+        .header("User-Agent", "Booki")
+        .call()
+        .map_err(|_| "download failed".to_string())?;
+    let total = response
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    const LIMIT: u64 = 4 * 1024 * 1024 * 1024;
+    let partial = path.with_extension("part");
+    let mut file = std::fs::File::create(&partial).map_err(|e| e.to_string())?;
+    let mut reader = response.body_mut().as_reader();
+    let mut buffer = vec![0u8; 256 * 1024];
+    let (mut done, mut last) = (0u64, -1i64);
+    let copied: Result<(), String> = (|| loop {
+        let n = reader
+            .read(&mut buffer)
+            .map_err(|_| "download interrupted".to_string())?;
+        if n == 0 {
+            return Ok(());
+        }
+        done += n as u64;
+        if done > LIMIT {
+            return Err("download too large".into());
+        }
+        std::io::Write::write_all(&mut file, &buffer[..n]).map_err(|e| e.to_string())?;
+        if let Some(percent) = (done * 100).checked_div(total) {
+            let percent = percent as i64;
+            if percent != last {
+                last = percent;
+                emit("progress", percent as f64, name.clone(), String::new());
+            }
+        }
+    })();
+    drop(file);
+    if let Err(error) = copied {
+        let _ = std::fs::remove_file(&partial);
+        return Err(error);
+    }
+    std::fs::rename(&partial, &path).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 #[cfg(test)]

@@ -28,6 +28,13 @@ pub struct Plugin {
     pub tag: String,
     /// The executable the plugin provides, found anywhere in the archive.
     pub exe: String,
+    /// Tools installed and removed together with this one (yt-dlp brings
+    /// ffmpeg and gallery-dl).
+    #[serde(default)]
+    pub companions: Vec<String>,
+    /// Installed only as another plugin's companion; not listed on its own.
+    #[serde(default)]
+    pub companion: bool,
 }
 
 /// HeadsetControl (GPL-3.0): battery of wireless headsets on a USB dongle
@@ -133,6 +140,17 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
     let _turn = INSTALL_TURN
         .try_lock()
         .map_err(|_| "another plugin operation is in progress")?;
+    let version = install_one(plugin)?;
+    for id in &plugin.companions {
+        let companion = find(id).ok_or("unknown companion")?;
+        if executable(companion).is_none() {
+            install_one(companion)?;
+        }
+    }
+    Ok(version)
+}
+
+fn install_one(plugin: &Plugin) -> Result<String, String> {
     let (url, expected) = release_asset(plugin)?;
     if url != plugin.url
         && !url.starts_with(&format!(
@@ -199,6 +217,15 @@ pub fn uninstall(plugin: &Plugin) -> Result<(), String> {
     let _turn = INSTALL_TURN
         .try_lock()
         .map_err(|_| "another plugin operation is in progress")?;
+    for id in &plugin.companions {
+        if let Some(companion) = find(id) {
+            remove_one(companion)?;
+        }
+    }
+    remove_one(plugin)
+}
+
+fn remove_one(plugin: &Plugin) -> Result<(), String> {
     let Some(target) = dir(plugin) else {
         return Ok(());
     };
@@ -273,6 +300,13 @@ mod tests {
                 plugin.id
             );
             assert_eq!(sha.len(), 64);
+            for id in &plugin.companions {
+                assert!(
+                    find(id).is_some_and(|c| c.companion),
+                    "{}: companion {id}",
+                    plugin.id
+                );
+            }
         }
     }
     #[test]

@@ -6,7 +6,7 @@ import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
-import { paintDownloads } from "./downloads.js";
+import { paintDownloads } from "./collector.js";
 import { deviceReading, aiReading, batteryTone, usageTone, TONE_COLORS } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
@@ -417,7 +417,7 @@ function pollKinds() {
     clipboard: widgetPresent("clipboard"),
     devices: widgetPresent("devices"),
     ai: widgetPresent("ai"),
-    downloads: widgetPresent("downloads"),
+    collector: widgetPresent("collector"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -429,7 +429,7 @@ function paintPolls(k) {
   if (k.clipboard) pollClipboard();
   if (k.devices) pollDevices();
   if (k.ai) pollAi();
-  if (k.downloads) paintDownloads();
+  if (k.collector) paintDownloads();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new

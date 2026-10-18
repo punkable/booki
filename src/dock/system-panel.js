@@ -5,7 +5,7 @@ import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
 import { pluginError } from "../plugin-errors.js";
-import { download, startDownload, onDownloadChange } from "./downloads.js";
+import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
 import { deviceReading, aiReading, batteryTone, usageTone } from "./readings.js";
 
 function text(tag, value, className = "") {
@@ -142,13 +142,13 @@ export function buildSystemPanel(item, { close }) {
       list(native, [["CPU", `${Math.round(stats.cpu || 0)}%`], ["RAM", `${Math.round(stats.mem || 0)}%`]]);
     });
   }
-  if (item.widget === "downloads") {
-    const box = section(t("w.downloads"));
+  if (item.widget === "collector") {
+    const box = section(t("w.collector"));
     const status = document.createElement("div"); status.className = "download-status"; status.setAttribute("aria-live", "polite");
     const paintStatus = () => {
       status.replaceChildren();
       if (download.state === "start" || download.state === "progress") {
-        cards(status, [{ name: download.title || t("w.downloads"), glyph: "download", value: `${Math.round(download.percent)}%`, bars: [{ label: "", percent: download.percent, tone: "charging" }] }]);
+        cards(status, [{ name: download.title || t("w.collector"), glyph: "download", value: `${Math.round(download.percent)}%`, bars: [{ label: "", percent: download.percent, tone: "charging" }] }]);
       } else if (download.state === "done" && download.path) {
         const name = download.path.split(/[\\/]/).pop();
         cards(status, [{ name, sub: t("dl.done"), glyph: "download", tone: "good" }]);
@@ -160,7 +160,8 @@ export function buildSystemPanel(item, { close }) {
     unsubscribe.push(onDownloadChange(() => { if (!disposed) paintStatus(); }));
     api.pluginStatus("yt-dlp").then((state) => {
       if (disposed) return;
-      if (!state?.installed) {
+      // A direct file link needs no tool; everything else needs the plugin.
+      if (!state?.installed && !(item.url && classifyLink(item.url) === "file")) {
         const offer = document.createElement("div"); offer.className = "device-offer";
         offer.append(text("span", t("dl.needs")));
         button(offer, t("dev.enable"), async () => { await api.pluginInstall("yt-dlp"); offer.remove(); showForm(); });
@@ -171,15 +172,31 @@ export function buildSystemPanel(item, { close }) {
     const showForm = () => {
       const form = document.createElement("div"); form.className = "download-form";
       const input = document.createElement("input"); input.type = "url"; input.placeholder = t("dl.paste"); input.setAttribute("aria-label", t("dl.paste")); input.value = item.url || "";
-      const ask = text("p", item.url ? t("dl.ask") : t("dl.drop"), "download-ask");
+      const ask = text("p", "", "download-ask");
       const choices = document.createElement("div"); choices.className = "plugin-panel-actions";
       const go = (format) => async () => {
         const url = videoUrl(input.value); if (!url) throw new Error(t("perr.link"));
         await startDownload(url, format);
       };
-      button(choices, t("dl.video"), go("video")).classList.add("primary");
-      button(choices, t("dl.audio"), go("audio"));
+      // Booki picks the tool from the link; only video pages ask.
+      const shape = () => {
+        const kind = input.value.trim() ? classifyLink(input.value.trim()) : "media";
+        choices.replaceChildren();
+        if (kind === "media") {
+          ask.textContent = input.value.trim() ? t("dl.ask") : t("dl.drop");
+          button(choices, t("dl.video"), go("video")).classList.add("primary");
+          button(choices, t("dl.audio"), go("audio"));
+        } else {
+          ask.textContent = t(kind === "file" ? "dl.isFile" : "dl.isGallery");
+          button(choices, t("dl.save"), go(kind)).classList.add("primary");
+        }
+        return kind;
+      };
+      input.addEventListener("input", shape);
       form.append(ask, input, choices); box.append(form, status);
+      const kind = shape();
+      // A dropped file or gallery link starts at once: nothing to choose.
+      if (item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
       if (!item.url) requestAnimationFrame(() => input.focus());
       paintStatus();
     };

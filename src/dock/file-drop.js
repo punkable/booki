@@ -149,9 +149,9 @@ export function setupFileDrop() {
   onLinkDrop((value) => {
     const url = videoUrl(String(value || ""));
     if (!url) return;
-    const card = dockEl.querySelector('.tile.widget[data-widget="downloads"]');
+    const card = dockEl.querySelector('.tile.widget[data-widget="collector"]');
     const pinned = card ? findWidgetPin(card.dataset.id) : null;
-    openSystemPanel({ ...(pinned || { id: "downloads", kind: "widget" }), widget: "downloads", url }, card || dockEl);
+    openSystemPanel({ ...(pinned || { id: "collector", kind: "widget" }), widget: "collector", url }, card || dockEl);
   });
   // Browser links arrive through the native drop bridge (link_drop.rs), which
   // replaces WebView2's drop target, so the DOM never sees them.

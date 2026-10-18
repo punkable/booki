@@ -75,6 +75,30 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
   assert.deepEqual(errors, []); await page.close();
 });
 
+test("the Collector picks the tool from the link: files and galleries start, videos ask", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("collector")] }),
+    initScript: `window.__downloadRequests=[]; const invoke=window.__TAURI__.core.invoke;
+      window.__TAURI__.core.invoke=(cmd,args)=> {
+        if(cmd==="plugin_status") return Promise.resolve({installed:true,version:"test"});
+        if(cmd==="plugin_download") {window.__downloadRequests.push(args);return Promise.resolve("C:/Users/me/Downloads/x");}
+        return invoke(cmd,args);
+      };`,
+  });
+  await emit(page, "booki://link-drop", "https://example.com/files/report.pdf");
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 1);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[0].format), "file");
+  await page.keyboard.press("Escape");
+  await emit(page, "booki://link-drop", "https://www.pinterest.com/pin/123/");
+  await waitForAsyncCondition(page, () => window.__downloadRequests.length === 2);
+  assert.equal(await page.evaluate(() => window.__downloadRequests[1].format), "gallery");
+  await page.keyboard.press("Escape");
+  await emit(page, "booki://link-drop", "https://www.youtube.com/watch?v=abc");
+  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__downloadRequests.length), 2);
+  assert.deepEqual(errors, []); await page.close();
+});
+
 test("a click on the volume card mutes; its panel is one right-click away", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),

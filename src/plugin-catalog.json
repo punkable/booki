@@ -27,7 +27,11 @@
     "archive_root": "",
     "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
     "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
-    "external": false
+    "external": false,
+    "companions": [
+      "ffmpeg",
+      "gallery-dl"
+    ]
   },
   {
     "id": "rclone",
@@ -88,5 +92,37 @@
     "url": "",
     "sha256": "",
     "external": true
+  },
+  {
+    "id": "ffmpeg",
+    "name": "FFmpeg",
+    "license": "GPL-3.0",
+    "source": "https://www.gyan.dev/ffmpeg/builds/",
+    "feeds": "downloads",
+    "repo": "GyanD/codexffmpeg",
+    "tag": "9.0.2",
+    "exe": "bin/ffmpeg.exe",
+    "asset": "ffmpeg-9.0.2-essentials_build.zip",
+    "archive_root": "ffmpeg-9.0.2-essentials_build",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+    "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+    "external": false,
+    "companion": true
+  },
+  {
+    "id": "gallery-dl",
+    "name": "gallery-dl",
+    "license": "GPL-2.0",
+    "source": "https://codeberg.org/mikf/gallery-dl",
+    "feeds": "downloads",
+    "repo": "mikf/gallery-dl",
+    "tag": "v1.32.17",
+    "exe": "gallery-dl.exe",
+    "asset": "gallery-dl.exe",
+    "archive_root": "",
+    "url": "https://codeberg.org/mikf/gallery-dl/releases/download/v1.32.17/gallery-dl.exe",
+    "sha256": "77c8f4c6808cf1044a54ec7187b548f5977f7c304d5432b63cf6cfdfe70ffc12",
+    "external": false,
+    "companion": true
   }
 ]
