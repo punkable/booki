@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -133,9 +133,16 @@ function release88() {
   ] };
 }
 
-export function currentRelease() {
+function release881() {
   return { version: "0.88.1", date: "2026-10-18", headline: t("release881.headline"), sections: [
     { icon: "sparkles", title: t("release86.windowsTitle"), notes: [t("release881.motion"), t("release881.panels")] },
     { icon: "performance", title: t("plugins.title"), notes: [t("release881.plugins"), t("release881.fixes")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.89.0", date: "2026-10-18", headline: t("release89.headline"), sections: [
+    { icon: "sparkles", title: t("release86.widgetsTitle"), notes: [t("release89.collector"), t("release89.devices"), t("release89.ai")] },
+    { icon: "performance", title: t("plugins.title"), notes: [t("release89.plugins")] },
   ] };
 }
