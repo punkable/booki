@@ -19,6 +19,9 @@ import { scheduleHide } from "./autohide.js";
 import { persist } from "./config-sync.js";
 
 export function closeProductivityPanel() {
+  // Give keyboard focus back to the tile that opened the panel.
+  const panel = S.productivityPanel;
+  if (panel?._opener?.isConnected && panel.contains(document.activeElement)) panel._opener.focus();
   S.productivityPanel?.dispose?.();
   S.productivityPanel?.remove(); S.productivityPanel = null; S.pinnedReveal = false; reframe(); scheduleHide();
 }
@@ -48,6 +51,7 @@ export function openSystemPanel(item, tile) {
   mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
 }
 function mountWidgetPanel(item, tile, panel) {
+  panel._opener = tile;
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
   const place = () => {
@@ -98,7 +102,8 @@ export async function editNote(item) {
     // encrypted local copy. Clear only the matching text after durable save.
     await dockApi.writeNoteDraft(item.id, text);
     const current = findWidgetPin(item.id);
-    if (!current || current.widget !== "notes") return false;
+    // The note's widget is gone: the text is safe in the draft; let it close.
+    if (!current || current.widget !== "notes") return true;
     current.style = { ...(current.style || {}), note: text };
     if (!(await persist({}, { showError: false }))) return false;
     eachWidget("notes", (el) => {

@@ -652,7 +652,7 @@ function partyMode() {
 wireLiveWidgets({ startRunningPoll });
 wireRender({ onPointerDown, openMenu, openBackgroundMenu, removeItem, openAddPanel });
 wireUndoToast({ persist });
-wireConfigSync({ hideTip, closeStack });
+wireConfigSync({ hideTip, closeStack, cancelDrag });
 wireStack({ takeOutButton, wireStackDragOut, openFileMenu, addToFolderFromDock });
 wireLaunch({ hideTip });
 

@@ -169,7 +169,8 @@ async function renderClipboardList(grid, foot) {
       row.classList.add("copied");
       setTimeout(() => row.classList.remove("copied"), 700);
     }, "overhaul.failed");
-    row.addEventListener("click", copy);
+    // Clicks inside the edit box place the caret; they must not copy.
+    row.addEventListener("click", () => { if (!row.classList.contains("editing")) copy(); });
     row.addEventListener("keydown", (ev) => {
       if (ev.target !== row || (ev.key !== "Enter" && ev.key !== " ")) return;
       ev.preventDefault();
