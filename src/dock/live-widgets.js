@@ -6,8 +6,10 @@ import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
+import { deviceReading, aiReading } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
+import { icon } from "../icons.js";
 import { STAT_WIDGETS, RING_DEFAULTS } from "../widgets-meta.js";
 import {
   MEDIA_SVG,
@@ -137,7 +139,7 @@ const pollStats = singleFlight(async () => {
 const PLUGIN_NAMES = { headsetcontrol: "HeadsetControl" };
 const pollDevices = singleFlight(async () => {
   let list = [];
-  try { list = (await dockApi.deviceBatteries()) || []; } catch (_) { list = []; }
+  try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
   eachWidget("devices", (el) => {
     setWidgetAvailable(el, list.length > 0);
     if (!list.length) { setText(el, t("w.devices"), "—"); setTileLabel(el, t("w.devicesNone")); return; }
@@ -157,26 +159,46 @@ const resetClock = (seconds) => seconds > 0
   ? new Date(seconds * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" })
   : "";
 const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
-const pollAi = singleFlight(async () => {
-  let providers = [];
-  try { providers = (await dockApi.aiUsage()) || []; } catch (_) { providers = []; }
+// Every signed-in provider takes a turn on the card (about every 6 s) with its
+// own isotype and fullest window; rotating repaints the cached reading, it
+// never asks the services again.
+let aiRotation = 0; let aiTurn = 0;
+const PROVIDER_ICON = { claude: "ai-claude", codex: "ai-openai" };
+function paintAi(providers) {
   const windows = providers.flatMap((p) => (p.windows || []).map((w) => ({ ...w, provider: p.name })));
+  const shown = providers.filter((p) => (p.windows || []).length);
   eachWidget("ai", (el) => {
     setWidgetAvailable(el, windows.length > 0);
     if (!windows.length) {
       const signin = providers.some((p) => p.error === "signin");
+      delete el.dataset.provider;
       setText(el, t("w.ai"), "—");
       setTileLabel(el, t(!providers.length ? "w.aiNone" : signin ? "w.aiSignin" : "w.aiUnavailable"));
       return;
     }
-    const top = windows.reduce((a, b) => (b.percent > a.percent ? b : a));
-    setMetric(el, `${top.provider} · ${windowName(top.label)}`, Math.round(top.percent));
+    const current = shown[aiTurn % shown.length];
+    const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
+    el.dataset.provider = current.id;
+    const host = el.querySelector(".w-card") || el;
+    const glyph = host.querySelector(".w-provider") || host.appendChild(Object.assign(document.createElement("span"), { className: "w-provider" }));
+    glyph.innerHTML = icon(PROVIDER_ICON[current.id] || "sparkles");
+    setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
     setTileLabel(el, windows.map((w) => {
       const reset = resetClock(w.resets_at);
       return `${w.provider} ${windowName(w.label)} · ${Math.round(w.percent)}%${reset ? ` · ${t("w.aiResets").replace("{time}", () => reset)}` : ""}`;
-    }).join("\n"));
+    }).concat(providers.filter((p) => !(p.windows || []).length).map((p) => `${p.name} · ${t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable")}`)).join("\n"));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", top.percent >= 80 ? BATTERY_LOW : RING_DEFAULTS.ai);
   });
+  clearInterval(aiRotation); aiRotation = 0;
+  if (shown.length > 1) aiRotation = setInterval(() => {
+    if (S.hiddenState || S.displayOff || !document.querySelector('.tile.widget[data-widget="ai"]')) return;
+    aiTurn++; paintAi(aiReading.last || []);
+  }, 6000);
+}
+const pollAi = singleFlight(async () => {
+  let providers = [];
+  try { providers = (await aiReading.refresh()) || []; } catch (_) { providers = []; }
+  paintAi(providers);
 });
 
 function setWidgetAvailable(el, available) {

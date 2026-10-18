@@ -4,6 +4,7 @@ import { dock as api, pickFolder, pickRgbProfile } from "../api.js";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
+import { deviceReading, aiReading } from "./readings.js";
 
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
@@ -12,7 +13,8 @@ export function buildSystemPanel(item, { close }) {
   const panel = document.createElement("section"); panel.className = "productivity-panel system-widget-panel";
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t(`w.${item.widget}`));
   let disposed = false;
-  panel.dispose = () => { disposed = true; };
+  const unsubscribe = [];
+  panel.dispose = () => { disposed = true; unsubscribe.forEach((off) => off()); };
   const head = document.createElement("div"); head.className = "productivity-head";
   const done = document.createElement("button"); done.type = "button"; done.className = "stack-close";
   done.innerHTML = icon("x"); done.setAttribute("aria-label", t("stack.close")); done.addEventListener("click", close);
@@ -41,6 +43,39 @@ export function buildSystemPanel(item, { close }) {
     try { const data = await action(); if (!disposed && reads.get(container) === request) { loading.remove(); paint(data); } }
     catch (error) { if (!disposed && reads.get(container) === request) { loading.textContent = `${t("plugins.failed")} ${String(error)}`; loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
   };
+  // Cards from a shared reading: the last value paints at once (no "Loading"
+  // on reopen), then a fresh one replaces it when it lands.
+  const live = (container, reading, maxAge, paint) => {
+    const draw = (data) => { if (!disposed) { container.querySelector(":scope > .reading-cards, :scope > p")?.remove(); paint(data); } };
+    unsubscribe.push(reading.subscribe(draw));
+    if (reading.last !== undefined) { draw(reading.last); reading.fresh(maxAge).catch(() => {}); }
+    else load(container, () => reading.fresh(maxAge), () => {});
+  };
+  const cards = (container, rows) => {
+    const grid = document.createElement("div"); grid.className = "reading-cards";
+    for (const row of rows) {
+      const card = document.createElement("div"); card.className = "reading-card";
+      const top = document.createElement("div"); top.className = "reading-card-top";
+      if (row.glyph) { const g = text("span", "", "reading-card-glyph"); g.innerHTML = icon(row.glyph); top.append(g); }
+      const names = document.createElement("div"); names.className = "reading-card-names";
+      names.append(text("strong", row.name)); if (row.sub) names.append(text("small", row.sub));
+      top.append(names);
+      if (row.error) top.append(text("span", row.error, "reading-card-note"));
+      card.append(top);
+      for (const bar of row.bars || []) {
+        const line = document.createElement("div"); line.className = "reading-bar";
+        line.append(text("span", bar.label), text("span", `${Math.round(bar.percent)}%`, "reading-bar-value"));
+        const track = document.createElement("div"); track.className = "reading-bar-track";
+        track.setAttribute("role", "meter"); track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", "100");
+        track.setAttribute("aria-valuenow", String(Math.round(bar.percent))); track.setAttribute("aria-label", `${row.name} ${bar.label}`);
+        const fill = document.createElement("i"); fill.style.width = `${Math.max(0, Math.min(100, bar.percent))}%`;
+        if (bar.warn) fill.className = "warn";
+        track.append(fill); line.append(track); card.append(line);
+      }
+      grid.append(card);
+    }
+    container.append(grid);
+  };
   if (item.widget === "media") {
     const transport = section(t("w.media"));
     load(transport, api.mediaInfo, (media) => { transport.append(text("p", media?.title ? `${media.title} · ${media.artist || ""}` : t("plugins.noData"))); });
@@ -54,9 +89,16 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
-    load(ai, api.aiUsage, (providers) => {
-      const readings = (Array.isArray(providers) ? providers : []).flatMap((provider) => (provider.windows || []).map((window) => [`${provider.name} · ${window.label}`, `${Math.round(window.percent)}%`]));
-      if (readings.length) list(ai, readings); else ai.append(text("p", t("w.aiNone")));
+    const icons = { claude: "ai-claude", codex: "ai-openai" };
+    const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
+    live(ai, aiReading, 60000, (providers) => {
+      const all = Array.isArray(providers) ? providers : [];
+      if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
+      cards(ai, all.map((p) => ({
+        name: p.name, glyph: icons[p.id] || "sparkles",
+        error: (p.windows || []).length ? "" : t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable"),
+        bars: (p.windows || []).map((w) => ({ label: windowName(w.label), percent: w.percent, warn: w.percent >= 80 })),
+      })));
     });
   }
   if (item.widget === "volume") {
@@ -79,9 +121,13 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
-    load(devices, api.deviceBatteries, (values) => {
+    const sources = { bluetooth: "Bluetooth", logitech: "Logitech", headsetcontrol: via("HeadsetControl") };
+    live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
-      list(devices, values.map((d) => [`${d.name}${d.source === "headsetcontrol" ? ` · ${via("HeadsetControl")}` : ""}`, `${d.level}%`]));
+      cards(devices, values.map((d) => ({
+        name: d.name, sub: sources[d.source] || "", glyph: "battery",
+        bars: [{ label: t("w.battery"), percent: d.level, warn: d.level <= 20 }],
+      })));
     });
   }
   if (item.widget === "system") {

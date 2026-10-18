@@ -191,6 +191,9 @@ const iconMap = {
   "cloud-snow": iconCloudSnow,
   "cloud-fog": iconCloudFog,
   "cloud-lightning": iconCloudLightning,
+  // Provider isotypes for the AI card: simplified marks in the app's stroke style.
+  "ai-claude": () => S(`<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>`),
+  "ai-openai": () => S(`<path d="M12 3.5 19.4 7.8v8.4L12 20.5l-7.4-4.3V7.8Z"/><path d="M12 8.2 15.3 10.1v3.8L12 15.8l-3.3-1.9v-3.8Z"/>`),
 };
 
 export function icon(name) {
