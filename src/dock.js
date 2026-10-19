@@ -91,7 +91,7 @@ import { launchModifiers, launch, wireLaunch } from "./dock/launch.js";
 import { setupFileDrop } from "./dock/file-drop.js";
 import { exitEdit, onPointerDown, cancelDrag } from "./dock/edit-reorder.js";
 import { takeOutButton, wireStackDragOut, addToFolderFromDock } from "./dock/group-ops.js";
-import { openMenu, openBackgroundMenu, openFileMenu } from "./dock/menus.js";
+import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu } from "./dock/menus.js";
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
@@ -379,6 +379,11 @@ document.addEventListener("contextmenu", (e) => {
   if (isTextEditor(e.target)) return;
   e.preventDefault();
   if (closestSel(e.target, "#ctx-menu")) return;
+  if (closestSel(e.target, ".productivity-panel, .note-editor")) {
+    const card = closestSel(e.target, ".reading-card");
+    if (card) openPanelItemMenu(e, card); else closeMenu();
+    return;
+  }
   const item = closestSel(e.target, "#stack") && findPinnedById(S.stackItemId);
   if (item) openMenu(e, item); else openBackgroundMenu(e);
 });
