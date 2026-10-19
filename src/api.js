@@ -434,6 +434,11 @@ export async function closeSelf({ keepAlive = false } = {}) {
   window.close();
 }
 
+/** Give this window keyboard focus (a dock flyout opened by a drop from another app). */
+export function focusDockWindow() {
+  try { T?.window?.getCurrentWindow?.()?.setFocus?.()?.catch?.(() => {}); } catch (_) { /* not in Tauri */ }
+}
+
 /** Let Settings finish pending writes before the native close request. */
 export async function onCloseRequest(cb) {
   const current = T?.window?.getCurrentWindow?.();

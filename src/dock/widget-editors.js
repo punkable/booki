@@ -44,7 +44,7 @@ export function insideWidgetPanel(target) {
   return !!panel && (panel.contains(target) || !!panel._opener?.contains?.(target));
 }
 export function openProductivity(item, tile) {
-  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
+  if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   const panel = buildProductivityPanel(item, {
     save: async (draft, previous) => {
@@ -67,7 +67,7 @@ export function openProductivity(item, tile) {
 }
 export function openSystemPanel(item, tile) {
   // A second click on the tile that opened the panel closes it, as with a folder.
-  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
+  if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
 }

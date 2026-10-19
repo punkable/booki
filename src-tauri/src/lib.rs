@@ -237,6 +237,7 @@ async fn save_config(
             c.monitor,
             c.monitor_name.clone(),
             c.edge_gap,
+            c.taskbar_follow,
             c.notch_position.clone(),
             c.notch_mode.clone(),
             c.legacy.notch_edge.clone(),
