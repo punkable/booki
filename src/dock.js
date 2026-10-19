@@ -4,6 +4,7 @@
    This file boots the dock and wires the page-level listeners; the features
    live in ./dock/*.js, with shared mutable state in ./dock/state.js. */
 
+import { normalizeGroups } from "./pins.js";
 import "./dock/error-log.js";
 import {
   config as configApi,
@@ -90,10 +91,11 @@ import { launchModifiers, launch, wireLaunch } from "./dock/launch.js";
 import { setupFileDrop } from "./dock/file-drop.js";
 import { exitEdit, onPointerDown, cancelDrag } from "./dock/edit-reorder.js";
 import { takeOutButton, wireStackDragOut, addToFolderFromDock } from "./dock/group-ops.js";
-import { openMenu, openBackgroundMenu, openFileMenu } from "./dock/menus.js";
+import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu } from "./dock/menus.js";
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
+import "./dock/agent-notices.js";
 
 
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,
@@ -111,6 +113,7 @@ let booted = false;
 async function boot() {
   try {
     S.cfg = await configApi.get();
+    S.cfg.pinned = normalizeGroups(S.cfg.pinned || []);
     await ensureLang(S.cfg.language); // load pt/fr/de before the first paint
     applyAll();
     await render(); // render() starts widget polls when visible
@@ -376,6 +379,11 @@ document.addEventListener("contextmenu", (e) => {
   if (isTextEditor(e.target)) return;
   e.preventDefault();
   if (closestSel(e.target, "#ctx-menu")) return;
+  if (closestSel(e.target, ".productivity-panel, .note-editor")) {
+    const card = closestSel(e.target, ".reading-card");
+    if (card) openPanelItemMenu(e, card); else closeMenu();
+    return;
+  }
   const item = closestSel(e.target, "#stack") && findPinnedById(S.stackItemId);
   if (item) openMenu(e, item); else openBackgroundMenu(e);
 });

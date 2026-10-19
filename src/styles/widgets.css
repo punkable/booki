@@ -150,6 +150,8 @@
 @media (prefers-reduced-motion: reduce) { .w-ring-fill { transition: none; } }
 .tile.widget[data-widget="volume"].muted .w-ring { opacity: 0.45; }
 .tile.widget[data-widget="battery"].charging .w-ring-ico { animation: w-pulse 1.8s var(--ease-in-out) infinite; }
+.tile.widget[data-widget="devices"].charging .w-ring-ico { color: #30a46c; animation: w-pulse 1.8s var(--ease-in-out) infinite; }
+@media (prefers-reduced-motion: reduce) { .tile.widget[data-widget="devices"].charging .w-ring-ico { animation: none; } }
 @keyframes w-pulse { 50% { opacity: 0.45; } }
 
 /* ── Card (3×1): notes and clipboard ───────────────────────────────────── */

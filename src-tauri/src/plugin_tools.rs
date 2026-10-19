@@ -123,7 +123,6 @@ fn winget() -> Result<PathBuf, String> {
 pub async fn plugin_read(id: String) -> Result<String, String> {
     util::blocking(move || match id.as_str() {
         "winget" => capture(&winget()?, &["upgrade", "--accept-source-agreements", "--disable-interactivity"], 60),
-        "rclone" => capture(&executable("rclone")?, &["rc", "core/stats", "--url", "http://127.0.0.1:5572"], 10),
         "librehardwaremonitor" => {
             // Reading requires the person to enable LHM's local web server.
             let mut response = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(3))).build().new_agent().get("http://127.0.0.1:8085/data.json").call().map_err(|_| "Open LibreHardwareMonitor and enable Options > Remote Web Server on localhost:8085")?;
@@ -241,7 +240,9 @@ pub async fn app_updates() -> Result<Vec<AppUpdate>, String> {
     util::blocking(|| {
         let output = capture(
             &winget()?,
-            &winget_args(&["upgrade", "--include-unknown"]),
+            // Apps with an unknown installed version are left out: winget
+            // lists them but then has "no applicable update" for them.
+            &winget_args(&["upgrade"]),
             120,
         )
         .or_else(|e| {
@@ -276,75 +277,18 @@ pub async fn app_update(id: Option<String>) -> Result<(), String> {
             .map_err(|_| "another plugin operation is in progress")?;
         let target: Vec<&str> = match &id {
             Some(id) => vec!["upgrade", "--id", id, "--exact"],
-            None => vec!["upgrade", "--all", "--include-unknown"],
+            None => vec!["upgrade", "--all"],
         };
         let mut args = winget_args(&target);
         args.extend(["--silent", "--accept-package-agreements"]);
-        capture(&winget()?, &args, 3600).map(|_| ())
-    })
-    .await?
-}
-
-// ───────────────────── Cloud (rclone) ─────────────────────
-
-#[derive(serde::Serialize, Clone, Debug, PartialEq)]
-pub struct CloudSpace {
-    pub name: String,
-    pub used: u64,
-    pub total: u64,
-    pub error: bool,
-}
-
-/// Used and total space of every remote set up in rclone. Read-only.
-#[tauri::command]
-pub async fn cloud_space() -> Result<Vec<CloudSpace>, String> {
-    util::blocking(|| {
-        let rclone = executable("rclone")?;
-        let remotes = capture(&rclone, &["listremotes"], 30)?;
-        Ok(remotes
-            .lines()
-            .map(str::trim)
-            .filter(|r| r.ends_with(':') && r.len() > 1 && r.len() < 128)
-            .take(16)
-            .map(|remote| {
-                let about = capture(&rclone, &["about", remote, "--json"], 45)
-                    .ok()
-                    .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-                let num = |key: &str| {
-                    about
-                        .as_ref()
-                        .and_then(|j| j.get(key))
-                        .and_then(|v| v.as_u64())
-                };
-                let used = num("used").unwrap_or(0);
-                let total = num("total").unwrap_or(0);
-                CloudSpace {
-                    name: remote.trim_end_matches(':').to_string(),
-                    used,
-                    total,
-                    error: total == 0,
-                }
-            })
-            .collect())
-    })
-    .await?
-}
-
-/// Open rclone's interactive setup in a console window.
-#[tauri::command]
-pub async fn cloud_setup() -> Result<(), String> {
-    util::blocking(|| {
-        let rclone = executable("rclone")?;
-        // rclone's own interactive setup in a new console. No shell in
-        // between, so no path character can turn into a second command.
-        let mut command = Command::new(&rclone);
-        command.arg("config");
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(0x0000_0010); // CREATE_NEW_CONSOLE
-        }
-        command.spawn().map(|_| ()).map_err(|e| e.to_string())
+        capture(&winget()?, &args, 3600).map(|_| ()).map_err(|e| {
+            // 0x8A15002B: winget lists the update but can't apply it.
+            if e.contains("8A15002B") || e.to_ascii_lowercase().contains("no applicable") {
+                "not-applicable".to_string()
+            } else {
+                e
+            }
+        })
     })
     .await?
 }

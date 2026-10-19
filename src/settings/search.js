@@ -36,7 +36,7 @@ export const SEARCH_PARENT = {
 const PAGE_LABELS = { plugins: "plugins.title", home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
 
 const SEARCH_ALIASES = {
-  "plugins.title": "plugins complementos instalar quitar configurar headsetcontrol audio yt-dlp descargas winget actualizaciones openrgb iluminacion rclone sincronizacion librehardwaremonitor sensores temperaturas",
+  "plugins.title": "plugins complementos instalar quitar configurar headsetcontrol audio yt-dlp descargas winget actualizaciones openrgb iluminacion librehardwaremonitor sensores temperaturas",
   "ap.theme": "tema theme claro oscuro light dark modo mode",
   "ap.accent": "color colour acento accent fondo wallpaper pantone paleta palette",
   "look.source": "color colour windows barra tareas taskbar fondo pantalla wallpaper acento accent automatico automatic tema theme",

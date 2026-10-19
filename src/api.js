@@ -62,6 +62,7 @@ const DEMO_CONFIG = {
   language: "system",
   notchTrigger: "click",
   notchVisibility: "auto",
+  notchAgents: true,
   compact: false,
   onboarded: true,
   settingsIntroSeen: true,
@@ -81,6 +82,7 @@ const DEMO_CONFIG = {
   captureVisible: false,
   pluginTerms: 0,
   ignoredUpdates: [],
+  backupFolder: "",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
@@ -589,8 +591,6 @@ export const dock = {
   aiUsage: () => invoke("ai_usage"),
   appUpdates: () => invoke("app_updates"),
   appUpdate: (id = null) => invoke("app_update", { id }),
-  cloudSpace: () => invoke("cloud_space"),
-  cloudSetup: () => invoke("cloud_setup"),
   rgbProfiles: () => invoke("rgb_profiles"),
   rgbApply: (profile = null) => invoke("rgb_apply", { profile }),
   pluginCatalog: () => isTauri ? invoke("plugin_catalog") : Promise.resolve(PLUGINS),
@@ -645,6 +645,7 @@ export const dock = {
   weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
   weatherForecast: (latitude, longitude) => invoke("weather_forecast", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
+  backupFile: (folder) => invoke("backup_file", { folder }),
   importConfig: (path, expected) => invoke("import_config", { path, expected }),
   previewImport: (path) => invoke("preview_config_import", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),
@@ -776,6 +777,12 @@ export async function onNotchToast(cb) {
     if (p && typeof p === "object") cb(p);
     else cb({ title: String(p || ""), detail: "" });
   });
+}
+
+/** Claude Code / Codex changed state: { provider, state, since }. */
+export async function onAgentActivity(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://agent-activity", (e) => { if (e.payload && typeof e.payload === "object") cb(e.payload); });
 }
 
 /** Fade the notch toast out before blackout. */

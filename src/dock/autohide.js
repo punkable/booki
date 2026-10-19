@@ -8,6 +8,7 @@ import { reportHitRects, reportDockMaterial } from "./hit-regions.js";
 import { applyFrame } from "./frame.js";
 import { stopPolls, startPolls } from "./live-widgets.js";
 import { reduceMotion } from "./motion.js";
+import { focusTuckWanted, onFocusDndChange } from "./focus-dnd.js";
 
 // ───────────────────────── Auto-hide ─────────────────────────
 // Modes: "off" (always visible) · "smart" (hide when a window covers the dock,
@@ -175,6 +176,7 @@ function visibilityState() {
     summoned: S.pinnedReveal,
     draggingFile: S.draggingFile,
     pointerInside: S.pointerInside,
+    focusTuck: focusTuckWanted(),
   };
 }
 
@@ -242,7 +244,7 @@ export function reveal() {
 // Grace period after leaving the dock; the callback re-checks EVERYTHING so a
 // pointer that came back (or an opened menu) simply cancels the hide.
 export function scheduleHide() {
-  if (hideMode() === "off") return;
+  if (hideMode() === "off" && !focusTuckWanted()) return;
   clearTimeout(S.hideTimer);
   S.hideTimer = setTimeout(tryTuck, S.cfg.autoHideDelay ?? 650);
 }
@@ -333,3 +335,13 @@ export function softOpen() {
   // hide so we don't sit over the app forever (occlusion won't re-fire if true).
   if (wantsHideNow() && !S.pointerInside) scheduleHide();
 }
+
+// A focus block with "keep the dock tucked away" starts or ends.
+let lastFocusTuck = false;
+onFocusDndChange(() => {
+  const tuck = focusTuckWanted();
+  if (tuck === lastFocusTuck) return;
+  lastFocusTuck = tuck;
+  if (tuck) { S.pinnedReveal = false; if (!S.hiddenState) scheduleHide(); }
+  else if (S.hiddenState && decideVisible(visibilityState()) === true) setHidden(false);
+});

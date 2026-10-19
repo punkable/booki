@@ -34,6 +34,7 @@
  * @property {boolean} summoned     the user asked for it (notch click / hot edge)
  * @property {boolean} draggingFile an OS file drag is over the dock
  * @property {boolean} pointerInside the pointer is within the dock's live area
+ * @property {boolean} [focusTuck] a focus block asks the dock to stay tucked away
  */
 /**
  * @param {VisibilityState} s
@@ -49,6 +50,10 @@ export function decideVisible(s) {
 
   // While Settings previews a position, that preview owns the window.
   if (s.previewing) return null;
+
+  // A focus block that asked for a quiet screen: tucked unless summoned, a
+  // file is being dropped, or the pointer is already on the bar.
+  if (s.focusTuck && !s.summoned && !s.draggingFile) return s.pointerInside ? null : false;
 
   // Never auto-hides.
   if (s.mode === "off") return true;

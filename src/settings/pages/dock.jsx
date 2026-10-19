@@ -69,6 +69,7 @@ export function DockPage({ cfg, set }) {
     <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
       {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
         onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
+      <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
       {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}

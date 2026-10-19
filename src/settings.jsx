@@ -156,7 +156,9 @@ function App() {
       <button type="button" className="button button-accent" autoFocus onClick={store.retryLoad}>{t("focus.retry")}</button>
     </section></div>
   </main></div>;
-  if (!cfg) return <div className="settings" aria-busy="true"><aside className="sidebar" /><main className="settings-main" /></div>;
+  if (!cfg) return <div className="settings" aria-busy="true"><aside className="sidebar" /><main className="settings-main">
+    <div className="page settings-loading"><span className="settings-spinner" aria-hidden="true" /><p>{t("overhaul.loading")}</p></div>
+  </main></div>;
 
   const select = (item) => { navigate(item.kind === "widget" ? "widgets" : "apps"); setFocusedPin(item.id); };
   const pageProps = { cfg, set, focusedPin };

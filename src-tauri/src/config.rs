@@ -359,6 +359,10 @@ pub struct Config {
     /// out of sight until the pointer nears it or something new happens).
     #[serde(default = "default_notch_visibility")]
     pub notch_visibility: String,
+    /// Show Claude Code / Codex working, waiting or done on the notch, read
+    /// from their local session logs (agent_activity.rs).
+    #[serde(default = "default_true")]
+    pub notch_agents: bool,
     /// Compact density: tighter padding/gaps for small screens.
     #[serde(default)]
     pub compact: bool,
@@ -399,6 +403,10 @@ pub struct Config {
     /// version of the same package shows again.
     #[serde(default)]
     pub ignored_updates: Vec<String>,
+    /// A folder (OneDrive, Google Drive…) that receives a copy of these
+    /// settings after every change; empty when automatic backup is off.
+    #[serde(default)]
+    pub backup_folder: String,
     /// Settings from older builds, read only so `migrate` can convert them
     /// and never written back.
     #[serde(flatten, skip_serializing)]
@@ -484,6 +492,7 @@ impl Default for Config {
             profile_rules: ProfileRules::default(),
             notch_trigger: default_notch_trigger(),
             notch_visibility: default_notch_visibility(),
+            notch_agents: true,
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
@@ -496,6 +505,7 @@ impl Default for Config {
             capture_visible: false,
             plugin_terms: 0,
             ignored_updates: Vec::new(),
+            backup_folder: String::new(),
         }
     }
 }

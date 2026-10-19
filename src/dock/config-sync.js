@@ -82,7 +82,7 @@ export async function reloadConfig({ afterSaves = true } = {}) {
   // or the older snapshot would put the edit back.
   if (afterSaves && queued !== persistQueue) return reloadConfig({ afterSaves });
   const prev = S.cfg;
-  S.cfg = next;
+  S.cfg = { ...next, pinned: normalizeGroups(next.pinned || []) };
   // If the language changed, make sure its dictionary is loaded before re-render.
   if (!prev || prev.language !== S.cfg.language) await ensureLang(S.cfg.language);
   if (request !== configReloadGeneration) return;

@@ -8,7 +8,8 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
+import { pollDnd, dndActive, onFocusDndChange } from "./focus-dnd.js";
+import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -76,7 +77,21 @@ export function tickClocks() {
 }
 
 const weatherCache = new Map();
+// A small moon on the Focus card while Windows holds notifications.
+function paintDndBadge(el, on) {
+  let badge = el.querySelector(".focus-dnd-badge");
+  if (on && !badge) {
+    badge = document.createElement("span"); badge.className = "focus-dnd-badge";
+    badge.innerHTML = icon("moon"); badge.setAttribute("role", "img");
+    badge.setAttribute("aria-label", t("focus.dndOn")); badge.title = t("focus.dndOn");
+    el.appendChild(badge);
+  } else if (!on && badge) badge.remove();
+  el.classList.toggle("focus-dnd", on);
+}
+onFocusDndChange(() => eachWidget("focus", (el) => paintDndBadge(el, dndActive())));
 export function tickProductivity() {
+  // Windows' own toggle: read every ten seconds while a Focus card is shown.
+  if (widgetEls.focus?.length) pollDnd();
   // Focus shows the running (or just finished) timer, otherwise the next task.
   eachWidget("focus", (el) => {
     const item = findWidgetPin(el.dataset.id); if (!item) return;
@@ -88,6 +103,7 @@ export function tickProductivity() {
     else if (summary.total) setText(el, summary.next || t("focus.allDone"), `${summary.done}/${summary.total}`);
     else setText(el, t("w.focus"), formatTimer(seconds));
     el.classList.toggle("focus-finished", finished);
+    paintDndBadge(el, dndActive());
   });
   eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
   eachWidget("weather", (el) => {
@@ -190,8 +206,12 @@ function paintDevices(list) {
       return;
     }
     const shown = own ? mine[0] : mine[deviceTurn % mine.length];
-    setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
-    setMetric(el, own ? shortDeviceName(shown.name) : shown.name, shown.level);
+    // Charging shows the bolt in the ring and says so under the name.
+    if (shown.charging) setCornerGlyph(el, "zap", "device-charging");
+    else setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
+    el.classList.toggle("charging", !!shown.charging);
+    const label = own ? shortDeviceName(shown.name) : shown.name;
+    setMetric(el, shown.charging ? `${label} · ${t("dev.charging")}` : label, shown.level);
     setTileLabel(el, mine.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
     // The ring speaks the battery: green, amber, red; it pulses when a device
     // is about to die (any of them, not only the one on screen).
@@ -212,7 +232,7 @@ const warnedDevices = new Set();
 function warnLowDevices(list) {
   for (const d of list) {
     if (!d.charging && d.level <= 10) {
-      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`); }
+      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`, { critical: d.level <= 10 }); }
     } else if (d.charging || d.level > 15) warnedDevices.delete(d.name);
   }
 }
@@ -298,24 +318,6 @@ const pollUpdates = singleFlight(async () => {
   });
   if (list && list.length > lastUpdateCount && lastUpdateCount >= 0) notify(t("up.found").replace("{n}", () => list.length));
   if (list) lastUpdateCount = list.length;
-});
-
-// Cloud (rclone): the fullest remote on the card; every remote in the hint.
-const pollCloud = singleFlight(async () => {
-  let list = [];
-  try { list = (await cloudReading.fresh(30 * 60000)) || []; } catch (_) { list = []; }
-  const known = list.filter((c) => c.total > 0);
-  eachWidget("cloud", (el) => {
-    setWidgetAvailable(el, known.length > 0);
-    if (!known.length) { setText(el, t("w.cloud"), "—"); setTileLabel(el, t("cl.none")); return; }
-    const full = known.reduce((a, b) => (b.used / b.total > a.used / a.total ? b : a));
-    const percent = Math.round((full.used / full.total) * 100);
-    setMetric(el, full.name, percent);
-    setTileLabel(el, known.map((c) => `${c.name} · ${t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total))}`).join("\n"));
-    const tone = usageTone(percent);
-    el.dataset.tone = tone;
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
-  });
 });
 
 // Lighting (OpenRGB): the card names the profile last applied from Booki.
@@ -516,7 +518,6 @@ function pollKinds() {
     ai: widgetPresent("ai"),
     collector: widgetPresent("collector"),
     updates: widgetPresent("updates"),
-    cloud: widgetPresent("cloud"),
     lighting: widgetPresent("lighting"),
   };
 }
@@ -532,7 +533,6 @@ function paintPolls(k) {
   if (!k.devices && !k.ai) syncRotation();
   if (k.collector) paintDownloads();
   if (k.updates) pollUpdates();
-  if (k.cloud) pollCloud();
   if (k.lighting) paintLighting();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
@@ -560,7 +560,7 @@ export function startPolls() {
   if (k.lighting) paintLighting();
   // Updates and Cloud reuse their reading until it is 6 h / 30 min old, so a
   // check every ten minutes costs nothing until then.
-  const hasSlow = k.updates || k.cloud;
+  const hasSlow = k.updates;
   // Nothing live pinned → no timer at all (zero idle cost).
   if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi && !hasSlow) return;
   // First paint immediately so cards aren't blank until the first tick, then
@@ -583,7 +583,7 @@ export function startPolls() {
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
     if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
     if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
-    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); if (k.cloud) pollCloud(); }
+    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).

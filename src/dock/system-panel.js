@@ -9,15 +9,13 @@ import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
 }
-// rclone remotes are named by the person; common ones read as their service.
-const CLOUD_NAMES = { drive: "Google Drive", gdrive: "Google Drive", onedrive: "OneDrive", dropbox: "Dropbox", box: "Box", mega: "MEGA", pcloud: "pCloud", icloud: "iCloud Drive", s3: "Amazon S3" };
 export function buildSystemPanel(item, { close }) {
   const panel = document.createElement("section"); panel.className = "productivity-panel system-widget-panel";
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t(`w.${item.widget}`));
@@ -313,6 +311,13 @@ export function buildSystemPanel(item, { close }) {
         row.append(glyph, names, go, skip); rows.append(row);
         return { u, row, sub, go, skip };
       });
+      const skipUpdate = async (e) => {
+        const key = `${e.u.id}@${e.u.available}`;
+        const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
+        if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return false; }
+        S.cfg.ignoredUpdates = ignored; e.row.remove();
+        return true;
+      };
       const lock = (on) => { running = on; all.disabled = on; for (const e of entries) if (e.row.isConnected) e.go.disabled = on; };
       const updateOne = async (e) => {
         e.row.classList.add("is-working"); e.row.classList.remove("has-error");
@@ -324,6 +329,8 @@ export function buildSystemPanel(item, { close }) {
           return true;
         } catch (error) {
           if (disposed) return false;
+          // An update winget can't apply leaves the list for good.
+          if (String(error).includes("not-applicable")) { await skipUpdate(e); return true; }
           e.row.classList.add("has-error"); e.sub.textContent = pluginError(error);
           e.go.textContent = t("focus.retry");
           return false;
@@ -335,12 +342,7 @@ export function buildSystemPanel(item, { close }) {
           lock(true); await updateOne(e); if (!disposed) lock(false);
           refreshUpdates();
         });
-        e.skip.addEventListener("click", async () => {
-          const key = `${e.u.id}@${e.u.available}`;
-          const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
-          if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return; }
-          S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
-        });
+        e.skip.addEventListener("click", async () => { if (await skipUpdate(e)) { paint(latest); refreshUpdates(); } });
       }
       all.addEventListener("click", async () => {
         if (running) return;
@@ -355,24 +357,6 @@ export function buildSystemPanel(item, { close }) {
       box.append(bar, rows);
     };
     live(box, updatesReading, 6 * 3600000, paint);
-  }
-  if (item.widget === "cloud") {
-    const box = section(t("w.cloud"));
-    needsPlugin("rclone", box, () => {
-      live(box, cloudReading, 30 * 60000, (list) => {
-        box.querySelectorAll(":scope > .plugin-panel-actions").forEach((el) => el.remove());
-        const known = (Array.isArray(list) ? list : []);
-        if (!known.length) box.append(text("p", t("cl.none")));
-        else cards(box, known.map((c) => ({
-          name: CLOUD_NAMES[c.name.toLowerCase()] || c.name, glyph: "cloud",
-          sub: c.total ? t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total)) : t("cl.unknown"),
-          value: c.total ? `${Math.round((c.used / c.total) * 100)}%` : "",
-          bars: c.total ? [{ label: "", percent: (c.used / c.total) * 100, tone: usageTone((c.used / c.total) * 100) }] : [],
-        })));
-        const actions = document.createElement("div"); actions.className = "plugin-panel-actions"; box.append(actions);
-        button(actions, t("cl.setup"), () => api.cloudSetup());
-      });
-    });
   }
   if (item.widget === "lighting") {
     const box = section(t("w.lighting"));
@@ -420,7 +404,7 @@ export function buildSystemPanel(item, { close }) {
         return;
       }
       controls.append(text("small", via(plugin.name)));
-      if (["winget", "rclone", "librehardwaremonitor"].includes(id)) button(controls, t("plugins.refresh"), async () => {
+      if (["winget", "librehardwaremonitor"].includes(id)) button(controls, t("plugins.refresh"), async () => {
         const result = await api.pluginRead(id);
         if (disposed) return;
         box.querySelector(".plugin-result")?.remove();
@@ -469,10 +453,6 @@ export function formatPluginResult(id, value) {
   if (id === "winget") return String(value || t("plugins.noData"));
   let data;
   try { data = typeof value === "string" ? JSON.parse(value) : value; } catch { return t("plugins.noData"); }
-  if (id === "rclone") {
-    const size = (n) => { const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; n = Number(n) || 0; while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; } return `${n.toFixed(i ? 1 : 0)} ${u[i]}`; };
-    return [`${size(data?.bytes)} · ${size(data?.speed)}/s`, t("rclone.transfers").replace("{n}", () => data?.transfers ?? 0), t("rclone.errors").replace("{n}", () => data?.errors ?? 0)].join(" · ");
-  }
   const rows = [];
   function visit(node, depth = 0) {
     if (!node || depth > 32 || rows.length >= 128) return;

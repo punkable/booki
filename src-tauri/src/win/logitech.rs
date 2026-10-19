@@ -55,7 +55,8 @@ pub fn batteries() -> Vec<DeviceBattery> {
 }
 
 fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
-    let level = unified_battery(device, slot).or_else(|| battery_status(device, slot))?;
+    let (level, charging) =
+        unified_battery(device, slot).or_else(|| battery_status(device, slot))?;
     let name = device_name(device, slot).unwrap_or_else(|| "Logitech".to_string());
     let kind = device_type(device, slot).unwrap_or_else(|| super::devices::kind_from_name(&name));
     Some(DeviceBattery {
@@ -63,24 +64,30 @@ fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
         level,
         source: "logitech",
         kind,
-        charging: false,
+        charging,
     })
 }
 
-/// Feature 0x1004, get_status: state of charge in percent.
-fn unified_battery(device: &HidDevice, slot: u8) -> Option<u8> {
+/// Feature 0x1004, get_status: state of charge in percent, then the level
+/// flags and the charging status (1 charging, 2 slow charging, 3 full on
+/// power; 0 discharging, 4 error).
+fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let index = feature_index(device, slot, UNIFIED_BATTERY)?;
     let reply = request(device, slot, index, 1, &[])?;
     let level = reply[4];
-    (1..=100).contains(&level).then_some(level)
+    let charging = matches!(reply.get(6), Some(1..=3));
+    (1..=100).contains(&level).then_some((level, charging))
 }
 
-/// Feature 0x1000, GetBatteryLevelStatus: level in percent.
-fn battery_status(device: &HidDevice, slot: u8) -> Option<u8> {
+/// Feature 0x1000, GetBatteryLevelStatus: level in percent, the next level,
+/// then the status (1 recharging, 2 almost full, 3 full, 4 slow recharge;
+/// 0 discharging, above 4 an error).
+fn battery_status(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let index = feature_index(device, slot, BATTERY_STATUS)?;
     let reply = request(device, slot, index, 0, &[])?;
     let level = reply[4];
-    (1..=100).contains(&level).then_some(level)
+    let charging = matches!(reply.get(6), Some(1..=4));
+    (1..=100).contains(&level).then_some((level, charging))
 }
 
 /// Feature 0x0005: the marketing name, 16 characters per request.

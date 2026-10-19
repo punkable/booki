@@ -3,6 +3,7 @@
 //! Owns the frameless always-on-top dock window, the system-tray icon, config
 //! persistence, app launching and (on Windows) native window management.
 
+mod agent_activity;
 mod ai_usage;
 mod app_catalog;
 mod apps;
@@ -12,6 +13,7 @@ mod config;
 mod config_document;
 mod config_transaction;
 mod directory;
+mod dnd;
 mod dock_window;
 mod favicon;
 mod files;
@@ -183,9 +185,12 @@ fn apply_capture_policy(app: &AppHandle, visible: bool) {
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
+// Async: answered from a worker, so Settings still opens while the UI
+// thread is busy with something else.
 #[tauri::command]
-fn get_config() -> Config {
-    config::load()
+async fn get_config() -> Result<Config, String> {
+    // Never a default stand-in: Settings would save it over the real file.
+    util::blocking(config::load).await
 }
 
 // Async so the fsync'd write never stalls the dock's UI thread (Settings
@@ -258,7 +263,40 @@ async fn save_config(
             }
         }
     }
+    schedule_backup(&config.backup_folder);
     Ok(config)
+}
+
+/// The automatic backup's file inside the chosen folder.
+const BACKUP_FILE: &str = "Booki backup.json";
+
+/// Copy the settings to the backup folder a few seconds after the last
+/// change, so a burst of slider steps writes the file once.
+fn schedule_backup(folder: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static TURN: AtomicU64 = AtomicU64::new(0);
+    let folder = std::path::PathBuf::from(folder);
+    if !folder.is_absolute() {
+        return;
+    }
+    let turn = TURN.fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        if TURN.load(Ordering::SeqCst) != turn || !folder.is_dir() {
+            return;
+        }
+        if let Ok(text) = serde_json::to_string_pretty(&config::load()) {
+            let _ = snapshot::write(&folder.join(BACKUP_FILE), &text);
+        }
+    });
+}
+
+/// The backup file in the chosen folder, when there is one to restore.
+#[tauri::command]
+fn backup_file(folder: String) -> Option<String> {
+    let path = std::path::Path::new(&folder).join(BACKUP_FILE);
+    (std::path::Path::new(&folder).is_absolute() && path.is_file())
+        .then(|| path.to_string_lossy().into_owned())
 }
 
 /// Moving into Booki is explicit and limited to the user's desktop.
@@ -608,6 +646,13 @@ async fn device_batteries() -> Vec<serde_json::Value> {
     }
 }
 
+/// Claude Code / Codex sessions that are working, waiting or just done,
+/// for a notch window that just loaded (changes arrive as events).
+#[tauri::command]
+fn agent_activity() -> Vec<agent_activity::Activity> {
+    agent_activity::current()
+}
+
 /// Plan usage of the AI services signed in on this PC, for the AI widget.
 /// The dock only asks while that widget is pinned.
 #[tauri::command]
@@ -903,6 +948,7 @@ fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Resu
     let live = config::load();
     cfg.profile_rules = live.profile_rules;
     cfg.last_profile = live.last_profile;
+    cfg.backup_folder = live.backup_folder;
     apply_config_snapshot(&app, cfg)
 }
 
@@ -1035,6 +1081,32 @@ fn open_data_dir() -> Result<(), String> {
     let dir = config::config_dir();
     let _ = std::fs::create_dir_all(&dir);
     apps::launch(&dir.to_string_lossy(), &[])
+}
+
+/// Windows "Do not disturb": `None` when it cannot be read.
+#[tauri::command]
+async fn dnd_state() -> Option<bool> {
+    tauri::async_runtime::spawn_blocking(dnd::state)
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Turn Do not disturb on (only when off) or back off (only when Booki turned
+/// it on). `true` when Windows was changed.
+#[tauri::command]
+async fn set_dnd(on: bool) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || dnd::set(on))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Undo a Do not disturb Booki left on (no focus session is running).
+#[tauri::command]
+async fn dnd_restore() -> bool {
+    tauri::async_runtime::spawn_blocking(dnd::restore)
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -1526,14 +1598,13 @@ pub fn run() {
             launched_at_login,
             device_batteries,
             ai_usage,
+            agent_activity,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,
             plugin_tools::plugin_download,
             plugin_tools::app_updates,
             plugin_tools::app_update,
-            plugin_tools::cloud_space,
-            plugin_tools::cloud_setup,
             plugin_tools::rgb_profiles,
             plugin_tools::rgb_apply,
             plugin_status,
@@ -1597,7 +1668,11 @@ pub fn run() {
             open_settings_tab,
             take_pending_tab,
             export_config,
+            backup_file,
             export_diagnostics,
+            dnd_state,
+            set_dnd,
+            dnd_restore,
             weather_search,
             weather_current,
             weather_forecast,
@@ -1680,6 +1755,15 @@ pub fn run() {
         })
         .setup(|app| {
             log::info!("Booki backend started");
+            {
+                let handle = app.handle().clone();
+                agent_activity::start(
+                    || config::load().notch_agents,
+                    move |activity| {
+                        let _ = handle.emit(agent_activity::EVENT, activity);
+                    },
+                );
+            }
             #[cfg(windows)]
             {
                 let handle = app.handle().clone();
@@ -2370,8 +2454,14 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Booki dock");
+        .build(tauri::generate_context!())
+        .expect("error while running Booki dock")
+        .run(|_app, event| {
+            // Never leave Do not disturb on after Booki is gone.
+            if let tauri::RunEvent::Exit = event {
+                dnd::restore();
+            }
+        });
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 /* Profile and backup UI; snapshot operations share the root save barrier. */
 import React, { useEffect, useRef, useState } from "react";
-import { dock as dockApi, pickSavePath, pickJsonFile } from "../api.js";
+import { dock as dockApi, pickSavePath, pickJsonFile, pickFolder } from "../api.js";
 import { Inspector } from "./inspector.jsx";
 import { DockPreview } from "./dock-preview.jsx";
 import { SnapshotReview } from "./snapshot-review.jsx";
@@ -100,7 +100,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
 
 }
 
-export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport, embedded = false }) {
+export function ProfilesPage({ cfg, set, onApply, beforeSnapshot, onImport, embedded = false }) {
   const [backupMsg, setBackupMsg] = useState("");
   const [review, setReview] = useState(null);
   const flashTimer = useRef(null);
@@ -151,7 +151,30 @@ export function ProfilesPage({ cfg, onApply, beforeSnapshot, onImport, embedded 
           </Button>
 
       </div></section>
+      {set && <AutoBackup folder={cfg.backupFolder || ""} set={set} flash={flash} onRestore={async () => {
+        try {
+          const p = await dockApi.backupFile(cfg.backupFolder);
+          if (!p) { flash(t("backup.none")); return; }
+          const snapshot = await dockApi.previewImport(p);
+          if (!snapshot || !Array.isArray(snapshot.pinned)) throw new Error("Invalid backup");
+          setReview({ path: p, snapshot });
+        } catch (_) {
+          flash(t("ap.backupError"));
+        }
+      }} />}
     </>
   );
 }
 
+
+// A folder synced by OneDrive, Google Drive or similar gets a copy of the
+// settings after every change; Restore reviews that copy before applying it.
+function AutoBackup({ folder, set, flash, onRestore }) {
+  return (
+    <section className="profile-backup"><div><h2>{t("backup.auto")}</h2><p>{folder ? t("backup.on").replace("{folder}", () => folder) : t("backup.hint")}</p></div><div className="workspace-actions">
+      <Button onClick={async () => { const p = await pickFolder(); if (p) { set({ backupFolder: p }); flash(t("backup.saved")); } }}>{folder ? t("backup.change") : t("backup.choose")}</Button>
+      {folder && <Button onClick={onRestore}>{t("backup.restore")}</Button>}
+      {folder && <Button onClick={() => set({ backupFolder: "" })}>{t("backup.off")}</Button>}
+    </div></section>
+  );
+}

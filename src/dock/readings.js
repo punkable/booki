@@ -34,7 +34,6 @@ export function shownUpdates(list, ignored = []) {
   const skip = new Set(Array.isArray(ignored) ? ignored : []);
   return list.filter((u) => !skip.has(`${u.id}@${u.available}`));
 }
-export const cloudReading = sharedReading(() => api.cloudSpace());
 
 /** Bytes as KB/MB/GB/TB. */
 export function sizeText(n) {
