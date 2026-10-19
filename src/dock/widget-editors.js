@@ -35,6 +35,7 @@ function dismissFlyout(panel, done) {
   panel.classList.remove("is-open"); panel.classList.add("is-closing");
   // Gone for keyboards and screen readers at once; only its fade remains.
   panel.inert = true; panel.setAttribute("aria-hidden", "true");
+  scheduleHitReport(); // its native blur goes before the fade, not after
   setTimeout(() => { panel.remove(); done?.(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 170);
 }
 /** True when a pointer event landed on the open widget panel or the tile that opened it. */
@@ -185,7 +186,7 @@ export async function editNote(item) {
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
+    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
     panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);

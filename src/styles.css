@@ -52,11 +52,6 @@ body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 18px); }
 body.dock-body.edge-top { padding-top: var(--edge-pad, 18px); }
 body.dock-body.edge-left { padding-left: var(--edge-pad, 18px); }
 body.dock-body.edge-right { padding-right: var(--edge-pad, 18px); }
-/* Tight to the taskbar: keep material insets, only shrink the outer cast. */
-body.tight-edge .dock {
-  box-shadow:
-    0 1px 3px color-mix(in srgb, #000 12%, transparent);
-}
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
 body.edge-left { align-items: center; justify-content: flex-start; }
@@ -132,7 +127,10 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
   /* Inset light follows the free edge (--lit-*), cast shadow follows --sh-*. */
   /* One outline (the border) and one soft drop shadow: inset highlights read
      as a second rim around the bar. */
-  box-shadow: 0 12px 30px color-mix(in srgb, #000 14%, transparent);
+  /* The window leaves --edge-pad (at most 18 px) below the bar. A 12/30 px
+     shadow reached 42 px down and was cut by the window edge into a hard
+     band; this one ends exactly where the window does. */
+  box-shadow: 0 calc(var(--edge-pad, 18px) / 3) calc(var(--edge-pad, 18px) * 2 / 3) color-mix(in srgb, #000 16%, transparent);
   transition:
     transform var(--dur-4) var(--ease-out),
     opacity var(--dur-3) var(--ease-out),
@@ -853,8 +851,8 @@ body.notch-body.toast.toast-out .notch-toast {
 .nl, .nc { position: absolute; inset: 0; display: flex; align-items: center; opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out); }
 body.notch-body.peekable .notch-pill {
   transition:
-    width var(--dur-spring) var(--spring),
-    height var(--dur-spring) var(--spring),
+    width var(--dur-4) cubic-bezier(0, 0, 0, 1),
+    height var(--dur-4) cubic-bezier(0, 0, 0, 1),
     border-radius 0.4s var(--ease-out),
     background var(--dur-3) var(--ease-out),
     box-shadow var(--dur-3) var(--ease-out),
@@ -943,9 +941,11 @@ body.notch-body:not(.card) .notch-pill {
 body.notch-body.peekable.card .notch-pill {
   width: 300px;
   height: 54px;
+  /* The card nearly fills its window (300×54 in 320×60): a 32 px shadow was
+     cut into a hard box by the window edge. A tight one fits. */
   box-shadow:
     inset 0 1px 0 var(--surf-inset-lit),
-    0 12px 32px -8px color-mix(in srgb, #000 40%, transparent);
+    0 1px 3px color-mix(in srgb, #000 22%, transparent);
 }
 body.notch-body.peekable.peek.edge-bottom.card .notch-pill { border-radius: 18px 18px 0 0; }
 body.notch-body.peekable.peek.edge-top.card .notch-pill { border-radius: 0 0 18px 18px; }
@@ -2575,3 +2575,27 @@ body.hide-running-indicators .tile.launching::after { display: none; }
 
 /* One overlay radius for every flyout and panel. */
 .stack, .productivity-panel { border-radius: var(--r-overlay) !important; }
+
+/* ─────────── Fluent acrylic, one recipe for every floating surface ───────────
+   WinUI's acrylic is the blurred backdrop (Windows draws it: material.js),
+   a tint, a faint grain and a hairline, with the flyout elevation shadow.
+   The grain is what keeps a translucent fill from reading as flat plastic;
+   the shadow is the same 8/16 px elevation Windows gives its own flyouts. */
+:root {
+  --acrylic-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+  /* Reaches 8 px above and 16 px below: flyouts keep 16 px to the window
+     edge (placeBesideBar), so the shadow is never cut. */
+  --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.3); } }
+:root[data-theme="dark"] { --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.3); }
+body.surface-glass :is(.dock, .stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach, .notch-toast) {
+  background-image: var(--acrylic-noise) !important;
+  background-size: 128px 128px;
+}
+:is(.stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach) {
+  box-shadow: var(--shadow-flyout) !important;
+}
+@media (prefers-reduced-transparency: reduce) {
+  body.surface-glass :is(.dock, .stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach, .notch-toast) { background-image: none !important; }
+}

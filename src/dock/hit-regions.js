@@ -71,7 +71,19 @@ export function pointInLiveHitArea(x, y) {
   return rects.some((rect) => pointInRect(x, y, rect));
 }
 // Real blur behind the bar and whatever panel is open over the desktop.
-export const MATERIAL_PANELS = "#ctx-menu:not(.hidden), .trash-pop, .coach, .update-pill:not(.hidden)";
+// Every floating surface belongs here: one left out only gets the CSS blur,
+// which sees the page and not the desktop, and reads as a flat second sheet.
+export const MATERIAL_PANELS = [
+  "#ctx-menu:not(.hidden)", ".trash-pop", ".coach", ".update-pill:not(.hidden)",
+  ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".dock-tip.show", ".drop-hint.show",
+].join(", ");
+// A surface reports its shape only once it is fully shown (shapeOf skips a
+// fading one), so report again whenever one finishes appearing or leaving.
+for (const type of ["transitionend", "animationend"]) {
+  document.addEventListener(type, (event) => {
+    if (event.target instanceof Element && event.target.matches(`${MATERIAL_PANELS}, .productivity-panel, .note-editor, .undo-toast, .dock-tip, .drop-hint`)) scheduleHitReport();
+  }, true);
+}
 export function reportDockMaterial() {
   const body = document.body.classList;
   if (S.hiddenState || body.contains("tucked") || body.contains("edge-swap") || body.contains("booting")) {

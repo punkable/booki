@@ -36,7 +36,7 @@ const clamp = (v, lo, hi) => Math.min(Math.max(lo, v), Math.max(lo, hi));
  * @param {number} [o.pad]     Minimum space between box and window edge.
  * @returns {{left: number, top: number}}
  */
-export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 10, pad = 8 }) {
+export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 10, pad = 16 }) {
   const maxLeft = viewport.width - box.width - pad;
   const maxTop = viewport.height - box.height - pad;
 
