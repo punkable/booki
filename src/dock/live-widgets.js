@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName } from "./readings.js";
+import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -171,11 +171,17 @@ function syncRotation() {
     paintDevices(deviceReading.last || []); paintAi(aiReading.last || []);
   }, 6000);
 }
+const lastOwnReading = new Map();
 function paintDevices(list) {
   eachWidget("devices", (el) => {
     // A card made for one device follows only that one, under its short name.
-    const own = findWidgetPin(el.dataset.id)?.style?.device;
-    const mine = own ? list.filter((d) => d.name === own) : list;
+    const style = findWidgetPin(el.dataset.id)?.style;
+    const own = style?.device;
+    // A card made for one device keeps showing its last reading when that
+    // device skips one poll, instead of falling back to an empty card.
+    const found = own ? matchDevice(list, own, style.deviceKind) : null;
+    if (own && found) lastOwnReading.set(el.dataset.id, found);
+    const mine = own ? [found || lastOwnReading.get(el.dataset.id)].filter(Boolean) : list;
     setWidgetAvailable(el, mine.length > 0);
     if (!mine.length) {
       resetGlyph(el, "devices");

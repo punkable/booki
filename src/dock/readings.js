@@ -43,3 +43,18 @@ export function shortDeviceName(name, max = 14) {
   const plain = String(name || "").replace(BRANDS, "").replace(/\s*\((?:bluetooth|wireless|usb)\)$/i, "").trim() || String(name || "");
   return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
 }
+
+/** The reading for a device's own card. Windows names one device a little
+ *  differently per source (Bluetooth, Logitech, HeadsetControl), so after
+ *  the exact name it tries the name without brand and punctuation, then
+ *  either name containing the other, then the only device of the same kind. */
+export function matchDevice(list, name, kind) {
+  if (!Array.isArray(list) || !name) return null;
+  const plain = (value) => shortDeviceName(value, 200).toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const want = plain(name);
+  return list.find((d) => d.name === name)
+    || list.find((d) => plain(d.name) === want)
+    || list.find((d) => { const p = plain(d.name); return p && want && (p.includes(want) || want.includes(p)); })
+    || (kind && kind !== "other" && list.filter((d) => d.kind === kind).length === 1 ? list.find((d) => d.kind === kind) : null)
+    || null;
+}

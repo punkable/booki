@@ -117,3 +117,20 @@ test("a device can get its own card that follows only it, under a short name", a
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("a device's own card still finds it when Windows names it a little differently", async () => {
+  const pins = [
+    { id: "h", name: "Devices", path: "", args: [], kind: "widget", widget: "devices", style: { device: "SteelSeries Arctis Nova 7", deviceKind: "headset" } },
+    { id: "k", name: "Devices", path: "", args: [], kind: "widget", widget: "devices", style: { device: "G915 Keyboard", deviceKind: "keyboard" } },
+  ];
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: pins }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "device_batteries"
+      ? Promise.resolve([{ name: "Arctis Nova 7 Wireless", level: 40, kind: "headset" }, { name: "Logitech G915 LIGHTSPEED", level: 70, kind: "keyboard" }]) : old(c, a); }`,
+  });
+  await page.locator('.tile[data-id="h"] .w-ring-num', { hasText: "40" }).waitFor();
+  await page.locator('.tile[data-id="k"] .w-ring-num', { hasText: "70" }).waitFor();
+  assert.equal(await page.locator('.tile[data-id="k"]').getAttribute("data-glyph"), "device-keyboard");
+  assert.deepEqual(errors, []);
+  await page.close();
+});

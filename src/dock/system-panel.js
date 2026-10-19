@@ -9,7 +9,7 @@ import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, matchDevice, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -162,7 +162,7 @@ export function buildSystemPanel(item, { close }) {
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       const own = item.style?.device;
-      const shown = own ? values.filter((d) => d.name === own) : values;
+      const shown = own ? [matchDevice(values, own, item.style?.deviceKind)].filter(Boolean) : values;
       if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       cards(devices, shown.map((d) => ({
         name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
@@ -175,7 +175,7 @@ export function buildSystemPanel(item, { close }) {
         if (pinnedDevices.has(shown[i].name)) return;
         const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
         button(row, t("dev.ownCard"), async () => {
-          if (!(await addWidget("devices", { style: { device: shown[i].name }, after: item.id }))) throw new Error(t("status.saveError"));
+          if (!(await addWidget("devices", { style: { device: shown[i].name, deviceKind: shown[i].kind }, after: item.id }))) throw new Error(t("status.saveError"));
           row.remove();
         });
       });
