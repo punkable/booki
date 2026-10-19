@@ -395,6 +395,10 @@ pub struct Config {
     /// Version of the plugin terms (TERMS.md) the person accepted; 0 = none.
     #[serde(default)]
     pub plugin_terms: u32,
+    /// Updates the person dismissed, as "package id@version"; a newer
+    /// version of the same package shows again.
+    #[serde(default)]
+    pub ignored_updates: Vec<String>,
     /// Settings from older builds, read only so `migrate` can convert them
     /// and never written back.
     #[serde(flatten, skip_serializing)]
@@ -491,6 +495,7 @@ impl Default for Config {
             clipboard_compact: false,
             capture_visible: false,
             plugin_terms: 0,
+            ignored_updates: Vec::new(),
         }
     }
 }

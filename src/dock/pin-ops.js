@@ -16,8 +16,11 @@ import { showUndoToast } from "./undo-toast.js";
 import { popButton, showConfirmPop, closeTrashPop, placePop } from "./popovers.js";
 import { reloadConfig, persist } from "./config-sync.js";
 
-export async function addWidget(type, { showError = true } = {}) {
-  S.cfg.pinned.push({ id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type });
+export async function addWidget(type, { showError = true, style, after } = {}) {
+  const pin = { id: uid(), name: widgetLabel(type), path: "", args: [], kind: "widget", widget: type, ...(style ? { style } : {}) };
+  // Beside the card it came from (a device's own card), else at the end.
+  const at = after ? S.cfg.pinned.findIndex((p) => p.id === after) : -1;
+  if (at >= 0) S.cfg.pinned.splice(at + 1, 0, pin); else S.cfg.pinned.push(pin);
   if (!(await persist({}, { showError }))) return false;
   await render();
   reframe();

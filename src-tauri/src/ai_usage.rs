@@ -26,17 +26,25 @@ pub struct ProviderUsage {
     pub id: &'static str,
     pub name: &'static str,
     pub windows: Vec<UsageWindow>,
-    /// Why the windows are empty: "signin" (sign in again in the app) or
+    /// Why the windows are empty: "signin" (sign in again in the app),
+    /// "expired" (the saved sign-in has lapsed; opening the app renews it),
+    /// "nocode" (the app is installed but no sign-in was found on this PC) or
     /// "unavailable" (the service did not answer as expected).
     pub error: Option<&'static str>,
 }
 
-/// Every provider signed in on this PC; providers without a local sign-in
-/// are left out entirely.
+/// Every provider signed in on this PC. Claude stays listed with a reason
+/// when it is installed but its sign-in can't be used; providers that are
+/// not on this PC at all are left out.
 pub fn usage() -> Vec<ProviderUsage> {
     let mut out = Vec::new();
-    if let Some(token) = claude_token() {
-        out.push(claude(token));
+    match claude_credentials() {
+        // Refreshing would rotate the refresh token and sign Claude Code out,
+        // so a lapsed token is reported instead and Claude Code renews it.
+        Some(cred) if cred.expired(now_millis()) => out.push(claude_error("expired")),
+        Some(cred) => out.push(claude(cred.token)),
+        None if claude_installed() => out.push(claude_error("nocode")),
+        None => {}
     }
     if let Some(auth) = codex_auth() {
         out.push(codex(auth));
@@ -84,15 +92,153 @@ fn failure(status: u16) -> &'static str {
 
 // ───────────────────────────── Claude ─────────────────────────────
 
-/// Claude Code keeps its sign-in in $CLAUDE_CONFIG_DIR/.credentials.json
-/// (~/.claude by default).
-fn claude_token() -> Option<String> {
-    let home = std::env::var_os("CLAUDE_CONFIG_DIR")
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|h| h.join(".claude")))?;
-    let json = read_json(home.join(".credentials.json"))?;
-    let token = json.get("claudeAiOauth")?.get("accessToken")?.as_str()?;
-    (!token.is_empty()).then(|| token.to_string())
+struct ClaudeCredentials {
+    token: String,
+    /// Unix milliseconds after which the token is refused (0 when unknown).
+    expires_at: i64,
+}
+
+impl ClaudeCredentials {
+    /// A minute of slack so a token about to lapse is not sent.
+    fn expired(&self, now_ms: i64) -> bool {
+        self.expires_at > 0 && self.expires_at <= now_ms.saturating_add(60_000)
+    }
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Folders Claude Code may keep its settings in: $CLAUDE_CONFIG_DIR, then
+/// ~/.claude, and %USERPROFILE%\.claude when that differs from the home dir.
+fn claude_dirs() -> Vec<PathBuf> {
+    let mut found: Vec<PathBuf> = Vec::new();
+    let candidates = [
+        std::env::var_os("CLAUDE_CONFIG_DIR")
+            .filter(|d| !d.is_empty())
+            .map(PathBuf::from),
+        dirs::home_dir().map(|h| h.join(".claude")),
+        std::env::var_os("USERPROFILE")
+            .filter(|d| !d.is_empty())
+            .map(|p| PathBuf::from(p).join(".claude")),
+    ];
+    for dir in candidates.into_iter().flatten() {
+        if !found.contains(&dir) {
+            found.push(dir);
+        }
+    }
+    found
+}
+
+/// `{"claudeAiOauth": {"accessToken": "…", "refreshToken": "…",
+///   "expiresAt": 1760000000000, "scopes": […]}}`
+fn parse_claude_credentials(json: &Value) -> Option<ClaudeCredentials> {
+    let oauth = json.get("claudeAiOauth")?;
+    let token = oauth.get("accessToken")?.as_str()?;
+    if token.is_empty() {
+        return None;
+    }
+    let expires_at = oauth
+        .get("expiresAt")
+        .and_then(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok()))
+        .unwrap_or(0);
+    Some(ClaudeCredentials {
+        token: token.to_string(),
+        expires_at,
+    })
+}
+
+/// Claude Code keeps its sign-in in .credentials.json inside its settings
+/// folder; some builds keep the same JSON in the Windows Credential Manager
+/// instead. With several copies, the one that lasts longest wins.
+fn claude_credentials() -> Option<ClaudeCredentials> {
+    #[allow(unused_mut)]
+    let mut found: Vec<ClaudeCredentials> = claude_dirs()
+        .into_iter()
+        .filter_map(|dir| read_json(dir.join(".credentials.json")))
+        .filter_map(|json| parse_claude_credentials(&json))
+        .collect();
+    #[cfg(windows)]
+    found.extend(
+        credential_manager::claude_json()
+            .iter()
+            .filter_map(parse_claude_credentials),
+    );
+    found.into_iter().max_by_key(|c| {
+        if c.expires_at == 0 {
+            i64::MAX
+        } else {
+            c.expires_at
+        }
+    })
+}
+
+/// Claude Code or the Claude desktop app is on this PC, so a missing sign-in
+/// is worth explaining instead of hiding Claude.
+fn claude_installed() -> bool {
+    claude_dirs().iter().any(|d| d.is_dir())
+        || dirs::config_dir().is_some_and(|d| d.join("Claude").is_dir())
+        || dirs::data_local_dir().is_some_and(|d| d.join("AnthropicClaude").is_dir())
+}
+
+fn claude_error(error: &'static str) -> ProviderUsage {
+    ProviderUsage {
+        id: "claude",
+        name: "Claude",
+        windows: Vec::new(),
+        error: Some(error),
+    }
+}
+
+#[cfg(windows)]
+mod credential_manager {
+    use serde_json::Value;
+    use windows::core::PCWSTR;
+    use windows::Win32::Security::Credentials::{
+        CredFree, CredReadW, CREDENTIALW, CRED_TYPE_GENERIC,
+    };
+
+    /// Generic credentials Claude Code may file its sign-in under.
+    const TARGETS: [&str; 2] = ["Claude Code-credentials", "Claude Code"];
+
+    pub fn claude_json() -> Vec<Value> {
+        TARGETS.iter().filter_map(|t| read(t)).collect()
+    }
+
+    fn read(target: &str) -> Option<Value> {
+        let wide: Vec<u16> = target.encode_utf16().chain(Some(0)).collect();
+        let mut cred: *mut CREDENTIALW = std::ptr::null_mut();
+        // SAFETY: `wide` is NUL-terminated and outlives the call; on success
+        // `cred` points to a buffer that is copied and then freed with CredFree.
+        let blob = unsafe {
+            CredReadW(PCWSTR(wide.as_ptr()), CRED_TYPE_GENERIC, None, &mut cred).ok()?;
+            let c = &*cred;
+            let blob = if c.CredentialBlob.is_null() {
+                Vec::new()
+            } else {
+                std::slice::from_raw_parts(c.CredentialBlob, c.CredentialBlobSize as usize).to_vec()
+            };
+            CredFree(cred as *const _);
+            blob
+        };
+        decode(&blob)
+    }
+
+    /// The blob is UTF-8 JSON, or UTF-16 when written by Windows tools.
+    fn decode(blob: &[u8]) -> Option<Value> {
+        if let Ok(v) = serde_json::from_slice(blob) {
+            return Some(v);
+        }
+        let units: Vec<u16> = blob
+            .chunks_exact(2)
+            .map(|b| u16::from_le_bytes([b[0], b[1]]))
+            .collect();
+        let text = String::from_utf16(&units).ok()?;
+        serde_json::from_str(text.trim_end_matches('\0')).ok()
+    }
 }
 
 fn claude(token: String) -> ProviderUsage {
@@ -311,6 +457,20 @@ mod tests {
         let w = parse_claude(&json);
         assert_eq!(w.len(), 2);
         assert!(w.iter().all(|w| w.percent == 0.0));
+    }
+
+    #[test]
+    fn claude_credentials_read_token_and_expiry() {
+        let json = serde_json::json!({"claudeAiOauth": {
+            "accessToken": "t", "refreshToken": "r", "expiresAt": 2_000_000_000_000_i64}});
+        let c = parse_claude_credentials(&json).unwrap();
+        assert_eq!(c.token, "t");
+        assert!(!c.expired(1_000_000_000_000));
+        assert!(c.expired(2_000_000_000_000));
+        let json = serde_json::json!({"claudeAiOauth": {"accessToken": "t"}});
+        assert!(!parse_claude_credentials(&json).unwrap().expired(i64::MAX));
+        let empty = serde_json::json!({"claudeAiOauth": {"accessToken": ""}});
+        assert!(parse_claude_credentials(&empty).is_none());
     }
 
     #[test]

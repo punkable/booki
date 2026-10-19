@@ -80,6 +80,7 @@ const DEMO_CONFIG = {
   clipboardCompact: false,
   captureVisible: false,
   pluginTerms: 0,
+  ignoredUpdates: [],
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it

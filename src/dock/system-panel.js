@@ -7,8 +7,9 @@ import PLUGINS from "../plugin-catalog.json";
 import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
+import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, updatesReading, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -123,14 +124,14 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
-    const icons = { claude: "ai-claude", codex: "ai-openai" };
+    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
     live(ai, aiReading, 60000, (providers) => {
       const all = Array.isArray(providers) ? providers : [];
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
       cards(ai, all.map((p) => ({
         name: p.name, glyph: icons[p.id] || "sparkles",
-        error: (p.windows || []).length ? "" : t(p.error === "signin" ? "w.aiSignin" : "w.aiUnavailable"),
+        error: (p.windows || []).length ? "" : t(aiErrorKey(p.error)),
         tone: usageTone(Math.max(0, ...(p.windows || []).map((w) => w.percent))), bars: (p.windows || []).map((w) => {
           const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
           return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, tone: usageTone(w.percent) };
@@ -160,10 +161,24 @@ export function buildSystemPanel(item, { close }) {
     const devices = section(t("w.devices"));
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
-      cards(devices, values.map((d) => ({
+      const own = item.style?.device;
+      const shown = own ? values.filter((d) => d.name === own) : values;
+      if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
+      cards(devices, shown.map((d) => ({
         name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
         value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
       })));
+      // Each device can have its own card on the dock, beside this one.
+      if (own) return;
+      const pinnedDevices = new Set(allWidgetPins("devices").map((p) => p.style?.device).filter(Boolean));
+      devices.querySelectorAll(".reading-card").forEach((card, i) => {
+        if (pinnedDevices.has(shown[i].name)) return;
+        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
+        button(row, t("dev.ownCard"), async () => {
+          if (!(await addWidget("devices", { style: { device: shown[i].name }, after: item.id }))) throw new Error(t("status.saveError"));
+          row.remove();
+        });
+      });
     });
   }
   if (item.widget === "system") {
@@ -229,6 +244,8 @@ export function buildSystemPanel(item, { close }) {
       form.append(ask, input, choices); box.append(form, status);
       const kind = shape();
       // A dropped file or gallery link starts at once: nothing to choose.
+      // So does a link dropped right on the Collector card (video for a page).
+      if (!disposed && item.url && item.autoStart && kind === "media" && download.state !== "start" && download.state !== "progress") go("video")().catch(() => {});
       if (!disposed && item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
       if (!item.url) requestAnimationFrame(() => input.focus());
       paintStatus();
@@ -245,7 +262,10 @@ export function buildSystemPanel(item, { close }) {
   }).catch(() => onReady());
   if (item.widget === "updates") {
     const box = section(t("w.updates"));
-    const paint = (list) => {
+    let latest = null;
+    const paint = (raw) => {
+      latest = raw;
+      const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
       box.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .plugin-panel-actions").forEach((el) => el.remove());
       if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
       if (!list.length) { box.append(text("p", t("up.none"))); return; }
@@ -256,6 +276,13 @@ export function buildSystemPanel(item, { close }) {
       box.querySelectorAll(".reading-card").forEach((card, i) => {
         const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
         button(row, t("up.one"), async () => { row.querySelector("button").textContent = t("up.working"); await api.appUpdate(list[i].id); refreshUpdates(); });
+        // Not interested in this one: hide it until a newer version comes.
+        button(row, t("up.skip"), async () => {
+          const key = `${list[i].id}@${list[i].available}`;
+          const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
+          if (!(await persist({ ignoredUpdates: ignored }))) throw new Error(t("status.saveError"));
+          S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
+        });
       });
     };
     live(box, updatesReading, 6 * 3600000, paint);
@@ -362,6 +389,10 @@ export function buildSystemPanel(item, { close }) {
   return panel;
 }
 function via(name) { return t("w.devicesVia").replace("{plugin}", () => name); }
+/** Every pin of one widget type, inside groups too. */
+function allWidgetPins(type, items = S.cfg?.pinned || []) {
+  return items.flatMap((p) => (p.kind === "group" ? allWidgetPins(type, p.children || []) : p.kind === "widget" && p.widget === type ? [p] : []));
+}
 export function videoUrl(value) {
   try { const url = new URL(value.trim()); return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password ? url.href : null; } catch { return null; }
 }

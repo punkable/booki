@@ -32,6 +32,8 @@ function dropSpot(position) {
   if (tile) {
     const item = S.cfg.pinned.find((p) => p.id === tile.dataset.id);
     const k = item && item.kind;
+    // The whole Collector card takes a dropped link.
+    if (k === "widget" && item.widget === "collector") return { target: tile, index: null };
     if (k === "app" || k === "folder" || k === "group" || k === "trash") {
       const r = tile.getBoundingClientRect();
       // A group takes most of its tile, across the whole bar: filing a file
@@ -89,6 +91,7 @@ function dropHintText(spot) {
   if (item?.kind === "folder") return t("drop.moveTo").replace("{name}", () => name);
   if (item?.kind === "group") return t("drop.addTo").replace("{name}", () => name);
   if (item?.kind === "trash") return t("drop.trash");
+  if (item?.widget === "collector") return t("drop.collect");
   return t("drop.pin");
 }
 function showDropHint(spot) {
@@ -133,7 +136,8 @@ function setDropTarget(el) {
   if (el) {
     const item = S.cfg.pinned.find((p) => p.id === el.dataset.id);
     const kind = item && item.kind;
-    if (kind !== "app" && kind !== "folder" && kind !== "group" && kind !== "trash") {
+    const collector = kind === "widget" && item.widget === "collector";
+    if (kind !== "app" && kind !== "folder" && kind !== "group" && kind !== "trash" && !collector) {
       el = null;
     }
   }
@@ -147,11 +151,16 @@ export function setupFileDrop() {
   // A dropped link asks Video or Audio only in the Downloads panel, by the
   // Downloads card when one is pinned.
   onLinkDrop((value) => {
-    const url = videoUrl(String(value || ""));
+    const url = videoUrl(String((value && value.url) ?? value ?? ""));
     if (!url) return;
-    const card = dockEl.querySelector('.tile.widget[data-widget="collector"]');
+    // Dropped right on the Collector card: start at once, video for a media
+    // page (galleries and files need no choice). Anywhere else on the dock
+    // opens its panel, which asks Video or Audio only.
+    const spot = value && value.position ? dropSpot(value.position) : null;
+    const onCard = spot?.target?.matches?.('.tile.widget[data-widget="collector"]') ? spot.target : null;
+    const card = onCard || dockEl.querySelector('.tile.widget[data-widget="collector"]');
     const pinned = card ? findWidgetPin(card.dataset.id) : null;
-    openSystemPanel({ ...(pinned || { id: "collector", kind: "widget" }), widget: "collector", url }, card || dockEl);
+    openSystemPanel({ ...(pinned || { id: "collector", kind: "widget" }), widget: "collector", url, autoStart: !!onCard }, card || dockEl);
   });
   // Browser links arrive through the native drop bridge (link_drop.rs), which
   // replaces WebView2's drop target, so the DOM never sees them.
