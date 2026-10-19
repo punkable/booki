@@ -3,6 +3,7 @@
 //! Owns the frameless always-on-top dock window, the system-tray icon, config
 //! persistence, app launching and (on Windows) native window management.
 
+mod agent_activity;
 mod ai_usage;
 mod app_catalog;
 mod apps;
@@ -609,6 +610,13 @@ async fn device_batteries() -> Vec<serde_json::Value> {
     {
         Vec::new()
     }
+}
+
+/// Claude Code / Codex sessions that are working, waiting or just done,
+/// for a notch window that just loaded (changes arrive as events).
+#[tauri::command]
+fn agent_activity() -> Vec<agent_activity::Activity> {
+    agent_activity::current()
 }
 
 /// Plan usage of the AI services signed in on this PC, for the AI widget.
@@ -1529,6 +1537,7 @@ pub fn run() {
             launched_at_login,
             device_batteries,
             ai_usage,
+            agent_activity,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,
@@ -1681,6 +1690,15 @@ pub fn run() {
         })
         .setup(|app| {
             log::info!("Booki backend started");
+            {
+                let handle = app.handle().clone();
+                agent_activity::start(
+                    || config::load().notch_agents,
+                    move |activity| {
+                        let _ = handle.emit(agent_activity::EVENT, activity);
+                    },
+                );
+            }
             #[cfg(windows)]
             {
                 let handle = app.handle().clone();

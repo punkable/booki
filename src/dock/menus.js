@@ -256,3 +256,21 @@ export function openFileMenu(e, item, parent, openFolder) {
   sep(); add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
   placeMenu(e);
 }
+
+// Right-click on a card inside a widget panel: that card's own actions, not
+// the dock's menu.
+export function openPanelItemMenu(e, card) {
+  e.preventDefault();
+  e.stopPropagation();
+  ++S.menuGeneration;
+  ctxMenu.replaceChildren();
+  const { add, sep } = menuActions(ctxMenu, closeMenu);
+  const name = card.querySelector("strong")?.textContent || "";
+  const value = card.querySelector(".reading-card-value")?.textContent || "";
+  addMenuHead(name, value);
+  const buttons = [...card.querySelectorAll("button:not([disabled])")];
+  for (const b of buttons) add("plus", b.textContent.trim(), () => b.click());
+  if (buttons.length) sep();
+  add("copy", t("ab.copy"), () => navigator.clipboard?.writeText([name, value].filter(Boolean).join(" · ")).catch(() => {}));
+  placeMenu(e);
+}

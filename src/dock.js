@@ -95,6 +95,7 @@ import { openMenu, openBackgroundMenu, openFileMenu } from "./dock/menus.js";
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
+import "./dock/agent-notices.js";
 
 
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,

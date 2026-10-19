@@ -62,6 +62,7 @@ const DEMO_CONFIG = {
   language: "system",
   notchTrigger: "click",
   notchVisibility: "auto",
+  notchAgents: true,
   compact: false,
   onboarded: true,
   settingsIntroSeen: true,
@@ -774,6 +775,12 @@ export async function onNotchToast(cb) {
     if (p && typeof p === "object") cb(p);
     else cb({ title: String(p || ""), detail: "" });
   });
+}
+
+/** Claude Code / Codex changed state: { provider, state, since }. */
+export async function onAgentActivity(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://agent-activity", (e) => { if (e.payload && typeof e.payload === "object") cb(e.payload); });
 }
 
 /** Fade the notch toast out before blackout. */

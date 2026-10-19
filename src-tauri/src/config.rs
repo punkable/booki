@@ -359,6 +359,10 @@ pub struct Config {
     /// out of sight until the pointer nears it or something new happens).
     #[serde(default = "default_notch_visibility")]
     pub notch_visibility: String,
+    /// Show Claude Code / Codex working, waiting or done on the notch, read
+    /// from their local session logs (agent_activity.rs).
+    #[serde(default = "default_true")]
+    pub notch_agents: bool,
     /// Compact density: tighter padding/gaps for small screens.
     #[serde(default)]
     pub compact: bool,
@@ -484,6 +488,7 @@ impl Default for Config {
             profile_rules: ProfileRules::default(),
             notch_trigger: default_notch_trigger(),
             notch_visibility: default_notch_visibility(),
+            notch_agents: true,
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),

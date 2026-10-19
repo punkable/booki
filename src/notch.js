@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
+import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { imageSrc } from "./image-src.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
@@ -22,6 +22,7 @@ import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
+import { icon } from "./icons.js";
 import { reportMaterial, shapeOf, applyMaterial, followFrames } from "./material.js";
 
 const root = document.documentElement;
@@ -62,6 +63,8 @@ async function applyLook() {
     document.body.classList.toggle("floating", shape === "floating");
     document.body.classList.toggle("smart", shape === "smart");
     focusTimers = focusTimersOf(cfg.pinned || []);
+    agentsOn = cfg.notchAgents !== false;
+    if (!agentsOn) clearAgents();
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     // Stacked under a visible dock the card would grow over the bar.
@@ -324,8 +327,79 @@ function focusTimersOf(items = []) {
   return out;
 }
 
+// ─── AI agents (Claude Code, Codex) ──────────────────────────────────────
+// The backend (agent_activity.rs) watches their local session logs and
+// emits only state changes. Waiting for approval outranks everything but a
+// volume flash and stays until answered; working stays quietly while it
+// lasts; a finished turn is a 5 s notice, several queue up one by one.
+const AGENT_NAMES = { claude: "Claude", codex: "Codex" };
+const AGENT_ICONS = { claude: "ai-claude", codex: "ai-openai" };
+const AGENT_DONE_MS = 5000;
+let agentsOn = true;
+const agents = new Map(); // provider -> { state: "working" | "waiting", since }
+let agentDone = null; // { provider, since, until }
+const agentDoneQueue = [];
+const lAgent = document.getElementById("nl-agent");
+
+function clearAgents() {
+  agents.clear();
+  agentDone = null;
+  agentDoneQueue.length = 0;
+}
+
+function agentLabel(state, provider) {
+  const key = { working: "notch.agentWorking", waiting: "notch.agentWaiting", done: "notch.agentDone" }[state];
+  return t(key).replace("{agent}", () => AGENT_NAMES[provider] || provider);
+}
+
+function nextAgentDone(now) {
+  if (agentDone && agentDone.until > now) return agentDone;
+  agentDone = null;
+  const next = agentDoneQueue.shift();
+  if (next) agentDone = { ...next, until: now + AGENT_DONE_MS };
+  return agentDone;
+}
+
+/** The notch itself cannot show it (vertical edge, hover trigger): fall
+ *  back to the notice chip, which also covers the tab stepping aside. */
+function agentNotice(state, provider) {
+  if (canPeek) nudgePresence();
+  else invoke("notch_notice", { title: agentLabel(state, provider), detail: "" }).catch(() => {});
+}
+
+function applyAgent({ provider, state, since } = {}, quiet = false) {
+  if (!agentsOn || !AGENT_NAMES[provider]) return;
+  const before = agents.get(provider)?.state;
+  if (state === "working" || state === "waiting") {
+    agents.set(provider, { state, since: Number(since) || Date.now() });
+    if (state === "waiting" && before !== "waiting" && !quiet) agentNotice(state, provider);
+  } else {
+    agents.delete(provider);
+    if (state === "done" && !quiet && !agentDoneQueue.some((d) => d.provider === provider) && agentDone?.provider !== provider) {
+      agentDoneQueue.push({ provider, since: Number(since) || Date.now() });
+      agentNotice(state, provider);
+    }
+  }
+  paintActivity();
+}
+
+function agentActivity() {
+  let pick = null;
+  for (const [provider, a] of agents) {
+    if (!pick || (a.state === "waiting" && pick.state !== "waiting")) pick = { provider, ...a };
+  }
+  return pick;
+}
+
+onAgentActivity((payload) => applyAgent(payload));
+if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
+
 function currentActivity(now = Date.now()) {
   if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
+  const agent = agentsOn ? agentActivity() : null;
+  if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
+  const done = agentsOn ? nextAgentDone(now) : null;
+  if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
   if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
@@ -345,6 +419,7 @@ function currentActivity(now = Date.now()) {
   // Music opens the notch for a few seconds when it starts or the track
   // changes, then lets it settle; it stays in the card on hover.
   if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
+  if (agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   if (low <= 15) return { kind: "battery", level: low };
   return null;
 }
@@ -362,7 +437,7 @@ function paintActivity() {
     lastActivityKind = kind;
   }
   document.body.classList.toggle("live", !!activity);
-  for (const name of ["timer", "done", "volume", "media", "battery", "charging"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  for (const name of ["timer", "done", "volume", "media", "battery", "charging", "agent", "agent-waiting", "agent-done"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
     lText.textContent = mmss(activity.left);
     ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
@@ -373,12 +448,22 @@ function paintActivity() {
     lText.textContent = t("notch.focusDone");
   } else if (kind === "battery" || kind === "charging") {
     lText.textContent = `${activity.level}%`;
+  } else if (kind.startsWith("agent")) {
+    lText.textContent = agentLabel(kind === "agent" ? "working" : kind.slice(6), activity.provider);
+    const mark = AGENT_ICONS[activity.provider];
+    if (lAgent.dataset.icon !== mark) {
+      lAgent.innerHTML = icon(mark);
+      lAgent.dataset.icon = mark;
+    }
   }
+  for (const name of Object.keys(AGENT_NAMES)) document.body.classList.toggle(`agent-${name}`, kind.startsWith("agent") && activity.provider === name);
   // Tick once a second only while a timer is visible; a passing state
   // repaints once when it runs out.
   clearInterval(activityTick);
   clearTimeout(activityExpiry);
-  activityTick = kind === "timer" ? setInterval(() => { paintActivity(); if (cardOpen) paintCard(); }, 1000) : null;
+  activityTick = kind === "timer" ? setInterval(() => { paintActivity(); if (cardOpen) paintCard(); }, 1000)
+    // An agent's card shows how long it has been at it; refresh that slowly.
+    : kind.startsWith("agent") ? setInterval(() => { if (cardOpen) paintCard(); }, 30000) : null;
   activityExpiry = activity?.until ? setTimeout(paintActivity, Math.max(50, activity.until - Date.now() + 20)) : null;
   paintCard();
 }
@@ -441,6 +526,14 @@ function paintCard() {
     document.body.classList.add("card-clock");
     return;
   }
+  if (activity?.kind.startsWith("agent")) {
+    const state = activity.kind === "agent" ? "working" : activity.kind.slice(6);
+    cTitle.textContent = agentLabel(state, activity.provider);
+    cSub.textContent = agentElapsed(activity.since);
+    cPlay.hidden = true;
+    document.body.classList.add("card-clock");
+    return;
+  }
   if (activity?.kind === "battery" || activity?.kind === "charging") {
     cTitle.textContent = `${activity.level}%`;
     cSub.textContent = t(activity.kind === "charging" ? "notch.charging" : "notch.batteryLow");
@@ -465,6 +558,16 @@ function paintCard() {
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
   }
+}
+
+/** "hace 2 min" / "2 min ago", in the notch's language. */
+function agentElapsed(since, now = Date.now()) {
+  const seconds = Math.max(0, Math.round((now - Number(since || now)) / 1000));
+  let rtf;
+  try { rtf = new Intl.RelativeTimeFormat(curLang(), { numeric: "auto", style: "short" }); } catch (_) { return ""; }
+  if (seconds < 60) return rtf.format(-seconds, "second");
+  if (seconds < 3600) return rtf.format(-Math.floor(seconds / 60), "minute");
+  return rtf.format(-Math.floor(seconds / 3600), "hour");
 }
 
 let nativeSupport = {};

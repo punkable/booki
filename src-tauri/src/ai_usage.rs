@@ -133,7 +133,7 @@ fn read_logs(roots: &[PathBuf], now: i64, mut each: impl FnMut(&[u8])) {
     }
 }
 
-fn collect_jsonl(dir: &Path, since: i64, depth: usize, out: &mut Vec<(PathBuf, i64)>) {
+pub(crate) fn collect_jsonl(dir: &Path, since: i64, depth: usize, out: &mut Vec<(PathBuf, i64)>) {
     if depth > MAX_DEPTH {
         return;
     }
@@ -170,7 +170,7 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 
 /// $CLAUDE_CONFIG_DIR (comma-separated list allowed), else ~/.claude and
 /// ~/.config/claude.
-fn claude_dirs() -> Vec<PathBuf> {
+pub(crate) fn claude_dirs() -> Vec<PathBuf> {
     if let Some(list) = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|d| !d.is_empty()) {
         let list = list.to_string_lossy().into_owned();
         let dirs: Vec<PathBuf> = list
@@ -304,7 +304,7 @@ fn claude_usage(entries: Vec<ClaudeEntry>, now: i64) -> ProviderUsage {
 // ───────────────────────────── Codex CLI ─────────────────────────────
 
 /// $CODEX_HOME, else ~/.codex.
-fn codex_home() -> Option<PathBuf> {
+pub(crate) fn codex_home() -> Option<PathBuf> {
     std::env::var_os("CODEX_HOME")
         .filter(|d| !d.is_empty())
         .map(PathBuf::from)
