@@ -192,7 +192,13 @@ export function useSettingsStore() {
   const load = () => {
     const seq = ++loadSeq.current;
     setLoadError(false);
-    return configApi.get().then(async (c) => {
+    // A Booki that stopped answering must not leave Settings blank: after a
+    // few seconds the read counts as failed and the window offers Retry.
+    const answer = Promise.race([
+      configApi.get(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("config read timed out")), 8000)),
+    ]);
+    return answer.then(async (c) => {
       await ensureLang(c.language);
       // A config-changed read may already have filled the window.
       if (seq !== loadSeq.current || cfgRef.current) return;

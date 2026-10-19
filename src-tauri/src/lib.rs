@@ -183,9 +183,12 @@ fn apply_capture_policy(app: &AppHandle, visible: bool) {
 
 // ─────────────────────────────── Commands ───────────────────────────────
 
+// Async: answered from a worker, so Settings still opens while the UI
+// thread is busy with something else.
 #[tauri::command]
-fn get_config() -> Config {
-    config::load()
+async fn get_config() -> Result<Config, String> {
+    // Never a default stand-in: Settings would save it over the real file.
+    util::blocking(config::load).await
 }
 
 // Async so the fsync'd write never stalls the dock's UI thread (Settings

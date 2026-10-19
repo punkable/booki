@@ -1024,3 +1024,9 @@
 .catalog-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .catalog-pinned { display: grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-contrast, #fff); }
 .catalog-pinned svg { width: 10px; height: 10px; }
+
+/* While the configuration loads: a WinUI ProgressRing, never an empty window. */
+.settings-loading { display: flex; align-items: center; gap: 12px; color: var(--ink-2); }
+.settings-spinner { width: 20px; height: 20px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: settings-spin 0.8s linear infinite; }
+@keyframes settings-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .settings-spinner { animation-duration: 2.4s; } }
