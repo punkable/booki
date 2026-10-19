@@ -261,29 +261,79 @@ export function buildSystemPanel(item, { close }) {
     container.append(offer);
   }).catch(() => onReady());
   if (item.widget === "updates") {
+    // A Windows-style list: one row per app with Update and a quiet Skip.
+    // winget installs one thing at a time, so Booki queues them: while one
+    // runs the other Update buttons wait, and Update all goes row by row so
+    // each one shows its own progress. A failure stays on its own row.
     const box = section(t("w.updates"));
     let latest = null;
+    let running = false;
+    const versionLine = (u) => (!u.current || /^unknown$/i.test(u.current)) ? t("up.newVersion").replace("{v}", () => u.available) : `${u.current} → ${u.available}`;
     const paint = (raw) => {
       latest = raw;
+      // A fresh reading must not rebuild the list under a running update.
+      if (running) return;
       const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
-      box.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .plugin-panel-actions").forEach((el) => el.remove());
+      box.querySelectorAll(":scope > *:not(strong)").forEach((el) => el.remove());
       if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
-      if (!list.length) { box.append(text("p", t("up.none"))); return; }
-      const all = document.createElement("div"); all.className = "plugin-panel-actions";
-      button(all, t("up.all"), async () => { all.querySelector("button").textContent = t("up.working"); await api.appUpdate(null); notify(t("up.done")); refreshUpdates(); }).classList.add("primary");
-      box.append(all);
-      cards(box, list.map((u) => ({ name: u.name, sub: `${u.current} → ${u.available}`, glyph: "refresh" })));
-      box.querySelectorAll(".reading-card").forEach((card, i) => {
-        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
-        button(row, t("up.one"), async () => { row.querySelector("button").textContent = t("up.working"); await api.appUpdate(list[i].id); refreshUpdates(); });
-        // Not interested in this one: hide it until a newer version comes.
-        button(row, t("up.skip"), async () => {
-          const key = `${list[i].id}@${list[i].available}`;
+      if (!list.length) { box.append(text("p", t("up.none"), "update-empty")); return; }
+      const bar = document.createElement("div"); bar.className = "update-bar";
+      const count = text("span", t("up.some").replace("{n}", () => list.length), "update-count");
+      const all = text("button", t("up.all"), "productivity-button primary"); all.type = "button";
+      bar.append(count, all);
+      const rows = document.createElement("ul"); rows.className = "update-list";
+      const entries = list.map((u) => {
+        const row = document.createElement("li"); row.className = "update-row";
+        const glyph = text("span", "", "update-glyph"); glyph.innerHTML = icon("refresh");
+        const names = document.createElement("div"); names.className = "update-names";
+        const sub = text("small", versionLine(u));
+        names.append(text("strong", u.name), sub);
+        const go = text("button", t("up.one"), "productivity-button"); go.type = "button";
+        const skip = document.createElement("button"); skip.type = "button"; skip.className = "update-skip";
+        skip.innerHTML = icon("eye-off"); skip.title = t("up.skip"); skip.setAttribute("aria-label", `${t("up.skip")}: ${u.name}`);
+        row.append(glyph, names, go, skip); rows.append(row);
+        return { u, row, sub, go, skip };
+      });
+      const lock = (on) => { running = on; all.disabled = on; for (const e of entries) if (e.row.isConnected) e.go.disabled = on; };
+      const updateOne = async (e) => {
+        e.row.classList.add("is-working"); e.row.classList.remove("has-error");
+        e.go.textContent = t("up.working"); e.sub.textContent = versionLine(e.u);
+        try {
+          await api.appUpdate(e.u.id);
+          e.row.classList.add("is-done"); e.sub.textContent = t("up.updated");
+          setTimeout(() => e.row.remove(), 900);
+          return true;
+        } catch (error) {
+          if (disposed) return false;
+          e.row.classList.add("has-error"); e.sub.textContent = pluginError(error);
+          e.go.textContent = t("focus.retry");
+          return false;
+        } finally { e.row.classList.remove("is-working"); }
+      };
+      for (const e of entries) {
+        e.go.addEventListener("click", async () => {
+          if (running) return;
+          lock(true); await updateOne(e); if (!disposed) lock(false);
+          refreshUpdates();
+        });
+        e.skip.addEventListener("click", async () => {
+          const key = `${e.u.id}@${e.u.available}`;
           const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
-          if (!(await persist({ ignoredUpdates: ignored }))) throw new Error(t("status.saveError"));
+          if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return; }
           S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
         });
+      }
+      all.addEventListener("click", async () => {
+        if (running) return;
+        lock(true); all.textContent = t("up.working");
+        let failed = 0;
+        for (const e of entries) { if (disposed) return; if (e.row.isConnected && !(await updateOne(e))) failed++; }
+        if (disposed) return;
+        lock(false); all.textContent = t("up.all");
+        notify(failed ? t("up.someFailed").replace("{n}", () => failed) : t("up.done"));
+        refreshUpdates();
       });
+      box.append(bar, rows);
     };
     live(box, updatesReading, 6 * 3600000, paint);
   }

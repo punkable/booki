@@ -15,6 +15,7 @@ import { S } from "./state.js";
 import { isVertical, widgetLabel, syncIcon, resolveIcon, menuPinTitle } from "./helpers.js";
 import { dockEl, esc, stackEl } from "./dom.js";
 import { reframe, applyFrame } from "./frame.js";
+import { reportDockMaterial } from "./hit-regions.js";
 import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
@@ -633,6 +634,7 @@ export function closeStack() {
   S.pendingReplace = null;
   document.body.classList.remove("stack-open");
   stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode");
+  reportDockMaterial(); // its blur goes with it, before the window shrinks
   cacheWidgetEls();
   syncPolls({ repaint: false });
   clearTimeout(stackCloseTimer);

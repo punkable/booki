@@ -122,8 +122,9 @@ test("Updates counts apps with an update and updates them all from its panel", a
   await card.locator(".w-ring-num", { hasText: "2" }).waitFor();
   await card.click();
   await page.getByRole("button", { name: "Update all", exact: true }).click();
-  await waitForAsyncCondition(page, () => window.__updates.length === 1);
-  assert.equal(await page.evaluate(() => window.__updates[0].id), null);
+  // winget runs one install at a time: Update all goes row by row.
+  await waitForAsyncCondition(page, () => window.__updates.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__updates.map((u) => u.id)), ["Mozilla.Firefox", "7zip.7zip"]);
   assert.deepEqual(errors, []); await page.close();
 });
 
