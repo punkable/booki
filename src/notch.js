@@ -10,6 +10,7 @@
 
 import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
+import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
 import { observeSystem, recoveryInterval } from "./dock/system-observer.js";
 import { showBookiMenu } from "./native-context-menu.js";
@@ -22,7 +23,6 @@ import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
-import { icon } from "./icons.js";
 import { reportMaterial, shapeOf, applyMaterial, followFrames } from "./material.js";
 
 const root = document.documentElement;
@@ -485,6 +485,16 @@ const pollBattery = singleFlight(async () => {
   if (battery) batteryTimer = setTimeout(pollBattery, 60000);
 });
 let batteryTimer = null;
+
+// Windows "Do not disturb": a subtle moon on the tab, read every ten seconds.
+const dndEl = document.getElementById("notch-dnd");
+if (dndEl) dndEl.innerHTML = icon("moon");
+async function pollDndState() {
+  let on = false;
+  try { on = (await invoke("dnd_state")) === true; } catch (_) { on = false; }
+  document.body.classList.toggle("dnd", on);
+}
+if (inTauri) { pollDndState(); setInterval(() => { if (!document.hidden) pollDndState(); }, 10000); }
 
 let lastTrack = "";
 function paintMedia() {

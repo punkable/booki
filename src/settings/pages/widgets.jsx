@@ -73,6 +73,10 @@ function WidgetFields({ item, cfg, set, onChange }) {
         options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: t(`w.span${n}`) }))]} />
     </Row>}
     <Row label={t("w.color")} stack><AccentPicker sources value={style.color || WIDGET_META[item.widget]?.accent || cfg.accent} onChange={(v) => patch({ color: v })} /></Row>
+    {item.widget === "focus" && <CollapsibleSection title={t("focus.quietTitle")}>
+      <Toggle label={t("focus.dnd")} hint={t("focus.dndHint")} checked={style.dnd === true} onChange={(v) => patch({ dnd: v })} />
+      <Toggle label={t("focus.tuck")} hint={t("focus.tuckHint")} checked={!!style.tuckDuringFocus} onChange={(v) => patch({ tuckDuringFocus: v })} />
+    </CollapsibleSection>}
     {item.widget === "clipboard" && <CollapsibleSection title={t("clip.privacyTitle")}><ClipboardPolicy cfg={cfg} set={set} /></CollapsibleSection>}
   </>;
 }

@@ -13,6 +13,7 @@ mod config;
 mod config_document;
 mod config_transaction;
 mod directory;
+mod dnd;
 mod dock_window;
 mod favicon;
 mod files;
@@ -1082,6 +1083,32 @@ fn open_data_dir() -> Result<(), String> {
     apps::launch(&dir.to_string_lossy(), &[])
 }
 
+/// Windows "Do not disturb": `None` when it cannot be read.
+#[tauri::command]
+async fn dnd_state() -> Option<bool> {
+    tauri::async_runtime::spawn_blocking(dnd::state)
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Turn Do not disturb on (only when off) or back off (only when Booki turned
+/// it on). `true` when Windows was changed.
+#[tauri::command]
+async fn set_dnd(on: bool) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || dnd::set(on))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Undo a Do not disturb Booki left on (no focus session is running).
+#[tauri::command]
+async fn dnd_restore() -> bool {
+    tauri::async_runtime::spawn_blocking(dnd::restore)
+        .await
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 async fn weather_search(city: String) -> Result<Vec<serde_json::Value>, String> {
     tauri::async_runtime::spawn_blocking(move || weather::search(&city))
@@ -1643,6 +1670,9 @@ pub fn run() {
             export_config,
             backup_file,
             export_diagnostics,
+            dnd_state,
+            set_dnd,
+            dnd_restore,
             weather_search,
             weather_current,
             weather_forecast,
@@ -2424,8 +2454,14 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Booki dock");
+        .build(tauri::generate_context!())
+        .expect("error while running Booki dock")
+        .run(|_app, event| {
+            // Never leave Do not disturb on after Booki is gone.
+            if let tauri::RunEvent::Exit = event {
+                dnd::restore();
+            }
+        });
 }
 
 #[cfg(test)]

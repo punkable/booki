@@ -106,6 +106,16 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       more.addEventListener("click", () => setMinutes(minutes < 5 ? 5 : Math.floor(minutes / 5) * 5 + 5));
       const controls = document.createElement("div"); controls.className = "focus-stepper-controls"; controls.append(less, input, more);
       stepper.append(label, controls); body.appendChild(stepper);
+      if (item.widget !== "focus") return;
+      // Quiet-time options: Windows' Do not disturb (on by default) and a tucked dock.
+      const options = document.createElement("div"); options.className = "focus-options";
+      for (const [key, label, on] of [["dnd", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "focus.tuck", !!st.tuckDuringFocus]]) {
+        const row = document.createElement("label"); row.className = `focus-option focus-option-${key}`;
+        const box = document.createElement("input"); box.type = "checkbox"; box.checked = on;
+        box.addEventListener("change", () => update({ [key]: box.checked }));
+        row.append(box, text("span", "", t(label))); options.appendChild(row);
+      }
+      body.appendChild(options);
     },
     tasks(body, st) {
       const list = Array.isArray(st.tasks) ? st.tasks : [];

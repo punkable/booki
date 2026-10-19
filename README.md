@@ -48,7 +48,7 @@
 
 <h2 align="center">Live, at a glance.</h2>
 
-<p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.</p>
+<p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.<br/>A focus block turns on Windows Do not disturb (and turns it back off when it ends), holds Booki's own notices and can keep the dock tucked away.</p>
 
 <p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki widget gallery with live previews" /></p>
 

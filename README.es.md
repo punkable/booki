@@ -48,7 +48,7 @@
 
 <h2 align="center">En vivo, de un vistazo.</h2>
 
-<p align="center">Reloj, calendario, clima, sistema (CPU, memoria, disco, red), batería, música, volumen, notas, portapapeles y enfoque (temporizador + tareas).<br/>Fichas compactas en la propia barra.</p>
+<p align="center">Reloj, calendario, clima, sistema (CPU, memoria, disco, red), batería, música, volumen, notas, portapapeles y enfoque (temporizador + tareas).<br/>Fichas compactas en la propia barra.<br/>Un bloque de enfoque activa No molestar de Windows (y lo desactiva al terminar), retiene los avisos de Booki y puede mantener el dock oculto.</p>
 
 <p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Galería de widgets de Booki con vistas previas en vivo" /></p>
 

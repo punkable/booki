@@ -8,6 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
+import { pollDnd, dndActive, onFocusDndChange } from "./focus-dnd.js";
 import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
@@ -76,7 +77,21 @@ export function tickClocks() {
 }
 
 const weatherCache = new Map();
+// A small moon on the Focus card while Windows holds notifications.
+function paintDndBadge(el, on) {
+  let badge = el.querySelector(".focus-dnd-badge");
+  if (on && !badge) {
+    badge = document.createElement("span"); badge.className = "focus-dnd-badge";
+    badge.innerHTML = icon("moon"); badge.setAttribute("role", "img");
+    badge.setAttribute("aria-label", t("focus.dndOn")); badge.title = t("focus.dndOn");
+    el.appendChild(badge);
+  } else if (!on && badge) badge.remove();
+  el.classList.toggle("focus-dnd", on);
+}
+onFocusDndChange(() => eachWidget("focus", (el) => paintDndBadge(el, dndActive())));
 export function tickProductivity() {
+  // Windows' own toggle: read every ten seconds while a Focus card is shown.
+  if (widgetEls.focus?.length) pollDnd();
   // Focus shows the running (or just finished) timer, otherwise the next task.
   eachWidget("focus", (el) => {
     const item = findWidgetPin(el.dataset.id); if (!item) return;
@@ -88,6 +103,7 @@ export function tickProductivity() {
     else if (summary.total) setText(el, summary.next || t("focus.allDone"), `${summary.done}/${summary.total}`);
     else setText(el, t("w.focus"), formatTimer(seconds));
     el.classList.toggle("focus-finished", finished);
+    paintDndBadge(el, dndActive());
   });
   eachWidget("calendar", (el) => setText(el, new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())));
   eachWidget("weather", (el) => {
@@ -216,7 +232,7 @@ const warnedDevices = new Set();
 function warnLowDevices(list) {
   for (const d of list) {
     if (!d.charging && d.level <= 10) {
-      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`); }
+      if (!warnedDevices.has(d.name)) { warnedDevices.add(d.name); notify(t("dev.low"), `${d.name} · ${d.level}%`, { critical: d.level <= 10 }); }
     } else if (d.charging || d.level > 15) warnedDevices.delete(d.name);
   }
 }
@@ -544,7 +560,7 @@ export function startPolls() {
   if (k.lighting) paintLighting();
   // Updates and Cloud reuse their reading until it is 6 h / 30 min old, so a
   // check every ten minutes costs nothing until then.
-  const hasSlow = k.updates || k.cloud;
+  const hasSlow = k.updates;
   // Nothing live pinned → no timer at all (zero idle cost).
   if (!hasClock && !hasLocal && !hasStats && !hasMedia && !hasVolume && !hasClipboard && !hasDevices && !hasAi && !hasSlow) return;
   // First paint immediately so cards aren't blank until the first tick, then
