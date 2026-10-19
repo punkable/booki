@@ -2,7 +2,7 @@
 
 import { videoUrl } from "./system-panel.js";
 import { openSystemPanel } from "./widget-editors.js";
-import { onFileDrop, onLinkDrop, dock as dockApi } from "../api.js";
+import { onFileDrop, onLinkDrop, dock as dockApi, focusDockWindow } from "../api.js";
 import { kindForPath } from "../pins.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
@@ -161,6 +161,9 @@ export function setupFileDrop() {
     const card = onCard || dockEl.querySelector('.tile.widget[data-widget="collector"]');
     const pinned = card ? findWidgetPin(card.dataset.id) : null;
     openSystemPanel({ ...(pinned || { id: "collector", kind: "widget" }), widget: "collector", url, autoStart: !!onCard }, card || dockEl);
+    // The browser keeps focus after a drop; take it, so a click elsewhere
+    // blurs the dock and closes the panel like any other flyout.
+    focusDockWindow();
   });
   // Browser links arrive through the native drop bridge (link_drop.rs), which
   // replaces WebView2's drop target, so the DOM never sees them.

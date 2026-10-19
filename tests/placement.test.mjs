@@ -87,7 +87,8 @@ test("both axes are clamped into the window", () => {
     viewport: VIEW,
     along: 980, // near the right edge
   });
-  assert.equal(wide.left, 1000 - 300 - 8);
+  // Flyouts keep 16 px to the window edge, room for their whole shadow.
+  assert.equal(wide.left, 1000 - 300 - 16);
 });
 
 test("a box larger than the window still lands at the padding, not off-screen", () => {

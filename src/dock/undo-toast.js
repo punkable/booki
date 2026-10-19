@@ -29,7 +29,7 @@ export function placeUndoToast() {
   const { left, top } = placeBesideBar({
     bar: dockEl.getBoundingClientRect(),
     box: { width: undoToast.offsetWidth, height: undoToast.offsetHeight },
-    edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12, pad: 8,
+    edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12,
   });
   undoToast.style.left = `${left}px`; undoToast.style.top = `${top}px`;
 }

@@ -105,10 +105,22 @@ fn system_executable(plugin: &Plugin) -> Option<PathBuf> {
             places.push(PathBuf::from(base).join(&plugin.name));
         }
     }
+    if let Some(sub) = std::path::Path::new(&plugin.exe).parent() {
+        // FFmpeg's own layout keeps the exe in bin\ under its folder.
+        for root in ["ProgramFiles", "ProgramFiles(x86)"] {
+            if let Some(base) = std::env::var_os(root) {
+                places.push(PathBuf::from(base).join(&plugin.name).join(sub));
+            }
+        }
+    }
+    // Only absolute folders: an empty or relative PATH entry would resolve
+    // against Booki's working directory and run whatever sits there.
     places
         .into_iter()
+        .filter(|dir| dir.is_absolute())
         .map(|dir| dir.join(&file))
         .find(|path| path.is_file())
+        .and_then(|path| path.canonicalize().ok())
 }
 
 #[derive(serde::Serialize)]
@@ -127,7 +139,12 @@ pub fn status(plugin: &Plugin) -> Status {
             .companions
             .iter()
             .all(|id| find(id).is_some_and(|c| executable(c).is_some()));
-    let own = own_executable(plugin).is_some();
+    // Booki's copy of the plugin or of any companion: it stays removable.
+    let own = own_executable(plugin).is_some()
+        || plugin
+            .companions
+            .iter()
+            .any(|id| find(id).is_some_and(|c| own_executable(c).is_some()));
     let version = (installed && own)
         .then(|| dir(plugin))
         .flatten()

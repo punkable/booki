@@ -29,6 +29,17 @@
   --track: rgba(0, 0, 0, 0.12);
   --shadow: 0 8px 16px rgba(0, 0, 0, 0.14);
   --surface-tint: #f4f4f7;
+  --stroke-flyout: rgba(0, 0, 0, 0.0578);
+  --divider: rgba(0, 0, 0, 0.0803);
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.14);
+  --shadow-tooltip: 0 4px 8px rgba(0, 0, 0, 0.14);
+  --ctrl-fill: rgba(255, 255, 255, 0.7);
+  --ctrl-fill-hover: rgba(249, 249, 249, 0.5);
+  --ctrl-fill-pressed: rgba(249, 249, 249, 0.3);
+  --ctrl-stroke: rgba(0, 0, 0, 0.0578);
+  --ctrl-stroke-bottom: rgba(0, 0, 0, 0.1622);
+  --ctrl-strong-stroke: rgba(0, 0, 0, 0.4458);
+  --ctrl-alt-fill: rgba(0, 0, 0, 0.0241);
 
   /* Geometry */
   --r-control: 4px;
@@ -44,10 +55,14 @@
   /* Motion: strong ease-out, five durations by how much of the screen moves,
      on Windows' own steps: 83ms for pointer feedback, 167ms for controls,
      250ms for panels and 333ms for the largest moves. */
-  --ease: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.25, 0.5, 1);
+  /* Fluent 2: FastOutSlowIn / decelerate (0,0,0,1) for entering, accelerate
+     (1,0,1,1) for exits, standard point-to-point (0.8,0,0.2,1). */
+  --ease: cubic-bezier(0, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0, 1);
+  --ease-in: cubic-bezier(1, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.8, 0, 0.2, 1);
+  /* Fluent has no overshoot: the old bounce now resolves to the decelerate curve. */
+  --ease-bounce: cubic-bezier(0, 0, 0, 1);
   --dur-1: 0.083s;
   --dur-2: 0.167s;
   --dur-3: 0.2s;
@@ -55,13 +70,14 @@
   --dur-5: 0.333s;
   /* One spring for every shape change between the notch and the dock: the
      notch growing into a live capsule or card, and the dock opening out of
-     that capsule. It overshoots a hair and settles. The genie from an idle
+     that capsule. Fluent's decelerate curve, no overshoot. The genie from an idle
      notch and plain fades keep the ease-out above. */
-  --spring: linear(0.0, 0.051, 0.1692, 0.3153, 0.4639, 0.6001, 0.7163, 0.8102, 0.8823, 0.935, 0.9717, 0.9955, 1.0098, 1.0171, 1.0198, 1.0195, 1.0175, 1.0147, 1.0117, 1.0089, 1.0064, 1.0044, 1.0028, 1.0016, 1.0008, 1.0002, 0.9999, 0.9997, 0.9996, 0.9996, 0.9996, 0.9997, 0.9997, 0.9998, 0.9999, 0.9999, 0.9999, 1.0, 1.0, 1.0, 1);
-  --dur-spring: 0.52s;
+  --spring: cubic-bezier(0, 0, 0, 1);
+  --dur-spring: 0.5s;
   /* Windows' focus visual: the ink colour, not the accent, so it reads on any
      fill. Used for every keyboard focus ring. */
   --focus-ring: var(--ink);
+  --focus-inner: var(--bg);
 }
 
 /* Dark values, for the system preference and for an explicit choice. */
@@ -82,6 +98,17 @@
     --track: rgba(255, 255, 255, 0.16);
     --shadow: 0 8px 16px rgba(0, 0, 0, 0.26);
     --surface-tint: #2c2c2c;
+    --stroke-flyout: rgba(0, 0, 0, 0.2);
+    --divider: rgba(255, 255, 255, 0.0837);
+    --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.26);
+    --shadow-tooltip: 0 4px 8px rgba(0, 0, 0, 0.26);
+    --ctrl-fill: rgba(255, 255, 255, 0.0605);
+    --ctrl-fill-hover: rgba(255, 255, 255, 0.0837);
+    --ctrl-fill-pressed: rgba(255, 255, 255, 0.0326);
+    --ctrl-stroke: rgba(255, 255, 255, 0.0698);
+    --ctrl-stroke-bottom: rgba(255, 255, 255, 0.0698);
+    --ctrl-strong-stroke: rgba(255, 255, 255, 0.5442);
+    --ctrl-alt-fill: rgba(0, 0, 0, 0.1);
   }
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -102,6 +129,17 @@
   --track: rgba(255, 255, 255, 0.16);
   --shadow: 0 8px 16px rgba(0, 0, 0, 0.26);
   --surface-tint: #2c2c2c;
+  --stroke-flyout: rgba(0, 0, 0, 0.2);
+  --divider: rgba(255, 255, 255, 0.0837);
+  --shadow-flyout: 0 8px 16px rgba(0, 0, 0, 0.26);
+  --shadow-tooltip: 0 4px 8px rgba(0, 0, 0, 0.26);
+  --ctrl-fill: rgba(255, 255, 255, 0.0605);
+  --ctrl-fill-hover: rgba(255, 255, 255, 0.0837);
+  --ctrl-fill-pressed: rgba(255, 255, 255, 0.0326);
+  --ctrl-stroke: rgba(255, 255, 255, 0.0698);
+  --ctrl-stroke-bottom: rgba(255, 255, 255, 0.0698);
+  --ctrl-strong-stroke: rgba(255, 255, 255, 0.5442);
+  --ctrl-alt-fill: rgba(0, 0, 0, 0.1);
 }
 
 * { box-sizing: border-box; }
@@ -114,7 +152,8 @@ html, body {
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
-:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* WinUI focus visual: 2px outer ink ring with a 1px inner contrast ring. */
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; box-shadow: 0 0 0 1px var(--focus-inner, var(--bg)); }
 
 /* Windows 11's thin scrollbar: a slim ink thumb on no track, everywhere. */
 * {

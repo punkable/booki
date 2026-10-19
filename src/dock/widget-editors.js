@@ -35,6 +35,7 @@ function dismissFlyout(panel, done) {
   panel.classList.remove("is-open"); panel.classList.add("is-closing");
   // Gone for keyboards and screen readers at once; only its fade remains.
   panel.inert = true; panel.setAttribute("aria-hidden", "true");
+  scheduleHitReport(); // its native blur goes before the fade, not after
   setTimeout(() => { panel.remove(); done?.(); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 170);
 }
 /** True when a pointer event landed on the open widget panel or the tile that opened it. */
@@ -43,7 +44,7 @@ export function insideWidgetPanel(target) {
   return !!panel && (panel.contains(target) || !!panel._opener?.contains?.(target));
 }
 export function openProductivity(item, tile) {
-  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
+  if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   const panel = buildProductivityPanel(item, {
     save: async (draft, previous) => {
@@ -66,7 +67,7 @@ export function openProductivity(item, tile) {
 }
 export function openSystemPanel(item, tile) {
   // A second click on the tile that opened the panel closes it, as with a folder.
-  if (S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
+  if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
   mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
 }
@@ -185,7 +186,7 @@ export async function editNote(item) {
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, pad: 6 });
+    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
     panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);

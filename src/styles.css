@@ -52,11 +52,6 @@ body.dock-body.edge-bottom { padding-bottom: var(--edge-pad, 18px); }
 body.dock-body.edge-top { padding-top: var(--edge-pad, 18px); }
 body.dock-body.edge-left { padding-left: var(--edge-pad, 18px); }
 body.dock-body.edge-right { padding-right: var(--edge-pad, 18px); }
-/* Tight to the taskbar: keep material insets, only shrink the outer cast. */
-body.tight-edge .dock {
-  box-shadow:
-    0 1px 3px color-mix(in srgb, #000 12%, transparent);
-}
 body.edge-bottom { align-items: flex-end; justify-content: center; }
 body.edge-top { align-items: flex-start; justify-content: center; }
 body.edge-left { align-items: center; justify-content: flex-start; }
@@ -132,7 +127,10 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
   /* Inset light follows the free edge (--lit-*), cast shadow follows --sh-*. */
   /* One outline (the border) and one soft drop shadow: inset highlights read
      as a second rim around the bar. */
-  box-shadow: 0 12px 30px color-mix(in srgb, #000 14%, transparent);
+  /* The window leaves --edge-pad (at most 18 px) below the bar. A 12/30 px
+     shadow reached 42 px down and was cut by the window edge into a hard
+     band; this one ends exactly where the window does. */
+  box-shadow: 0 calc(var(--edge-pad, 18px) / 3) calc(var(--edge-pad, 18px) * 2 / 3) color-mix(in srgb, #000 16%, transparent);
   transition:
     transform var(--dur-4) var(--ease-out),
     opacity var(--dur-3) var(--ease-out),
@@ -270,7 +268,7 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
   position: absolute;
   display: flex; align-items: center; justify-content: center;
   border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 16px;
+  border-radius: var(--r-overlay);
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   transition: background var(--dur-3) ease, border-color var(--dur-3) ease, transform var(--dur-3) var(--ease);
 }
@@ -282,15 +280,14 @@ body.edge-moving .dock { opacity: 0.35; transform: scale(0.97); pointer-events: 
 .edge-zone.active {
   background: color-mix(in srgb, var(--accent) 20%, transparent);
   border-color: var(--accent);
-  transform: scale(1.02);
 }
-.edge-zone.active .edge-zone-dot { background: var(--accent); transform: scale(1.6); }
+.edge-zone.active .edge-zone-dot { background: var(--accent); transform: scale(1.33); }
 .edge-ghost {
   position: absolute;
   border-radius: var(--dock-r, 18px);
   background: color-mix(in srgb, var(--accent) 26%, transparent);
-  border: 1.5px solid var(--accent);
-  box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 40%, transparent);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow-flyout);
   transition: top var(--dur-4) var(--ease), left var(--dur-4) var(--ease),
               width var(--dur-4) var(--ease), height var(--dur-4) var(--ease);
 }
@@ -853,8 +850,8 @@ body.notch-body.toast.toast-out .notch-toast {
 .nl, .nc { position: absolute; inset: 0; display: flex; align-items: center; opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out); }
 body.notch-body.peekable .notch-pill {
   transition:
-    width var(--dur-spring) var(--spring),
-    height var(--dur-spring) var(--spring),
+    width var(--dur-4) cubic-bezier(0, 0, 0, 1),
+    height var(--dur-4) cubic-bezier(0, 0, 0, 1),
     border-radius 0.4s var(--ease-out),
     background var(--dur-3) var(--ease-out),
     box-shadow var(--dur-3) var(--ease-out),
@@ -943,9 +940,11 @@ body.notch-body:not(.card) .notch-pill {
 body.notch-body.peekable.card .notch-pill {
   width: 300px;
   height: 54px;
+  /* The card nearly fills its window (300×54 in 320×60): a 32 px shadow was
+     cut into a hard box by the window edge. A tight one fits. */
   box-shadow:
     inset 0 1px 0 var(--surf-inset-lit),
-    0 12px 32px -8px color-mix(in srgb, #000 40%, transparent);
+    0 1px 3px color-mix(in srgb, #000 22%, transparent);
 }
 body.notch-body.peekable.peek.edge-bottom.card .notch-pill { border-radius: 18px 18px 0 0; }
 body.notch-body.peekable.peek.edge-top.card .notch-pill { border-radius: 0 0 18px 18px; }
@@ -1149,24 +1148,23 @@ body.edit .dock { cursor: grab; }
   border-radius: max(2px, calc(var(--tile-r) * 0.55));
   background: color-mix(in srgb, var(--accent) 82%, var(--accent-deep));
   color: #fff;
-  font-weight: 650;
+  font-weight: 600;
   font-size: calc(var(--size) * 0.34);
   filter: none;
   transition: border-radius var(--dur-3) var(--ease);
 }
 /* Fallback for a pin with no icon: its own palette colour (pin-fallback.js),
-   lit from the top like the app icons around it. */
+   flat like a Fluent app tile (no gloss gradient, no highlight band). */
 .tile .glyph.fallback {
-  background: linear-gradient(180deg, var(--fb-color), var(--fb-deep));
+  background: var(--fb-color);
   color: var(--fb-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 .tile .glyph svg { width: 52%; height: 52%; stroke-width: 1.8; }
 
 /* Launch feedback: the icon pops once and the indicator pulses until the
    app's window shows up (dock.js markLaunching). */
 .tile.launching img,
-.tile.launching .glyph { animation: launch-pop 0.42s var(--ease-bounce); }
+.tile.launching .glyph { animation: launch-pop 0.333s var(--ease-in-out); }
 .tile.launching::after {
   content: "";
   position: absolute;
@@ -1182,7 +1180,7 @@ body.edit .dock { cursor: grab; }
 body.edge-top .tile.launching::after { bottom: auto; top: -5px; }
 body.edge-left .tile.launching::after { bottom: 50%; left: -5px; transform: translateY(50%); width: 3px; height: 6px; }
 body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; transform: translateY(50%); width: 3px; height: 6px; }
-@keyframes launch-pop { 0%, 100% { transform: scale(1); } 45% { transform: scale(0.88); } 75% { transform: scale(1.05); } }
+@keyframes launch-pop { 0%, 100% { transform: scale(1); } 40% { transform: scale(0.92); } }
 @keyframes launch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) {
   .tile.launching img, .tile.launching .glyph { animation: none; }
@@ -1215,7 +1213,7 @@ body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; t
 }
 .tile.group .group-mini img { width: 100%; height: 100%; object-fit: contain; }
 .tile.group .group-mini.fallback {
-  background: linear-gradient(180deg, var(--fb-color), var(--fb-deep));
+  background: var(--fb-color);
   color: var(--fb-ink);
   border-radius: max(2px, calc(var(--tile-r) * 0.35));
 }
@@ -1229,8 +1227,8 @@ body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; t
 .tile.group.badge-group .group-grid {
   padding: 0;
   color: var(--group-ink, var(--accent-contrast));
-  background: linear-gradient(160deg, color-mix(in srgb, var(--group-color, var(--accent)) 100%, #fff 12%), color-mix(in srgb, var(--group-color, var(--accent)) 82%, #000));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.2);
+  background: var(--group-color, var(--accent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 8%, transparent);
 }
 .tile.group.badge-group .group-grid > svg { width: 52%; height: 52%; color: inherit; }
 .stack.tinted .stack-head-icon { color: var(--group-color); background: color-mix(in srgb, var(--group-color) 20%, transparent); }
@@ -1242,8 +1240,8 @@ body.edge-right .tile.launching::after { bottom: 50%; left: auto; right: -5px; t
 .tile.drop-target { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: 0 0 0 2px var(--accent); }
 /* Running-app dot indicator. */
 .tile.merge-target::before {
-  content: ""; position: absolute; inset: -3px; border-radius: 30%;
-  box-shadow: 0 0 0 2px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+  content: ""; position: absolute; inset: -3px; border-radius: calc(var(--tile-r) + 3px);
+  box-shadow: 0 0 0 2px var(--accent);
   pointer-events: none;
 }
 
@@ -1399,13 +1397,10 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   padding: 12px;
   /* Same material family as the dock — never a mismatched frost lid. */
   background: var(--panel-fill);
-  border: 1px solid color-mix(in srgb, var(--surf-stroke) 70%, transparent);
-  /* Concentric with the bar: a flyout is the dock opening up, not a window. */
-  border-radius: calc(var(--dock-r, 18px) + 2px);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
-    0 18px 48px -12px color-mix(in srgb, #000 45%, transparent),
-    0 2px 8px color-mix(in srgb, #000 18%, transparent);
+  /* WinUI flyout: SurfaceStrokeColorFlyout, OverlayCornerRadius, flyout shadow. */
+  border: 1px solid var(--stroke-flyout);
+  border-radius: var(--r-overlay);
+  box-shadow: var(--shadow-flyout);
   -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-sat));
   overscroll-behavior: contain;
@@ -1415,27 +1410,25 @@ body.edge-left .sep-line, body.edge-right .sep-line {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(8px) scale(0.97);
-  filter: blur(1px);
+  transform: translateY(8px);
   /* Exit snappier than enter. */
-  transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-2) var(--ease-out), filter var(--dur-2) var(--ease-out),
-    visibility 0s linear var(--dur-2);
+  transition: opacity var(--dur-1) var(--ease-in), transform var(--dur-1) var(--ease-in),
+    visibility 0s linear var(--dur-1);
 }
 .stack.open {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
   transform: none;
-  filter: none;
-  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-4) var(--ease-out), filter var(--dur-2) var(--ease-out);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-4) var(--ease-out);
 }
 body:not(.surface-glass) .stack {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-body.edge-top .stack { transform-origin: top center; transform: translateY(-8px) scale(0.96); }
-body.edge-left .stack { transform-origin: left center; transform: translateX(-8px) scale(0.96); }
-body.edge-right .stack { transform-origin: right center; transform: translateX(8px) scale(0.96); }
+body.edge-top .stack { transform-origin: top center; transform: translateY(-8px); }
+body.edge-left .stack { transform-origin: left center; transform: translateX(-8px); }
+body.edge-right .stack { transform-origin: right center; transform: translateX(8px); }
 body.edge-top .stack.open,
 body.edge-left .stack.open,
 body.edge-right .stack.open { transform: none; }
@@ -1449,41 +1442,41 @@ body.edge-right .stack.open { transform: none; }
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
   color: var(--ink-2);
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: var(--hover);
 }
 .stack-head-icon svg { width: 15px; height: 15px; }
 .stack-head-icon img.emo { width: 15px; height: 15px; }
-.stack-title { flex: 1; min-width: 0; font-size: 0.8125rem; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; line-height: 20px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
-.stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: 8px; font: inherit; font-size: 0.75rem; color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: var(--r-control); font: inherit; font-size: 0.75rem; color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
 .stack-breadcrumbs button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .stack-rename {
-  flex: 1; min-width: 0; font: inherit; font-size: 0.8125rem; font-weight: 700;
+  flex: 1; min-width: 0; font: inherit; font-size: 0.875rem; font-weight: 600;
   color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: var(--r-control); padding: 4px 8px;
 }
 .stack-rename:hover { background: var(--hover); }
-.stack-rename:focus { background: var(--layer-strong); border-color: var(--stroke); outline: none; }
+.stack-rename:focus { background: var(--layer-strong); border-color: var(--stroke); border-bottom: 2px solid var(--accent); outline: none; }
 .stack-close {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   color: var(--ink-2);
   cursor: pointer;
   background: transparent;
   border: 0;
   border-radius: var(--r-control);
-  transition: background var(--dur-1) ease, color var(--dur-1) ease, transform var(--dur-1) var(--ease);
+  transition: background var(--dur-1) ease, color var(--dur-1) ease;
 }
-.stack-close svg { width: 14px; height: 14px; }
+.stack-close svg { width: 16px; height: 16px; }
 .stack-close:hover { color: var(--ink); background: var(--hover); }
-.stack-close:active { transform: scale(0.96); }
+.stack-close:active { color: var(--ink-2); background: var(--pressed); }
 .stack-item { position: relative; }
 /* Take-out only — never a permanent delete X. Hover-only so rename/focus
    does not keep a red badge stuck on every cell. Hidden with opacity, not
@@ -1495,7 +1488,7 @@ body.edge-right .stack.open { transform: none; }
   background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
   border-radius: var(--r-control); cursor: pointer;
-  box-shadow: 0 2px 8px color-mix(in srgb, #000 16%, transparent);
+  box-shadow: var(--shadow-tooltip);
   transition: transform var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
   padding: 0;
 }
@@ -1515,12 +1508,12 @@ body.edge-right .stack.open { transform: none; }
   color: var(--ink);
   background: var(--layer-strong);
 }
-.stack-rm:active { transform: scale(0.94); }
-.stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.stack-rm:active { color: var(--ink-2); background: var(--pressed); }
+.stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 4px; }
 .stack-empty { grid-column: 1 / -1; color: var(--ink-2); font-size: 0.8125rem; padding: 14px; text-align: center; }
 .stack-item {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 6px; border: 0; background: transparent; border-radius: var(--r-card);
+  padding: 10px 6px; border: 0; background: transparent; border-radius: var(--r-control);
   /* visible so corner × / actions aren't clipped on small cells */
   cursor: pointer; color: var(--ink); overflow: visible;
   transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
@@ -1555,8 +1548,8 @@ body.edge-right .stack.open { transform: none; }
 .stack-item.drop-after {
   box-shadow: inset -3px 0 0 var(--accent);
 }
-.stack-item:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
-.stack-item:active { transform: scale(0.96); }
+.stack-item:hover { background: var(--hover); }
+.stack-item:active { background: var(--pressed); }
 /* Staggered entry of the folder items when the flyout opens. */
 @media (prefers-reduced-motion: no-preference) {
   /* Stagger only on the open that just happened — not on every re-render. */
@@ -1566,7 +1559,7 @@ body.edge-right .stack.open { transform: none; }
   }
 }
 @keyframes stack-cell-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 .stack-item img, .stack-item .stack-glyph { width: 42px; height: 42px; object-fit: contain; display: flex; align-items: center; justify-content: center; font-size: 24px; }
@@ -1574,13 +1567,13 @@ body.edge-right .stack.open { transform: none; }
 /* Letter fallback for files with no icon — a soft rounded chip, like dock tiles. */
 .stack-item .stack-glyph {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
-  border: 1px solid var(--stroke-light);
-  border-radius: 10px;
+  background: var(--ctrl-fill);
+  border: 1px solid var(--ctrl-stroke);
+  border-radius: var(--r-card);
 }
-.stack-name { font-size: 0.6875rem; font-weight: 500; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-name { font-size: 0.75rem; font-weight: 400; line-height: 16px; color: var(--ink); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* In-flyout "add app to folder" cell — optimized for adding several programs. */
 /* Hover actions on a flyout file cell: copy path · Explorer · open with. */
 .stack-acts { position: absolute; top: 3px; left: 3px; display: none; gap: 3px; z-index: 2; }
@@ -1593,16 +1586,16 @@ body.edge-right .stack.open { transform: none; }
   background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
   border-radius: var(--r-control);
-  box-shadow: 0 2px 8px color-mix(in srgb, #000 14%, transparent);
+  box-shadow: var(--shadow-tooltip);
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), transform var(--dur-1) var(--ease);
 }
 .stack-act:hover { color: var(--ink); background: var(--hover); }
-.stack-act:active { transform: scale(0.94); }
-.stack-act svg { width: 11px; height: 11px; }
+.stack-act:active { color: var(--ink-2); background: var(--pressed); }
+.stack-act svg { width: 12px; height: 12px; }
 /* Real thumbnails (photos/videos) fill their slot edge-to-edge. */
 .stack-item img.thumb {
   width: 56px; height: 44px; object-fit: cover;
-  border-radius: 9px; border: 1px solid var(--stroke-light);
+  border-radius: var(--r-control); border: 1px solid var(--stroke-light);
 }
 
 /* Placeholder cells while a big folder lists — the flyout opens instantly. */
@@ -1618,12 +1611,14 @@ body.edge-right .stack.open { transform: none; }
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  border: 0;
-  border-radius: var(--r-card);
-  transition: background var(--dur-2) ease;
+  background: var(--ctrl-fill);
+  border: 1px solid var(--ctrl-stroke);
+  border-bottom-color: var(--ctrl-stroke-bottom);
+  border-radius: var(--r-control);
+  transition: background var(--dur-1) ease;
 }
-.stack-more:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.stack-more:hover { background: var(--ctrl-fill-hover); }
+.stack-more:active { color: var(--ink-2); background: var(--ctrl-fill-pressed); }
 
 /* ─────────────────────────── Add panel ───────────────────────────
    The flyout in "add" mode: search, Apps/Widgets tabs, a scrolling body and
@@ -1644,18 +1639,23 @@ body.edge-right .stack.open { transform: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 11px;
   color: var(--ink-2);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  /* WinUI TextBox: control fill, hairline with a stronger bottom edge; the
+     focused box goes to the solid layer with a 2px accent underline. */
+  background: var(--ctrl-fill);
+  border: 1px solid var(--ctrl-stroke);
+  border-bottom-color: var(--ctrl-strong-stroke);
   border-radius: var(--r-control);
 }
-.add-search:focus-within { background: color-mix(in srgb, var(--ink) 10%, transparent); }
-.add-search svg { flex: 0 0 auto; width: 15px; height: 15px; }
+.add-search:hover { background: var(--ctrl-fill-hover); }
+.add-search:focus-within { background: var(--layer-strong); border-bottom: 2px solid var(--accent); padding-bottom: 0; }
+.add-search svg { flex: 0 0 auto; width: 16px; height: 16px; }
 .add-search input {
   flex: 1 1 auto;
   min-width: 0;
-  font: 500 0.875rem var(--font);
+  font: 400 0.875rem var(--font);
   color: var(--ink);
   background: transparent;
   border: 0;
@@ -1668,24 +1668,26 @@ body.edge-right .stack.open { transform: none; }
   gap: 2px;
   padding: 2px;
   margin-bottom: 8px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  background: var(--ctrl-alt-fill);
+  border: 1px solid var(--ctrl-stroke);
   border-radius: var(--r-control);
 }
 .add-tab {
   height: 28px;
-  font: 600 0.8125rem var(--font);
+  font: 400 0.875rem var(--font);
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: calc(10px - 2px);
+  border-radius: var(--r-control);
   cursor: pointer;
   transition: background var(--dur-2) var(--ease), color var(--dur-2) var(--ease);
 }
 .add-tab:hover { color: var(--ink); }
 .add-tab.on {
   color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 12%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+  font-weight: 600;
+  background: var(--ctrl-fill);
+  box-shadow: inset 0 0 0 1px var(--ctrl-stroke);
 }
 .add-body {
   flex: 1 1 auto;
@@ -1698,10 +1700,10 @@ body.edge-right .stack.open { transform: none; }
 }
 .add-label {
   padding: 8px 6px 4px;
-  font: 600 0.6875rem var(--font);
+  font: 600 0.75rem var(--font);
   color: var(--ink-2);
 }
-.add-utilities { border-top: 1px solid var(--stroke); margin-top: 8px; }
+.add-utilities { border-top: 1px solid var(--divider); margin-top: 8px; }
 .add-utilities > summary { padding: 10px 6px; color: var(--ink-2); font: 600 0.6875rem var(--font); cursor: pointer; }
 .add-utilities > summary:hover { color: var(--ink); }
 .add-utilities > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--r-card); }
@@ -2048,12 +2050,13 @@ body.edge-right .stack.open { transform: none; }
 .dock-tip {
   position: fixed; top: 0; left: 0; z-index: 60;
   display: flex; align-items: center; gap: 8px;
-  width: max-content; max-width: min(260px, calc(100vw - 16px));
-  /* Windows 11 tooltip: small, one line, 4px corners, a hairline and a soft shadow. */
-  padding: 5px 9px; font-size: 0.75rem; line-height: 1.35;
+  width: max-content; max-width: min(320px, calc(100vw - 16px));
+  /* WinUI ToolTip: 9,6,9,8 padding, Caption 12/16, ControlCornerRadius,
+     SurfaceStrokeColorFlyout and the tooltip shadow. */
+  padding: 6px 9px 8px; font-size: 0.75rem; line-height: 16px;
   color: var(--ink); background: var(--layer-strong);
-  border: 1px solid var(--stroke); border-radius: 4px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / .14);
+  border: 1px solid var(--stroke-flyout); border-radius: var(--r-control);
+  box-shadow: var(--shadow-tooltip);
   pointer-events: none; opacity: 0;
   transition: opacity var(--dur-2) var(--ease);
 }
@@ -2063,7 +2066,7 @@ body.edge-right .stack.open { transform: none; }
 .dock-tip-mark { display: none !important; flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
 .dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
 .dock-tip-mark svg { width: 22px; height: 22px; }
-.dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: linear-gradient(180deg, var(--fb-color), var(--fb-deep)); color: var(--fb-ink); font-size: 13px; font-weight: 650; }
+.dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--fb-color); color: var(--fb-ink); font-size: 13px; font-weight: 600; }
 .dock-tip-mark .glyph.fallback svg { width: 16px; height: 16px; }
 .dock-tip.show { opacity: 1; }
 body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; }
@@ -2575,3 +2578,27 @@ body.hide-running-indicators .tile.launching::after { display: none; }
 
 /* One overlay radius for every flyout and panel. */
 .stack, .productivity-panel { border-radius: var(--r-overlay) !important; }
+
+/* ─────────── Fluent acrylic, one recipe for every floating surface ───────────
+   WinUI's acrylic is the blurred backdrop (Windows draws it: material.js),
+   a tint, a faint grain and a hairline, with the flyout elevation shadow.
+   The grain is what keeps a translucent fill from reading as flat plastic;
+   the shadow is the same 8/16 px elevation Windows gives its own flyouts. */
+:root {
+  --acrylic-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='128' height='128' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+  /* Reaches 8 px above and 16 px below: flyouts keep 16 px to the window
+     edge (placeBesideBar), so the shadow is never cut. */
+  --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.3); } }
+:root[data-theme="dark"] { --shadow-flyout: 0 4px 12px rgba(0, 0, 0, 0.3); }
+body.surface-glass :is(.dock, .stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach, .notch-toast) {
+  background-image: var(--acrylic-noise) !important;
+  background-size: 128px 128px;
+}
+:is(.stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach) {
+  box-shadow: var(--shadow-flyout) !important;
+}
+@media (prefers-reduced-transparency: reduce) {
+  body.surface-glass :is(.dock, .stack, #ctx-menu, .productivity-panel, .note-editor.note-workspace, .trash-pop, .undo-toast, .coach, .notch-toast) { background-image: none !important; }
+}
