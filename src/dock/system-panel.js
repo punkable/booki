@@ -9,7 +9,7 @@ import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, matchDevice, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -126,17 +126,36 @@ export function buildSystemPanel(item, { close }) {
     const ai = section(t("w.ai"));
     const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
+    const clock = (s) => (s > 0 ? new Date(s * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "");
+    const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
+    const tokens = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
     live(ai, aiReading, 60000, (providers) => {
       const all = Array.isArray(providers) ? providers : [];
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
-      cards(ai, all.map((p) => ({
-        name: p.name, glyph: icons[p.id] || "sparkles",
-        error: (p.windows || []).length ? "" : t(aiErrorKey(p.error)),
-        tone: usageTone(Math.max(0, ...(p.windows || []).map((w) => w.percent))), bars: (p.windows || []).map((w) => {
-          const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
-          return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, tone: usageTone(w.percent) };
-        }),
-      })));
+      cards(ai, all.map((p) => {
+        const windows = p.windows || [];
+        const sub = t("w.aiWeekTokens").replace("{n}", () => tokens(p.week_tokens));
+        if (windows.length) {
+          return {
+            name: p.name, glyph: icons[p.id] || "sparkles", sub,
+            tone: usageTone(Math.max(0, ...windows.map((w) => w.percent))),
+            bars: windows.map((w) => ({ label: withReset(windowName(w.label), w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
+          };
+        }
+        if (p.block) {
+          // Local logs hold no plan limit: the bar is time elapsed in the
+          // 5-hour block, the value is the tokens spent in it.
+          return {
+            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: tokens(p.block.tokens),
+            bars: [{ label: withReset(t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent)), p.block.resets_at), percent: p.block.elapsed_percent, tone: "good" }],
+          };
+        }
+        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.week_tokens > 0 ? sub : "", error: t("w.aiIdle"), bars: [] };
+      }));
+      const ids = new Set(all.map((p) => p.id));
+      if (!ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
+      if (!ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
+      ai.append(text("p", t("w.aiLocal")));
     });
   }
   if (item.widget === "volume") {

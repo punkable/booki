@@ -32,7 +32,7 @@ By installing and using a plugin you agree that:
 
 ## 4. Optional connections to other services
 
-The AI usage widget reads the sign-in that Claude Code or Codex already keep on your PC. It sends that sign-in only to its own provider (Anthropic or OpenAI) to read your plan's usage, and never stores, logs or forwards it. This happens only while the widget is on the dock. Weather uses Open-Meteo, and only after you choose a city. Each service's own terms apply to your use of it.
+The AI usage widget only reads the local usage logs that Claude Code and Codex already write on your PC (token counts, timestamps and, for Codex, its plan percentages), and only while the widget is on the dock. Booki never reads, uses, stores or sends your Claude or ChatGPT credentials or tokens, keeps no message content, and makes no network request for this widget. Weather uses Open-Meteo, and only after you choose a city. Each service's own terms apply to your use of it.
 
 ## 5. Trademarks
 
@@ -76,7 +76,7 @@ Al instalar y usar un complemento aceptas que:
 
 ## 4. Conexiones opcionales con otros servicios
 
-El widget de uso de IA lee el inicio de sesión que Claude Code o Codex ya guardan en tu PC. Lo envía solo a su propio proveedor (Anthropic u OpenAI) para leer el uso de tu plan, y nunca lo guarda, registra ni reenvía. Esto solo ocurre mientras el widget está en el dock. El tiempo usa Open-Meteo, y solo después de que eliges una ciudad. Al usar cada servicio se aplican sus propias condiciones.
+El widget de uso de IA solo lee los registros de uso locales que Claude Code y Codex ya escriben en tu PC (recuentos de tokens, horas y, en Codex, los porcentajes de su plan), y solo mientras el widget está en el dock. Booki nunca lee, usa, guarda ni envía tus credenciales o tokens de Claude o ChatGPT, no conserva el contenido de los mensajes y no hace ninguna petición de red para este widget. El tiempo usa Open-Meteo, y solo después de que eliges una ciudad. Al usar cada servicio se aplican sus propias condiciones.
 
 ## 5. Marcas
 
