@@ -262,7 +262,40 @@ async fn save_config(
             }
         }
     }
+    schedule_backup(&config.backup_folder);
     Ok(config)
+}
+
+/// The automatic backup's file inside the chosen folder.
+const BACKUP_FILE: &str = "Booki backup.json";
+
+/// Copy the settings to the backup folder a few seconds after the last
+/// change, so a burst of slider steps writes the file once.
+fn schedule_backup(folder: &str) {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static TURN: AtomicU64 = AtomicU64::new(0);
+    let folder = std::path::PathBuf::from(folder);
+    if !folder.is_absolute() {
+        return;
+    }
+    let turn = TURN.fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        if TURN.load(Ordering::SeqCst) != turn || !folder.is_dir() {
+            return;
+        }
+        if let Ok(text) = serde_json::to_string_pretty(&config::load()) {
+            let _ = snapshot::write(&folder.join(BACKUP_FILE), &text);
+        }
+    });
+}
+
+/// The backup file in the chosen folder, when there is one to restore.
+#[tauri::command]
+fn backup_file(folder: String) -> Option<String> {
+    let path = std::path::Path::new(&folder).join(BACKUP_FILE);
+    (std::path::Path::new(&folder).is_absolute() && path.is_file())
+        .then(|| path.to_string_lossy().into_owned())
 }
 
 /// Moving into Booki is explicit and limited to the user's desktop.
@@ -914,6 +947,7 @@ fn import_config(app: AppHandle, path: String, expected: Option<Config>) -> Resu
     let live = config::load();
     cfg.profile_rules = live.profile_rules;
     cfg.last_profile = live.last_profile;
+    cfg.backup_folder = live.backup_folder;
     apply_config_snapshot(&app, cfg)
 }
 
@@ -1607,6 +1641,7 @@ pub fn run() {
             open_settings_tab,
             take_pending_tab,
             export_config,
+            backup_file,
             export_diagnostics,
             weather_search,
             weather_current,

@@ -80,7 +80,9 @@ pub(crate) fn profile_apply(
     cfg.last_profile = name.trim().to_string();
     // The switching rules are global: a profile saved before they changed
     // must not bring back its old copy of them.
-    cfg.profile_rules = config::load().profile_rules;
+    let live = config::load();
+    cfg.profile_rules = live.profile_rules;
+    cfg.backup_folder = live.backup_folder;
     apply_config_snapshot(&app, cfg)
 }
 

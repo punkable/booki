@@ -82,6 +82,7 @@ const DEMO_CONFIG = {
   captureVisible: false,
   pluginTerms: 0,
   ignoredUpdates: [],
+  backupFolder: "",
 };
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
@@ -644,6 +645,7 @@ export const dock = {
   weatherCurrent: (latitude, longitude) => invoke("weather_current", { latitude, longitude }),
   weatherForecast: (latitude, longitude) => invoke("weather_forecast", { latitude, longitude }),
   exportConfig: (path) => invoke("export_config", { path }),
+  backupFile: (folder) => invoke("backup_file", { folder }),
   importConfig: (path, expected) => invoke("import_config", { path, expected }),
   previewImport: (path) => invoke("preview_config_import", { path }),
   pathsExist: (paths) => invoke("paths_exist", { paths }),

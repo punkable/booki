@@ -105,7 +105,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       <UpdatesCard beforeApply={store.prepareConfigOperation} />
     </SettingsSection>
 
-    <section className="ui-group-wrap profiles-wrap"><ProfilesPage embedded cfg={cfg} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
+    <section className="ui-group-wrap profiles-wrap"><ProfilesPage embedded cfg={cfg} set={set} onApply={store.applyProfile} beforeSnapshot={store.prepareConfigOperation} onImport={store.importProfile} /></section>
 
     <AutoProfiles cfg={cfg} set={set} />
 

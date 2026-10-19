@@ -403,6 +403,10 @@ pub struct Config {
     /// version of the same package shows again.
     #[serde(default)]
     pub ignored_updates: Vec<String>,
+    /// A folder (OneDrive, Google Drive…) that receives a copy of these
+    /// settings after every change; empty when automatic backup is off.
+    #[serde(default)]
+    pub backup_folder: String,
     /// Settings from older builds, read only so `migrate` can convert them
     /// and never written back.
     #[serde(flatten, skip_serializing)]
@@ -501,6 +505,7 @@ impl Default for Config {
             capture_visible: false,
             plugin_terms: 0,
             ignored_updates: Vec::new(),
+            backup_folder: String::new(),
         }
     }
 }
