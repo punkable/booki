@@ -2,6 +2,11 @@
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
   es: {
+    "release92.headline": "Claude y Codex en el notch, concentración con No molestar y copia automática.",
+    "release92.agents": "El notch muestra cuando Claude Code o Codex están trabajando, cuando necesitan tu permiso y cuando terminan. Solo lee sus registros locales: nunca credenciales ni internet. Puedes desactivarlo en Ajustes.",
+    "release92.focus": "Cada tarjeta de Concentración puede activar No molestar de Windows mientras dura el bloque y apagarlo al terminar. Los avisos de Booki esperan hasta que acabes.",
+    "release92.backup": "Elige una carpeta de OneDrive o Google Drive en Ajustes > Sistema y Booki guarda ahí tu configuración tras cada cambio. Restaurar te muestra la copia antes de aplicarla.",
+    "release92.fixes": "Clic derecho dentro de un panel muestra el menú de ese elemento. Actualizaciones ya no muestra lo que winget no puede instalar. La batería de los teclados ya no salta entre vacía y llena. Ajustes ya no se abre en blanco y los dispositivos muestran cuando cargan. Se retiraron el widget Nube y el complemento Rclone.",
     "backup.auto": "Copia automática",
     "backup.hint": "Elige una carpeta de OneDrive, Google Drive u otra nube y Booki guardará ahí tu configuración después de cada cambio.",
     "backup.on": "Se guarda en {folder} después de cada cambio.",
@@ -404,6 +409,11 @@ export const STRINGS = {
     "a11y.runningWindows": "En ejecución · {n} ventanas",
   },
   en: {
+    "release92.headline": "Claude and Codex in the notch, focus with Do not disturb, and automatic backup.",
+    "release92.agents": "The notch shows when Claude Code or Codex is working, needs your permission or has finished. It only reads their local logs: never credentials, never the internet. You can turn it off in Settings.",
+    "release92.focus": "Each Focus card can turn on Windows Do not disturb for the block and turn it off when it ends. Booki's notices wait until you're done.",
+    "release92.backup": "Pick a OneDrive or Google Drive folder in Settings > System and Booki saves your setup there after every change. Restore shows you the copy before applying it.",
+    "release92.fixes": "Right-click inside a panel shows that item's menu. Updates no longer lists what winget can't install. Keyboard batteries no longer jump between empty and full. Settings no longer opens blank, and devices show when they're charging. The Cloud widget and Rclone plugin are gone.",
     "backup.auto": "Automatic backup",
     "backup.hint": "Pick a OneDrive, Google Drive or other cloud folder and Booki saves your setup there after every change.",
     "backup.on": "Saved to {folder} after every change.",
@@ -806,6 +816,11 @@ export const STRINGS = {
     "a11y.runningWindows": "Running · {n} windows",
   },
   pt: {
+    "release92.headline": "Claude e Codex no notch, foco com Não incomodar e cópia automática.",
+    "release92.agents": "O notch mostra quando o Claude Code ou o Codex está trabalhando, precisa da sua permissão ou terminou. Lê apenas os registros locais: nunca credenciais nem internet. Dá para desativar em Configurações.",
+    "release92.focus": "Cada cartão de Foco pode ativar o Não incomodar do Windows durante o bloco e desativá-lo no fim. Os avisos do Booki esperam você terminar.",
+    "release92.backup": "Escolha uma pasta do OneDrive ou Google Drive em Configurações > Sistema e o Booki salva sua configuração lá após cada alteração. Restaurar mostra a cópia antes de aplicá-la.",
+    "release92.fixes": "Clique direito dentro de um painel mostra o menu daquele item. Atualizações não lista mais o que o winget não consegue instalar. A bateria dos teclados não salta mais entre vazia e cheia. Configurações não abre mais em branco e os dispositivos mostram quando estão carregando. O widget Nuvem e o complemento Rclone foram removidos.",
     "backup.auto": "Cópia automática",
     "backup.hint": "Escolha uma pasta do OneDrive, Google Drive ou outra nuvem e o Booki salva sua configuração lá após cada alteração.",
     "backup.on": "Salva em {folder} após cada alteração.",
@@ -1208,6 +1223,11 @@ export const STRINGS = {
     "a11y.runningWindows": "Em execução · {n} janelas",
   },
   fr: {
+    "release92.headline": "Claude et Codex dans le notch, concentration avec Ne pas déranger et sauvegarde automatique.",
+    "release92.agents": "Le notch indique quand Claude Code ou Codex travaille, attend votre autorisation ou a terminé. Il ne lit que leurs journaux locaux : jamais d’identifiants, jamais Internet. Désactivable dans Réglages.",
+    "release92.focus": "Chaque carte Concentration peut activer Ne pas déranger de Windows pendant le bloc et le désactiver à la fin. Les avis de Booki attendent que vous ayez fini.",
+    "release92.backup": "Choisissez un dossier OneDrive ou Google Drive dans Réglages > Système et Booki y enregistre votre configuration après chaque modification. Restaurer vous montre la copie avant de l’appliquer.",
+    "release92.fixes": "Le clic droit dans un panneau affiche le menu de cet élément. Mises à jour ne liste plus ce que winget ne peut pas installer. La batterie des claviers ne saute plus entre vide et pleine. Réglages ne s’ouvre plus vide et les appareils indiquent quand ils chargent. Le widget Cloud et le module Rclone ont été retirés.",
     "backup.auto": "Sauvegarde automatique",
     "backup.hint": "Choisissez un dossier OneDrive, Google Drive ou d’un autre cloud et Booki y enregistre votre configuration après chaque modification.",
     "backup.on": "Enregistrée dans {folder} après chaque modification.",
@@ -1610,6 +1630,11 @@ export const STRINGS = {
     "a11y.runningWindows": "En cours · {n} fenêtres",
   },
   de: {
+    "release92.headline": "Claude und Codex im Notch, Fokus mit Nicht stören und automatische Sicherung.",
+    "release92.agents": "Der Notch zeigt, wenn Claude Code oder Codex arbeitet, deine Erlaubnis braucht oder fertig ist. Er liest nur deren lokale Protokolle: nie Anmeldedaten, nie das Internet. In den Einstellungen abschaltbar.",
+    "release92.focus": "Jede Fokus-Karte kann während des Blocks Windows-Nicht-stören einschalten und am Ende wieder aus. Booki-Hinweise warten, bis du fertig bist.",
+    "release92.backup": "Wähle unter Einstellungen > System einen OneDrive- oder Google-Drive-Ordner, und Booki speichert deine Einrichtung dort nach jeder Änderung. Wiederherstellen zeigt dir die Kopie, bevor sie angewendet wird.",
+    "release92.fixes": "Rechtsklick in einem Panel zeigt das Menü dieses Elements. Updates listet nicht mehr, was winget nicht installieren kann. Tastatur-Akkus springen nicht mehr zwischen leer und voll. Einstellungen öffnet sich nicht mehr leer, und Geräte zeigen, wenn sie laden. Das Cloud-Widget und das Rclone-Plugin wurden entfernt.",
     "backup.auto": "Automatische Sicherung",
     "backup.hint": "Wähle einen OneDrive-, Google-Drive- oder anderen Cloud-Ordner, und Booki speichert deine Einrichtung dort nach jeder Änderung.",
     "backup.on": "Wird nach jeder Änderung in {folder} gespeichert.",
