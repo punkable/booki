@@ -233,7 +233,15 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
 /// One entry per device name, keeping the lowest reading, lowest first.
 fn merge(mut list: Vec<DeviceBattery>) -> Vec<DeviceBattery> {
     list.sort_by(|a, b| a.name.cmp(&b.name).then(a.level.cmp(&b.level)));
-    list.dedup_by(|later, first| later.name == first.name);
+    // One entry per name; a device that one source reports as charging is
+    // charging, whichever reading is kept.
+    list.dedup_by(|later, first| {
+        let same = later.name == first.name;
+        if same {
+            first.charging |= later.charging;
+        }
+        same
+    });
     list.sort_by(|a, b| a.level.cmp(&b.level).then(a.name.cmp(&b.name)));
     list
 }

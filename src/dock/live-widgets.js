@@ -190,8 +190,12 @@ function paintDevices(list) {
       return;
     }
     const shown = own ? mine[0] : mine[deviceTurn % mine.length];
-    setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
-    setMetric(el, own ? shortDeviceName(shown.name) : shown.name, shown.level);
+    // Charging shows the bolt in the ring and says so under the name.
+    if (shown.charging) setCornerGlyph(el, "zap", "device-charging");
+    else setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
+    el.classList.toggle("charging", !!shown.charging);
+    const label = own ? shortDeviceName(shown.name) : shown.name;
+    setMetric(el, shown.charging ? `${label} · ${t("dev.charging")}` : label, shown.level);
     setTileLabel(el, mine.map((d) => `${d.name} · ${d.level}%${d.charging ? ` · ${t("dev.charging")}` : ""}`).join("\n"));
     // The ring speaks the battery: green, amber, red; it pulses when a device
     // is about to die (any of them, not only the one on screen).

@@ -140,3 +140,18 @@ test("a device's own card still finds it when Windows names it a little differen
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("a charging device shows the bolt and says it is charging", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [{ ...widget, style: { device: "MX Master 3S", deviceKind: "mouse" } }] }),
+    initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "device_batteries"
+      ? Promise.resolve([{ name: "MX Master 3S", level: 35, kind: "mouse", charging: true }]) : old(c, a); }`,
+  });
+  const card = page.locator('.tile[data-id="dev"]');
+  await card.locator(".w-ring-num", { hasText: "35" }).waitFor();
+  assert.equal(await card.getAttribute("data-glyph"), "device-charging");
+  assert.equal(await card.evaluate((el) => el.classList.contains("charging")), true);
+  assert.match(await card.locator(".w-label").textContent(), /charging/i);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
