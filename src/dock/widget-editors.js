@@ -79,7 +79,7 @@ function mountWidgetPanel(item, tile, panel) {
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
   const place = () => {
     if (!panel.isConnected) return;
-    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
     panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
   };
   const dispose = panel.dispose;
@@ -186,7 +186,7 @@ export async function editNote(item) {
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight } });
+    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
     panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);

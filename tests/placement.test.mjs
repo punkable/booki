@@ -112,3 +112,12 @@ test("the transform origin is the trigger, clamped to the box", () => {
   assert.deepEqual(transformOrigin(box, 50, 90), { x: 0, y: 0 });
   assert.deepEqual(transformOrigin(box, 999, 999), { x: 200, y: 80 });
 });
+
+test("a flyout opened from the last tile stays within the dock's ends", () => {
+  const dock = { left: 100, top: 520, width: 600, height: 60 };
+  const lastTile = { left: 640, top: 528, width: 44, height: 44 };
+  const { left } = placeBesideBar({ bar: lastTile, box: { width: 320, height: 300 }, edge: "bottom", viewport: VIEW, inside: dock });
+  assert.equal(left, 100 + 600 - 320, "right edges line up instead of overhanging");
+  const first = placeBesideBar({ bar: { ...lastTile, left: 110 }, box: { width: 320, height: 300 }, edge: "bottom", viewport: VIEW, inside: dock });
+  assert.equal(first.left, 100, "left edges line up from the first tile");
+});

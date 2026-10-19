@@ -511,7 +511,7 @@ export function placeStackNear(tileEl) {
   const { left, top } = placeBesideBar({
     bar, box, edge, viewport: { width: window.innerWidth, height: window.innerHeight },
     along: isVertical() ? anchor.top + anchor.height / 2 : anchor.left + anchor.width / 2,
-    gap, pad,
+    gap, pad, inside: dockEl.getBoundingClientRect(),
   });
   stackEl.style.right = stackEl.style.bottom = "";
   stackEl.style.left = `${left}px`;
