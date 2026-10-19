@@ -76,7 +76,7 @@
 
 - **Collector**: drop a link on the dock to save video or audio only from hundreds of sites, image galleries or files.
 - **Devices** rotates through headset, mouse and keyboard with their icons; color shows the battery and pulses when it needs charging.
-- **AI usage** with official Claude and ChatGPT logos, in turn, and when each limit resets.
+- **AI usage** with official Claude and ChatGPT logos, in turn: Codex's plan windows with their resets, and Claude Code's tokens in the current 5-hour block.
 - **Updates**, **Cloud** and **Lighting** widgets (winget, rclone, OpenRGB), and notices that never cover the dock.
 - **Position** picked with one click on a drawing of your screen; folders without overlapping names.
 - Plugins pinned to SHA-256 checksums, with [terms of use](TERMS.md).
@@ -102,7 +102,7 @@ See the [0.87 release notes](docs/releases/v0.87.0.md) for setup requirements an
 - **Feels like Windows 11** — WinUI-style menus, Windows' accent colours, 4/8 px corners, Windows type sizes and motion steps, taskbar-style hints and thin scrollbars.
 - **A live notch widens into the dock** from wherever it sits, with one spring for the whole move, and the dock no longer blinks behind the active app.
 - **Devices widget** — battery of Bluetooth headphones, mice and keyboards, Logitech devices on a Bolt or Unifying receiver, and wireless headsets through the optional HeadsetControl plugin.
-- **AI usage widget (opt-in)** — your Claude and ChatGPT/Codex limits, read from the sign-in those apps already keep on your PC.
+- **AI usage widget (opt-in)** — your Claude Code and Codex usage, read only from the local usage logs those tools already write on your PC.
 - **Plugins** — optional open-source tools you install from Settings, verified before they run.
 - **Smarter start with Windows** — the dock appears at once while Booki stays out of the way during sign-in.
 - **A first dock that already looks like yours**, a simpler Dock page with More settings, a "Charging" moment on the notch, and many fixes.
@@ -162,7 +162,7 @@ See the [0.86 release notes](docs/releases/v0.86.0.md), the [0.85 release notes]
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
 - Network requests are limited to update checks/downloads and website favicons, plus three things that happen only when you turn them on: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source), and the AI usage widget.
-- The AI usage widget reads the sign-in Claude Code (`~/.claude`) and Codex (`~/.codex`) already keep on your PC and sends each only to its own service (Anthropic or OpenAI) to read your plan's usage. Booki never stores, logs or forwards it, and asks only while the widget is on the dock.
+- The AI usage widget only reads the local usage logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions`), read-only and only while the widget is on the dock. Booki never reads, uses, stores or sends your Claude or ChatGPT credentials, keeps no message content, and makes no network request for it. Claude's local logs hold no plan limits, so the widget shows tokens in the current 5-hour block and this week; Codex's logs include its plan percentages.
 - Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
 - Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.

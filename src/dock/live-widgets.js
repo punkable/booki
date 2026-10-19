@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName } from "./readings.js";
+import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -160,7 +160,7 @@ let rotationTimer = 0;
 function syncRotation() {
   // Only cards still on the dock rotate; unpinning one lets the timer go.
   const devices = widgetPresent("devices") && (deviceReading.last || []).length > 1;
-  const ai = widgetPresent("ai") && (aiReading.last || []).filter((p) => (p.windows || []).length).length > 1;
+  const ai = widgetPresent("ai") && (aiReading.last || []).filter(aiActive).length > 1;
   if (!devices && !ai) { clearInterval(rotationTimer); rotationTimer = 0; return; }
   if (rotationTimer) return;
   rotationTimer = setInterval(() => {
@@ -171,11 +171,17 @@ function syncRotation() {
     paintDevices(deviceReading.last || []); paintAi(aiReading.last || []);
   }, 6000);
 }
+const lastOwnReading = new Map();
 function paintDevices(list) {
   eachWidget("devices", (el) => {
     // A card made for one device follows only that one, under its short name.
-    const own = findWidgetPin(el.dataset.id)?.style?.device;
-    const mine = own ? list.filter((d) => d.name === own) : list;
+    const style = findWidgetPin(el.dataset.id)?.style;
+    const own = style?.device;
+    // A card made for one device keeps showing its last reading when that
+    // device skips one poll, instead of falling back to an empty card.
+    const found = own ? matchDevice(list, own, style.deviceKind) : null;
+    if (own && found) lastOwnReading.set(el.dataset.id, found);
+    const mine = own ? [found || lastOwnReading.get(el.dataset.id)].filter(Boolean) : list;
     setWidgetAvailable(el, mine.length > 0);
     if (!mine.length) {
       resetGlyph(el, "devices");
@@ -211,40 +217,62 @@ function warnLowDevices(list) {
   }
 }
 
-// Plan usage of the AI services signed in on this PC (Claude Code, Codex).
-// The card shows the window closest to its limit; the hint lists them all
-// with when each resets. Asked every five minutes, only while pinned.
+// AI usage of the tools found on this PC (Claude Code, Codex), read by the
+// backend from their own local usage logs only: no sign-in, no network.
+// Codex logs carry its plan's windows (real percentages); Claude's logs carry
+// only token counts, so its ring shows how much of the 5-hour block has
+// elapsed, never a guessed share of a plan limit. Asked every five minutes,
+// only while pinned.
 const resetClock = (seconds) => seconds > 0
   ? new Date(seconds * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" })
   : "";
 const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
-// Every signed-in provider takes a turn on the card (about every 6 s) with its
-// own isotype and fullest window; rotating repaints the cached reading, it
-// never asks the services again.
+const resetsText = (seconds) => { const r = resetClock(seconds); return r ? ` · ${t("w.aiResets").replace("{time}", () => r)}` : ""; };
+const tokensText = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
+/** Every hint line for one provider. */
+function aiHintLines(p) {
+  const week = `${p.name} · ${t("w.aiWeekTokens").replace("{n}", () => tokensText(p.week_tokens))}`;
+  if ((p.windows || []).length) {
+    return p.windows.map((w) => `${p.name} ${windowName(w.label)} · ${Math.round(w.percent)}%${resetsText(w.resets_at)}`);
+  }
+  if (p.block) {
+    return [
+      `${p.name} · ${t("w.aiBlock")}: ${tokensText(p.block.tokens)}${resetsText(p.block.resets_at)}`,
+      `${p.name} · ${t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent))}`,
+      week,
+    ];
+  }
+  return [`${p.name} · ${t("w.aiIdle")}`, ...(p.week_tokens > 0 ? [week] : [])];
+}
+// Every active provider takes a turn on the card (about every 6 s);
+// rotating repaints the cached reading, it never reads the logs again.
 let aiTurn = 0;
 const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
 function paintAi(providers) {
-  const windows = providers.flatMap((p) => (p.windows || []).map((w) => ({ ...w, provider: p.name })));
-  const shown = providers.filter((p) => (p.windows || []).length);
+  const shown = providers.filter(aiActive);
   eachWidget("ai", (el) => {
-    setWidgetAvailable(el, windows.length > 0);
-    if (!windows.length) {
+    setWidgetAvailable(el, shown.length > 0);
+    const hint = providers.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
+    if (!shown.length) {
       resetGlyph(el, "ai");
       setText(el, t("w.ai"), "—");
-      setTileLabel(el, !providers.length ? t("w.aiNone") : providers.map((p) => `${p.name} · ${t(aiErrorKey(p.error))}`).join("\n"));
+      setTileLabel(el, !providers.length ? t("w.aiNone") : hint);
       return;
     }
     const current = shown[aiTurn % shown.length];
-    const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
     setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
-    setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
-    setTileLabel(el, windows.map((w) => {
-      const reset = resetClock(w.resets_at);
-      return `${w.provider} ${windowName(w.label)} · ${Math.round(w.percent)}%${reset ? ` · ${t("w.aiResets").replace("{time}", () => reset)}` : ""}`;
-    }).concat(providers.filter((p) => !(p.windows || []).length).map((p) => `${p.name} · ${t(aiErrorKey(p.error))}`)).join("\n"));
-    const tone = usageTone(top.percent);
+    setTileLabel(el, hint);
+    let tone = "good";
+    if ((current.windows || []).length) {
+      const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
+      setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
+      tone = usageTone(top.percent);
+    } else {
+      // Claude: tokens in the label; the ring is time elapsed in the block.
+      setMetric(el, `${current.name} · ${tokensText(current.block.tokens)}`, Math.round(current.block.elapsed_percent));
+    }
     el.dataset.tone = tone;
-    el.classList.toggle("needs-attention", windows.some((w) => w.percent >= 95));
+    el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }

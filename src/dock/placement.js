@@ -34,11 +34,25 @@ const clamp = (v, lo, hi) => Math.min(Math.max(lo, v), Math.max(lo, hi));
  *                             own centre.
  * @param {number} [o.gap]     Space between bar and box.
  * @param {number} [o.pad]     Minimum space between box and window edge.
+ * @param {{left:number, top:number, width:number, height:number} | null} [o.inside]
+ *                             The whole dock: a box narrower than it stays
+ *                             within its ends instead of overhanging them, as
+ *                             a WinUI flyout stays within its anchor's span.
  * @returns {{left: number, top: number}}
  */
-export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 10, pad = 16 }) {
-  const maxLeft = viewport.width - box.width - pad;
-  const maxTop = viewport.height - box.height - pad;
+export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 10, pad = 16, inside = null }) {
+  let minLeft = pad;
+  let maxLeft = viewport.width - box.width - pad;
+  let minTop = pad;
+  let maxTop = viewport.height - box.height - pad;
+  if (inside && !isVerticalEdge(edge) && box.width <= inside.width) {
+    minLeft = Math.max(minLeft, inside.left);
+    maxLeft = Math.min(maxLeft, inside.left + inside.width - box.width);
+  }
+  if (inside && isVerticalEdge(edge) && box.height <= inside.height) {
+    minTop = Math.max(minTop, inside.top);
+    maxTop = Math.min(maxTop, inside.top + inside.height - box.height);
+  }
 
   if (isVerticalEdge(edge)) {
     const centre = along ?? bar.top + bar.height / 2;
@@ -48,13 +62,13 @@ export function placeBesideBar({ bar, box, edge, viewport, along = null, gap = 1
         pad,
         maxLeft
       ),
-      top: clamp(centre - box.height / 2, pad, maxTop),
+      top: clamp(centre - box.height / 2, minTop, maxTop),
     };
   }
 
   const centre = along ?? bar.left + bar.width / 2;
   return {
-    left: clamp(centre - box.width / 2, pad, maxLeft),
+    left: clamp(centre - box.width / 2, minLeft, maxLeft),
     top: clamp(
       edge === "top" ? bar.top + bar.height + gap : bar.top - box.height - gap,
       pad,

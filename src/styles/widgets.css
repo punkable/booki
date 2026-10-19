@@ -564,3 +564,29 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .download-ask { font-weight: 400; font-size: 0.8125rem; color: var(--ink-2); }
 .rgb-profiles > .productivity-button:nth-last-child(2) { margin-inline-start: auto; }
 .tile.widget .w-label { text-overflow: ellipsis; }
+
+/* Updates: a WinUI list, not a stack of cards. Name and version on the left,
+   Update and a quiet Skip on the right; a row's state shows in its own line. */
+.update-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.update-count { font-size: 12px; color: var(--ink-2); }
+.update-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.update-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 32px; align-items: center; gap: 10px; padding: 6px 4px 6px 8px; border-radius: var(--r-control); transition: background var(--dur-1) linear, opacity var(--dur-2) linear; }
+.update-row:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.update-glyph { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-control); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.update-glyph svg { width: 16px; height: 16px; }
+.update-names { display: grid; min-width: 0; }
+.update-names strong, .update-names small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.update-names strong { font-size: 14px; font-weight: 600; }
+.update-names small { font-size: 12px; color: var(--ink-2); }
+.update-row .productivity-button { white-space: nowrap; }
+.update-skip { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink-2); cursor: pointer; }
+.update-skip:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); }
+.update-skip svg { width: 16px; height: 16px; }
+.update-row.is-working .update-glyph svg { animation: update-spin 1s linear infinite; }
+.update-row.is-working .update-names small { color: var(--accent); }
+.update-row.has-error .update-names small { color: var(--danger-text); white-space: normal; }
+.update-row.is-done { opacity: 0.5; }
+.update-row.is-done .update-names small { color: var(--ink); }
+@keyframes update-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .update-row.is-working .update-glyph svg { animation: none; } }
+.update-empty { color: var(--ink-2); }

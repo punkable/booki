@@ -81,12 +81,15 @@ function CatalogCard({ widget, pinned, selected, style, onInspect }) {
   const meta = WIDGET_META[widget];
   return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} title={pinned ? t("widget.pinned") : undefined}
     style={{ "--widget-accent": meta.accent }} onClick={onInspect}>
+    <span className="catalog-preview" aria-hidden="true"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span>
     <span className="catalog-head">
       <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
-      <span className="catalog-text"><span className="catalog-name">{name(widget)}</span><span className="catalog-desc">{t(meta.desc)}</span></span>
-      {pinned && <span className="catalog-badge">{t("widget.pinned")}</span>}
+      <span className="catalog-text">
+        <span className="catalog-name"><span className="catalog-title">{name(widget)}</span>
+          {pinned && <span className="catalog-pinned" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("check") }} />}</span>
+        <span className="catalog-desc">{t(meta.desc)}</span>
+      </span>
     </span>
-    <span className="catalog-preview" aria-hidden="true"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span>
   </button>;
 }
 

@@ -388,6 +388,7 @@ window.addEventListener("blur", () => {
   closeMenu();
   closeStack();
   if (S.productivityPanel) closeProductivityPanel();
+  reportDockMaterial();
   // Focus moved to another app → release a pinned reveal so the dock can tuck
   // back into the notch instead of lingering on top of whatever the user opened.
   if (S.pinnedReveal) {

@@ -1011,3 +1011,16 @@
 .settings-body input[type="checkbox"]:checked::after { content: ""; width: 10px; height: 6px; margin-top: -3px; border: solid var(--accent-contrast); border-width: 0 0 1.5px 1.5px; transform: rotate(-45deg); }
 .settings-body input[type="checkbox"]:disabled { opacity: 0.45; cursor: default; }
 @media (forced-colors: active) { .settings-body input[type="checkbox"] { appearance: auto; -webkit-appearance: auto; } }
+
+/* Widget catalog, like the Windows widget picker: the live preview first,
+   then the name with a small check when it is on the dock (a badge used to
+   cover the name: "Portapapele…"), then two lines of description. */
+.catalog-card { gap: 10px; padding: 8px 8px 12px; }
+.catalog-preview { order: -1; min-height: 76px; border-radius: var(--r-control); }
+.catalog-head { padding: 0 4px; gap: 8px; }
+.catalog-icon { flex: none; }
+.catalog-text { display: grid; gap: 2px; min-width: 0; }
+.catalog-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.catalog-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.catalog-pinned { display: grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-contrast, #fff); }
+.catalog-pinned svg { width: 10px; height: 10px; }

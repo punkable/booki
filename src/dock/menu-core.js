@@ -35,6 +35,7 @@ export function placeMenu(e, focus = true) {
       edge: S.cfg.edge,
       viewport: { width: window.innerWidth, height: window.innerHeight },
       along: isVertical() ? cy : cx,
+      inside: dockEl.getBoundingClientRect(),
     });
     ctxMenu.style.left = `${left}px`;
     ctxMenu.style.top = `${top}px`;

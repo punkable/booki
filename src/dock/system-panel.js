@@ -9,7 +9,7 @@ import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
-import { deviceReading, aiReading, aiErrorKey, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, cloudReading, sizeText, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -126,17 +126,36 @@ export function buildSystemPanel(item, { close }) {
     const ai = section(t("w.ai"));
     const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
+    const clock = (s) => (s > 0 ? new Date(s * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "");
+    const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
+    const tokens = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
     live(ai, aiReading, 60000, (providers) => {
       const all = Array.isArray(providers) ? providers : [];
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
-      cards(ai, all.map((p) => ({
-        name: p.name, glyph: icons[p.id] || "sparkles",
-        error: (p.windows || []).length ? "" : t(aiErrorKey(p.error)),
-        tone: usageTone(Math.max(0, ...(p.windows || []).map((w) => w.percent))), bars: (p.windows || []).map((w) => {
-          const reset = w.resets_at > 0 ? new Date(w.resets_at * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
-          return { label: reset ? `${windowName(w.label)} · ${t("w.aiResets").replace("{time}", () => reset)}` : windowName(w.label), percent: w.percent, tone: usageTone(w.percent) };
-        }),
-      })));
+      cards(ai, all.map((p) => {
+        const windows = p.windows || [];
+        const sub = t("w.aiWeekTokens").replace("{n}", () => tokens(p.week_tokens));
+        if (windows.length) {
+          return {
+            name: p.name, glyph: icons[p.id] || "sparkles", sub,
+            tone: usageTone(Math.max(0, ...windows.map((w) => w.percent))),
+            bars: windows.map((w) => ({ label: withReset(windowName(w.label), w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
+          };
+        }
+        if (p.block) {
+          // Local logs hold no plan limit: the bar is time elapsed in the
+          // 5-hour block, the value is the tokens spent in it.
+          return {
+            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: tokens(p.block.tokens),
+            bars: [{ label: withReset(t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent)), p.block.resets_at), percent: p.block.elapsed_percent, tone: "good" }],
+          };
+        }
+        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.week_tokens > 0 ? sub : "", error: t("w.aiIdle"), bars: [] };
+      }));
+      const ids = new Set(all.map((p) => p.id));
+      if (!ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
+      if (!ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
+      ai.append(text("p", t("w.aiLocal")));
     });
   }
   if (item.widget === "volume") {
@@ -162,7 +181,7 @@ export function buildSystemPanel(item, { close }) {
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       const own = item.style?.device;
-      const shown = own ? values.filter((d) => d.name === own) : values;
+      const shown = own ? [matchDevice(values, own, item.style?.deviceKind)].filter(Boolean) : values;
       if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       cards(devices, shown.map((d) => ({
         name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
@@ -175,7 +194,7 @@ export function buildSystemPanel(item, { close }) {
         if (pinnedDevices.has(shown[i].name)) return;
         const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
         button(row, t("dev.ownCard"), async () => {
-          if (!(await addWidget("devices", { style: { device: shown[i].name }, after: item.id }))) throw new Error(t("status.saveError"));
+          if (!(await addWidget("devices", { style: { device: shown[i].name, deviceKind: shown[i].kind }, after: item.id }))) throw new Error(t("status.saveError"));
           row.remove();
         });
       });
@@ -261,29 +280,79 @@ export function buildSystemPanel(item, { close }) {
     container.append(offer);
   }).catch(() => onReady());
   if (item.widget === "updates") {
+    // A Windows-style list: one row per app with Update and a quiet Skip.
+    // winget installs one thing at a time, so Booki queues them: while one
+    // runs the other Update buttons wait, and Update all goes row by row so
+    // each one shows its own progress. A failure stays on its own row.
     const box = section(t("w.updates"));
     let latest = null;
+    let running = false;
+    const versionLine = (u) => (!u.current || /^unknown$/i.test(u.current)) ? t("up.newVersion").replace("{v}", () => u.available) : `${u.current} → ${u.available}`;
     const paint = (raw) => {
       latest = raw;
+      // A fresh reading must not rebuild the list under a running update.
+      if (running) return;
       const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
-      box.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .plugin-panel-actions").forEach((el) => el.remove());
+      box.querySelectorAll(":scope > *:not(strong)").forEach((el) => el.remove());
       if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
-      if (!list.length) { box.append(text("p", t("up.none"))); return; }
-      const all = document.createElement("div"); all.className = "plugin-panel-actions";
-      button(all, t("up.all"), async () => { all.querySelector("button").textContent = t("up.working"); await api.appUpdate(null); notify(t("up.done")); refreshUpdates(); }).classList.add("primary");
-      box.append(all);
-      cards(box, list.map((u) => ({ name: u.name, sub: `${u.current} → ${u.available}`, glyph: "refresh" })));
-      box.querySelectorAll(".reading-card").forEach((card, i) => {
-        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
-        button(row, t("up.one"), async () => { row.querySelector("button").textContent = t("up.working"); await api.appUpdate(list[i].id); refreshUpdates(); });
-        // Not interested in this one: hide it until a newer version comes.
-        button(row, t("up.skip"), async () => {
-          const key = `${list[i].id}@${list[i].available}`;
+      if (!list.length) { box.append(text("p", t("up.none"), "update-empty")); return; }
+      const bar = document.createElement("div"); bar.className = "update-bar";
+      const count = text("span", t("up.some").replace("{n}", () => list.length), "update-count");
+      const all = text("button", t("up.all"), "productivity-button primary"); all.type = "button";
+      bar.append(count, all);
+      const rows = document.createElement("ul"); rows.className = "update-list";
+      const entries = list.map((u) => {
+        const row = document.createElement("li"); row.className = "update-row";
+        const glyph = text("span", "", "update-glyph"); glyph.innerHTML = icon("refresh");
+        const names = document.createElement("div"); names.className = "update-names";
+        const sub = text("small", versionLine(u));
+        names.append(text("strong", u.name), sub);
+        const go = text("button", t("up.one"), "productivity-button"); go.type = "button";
+        const skip = document.createElement("button"); skip.type = "button"; skip.className = "update-skip";
+        skip.innerHTML = icon("eye-off"); skip.title = t("up.skip"); skip.setAttribute("aria-label", `${t("up.skip")}: ${u.name}`);
+        row.append(glyph, names, go, skip); rows.append(row);
+        return { u, row, sub, go, skip };
+      });
+      const lock = (on) => { running = on; all.disabled = on; for (const e of entries) if (e.row.isConnected) e.go.disabled = on; };
+      const updateOne = async (e) => {
+        e.row.classList.add("is-working"); e.row.classList.remove("has-error");
+        e.go.textContent = t("up.working"); e.sub.textContent = versionLine(e.u);
+        try {
+          await api.appUpdate(e.u.id);
+          e.row.classList.add("is-done"); e.sub.textContent = t("up.updated");
+          setTimeout(() => e.row.remove(), 900);
+          return true;
+        } catch (error) {
+          if (disposed) return false;
+          e.row.classList.add("has-error"); e.sub.textContent = pluginError(error);
+          e.go.textContent = t("focus.retry");
+          return false;
+        } finally { e.row.classList.remove("is-working"); }
+      };
+      for (const e of entries) {
+        e.go.addEventListener("click", async () => {
+          if (running) return;
+          lock(true); await updateOne(e); if (!disposed) lock(false);
+          refreshUpdates();
+        });
+        e.skip.addEventListener("click", async () => {
+          const key = `${e.u.id}@${e.u.available}`;
           const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
-          if (!(await persist({ ignoredUpdates: ignored }))) throw new Error(t("status.saveError"));
+          if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return; }
           S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
         });
+      }
+      all.addEventListener("click", async () => {
+        if (running) return;
+        lock(true); all.textContent = t("up.working");
+        let failed = 0;
+        for (const e of entries) { if (disposed) return; if (e.row.isConnected && !(await updateOne(e))) failed++; }
+        if (disposed) return;
+        lock(false); all.textContent = t("up.all");
+        notify(failed ? t("up.someFailed").replace("{n}", () => failed) : t("up.done"));
+        refreshUpdates();
       });
+      box.append(bar, rows);
     };
     live(box, updatesReading, 6 * 3600000, paint);
   }

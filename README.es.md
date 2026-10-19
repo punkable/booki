@@ -84,7 +84,7 @@ Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así q
 
 - **Recolector**: suelta un enlace en el dock y guarda video o solo audio de cientos de sitios, galerías de imágenes o archivos.
 - **Dispositivos** rota entre audífonos, mouse y teclado con su icono; el color indica la batería y parpadea cuando hay que cargar.
-- **Uso de IA** con logos oficiales de Claude y ChatGPT, rotando, y hora de reinicio de cada límite.
+- **Uso de IA** con logos oficiales de Claude y ChatGPT, rotando: las ventanas del plan de Codex con su reinicio y los tokens de Claude Code en el bloque de 5 horas actual.
 - Widgets **Actualizaciones**, **Nube** e **Iluminación** (winget, rclone, OpenRGB) y avisos que nunca tapan el dock.
 - **Posición** con un clic sobre un dibujo de tu pantalla; carpetas sin nombres solapados.
 - Complementos con huellas SHA-256 fijadas y [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
@@ -102,7 +102,7 @@ Consulta los requisitos de configuración y los límites de validación en las [
 - **Se siente como Windows 11**: menús al estilo WinUI, colores de acento de Windows, esquinas de 4/8 px, tamaños de texto y ritmos de animación de Windows, avisos como los de la barra de tareas y barras de desplazamiento finas.
 - **El notch en vivo se estira hasta ser el dock** desde donde esté, con un solo muelle para todo el movimiento, y el dock ya no parpadea detrás de la app activa.
 - **Widget Dispositivos**: batería de audífonos, mouse y teclados Bluetooth, de dispositivos Logitech con receptor Bolt o Unifying y de audífonos inalámbricos con el complemento opcional HeadsetControl.
-- **Widget Uso de IA (opcional)**: tus límites de Claude y ChatGPT/Codex, leídos de la sesión que esas apps ya guardan en tu PC.
+- **Widget Uso de IA (opcional)**: tu uso de Claude Code y Codex, leído solo de los registros de uso locales que esas herramientas ya escriben en tu PC.
 - **Complementos**: herramientas de código abierto opcionales que instalas desde Ajustes y que se verifican antes de usarse.
 - **Inicio con Windows más inteligente**: el dock aparece al instante y Booki no compite con el resto de programas al iniciar sesión.
 - **Un primer dock que ya se parece a ti**, una página Dock más simple con "Más ajustes", un aviso de "Cargando" en el notch y muchos arreglos.
@@ -127,7 +127,7 @@ No hay cuentas, telemetría ni sincronización en la nube. La configuración y l
 
 Las consultas de red se usan para actualizaciones y favicons, más tres cosas que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su página de versiones oficial (verificada con una suma SHA-256 fijada en el código de Booki) y el widget Uso de IA.
 
-El widget Uso de IA lee la sesión que Claude Code (`~/.claude`) y Codex (`~/.codex`) ya guardan en tu PC y la envía solo a su propio servicio (Anthropic u OpenAI) para consultar el uso de tu plan. Booki nunca la guarda, registra ni reenvía, y solo consulta mientras el widget está en el dock. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta. Son herramientas independientes de terceros, con sus propias licencias, que solo se instalan si tú lo decides; usarlas conforme a la ley es tu responsabilidad. Consulta los [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
+El widget Uso de IA solo lee, en modo lectura, los registros de uso locales de Claude Code (`~/.claude/projects`) y Codex (`~/.codex/sessions`), y solo mientras el widget está en el dock. Booki nunca lee, usa, guarda ni envía tus credenciales de Claude o ChatGPT, no conserva el contenido de los mensajes y no hace ninguna petición de red para él. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta. Son herramientas independientes de terceros, con sus propias licencias, que solo se instalan si tú lo decides; usarlas conforme a la ley es tu responsabilidad. Consulta los [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
 
 La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
 

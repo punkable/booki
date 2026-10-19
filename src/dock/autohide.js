@@ -4,7 +4,7 @@ import { dock as dockApi } from "../api.js";
 import { decideVisible, wantsHidden } from "./visibility-policy.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
-import { reportHitRects } from "./hit-regions.js";
+import { reportHitRects, reportDockMaterial } from "./hit-regions.js";
 import { applyFrame } from "./frame.js";
 import { stopPolls, startPolls } from "./live-widgets.js";
 import { reduceMotion } from "./motion.js";
@@ -127,6 +127,9 @@ export function setHidden(v) {
     // Slide the bar into its edge, then hand off to the notch window (and
     // hide the dock window) once it is out of sight.
     document.body.classList.add("tucked");
+    // Drop the native blur now, not when the window hides: an open folder
+    // or panel left its blur floating where the dock had been.
+    reportDockMaterial();
     handoffTimer = setTimeout(() => {
       if (S.hiddenState) dockApi.hideDock(S.cfg.edge);
     }, reduceMotion() ? 0 : HIDE_MS + 16);
