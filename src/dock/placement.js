@@ -34,7 +34,7 @@ const clamp = (v, lo, hi) => Math.min(Math.max(lo, v), Math.max(lo, hi));
  *                             own centre.
  * @param {number} [o.gap]     Space between bar and box.
  * @param {number} [o.pad]     Minimum space between box and window edge.
- * @param {{left:number, top:number, width:number, height:number}} [o.inside]
+ * @param {{left:number, top:number, width:number, height:number} | null} [o.inside]
  *                             The whole dock: a box narrower than it stays
  *                             within its ends instead of overhanging them, as
  *                             a WinUI flyout stays within its anchor's span.
