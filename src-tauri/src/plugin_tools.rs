@@ -240,7 +240,9 @@ pub async fn app_updates() -> Result<Vec<AppUpdate>, String> {
     util::blocking(|| {
         let output = capture(
             &winget()?,
-            &winget_args(&["upgrade", "--include-unknown"]),
+            // Apps with an unknown installed version are left out: winget
+            // lists them but then has "no applicable update" for them.
+            &winget_args(&["upgrade"]),
             120,
         )
         .or_else(|e| {
@@ -275,11 +277,18 @@ pub async fn app_update(id: Option<String>) -> Result<(), String> {
             .map_err(|_| "another plugin operation is in progress")?;
         let target: Vec<&str> = match &id {
             Some(id) => vec!["upgrade", "--id", id, "--exact"],
-            None => vec!["upgrade", "--all", "--include-unknown"],
+            None => vec!["upgrade", "--all"],
         };
         let mut args = winget_args(&target);
         args.extend(["--silent", "--accept-package-agreements"]);
-        capture(&winget()?, &args, 3600).map(|_| ())
+        capture(&winget()?, &args, 3600).map(|_| ()).map_err(|e| {
+            // 0x8A15002B: winget lists the update but can't apply it.
+            if e.contains("8A15002B") || e.to_ascii_lowercase().contains("no applicable") {
+                "not-applicable".to_string()
+            } else {
+                e
+            }
+        })
     })
     .await?
 }

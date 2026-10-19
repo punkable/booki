@@ -311,6 +311,13 @@ export function buildSystemPanel(item, { close }) {
         row.append(glyph, names, go, skip); rows.append(row);
         return { u, row, sub, go, skip };
       });
+      const skipUpdate = async (e) => {
+        const key = `${e.u.id}@${e.u.available}`;
+        const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
+        if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return false; }
+        S.cfg.ignoredUpdates = ignored; e.row.remove();
+        return true;
+      };
       const lock = (on) => { running = on; all.disabled = on; for (const e of entries) if (e.row.isConnected) e.go.disabled = on; };
       const updateOne = async (e) => {
         e.row.classList.add("is-working"); e.row.classList.remove("has-error");
@@ -322,6 +329,8 @@ export function buildSystemPanel(item, { close }) {
           return true;
         } catch (error) {
           if (disposed) return false;
+          // An update winget can't apply leaves the list for good.
+          if (String(error).includes("not-applicable")) { await skipUpdate(e); return true; }
           e.row.classList.add("has-error"); e.sub.textContent = pluginError(error);
           e.go.textContent = t("focus.retry");
           return false;
@@ -333,12 +342,7 @@ export function buildSystemPanel(item, { close }) {
           lock(true); await updateOne(e); if (!disposed) lock(false);
           refreshUpdates();
         });
-        e.skip.addEventListener("click", async () => {
-          const key = `${e.u.id}@${e.u.available}`;
-          const ignored = [...new Set([...(S.cfg?.ignoredUpdates || []), key])].slice(-200);
-          if (!(await persist({ ignoredUpdates: ignored }))) { e.sub.textContent = t("status.saveError"); e.row.classList.add("has-error"); return; }
-          S.cfg.ignoredUpdates = ignored; paint(latest); refreshUpdates();
-        });
+        e.skip.addEventListener("click", async () => { if (await skipUpdate(e)) { paint(latest); refreshUpdates(); } });
       }
       all.addEventListener("click", async () => {
         if (running) return;
