@@ -109,7 +109,37 @@ pub fn device_batteries() -> Vec<DeviceBattery> {
     let mut list = query().unwrap_or_default();
     list.extend(headsetcontrol());
     list.extend(super::logitech::batteries());
-    merge(list)
+    let mut list = merge(list);
+    steady(
+        &mut list,
+        &mut STEADY.lock().unwrap_or_else(|e| e.into_inner()),
+    );
+    list
+}
+
+static STEADY: std::sync::Mutex<Vec<(String, u8, Option<u8>)>> = std::sync::Mutex::new(Vec::new());
+
+/// Some keyboards (MS Keys Mini) report a stray empty or full level between
+/// real ones. A level that jumps by more than 25 points while not charging is
+/// only shown once the next reading agrees with it.
+fn steady(list: &mut [DeviceBattery], seen: &mut Vec<(String, u8, Option<u8>)>) {
+    for d in list.iter_mut() {
+        let Some(entry) = seen.iter_mut().find(|e| e.0 == d.name) else {
+            seen.push((d.name.clone(), d.level, None));
+            continue;
+        };
+        let jump = d.level.abs_diff(entry.1) > 25;
+        if !jump || d.charging || entry.2.is_some_and(|p| p.abs_diff(d.level) <= 10) {
+            entry.1 = d.level;
+            entry.2 = None;
+        } else {
+            entry.2 = Some(d.level);
+            d.level = entry.1;
+        }
+    }
+    if seen.len() > 32 {
+        seen.drain(..seen.len() - 32);
+    }
 }
 
 /// Wireless headsets on a USB dongle (SteelSeries Arctis, Logitech G,
@@ -232,7 +262,15 @@ fn query() -> windows::core::Result<Vec<DeviceBattery>> {
 
 /// One entry per device name, keeping the lowest reading, lowest first.
 fn merge(mut list: Vec<DeviceBattery>) -> Vec<DeviceBattery> {
-    list.sort_by(|a, b| a.name.cmp(&b.name).then(a.level.cmp(&b.level)));
+    // Logitech's own protocol is the steadiest reading for a device it also
+    // shares over Bluetooth, so it wins; otherwise the lowest level does.
+    let rank = |d: &DeviceBattery| u8::from(d.source != "logitech");
+    list.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then(rank(a).cmp(&rank(b)))
+            .then(a.level.cmp(&b.level))
+    });
     // One entry per name; a device that one source reports as charging is
     // charging, whichever reading is kept.
     list.dedup_by(|later, first| {
@@ -274,6 +312,28 @@ mod tests {
         };
         let merged = merge(vec![d("Buds", 80), d("Mouse", 40), d("Buds", 75)]);
         assert_eq!(merged, vec![d("Mouse", 40), d("Buds", 75)]);
+    }
+
+    #[test]
+    fn a_stray_jump_waits_for_a_second_reading() {
+        let d = |level| DeviceBattery {
+            name: "Keys".into(),
+            level,
+            source: "bluetooth",
+            kind: "keyboard",
+            charging: false,
+        };
+        let mut seen = Vec::new();
+        let mut shown = |level| {
+            let mut list = [d(level)];
+            steady(&mut list, &mut seen);
+            list[0].level
+        };
+        assert_eq!(shown(70), 70);
+        assert_eq!(shown(0), 70);
+        assert_eq!(shown(68), 68);
+        assert_eq!(shown(100), 68);
+        assert_eq!(shown(98), 98);
     }
 
     #[test]
