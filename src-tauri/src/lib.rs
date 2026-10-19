@@ -1535,8 +1535,6 @@ pub fn run() {
             plugin_tools::plugin_download,
             plugin_tools::app_updates,
             plugin_tools::app_update,
-            plugin_tools::cloud_space,
-            plugin_tools::cloud_setup,
             plugin_tools::rgb_profiles,
             plugin_tools::rgb_apply,
             plugin_status,

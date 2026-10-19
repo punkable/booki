@@ -216,7 +216,7 @@ test('plugins have their own searchable page and installation stays deliberate',
   await page.getByRole('combobox', { name: 'Search settings…' }).fill('HeadsetControl');
   await page.getByRole('option').filter({ hasText: 'Plugins' }).click();
   await page.locator('.page-plugins').waitFor();
-  assert.equal(await page.locator('.plugin-card').count(), 6);
+  assert.equal(await page.locator('.plugin-card').count(), 5);
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
   const section = page.locator('.plugin-card').filter({ has: page.getByRole('heading', { name: 'HeadsetControl', exact: true }) });
   assert.equal(await section.getByRole('button', { name: 'Download and install', exact: true }).isDisabled(), true);

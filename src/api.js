@@ -589,8 +589,6 @@ export const dock = {
   aiUsage: () => invoke("ai_usage"),
   appUpdates: () => invoke("app_updates"),
   appUpdate: (id = null) => invoke("app_update", { id }),
-  cloudSpace: () => invoke("cloud_space"),
-  cloudSetup: () => invoke("cloud_setup"),
   rgbProfiles: () => invoke("rgb_profiles"),
   rgbApply: (profile = null) => invoke("rgb_apply", { profile }),
   pluginCatalog: () => isTauri ? invoke("plugin_catalog") : Promise.resolve(PLUGINS),

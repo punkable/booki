@@ -7,7 +7,7 @@
 
 export const WIDGET_ORDER = [
   "clock", "calendar", "weather", "system", "battery", "devices",
-  "ai", "media", "volume", "notes", "clipboard", "focus", "collector", "updates", "cloud", "lighting",
+  "ai", "media", "volume", "notes", "clipboard", "focus", "collector", "updates", "lighting",
 ];
 
 /** Old widget names → the widget that replaced them (null = retired). */
@@ -35,7 +35,7 @@ export const WIDGET_ICONS = {
 export const WIDGET_GLYPHS = {
   clock: "clock", calendar: "calendar", weather: "cloud-sun", system: "cpu",
   battery: "battery", devices: "battery", ai: "sparkles", media: "music", volume: "volume", notes: "note",
-  clipboard: "clipboard", focus: "timer", collector: "download", updates: "refresh", cloud: "cloud", lighting: "lightbulb",
+  clipboard: "clipboard", focus: "timer", collector: "download", updates: "refresh", lighting: "lightbulb",
   // Metric glyphs inside the system widget.
   cpu: "cpu", ram: "memory", disk: "disk", net: "activity",
 };
@@ -43,7 +43,7 @@ export const WIDGET_GLYPHS = {
 export const WIDGET_VARIANTS = ["glass", "solid", "minimal"];
 
 export const STAT_WIDGETS = ["system", "battery"];
-export const RING_WIDGETS = ["battery", "devices", "ai", "volume", "collector", "updates", "cloud"];
+export const RING_WIDGETS = ["battery", "devices", "ai", "volume", "collector", "updates"];
 export const PREVIEW_WIDGETS = ["notes", "clipboard"];
 
 /** Gauge colours: the iOS system palette, vivid on any plate. */
@@ -77,7 +77,6 @@ export const WIDGET_META = {
   focus: { accent: "#f7630c", desc: "widget.focusDesc", category: "tools" },
   collector: { accent: "#0f6cbd", desc: "widget.collectorDesc", category: "tools", plugin: "yt-dlp" },
   updates: { accent: "#30a46c", desc: "widget.updatesDesc", category: "system", plugin: "winget" },
-  cloud: { accent: "#0078d4", desc: "widget.cloudDesc", category: "system", plugin: "rclone" },
   lighting: { accent: "#e3008c", desc: "widget.lightingDesc", category: "system", plugin: "openrgb" },
 };
 

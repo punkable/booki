@@ -109,11 +109,17 @@ export async function kindForPath(path, isDirFn) {
 /** Named containers keep their identity until the user explicitly ungroups
  * or removes them. Adding the first app and unrelated saves must not erase a
  * group's name, position, icon or future destination. */
+const RETIRED_WIDGETS = new Set(["cloud"]);
 export function normalizeGroups(pinned) {
-  return (pinned || []).map((pin) => pin.kind === "group"
-    ? { ...pin, children: [...(pin.children || [])] }
-    : pin);
+  return (pinned || [])
+    .filter((pin) => !(pin.kind === "widget" && RETIRED_WIDGETS.has(pin.widget)))
+    .map((pin) => pin.kind === "group"
+      ? { ...pin, children: (pin.children || []).filter((child) => !(child.kind === "widget" && RETIRED_WIDGETS.has(child.widget))) }
+      : pin);
 }
+
+/** Widgets Booki no longer offers; a pin left from an older version is
+ * dropped instead of drawing an empty card. */
 
 /** Pins in the exact shape Rust's PinnedApp saves them, defaults included.
  * A pin built here (no widget/style/icon/children/recents) otherwise differs

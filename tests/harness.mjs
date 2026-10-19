@@ -137,7 +137,6 @@ export const ALL_WIDGETS = [
   "focus",
   "collector",
   "updates",
-  "cloud",
   "lighting",
 ];
 

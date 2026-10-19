@@ -128,19 +128,6 @@ test("Updates counts apps with an update and updates them all from its panel", a
   assert.deepEqual(errors, []); await page.close();
 });
 
-test("Cloud shows the fullest remote and every remote's space in its panel", async () => {
-  const { page, errors } = await openPage(browser, port, "index.html", {
-    cfg: makeConfig({ pinned: [pin("cloud")] }),
-    initScript: `const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="plugin_status"?Promise.resolve({installed:true}):cmd==="cloud_space"?Promise.resolve([{name:"drive",used:75*2**30,total:100*2**30,error:false},{name:"onedrive",used:2**30,total:5*2**30,error:false}]):invoke(cmd,args);`,
-  });
-  const card = page.locator('.tile[data-id="cloud"]');
-  await card.locator(".w-ring-num", { hasText: "75" }).waitFor();
-  await card.click();
-  await page.locator(".reading-card", { hasText: "onedrive" }).waitFor();
-  assert.match(await page.locator(".reading-card", { hasText: "drive" }).first().innerText(), /75 GB of 100 GB/);
-  assert.deepEqual(errors, []); await page.close();
-});
-
 test("a click on the volume card mutes; its panel is one right-click away", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),
@@ -204,4 +191,11 @@ test("refreshing the mixer ignores an older in-flight session list", async () =>
   await page.evaluate(() => window.__sessionReads[0]([{id:"old",name:"Old app",percent:20,muted:false}]));
   assert.equal(await page.getByRole("slider", {name:"Old app",exact:true}).count(),0);
   assert.deepEqual(errors,[]);await page.close();
+});
+
+test("a Cloud card from an older version leaves the dock quietly", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("cloud"), pin("updates")] }) });
+  await page.locator('.tile[data-id="updates"]').waitFor();
+  assert.equal(await page.locator('.tile[data-widget="cloud"]').count(), 0);
+  assert.deepEqual(errors, []); await page.close();
 });

@@ -4,6 +4,7 @@
    This file boots the dock and wires the page-level listeners; the features
    live in ./dock/*.js, with shared mutable state in ./dock/state.js. */
 
+import { normalizeGroups } from "./pins.js";
 import "./dock/error-log.js";
 import {
   config as configApi,
@@ -111,6 +112,7 @@ let booted = false;
 async function boot() {
   try {
     S.cfg = await configApi.get();
+    S.cfg.pinned = normalizeGroups(S.cfg.pinned || []);
     await ensureLang(S.cfg.language); // load pt/fr/de before the first paint
     applyAll();
     await render(); // render() starts widget polls when visible

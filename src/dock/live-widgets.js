@@ -8,7 +8,7 @@ import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify } from "./notices.js";
-import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, cloudReading, sizeText, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
+import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -304,24 +304,6 @@ const pollUpdates = singleFlight(async () => {
   if (list) lastUpdateCount = list.length;
 });
 
-// Cloud (rclone): the fullest remote on the card; every remote in the hint.
-const pollCloud = singleFlight(async () => {
-  let list = [];
-  try { list = (await cloudReading.fresh(30 * 60000)) || []; } catch (_) { list = []; }
-  const known = list.filter((c) => c.total > 0);
-  eachWidget("cloud", (el) => {
-    setWidgetAvailable(el, known.length > 0);
-    if (!known.length) { setText(el, t("w.cloud"), "—"); setTileLabel(el, t("cl.none")); return; }
-    const full = known.reduce((a, b) => (b.used / b.total > a.used / a.total ? b : a));
-    const percent = Math.round((full.used / full.total) * 100);
-    setMetric(el, full.name, percent);
-    setTileLabel(el, known.map((c) => `${c.name} · ${t("cl.used").replace("{used}", () => sizeText(c.used)).replace("{total}", () => sizeText(c.total))}`).join("\n"));
-    const tone = usageTone(percent);
-    el.dataset.tone = tone;
-    if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
-  });
-});
-
 // Lighting (OpenRGB): the card names the profile last applied from Booki.
 export function paintLighting() {
   let current = "";
@@ -520,7 +502,6 @@ function pollKinds() {
     ai: widgetPresent("ai"),
     collector: widgetPresent("collector"),
     updates: widgetPresent("updates"),
-    cloud: widgetPresent("cloud"),
     lighting: widgetPresent("lighting"),
   };
 }
@@ -536,7 +517,6 @@ function paintPolls(k) {
   if (!k.devices && !k.ai) syncRotation();
   if (k.collector) paintDownloads();
   if (k.updates) pollUpdates();
-  if (k.cloud) pollCloud();
   if (k.lighting) paintLighting();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
@@ -587,7 +567,7 @@ export function startPolls() {
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
     if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
     if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
-    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); if (k.cloud) pollCloud(); }
+    if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
