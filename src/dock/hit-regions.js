@@ -75,7 +75,7 @@ export function pointInLiveHitArea(x, y) {
 // which sees the page and not the desktop, and reads as a flat second sheet.
 export const MATERIAL_PANELS = [
   "#ctx-menu:not(.hidden)", ".trash-pop", ".coach", ".update-pill:not(.hidden)",
-  ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".dock-tip.show", ".drop-hint.show",
+  ".stack-drag-clone", ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".dock-tip.show", ".drop-hint.show",
 ].join(", ");
 // A surface reports its shape only once it is fully shown (shapeOf skips a
 // fading one), so report again whenever one finishes appearing or leaving.

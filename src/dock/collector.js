@@ -1,23 +1,41 @@
-/* Collector widget (yt-dlp, FFmpeg, gallery-dl): drop a link on the dock, pick Video or Audio
-   only, and the card shows the progress; the panel shows the file when done.
-   One download at a time; progress arrives as native events. */
+/* Collector session queue: media, direct files and galleries share one native
+   download slot; progress and completion actions stay scoped to each job. */
 import { dock as api, onDownloadEvent } from "../api.js";
 import { t } from "../i18n.js";
 import { eachWidget } from "./live-widgets.js";
 import { setMetric, setText } from "./widget-view.js";
 import { setTileLabel } from "./tooltip.js";
+import { createDownloadQueue } from "./download-queue.js";
 import { notify } from "./notices.js";
+import { collectorPreferences } from "../collector-preferences.js";
+import { S } from "./state.js";
 
 export const download = { state: "idle", percent: 0, title: "", path: "", error: "" };
 const listeners = new Set();
 const baseName = (path) => String(path || "").split(/[\\/]/).pop();
+export const collectorQueue = createDownloadQueue({
+  run: (job) => api.pluginDownload(job.url, job.directory, job.format, job.id, job.quality),
+  cancel: (id) => api.pluginCancelDownload(id),
+  changed: (jobs, active) => {
+    const latest = active || jobs.reduce((last, job) => (job.finished || 0) >= (last?.finished || 0) ? job : last, null);
+    Object.assign(download, latest || { state: "idle", percent: 0, title: "", path: "", error: "" });
+    paintDownloads();
+    for (const fn of listeners) { try { fn(download); } catch (_) { /* a closed panel */ } }
+  },
+  completed: (job) => notify(t("dl.done"), baseName(job.path), { actions: [
+    { label: t("dl.open"), run: () => api.openLocation(job.path) },
+    { label: t("refine.openFile"), run: () => api.launch(job.path, []) },
+    { label: t("stack.copyPath"), run: () => api.copyText(job.path) },
+  ] }).catch(() => {}),
+});
 
 export function paintDownloads() {
   eachWidget("collector", (el) => {
     el.dataset.state = download.state;
     if (download.state === "progress" || download.state === "start") {
-      setMetric(el, t("w.collector"), Math.round(download.percent));
-      setTileLabel(el, `${download.title || t("w.collector")} · ${Math.round(download.percent)}%`);
+      if (download.indeterminate) setText(el, t("w.collector"), "…");
+      else setMetric(el, t("w.collector"), Math.round(download.percent));
+      setTileLabel(el, `${download.title || t("w.collector")} · ${download.indeterminate ? "…" : `${Math.round(download.percent)}%`}`);
     } else if (download.state === "done") {
       setMetric(el, t("dl.done"), 100);
       setTileLabel(el, `${t("dl.done")} · ${baseName(download.path)}`);
@@ -30,40 +48,12 @@ export function paintDownloads() {
     }
   });
 }
-
 export function onDownloadChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
-function changed() { paintDownloads(); for (const fn of listeners) { try { fn(download); } catch (_) { /* closed panel */ } } }
+onDownloadEvent((event) => collectorQueue.progress(event));
 
-onDownloadEvent((event) => {
-  if (!event || !["start", "progress", "done", "error"].includes(event.state)) return;
-  if (event.state === "progress" && ["done", "error"].includes(download.state)) return;
-  const percent = Number(event.percent);
-  Object.assign(download, { state: event.state, percent: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0 });
-  if (event.state === "start") Object.assign(download, { title: "", path: "", error: "" });
-  if (event.title) download.title = event.title;
-  if (event.state === "error" && event.error) download.error = String(event.error);
-  if (event.path) download.path = event.path;
-  changed();
-});
-
-/** Start a download; resolves with the saved path or throws. */
-export async function startDownload(url, format) {
-  // One at a time: a second click must not reset the one in progress.
-  if (download.state === "start" || download.state === "progress") throw new Error(t("perr.busy"));
-  Object.assign(download, { state: "start", percent: 0, title: "", path: "", error: "" });
-  changed();
-  try {
-    const path = await api.pluginDownload(url, null, format);
-    Object.assign(download, { state: "done", percent: 100, path: path || download.path });
-    changed();
-    notify(t("dl.done"), baseName(download.path));
-    return path;
-  } catch (error) {
-    Object.assign(download, { state: "error", error: String(error?.message ?? error ?? "") });
-    changed();
-    notify(t("dl.failed"));
-    throw error;
-  }
+export function startDownload(url, format, directory = null) {
+  const preferences = collectorPreferences(S.cfg);
+  return collectorQueue.enqueue([{ url, format, directory: directory || preferences.directory || null, quality: preferences.quality }])[0];
 }
 
 /** What a link most likely is, so only video pages ask Video or Audio:

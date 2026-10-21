@@ -73,7 +73,7 @@ const DEMO_CONFIG = {
   taskbarSettleMs: 1000,
   taskbarHoldWhileHover: true,
   focusIfRunning: true,
-  notchMode: "attached",
+  notchMode: "smart",
   clipboardPersist: false,
   clipboardRetentionDays: 7,
   clipboardHistoryLimit: 60,
@@ -599,7 +599,8 @@ export const dock = {
   appVolumeSet: (id, percent, muted) => invoke("app_volume_set", { id, percent, muted }),
   pluginRead: (id) => invoke("plugin_read", { id }),
   pluginOpen: (id, profile = null) => invoke("plugin_open", { id, profile }),
-  pluginDownload: (url, directory = null, format = "video") => invoke("plugin_download", { url, directory, format }),
+  pluginDownload: (url, directory = null, format = "video", jobId = null, quality = "best") => invoke("plugin_download", { url, directory, format, jobId, quality }),
+  pluginCancelDownload: (id) => invoke("plugin_cancel_download", { id }),
   pluginStatus: (id) => invoke("plugin_status", { id }),
   pluginInstall: (id) => invoke("plugin_install", { id }),
   pluginUninstall: (id) => invoke("plugin_uninstall", { id }),
@@ -610,6 +611,7 @@ export const dock = {
     invoke("apply_hotkeys", { toggle, positions, modifier, launcher }),
   movePaths: (paths, dest) => invoke("move_paths", { paths, dest }),
   listMonitors: () => invoke("list_monitors"),
+  monitorAtCursor: () => invoke("dock_monitor_at_cursor"),
   setMaterial: (shapes, tint) => invoke("set_material", { shapes, tint }),
   systemAccent: () => invoke("system_accent"),
   systemStats: () => invoke("system_stats"),
@@ -787,6 +789,16 @@ export async function onNotchToast(cb) {
     if (p && typeof p === "object") cb(p);
     else cb({ title: String(p || ""), detail: "" });
   });
+}
+
+/** A notice action resolves only against callbacks already registered by dock. */
+export async function onNoticeAction(cb) {
+  if (!T?.event?.listen) return () => {};
+  return T.event.listen("booki://notice-action", (event) => cb(event.payload));
+}
+export async function emitNoticeAction(id, index) {
+  if (!T?.event?.emit) return;
+  return T.event.emit("booki://notice-action", { id, index });
 }
 
 /** Claude Code / Codex changed state: { provider, state, since }. */

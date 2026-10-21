@@ -23,6 +23,9 @@ test('late app recents cannot reopen a dismissed dock menu', async () => {
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [app] }) });
   await page.evaluate(() => { const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c,a) => c === 'recent_files_for' ? new Promise((resolve) => { window.resolveRecents = resolve; }) : old(c,a); });
   await page.locator('.tile[data-id="editor"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Recent', exact: true }).click();
+  await waitForAsyncCondition(page, () => typeof window.resolveRecents === 'function');
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.resolveRecents([{ name: 'Report.txt', path: 'C:/Report.txt' }]));
   await page.waitForTimeout(150);

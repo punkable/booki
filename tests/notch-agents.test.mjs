@@ -66,7 +66,7 @@ test("the setting turns agents off", async () => {
   await page.close();
 });
 
-test("Cursor keeps its logo and complete name beside each compact status", async () => {
+test("Cursor shows its logo and status in a compact capsule with a complete accessible name", async () => {
   for (const notchMode of ["attached", "floating", "smart"]) {
     const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "always", notchMode, language: "es" }), viewport: { width: 320, height: 80 } });
     await page.mouse.move(0, 0);
@@ -77,14 +77,49 @@ test("Cursor keeps its logo and complete name beside each compact status", async
         const pill = document.getElementById("notch-pill").getBoundingClientRect();
         const label = document.getElementById("nl-text");
         const text = label.getBoundingClientRect();
-        return { width: pill.width, height: pill.height, label: label.textContent, fits: text.left >= pill.left && text.right <= pill.right, logo: document.getElementById("nl-agent").dataset.icon, status: document.getElementById("nl-state").dataset.icon };
+        return { width: pill.width, height: pill.height, label: label.textContent, accessible: document.getElementById("notch-pill").getAttribute("aria-label"), fits: text.left >= pill.left && text.right <= pill.right, logo: document.getElementById("nl-agent").dataset.icon, status: document.getElementById("nl-state").dataset.icon };
       });
       assert.equal(measured.label, "Cursor");
       assert.equal(measured.logo, "ai-cursor");
       assert.equal(measured.status, `agent-${state}`);
-      assert.ok(measured.width >= 100 && measured.width <= 128 && measured.height <= 26 && measured.fits, JSON.stringify(measured));
+      assert.match(measured.accessible, /Cursor/);
+      assert.ok(measured.width >= 56 && measured.width <= 72 && measured.height <= 26, JSON.stringify(measured));
     }
     assert.deepEqual(errors, []);
     await page.close();
   }
+});
+
+test("hovering a working agent keeps music controls available after the brief music introduction", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", {
+    cfg: makeConfig({ notchVisibility: "always", notchMode: "smart" }),
+    initScript: `window.__toggles=0; const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{
+      if(cmd==='media_info')return Promise.resolve({title:'Background music',artist:'Player',playing:true});
+      if(cmd==='media_toggle'){window.__toggles++;return Promise.resolve(true);}
+      return old(cmd,args);
+    };`,
+  });
+  await page.clock.install();
+  await event(page, "booki://agent-activity", { provider: "codex", state: "working", since: Date.now() });
+  await page.clock.fastForward(12000);
+  await page.locator("#notch-pill").hover();
+  await page.clock.fastForward(500);
+  await page.getByRole("button", { name: "Play / pause", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__toggles), 1);
+  assert.match(await page.locator("#nc-title").textContent(), /Codex/);
+  assert.match(await page.locator("#nc-sub").textContent(), /Background music/);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("download notice actions are visible and send only their opaque callback identity", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", {
+    cfg: makeConfig({ notchVisibility: "always" }), viewport: { width: 440, height: 100 },
+    initScript: `window.__actions=[];window.__TAURI__.event.emit=(name,payload)=>{if(name==='booki://notice-action')window.__actions.push(payload);return Promise.resolve();};`,
+  });
+  await event(page, "booki://notch-toast", { title: "Download complete", detail: "report.pdf", actionId: "opaque-id", actions: ["Show in folder", "Open file", "Copy path"] });
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
+  assert.deepEqual(await page.evaluate(() => window.__actions), [{ id: "opaque-id", index: 1 }]);
+  const bounds = await page.locator("#notch-toast-actions").boundingBox();
+  assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 100, JSON.stringify(bounds));
+  assert.deepEqual(errors, []); await page.close();
 });

@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -173,10 +173,19 @@ function release93() {
   ] };
 }
 
-export function currentRelease() {
+function release94() {
   return { version: "0.94.0", date: "2026-10-21", headline: t("release94.headline"), sections: [
     { icon: "folder", title: t("release94.groupsTitle"), notes: [t("release94.groups"), t("release94.appearance")] },
     { icon: "sparkles", title: t("release94.widgetsTitle"), notes: [t("release94.devices"), t("release94.ai"), t("release94.media")] },
     { icon: "download", title: t("release94.finishTitle"), notes: [t("release94.collector"), t("release94.updates"), t("release94.docs")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.95.0", date: "2026-10-21", headline: t("release95.headline"), sections: [
+    { icon: "folder", title: t("release95.groupsTitle"), notes: [t("release95.groups"), t("release95.drag"), t("release95.menus")] },
+    { icon: "sparkles", title: t("release95.lookTitle"), notes: [t("release95.look"), t("release95.notch")] },
+    { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release95.widgets")] },
+    { icon: "download", title: t("release95.collectorTitle"), notes: [t("release95.collector"), t("release95.updates")] },
   ] };
 }

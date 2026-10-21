@@ -195,6 +195,10 @@ export function refreshGroupTile(item) {
   const el = [...dockEl.querySelectorAll(".tile.group")].find((node) => node.dataset.id === item.id);
   if (!el) return;
   const next = groupTile(item);
+  setTileLabel(el, next.getAttribute("aria-label"));
+  el.classList.toggle("unnamed", next.classList.contains("unnamed"));
+  const label = el.querySelector(".label");
+  if (label) label.textContent = next.querySelector(".label")?.textContent || "";
   el.classList.toggle("tinted", next.classList.contains("tinted"));
   el.classList.toggle("badge-group", next.classList.contains("badge-group"));
   for (const key of ["--group-color", "--group-ink"]) {

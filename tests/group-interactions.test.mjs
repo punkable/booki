@@ -43,7 +43,7 @@ test("desktop files land directly in a large open group; only the content scroll
   await page.close();
 });
 
-test("the header opens Pantone colours and editing a group retains live widget elements", async () => {
+test("the header opens a compact staged group editor and retains live widgets on apply", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [group(6), { id: "battery", kind: "widget", widget: "battery" }] }),
   });
@@ -51,17 +51,26 @@ test("the header opens Pantone colours and editing a group retains live widget e
   await page.locator("#stack.open").waitFor();
   await page.evaluate(() => { window.__batteryElement = document.querySelector('#dock > [data-id="battery"]'); });
   await page.locator("#stack .stack-head-icon").click();
-  await page.getByRole("button", { name: "Mocha Mousse · 17-1230", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Customize group", exact: true });
+  assert.equal(await editor.locator('.customizer-picker:visible').count(), 0);
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Studio");
+  await editor.getByRole("button", { name: "Colour", exact: true }).click();
+  await editor.getByRole("button", { name: "Mocha Mousse · 17-1230", exact: true }).click();
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.color), undefined);
+  await editor.getByRole("button", { name: "Icon", exact: true }).click();
+  await editor.locator('.customizer-glyph button[data-value="star"]').click();
+  await editor.getByRole("button", { name: "Apply", exact: true }).click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.color === "#a47864");
+  await editor.waitFor({ state: "hidden" });
+  assert.equal(await page.locator("#stack .stack-head-icon").evaluate((el) => el === document.activeElement), true);
+  const saved = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0]);
+  assert.equal(saved.name, "Studio"); assert.equal(saved.style.glyph, "star");
+  assert.equal(await page.locator('#dock > [data-id="group"]').getAttribute("aria-label"), "Studio");
   assert.equal(await page.evaluate(() => window.__batteryElement === document.querySelector('#dock > [data-id="battery"]')), true);
   assert.equal(await page.locator('#dock > [data-id="group"]').evaluate((el) => el.style.getPropertyValue("--group-color")), "#a47864");
   assert.equal(await page.locator("#stack.open.tinted").count(), 1);
-  await page.locator("#stack .stack-head-icon").click();
-  await page.locator("#ctx-menu .menu-glyphs button").nth(1).click();
-  await waitForAsyncCondition(page, async () => !!(await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.glyph);
-  assert.equal(await page.evaluate(() => window.__batteryElement === document.querySelector('#dock > [data-id="battery"]')), true);
-  assert.deepEqual(errors, []);
-  await page.close();
+  assert.equal(await page.locator("#stack .stack-rename").inputValue(), "Studio");
+  assert.deepEqual(errors, []); await page.close();
 });
 
 test("an unavailable device stops displaying its old charge on the next reading", async () => {
@@ -117,4 +126,73 @@ test("a grouped widget can be taken out from its own right-click menu", async ()
   assert.equal(pins.find((pin) => pin.id === "group").children.length, 0);
   assert.deepEqual(errors, []);
   await page.close();
+});
+
+test("group search preserves live cells and Ctrl+wheel changes a persisted Explorer-style view", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(24)] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  await page.locator("#stack.open").waitFor();
+  await page.evaluate(() => { window.__groupCell = document.querySelector('#stack [data-child-id="a1"]'); });
+  await page.getByRole("searchbox", { name: "Search this group" }).fill("App 1");
+  assert.equal(await page.locator("#stack .stack-cell:visible").count(), 11);
+  assert.equal(await page.evaluate(() => window.__groupCell === document.querySelector('#stack [data-child-id="a1"]')), true);
+  await page.locator("#stack .stack-grid").dispatchEvent("wheel", { deltaY: -120, ctrlKey: true });
+  assert.equal(await page.locator("#stack .stack-grid").getAttribute("data-view"), "large");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.getByRole("searchbox", { name: "Search this group" }).inputValue(), "");
+  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  await page.locator("#stack .stack-head > .stack-close").last().click();
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.groupView === "list");
+  await page.locator('#dock > [data-id="group"]').click();
+  await page.locator("#stack.open").waitFor();
+  assert.equal(await page.locator("#stack .stack-grid").getAttribute("data-view"), "list");
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("group dragging keeps a named preview visible, marks its destination and Escape cancels", async () => {
+  const other = { ...group(2), id: "destination", name: "Design" };
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(6), other] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  const cell = page.locator('#stack [data-child-id="a0"]');
+  await cell.waitFor();
+  const origin = await cell.boundingBox();
+  const destination = await page.locator('#dock > [data-id="destination"]').boundingBox();
+  await page.mouse.move(origin.x + origin.width / 2, origin.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(origin.x + origin.width / 2 + 25, origin.y + 25, { steps: 5 });
+  const preview = page.locator(".group-drag-preview");
+  await preview.waitFor();
+  assert.match(await preview.textContent(), /App 0/);
+  assert.equal(await cell.evaluate((el) => el.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true }))), false, "native image dragging must not cancel the pointer gesture");
+  await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height / 2, { steps: 10 });
+  assert.match(await preview.textContent(), /Design/);
+  assert.equal(await page.locator('#dock > [data-id="destination"].merge-target').count(), 1);
+  const bounds = await preview.boundingBox(); assert.ok(bounds.width >= 112 && bounds.height >= 54);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  assert.equal(await preview.count(), 0);
+  assert.equal(await page.locator(".merge-target, .group-drop-before, .group-drop-after").count(), 0);
+  assert.equal(await page.locator('#stack [data-child-id="a0"]').count(), 1);
+  const pins = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned);
+  assert.equal(pins[0].children.length, 6); assert.equal(pins[1].children.length, 2);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+
+test("groups retain search across reopening and keyboard navigation follows visible list entries", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(24)] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  const search = page.getByRole("searchbox", { name: "Search this group" });
+  await search.fill("App 1");
+  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  const first = page.locator('#stack .stack-item:visible').first();
+  await first.focus();
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.childId), "a10");
+  await page.locator("#stack .stack-head > .stack-close").last().click();
+  await page.locator('#dock > [data-id="group"]').click();
+  await search.waitFor();
+  assert.equal(await search.inputValue(), "App 1");
+  assert.equal(await page.locator("#stack .stack-cell:visible").count(), 11);
+  assert.deepEqual(errors, []); await page.close();
 });

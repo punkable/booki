@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64-setup.exe"><b>Download for Windows v0.94.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.94.0.md">What's new v0.94.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64-setup.exe"><b>Download for Windows v0.95.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.95.0.md">What's new v0.95.0</a> ·
   <a href="README.es.md">Español</a>
 </p>
 <!-- booki:download:end -->
@@ -48,13 +48,13 @@
 
 <p align="center">Pin apps, folders, files and websites, then gather them into groups.<br/>Give each group a colour from a curated palette and an icon from the library — it shows in the dock and in Settings.</p>
 
-<p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki Apps and folders page with example pins and the app catalog" /></p>
+<p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki group flyout with search, selectable density and example app icons" /></p>
 
 <h2 align="center">Live, at a glance.</h2>
 
 <p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.<br/>A focus block turns on Windows Do not disturb (and turns it back off when it ends), holds Booki's own notices and can keep the dock tucked away.</p>
 
-<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Current Booki widget gallery" /></p>
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki live widget panel and Collector session queue" /></p>
 
 <h2 align="center">Settings you actually enjoy.</h2>
 
@@ -75,24 +75,24 @@
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.94.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v0.95.0, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.94.0
+## What's new in 0.95.0
 
-More flexible groups, clearer widgets and a refreshed README.
+A smoother Booki: clearer groups, a quieter notch and a fuller Collector.
 
-- Drop files and folders directly into an open group. Contents scroll beneath a fixed header; take members out through the context menu or dragging, with keyboard access too.
-- The header icon opens Pantone colours and icons. Appearance edits preserve live widgets and save against the current group. Glass panels report their geometry throughout opening.
-- Visible batteries refresh every 15 seconds, less often in energy-saving mode. Refresh manually or open Bluetooth settings. A missing reading shows ? instead of retaining an old percentage indefinitely.
-- The card rotates through detected providers with their logos and colours. Codex shows the remaining percentage of its most restrictive window. Claude shows tokens and unknown quota when its logs carry no allowance.
-- The notch player retires its card after one minute paused and becomes available again on playback.
-- Late progress events no longer replace the Collector’s completed result. Its card also includes the failure detail.
-- Update notices wait during focus, Do not disturb, video or games. Download and installation remain separate actions, with saving and backup before applying.
-- Twelve English/Spanish images with real UI, example icons and a recent-release history synchronized with the changelog.
+- Search inside groups and switch between list, small, medium or large icons with Ctrl + wheel. Reorganizing retains search, view and scroll.
+- Dragging from a group shows its icon or initial, name, destination and insertion marker. Escape cancels. Drag the dock background to change edge or screen.
+- Shorter context menus: Customize brings name, icon and color into a staged panel with expandable pickers and Apply/Cancel. Appearance, organization, windows, recents and profiles open separately.
+- Three optional starting styles, smooth scrolling and restrained motion. New installations and presets start with an idle dot; existing saved preferences are retained.
+- Agents show just logo and status, rotating with activity while waiting and errors take priority. Music appears briefly; hover still offers playback controls while an agent works.
+- One panel brings your live widgets together. The menu and launcher expose audio controls and quick actions. Device details show source and query time; AI usage without a published allowance is marked approximate.
+- Video, audio, files and galleries are explicit. Add multiple links to a session queue, cancel or retry, choose quality and folder, then open, reveal or copy the saved file, including from the notch notice.
+- Booki updates are announced discreetly beside the dock. Download and installation remain separate, with settings saved and backed up before applying.
 
-[Full release notes](docs/releases/v0.94.0.md)
+[Full release notes](docs/releases/v0.95.0.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -108,9 +108,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [0.94.0](docs/releases/v0.94.0.md) | More flexible groups, clearer widgets and a refreshed README. |
 | [0.93.0](docs/releases/v0.93.0.md) | Clearer agents, downloads that preserve your files and up-to-date releases. |
 | [0.92.0](docs/releases/v0.92.0.md) | Claude and Codex in the notch, focus with Do not disturb, and automatic backup. |
-| [0.91.0](docs/releases/v0.91.0.md) | AI usage without credentials, devices that are recognised and panels within the dock. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->
@@ -125,10 +125,16 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 | Right-click the dock | Add items, choose a profile or open Settings |
 | Middle-click a pin | Reveal its location in Explorer |
 | Double-click a widget | Open its configuration; utility widgets open their own panel |
+| Right-click a group → Customize | Edit name, icon and color; expand a picker only when needed, then Apply or Cancel |
+| `Ctrl` + wheel inside a group | Switch between list and icon sizes |
+| Drag from a group | See the shortcut and destination; `Escape` cancels |
+| Widget panel / Audio controls | Available from the menu and action search |
 | `Alt` + `1…9` | Launch the corresponding pin; the modifier is configurable |
 | Push the cursor to the edge | Reveal a hidden dock when edge/hover behavior is enabled |
 | Wheel over Media, if enabled | Change system volume |
 | Hover a widget | Its hint lists the details (every device's battery, every AI usage window and when it resets) |
+
+Collector supports video, audio, files and galleries: paste one link per line to queue several. Its gear opens folder, format and quality preferences, also available in Widgets and Plugins. The queue and results last until Booki closes.
 
 ## Privacy and your data
 

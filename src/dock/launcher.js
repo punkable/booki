@@ -19,13 +19,13 @@ const LIMIT = 8;
  * then open windows, pinned and frequent items. Launchers are listed once per
  * path, and carry `hwnd` when the app already has a window.
  */
-export function launcherResults({ pinned = [], installed = [], frequent = [], windows = [] }, query, limit = LIMIT) {
+export function launcherResults({ pinned = [], installed = [], frequent = [], windows = [], actions = [] }, query, limit = LIMIT) {
   const q = norm(query).trim();
   const out = new Map();
   const add = (entry, bonus) => {
     const score = q ? Math.max(matchScore(entry.name, q), Math.min(2, matchScore(baseTitle(entry.path), q))) : 1;
-    if (!score || !entry.path) return;
-    const key = entry.kind === "window" ? `w:${entry.hwnd}` : pathKey(entry.path);
+    if (!score || (!entry.path && entry.kind !== "action")) return;
+    const key = entry.kind === "action" ? `a:${entry.id}` : entry.kind === "window" ? `w:${entry.hwnd}` : pathKey(entry.path);
     const total = score * 10 + bonus;
     const prev = out.get(key);
     if (!prev || prev.total < total) out.set(key, { ...entry, total });
@@ -39,6 +39,7 @@ export function launcherResults({ pinned = [], installed = [], frequent = [], wi
   }
   frequent.forEach((app, i) => add({ kind: "app", name: app.name, path: app.path, args: app.args || [] }, 3 - Math.min(2, i / 4)));
   if (q) {
+    for (const action of actions) add({ ...action, kind: "action" }, 2);
     for (const group of installed) for (const item of group.items || []) {
       if (!item.is_dir) add({ kind: "app", name: item.name, path: item.path, args: item.args || [] }, 0);
     }
@@ -55,7 +56,7 @@ export function launcherResults({ pinned = [], installed = [], frequent = [], wi
     .sort((a, b) => b.total - a.total || (q ? a.name.localeCompare(b.name) : 0))
     .slice(0, limit)
     .map(({ total: _total, ...rest }) => {
-      if (rest.kind === "window" || rest.folder) return rest;
+      if (rest.kind === "action" || rest.kind === "window" || rest.folder) return rest;
       const hwnd = openByPath.get(pathKey(rest.path));
       return hwnd ? { ...rest, hwnd } : rest;
     });
@@ -71,6 +72,7 @@ export function launcherResults({ pinned = [], installed = [], frequent = [], wi
  * @param {() => Promise<object[]>} deps.listInstalled
  * @param {() => Promise<object[]>} deps.listFrequent
  * @param {(path: string) => Promise<string|null>} deps.appIcon
+ * @param {object[]} [deps.actions]
  * @param {boolean} deps.switchesToOpen  opening an open app goes to its window
  * @param {(entry: object) => void} deps.open      launch or switch, then close
  * @param {() => void} deps.close
@@ -78,7 +80,7 @@ export function launcherResults({ pinned = [], installed = [], frequent = [], wi
  */
 export function buildLauncher(root, deps) {
   const { t } = deps;
-  let data = { pinned: deps.pinned(), installed: [], frequent: [], windows: [] };
+  let data = { pinned: deps.pinned(), installed: [], frequent: [], windows: [], actions: deps.actions || [] };
   let results = [];
   let active = 0;
   let disposed = false;
@@ -158,15 +160,15 @@ export function buildLauncher(root, deps) {
     node.setAttribute("role", "option");
     node.innerHTML = `<span class="add-ico"></span><span class="add-name"></span><span class="launcher-kind"></span>`;
     node.querySelector(".add-name").textContent = entry.name;
-    node.querySelector(".launcher-kind").textContent = t(entry.kind === "window" || (entry.hwnd && deps.switchesToOpen) ? "launcher.switch" : entry.folder ? "launcher.folder" : "launcher.open");
+    node.querySelector(".launcher-kind").textContent = t(entry.kind === "action" ? "refine.actions" : entry.kind === "window" || (entry.hwnd && deps.switchesToOpen) ? "launcher.switch" : entry.folder ? "launcher.folder" : "launcher.open");
     const ico = node.querySelector(".add-ico");
     const look = pinFallback({ name: entry.name, path: entry.path, kind: entry.folder ? "folder" : "app" });
     ico.classList.add("launcher-fallback");
     ico.style.setProperty("--fb-deep", look.deep);
     ico.style.setProperty("--fb-ink", look.ink);
     ico.textContent = look.letter;
-    if (look.glyph) ico.innerHTML = icon(look.glyph);
-    if (!entry.folder) {
+    if (entry.glyph || look.glyph) ico.innerHTML = icon(entry.glyph || look.glyph);
+    if (!entry.folder && entry.kind !== "action") {
       deps.appIcon(entry.path).then((uri) => {
         if (!uri || disposed || !node.isConnected) return;
         const img = document.createElement("img");
@@ -185,7 +187,7 @@ export function buildLauncher(root, deps) {
     const [windows, installed, frequent] = await Promise.allSettled([deps.listWindows(), deps.listInstalled(), deps.listFrequent()]);
     if (disposed) return;
     const value = (r) => (r.status === "fulfilled" && Array.isArray(r.value) ? r.value : []);
-    data = { pinned: deps.pinned(), windows: value(windows), installed: value(installed), frequent: value(frequent) };
+    data = { pinned: deps.pinned(), actions: deps.actions || [], windows: value(windows), installed: value(installed), frequent: value(frequent) };
     draw();
   }
 

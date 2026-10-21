@@ -65,10 +65,11 @@ test("a browser link from the Windows drop bridge opens a deliberate download ac
       };`,
   });
   await emit(page, "booki://link-drop", "https://example.com/video");
-  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  await page.getByRole("combobox", { name: "What to save", exact: true }).waitFor();
   assert.equal(await page.getByRole("textbox", { name: "Paste a link" }).inputValue(), "https://example.com/video");
   assert.deepEqual(await page.evaluate(() => window.__downloadRequests), [], "a drop must never start a download or execute a tool");
-  await page.getByRole("button", { name: "Audio only", exact: true }).click();
+  await page.getByRole("combobox", { name: "What to save", exact: true }).selectOption("audio");
+  await page.getByRole("button", { name: "Add to queue", exact: true }).click();
   await waitForAsyncCondition(page, () => window.__downloadRequests.length === 1);
   assert.equal(await page.evaluate(() => window.__downloadRequests[0].format), "audio");
   await page.keyboard.press("Escape");
@@ -97,7 +98,7 @@ test("the Collector picks the tool from the link: files and galleries start, vid
   assert.equal(await page.evaluate(() => window.__downloadRequests[1].format), "gallery");
   await page.keyboard.press("Escape");
   await emit(page, "booki://link-drop", "https://www.youtube.com/watch?v=abc");
-  await page.getByRole("button", { name: "Audio only", exact: true }).waitFor();
+  await page.getByRole("combobox", { name: "What to save", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.__downloadRequests.length), 2);
   assert.deepEqual(errors, []); await page.close();
 });
@@ -200,19 +201,26 @@ test("a Cloud card from an older version leaves the dock quietly", async () => {
   assert.deepEqual(errors, []); await page.close();
 });
 
-test("Collector keeps terminal results when delayed progress arrives, and a new start clears them", async () => {
-  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("collector")] }) });
+test("Collector ignores late and foreign progress after the native result", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [pin("collector")] }),
+    initScript: `window.__jobs=[]; const old=window.__TAURI__.core.invoke; window.__TAURI__.core.invoke=(cmd,args)=>cmd==="plugin_download" ? new Promise((resolve,reject)=>window.__jobs.push({args,resolve,reject})) : old(cmd,args);`,
+  });
   const card = page.locator('#dock > [data-id="collector"]');
-  await emit(page, "plugin-download", { state: "start", title: "Example" });
-  await emit(page, "plugin-download", { state: "done", percent: 100, path: "C:/Examples/example.pdf" });
-  await emit(page, "plugin-download", { state: "progress", percent: 40 });
+  await card.click();
+  await page.getByRole("textbox", { name: "Paste a link" }).fill("https://example.com/a.pdf");
+  await page.getByRole("button", { name: "Add to queue", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__jobs.length === 1);
+  const id = await page.evaluate(() => window.__jobs[0].args.jobId);
+  await emit(page, "plugin-download", { id, state: "progress", percent: 40, title: "Example" });
+  await emit(page, "plugin-download", { id: "foreign", state: "progress", percent: 80 });
+  assert.equal(await card.getAttribute("data-state"), "progress");
+  await page.evaluate(() => window.__jobs[0].resolve("C:/Examples/example.pdf"));
+  await waitForAsyncCondition(page, () => document.querySelector('#dock > [data-id="collector"]').dataset.state === "done");
+  await emit(page, "plugin-download", { id, state: "progress", percent: 10 });
   assert.equal(await card.getAttribute("data-state"), "done");
   assert.match(await card.getAttribute("aria-label"), /example\.pdf/);
-  await emit(page, "plugin-download", { state: "start" });
-  await emit(page, "plugin-download", { state: "error", error: "Example connection failed" });
-  await emit(page, "plugin-download", { state: "progress", percent: 90 });
-  assert.equal(await card.getAttribute("data-state"), "error");
-  assert.match(await card.getAttribute("aria-label"), /Example connection failed/);
-  assert.deepEqual(errors, []);
-  await page.close();
+  assert.equal(await page.locator(".collector-job").count(), 1);
+  assert.equal(await page.locator(".collector-job").getByRole("button", { name: "Open file", exact: true }).count(), 1);
+  assert.deepEqual(errors, []); await page.close();
 });

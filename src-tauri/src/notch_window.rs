@@ -109,7 +109,7 @@ pub(crate) fn notch_toast(app: AppHandle, title: String, detail: Option<String>)
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = dock.hide();
     }
-    show_toast_frame(&app, title, detail);
+    show_toast_frame(&app, title, detail, None, Vec::new());
 }
 
 /// A short notice (download finished, battery low) on the notch while the
@@ -118,7 +118,13 @@ pub(crate) fn notch_toast(app: AppHandle, title: String, detail: Option<String>)
 /// after a few seconds. Returns false when the dock is out: the dock then
 /// shows the notice itself.
 #[tauri::command]
-pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>) -> bool {
+pub(crate) fn notch_notice(
+    app: AppHandle,
+    title: String,
+    detail: Option<String>,
+    action_id: Option<String>,
+    action_labels: Option<Vec<String>>,
+) -> bool {
     let dock_out = app
         .get_webview_window("dock")
         .map(|d| d.is_visible().unwrap_or(false))
@@ -136,10 +142,30 @@ pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>
         .get_webview_window("notch")
         .map(|n| n.is_visible().unwrap_or(false))
         .unwrap_or(false);
-    show_toast_frame(&app, title, detail);
+    let labels: Vec<String> = action_labels
+        .unwrap_or_default()
+        .into_iter()
+        .take(3)
+        .map(|label| label.chars().take(80).collect())
+        .collect();
+    let actionable = action_id
+        .as_ref()
+        .is_some_and(|id| !id.is_empty() && id.len() <= 128)
+        && !labels.is_empty();
+    show_toast_frame(
+        &app,
+        title,
+        detail,
+        if actionable { action_id } else { None },
+        if actionable { labels } else { Vec::new() },
+    );
     let app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(3600));
+        std::thread::sleep(std::time::Duration::from_millis(if actionable {
+            10000
+        } else {
+            3600
+        }));
         // A newer notice or a fullscreen toast owns the notch now.
         if NOTICE_GEN.load(Ordering::Relaxed) != generation
             || FULLSCREEN_BLACKOUT.load(Ordering::Relaxed)
@@ -156,7 +182,13 @@ pub(crate) fn notch_notice(app: AppHandle, title: String, detail: Option<String>
     true
 }
 
-fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
+fn show_toast_frame(
+    app: &AppHandle,
+    title: String,
+    detail: Option<String>,
+    action_id: Option<String>,
+    actions: Vec<String>,
+) {
     if let Some(notch) = app.get_webview_window("notch") {
         if let Ok(Some(mon)) = notch.current_monitor() {
             let dpr = notch.scale_factor().unwrap_or(1.0);
@@ -170,11 +202,22 @@ fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
             let m = (14.0 * dpr).round() as i32;
             let detail_len = detail.as_ref().map(|s| s.chars().count()).unwrap_or(0);
             let chars = title.chars().count().max(detail_len);
-            let desired_w = ((chars as f64 * 7.2) + 48.0).clamp(128.0, 320.0);
+            let desired_w = if actions.is_empty() {
+                ((chars as f64 * 7.2) + 48.0).clamp(128.0, 320.0)
+            } else {
+                440.0
+            };
             let max_w = ((aw - m * 2).max(240) as f64 / dpr).max(240.0);
             let ww = (desired_w.min(max_w) * dpr).round() as i32;
             let two_line = detail.as_ref().map(|s| !s.is_empty()).unwrap_or(false);
-            let wh = ((if two_line { 56.0 } else { 44.0 }) * dpr).round() as i32;
+            let wh = ((if !actions.is_empty() {
+                100.0
+            } else if two_line {
+                56.0
+            } else {
+                44.0
+            }) * dpr)
+                .round() as i32;
             let _ = notch.set_size(PhysicalSize::new(ww as u32, wh as u32));
             // Show the toast on the dock's anchored edge — a side-docked bar
             // must not flash a pill at the bottom of the screen.
@@ -193,6 +236,8 @@ fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
             serde_json::json!({
                 "title": title,
                 "detail": detail.unwrap_or_default(),
+                "actionId": action_id,
+                "actions": actions,
             }),
         );
     }

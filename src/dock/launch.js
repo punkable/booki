@@ -7,7 +7,7 @@ import { S } from "./state.js";
 import { menuPinTitle } from "./helpers.js";
 import { ctxMenu } from "./dom.js";
 import { scheduleHide } from "./autohide.js";
-import { addMenuHead, placeMenu, closeMenu } from "./menu-core.js";
+import { addMenuHead, placeMenu, closeMenu, resetMenu } from "./menu-core.js";
 import { windowsFor, clearAttention } from "./running-windows.js";
 import { openProductivity, openSystemPanel, editNote } from "./widget-editors.js";
 import { toggleStack } from "./stack.js";
@@ -100,8 +100,7 @@ function markLaunching(el) {
    Windows reports them, with a way to open another one. */
 function openWindowPicker(el, item, wins) {
   deps.hideTip();
-  ctxMenu.innerHTML = "";
-  ++S.menuGeneration;
+  resetMenu();
   const { add, sep } = menuActions(ctxMenu, closeMenu);
   addMenuHead(menuPinTitle(item), t("m.windows").replace("{n}", String(wins.length)));
   sep();

@@ -73,8 +73,8 @@ test("the AI widget shows remaining Codex quota and never presents Claude elapse
   assert.match(hint, /nothing leaves your PC/);
   // Claude's turn: token counts are known; the remaining allowance is not.
   await page.mouse.move(0, 0);
-  await card.locator(".w-ring-num", { hasText: "?" }).waitFor({ timeout: 8000 });
-  assert.equal((await card.locator(".w-label").textContent()).trim(), "Claude · 1.2 M tokens");
+  await card.locator(".w-ring-num", { hasText: "~1.2 M" }).waitFor({ timeout: 8000 });
+  assert.equal((await card.locator(".w-label").textContent()).trim(), "Claude · Approx. recorded usage");
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -113,7 +113,7 @@ test("a device can get its own card that follows only it, under a short name", a
   });
   await page.locator('.tile[data-id="dev"]').click();
   const panel = page.locator(".system-widget-panel");
-  await panel.getByRole("button", { name: "Own card on the dock" }).first().waitFor();
+  await panel.locator(".reading-card", { hasText: "Logitech MX Master 3S" }).locator("summary").click();
   await panel.locator(".reading-card", { hasText: "Logitech MX Master 3S" }).getByRole("button", { name: "Own card on the dock" }).click();
   const own = page.locator('#dock > .tile[data-widget="devices"]').nth(1);
   await own.locator(".w-ring-num", { hasText: "60" }).waitFor();
@@ -165,10 +165,13 @@ test("manual refresh updates the device panel and dock from the same new reading
   const card = page.locator('#dock > [data-id="dev"]');
   await card.locator(".w-ring-num", { hasText: "15" }).waitFor();
   await card.click();
+  await page.locator(".system-widget-panel .reading-card summary").click();
   await page.evaluate(() => { window.__level = 85; });
   await page.locator(".system-widget-panel").getByRole("button", { name: "Refresh data", exact: true }).click();
   await card.locator(".w-ring-num", { hasText: "85" }).waitFor();
   assert.match(await page.locator(".system-widget-panel .reading-card").textContent(), /85%/);
+  assert.equal(await page.locator(".system-widget-panel .reading-card").getAttribute("open"), "");
+  assert.match(await page.locator(".system-widget-panel .reading-card").textContent(), /does not guarantee a new sensor value/);
   assert.deepEqual(errors, []);
   await page.close();
 });

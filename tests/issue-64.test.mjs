@@ -41,6 +41,7 @@ test("shortcut launches as a shortcut and transfer failure leaves the pin intact
   await tile.click();
   assert.equal(await page.evaluate(() => window.__calls.find(c => c.cmd === "launch_app").args.path), shortcut.path);
   await tile.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Organize", exact: true }).click();
   await page.getByRole("menuitem", { name: "Move shortcut into Booki", exact: true }).click();
   await page.waitForTimeout(150);
   assert.equal(await tile.count(), 1);

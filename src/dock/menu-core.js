@@ -1,7 +1,8 @@
 /* Placing, opening and closing the dock's context menu. */
 
 import { placeBesideBar, transformOrigin } from "./placement.js";
-import { menuItems } from "./context-menu.js";
+import { menuItems, menuActions } from "./context-menu.js";
+import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { isVertical } from "./helpers.js";
 import { dockEl, ctxMenu, esc } from "./dom.js";
@@ -14,17 +15,44 @@ export function addMenuHead(title, subtitle) {
   ctxMenu.appendChild(head);
 }
 
+/** Each secondary view replaces the same bounded surface instead of widening it. */
+export function resetMenu() {
+  ++S.menuGeneration;
+  ctxMenu._nextReturnFocus = ctxMenu.contains(document.activeElement) ? menuReturnFocus : document.activeElement;
+  ctxMenu.replaceChildren();
+  ctxMenu.scrollTop = 0;
+  ctxMenu.classList.remove("group-customizer");
+  ctxMenu.setAttribute("role", "menu");
+  ctxMenu.removeAttribute("aria-label");
+  ctxMenu._back = null;
+  ctxMenu._onEscape = null;
+}
+export function addMenuSection(container, glyph, label, open, role = "menu") {
+  const button = menuActions(container, () => {}).add(glyph, label, open);
+  button.setAttribute("aria-haspopup", role);
+  const arrow = document.createElement("span"); arrow.className = "menu-next"; arrow.textContent = "›"; arrow.setAttribute("aria-hidden", "true"); button.append(arrow);
+  return button;
+}
+export function openMenuSection(e, title, back, build) {
+  resetMenu();
+  ctxMenu._back = back;
+  menuActions(ctxMenu, () => {}).add("chevron-left", t("refine.back"), back);
+  addMenuHead(title);
+  build(menuActions(ctxMenu, closeMenu));
+  placeMenu(e);
+}
+
 let menuReturnFocus = null;
 let menuPrevReplace = null;
 // The context menu lives beside the bar (like the folder flyout): the window is
 // grown to fit it, so it can never be cut off by the dock window's bounds.
 export function placeMenu(e, focus = true) {
-  if (focus) menuReturnFocus = document.activeElement;
+  if (focus) { menuReturnFocus = ctxMenu._nextReturnFocus || document.activeElement; ctxMenu._nextReturnFocus = null; }
   const cx = e.clientX;
   const cy = e.clientY;
   // Measure invisibly, grow the window FIRST, then reveal in its final spot —
   // one paint, no flicker from the window resizing under an already-visible menu.
-  ctxMenu.classList.add("measuring");
+  if (focus || ctxMenu.classList.contains("hidden")) ctxMenu.classList.add("measuring");
   ctxMenu.classList.remove("hidden");
   document.body.classList.add("menu-open");
   applyFrame();
@@ -52,11 +80,13 @@ export function placeMenu(e, focus = true) {
   if (S.pendingReplace && !S.pendingReplace._menu) menuPrevReplace = S.pendingReplace;
   put._menu = true;
   S.pendingReplace = put;
+  const generation = S.menuGeneration;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      if (generation !== S.menuGeneration) return;
       put();
       ctxMenu.classList.remove("measuring");
-      if (focus && !ctxMenu.classList.contains("hidden")) menuItems(ctxMenu)[0]?.focus();
+      if (focus && !ctxMenu.classList.contains("hidden")) (ctxMenu.querySelector("[data-menu-focus]") || menuItems(ctxMenu)[0])?.focus();
     });
   });
 }

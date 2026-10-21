@@ -70,11 +70,20 @@ async function undoLastRemoval() {
 }
 
 /** A short notice beside the bar (download finished, battery low). */
-export function showNoticeToast(title, detail = "") {
+export function showNoticeToast(title, detail = "", actions = []) {
   if (!undoToast) return;
   hideUndoToast();
   undoToast.innerHTML = `<span class="notice-copy"><strong>${esc(title)}</strong>${detail ? `<small>${esc(detail)}</small>` : ""}</span>`;
   undoToast.classList.remove("hidden");
   placeUndoToast();
-  undoRemovalTimer = setTimeout(hideUndoToast, 4000);
+  for (const action of actions) {
+    const button = document.createElement("button"); button.type = "button"; button.textContent = action.label;
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try { await action.run(); hideUndoToast(); }
+      catch (_) { showErrorToast(t("overhaul.failed")); }
+    });
+    undoToast.append(button);
+  }
+  undoRemovalTimer = setTimeout(hideUndoToast, actions.length ? 10000 : 4000);
 }

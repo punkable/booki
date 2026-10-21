@@ -6,6 +6,21 @@ use super::*;
 /// position_dock can re-anchor the occlusion rect without the flyout room.
 static DOCK_HOME_SIZE: Mutex<(i32, i32)> = Mutex::new((0, 0));
 
+/// Resolve in native physical coordinates: JS screenX is ambiguous across DPI.
+#[tauri::command]
+pub(crate) fn dock_monitor_at_cursor(window: WebviewWindow) -> Option<serde_json::Value> {
+    let point = window.cursor_position().ok()?;
+    list_monitors(window)
+        .into_iter()
+        .find(|monitor| {
+            point.x >= monitor.x as f64
+                && point.y >= monitor.y as f64
+                && point.x < monitor.x as f64 + monitor.w as f64
+                && point.y < monitor.y as f64 + monitor.h as f64
+        })
+        .map(|monitor| serde_json::json!({ "index": monitor.index, "name": monitor.name }))
+}
+
 #[derive(serde::Serialize)]
 pub(crate) struct MonitorInfo {
     pub(crate) index: i32,

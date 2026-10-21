@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
+import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
@@ -40,6 +40,7 @@ const pill = document.getElementById("notch-pill");
 const toastEl = document.getElementById("notch-toast");
 const toastTitleEl = document.getElementById("notch-toast-title");
 const toastSubEl = document.getElementById("notch-toast-sub");
+const toastActionsEl = document.getElementById("notch-toast-actions");
 
 async function applyLook() {
   try {
@@ -183,6 +184,9 @@ function clearNotchToast() {
     toastSubEl.textContent = "";
     toastSubEl.hidden = true;
   }
+  toastActionsEl?.replaceChildren();
+  if (toastActionsEl) toastActionsEl.hidden = true;
+  document.body.classList.remove("toast-actionable");
   scheduleHitReport();
 }
 function showNotchToast(payload) {
@@ -195,9 +199,24 @@ function showNotchToast(payload) {
     toastSubEl.textContent = detail;
     toastSubEl.hidden = !detail;
   }
+  toastActionsEl?.replaceChildren();
+  const actions = payload?.actionId && Array.isArray(payload.actions) ? payload.actions.slice(0, 3) : [];
+  document.body.classList.toggle("toast-actionable", actions.length > 0);
+  if (toastActionsEl) {
+    toastActionsEl.hidden = !actions.length;
+    actions.forEach((label, index) => {
+      const button = document.createElement("button"); button.type = "button"; button.textContent = String(label); button.title = String(label);
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation(); button.disabled = true;
+        try { await emitNoticeAction(payload.actionId, index); button.innerHTML = icon("check"); }
+        catch (_) { button.disabled = false; }
+      });
+      toastActionsEl.append(button);
+    });
+  }
   clearTimeout(toastTimer);
   // Safety clear if dock never blackouts (e.g. fullscreen ended early).
-  toastTimer = setTimeout(clearNotchToast, 3200);
+  toastTimer = setTimeout(clearNotchToast, actions.length ? 9600 : 3200);
   scheduleHitReport();
 }
 onNotchToast(showNotchToast);
@@ -451,20 +470,17 @@ function applyAgent({ provider, state, since } = {}, quiet = false) {
   paintActivity();
 }
 
-function agentActivity() {
-  let pick = null;
-  for (const [provider, a] of agents) {
-    const row = { provider, ...a };
-    if (!pick) { pick = row; continue; }
-    const rowWaits = row.state === "waiting" || row.state === "error";
-    const pickWaits = pick.state === "waiting" || pick.state === "error";
-    if (rowWaits !== pickWaits) { if (rowWaits) pick = row; continue; }
-    if (Number(row.since) > Number(pick.since)) pick = row;
-  }
-  return pick;
+function agentActivity(now = Date.now()) {
+  const all = [...agents].map(([provider, activity]) => ({ provider, ...activity }));
+  const urgent = all.filter((row) => ["waiting", "error"].includes(row.state));
+  const eligible = urgent.length ? urgent : all;
+  return eligible.length ? eligible[Math.floor(now / 8000) % eligible.length] : null;
 }
 
 onAgentActivity((payload) => applyAgent(payload));
+setInterval(() => {
+  if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
+}, 8000);
 onUsageReady(({ provider, name } = {}) => {
   if (!provider || videoForeground || scene === "game") return;
   usageFlash = { provider, name, until: Date.now() + 5000 };
@@ -482,15 +498,19 @@ function currentActivity(now = Date.now()) {
   if ((videoForeground || scene === "game") && !cardOpen) return null;
   if (screenBusy && scene !== "code" && scene !== "creative") return null;
   if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
-  const agent = agentsOn ? agentActivity() : null;
+  const agent = agentsOn ? agentActivity(now) : null;
   if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
   if (agent?.state === "error") return { kind: "agent-error", provider: agent.provider, since: agent.since };
   if (usageFlash && usageFlash.until > now) return { kind: "usage", provider: usageFlash.provider, name: usageFlash.name, until: usageFlash.until };
   const done = agentsOn ? nextAgentDone(now) : null;
   if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
   if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
+  // Music gets a brief introduction, including while an editor is focused.
+  // Afterwards it remains available on hover without occupying the capsule.
+  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
+    if (agent && !cardOpen && Math.floor(now / 8000) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
@@ -507,7 +527,6 @@ function currentActivity(now = Date.now()) {
   if (scene === "code" && agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   // Music opens the notch for a few seconds when it starts or the track
   // changes, then lets it settle; it stays in the card on hover.
-  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   if (agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   if (low <= 15) return { kind: "battery", level: low };
   return null;
@@ -642,9 +661,15 @@ function paintCard() {
   if (activity?.kind.startsWith("agent")) {
     const state = activity.kind === "agent" ? "working" : activity.kind.slice(6);
     cTitle.textContent = agentLabel(state, activity.provider);
-    cSub.textContent = agentElapsed(activity.since);
-    cPlay.hidden = true;
-    document.body.classList.add("card-clock");
+    const withMedia = activity.kind === "agent" && hasRecentMedia();
+    cSub.textContent = withMedia ? media.title || media.artist : agentElapsed(activity.since);
+    cPlay.hidden = !withMedia;
+    if (withMedia) {
+      cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+      cPlay.setAttribute("aria-label", t("w.playPause"));
+      cPlay.title = media.title || t("w.playPause");
+    }
+    document.body.classList.toggle("card-clock", !withMedia);
     return;
   }
   if (activity?.kind === "battery" || activity?.kind === "charging") {

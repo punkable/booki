@@ -2,6 +2,8 @@
 
 import { dock as dockApi } from "../api.js";
 import { setTileLabel } from "./tooltip.js";
+import { toggleClipboardStack } from "./clipboard-stack.js";
+import { buildWidgetHub } from "./widget-hub.js";
 import { buildSystemPanel } from "./system-panel.js";
 import { buildProductivityPanel } from "./productivity-panel.js";
 import { createDraftSaver } from "./draft-saver.js";
@@ -14,7 +16,7 @@ import { findPinnedById, widgetLabel, findWidgetPin } from "./helpers.js";
 import { dockEl } from "./dom.js";
 import { scheduleHitReport } from "./hit-regions.js";
 import { reframe, applyFrame } from "./frame.js";
-import { eachWidget, tickProductivity } from "./live-widgets.js";
+import { eachWidget, tickProductivity, cacheWidgetEls, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { persist } from "./config-sync.js";
 import { closeStack } from "./stack.js";
@@ -26,6 +28,7 @@ export function closeProductivityPanel() {
   if (panel?._opener?.isConnected && panel.contains(document.activeElement)) panel._opener.focus();
   panel?.dispose?.();
   S.productivityPanel = null; S.pinnedReveal = false;
+  cacheWidgetEls(); syncPolls();
   if (!panel) { reframe(); scheduleHide(); return; }
   // Leave the way a folder flyout leaves, then shrink the window.
   dismissFlyout(panel, () => { reframe(); scheduleHide(); });
@@ -71,12 +74,23 @@ export function openSystemPanel(item, tile) {
   closeProductivityPanel();
   mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
 }
+export function openWidgetHub() {
+  closeProductivityPanel();
+  const item = { id: "__widgets", widget: "hub" };
+  const open = (pin) => {
+    if (["focus", "clock", "calendar", "weather"].includes(pin.widget)) openProductivity(pin, dockEl);
+    else if (pin.widget === "notes") editNote(pin);
+    else if (pin.widget === "clipboard") { closeProductivityPanel(); toggleClipboardStack(dockEl); }
+    else openSystemPanel(pin, dockEl);
+  };
+  mountWidgetPanel(item, dockEl, buildWidgetHub(S.cfg.pinned, { open, close: closeProductivityPanel, settings: () => dockApi.openSettingsTab("widgets") }));
+}
 function mountWidgetPanel(item, tile, panel) {
   // One flyout at a time: a widget panel replaces an open folder or menu.
   closeStack(); closeMenu();
   panel._opener = tile; panel._itemId = item.id;
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
-  S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; applyFrame();
+  S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; cacheWidgetEls(); syncPolls(); applyFrame();
   const place = () => {
     if (!panel.isConnected) return;
     const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
@@ -103,8 +117,7 @@ async function closeNoteEditor() {
 export async function editNote(item) {
   if (!(await closeNoteEditor())) return;
   closeProductivityPanel(); closeStack(); closeMenu();
-  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
-  if (!tile) return;
+  const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`) || dockEl;
   const panel = document.createElement("section");
   panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));

@@ -57,16 +57,17 @@ test("right-clicking the notch asks the dock to open its menu", async () => {
   await page.close();
 });
 
-test("the dock's menu changes its style in one click, and the notch opens the same menu", async () => {
+test("the dock menu groups appearance options and the notch opens the same menu", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: pins, surfaceStyle: "glass" }) });
   await page.locator("#dock").waitFor();
   await fire(page, "booki://notch-menu");
   const styles = page.locator("#ctx-menu .menu-styles [role=menuitemradio]");
   await waitForAsyncCondition(page, () => !document.getElementById("ctx-menu").classList.contains("hidden"));
+  assert.equal(await styles.count(), 0);
+  await page.locator("#ctx-menu").getByRole("menuitem", { name: "Dock style", exact: true }).click();
   assert.equal(await styles.count(), 3);
   assert.equal(await page.locator('#ctx-menu [data-style="glass"]').getAttribute("aria-checked"), "true");
-  // The menu fills in after its async sections; wait instead of counting at once.
-  await page.locator("#ctx-menu").getByRole("menuitem", { name: "App library" }).first().waitFor();
+
   await page.locator('#ctx-menu [data-style="solid"]').click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).surfaceStyle === "solid");
   assert.equal(await page.evaluate(() => document.body.classList.contains("look-solid")), true);
