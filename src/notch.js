@@ -642,9 +642,15 @@ function paintCard() {
   if (activity?.kind.startsWith("agent")) {
     const state = activity.kind === "agent" ? "working" : activity.kind.slice(6);
     cTitle.textContent = agentLabel(state, activity.provider);
-    cSub.textContent = agentElapsed(activity.since);
-    cPlay.hidden = true;
-    document.body.classList.add("card-clock");
+    const withMedia = activity.kind === "agent" && hasRecentMedia();
+    cSub.textContent = withMedia ? media.title || media.artist : agentElapsed(activity.since);
+    cPlay.hidden = !withMedia;
+    if (withMedia) {
+      cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
+      cPlay.setAttribute("aria-label", t("w.playPause"));
+      cPlay.title = media.title || t("w.playPause");
+    }
+    document.body.classList.toggle("card-clock", !withMedia);
     return;
   }
   if (activity?.kind === "battery" || activity?.kind === "charging") {

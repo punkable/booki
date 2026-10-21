@@ -89,3 +89,24 @@ test("Cursor shows its logo and status in a compact capsule with a complete acce
     await page.close();
   }
 });
+
+test("hovering a working agent keeps music controls available after the brief music introduction", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", {
+    cfg: makeConfig({ notchVisibility: "always", notchMode: "smart" }),
+    initScript: `window.__toggles=0; const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{
+      if(cmd==='media_info')return Promise.resolve({title:'Background music',artist:'Player',playing:true});
+      if(cmd==='media_toggle'){window.__toggles++;return Promise.resolve(true);}
+      return old(cmd,args);
+    };`,
+  });
+  await page.clock.install();
+  await event(page, "booki://agent-activity", { provider: "codex", state: "working", since: Date.now() });
+  await page.clock.fastForward(12000);
+  await page.locator("#notch-pill").hover();
+  await page.clock.fastForward(500);
+  await page.getByRole("button", { name: "Play / pause", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.__toggles), 1);
+  assert.match(await page.locator("#nc-title").textContent(), /Codex/);
+  assert.match(await page.locator("#nc-sub").textContent(), /Background music/);
+  assert.deepEqual(errors, []); await page.close();
+});

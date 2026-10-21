@@ -59,7 +59,9 @@ selectable; retain that control instead of introducing another size system.
   ambiguity. Cross-screen behavior still needs a Windows/manual DPI check.
 - Notch: compact logo/status presentation, accessible full label, cached
   rotation among agents; brief music introductions also in editors; alternate
-  a running timer with nonurgent agent work. Waiting/error stay higher priority.
+  a running timer with nonurgent agent work. Hovering working agents keeps
+  recent music and its play/pause control available. Waiting/error stay higher
+  priority.
 - Widgets: common panel reuses live widget cards and existing details; direct
   mixer access; device details; recorded consumption clearly marked approximate.
 - Launcher: searchable built-in audio, widgets, settings, playback and group
