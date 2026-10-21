@@ -7,6 +7,7 @@ import { emo } from "../emoji.js";
 import { libGlyphSVG } from "../icon-library.js";
 import { t } from "../i18n.js";
 import { placeBesideBar, transformOrigin } from "./placement.js";
+import { enhanceGroupView } from "./group-view.js";
 import { groupAppearance } from "../group-style.js";
 import { createFolderNavigation } from "./folder-navigation.js";
 import { buildAddPanel } from "./add-panel.js";
@@ -21,7 +22,7 @@ import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
-import { closeProductivityPanel } from "./widget-editors.js";
+import { closeProductivityPanel, openSystemPanel, openWidgetHub } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -91,6 +92,7 @@ export async function toggleStack(tileEl, item) {
 }
 
 export async function openStack(tileEl, item) {
+  if (item.kind === "group") item = S.cfg.pinned.find((pin) => pin.id === item.id) || item;
   if (S.stackOpen && S.stackItemId === item.id) return;
   if (S.stackOpen) closeStack();
   if (S.productivityPanel) closeProductivityPanel();
@@ -495,6 +497,7 @@ export async function openStack(tileEl, item) {
     queueMicrotask(() => loadPage(0));
   }
   stackEl.appendChild(grid);
+  if (isGroup) stackDispose = enhanceGroupView(stackEl, grid, item);
 
   S.stackOpen = true;
   document.body.classList.add("stack-open");
@@ -622,12 +625,20 @@ export function openLauncher() {
     t,
     pinned: () => S.cfg.pinned,
     switchesToOpen: S.cfg.focusIfRunning !== false,
+    actions: [
+      { id: "audio", name: t("refine.audio"), glyph: "volume", run: () => openSystemPanel({ id: "__audio", widget: "volume" }, dockEl) },
+      { id: "widgets", name: t("refine.hub"), glyph: "grid", run: openWidgetHub },
+      { id: "settings", name: t("m.settings"), glyph: "settings", run: () => dockApi.openSettings() },
+      { id: "media", name: t("w.playPause"), glyph: "play", run: () => dockApi.mediaToggle() },
+      ...(S.cfg.pinned || []).filter((pin) => pin.kind === "group").map((pin) => ({ id: pin.id, name: `${t("refine.openGroup")}: ${pin.name}`, glyph: "folder", run: () => { const tile = [...dockEl.children].find((el) => el.dataset.id === pin.id); if (tile) openStack(tile, pin); } })),
+    ],
     listWindows: () => dockApi.listWindows(),
     listInstalled: () => dockApi.listInstalledApps(),
     listFrequent: () => S.cfg.usageRecommendationsEnabled === false ? Promise.resolve([]) : dockApi.frequentApps(12),
     appIcon: (path) => dockApi.appIcon(path),
     open: (entry) => {
       closeStack();
+      if (entry.kind === "action") { Promise.resolve().then(entry.run).catch(() => dockApi.notify(t("overhaul.failed"), "")); return; }
       S.pinnedReveal = false;
       scheduleHide();
       if (entry.kind === "window" || (entry.hwnd && S.cfg.focusIfRunning !== false)) dockApi.focusWindow(Number(entry.hwnd));

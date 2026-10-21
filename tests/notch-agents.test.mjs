@@ -66,7 +66,7 @@ test("the setting turns agents off", async () => {
   await page.close();
 });
 
-test("Cursor keeps its logo and complete name beside each compact status", async () => {
+test("Cursor shows its logo and status in a compact capsule with a complete accessible name", async () => {
   for (const notchMode of ["attached", "floating", "smart"]) {
     const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "always", notchMode, language: "es" }), viewport: { width: 320, height: 80 } });
     await page.mouse.move(0, 0);
@@ -77,12 +77,13 @@ test("Cursor keeps its logo and complete name beside each compact status", async
         const pill = document.getElementById("notch-pill").getBoundingClientRect();
         const label = document.getElementById("nl-text");
         const text = label.getBoundingClientRect();
-        return { width: pill.width, height: pill.height, label: label.textContent, fits: text.left >= pill.left && text.right <= pill.right, logo: document.getElementById("nl-agent").dataset.icon, status: document.getElementById("nl-state").dataset.icon };
+        return { width: pill.width, height: pill.height, label: label.textContent, accessible: document.getElementById("notch-pill").getAttribute("aria-label"), fits: text.left >= pill.left && text.right <= pill.right, logo: document.getElementById("nl-agent").dataset.icon, status: document.getElementById("nl-state").dataset.icon };
       });
       assert.equal(measured.label, "Cursor");
       assert.equal(measured.logo, "ai-cursor");
       assert.equal(measured.status, `agent-${state}`);
-      assert.ok(measured.width >= 100 && measured.width <= 128 && measured.height <= 26 && measured.fits, JSON.stringify(measured));
+      assert.match(measured.accessible, /Cursor/);
+      assert.ok(measured.width >= 56 && measured.width <= 72 && measured.height <= 26, JSON.stringify(measured));
     }
     assert.deepEqual(errors, []);
     await page.close();

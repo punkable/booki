@@ -2743,3 +2743,57 @@ button.stack-head-icon:focus-visible { outline: 2px solid var(--focus-ring); out
 body.surface-glass.native-material .stack.open {
   transition: transform var(--dur-4) var(--ease-out);
 }
+
+/* Refined Explorer-style groups: stable toolbar, four densities, one material. */
+.group-toolbar { display: flex; align-items: center; gap: 8px; padding: 2px 0 12px; flex: 0 0 auto; }
+.group-toolbar input, .group-toolbar select { min-width: 0; min-height: 32px; padding: 5px 8px; font: 12px/20px var(--font); color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-bottom-color: var(--ctrl-stroke-bottom); border-radius: var(--r-control); }
+.group-toolbar input { flex: 1; width: 100%; }
+.group-toolbar select { max-width: 142px; }
+.group-toolbar :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.group-stack .stack-grid { --group-icon: 40px; --group-cell: 92px; grid-template-columns: repeat(auto-fill, minmax(var(--group-cell), 1fr)); }
+.group-stack .stack-grid[data-view="small"] { --group-icon: 28px; --group-cell: 72px; }
+.group-stack .stack-grid[data-view="large"] { --group-icon: 56px; --group-cell: 112px; }
+.group-stack .stack-grid[data-view="list"] { --group-icon: 24px; grid-template-columns: 1fr; }
+.group-stack .stack-item { border-radius: var(--r-card); }
+.group-stack .stack-item > :is(img, .stack-glyph) { width: var(--group-icon); height: var(--group-icon); }
+.group-stack .stack-grid[data-view="list"] .stack-item:not(.stack-widget) { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 8px 10px; }
+.group-stack .stack-grid[data-view="list"] .stack-name { text-align: left; min-height: 0; -webkit-line-clamp: 1; line-clamp: 1; }
+.group-stack .stack-cell .stack-item { width: 100%; height: 100%; }
+.group-stack .stack-grid > [hidden] { display: none; }
+.group-stack .stack-grid .group-no-matches:not([hidden]) { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .stack.group-stack.open.just-opened .stack-item { animation: none; }
+}
+/* A compact logo and state; the full accessible label stays on the capsule. */
+body.notch-body:is(.act-agent, .act-agent-waiting, .act-agent-error, .act-agent-done):not(.card) .nl-text { display: none; }
+body.notch-body.peekable.live:is(.act-agent, .act-agent-waiting, .act-agent-error, .act-agent-done):not(.card) .notch-pill { width: 64px; }
+body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-workspace).is-open { transition: transform var(--dur-4) var(--ease-out); }
+.undo-toast:has(.notice-copy) { flex-wrap: wrap; max-width: min(520px, calc(100vw - 24px)); }
+.undo-toast .notice-copy { flex-basis: 100%; }
+.widget-hub-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.widget-hub-item { display: grid; grid-template-columns: 24px 1fr; gap: 6px; padding: 10px; border: 1px solid var(--stroke); border-radius: var(--r-card); color: var(--ink); background: var(--ctrl-fill); text-align: left; cursor: pointer; }
+.widget-hub-item:hover { background: var(--hover); }
+.widget-hub-item span { grid-row: span 2; }
+.widget-hub-item svg { width: 20px; height: 20px; }
+.widget-hub-item small { color: var(--ink-2); font-size: 11px; line-height: 1.4; }
+.widget-hub-item strong { min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+
+.widget-hub-item { display: flex; flex-direction: column; cursor: default; }
+.widget-hub-item .tile.widget { width: 100%; max-width: 100%; height: var(--size); }
+.widget-hub-item .tile.widget .w-card { width: 100%; }
+.widget-hub-item:has(.tile[data-widget="media"]), .widget-hub-item:has(.tile[data-widget="system"]) { grid-column: 1 / -1; }
+
+/* A group shortcut remains visible while moving, even before its icon loads. */
+.stack-drag-clone.group-drag-preview { display: flex; flex-direction: row; justify-content: flex-start; gap: 10px; width: max-content; min-width: 112px; max-width: min(240px, calc(100vw - 12px)); min-height: 54px; padding: 9px 12px; box-sizing: border-box; border-radius: var(--r-card); border: 1px solid var(--stroke-strong); background: var(--layer-strong); color: var(--ink); opacity: 1; transform: none; box-shadow: var(--shadow-flyout); filter: none; }
+.group-drag-art { flex: 0 0 32px; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-control); background: var(--hover); font-size: 20px; }
+.group-drag-art :is(img, svg, .stack-glyph, .w-ring-ico, .w-ico) { width: 28px; height: 28px; object-fit: contain; }
+.group-drag-copy { display: grid; gap: 3px; min-width: 0; }
+.group-drag-copy strong, .group-drag-copy small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 170px; }
+.group-drag-copy strong { font: 600 12px/16px var(--font); }
+.group-drag-copy small { font: 400 11px/15px var(--font); color: var(--ink-2); }
+.tile.group-drop-before::before, .tile.group-drop-after::before { content: ""; position: absolute; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--accent); }
+.tile.group-drop-before::before { left: -4px; }
+.tile.group-drop-after::before { right: -4px; }
+body:is(.edge-left, .edge-right) .tile:is(.group-drop-before, .group-drop-after)::before { left: 4px; right: 4px; width: auto; height: 3px; }
+body:is(.edge-left, .edge-right) .tile.group-drop-before::before { top: -4px; bottom: auto; }
+body:is(.edge-left, .edge-right) .tile.group-drop-after::before { top: auto; bottom: -4px; }

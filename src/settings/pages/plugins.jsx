@@ -1,4 +1,5 @@
 /* Optional tools live together, independently from Booki's system settings. */
+import { CollectorSettings } from "../collector-settings.jsx";
 import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
@@ -45,6 +46,7 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
     <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}</p>
     {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}
+    {id === "yt-dlp" && <details className="collector-settings"><summary>{t("refine.collectorSettings")}</summary><CollectorSettings cfg={cfg} set={set} /></details>}
     <div className="plugin-actions">
       {state.installed && ["openrgb", "librehardwaremonitor"].includes(id) && <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginOpen(id))}>{t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open")}</button>}
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}

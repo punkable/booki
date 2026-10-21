@@ -1,7 +1,7 @@
 /* Live widget read-outs (clock, focus, weather, stats, media, volume, clipboard)
    and the single poll loop that drives them while the dock is visible. */
 
-import { dock as dockApi, invoke } from "../api.js";
+import { dock as dockApi, invoke, onAgentActivity } from "../api.js";
 import { usageResets, usageSnapshot } from "../usage-reset.js";
 import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
@@ -50,7 +50,7 @@ export function cacheWidgetEls() {
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
   const sel = S.stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
-  document.querySelectorAll(sel).forEach((el) => {
+  document.querySelectorAll(sel + (S.productivityPanel?.classList.contains("widget-hub") ? ", .widget-hub:not(.is-closing) .tile.widget" : "")).forEach((el) => {
     const w = el.dataset.widget || "";
     (widgetEls[w] || (widgetEls[w] = [])).push(el);
   });
@@ -270,9 +270,18 @@ function aiHintLines(p) {
 // Every active provider takes a turn on the card (about every 6 s);
 // rotating repaints the cached reading, it never reads the logs again.
 let aiTurn = 0;
+const aiStages = new Map();
+onAgentActivity(({ provider, state }) => {
+  if (["working", "waiting", "error"].includes(state)) aiStages.set(provider, state);
+  else aiStages.delete(provider);
+  aiTurn = 0;
+  if (aiReading.last) paintAi(aiReading.last);
+});
 const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
 function paintAi(providers) {
-  const shown = providers;
+  const urgent = providers.filter((p) => ["waiting", "error"].includes(aiStages.get(p.id)));
+  const working = providers.filter((p) => aiStages.get(p.id) === "working");
+  const shown = urgent.length ? urgent : working.length ? working : providers;
   eachWidget("ai", (el) => {
     setWidgetAvailable(el, shown.length > 0);
     const hint = providers.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
@@ -294,7 +303,8 @@ function paintAi(providers) {
     } else {
       // Local Claude logs have token counts, not the subscription allowance.
       // An elapsed-time ring must never masquerade as remaining quota.
-      setText(el, `${current.name} · ${current.block ? tokensText(current.block.tokens) : t("w.aiIdle")}`, "?");
+      const recorded = current.block?.tokens || current.week_tokens || 0;
+      setText(el, `${current.name} · ${t("refine.estimate")}`, recorded > 0 ? `~${tokenText(recorded)}` : "?");
     }
     el.dataset.tone = tone;
     el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));

@@ -3,12 +3,14 @@
 import { dock as dockApi, pickAppFile, pickFolder } from "../api.js";
 import { kindForPath, placePin, takeOutOfGroup } from "../pins.js";
 import { S } from "./state.js";
-import { uid, isVertical, baseName } from "./helpers.js";
+import { uid, isVertical, baseName, widgetLabel } from "./helpers.js";
 import { dockEl, closestSel, stackEl } from "./dom.js";
 import { reframe } from "./frame.js";
 import { render } from "./render.js";
 import { persist } from "./config-sync.js";
 import { openStack, closeStack } from "./stack.js";
+import { t } from "../i18n.js";
+import { scheduleHitReport } from "./hit-regions.js";
 import { mergeTargetAt } from "./edit-reorder.js";
 
 // Dissolve a folder: spill its children back to the dock at its position.
@@ -93,6 +95,9 @@ function dockDropSlot(x, y, fromGroupId) {
 }
 
 let outTargetEl = null;
+function clearOutSlot() {
+  dockEl.querySelectorAll(".group-drop-before, .group-drop-after").forEach((tile) => tile.classList.remove("group-drop-before", "group-drop-after"));
+}
 function markOutTarget(el) {
   if (outTargetEl === el) return;
   outTargetEl?.classList.remove("merge-target");
@@ -115,13 +120,22 @@ async function moveChildTo(group, child, slot) {
 // return it to the dock. Pointer-based (no native drag → no stray files).
 export function wireStackDragOut(cell, group, child) {
   let st = null;
+  // An image's native HTML drag would cancel our pointer capture and erase
+  // the custom preview. This gesture moves a Booki shortcut, never a file.
+  cell.draggable = false;
+  cell.addEventListener("dragstart", (event) => event.preventDefault());
+  const onEscape = (event) => { if (event.key === "Escape" && st) { event.preventDefault(); event.stopImmediatePropagation(); cancel(); } };
+  const detach = () => { window.removeEventListener("keydown", onEscape, true); window.removeEventListener("blur", cancel); };
   const clearDropHint = () => {
     stackEl.querySelectorAll(".stack-item.drop-before, .stack-item.drop-after")
       .forEach((n) => n.classList.remove("drop-before", "drop-after"));
   };
   cell.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || closestSel(e.target, ".stack-rm, .stack-acts, .stack-act")) return;
+    cell._suppressClick = false;
     st = { x: e.clientX, y: e.clientY, moved: false, pointerId: e.pointerId };
+    window.addEventListener("keydown", onEscape, true);
+    window.addEventListener("blur", cancel);
     try {
       cell.setPointerCapture(e.pointerId);
     } catch (_) {}
@@ -132,14 +146,20 @@ export function wireStackDragOut(cell, group, child) {
     if (!st.moved) {
       st.moved = true;
       try { cell.setPointerCapture(st.pointerId); } catch (_) {}
-      const r = cell.getBoundingClientRect();
-      st.clone = cell.cloneNode(true);
-      st.clone.className = "stack-item stack-drag-clone";
-      st.clone.style.width = `${r.width}px`;
-      st.clone.style.height = `${r.height}px`;
-      st.gx = e.clientX - r.left;
-      st.gy = e.clientY - r.top;
+      st.clone = document.createElement("div");
+      st.clone.className = "stack-drag-clone group-drag-preview";
+      st.clone.setAttribute("aria-hidden", "true");
+      st.clone.inert = true;
+      const art = document.createElement("span"); art.className = "group-drag-art";
+      const original = cell.querySelector("img:not(.emo), .stack-glyph:not(.skel), .w-ring-ico, .w-ico");
+      if (original) { const copy = original.cloneNode(true); copy.removeAttribute("id"); copy.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id")); art.append(copy); }
+      else art.textContent = (child.name || child.widget || "?").slice(0, 1).toUpperCase();
+      const copy = document.createElement("span"); copy.className = "group-drag-copy";
+      const name = document.createElement("strong"); name.textContent = child.name || (child.widget ? widgetLabel(child.widget) : baseName(child.path));
+      st.hint = document.createElement("small"); copy.append(name, st.hint);
+      st.clone.append(art, copy);
       document.body.appendChild(st.clone);
+      scheduleHitReport();
       cell.classList.add("dragging");
     }
     st.pointerY = e.clientY;
@@ -156,15 +176,15 @@ export function wireStackDragOut(cell, group, child) {
       };
       st.scrollFrame = requestAnimationFrame(scroll);
     }
-    st.clone.style.left = `${e.clientX - st.gx}px`;
-    st.clone.style.top = `${e.clientY - st.gy}px`;
+    st.clone.style.left = `${Math.max(6, Math.min(innerWidth - st.clone.offsetWidth - 6, e.clientX + 14))}px`;
+    st.clone.style.top = `${Math.max(6, Math.min(innerHeight - st.clone.offsetHeight - 6, e.clientY + 14))}px`;
     const sr = stackEl.getBoundingClientRect();
     const out =
       e.clientX < sr.left - 8 || e.clientX > sr.right + 8 ||
       e.clientY < sr.top - 8 || e.clientY > sr.bottom + 8;
     if (out !== st.out) {
       st.out = out;
-      st.clone.classList.toggle("will-unpin", out);
+      st.clone.dataset.outside = String(out);
       if (out) clearDropHint();
     }
     if (out) {
@@ -172,12 +192,20 @@ export function wireStackDragOut(cell, group, child) {
       // Over the bar: land where the pointer is, or inside the group under it.
       st.slot = dockDropSlot(e.clientX, e.clientY, group.id);
       const into = st.slot?.groupId ? dockEl.querySelector(`.tile[data-id="${st.slot.groupId}"]`) : null;
-      markOutTarget(into);
-      st.clone.classList.toggle("will-unpin", !st.slot);
+      markOutTarget(into); clearOutSlot();
+      if (st.slot && !st.slot.groupId) {
+        const tiles = [...dockEl.querySelectorAll(".tile[data-id]")];
+        const before = tiles.find((tile) => tile.dataset.id === st.slot.beforeId);
+        (before || tiles.at(-1))?.classList.add(before ? "group-drop-before" : "group-drop-after");
+      }
+      const destination = st.slot?.groupId ? S.cfg.pinned.find((pin) => pin.id === st.slot.groupId)?.name : t("tab.dock");
+      st.hint.textContent = t("drop.addTo").replace("{name}", () => destination || t("tab.dock"));
+      scheduleHitReport();
       return;
     }
     st.slot = null;
-    markOutTarget(null);
+    markOutTarget(null); clearOutSlot();
+    st.hint.textContent = group.name || t("group.new");
     clearDropHint();
     // undefined = no target under the pointer (no reorder); null = append.
     st.beforeId = undefined;
@@ -192,7 +220,7 @@ export function wireStackDragOut(cell, group, child) {
     }
     if (!target) return;
     const r = target.getBoundingClientRect();
-    const before = e.clientX < r.left + r.width / 2;
+    const before = stackEl.querySelector(".stack-grid")?.dataset.view === "list" ? e.clientY < r.top + r.height / 2 : e.clientX < r.left + r.width / 2;
     target.classList.add(before ? "drop-before" : "drop-after");
     const tid = target.dataset.childId;
     if (before) st.beforeId = tid;
@@ -205,6 +233,7 @@ export function wireStackDragOut(cell, group, child) {
   const finish = async () => {
     if (!st) return;
     const s = st;
+    detach(); clearOutSlot();
     cancelAnimationFrame(s.scrollFrame);
     st = null;
     try { cell.releasePointerCapture(s.pointerId); } catch (_) {}
@@ -215,11 +244,7 @@ export function wireStackDragOut(cell, group, child) {
     setTimeout(() => { cell._suppressClick = false; }, 0);
     markOutTarget(null);
     if (s.out) {
-      if (s.clone) {
-        const c = s.clone;
-        c.classList.add("poof");
-        setTimeout(() => c.remove(), 280);
-      }
+      s.clone?.remove();
       if (s.slot) await moveChildTo(group, child, s.slot);
       else await takeOutChild(group, child.id);
     } else if (s.beforeId !== undefined && s.beforeId !== child.id) {
@@ -235,8 +260,9 @@ export function wireStackDragOut(cell, group, child) {
     }
   };
   cell.addEventListener("pointerup", finish);
-  cell.addEventListener("pointercancel", () => {
+  const cancel = () => {
     if (!st) return;
+    detach(); clearOutSlot();
     markOutTarget(null);
     const cancelled = st;
     cancelAnimationFrame(cancelled.scrollFrame);
@@ -246,8 +272,10 @@ export function wireStackDragOut(cell, group, child) {
     cancelled.clone?.remove();
     clearDropHint();
     cell._suppressClick = true;
-    setTimeout(() => { cell._suppressClick = false; }, 0);
-  });
+    scheduleHitReport();
+  };
+  cell.addEventListener("pointercancel", cancel);
+  cell.addEventListener("lostpointercapture", cancel);
 }
 
 // Add an app or folder into a group from its open flyout, then reopen it so

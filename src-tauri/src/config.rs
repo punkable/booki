@@ -281,6 +281,10 @@ pub struct Config {
     /// Global shortcut that opens the quick app launcher; empty = none.
     #[serde(default = "default_launcher_hotkey")]
     pub launcher_hotkey: String,
+    #[serde(default)]
+    pub collector_directory: String,
+    #[serde(default)]
+    pub collector_format: String,
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
@@ -469,6 +473,8 @@ impl Default for Config {
             magnify_style: default_anim(),
             hotkey: String::new(),
             launcher_hotkey: default_launcher_hotkey(),
+            collector_directory: String::new(),
+            collector_format: String::new(),
             monitor: default_monitor(),
             monitor_name: String::new(),
             overflow_mode: default_overflow(),

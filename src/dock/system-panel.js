@@ -8,7 +8,7 @@ import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
-import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
+import { buildCollectorPanel } from "./collector-panel.js";
 import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, refreshDevices, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
@@ -83,8 +83,8 @@ export function buildSystemPanel(item, { close }) {
   const cards = (container, rows) => {
     const grid = document.createElement("div"); grid.className = "reading-cards";
     for (const row of rows) {
-      const card = document.createElement("div"); card.className = "reading-card"; if (row.tone) card.dataset.tone = row.tone;
-      const top = document.createElement("div"); top.className = "reading-card-top";
+      const card = document.createElement(row.details ? "details" : "div"); card.className = "reading-card"; if (row.tone) card.dataset.tone = row.tone;
+      const top = document.createElement(row.details ? "summary" : "div"); top.className = "reading-card-top";
       if (row.glyph) { const g = text("span", "", "reading-card-glyph"); g.innerHTML = icon(row.glyph); top.append(g); }
       const names = document.createElement("div"); names.className = "reading-card-names";
       names.append(text("strong", row.name)); if (row.sub) names.append(text("small", row.sub));
@@ -102,6 +102,7 @@ export function buildSystemPanel(item, { close }) {
         if (bar.tone) fill.dataset.tone = bar.tone;
         track.append(fill); line.append(track); card.append(line);
       }
+      if (row.details) { list(card, row.details); card.append(text("small", t("refine.deviceNote"), "device-reading-note")); }
       grid.append(card);
     }
     container.append(grid);
@@ -188,6 +189,7 @@ export function buildSystemPanel(item, { close }) {
       cards(devices, shown.map((d) => ({
         name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
         value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
+        details: [[t("refine.source"), ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[d.source] || d.source || t("plugins.noData")], [t("refine.readAt"), deviceReading.checkedAt ? new Date(deviceReading.checkedAt).toLocaleTimeString(curLang(), { hour: "2-digit", minute: "2-digit" }) : "—"]],
       })));
       // Each device can have its own card on the dock, beside this one.
       if (own) return;
@@ -210,67 +212,7 @@ export function buildSystemPanel(item, { close }) {
     });
   }
   if (item.widget === "collector") {
-    const box = section(t("w.collector"));
-    const status = document.createElement("div"); status.className = "download-status"; status.setAttribute("aria-live", "polite");
-    const paintStatus = () => {
-      status.replaceChildren();
-      if (download.state === "start" || download.state === "progress") {
-        cards(status, [{ name: download.title || t("w.collector"), glyph: "download", value: `${Math.round(download.percent)}%`, bars: [{ label: "", percent: download.percent, tone: "charging" }] }]);
-      } else if (download.state === "done" && download.path) {
-        const name = download.path.split(/[\\/]/).pop();
-        cards(status, [{ name, sub: t("dl.done"), glyph: "download", tone: "good" }]);
-        button(status, t("dl.open"), () => api.openLocation(download.path));
-      } else if (download.state === "error") {
-        status.append(text("p", pluginError(download.error), "plugin-action-error"));
-      }
-    };
-    unsubscribe.push(onDownloadChange(() => { if (!disposed) paintStatus(); }));
-    api.pluginStatus("yt-dlp").then((state) => {
-      if (disposed) return;
-      // A direct file link needs no tool; everything else needs the plugin.
-      if (!state?.installed && !(item.url && classifyLink(item.url) === "file")) {
-        const offer = document.createElement("div"); offer.className = "device-offer";
-        const copy = document.createElement("div"); copy.className = "device-offer-copy";
-        copy.append(text("span", t("dl.needs")), text("small", t("plugins.terms")));
-        offer.append(copy);
-        installButton(offer, t("dev.enable"), "yt-dlp", () => { offer.remove(); showForm(); });
-        box.append(offer); return;
-      }
-      showForm();
-    }).catch(() => { if (!disposed) showForm(); });
-    const showForm = () => {
-      const form = document.createElement("div"); form.className = "download-form";
-      const input = document.createElement("input"); input.type = "url"; input.placeholder = t("dl.paste"); input.setAttribute("aria-label", t("dl.paste")); input.value = item.url || "";
-      const ask = text("p", "", "download-ask");
-      const choices = document.createElement("div"); choices.className = "plugin-panel-actions";
-      const go = (format) => async () => {
-        const url = videoUrl(input.value); if (!url) throw new Error(t("perr.link"));
-        await startDownload(url, format);
-      };
-      // Booki picks the tool from the link; only video pages ask.
-      const shape = () => {
-        const kind = input.value.trim() ? classifyLink(input.value.trim()) : "media";
-        choices.replaceChildren();
-        if (kind === "media") {
-          ask.textContent = input.value.trim() ? t("dl.ask") : t("dl.drop");
-          button(choices, t("dl.video"), go("video")).classList.add("primary");
-          button(choices, t("dl.audio"), go("audio"));
-        } else {
-          ask.textContent = t(kind === "file" ? "dl.isFile" : "dl.isGallery");
-          button(choices, t("dl.save"), go(kind)).classList.add("primary");
-        }
-        return kind;
-      };
-      input.addEventListener("input", shape);
-      form.append(ask, input, choices); box.append(form, status);
-      const kind = shape();
-      // A dropped file or gallery link starts at once: nothing to choose.
-      // So does a link dropped right on the Collector card (video for a page).
-      if (!disposed && item.url && item.autoStart && kind === "media" && download.state !== "start" && download.state !== "progress") go("video")().catch(() => {});
-      if (!disposed && item.url && kind !== "media" && download.state !== "start" && download.state !== "progress") go(kind)().catch(() => {});
-      if (!item.url) requestAnimationFrame(() => input.focus());
-      paintStatus();
-    };
+    buildCollectorPanel(item, { box: section(t("w.collector")), button, installButton, isDisposed: () => disposed, onDispose: (off) => unsubscribe.push(off) });
   }
   // A widget whose plugin is missing offers it in one line, terms included.
   const needsPlugin = (id, container, onReady) => api.pluginStatus(id).then((state) => {

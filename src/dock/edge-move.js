@@ -69,6 +69,10 @@ export async function enterEdgeMove() {
   S.edgeMove.barThick = Math.round(vert ? r.width : r.height) || 54;
   buildEdgeOverlay();
   document.body.classList.add("edge-moving");
+  const move = S.edgeMove;
+  const source = await dockApi.monitorAtCursor().catch(() => null);
+  if (S.edgeMove !== move) return;
+  move.monitor = source;
   let css = null;
   try { css = await dockApi.dockCoverWorkarea(); } catch (_) {}
   if (!S.edgeMove) return; // released/cancelled while the resize was in flight
@@ -89,17 +93,20 @@ export async function endEdgeMove(commit) {
   // bar-sized frame — so applyFrame() would no-op and leave the window huge.
   // Force it to re-issue the real frame.
   S.lastFull = null;
-  const target = mv.target;
-  if (commit && target && target !== S.cfg.edge) {
+  const destination = commit ? await dockApi.monitorAtCursor().catch(() => null) : null;
+  const movedScreen = destination && mv.monitor && destination.name !== mv.monitor.name;
+  const target = movedScreen ? S.cfg.edge : mv.target;
+  if (commit && target && (target !== S.cfg.edge || movedScreen)) {
     // Land on the new edge with a pop so the move reads as motion, not a jump.
-    S.cfg.edge = target;
+    const patch = { edge: target, ...(movedScreen ? { monitor: destination.index, monitorName: destination.name } : {}) };
+    if (!(await persist(patch))) { applyFrame(); return; }
+    Object.assign(S.cfg, patch);
     applyEdge(S.cfg);
     dockKeys.sync();
     fitDock();
     document.body.classList.add("edge-swap");
     applyFrame();
     await dockApi.setDockEdge(target);
-    await persist({ edge: target });
     setTimeout(() => requestAnimationFrame(() => document.body.classList.remove("edge-swap")), 90);
   } else {
     applyFrame(); // same edge or cancelled → just shrink the window back to the bar

@@ -213,7 +213,7 @@ export function applyAll() {
   document.body.classList.toggle("autohide", hideMode() !== "off");
   // Magnify animation style → easing curve used for the size/lift transitions.
   const style = S.cfg.magnifyStyle || "spring";
-  const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.34,1.5,0.5,1)";
+  const ease = style === "smooth" ? "cubic-bezier(0.16,1,0.3,1)" : "cubic-bezier(0.16,1,0.3,1)";
   root.style.setProperty("--mag-ease", ease);
   // Genie minimize: the notch always sits on the dock's edge, so the bar funnels
   // toward its along-position on that same edge.

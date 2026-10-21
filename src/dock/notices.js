@@ -9,21 +9,22 @@ import { isFocusing, dndActive, onFocusDndChange } from "./focus-dnd.js";
 const HELD_MAX = 5;
 const held = [];
 
-async function show(title, detail) {
+async function show(title, detail, actions = []) {
+  if (actions.length && document.visibilityState === "visible") { showNoticeToast(title, detail, actions); return; }
   let onNotch = false;
   try { onNotch = await invoke("notch_notice", { title, detail }); } catch (_) { onNotch = false; }
-  if (!onNotch) showNoticeToast(title, detail);
+  if (!onNotch) showNoticeToast(title, detail, actions);
 }
 
 export const quiet = () => isFocusing() || dndActive();
 
-export async function notify(title, detail = "", { critical = false } = {}) {
+export async function notify(title, detail = "", { critical = false, actions = [] } = {}) {
   if (!critical && quiet()) {
-    if (!held.some((entry) => entry.title === title && entry.detail === detail)) held.push({ title, detail });
+    if (!held.some((entry) => entry.title === title && entry.detail === detail)) held.push({ title, detail, actions });
     if (held.length > HELD_MAX) held.shift();
     return;
   }
-  await show(title, detail);
+  await show(title, detail, actions);
 }
 
 /** Notices held so far (for tests and the Focus card). */
@@ -31,5 +32,5 @@ export const heldNotices = () => held.slice();
 
 onFocusDndChange(() => {
   if (quiet() || !held.length) return;
-  held.splice(0).forEach(({ title, detail }, i) => setTimeout(() => show(title, detail), i * 4000));
+  held.splice(0).forEach(({ title, detail, actions }, i) => setTimeout(() => show(title, detail, actions), i * 4000));
 });

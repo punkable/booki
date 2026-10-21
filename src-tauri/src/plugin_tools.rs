@@ -4,7 +4,32 @@ use crate::{apps, plugins, util};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use std::time::{Duration, Instant};
+
+type ActiveDownload = Option<(String, Arc<AtomicBool>)>;
+static ACTIVE_DOWNLOAD: Mutex<ActiveDownload> = Mutex::new(None);
+struct DownloadGuard(String);
+impl Drop for DownloadGuard {
+    fn drop(&mut self) {
+        let mut active = ACTIVE_DOWNLOAD.lock().unwrap_or_else(|e| e.into_inner());
+        if active.as_ref().is_some_and(|(id, _)| id == &self.0) {
+            *active = None;
+        }
+    }
+}
+#[tauri::command]
+pub fn plugin_cancel_download(id: String) -> bool {
+    let active = ACTIVE_DOWNLOAD.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, flag)) = active.as_ref().filter(|(job, _)| job == &id) {
+        flag.store(true, Ordering::Relaxed);
+        return true;
+    }
+    false
+}
 
 fn capture(program: &Path, args: &[&str], seconds: u64) -> Result<String, String> {
     capture_lines(program, args, seconds, None)
@@ -18,6 +43,18 @@ fn capture_lines(
     seconds: u64,
     on_line: Option<LineSink>,
 ) -> Result<String, String> {
+    capture_cancellable(program, args, seconds, on_line, None)
+}
+fn capture_cancellable(
+    program: &Path,
+    args: &[&str],
+    seconds: u64,
+    on_line: Option<LineSink>,
+    cancelled: Option<&AtomicBool>,
+) -> Result<String, String> {
+    if cancelled.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+        return Err("download cancelled".into());
+    }
     let mut command = Command::new(program);
     command
         .args(args)
@@ -69,7 +106,8 @@ fn capture_lines(
         if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
             break status;
         }
-        if started.elapsed() > Duration::from_secs(seconds) {
+        let stopping = cancelled.is_some_and(|flag| flag.load(Ordering::Relaxed));
+        if stopping || started.elapsed() > Duration::from_secs(seconds) {
             // yt-dlp may have started ffmpeg: end the whole tree, not one process.
             #[cfg(windows)]
             {
@@ -81,7 +119,12 @@ fn capture_lines(
             }
             let _ = child.kill();
             let _ = child.wait();
-            return Err("the tool took too long; try again".into());
+            return Err(if stopping {
+                "download cancelled"
+            } else {
+                "the tool took too long; try again"
+            }
+            .into());
         }
         std::thread::sleep(Duration::from_millis(100));
     };
@@ -363,6 +406,7 @@ pub async fn rgb_apply(profile: Option<String>) -> Result<(), String> {
 /// Progress of the one running download, sent to the dock as it happens.
 #[derive(serde::Serialize, Clone)]
 struct DownloadEvent {
+    id: String,
     state: &'static str,
     percent: f64,
     title: String,
@@ -392,6 +436,7 @@ pub async fn plugin_download(
     url: String,
     directory: Option<String>,
     format: Option<String>,
+    job_id: Option<String>,
 ) -> Result<String, String> {
     use tauri::Emitter;
     let parsed = url.parse::<ureq::http::Uri>().map_err(|_| "invalid link")?;
@@ -409,17 +454,27 @@ pub async fn plugin_download(
         return Err("choose an existing download folder".into());
     }
     let format = format.unwrap_or_else(|| "video".into());
+    let id = job_id
+        .filter(|id| id.len() <= 100)
+        .unwrap_or_else(|| "legacy-download".into());
+    let cancelled = Arc::new(AtomicBool::new(false));
+    {
+        let mut active = ACTIVE_DOWNLOAD.lock().unwrap_or_else(|e| e.into_inner());
+        if active.is_some() {
+            return Err("a download is already running".into());
+        }
+        *active = Some((id.clone(), cancelled.clone()));
+    }
+    let guard = DownloadGuard(id.clone());
     util::blocking(move || {
-        static DOWNLOAD_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _turn = DOWNLOAD_TURN
-            .try_lock()
-            .map_err(|_| "a download is already running")?;
+        let _guard = guard;
         let emit: Emit = {
             let app = app.clone();
             std::sync::Arc::new(move |state, percent, title, path| {
                 let _ = app.emit(
                     "plugin-download",
                     DownloadEvent {
+                        id: id.clone(),
                         state,
                         percent,
                         title,
@@ -430,9 +485,9 @@ pub async fn plugin_download(
         };
         emit("start", 0.0, String::new(), String::new());
         let result = match format.as_str() {
-            "file" => direct_file(&url, &folder, &emit),
-            "gallery" => gallery(&url, &folder, &emit),
-            _ => media(&url, &folder, format == "audio", &emit),
+            "file" => direct_file(&url, &folder, &emit, &cancelled),
+            "gallery" => gallery(&url, &folder, &emit, &cancelled),
+            _ => media(&url, &folder, format == "audio", &emit, &cancelled),
         };
         match result {
             Ok(path) => {
@@ -464,7 +519,13 @@ fn last_path(output: &str) -> String {
 /// Video or audio with yt-dlp. With FFmpeg alongside, the best video and
 /// audio streams are merged into an MP4 and audio becomes an MP3; without
 /// it, the best single file is kept.
-fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, String> {
+fn media(
+    url: &str,
+    folder: &Path,
+    audio: bool,
+    emit: &Emit,
+    cancelled: &AtomicBool,
+) -> Result<String, String> {
     let ffmpeg_dir = plugins::find("ffmpeg")
         .and_then(plugins::executable)
         .and_then(|p| p.parent().map(|d| d.to_string_lossy().into_owned()));
@@ -520,7 +581,7 @@ fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, S
     let argv: Vec<&str> = args.iter().map(String::as_str).collect();
     let sink = emit.clone();
     let mut last = -1.0f64;
-    let output = capture_lines(
+    let output = capture_cancellable(
         &executable("yt-dlp")?,
         &argv,
         1800,
@@ -533,36 +594,36 @@ fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, S
                 }
             }
         })),
+        Some(cancelled),
     )?;
     Ok(last_path(&output))
 }
 
 /// Image galleries and posts with gallery-dl, one file at a time; the count
 /// of saved files stands in for a percentage it cannot know in advance.
-fn gallery(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
+fn gallery(
+    url: &str,
+    folder: &Path,
+    emit: &Emit,
+    cancelled: &AtomicBool,
+) -> Result<String, String> {
     let target = folder.to_string_lossy().into_owned();
     let sink = emit.clone();
-    let mut saved = 0u32;
-    let output = capture_lines(
+    let output = capture_cancellable(
         &executable("gallery-dl")?,
         &["--config-ignore", "--no-input", "-D", &target, "--", url],
         1800,
         Some(Box::new(move |line: &str| {
             let path = line.trim().trim_start_matches("# ");
             if Path::new(path).is_absolute() {
-                saved += 1;
                 let shown = Path::new(path)
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                sink(
-                    "progress",
-                    (saved as f64 * 7.0).min(95.0),
-                    shown,
-                    String::new(),
-                );
+                sink("progress", -1.0, shown, String::new());
             }
         })),
+        Some(cancelled),
     )?;
     let last = last_path(&output);
     let last = last.trim_start_matches("# ").to_string();
@@ -584,7 +645,15 @@ fn reserved_name(name: &str) -> bool {
 
 /// A direct link to a file (a PDF, an archive, an image…), fetched by Booki
 /// itself with the same bounds as plugin downloads.
-fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> {
+fn direct_file(
+    url: &str,
+    folder: &Path,
+    emit: &Emit,
+    cancelled: &AtomicBool,
+) -> Result<String, String> {
+    if cancelled.load(Ordering::Relaxed) {
+        return Err("download cancelled".into());
+    }
     let name = url
         .split(['?', '#'])
         .next()
@@ -640,9 +709,15 @@ fn direct_file(url: &str, folder: &Path, emit: &Emit) -> Result<String, String> 
     let mut buffer = vec![0u8; 256 * 1024];
     let (mut done, mut last) = (0u64, -1i64);
     let copied: Result<(), String> = (|| loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("download cancelled".into());
+        }
         let n = reader
             .read(&mut buffer)
             .map_err(|_| "download interrupted".to_string())?;
+        if cancelled.load(Ordering::Relaxed) {
+            return Err("download cancelled".into());
+        }
         if n == 0 {
             return Ok(());
         }

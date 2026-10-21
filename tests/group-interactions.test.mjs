@@ -118,3 +118,53 @@ test("a grouped widget can be taken out from its own right-click menu", async ()
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("group search preserves live cells and Ctrl+wheel changes a persisted Explorer-style view", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(24)] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  await page.locator("#stack.open").waitFor();
+  await page.evaluate(() => { window.__groupCell = document.querySelector('#stack [data-child-id="a1"]'); });
+  await page.getByRole("searchbox", { name: "Search this group" }).fill("App 1");
+  assert.equal(await page.locator("#stack .stack-cell:visible").count(), 11);
+  assert.equal(await page.evaluate(() => window.__groupCell === document.querySelector('#stack [data-child-id="a1"]')), true);
+  await page.locator("#stack .stack-grid").dispatchEvent("wheel", { deltaY: -120, ctrlKey: true });
+  assert.equal(await page.locator("#stack .stack-grid").getAttribute("data-view"), "large");
+  await page.keyboard.press("Escape");
+  assert.equal(await page.getByRole("searchbox", { name: "Search this group" }).inputValue(), "");
+  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  await page.locator("#stack .stack-head > .stack-close").last().click();
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.groupView === "list");
+  await page.locator('#dock > [data-id="group"]').click();
+  await page.locator("#stack.open").waitFor();
+  assert.equal(await page.locator("#stack .stack-grid").getAttribute("data-view"), "list");
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("group dragging keeps a named preview visible, marks its destination and Escape cancels", async () => {
+  const other = { ...group(2), id: "destination", name: "Design" };
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(6), other] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  const cell = page.locator('#stack [data-child-id="a0"]');
+  await cell.waitFor();
+  const origin = await cell.boundingBox();
+  const destination = await page.locator('#dock > [data-id="destination"]').boundingBox();
+  await page.mouse.move(origin.x + origin.width / 2, origin.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(origin.x + origin.width / 2 + 25, origin.y + 25, { steps: 5 });
+  const preview = page.locator(".group-drag-preview");
+  await preview.waitFor();
+  assert.match(await preview.textContent(), /App 0/);
+  assert.equal(await cell.evaluate((el) => el.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true }))), false, "native image dragging must not cancel the pointer gesture");
+  await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height / 2, { steps: 10 });
+  assert.match(await preview.textContent(), /Design/);
+  assert.equal(await page.locator('#dock > [data-id="destination"].merge-target').count(), 1);
+  const bounds = await preview.boundingBox(); assert.ok(bounds.width >= 112 && bounds.height >= 54);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  assert.equal(await preview.count(), 0);
+  assert.equal(await page.locator(".merge-target, .group-drop-before, .group-drop-after").count(), 0);
+  assert.equal(await page.locator('#stack [data-child-id="a0"]').count(), 1);
+  const pins = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned);
+  assert.equal(pins[0].children.length, 6); assert.equal(pins[1].children.length, 2);
+  assert.deepEqual(errors, []); await page.close();
+});

@@ -50,3 +50,14 @@ test("results are capped", () => {
   const many = [{ items: Array.from({ length: 30 }, (_, i) => ({ name: `App ${i}`, path: `C:/a${i}.exe` })) }];
   assert.equal(launcherResults({ installed: many }, "app").length, 8);
 });
+
+test("actions are searchable without fake executable paths and do not crowd an empty query", () => {
+  const run = () => {};
+  const actions = [{ id: "audio", name: "Audio controls", glyph: "volume", run }, { id: "widgets", name: "Widget panel", glyph: "grid", run }];
+  assert.equal(launcherResults({ actions }, "").length, 0);
+  const [result] = launcherResults({ actions }, "audio");
+  assert.equal(result.kind, "action");
+  assert.equal(result.id, "audio");
+  assert.equal(result.run, run);
+  assert.equal(result.path, undefined);
+});

@@ -1,5 +1,6 @@
 /* Dock: how it behaves, where it lives, how it looks, how it reacts.
    One page, ordered by how often people change each thing. */
+import { DOCK_PRESETS } from "../../dock/presets.js";
 import React, { useEffect, useState } from "react";
 import { dock as dockApi } from "../../api.js";
 import { t } from "../../i18n.js";
@@ -27,6 +28,12 @@ export function DockPage({ cfg, set }) {
   return <>
     <PageHeader title={t("tab.dock")}>{t("dock.pageHint")}</PageHeader>
     <div className="sticky-preview"><DockPreview cfg={cfg} stage /></div>
+    <SettingsSection icon="sparkles" title={t("refine.presets")} hint={t("refine.presetsHint")}>
+      <div className="chips dock-presets">
+        {DOCK_PRESETS.map((preset) => <button key={preset.id} type="button" className="chip" onClick={() => set(preset.patch, afterSurface)}>{t(`refine.${preset.id}`)}</button>)}
+      </div>
+    </SettingsSection>
+
 
     {/* What most people change, in the order they reach for it. Everything
         else is one disclosure away, so the page reads at a glance. */}

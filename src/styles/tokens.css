@@ -73,7 +73,7 @@
      that capsule. Fluent's decelerate curve, no overshoot. The genie from an idle
      notch and plain fades keep the ease-out above. */
   --spring: cubic-bezier(0, 0, 0, 1);
-  --dur-spring: 0.5s;
+  --dur-spring: 0.333s;
   /* Windows' focus visual: the ink colour, not the accent, so it reads on any
      fill. Used for every keyboard focus ring. */
   --focus-ring: var(--ink);

@@ -1,4 +1,5 @@
 /* Widgets: the catalog of ten, and an inspector for the one you pick. */
+import { CollectorSettings } from "../collector-settings.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import { dock as dockApi } from "../../api.js";
 import { t } from "../../i18n.js";
@@ -56,6 +57,7 @@ function WidgetFields({ item, cfg, set, onChange }) {
           disabled={metrics.length === 1 && metrics.includes(metric)} onClick={() => toggleMetric(metric)}>{metricLabel(metric, t)}</button>)}
       </div>
     </Row>}
+    {item.widget === "collector" && <CollectorSettings cfg={cfg} set={set} />}
     {item.widget === "notes" && <Row label={t("w.note")} stack>
       <input className="text-field" type="text" value={style.note || ""} placeholder={t("w.notesEmpty")} onChange={(e) => patch({ note: e.target.value })} />
     </Row>}

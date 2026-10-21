@@ -51,6 +51,7 @@ export function sharedReading(fetcher) {
     refreshAfter: () => (pending ? pending.catch(() => {}).then(refresh) : refresh()),
     fresh: (ms) => (at && Date.now() - at < ms ? Promise.resolve(value) : refresh()),
     get last() { return at ? value : undefined; },
+    get checkedAt() { return at; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

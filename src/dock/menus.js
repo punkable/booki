@@ -28,6 +28,7 @@ import {
   addSeparatorAfter,
   removeItem,
 } from "./pin-ops.js";
+import { openWidgetHub } from "./widget-editors.js";
 import { openStack, openAddPanel, openLauncher } from "./stack.js";
 import { enterEdit } from "./edit-reorder.js";
 import { ungroup, takeOutChild } from "./group-ops.js";
@@ -182,6 +183,8 @@ export function openBackgroundMenu(e) {
   addMenuHead("Booki", t("m.dockMenu"));
   add("plus", t("add.open"), () => openAddPanel(dockEl));
   add("search", t("launcher.menu"), openLauncher);
+  add("grid", t("refine.hub"), openWidgetHub);
+  add("volume", t("refine.audio"), () => openSystemPanel({ id: "__audio", widget: "volume" }, dockEl));
   add("grid", t("workspace.library"), () => dockApi.openSettingsTab("apps"));
   const profilesSlot = document.createElement("div");
   ctxMenu.append(profilesSlot);

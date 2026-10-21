@@ -451,20 +451,17 @@ function applyAgent({ provider, state, since } = {}, quiet = false) {
   paintActivity();
 }
 
-function agentActivity() {
-  let pick = null;
-  for (const [provider, a] of agents) {
-    const row = { provider, ...a };
-    if (!pick) { pick = row; continue; }
-    const rowWaits = row.state === "waiting" || row.state === "error";
-    const pickWaits = pick.state === "waiting" || pick.state === "error";
-    if (rowWaits !== pickWaits) { if (rowWaits) pick = row; continue; }
-    if (Number(row.since) > Number(pick.since)) pick = row;
-  }
-  return pick;
+function agentActivity(now = Date.now()) {
+  const all = [...agents].map(([provider, activity]) => ({ provider, ...activity }));
+  const urgent = all.filter((row) => ["waiting", "error"].includes(row.state));
+  const eligible = urgent.length ? urgent : all;
+  return eligible.length ? eligible[Math.floor(now / 8000) % eligible.length] : null;
 }
 
 onAgentActivity((payload) => applyAgent(payload));
+setInterval(() => {
+  if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
+}, 8000);
 onUsageReady(({ provider, name } = {}) => {
   if (!provider || videoForeground || scene === "game") return;
   usageFlash = { provider, name, until: Date.now() + 5000 };
@@ -482,15 +479,19 @@ function currentActivity(now = Date.now()) {
   if ((videoForeground || scene === "game") && !cardOpen) return null;
   if (screenBusy && scene !== "code" && scene !== "creative") return null;
   if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
-  const agent = agentsOn ? agentActivity() : null;
+  const agent = agentsOn ? agentActivity(now) : null;
   if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
   if (agent?.state === "error") return { kind: "agent-error", provider: agent.provider, since: agent.since };
   if (usageFlash && usageFlash.until > now) return { kind: "usage", provider: usageFlash.provider, name: usageFlash.name, until: usageFlash.until };
   const done = agentsOn ? nextAgentDone(now) : null;
   if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
   if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
+  // Music gets a brief introduction, including while an editor is focused.
+  // Afterwards it remains available on hover without occupying the capsule.
+  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
+    if (agent && !cardOpen && Math.floor(now / 8000) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
@@ -507,7 +508,6 @@ function currentActivity(now = Date.now()) {
   if (scene === "code" && agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   // Music opens the notch for a few seconds when it starts or the track
   // changes, then lets it settle; it stays in the card on hover.
-  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   if (agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   if (low <= 15) return { kind: "battery", level: low };
   return null;

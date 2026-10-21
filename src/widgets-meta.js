@@ -1,6 +1,6 @@
 /* Shared widget catalog: the dock, the add panel and Settings read it.
 
-   Sixteen widgets. CPU, RAM, disk and network live in one "system" widget that
+   Fifteen widgets. CPU, RAM, disk and network live in one "system" widget that
    shows the metrics you choose; timer and tasks live in "focus". Configs from
    older builds are migrated by the backend (config rev 9); canonicalWidget()
    lets previews of old profiles and backups render before that happens. */

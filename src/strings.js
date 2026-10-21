@@ -1,3 +1,4 @@
+import { REFINEMENT_STRINGS } from "./refinement-strings.js";
 /* Strings introduced by the 0.80 overhaul, in every language. Merged into
    i18n.js DICT (es/en at import, pt/fr/de with the lazy extra pack). */
 export const STRINGS = {
@@ -2197,3 +2198,5 @@ export const STRINGS = {
     "a11y.runningWindows": "Wird ausgeführt · {n} Fenster",
   },
 };
+
+for (const [lang, entries] of Object.entries(REFINEMENT_STRINGS)) Object.assign(STRINGS[lang], entries);

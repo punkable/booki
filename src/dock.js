@@ -1,3 +1,4 @@
+import { reduceMotion } from "./dock/motion.js";
 /* Booki Dock — tile rendering, magnify-on-hover (overflowing the bar),
    pointer reordering, desktop file-drop, auto-hide and live settings.
 
@@ -265,8 +266,7 @@ dockEl.addEventListener(
     if (document.body.classList.contains("dock-overflow") && !e.altKey) {
       e.preventDefault();
       const amt = (e.deltaY || e.deltaX) * 1.2;
-      if (isVertical()) dockEl.scrollTop += amt;
-      else dockEl.scrollLeft += amt;
+      dockEl.scrollBy({ [isVertical() ? "top" : "left"]: amt, behavior: reduceMotion() ? "instant" : "smooth" });
       return;
     }
     const w = closestSel(e.target, ".tile.widget");
