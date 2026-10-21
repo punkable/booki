@@ -255,7 +255,7 @@ export async function openStack(tileEl, item) {
         wCell.appendChild(widgetTile(it, { inFlyout: true }));
         deps.wireStackDragOut(wCell, item, it);
         wCell.dataset.childId = it.id;
-        wCell.addEventListener("contextmenu", (e) => deps.openFileMenu(e, it, item));
+        wCell.addEventListener("contextmenu", (e) => deps.openFileMenu(e, it, item), { capture: true });
         grid.appendChild(wCell);
         continue;
       }

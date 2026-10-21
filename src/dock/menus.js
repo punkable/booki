@@ -337,7 +337,7 @@ export function openFileMenu(e, item, parent, openFolder) {
   ctxMenu.replaceChildren();
   addMenuHead(item.name, item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
   const { add, sep } = menuActions(ctxMenu, closeMenu);
-  add("external", t("m.open"), () => { if (item.is_dir && openFolder) return openFolder(); if (item.kind === "action") return dockApi.openSettings(); return dockApi.launch(item.path, item.args || []); });
+  if (item.kind !== "widget") add("external", t("m.open"), () => { if (item.is_dir && openFolder) return openFolder(); if (item.kind === "action") return dockApi.openSettings(); return dockApi.launch(item.path, item.args || []); });
   if (item.path) {
     add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));
     add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));

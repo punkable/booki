@@ -104,3 +104,17 @@ test("a paused media card retires after one minute and becomes available again o
   assert.deepEqual(errors, []);
   await page.close();
 });
+
+test("a grouped widget can be taken out from its own right-click menu", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [{ id: "group", kind: "group", name: "Work", children: [{ id: "clock", kind: "widget", widget: "clock" }] }] }),
+  });
+  await page.locator('#dock > [data-id="group"]').click();
+  await page.locator('#stack [data-widget="clock"]').click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Take out of group", exact: true }).click();
+  await page.locator('#dock > [data-id="clock"]').waitFor();
+  const pins = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned);
+  assert.equal(pins.find((pin) => pin.id === "group").children.length, 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
