@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
+import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
@@ -40,6 +40,7 @@ const pill = document.getElementById("notch-pill");
 const toastEl = document.getElementById("notch-toast");
 const toastTitleEl = document.getElementById("notch-toast-title");
 const toastSubEl = document.getElementById("notch-toast-sub");
+const toastActionsEl = document.getElementById("notch-toast-actions");
 
 async function applyLook() {
   try {
@@ -183,6 +184,9 @@ function clearNotchToast() {
     toastSubEl.textContent = "";
     toastSubEl.hidden = true;
   }
+  toastActionsEl?.replaceChildren();
+  if (toastActionsEl) toastActionsEl.hidden = true;
+  document.body.classList.remove("toast-actionable");
   scheduleHitReport();
 }
 function showNotchToast(payload) {
@@ -195,9 +199,24 @@ function showNotchToast(payload) {
     toastSubEl.textContent = detail;
     toastSubEl.hidden = !detail;
   }
+  toastActionsEl?.replaceChildren();
+  const actions = payload?.actionId && Array.isArray(payload.actions) ? payload.actions.slice(0, 3) : [];
+  document.body.classList.toggle("toast-actionable", actions.length > 0);
+  if (toastActionsEl) {
+    toastActionsEl.hidden = !actions.length;
+    actions.forEach((label, index) => {
+      const button = document.createElement("button"); button.type = "button"; button.textContent = String(label); button.title = String(label);
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation(); button.disabled = true;
+        try { await emitNoticeAction(payload.actionId, index); button.innerHTML = icon("check"); }
+        catch (_) { button.disabled = false; }
+      });
+      toastActionsEl.append(button);
+    });
+  }
   clearTimeout(toastTimer);
   // Safety clear if dock never blackouts (e.g. fullscreen ended early).
-  toastTimer = setTimeout(clearNotchToast, 3200);
+  toastTimer = setTimeout(clearNotchToast, actions.length ? 9600 : 3200);
   scheduleHitReport();
 }
 onNotchToast(showNotchToast);

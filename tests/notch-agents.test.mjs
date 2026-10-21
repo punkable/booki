@@ -110,3 +110,16 @@ test("hovering a working agent keeps music controls available after the brief mu
   assert.match(await page.locator("#nc-sub").textContent(), /Background music/);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test("download notice actions are visible and send only their opaque callback identity", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", {
+    cfg: makeConfig({ notchVisibility: "always" }), viewport: { width: 440, height: 100 },
+    initScript: `window.__actions=[];window.__TAURI__.event.emit=(name,payload)=>{if(name==='booki://notice-action')window.__actions.push(payload);return Promise.resolve();};`,
+  });
+  await event(page, "booki://notch-toast", { title: "Download complete", detail: "report.pdf", actionId: "opaque-id", actions: ["Show in folder", "Open file", "Copy path"] });
+  await page.getByRole("button", { name: "Open file", exact: true }).click();
+  assert.deepEqual(await page.evaluate(() => window.__actions), [{ id: "opaque-id", index: 1 }]);
+  const bounds = await page.locator("#notch-toast-actions").boundingBox();
+  assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 100, JSON.stringify(bounds));
+  assert.deepEqual(errors, []); await page.close();
+});

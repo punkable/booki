@@ -168,3 +168,22 @@ test("group dragging keeps a named preview visible, marks its destination and Es
   assert.equal(pins[0].children.length, 6); assert.equal(pins[1].children.length, 2);
   assert.deepEqual(errors, []); await page.close();
 });
+
+
+test("groups retain search across reopening and keyboard navigation follows visible list entries", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [group(24)] }) });
+  await page.locator('#dock > [data-id="group"]').click();
+  const search = page.getByRole("searchbox", { name: "Search this group" });
+  await search.fill("App 1");
+  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  const first = page.locator('#stack .stack-item:visible').first();
+  await first.focus();
+  await page.keyboard.press("ArrowDown");
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.childId), "a10");
+  await page.locator("#stack .stack-head > .stack-close").last().click();
+  await page.locator('#dock > [data-id="group"]').click();
+  await search.waitFor();
+  assert.equal(await search.inputValue(), "App 1");
+  assert.equal(await page.locator("#stack .stack-cell:visible").count(), 11);
+  assert.deepEqual(errors, []); await page.close();
+});

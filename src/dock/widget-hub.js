@@ -24,6 +24,7 @@ export function buildWidgetHub(pins, { open, close, settings }) {
     row.append(button, name, desc); grid.append(row);
   } };
   walk(pins);
+  if (!grid.children.length) { const empty = document.createElement("p"); empty.className = "widget-hub-empty"; empty.textContent = t("refine.hubEmpty"); grid.append(empty); }
   const add = document.createElement("button"); add.type = "button"; add.className = "productivity-button"; add.textContent = t("overhaul.addWidget"); add.addEventListener("click", settings); panel.append(add);
   return panel;
 }

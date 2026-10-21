@@ -7,6 +7,12 @@ All work stays in **one new large release**, as explicitly requested. Branch
 commits and review fixes are not separate product updates; do not publish
 intermediate versions.
 
+The user also explicitly requested batching validation: complete the full set of
+changes locally before a single final validation round and branch sync. Do not
+push each implementation increment, because PR synchronization starts hosted CI.
+Keep the repository's required checks intact; this is a work-order decision, not
+permission to bypass release verification.
+
 ## Direction agreed with the user
 
 Booki is an intelligent dock that coexists with the Windows taskbar. Refine its
@@ -70,7 +76,8 @@ selectable; retain that control instead of introducing another size system.
   job-scoped progress and cancellation; retry; 50-job session bound; explicit
   file/gallery/video/audio modes; shared folder/default-format preferences in
   Widgets and Plugins plus a gear disclosure in the panel. Completion exposes
-  reveal/open/copy actions when the dock is visible and in the result row.
+  reveal/open/copy actions beside the dock or in an actionable notch popup,
+  and in the result row. Folder, format and video quality preferences are shared.
 
 ## Deliberate boundaries
 
@@ -86,16 +93,16 @@ selectable; retain that control instead of introducing another size system.
   is no universal pause/resume guarantee. URLs/results remain in memory and
   aren't copied into persistent history; the queue ends when Booki closes.
 - Gallery progress is indeterminate because the total count is unknown.
-- Popup file actions are available beside a visible dock; when tucked away,
-  the notch receives the normal short notice and actions remain in Collector.
+- Popup actions on the separate notch receive only an expiring opaque callback
+  token and labels. Paths remain in the dock process; no persistent notice history.
 - Multiple simultaneous docks, media-session picking, bulk selection inside a
   dock group and profile-scope redesign are not part of this first refinement.
   Existing profiles, schedules and editing mode remain available.
 - A Fluent visual pass doesn't prove that native compositor flashes are gone.
   Validate actual opening/closing, display movement, DPI changes, suspend/resume,
   peripheral charge/disconnect and an installed upgrade on Windows.
-- The public release remains 0.94.0. These changes are unreleased; final version,
-  changelog and release screenshots should be prepared only when scope is closed.
+- The public release remains 0.94.0. This batch targets **0.95.0**; versioned
+  notes and source captures prepare that one release without publishing it.
 
 ## Validation
 
@@ -103,3 +110,35 @@ Exercise serial queue ownership, cancellation/retry and stale progress, group
 view persistence and search, native command contracts, contextual agent rotation,
 the live widget panel, shared preferences and the existing regression suite.
 Keep reduced-motion, high-contrast and keyboard paths in the visual review.
+
+### Evidence gathered before the batching instruction
+
+- Full frontend suite: 332 tests passed with four test-file workers. An earlier
+  run overlapped a rebuild and had a folder boot timeout; its isolated rerun and
+  the later complete run passed.
+- The final music-on-agent hover change and device/Collector preference paths:
+  18 focused tests passed; build and lint passed.
+- Rust formatting passed. A local Clippy attempt lacked GLib development files.
+  A dependency-equipped Docker check was then started and deliberately stopped
+  when the user requested deferring validation until the whole batch is ready.
+  Native compilation/test success is therefore **not yet established**.
+- Hosted CI runs triggered by incremental PR pushes were cancelled/requested to
+  cancel after the batching instruction. Re-run the required validation once the
+  remaining product batch is closed; do not infer success from a cancelled run.
+
+### Final 0.95.0 validation
+
+- Version agreement, ESLint, TypeScript, text encoding, icon contracts,
+  publication privacy and five-language parity pass (1,074 translation keys).
+- Native formatting and Clippy pass, with warnings denied. The native library
+  suite passes **80 tests** in the dependency-equipped Linux container. Tauri's
+  generated-schema directory must be writable; source stays mounted read-only.
+- The first full browser run found an actual pointer-events inheritance bug in
+  the new notch popup. Its buttons now opt into pointer events, and the popup
+  regression checks the native 100px window height. The rebuilt frontend passes
+  the complete **339-test** suite with four test-file workers (no skips).
+- Both READMEs, versioned notes and all **12 source captures** pass the release
+  documentation guard. Group/widget/Collector compositions were visually reviewed.
+- Windows-specific compilation/packaging runs in the PR's required CI after
+  the final batch sync. Hardware and installed-upgrade checks remain listed in
+  [the Windows checklist](v0.95.0-windows-checklist.md).

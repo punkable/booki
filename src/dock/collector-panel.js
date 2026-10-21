@@ -4,6 +4,7 @@ import { icon } from "../icons.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { collectorQueue, classifyLink, onDownloadChange } from "./collector.js";
+import { COLLECTOR_QUALITIES, collectorPreferences } from "../collector-preferences.js";
 import { pluginError } from "../plugin-errors.js";
 
 const text = (tag, value, className = "") => { const el = document.createElement(tag); el.textContent = value; el.className = className; return el; };
@@ -16,18 +17,30 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
   const save = async (patch) => { if (!(await persist(patch))) throw new Error(t("status.saveError")); Object.assign(S.cfg, patch); };
   button(preferences, t("m.addFolder"), async () => { const path = await pickFolder(); if (path) { await save({ collectorDirectory: path }); folder.textContent = path; } });
   button(preferences, t("refine.systemDownloads"), async () => { await save({ collectorDirectory: "" }); folder.textContent = t("refine.systemDownloads"); });
-  preferences.append(folder);
+  const saveStatus = text("p", "", "plugin-action-error"); saveStatus.hidden = true; saveStatus.setAttribute("role", "alert");
+  preferences.append(folder, saveStatus);
   const defaultLabel = text("label", t("refine.defaultFormat"), "collector-field");
   const defaultFormat = document.createElement("select"); defaultFormat.setAttribute("aria-label", t("refine.defaultFormat"));
   for (const mode of ["video", "audio"]) defaultFormat.append(new Option(t(`dl.${mode}`), mode));
   defaultFormat.value = (S.cfg.collectorFormat === "audio" ? "audio" : "video");
   defaultFormat.addEventListener("change", async () => {
     defaultFormat.disabled = true;
-    try { await save({ collectorFormat: defaultFormat.value }); }
-    catch (_) { defaultFormat.value = (S.cfg.collectorFormat === "audio" ? "audio" : "video"); folder.textContent = t("status.saveError"); }
+    try { await save({ collectorFormat: defaultFormat.value }); saveStatus.hidden = true; }
+    catch (_) { defaultFormat.value = (S.cfg.collectorFormat === "audio" ? "audio" : "video"); saveStatus.textContent = t("status.saveError"); saveStatus.hidden = false; }
     finally { defaultFormat.disabled = false; }
   });
-  defaultLabel.append(defaultFormat); preferences.append(defaultLabel); box.append(preferences);
+  defaultLabel.append(defaultFormat); preferences.append(defaultLabel);
+  const qualityLabel = text("label", t("refine.quality"), "collector-field");
+  const quality = document.createElement("select"); quality.setAttribute("aria-label", t("refine.quality"));
+  for (const value of COLLECTOR_QUALITIES) quality.append(new Option(value === "best" ? t("refine.bestQuality") : `${value}p`, value));
+  quality.value = collectorPreferences(S.cfg).quality;
+  quality.addEventListener("change", async () => {
+    quality.disabled = true;
+    try { await save({ collectorQuality: quality.value }); saveStatus.hidden = true; }
+    catch (_) { quality.value = collectorPreferences(S.cfg).quality; saveStatus.textContent = t("status.saveError"); saveStatus.hidden = false; }
+    finally { quality.disabled = false; }
+  });
+  qualityLabel.append(quality); preferences.append(qualityLabel, text("small", t("refine.qualityHint"))); box.append(preferences);
 
   const form = document.createElement("div"); form.className = "download-form";
   const input = document.createElement("textarea"); input.rows = 3; input.maxLength = 40000; input.placeholder = t("dl.paste"); input.setAttribute("aria-label", t("dl.paste")); input.value = item.url || "";
@@ -44,7 +57,7 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
       try { url = new URL(line); } catch (_) { throw new Error(t("perr.link")); }
       if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || line.length > 8192) throw new Error(t("perr.link"));
       const kind = classifyLink(url.href);
-      return { url: url.href, directory: S.cfg.collectorDirectory || null, format: mode.value === "auto" ? (kind === "media" ? (S.cfg.collectorFormat === "audio" ? "audio" : "video") : kind) : mode.value };
+      return { url: url.href, quality: collectorPreferences(S.cfg).quality, directory: S.cfg.collectorDirectory || null, format: mode.value === "auto" ? (kind === "media" ? (S.cfg.collectorFormat === "audio" ? "audio" : "video") : kind) : mode.value };
     });
     try { collectorQueue.enqueue(entries); }
     catch (_) { throw new Error(t("refine.queueFull")); }
@@ -70,7 +83,8 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
       let row = rows.get(job.id);
       if (!row) {
         row = text("article", "", "collector-job"); row.dataset.id = job.id;
-        row.append(text("strong", "", "collector-job-title"), text("p", "", "collector-job-state"), text("div", "", "collector-job-actions"));
+        const progress = document.createElement("progress"); progress.max = 100; progress.className = "collector-job-progress";
+        row.append(text("strong", "", "collector-job-title"), text("p", "", "collector-job-state"), progress, text("div", "", "collector-job-actions"));
         list.append(row); rows.set(job.id, row);
       }
       let host = "";
@@ -78,6 +92,10 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
       row.querySelector("strong").textContent = job.title || job.path.split(/[\\/]/).pop() || host;
       const labelKey = { queued: "refine.queued", cancelled: "refine.cancelled", done: "dl.done", error: "dl.failed" }[job.state];
       row.querySelector("p").textContent = job.cancelRequested ? t("refine.cancelling") : job.state === "error" ? pluginError(job.error) : labelKey ? t(labelKey) : job.indeterminate ? "…" : `${Math.round(job.percent)}%`;
+      const progress = row.querySelector("progress");
+      progress.hidden = !["start", "progress"].includes(job.state);
+      progress.setAttribute("aria-label", job.title || host);
+      if (job.indeterminate || job.state === "start") progress.removeAttribute("value"); else progress.value = job.percent;
       if (row.dataset.state === job.state && row.dataset.cancelling === String(!!job.cancelRequested)) continue;
       row.dataset.state = job.state; row.dataset.cancelling = String(!!job.cancelRequested);
       const actions = row.querySelector(".collector-job-actions"); actions.replaceChildren();

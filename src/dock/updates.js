@@ -48,7 +48,6 @@ function showUpdate(update) {
   if (updateRetry) { clearInterval(updateRetry); updateRetry = 0; }
   pill.textContent = t("toast.updateBody").replace("{version}", () => version);
   pill.classList.remove("hidden");
-  dockApi.notify(t("toast.updateBody").replace("{version}", () => version), "").catch(() => {});
   placeUpdatePill();
   if (!pill.dataset.bound) {
     pill.dataset.bound = "1";

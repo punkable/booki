@@ -148,24 +148,66 @@ async function shootSettings(locale, theme, pageName) {
   return { file, ...WINDOW };
 }
 
+async function shootGroup(locale) {
+  const opened = await open('index.html', config(locale, 'light', { autoHideMode: 'off', magnification: false, pinned: [app('files'), app('browser'), group('grp-work', 'Work', '#6b69d6', 'zap', ['terminal', 'chat', 'notes', 'calendar', 'editor', 'mail', 'photos', 'videos']), widget('clock'), widget('system', { metrics: ['cpu', 'ram'] })] }), { width: 1600, height: 700 });
+  const { page } = opened;
+  await page.locator('#dock > [data-id="grp-work"]').click();
+  await page.locator('#stack.open').waitFor();
+  await page.mouse.move(1, 1); await page.waitForTimeout(350);
+  const dock = await page.locator('#dock').boundingBox(), panel = await page.locator('#stack').boundingBox();
+  const box = { x: Math.min(dock.x, panel.x), y: Math.min(dock.y, panel.y), width: Math.max(dock.x + dock.width, panel.x + panel.width) - Math.min(dock.x, panel.x), height: Math.max(dock.y + dock.height, panel.y + panel.height) - Math.min(dock.y, panel.y) };
+  const file = resolve(shots, `group-flyout-${locale}.png`);
+  await page.screenshot({ path: file, omitBackground: true, clip: pad(box, 20) });
+  await finish(opened, `group flyout ${locale}`);
+  return { file, width: box.width, height: box.height, pad: 20 };
+}
+
+async function shootUtility(locale, kind) {
+  const opened = await open('index.html', config(locale, 'dark', { autoHideMode: 'off', pinned: ['clock', 'devices', 'volume', 'ai', 'focus', 'collector'].map((type) => widget(type, type === 'focus' ? FOCUS : {})) }), { width: 1200, height: 820 }, `{
+    window.__captureJobs = [];
+    const old = window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke = (cmd, args) => cmd === 'plugin_status' ? Promise.resolve({ installed: true, version: 'sample' }) : cmd === 'plugin_download' ? new Promise((resolve) => window.__captureJobs.push({ args, resolve })) : old(cmd, args);
+  }`);
+  const { page } = opened;
+  let selector;
+  if (kind === 'hub') {
+    await page.locator('#dock').dispatchEvent('contextmenu', { clientX: 600, clientY: 650 });
+    await page.getByRole('menuitem', { name: locale === 'es' ? 'Panel de widgets' : 'Widget panel', exact: true }).click();
+    selector = '.widget-hub.is-open';
+  } else {
+    await page.locator('#dock > [data-id="w-collector"]').click();
+    await page.getByRole('textbox', { name: locale === 'es' ? 'Pega un enlace' : 'Paste a link' }).fill('https://example.com/tutorial\nhttps://example.com/guide.pdf');
+    await page.getByRole('button', { name: locale === 'es' ? 'Añadir a la cola' : 'Add to queue', exact: true }).click();
+    await page.waitForFunction(() => window.__captureJobs.length > 0);
+    await page.evaluate(() => { for (const cb of window.__listeners['plugin-download'] || []) cb({ payload: { id: window.__captureJobs[0].args.jobId, state: 'progress', percent: 64, title: 'Design tutorial' } }); });
+    selector = '.system-widget-panel.is-open';
+    await page.locator('.system-widget-sections').evaluate((el) => { el.scrollTop = 0; });
+  }
+  await page.locator(selector).waitFor(); await page.mouse.move(1, 1); await page.waitForTimeout(300);
+  const box = await page.locator(selector).boundingBox(), file = resolve(shots, `${kind}-${locale}.png`);
+  await page.locator(selector).screenshot({ path: file, omitBackground: true });
+  await finish(opened, `${kind} ${locale}`);
+  return { file, width: box.width, height: box.height, pad: 0 };
+}
+
 /* ── Composition ────────────────────────────────────────────────────────── */
 
 const COPY = {
   en: {
     note: PREVIEW ? `Branch preview · base v${VERSION} · example icons and data` : `v${VERSION} · actual interface · example icons and data`,
     hero: [['Your desktop,', 'calmer.'], 'One beautiful dock for your apps, folders and live widgets. Free and open source for Windows 11.'],
-    widgets: [['Live, at', 'a glance.'], 'Clock, weather, system, focus, media, notes and more, right on the bar.'],
+    widgets: [['Your tools,', 'together.'], 'Live widgets, quick audio controls and a Collector with an explicit download queue.'],
     island: [['The notch that', 'tells you things.'], 'Claude Code, Codex and Cursor. Their status on your desktop, with local signals and clear indicators.'],
-    groups: [['Groups that look', 'like yours.'], 'Give any group a colour from a curated palette and an icon from the library.'],
+    groups: [['Find. Move.', 'Make it yours.'], 'Search your groups, change views with Ctrl + wheel and see where every shortcut will land.'],
     settings: [['Settings you', 'actually enjoy.'], 'Six clear sections for your dock, widgets, apps, plugins and system.'],
     dark: [['At home in', 'the dark.'], 'Taskbar, glass or solid. Light or dark. Booki follows Windows.'],
   },
   es: {
     note: PREVIEW ? `Vista previa · base v${VERSION} · iconos y datos de ejemplo` : `v${VERSION} · interfaz real · iconos y datos de ejemplo`,
     hero: [['Tu escritorio,', 'más en calma.'], 'Un dock precioso para tus apps, carpetas y widgets en vivo. Gratis y de código abierto para Windows 11.'],
-    widgets: [['En vivo,', 'de un vistazo.'], 'Reloj, clima, sistema, enfoque, música, notas y más, en la propia barra.'],
+    widgets: [['Tus herramientas,', 'reunidas.'], 'Widgets en vivo, controles de audio y un Recolector con una cola clara de descargas.'],
     island: [['El notch que', 'te cuenta cosas.'], 'Claude Code, Codex y Cursor. Su estado en tu escritorio, con señales locales e indicadores claros.'],
-    groups: [['Grupos con', 'tu estilo.'], 'Dale a cada grupo un color de una paleta cuidada y un icono de la librería.'],
+    groups: [['Busca. Mueve.', 'Hazlo tuyo.'], 'Busca dentro de tus grupos, cambia de vista con Ctrl + rueda y ve dónde caerá cada acceso.'],
     settings: [['Ajustes que', 'da gusto usar.'], 'Seis secciones para tu dock, widgets, apps, complementos y sistema.'],
     dark: [['Como en casa', 'a oscuras.'], 'Barra de tareas, vidrio o sólido. Claro u oscuro. Booki sigue a Windows.'],
   },
@@ -226,7 +268,7 @@ function compose(name, locale, s) {
   const dockAt = (shot) => piece(shot, { left: (1920 - DOCK_WIDTH) / 2, top: 970 - shot.height * (DOCK_WIDTH / shot.width), width: DOCK_WIDTH });
   switch (name) {
     case 'hero': {
-      const pill = 300;
+      const pill = 160;
       return page('light', note, `${piece(s.notch, { left: (1920 - pill) / 2, top: 36, width: pill })}
         <div style="position:absolute;left:0;right:0;top:250px;display:flex;justify-content:center">${headline(title, body, { theme: 'light', align: 'center', width: 1400 })}</div>
         <div style="position:absolute;left:0;right:0;top:680px;display:flex;justify-content:center;gap:16px">
@@ -234,12 +276,14 @@ function compose(name, locale, s) {
         </div>${dockAt(s.dockLight)}`);
     }
     case 'island': {
-      const pill = 560;
+      const pill = 230;
       return page('dark', note, `<div style="position:absolute;left:120px;top:205px">${headline(title, body, { theme: 'dark', align: 'left', width: 900 })}</div>
-        ${[s.notchDark, s.notchWaiting, s.notchDone].map((shot, i) => piece(shot, { left: 1180, top: 220 + i * 150, width: pill })).join('')}
+        ${[s.notchDark, s.notchWaiting, s.notchDone].map((shot, i) => piece(shot, { left: 1200, top: 220 + i * 150, width: pill }) + `<span style="position:absolute;left:1480px;top:${242 + i * 150}px;color:#eee;font-size:27px">${['Claude Code', 'Cursor', 'Codex'][i]}</span>`).join('')}
         ${dockAt(s.dockDark)}`);
     }
-    case 'widgets': case 'groups': case 'settings': case 'dark': {
+    case 'groups': return page('light', note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme: 'light', align: 'left', width: 540, size: 106 })}</div>${piece(s.group, { left: 800, top: 210, width: 900 })}`);
+    case 'widgets': return page('dark', note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme: 'dark', align: 'left', width: 510, size: locale === 'es' ? 76 : 96 })}</div>${piece(s.hub, { left: 700, top: 185, width: 390 })}${piece(s.collector, { left: 1130, top: 160, width: 610 })}`);
+    case 'settings': case 'dark': {
       const theme = name === 'widgets' || name === 'dark' ? 'dark' : 'light';
       return page(theme, note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme, align: 'left', width: 570, size: name === 'dark' ? 98 : 118 })}</div>
         ${windowFrame(s.window, { left: 710, top: 110, width: 1120, theme })}`);
@@ -271,8 +315,8 @@ try {
     const scenes = {
       hero: { dockLight, notch: notchDark }, // the Island reads as dark on any wallpaper
       island: { dockDark, notchDark, notchWaiting, notchDone },
-      widgets: { window: await shootSettings(locale, 'dark', 'widgets') },
-      groups: { window: await shootSettings(locale, 'light', 'apps') },
+      widgets: { hub: await shootUtility(locale, 'hub'), collector: await shootUtility(locale, 'collector') },
+      groups: { group: await shootGroup(locale) },
       settings: { window: await shootSettings(locale, 'light', 'home') },
       dark: { window: await shootSettings(locale, 'dark', 'dock') },
     };

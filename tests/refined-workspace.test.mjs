@@ -60,10 +60,34 @@ test("Collector default format is saved from its gear panel and used for automat
   await page.locator('#dock > [data-id="collector"]').click();
   await page.getByRole("button", { name: "Collector settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Format for video pages", exact: true }).selectOption("audio");
+  await page.getByRole("combobox", { name: "Video quality", exact: true }).selectOption("1080");
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).collectorFormat === "audio");
   await page.getByRole("textbox", { name: "Paste a link" }).fill("https://example.com/watch?v=123");
   await page.getByRole("button", { name: "Add to queue", exact: true }).click();
   await waitForAsyncCondition(page, () => window.__jobs.length === 1);
   assert.equal(await page.evaluate(() => window.__jobs[0].format), "audio");
+  assert.equal(await page.evaluate(() => window.__jobs[0].quality), "1080");
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test("finished Collector notices on the notch dispatch only their registered file action", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [widget("collector")] }),
+    initScript: `window.__notices=[];window.__opened=[];const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{
+      if(cmd==='plugin_download')return Promise.resolve('C:/Downloads/report.pdf');
+      if(cmd==='notch_notice'){window.__notices.push(args);return Promise.resolve(true);}
+      if(cmd==='open_location'){window.__opened.push(args);return Promise.resolve();}
+      return old(cmd,args);
+    };`,
+  });
+  await page.locator('#dock > [data-id="collector"]').click();
+  await page.getByRole("textbox", { name: "Paste a link" }).fill("https://example.com/report.pdf");
+  await page.getByRole("button", { name: "Add to queue", exact: true }).click();
+  await waitForAsyncCondition(page, () => window.__notices.some((notice) => notice.actionId));
+  const notice = await page.evaluate(() => window.__notices.find((notice) => notice.actionId));
+  assert.equal(notice.actionLabels.length, 3);
+  assert.equal(JSON.stringify(notice).includes("C:/Downloads"), false);
+  await page.evaluate(async (id) => { for (const cb of window.__listeners['booki://notice-action'] || []) await cb({ payload: { id, index: 0 } }); }, notice.actionId);
+  await waitForAsyncCondition(page, () => window.__opened.length === 1);
   assert.deepEqual(errors, []); await page.close();
 });

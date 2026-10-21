@@ -37,13 +37,22 @@ test("cancelling active work waits for the native process; queued cancellation s
 });
 test("failed work is retained, retry gets a new identity, and clear keeps pending work", async () => {
   const { queue, runs } = fixture();
-  const [a] = queue.enqueue([{ url: "a", directory: "target", format: "audio" }]);
+  const [a] = queue.enqueue([{ url: "a", directory: "target", format: "audio", quality: "1080" }]);
   runs[0].reject(new Error("offline")); await tick();
   assert.equal(a.state, "error"); assert.equal(a.error, "offline");
   const [retry] = queue.retry(a.id);
   assert.notEqual(retry.id, a.id); assert.equal(retry.directory, "target");
+  assert.equal(retry.quality, "1080");
   queue.clear(); assert.deepEqual(queue.jobs.map((job) => job.id), [retry.id]);
   runs[1].resolve("ok"); await tick();
+});
+
+test("a rejected oversized addition preserves finished results", async () => {
+  const { queue, runs } = fixture();
+  const [job] = queue.enqueue([{ url: "first" }]);
+  runs[0].resolve("first.mp4"); await tick();
+  assert.throws(() => queue.enqueue(Array.from({ length: 51 }, () => ({ url: "new" }))));
+  assert.equal(queue.jobs[0].id, job.id);
 });
 test("queue capacity is atomic and never evicts pending jobs", () => {
   const { queue } = fixture();

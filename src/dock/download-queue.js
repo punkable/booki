@@ -4,6 +4,7 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
   const jobs = [];
   let active = null;
   let serial = 0;
+  let finished = 0;
   const publish = () => changed(jobs.slice(), active);
   const pump = async () => {
     if (active) return;
@@ -15,11 +16,12 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
       job.path = path || job.path;
       job.state = "done";
       job.percent = 100;
-      if (job.state === "done") { try { completed(job); } catch (_) { /* notification failure cannot fail a saved file */ } }
+      try { completed(job); } catch (_) { /* notification failure cannot fail a saved file */ }
     } catch (error) {
       job.state = job.cancelRequested ? "cancelled" : "error";
       job.error = String(error?.message ?? error ?? "");
     } finally {
+      job.finished = ++finished;
       active = null; publish(); void pump();
     }
   };
@@ -27,6 +29,8 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
     get jobs() { return jobs.slice(); },
     get active() { return active; },
     enqueue(entries) {
+      const retained = jobs.filter((job) => !["done", "error", "cancelled"].includes(job.state)).length;
+      if (retained + entries.length > 50) throw new Error("queue full");
       // Retain at most 50 recent results, without dropping pending work.
       while (jobs.length + entries.length > 50) {
         const at = jobs.findIndex((job) => ["done", "error", "cancelled"].includes(job.state));
@@ -49,7 +53,7 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
     async cancel(id) {
       const job = jobs.find((row) => row.id === id);
       if (!job) return;
-      if (job.state === "queued") { job.state = "cancelled"; publish(); return; }
+      if (job.state === "queued") { job.state = "cancelled"; job.finished = ++finished; publish(); return; }
       if (active !== job || job.cancelRequested) return;
       // Do not advance until the native process has actually stopped.
       job.cancelRequested = true; publish();
@@ -59,7 +63,7 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
     retry(id) {
       const job = jobs.find((row) => row.id === id);
       if (!job || !["error", "cancelled"].includes(job.state)) return;
-      return this.enqueue([{ url: job.url, format: job.format, directory: job.directory }]);
+      return this.enqueue([{ url: job.url, format: job.format, directory: job.directory, quality: job.quality }]);
     },
     clear() {
       for (let i = jobs.length - 1; i >= 0; i--) if (["done", "error", "cancelled"].includes(jobs[i].state)) jobs.splice(i, 1);

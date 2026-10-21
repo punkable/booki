@@ -2799,3 +2799,15 @@ body:is(.edge-left, .edge-right) .tile.group-drop-before::before { top: -4px; bo
 body:is(.edge-left, .edge-right) .tile.group-drop-after::before { top: auto; bottom: -4px; }
 
 .edge-move-hint { position: absolute; left: 50%; top: 50%; translate: -50% -50%; padding: 10px 16px; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-card); pointer-events: none; font: 13px/20px var(--font); }
+
+/* Finished-download actions use the same transient notch surface. */
+body.notch-body.toast.toast-actionable .notch-toast { display: grid; grid-template-columns: 16px minmax(0, 1fr); width: calc(100vw - 16px); border-radius: var(--r-card); gap: 10px; }
+.notch-toast-actions:not([hidden]) { grid-column: 1 / -1; display: flex; gap: 6px; }
+.notch-toast-actions[hidden] { display: none; }
+.notch-toast-actions button { pointer-events: auto; flex: 1; min-width: 0; min-height: 30px; padding: 4px 8px; font: 12px/18px var(--font); color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-bottom-color: var(--ctrl-stroke-bottom); border-radius: var(--r-control); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.notch-toast-actions button:hover { background: var(--ctrl-fill-hover); }
+.notch-toast-actions button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.notch-toast-actions button svg { width: 16px; height: 16px; vertical-align: middle; }
+
+.widget-hub-empty { grid-column: 1 / -1; color: var(--ink-2); font: 13px/1.5 var(--font); }
+body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-workspace).is-closing { opacity: 0; transition: none; }

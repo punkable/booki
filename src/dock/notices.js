@@ -2,18 +2,22 @@
    beside the bar while it is out. Never hides the dock, never steals focus.
    While a focus block runs or Windows' Do not disturb is on, notices wait and
    are shown when it ends; only critical ones (a nearly flat battery) pass. */
-import { invoke } from "../api.js";
+import { invoke, onNoticeAction } from "../api.js";
+import { t } from "../i18n.js";
+import { createNoticeActions } from "./notice-actions.js";
 import { showNoticeToast } from "./undo-toast.js";
 import { isFocusing, dndActive, onFocusDndChange } from "./focus-dnd.js";
 
 const HELD_MAX = 5;
 const held = [];
+const noticeActions = createNoticeActions();
+onNoticeAction((payload) => noticeActions.dispatch(payload).catch(() => showNoticeToast(t("overhaul.failed"))));
 
 async function show(title, detail, actions = []) {
-  if (actions.length && document.visibilityState === "visible") { showNoticeToast(title, detail, actions); return; }
   let onNotch = false;
-  try { onNotch = await invoke("notch_notice", { title, detail }); } catch (_) { onNotch = false; }
-  if (!onNotch) showNoticeToast(title, detail, actions);
+  const registered = actions.length ? noticeActions.register(actions) : null;
+  try { onNotch = await invoke("notch_notice", { title, detail, actionId: registered?.id || null, actionLabels: registered?.labels || [] }); } catch (_) { onNotch = false; }
+  if (!onNotch) { if (registered) noticeActions.revoke(registered.id); showNoticeToast(title, detail, actions); }
 }
 
 export const quiet = () => isFocusing() || dndActive();

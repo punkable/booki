@@ -120,8 +120,8 @@ fn default_notch_position() -> String {
     "center".into()
 }
 fn default_notch_mode() -> String {
-    // Attached = iPhone-style tab flush to the edge (former notchPeek default).
-    "attached".into()
+    // A quiet dot at rest; existing explicit placement preferences are kept.
+    "smart".into()
 }
 fn default_surface_style() -> String {
     // One finish for dock + notch: "glass", "mica" or "solid".
@@ -285,6 +285,8 @@ pub struct Config {
     pub collector_directory: String,
     #[serde(default)]
     pub collector_format: String,
+    #[serde(default)]
+    pub collector_quality: String,
     /// Monitor index to place the dock on (-1 = primary).
     #[serde(default = "default_monitor")]
     pub monitor: i32,
@@ -440,7 +442,7 @@ fn default_notch_visibility() -> String {
 }
 
 fn default_overflow() -> String {
-    "adapt".into()
+    "scroll".into()
 }
 
 impl Default for Config {
@@ -475,6 +477,7 @@ impl Default for Config {
             launcher_hotkey: default_launcher_hotkey(),
             collector_directory: String::new(),
             collector_format: String::new(),
+            collector_quality: String::new(),
             monitor: default_monitor(),
             monitor_name: String::new(),
             overflow_mode: default_overflow(),

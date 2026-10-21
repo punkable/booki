@@ -1,16 +1,20 @@
+import { widgetDisplayName } from "../widgets-meta.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 
+const sessions = new Map();
 export const GROUP_VIEWS = ["list", "small", "medium", "large"];
 const norm = (value) => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase();
-export function filterGroup(children, query) { const q = norm(query).trim(); return children.filter((item) => norm(item.name || item.widget || item.path).includes(q)); }
+export function filterGroup(children, query) { const q = norm(query).trim(); return children.filter((item) => norm([item.name, item.widget ? widgetDisplayName(item.widget, t) : "", item.path].filter(Boolean).join(" ")).includes(q)); }
 
 /* Filtering hides existing cells, retaining widget listeners and sensor polls.
    Ctrl+wheel changes density, like Explorer; ordinary wheel stays scrolling. */
 export function enhanceGroupView(stack, grid, item) {
   const toolbar = document.createElement("div"); toolbar.className = "group-toolbar";
   const search = document.createElement("input"); search.type = "search"; search.maxLength = 256;
+  const previous = sessions.get(item.id);
+  search.value = previous?.query || "";
   search.placeholder = t("refine.searchGroup"); search.setAttribute("aria-label", t("refine.searchGroup"));
   const select = document.createElement("select"); select.setAttribute("aria-label", t("refine.groupView")); select.title = t("refine.viewHint");
   GROUP_VIEWS.forEach((value) => select.append(new Option(t(`refine.${value}`), value)));
@@ -39,13 +43,43 @@ export function enhanceGroupView(stack, grid, item) {
       cell.hidden = !ids.has(id);
     }
     empty.hidden = !search.value || ids.size > 0;
+    const originalEmpty = grid.querySelector(".stack-empty:not(.group-no-matches)");
+    if (originalEmpty) originalEmpty.hidden = !!search.value;
   };
   search.addEventListener("input", applySearch);
+  applySearch();
+  if (previous) requestAnimationFrame(() => { if (grid.isConnected) grid.scrollTop = previous.scroll || 0; });
   const keydown = (event) => {
     if (event.ctrlKey && event.key.toLowerCase() === "f") { event.preventDefault(); event.stopPropagation(); search.focus(); search.select(); }
     if (event.key === "Escape" && search.value) { event.preventDefault(); event.stopPropagation(); search.value = ""; applySearch(); }
   };
   stack.addEventListener("keydown", keydown);
+  grid.addEventListener("keydown", (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey || event.target.matches("input, textarea, select") || event.target.closest(".w-controls")) return;
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    const cells = [...grid.querySelectorAll(".stack-item")].filter((cell) => cell.offsetParent !== null);
+    const current = event.target.closest(".stack-item");
+    let index = cells.indexOf(current);
+    if (!cells.length) return;
+    event.preventDefault();
+    if (index < 0 || event.key === "Home") index = 0;
+    else if (event.key === "End") index = cells.length - 1;
+    else if (["ArrowLeft", "ArrowRight"].includes(event.key) || view === "list") index += ["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 1;
+    else {
+      const origin = current.getBoundingClientRect();
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      let score = Infinity;
+      cells.forEach((cell, candidate) => {
+        const rect = cell.getBoundingClientRect();
+        const delta = (rect.top - origin.top) * direction;
+        const distance = delta * 4 + Math.abs(rect.left - origin.left);
+        if (delta > 1 && distance < score) { index = candidate; score = distance; }
+      });
+    }
+    const target = cells[Math.max(0, Math.min(cells.length - 1, index))];
+    (target.matches("button") ? target : target.querySelector("button"))?.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "nearest" });
+  });
   let wheel = 0;
   grid.addEventListener("wheel", (event) => {
     if (!event.ctrlKey) return;
@@ -56,5 +90,9 @@ export function enhanceGroupView(stack, grid, item) {
     changed(GROUP_VIEWS[at]); wheel = 0;
   }, { passive: false });
   toolbar.append(search, select); stack.insertBefore(toolbar, grid);
-  return () => { clearTimeout(timer); stack.removeEventListener("keydown", keydown); void save(); };
+  return () => {
+    sessions.delete(item.id); sessions.set(item.id, { query: search.value, scroll: grid.scrollTop });
+    while (sessions.size > 50) sessions.delete(sessions.keys().next().value);
+    clearTimeout(timer); stack.removeEventListener("keydown", keydown); void save();
+  };
 }

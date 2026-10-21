@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64-setup.exe"><b>Descargar para Windows v0.94.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.94.0.md">Novedades v0.94.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64-setup.exe"><b>Descargar para Windows v0.95.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.95.0.md">Novedades v0.95.0</a> ·
   <a href="README.md">English</a>
 </p>
 <!-- booki:download:end -->
@@ -48,13 +48,13 @@
 
 <p align="center">Ancla apps, carpetas, archivos y sitios web, y júntalos en grupos.<br/>Dale a cada grupo un color de una paleta cuidada y un icono de la librería: se ve en el dock y en Ajustes.</p>
 
-<p align="center"><img src="docs/presentation/groups-es.jpg" width="1000" alt="Apps y carpetas de Booki con elementos de ejemplo y catálogo de aplicaciones" /></p>
+<p align="center"><img src="docs/presentation/groups-es.jpg" width="1000" alt="Grupo de Booki con búsqueda, densidad seleccionable e iconos de apps de ejemplo" /></p>
 
 <h2 align="center">En vivo, de un vistazo.</h2>
 
 <p align="center">Reloj, calendario, clima, sistema (CPU, memoria, disco, red), batería, música, volumen, notas, portapapeles y enfoque (temporizador + tareas).<br/>Fichas compactas en la propia barra.<br/>Un bloque de enfoque activa No molestar de Windows (y lo desactiva al terminar), retiene los avisos de Booki y puede mantener el dock oculto.</p>
 
-<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Galería actual de widgets de Booki" /></p>
+<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Panel de widgets en vivo y cola de sesión del Recolector de Booki" /></p>
 
 <h2 align="center">Ajustes que da gusto usar.</h2>
 
@@ -75,7 +75,7 @@
 <p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Capturas del frontend del código fuente v0.94.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
+<p align="center"><sub>Capturas del frontend del código fuente v0.95.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
 <!-- booki:media:end -->
 
 ## Instalar y empezar
@@ -87,20 +87,19 @@
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
 
 <!-- booki:news:start -->
-## Novedades de 0.94.0
+## Novedades de 0.95.0
 
-Grupos más ágiles, widgets más claros y un README renovado.
+Un Booki más fluido: grupos claros, notch discreto y Recolector completo.
 
-- Arrastra archivos y carpetas directamente a un grupo abierto. El contenido tiene scroll interno con cabecera fija; sacar miembros queda en el menú contextual o el arrastre, también por teclado.
-- El icono de la cabecera abre colores Pantone e iconos. Cambiar la apariencia conserva los widgets y guarda sobre el grupo actual. Los paneles de vidrio reportan su geometría durante la apertura.
-- Las baterías visibles se consultan cada 15 segundos, con menor frecuencia en ahorro de energía. Puedes actualizar manualmente y abrir los ajustes Bluetooth. Sin lectura actual se muestra ?, sin conservar indefinidamente un porcentaje antiguo.
-- La tarjeta rota entre los proveedores detectados con sus logos y colores. Codex muestra el porcentaje restante de la ventana más restrictiva. Claude muestra tokens y cuota desconocida cuando sus registros no incluyen el límite.
-- El reproductor del notch deja de ofrecer una tarjeta tras un minuto en pausa y vuelve al reanudar.
-- Un evento tardío de progreso ya no reemplaza el resultado final del Recolector. El detalle del fallo también aparece en su tarjeta.
-- Los avisos de actualización esperan durante concentración, No molestar, vídeo o juegos. La descarga y la instalación siguen siendo acciones separadas, con guardado y respaldo antes de aplicar.
-- Doce imágenes en inglés y español con interfaz real, iconos de ejemplo e historial reciente sincronizado con el changelog.
+- Busca dentro del grupo y cambia entre lista e iconos pequeños, medianos o grandes con Ctrl + rueda. Al reorganizar se conservan búsqueda, vista y desplazamiento.
+- Al arrastrar desde un grupo ves el icono o inicial, el nombre, el destino y dónde se insertará. Escape cancela. Arrastra el fondo del dock para cambiar de borde o pantalla.
+- Tres estilos de partida opcionales, desplazamiento suave y animaciones más contenidas. El punto en reposo es el inicio para instalaciones nuevas y presets; tus preferencias guardadas se conservan.
+- Los agentes ocupan solo logo y estado. Rotan según la actividad, con prioridad para espera y error. La música aparece brevemente y sus controles siguen disponibles al acercarte mientras un agente trabaja.
+- Un panel reúne tus widgets en vivo. El menú y el lanzador ofrecen controles de audio y acciones rápidas. Al abrir un dispositivo puedes ver fuente y hora de consulta; el consumo de IA sin cuota publicada aparece como aproximado.
+- Vídeo, audio, archivos y galerías visibles desde el inicio. Añade varios enlaces a una cola de sesión, cancela o reintenta, elige calidad y carpeta, y abre, muestra o copia el archivo al terminar, también desde el aviso del notch.
+- Las actualizaciones de Booki se anuncian discretamente junto al dock. Descargar e instalar siguen separados, con guardado y respaldo antes de aplicar.
 
-[Notas completas](docs/releases/v0.94.0.md)
+[Notas completas](docs/releases/v0.95.0.md)
 <!-- booki:news:end -->
 
 <!-- booki:history:start -->
@@ -108,9 +107,9 @@ Grupos más ágiles, widgets más claros y un README renovado.
 
 | Versión | Qué cambió |
 |---|---|
+| [0.94.0](docs/releases/v0.94.0.md) | Grupos más ágiles, widgets más claros y un README renovado. |
 | [0.93.0](docs/releases/v0.93.0.md) | Agentes más claros, descargas que conservan tus archivos y actualizaciones al día. |
 | [0.92.0](docs/releases/v0.92.0.md) | Claude y Codex en el notch, concentración con No molestar y copia automática. |
-| [0.91.0](docs/releases/v0.91.0.md) | Uso de IA sin credenciales, dispositivos que se reconocen y paneles dentro del dock. |
 
 [Todas las versiones publicadas](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->
@@ -125,7 +124,12 @@ Grupos más ágiles, widgets más claros y un README renovado.
 | Clic derecho | Añadir elementos, cambiar perfil o abrir Ajustes |
 | Clic central | Mostrar la ubicación en Explorer |
 | `Alt` + `1…9` | Abrir el acceso correspondiente; modificador configurable |
+| `Ctrl` + rueda en un grupo | Cambiar entre lista y tamaños de iconos |
+| Arrastrar desde un grupo | Ver el acceso y su destino; `Escape` cancela |
+| Panel de widgets / Controles de audio | Disponibles desde el menú y la búsqueda de acciones |
 | Cursor al borde | Revelar el dock si elegiste ese comportamiento |
+
+El Recolector admite vídeo, audio, archivos y galerías: pega un enlace por línea para añadir varios a la cola. Su engranaje permite elegir carpeta, formato y calidad; esos ajustes también están en Widgets y Complementos. La cola y los resultados duran mientras Booki esté abierto.
 
 ## Privacidad
 

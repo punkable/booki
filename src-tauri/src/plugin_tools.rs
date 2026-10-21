@@ -437,6 +437,7 @@ pub async fn plugin_download(
     directory: Option<String>,
     format: Option<String>,
     job_id: Option<String>,
+    quality: Option<String>,
 ) -> Result<String, String> {
     use tauri::Emitter;
     let parsed = url.parse::<ureq::http::Uri>().map_err(|_| "invalid link")?;
@@ -454,6 +455,10 @@ pub async fn plugin_download(
         return Err("choose an existing download folder".into());
     }
     let format = format.unwrap_or_else(|| "video".into());
+    let quality = quality.unwrap_or_else(|| "best".into());
+    if !matches!(quality.as_str(), "best" | "1080" | "720") {
+        return Err("unsupported video quality".into());
+    }
     let id = job_id
         .filter(|id| id.len() <= 100)
         .unwrap_or_else(|| "legacy-download".into());
@@ -487,7 +492,14 @@ pub async fn plugin_download(
         let result = match format.as_str() {
             "file" => direct_file(&url, &folder, &emit, &cancelled),
             "gallery" => gallery(&url, &folder, &emit, &cancelled),
-            _ => media(&url, &folder, format == "audio", &emit, &cancelled),
+            _ => media(
+                &url,
+                &folder,
+                format == "audio",
+                &quality,
+                &emit,
+                &cancelled,
+            ),
         };
         match result {
             Ok(path) => {
@@ -523,6 +535,7 @@ fn media(
     url: &str,
     folder: &Path,
     audio: bool,
+    quality: &str,
     emit: &Emit,
     cancelled: &AtomicBool,
 ) -> Result<String, String> {
@@ -562,7 +575,15 @@ fn media(
     if let Some(dir) = &ffmpeg_dir {
         args.extend(["--ffmpeg-location".to_string(), dir.clone()]);
     }
-    args.extend(choice.iter().map(|s| s.to_string()));
+    let mut choice: Vec<String> = choice.iter().map(|s| s.to_string()).collect();
+    if !audio && quality != "best" {
+        choice[1] = if ffmpeg_dir.is_some() {
+            format!("bv*[height<={quality}][ext=mp4]+ba[ext=m4a]/bv*[height<={quality}]+ba/b[height<={quality}]")
+        } else {
+            format!("best[height<={quality}][ext=mp4]/best[height<={quality}]")
+        };
+    }
+    args.extend(choice);
     args.extend([
         "-P".into(),
         folder.to_string_lossy().into_owned(),
@@ -600,7 +621,7 @@ fn media(
 }
 
 /// Image galleries and posts with gallery-dl, one file at a time; the count
-/// of saved files stands in for a percentage it cannot know in advance.
+/// of saved files cannot be converted to a known total percentage.
 fn gallery(
     url: &str,
     folder: &Path,

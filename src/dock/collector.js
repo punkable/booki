@@ -1,6 +1,5 @@
-/* Collector widget (yt-dlp, FFmpeg, gallery-dl): drop a link on the dock, pick Video or Audio
-   only, and the card shows the progress; the panel shows the file when done.
-   One download at a time; progress arrives as native events. */
+/* Collector session queue: media, direct files and galleries share one native
+   download slot; progress and completion actions stay scoped to each job. */
 import { dock as api, onDownloadEvent } from "../api.js";
 import { t } from "../i18n.js";
 import { eachWidget } from "./live-widgets.js";
@@ -8,15 +7,17 @@ import { setMetric, setText } from "./widget-view.js";
 import { setTileLabel } from "./tooltip.js";
 import { createDownloadQueue } from "./download-queue.js";
 import { notify } from "./notices.js";
+import { collectorPreferences } from "../collector-preferences.js";
+import { S } from "./state.js";
 
 export const download = { state: "idle", percent: 0, title: "", path: "", error: "" };
 const listeners = new Set();
 const baseName = (path) => String(path || "").split(/[\\/]/).pop();
 export const collectorQueue = createDownloadQueue({
-  run: (job) => api.pluginDownload(job.url, job.directory, job.format, job.id),
+  run: (job) => api.pluginDownload(job.url, job.directory, job.format, job.id, job.quality),
   cancel: (id) => api.pluginCancelDownload(id),
   changed: (jobs, active) => {
-    const latest = active || jobs.at(-1);
+    const latest = active || jobs.reduce((last, job) => (job.finished || 0) >= (last?.finished || 0) ? job : last, null);
     Object.assign(download, latest || { state: "idle", percent: 0, title: "", path: "", error: "" });
     paintDownloads();
     for (const fn of listeners) { try { fn(download); } catch (_) { /* a closed panel */ } }
@@ -51,7 +52,8 @@ export function onDownloadChange(fn) { listeners.add(fn); return () => listeners
 onDownloadEvent((event) => collectorQueue.progress(event));
 
 export function startDownload(url, format, directory = null) {
-  return collectorQueue.enqueue([{ url, format, directory }])[0];
+  const preferences = collectorPreferences(S.cfg);
+  return collectorQueue.enqueue([{ url, format, directory: directory || preferences.directory || null, quality: preferences.quality }])[0];
 }
 
 /** What a link most likely is, so only video pages ask Video or Audio:
