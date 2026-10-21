@@ -1,19 +1,19 @@
 {
   "version": "0.95.0",
   "edition": "official",
-  "source": "038b4811fb5e956506610836a09ed9e9384813ab9105aafec7d63251aad234d5",
+  "source": "637bcda0b4b9d139bfded443b625ae2b7cd76977bbe2aa875679568b1c650e93",
   "kind": "composed browser frontend with offline placeholder app icons and example data; native blur not verified",
   "files": {
-    "docs/presentation/hero-en.jpg": "14a42bfaeea10d1fac2a21a531c7c8351152b4dc07e605c5da4146f06c33308e",
-    "docs/presentation/island-en.jpg": "6ab1d4398de69c2f6ec92f377c3be6e724d4f1e8633a8787a250cc0680712c6b",
+    "docs/presentation/hero-en.jpg": "469f256e0283101541eb8ec6c42e4ae4880c1fe56b95b56fff8278d6dba07eae",
+    "docs/presentation/island-en.jpg": "17d6e3114b12bda8733c260319c32e927a4e11603e938080fede8b741acb5d6f",
     "docs/presentation/groups-en.jpg": "3c69ed300ed4606df4a962a1cc6de434e7e69f8bcbd2ca20ce8d157486f8eac1",
-    "docs/presentation/widgets-en.jpg": "8f8fd04789d7523cdb7ef7af8efb940b5e0a3adb9b9cd379b1689349a1f55238",
+    "docs/presentation/widgets-en.jpg": "5e47f81f5290ad0286c5ecdaee636d11c33eff42542bce77433afe86192a9ec5",
     "docs/presentation/settings-en.jpg": "4058dda8fc2c95de302f5471d378c2ffa0bdbdad95af126d494eadc7f0683e1c",
     "docs/presentation/dark-en.jpg": "a311810774f17531ca402e16d9e2ee498ed6b8081caab46a63863fb5d269d0c7",
-    "docs/presentation/hero-es.jpg": "e06db5e9422e311aaa9499591e7009ab26bd9927b495db9a5394f5cf40f520f6",
-    "docs/presentation/island-es.jpg": "4deff707d4e13c67ea2525869a8744d8016c089154b0e75f44c8881bd0463c63",
+    "docs/presentation/hero-es.jpg": "861b63b80a6f176840d4397896ab45cc9a47072741801a1d15c5bee03f50769e",
+    "docs/presentation/island-es.jpg": "599749e93b85def1092e1f8cb421a1ab26f7a2fa3cbb855cfc35566561be2709",
     "docs/presentation/groups-es.jpg": "1d1285e4e93a91cbf19ba52af578cf8b4bc72c16b0afcb3e1793c55e70fbf566",
-    "docs/presentation/widgets-es.jpg": "8c0fdd43a7c6fd40e6eeb19fded75fdcf57e5076ed95f50187d387749606f7a4",
+    "docs/presentation/widgets-es.jpg": "5c0b85e6a2a19108986c7df3c3d8df49d202099ccd33321cff6b4d8ebf0b3b22",
     "docs/presentation/settings-es.jpg": "6943827a9243b1784d9ed787885e54341112890eef544719798c113fce06d0fb",
     "docs/presentation/dark-es.jpg": "a84ed89f3c5760e88d34e6bc14b22995852d42ff927e564a00b3912bd3f61b52"
   }

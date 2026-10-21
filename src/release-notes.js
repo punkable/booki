@@ -183,7 +183,7 @@ function release94() {
 
 export function currentRelease() {
   return { version: "0.95.0", date: "2026-10-21", headline: t("release95.headline"), sections: [
-    { icon: "folder", title: t("release95.groupsTitle"), notes: [t("release95.groups"), t("release95.drag")] },
+    { icon: "folder", title: t("release95.groupsTitle"), notes: [t("release95.groups"), t("release95.drag"), t("release95.menus")] },
     { icon: "sparkles", title: t("release95.lookTitle"), notes: [t("release95.look"), t("release95.notch")] },
     { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release95.widgets")] },
     { icon: "download", title: t("release95.collectorTitle"), notes: [t("release95.collector"), t("release95.updates")] },

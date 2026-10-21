@@ -387,7 +387,20 @@ document.addEventListener("contextmenu", (e) => {
   const item = closestSel(e.target, "#stack") && findPinnedById(S.stackItemId);
   if (item) openMenu(e, item); else openBackgroundMenu(e);
 });
+ctxMenu.addEventListener("click", (e) => e.stopPropagation());
 ctxMenu.addEventListener("keydown", (e) => {
+  if (ctxMenu.getAttribute("role") === "dialog") {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (!ctxMenu._onEscape?.()) closeMenu(); }
+    if (e.key === "Tab") {
+      const fields = [...ctxMenu.querySelectorAll('button:not([disabled]), input:not([disabled])')].filter((el) => el.offsetParent !== null && el.tabIndex >= 0);
+      const at = fields.indexOf(document.activeElement);
+      if (fields.length && ((e.shiftKey && at <= 0) || (!e.shiftKey && at === fields.length - 1))) { e.preventDefault(); fields[e.shiftKey ? fields.length - 1 : 0].focus(); }
+      e.stopPropagation();
+    }
+    return;
+  }
+  if ((e.key === "Escape" || e.key === "ArrowLeft") && ctxMenu._back) { e.preventDefault(); e.stopPropagation(); ctxMenu._back(); return; }
+  if (e.key === "ArrowRight" && document.activeElement?.getAttribute("aria-haspopup") === "menu") { e.preventDefault(); e.stopPropagation(); document.activeElement.click(); return; }
   if (moveMenuFocus(e, ctxMenu)) e.stopPropagation();
   if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); e.stopPropagation(); closeMenu(); }
 });

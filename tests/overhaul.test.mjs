@@ -152,6 +152,7 @@ test("unavailable media widgets can be recovered from the dock menu", async () =
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("clock"), pin("media", { hideWhenUnavailable: true })] }) });
   assert.equal(await page.locator('[data-widget="media"].conditionally-hidden').count(), 1);
   await page.locator("#dock").dispatchEvent("contextmenu", { clientX: 800, clientY: 300 });
+  await page.getByRole("menuitem", { name: "Organize", exact: true }).click();
   await page.getByRole("menuitem", { name: "Media", exact: true }).click();
   await page.waitForTimeout(400);
   assert.equal(await page.locator('[data-widget="media"].conditionally-hidden').count(), 0);

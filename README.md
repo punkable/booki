@@ -85,6 +85,7 @@ A smoother Booki: clearer groups, a quieter notch and a fuller Collector.
 
 - Search inside groups and switch between list, small, medium or large icons with Ctrl + wheel. Reorganizing retains search, view and scroll.
 - Dragging from a group shows its icon or initial, name, destination and insertion marker. Escape cancels. Drag the dock background to change edge or screen.
+- Shorter context menus: Customize brings name, icon and color into a staged panel with expandable pickers and Apply/Cancel. Appearance, organization, windows, recents and profiles open separately.
 - Three optional starting styles, smooth scrolling and restrained motion. New installations and presets start with an idle dot; existing saved preferences are retained.
 - Agents show just logo and status, rotating with activity while waiting and errors take priority. Music appears briefly; hover still offers playback controls while an agent works.
 - One panel brings your live widgets together. The menu and launcher expose audio controls and quick actions. Device details show source and query time; AI usage without a published allowance is marked approximate.
@@ -124,6 +125,7 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 | Right-click the dock | Add items, choose a profile or open Settings |
 | Middle-click a pin | Reveal its location in Explorer |
 | Double-click a widget | Open its configuration; utility widgets open their own panel |
+| Right-click a group → Customize | Edit name, icon and color; expand a picker only when needed, then Apply or Cancel |
 | `Ctrl` + wheel inside a group | Switch between list and icon sizes |
 | Drag from a group | See the shortcut and destination; `Escape` cancels |
 | Widget panel / Audio controls | Available from the menu and action search |

@@ -7,6 +7,7 @@ export function menuActions(container, close) {
     add(iconName, text, action, tone = '') {
       const button = document.createElement('button');
       button.type = 'button';
+      button.title = text;
       button.setAttribute('role', 'menuitem');
       button.tabIndex = -1;
       if (tone) button.classList.add(tone);

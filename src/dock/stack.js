@@ -131,9 +131,9 @@ export async function openStack(tileEl, item) {
   stackEl.dataset.id = isGroup ? item.id : "";
   if (isGroup) {
     glyph.type = "button";
-    glyph.title = t("group.color");
-    glyph.setAttribute("aria-label", t("group.color"));
-    glyph.setAttribute("aria-haspopup", "menu");
+    glyph.title = t("refine.customizeGroup");
+    glyph.setAttribute("aria-label", t("refine.customizeGroup"));
+    glyph.setAttribute("aria-haspopup", "dialog");
     glyph.addEventListener("click", (e) => deps.openGroupLook(e, item));
     const look = groupAppearance(item);
     if (look.glyph) glyph.innerHTML = libGlyphSVG(look.glyph);

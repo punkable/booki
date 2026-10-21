@@ -11,7 +11,7 @@
   z-index: 80;
   min-width: 220px;
   max-width: min(320px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
+  max-height: min(440px, calc(100vh - 16px));
   overflow-y: auto;
   padding: 2px 0;
   font-family: var(--font);
@@ -95,17 +95,6 @@ body:not(.surface-glass) .menu { -webkit-backdrop-filter: none; backdrop-filter:
 
 /* The dock's style, one click away: four painted samples in a row. */
 .menu .menu-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 2px 6px 4px; }
-.menu .menu-swatches, .menu .menu-glyphs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 6px; }
-.menu .menu-glyphs { max-height: 92px; overflow: auto; }
-.menu .menu-swatches button, .menu .menu-glyphs button {
-  width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; gap: 0;
-  border-radius: 50%; justify-content: center;
-}
-.menu .menu-swatches button { background: var(--sw, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent); }
-.menu .menu-swatches button.none { background: linear-gradient(135deg, transparent 46%, var(--ink-2) 48% 52%, transparent 54%); }
-.menu .menu-swatches button[aria-pressed="true"], .menu .menu-glyphs button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
-.menu .menu-glyphs button { width: 22px; height: 22px; border-radius: 4px; }
-.menu .menu-glyphs button svg { width: 14px; height: 14px; }
 .menu .menu-styles button {
   flex-direction: column;
   justify-content: center;
@@ -207,3 +196,30 @@ body.edge-top .drop-hint.show { transform: none; }
   background: Highlight;
   box-shadow: none;
 }
+
+/* Secondary lists stay in the same bounded flyout, with an explicit way back. */
+.menu .menu-next { margin-left: auto; flex: 0 0 auto; font-size: 20px; color: var(--ink-2); }
+.menu.group-customizer { width: 300px; max-height: min(480px, calc(100vh - 16px)); padding: 12px; }
+.customizer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.customizer-head strong { font-size: 14px; }
+.menu .customizer-head button { width: 30px; min-height: 30px; margin: 0; padding: 7px; }
+.customizer-name { display: grid; gap: 6px; margin-bottom: 12px; font-size: 12px; color: var(--ink-2); }
+.customizer-name input { width: 100%; min-width: 0; padding: 7px 10px; box-sizing: border-box; font: 14px/20px var(--font); color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-radius: var(--r-control); }
+.customizer-name input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.menu .customizer-choice { width: 100%; margin: 4px 0; min-height: 40px; padding: 8px; gap: 10px; background: var(--ctrl-fill); border: 1px solid var(--stroke); border-radius: var(--r-control); }
+.customizer-choice i { flex: 0 0 20px; width: 20px; height: 20px; }
+.customizer-choice .customizer-color-dot { border: 1px solid var(--stroke-strong); border-radius: 50%; }
+.customizer-choice .customizer-icon { display: grid; place-items: center; }
+.customizer-choice small { margin-left: auto; min-width: 0; max-width: 115px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 11px; }
+.menu .customizer-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; padding: 8px 2px; max-height: 150px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.menu .customizer-picker[hidden] { display: none; }
+.menu .customizer-color { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.menu .customizer-picker button { justify-content: center; width: 100%; height: 32px; min-height: 32px; padding: 6px; margin: 0; border: 1px solid var(--stroke); }
+.menu .customizer-picker .customizer-swatch { background: var(--sw); border-radius: 50%; }
+.menu .customizer-picker button[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -2px; box-shadow: inset 0 0 0 3px var(--layer-strong); }
+.customizer-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; margin-top: 8px; border-top: 1px solid var(--divider); }
+.menu .customizer-footer button { justify-content: center; width: auto; margin: 0; padding: 8px 12px; background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); }
+.menu .customizer-footer .customizer-apply { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.menu.group-customizer button:disabled { opacity: .5; cursor: default; }
+.customizer-error { color: var(--danger-text); font-size: 12px; line-height: 1.5; margin: 8px 0 0; }
+@media (forced-colors: active) { .menu .customizer-picker .customizer-swatch { forced-color-adjust: none; } }

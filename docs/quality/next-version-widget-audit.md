@@ -101,8 +101,9 @@ selectable; retain that control instead of introducing another size system.
 - A Fluent visual pass doesn't prove that native compositor flashes are gone.
   Validate actual opening/closing, display movement, DPI changes, suspend/resume,
   peripheral charge/disconnect and an installed upgrade on Windows.
-- The public release remains 0.94.0. This batch targets **0.95.0**; versioned
-  notes and source captures prepare that one release without publishing it.
+- Release metadata, versioned notes and source captures target **0.95.0**.
+  Publication uses the normal signed workflow and its source, asset and updater
+  verification gates.
 
 ## Validation
 
@@ -126,7 +127,7 @@ Keep reduced-motion, high-contrast and keyboard paths in the visual review.
   cancel after the batching instruction. Re-run the required validation once the
   remaining product batch is closed; do not infer success from a cancelled run.
 
-### Final 0.95.0 validation
+### Initial 0.95.0 validation
 
 - Version agreement, ESLint, TypeScript, text encoding, icon contracts,
   publication privacy and five-language parity pass (1,074 translation keys).
@@ -142,3 +143,38 @@ Keep reduced-motion, high-contrast and keyboard paths in the visual review.
 - Windows-specific compilation/packaging runs in the PR's required CI after
   the final batch sync. Hardware and installed-upgrade checks remain listed in
   [the Windows checklist](v0.95.0-windows-checklist.md).
+
+## Context-menu refinement in the same 0.95.0 batch
+
+The audit found eager group color/icon grids, root-level appearance samples,
+up to six profiles and duplicate recent-file lists inflating menus. Group
+customization now uses a staged name/icon/color dialog with one picker expanded
+at a time, Apply/Cancel and a retained draft on save failure. It resolves the
+current group by id and refreshes only that group, preserving live widgets.
+
+App/folder appearance, organization, multiple running windows, recent files,
+dock appearance and profiles use secondary views with Back. Recent files and
+profiles load only after opening their view; late replies are generation-guarded.
+Menus cap their height at 440px and scroll internally; the editor caps at 480px
+and the icon picker has its own scroll. File/member/card menus remain direct
+because they already have a small number of relevant actions. Window pickers
+retain their existing direct selection behavior. No release or CI push is made
+until this whole follow-up is complete and validated. The native Settings menu
+already has only three actions and stays direct. The notch routes to the same
+compact dock menu.
+
+### Context-menu batch validation
+
+- The complete frontend suite passes **342 tests** with two test-file workers,
+  no failures and no skips. Focused editor tests also cover cancellation,
+  bounded profile lists, failed-save retry, closing after Apply and focus return
+  after recovery replaces the original tile.
+- Build, lint, TypeScript, text encoding, icons, publication privacy and all
+  **1,082 keys in five languages** pass. The **12 source captures** and release
+  documentation guard match the final 0.95.0 frontend.
+- Existing regressions follow the new Organize/appearance/recent-file routes;
+  their actions and failure recovery remain exercised. Native Rust was not
+  changed in this follow-up; its 80-test evidence above still applies.
+- The user authorized publishing this single update. Required repository checks
+  and the signed release workflow remain enabled. Physical Windows checks in
+  the linked checklist remain pending and are not inferred from CI packaging.

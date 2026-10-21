@@ -43,7 +43,7 @@ test("desktop files land directly in a large open group; only the content scroll
   await page.close();
 });
 
-test("the header opens Pantone colours and editing a group retains live widget elements", async () => {
+test("the header opens a compact staged group editor and retains live widgets on apply", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [group(6), { id: "battery", kind: "widget", widget: "battery" }] }),
   });
@@ -51,17 +51,26 @@ test("the header opens Pantone colours and editing a group retains live widget e
   await page.locator("#stack.open").waitFor();
   await page.evaluate(() => { window.__batteryElement = document.querySelector('#dock > [data-id="battery"]'); });
   await page.locator("#stack .stack-head-icon").click();
-  await page.getByRole("button", { name: "Mocha Mousse · 17-1230", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Customize group", exact: true });
+  assert.equal(await editor.locator('.customizer-picker:visible').count(), 0);
+  await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Studio");
+  await editor.getByRole("button", { name: "Colour", exact: true }).click();
+  await editor.getByRole("button", { name: "Mocha Mousse · 17-1230", exact: true }).click();
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.color), undefined);
+  await editor.getByRole("button", { name: "Icon", exact: true }).click();
+  await editor.locator('.customizer-glyph button[data-value="star"]').click();
+  await editor.getByRole("button", { name: "Apply", exact: true }).click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.color === "#a47864");
+  await editor.waitFor({ state: "hidden" });
+  assert.equal(await page.locator("#stack .stack-head-icon").evaluate((el) => el === document.activeElement), true);
+  const saved = await page.evaluate(async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0]);
+  assert.equal(saved.name, "Studio"); assert.equal(saved.style.glyph, "star");
+  assert.equal(await page.locator('#dock > [data-id="group"]').getAttribute("aria-label"), "Studio");
   assert.equal(await page.evaluate(() => window.__batteryElement === document.querySelector('#dock > [data-id="battery"]')), true);
   assert.equal(await page.locator('#dock > [data-id="group"]').evaluate((el) => el.style.getPropertyValue("--group-color")), "#a47864");
   assert.equal(await page.locator("#stack.open.tinted").count(), 1);
-  await page.locator("#stack .stack-head-icon").click();
-  await page.locator("#ctx-menu .menu-glyphs button").nth(1).click();
-  await waitForAsyncCondition(page, async () => !!(await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.glyph);
-  assert.equal(await page.evaluate(() => window.__batteryElement === document.querySelector('#dock > [data-id="battery"]')), true);
-  assert.deepEqual(errors, []);
-  await page.close();
+  assert.equal(await page.locator("#stack .stack-rename").inputValue(), "Studio");
+  assert.deepEqual(errors, []); await page.close();
 });
 
 test("an unavailable device stops displaying its old charge on the next reading", async () => {
