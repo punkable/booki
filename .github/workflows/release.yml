@@ -35,6 +35,11 @@ jobs:
               ;;
             *) echo "::error::Releases run only from main or a tag on main, not $GITHUB_REF."; exit 1 ;;
           esac
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+      - name: Require current README, download buttons, notes and screenshots
+        run: npm run release:check
   # Exactly the same frontend/browser and Rust checks used by CI.
   checks:
     needs: source

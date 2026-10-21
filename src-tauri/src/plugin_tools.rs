@@ -505,6 +505,15 @@ fn media(url: &str, folder: &Path, audio: bool, emit: &Emit) -> Result<String, S
     args.extend([
         "-P".into(),
         folder.to_string_lossy().into_owned(),
+        // Audio extraction may reuse and delete an existing video with the
+        // same default filename. Give it its own intermediate/output stem so
+        // requesting audio never removes a video the person already saved.
+        "-o".into(),
+        if audio {
+            "%(title).180B-[%(id)s]-audio.%(ext)s".into()
+        } else {
+            "%(title).180B-[%(id)s].%(ext)s".into()
+        },
         "--".into(),
         url.into(),
     ]);

@@ -21,10 +21,10 @@ test('one style selector preserves layout/theme and shows the selected style', a
   const cfg = makeConfig({ theme: 'light', iconSize: 60, spacing: 3, cornerRadius: 4, nativeMaterial: false, pinned: pins });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg, viewport: { width: 520, height: 700 } });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  assert.equal(await page.locator('.finish-card').count(), 4);
+  assert.equal(await page.locator('.finish-card').count(), 3);
   assert.equal(await page.locator('h1').evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true);
-  await page.getByRole('radio', { name: /^Clear glass/ }).click();
-  await page.waitForFunction(() => document.querySelector('.finish-clear')?.getAttribute('aria-checked') === 'true');
+  await page.getByRole('radio', { name: /^Solid/ }).click();
+  await page.waitForFunction(() => document.querySelector('.finish-solid')?.getAttribute('aria-checked') === 'true');
   await page.waitForTimeout(200);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
   for (const key of ['theme', 'iconSize', 'spacing', 'cornerRadius', 'nativeMaterial', 'pinned']) assert.deepEqual(saved[key], cfg[key]);
@@ -39,7 +39,7 @@ test('one style selector preserves layout/theme and shows the selected style', a
 
 test('every material uses the canonical opacity once and tracks radius changes', async () => {
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: pins }) });
-  for (const surfaceStyle of ['taskbar', 'glass', 'clear', 'solid']) {
+  for (const surfaceStyle of ['taskbar', 'glass', 'solid']) {
     for (const materialStrength of [0, 38, 65, 100]) {
       await patch(page, { surfaceStyle, materialStrength, surfaceColor: '#223344', cornerRadius: materialStrength % 25 });
       await page.waitForFunction(({ style, alpha }) => document.body.classList.contains(`look-${style}`) && Math.abs(parseFloat(getComputedStyle(document.body).getPropertyValue('--glass-alpha')) - alpha) < .00001, { style: surfaceStyle, alpha: surfaceAlpha({ surfaceStyle, materialStrength }) });
@@ -153,13 +153,13 @@ test('closing Settings waits for the final edit and uses the Settings-only destr
     };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('radio', { name: /^Clear glass/ }).click();
+  await page.getByRole('radio', { name: /^Solid/ }).click();
   await page.evaluate(() => window.__nativeCloseRequested({ preventDefault() {} }));
   await page.waitForFunction(() => !!window.__finishSave);
   assert.equal(await page.evaluate(() => window.__closed), 0);
   await page.evaluate(() => window.__finishSave());
   await page.waitForFunction(() => window.__closed === 1);
-  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).surfaceStyle, 'clear');
+  assert.equal((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).surfaceStyle, 'solid');
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -192,7 +192,7 @@ test('a close that cannot save the last edit says so, and closing again discards
     };
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('radio', { name: /^Clear glass/ }).click();
+  await page.getByRole('radio', { name: /^Solid/ }).click();
   await page.evaluate(() => window.__nativeCloseRequested({ preventDefault() {} }));
   await page.locator('.close-error').getByRole('button', { name: 'Close without saving' }).waitFor();
   assert.equal(await page.evaluate(() => window.__closed), 0);

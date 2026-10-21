@@ -1,5 +1,6 @@
-//! "Agents working in the notch": notices when Claude Code or the Codex CLI
-//! is working on this PC, waiting for the person's approval, or done.
+//! "Agents working in the notch": notices when Claude Code, Codex (the
+//! ChatGPT coding agent on this PC), Cursor, or OpenCode is working, waiting,
+//! or done.
 //!
 //! Privacy contract (same as `ai_usage`): only the tools' own session logs
 //! (`*.jsonl`) are opened, read-only; no credential, token or auth file is
@@ -32,6 +33,11 @@
 //! - Quiet end: HEURISTIC fallback for transcripts whose last reply carries
 //!   no stop reason — no pending tool and `QUIET_DONE_MS` of silence after a
 //!   reply counts as done.
+//! - Cursor, OpenCode, Gemini CLI, Windsurf, Goose, Cline and Continue: size
+//!   only. The file is never opened. Growth means working; a pause means
+//!   waiting; a longer quiet means done. Auth, account and settings files
+//!   are never named and never opened. Aider has no stable home session
+//!   path, so it is not watched.
 use serde::de::IgnoredAny;
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -49,6 +55,10 @@ const WAIT_AFTER_MS: i64 = 6_000;
 const STALE_MS: i64 = 120_000;
 /// Reply without a stop reason + silence = done (heuristic fallback).
 const QUIET_DONE_MS: i64 = 30_000;
+/// Cursor: growth stopped, but not long enough to call the turn finished.
+const CURSOR_PAUSE_MS: i64 = 20_000;
+/// Cursor: no growth for this long ends the turn. The file is never read.
+const CURSOR_DONE_MS: i64 = 90_000;
 /// How long "done" is reported before it settles to idle.
 const DONE_HOLD_MS: i64 = 10_000;
 /// Bytes of an already-existing file read to learn where it stands.
@@ -60,6 +70,22 @@ const MAX_READ: u64 = 8 * 1024 * 1024;
 pub enum Provider {
     Claude,
     Codex,
+    /// Cursor's agent. Booki only watches whether a transcript file grows.
+    /// The file is never opened, so chats and keys stay unread.
+    Cursor,
+    /// OpenCode. Same size-only contract as Cursor: the database growing
+    /// means a turn is in progress. Auth files are never opened.
+    OpenCode,
+    /// Gemini CLI. Size of a session file under `~/.gemini/tmp`.
+    Gemini,
+    /// Windsurf / Codeium cascade. Size only, under `~/.codeium/windsurf`.
+    Windsurf,
+    /// Goose. Size of a session file, never its config.
+    Goose,
+    /// Cline, in the editor's globalStorage tasks folder.
+    Cline,
+    /// Continue. Size of a file under `~/.continue/sessions`.
+    Continue,
 }
 
 impl Provider {
@@ -67,7 +93,19 @@ impl Provider {
         match self {
             Provider::Claude => "claude",
             Provider::Codex => "codex",
+            Provider::Cursor => "cursor",
+            Provider::OpenCode => "opencode",
+            Provider::Gemini => "gemini",
+            Provider::Windsurf => "windsurf",
+            Provider::Goose => "goose",
+            Provider::Cline => "cline",
+            Provider::Continue => "continue",
         }
+    }
+
+    /// These tools are noticed by file size. Their bytes are never read.
+    fn size_only(self) -> bool {
+        !matches!(self, Provider::Claude | Provider::Codex)
     }
 }
 
@@ -77,6 +115,7 @@ pub enum State {
     Working,
     Waiting,
     Done,
+    Error,
 }
 
 impl State {
@@ -86,6 +125,7 @@ impl State {
             State::Working => "working",
             State::Waiting => "waiting",
             State::Done => "done",
+            State::Error => "error",
         }
     }
 }
@@ -105,6 +145,7 @@ enum Phase {
     /// The log itself says an approval is pending (Codex).
     Approval,
     Done,
+    Error,
 }
 
 /// The per-tool state machine. Times are Unix milliseconds.
@@ -138,7 +179,22 @@ impl Machine {
         match self.provider {
             Provider::Claude => self.feed_claude(line, now),
             Provider::Codex => self.feed_codex(line, now),
+            Provider::Cursor
+            | Provider::OpenCode
+            | Provider::Gemini
+            | Provider::Windsurf
+            | Provider::Goose
+            | Provider::Cline
+            | Provider::Continue => {}
         }
+    }
+
+    /// Cursor only: the transcript got longer. The bytes themselves are not read.
+    pub fn note_growth(&mut self, now: i64) {
+        self.last_write = now;
+        self.pending.clear();
+        self.after_reply = false;
+        self.phase = Phase::Working;
     }
 
     fn work(&mut self) {
@@ -226,6 +282,12 @@ impl Machine {
         };
         let kind = payload.kind.as_deref().unwrap_or("");
         match (entry.kind.as_deref(), kind) {
+            (Some("event_msg"), "error") => {
+                self.pending.clear();
+                self.after_reply = false;
+                self.phase = Phase::Error;
+                self.done_at = now;
+            }
             (Some("event_msg"), "task_started" | "user_message") => {
                 self.pending.clear();
                 self.after_reply = false;
@@ -272,8 +334,16 @@ impl Machine {
             Phase::Idle => State::Idle,
             Phase::Done if now - self.done_at < DONE_HOLD_MS => State::Done,
             Phase::Done => State::Idle,
+            Phase::Error if now - self.done_at < DONE_HOLD_MS => State::Error,
+            Phase::Error => State::Idle,
             Phase::Approval if quiet < STALE_MS => State::Waiting,
             Phase::Approval => State::Idle,
+            Phase::Working
+                if self.provider.size_only()
+                    && (CURSOR_PAUSE_MS..CURSOR_DONE_MS).contains(&quiet) =>
+            {
+                State::Waiting
+            }
             Phase::Working if quiet >= STALE_MS => State::Idle,
             // Heuristic: a tool call left unanswered while the log is silent
             // is most likely blocked on the permission prompt.
@@ -373,11 +443,39 @@ impl Watch {
             Provider::Codex => crate::ai_usage::codex_home()
                 .map(|h| vec![h.join("sessions")])
                 .unwrap_or_default(),
+            Provider::Cursor => cursor_roots(),
+            // The database only. account.json, auth.json and mcp-auth.json
+            // are never named here.
+            Provider::OpenCode => dirs::home_dir()
+                .map(|h| {
+                    let base = h.join(".local").join("share").join("opencode");
+                    vec![base.join("opencode.db"), base.join("opencode.db-wal")]
+                })
+                .unwrap_or_default(),
+            Provider::Gemini => dirs::home_dir()
+                .map(|h| vec![h.join(".gemini").join("tmp")])
+                .unwrap_or_default(),
+            Provider::Windsurf => dirs::home_dir()
+                .map(|h| vec![h.join(".codeium").join("windsurf")])
+                .unwrap_or_default(),
+            Provider::Goose => goose_roots(),
+            Provider::Cline => cline_roots(),
+            Provider::Continue => dirs::home_dir()
+                .map(|h| vec![h.join(".continue").join("sessions")])
+                .unwrap_or_default(),
         }
     }
 
     /// Switches to the most recently written file, if it changed.
     fn discover(&mut self, now: i64) {
+        if self.provider == Provider::OpenCode {
+            self.discover_files(now);
+            return;
+        }
+        if self.provider.size_only() {
+            self.discover_sessions(now);
+            return;
+        }
         let mut files = Vec::new();
         for root in self.roots() {
             crate::ai_usage::collect_jsonl(&root, now / 1000 - STALE_MS / 1000, 0, &mut files);
@@ -392,11 +490,63 @@ impl Watch {
         self.seed(now);
     }
 
+    /// OpenCode: pick the newer of the database and its wal. Switching files
+    /// keeps the current turn and only adopts the new length.
+    fn discover_files(&mut self, now: i64) {
+        let mut best: Option<(PathBuf, std::time::SystemTime)> = None;
+        for path in self.roots() {
+            let Ok(meta) = std::fs::metadata(&path) else {
+                continue;
+            };
+            let modified = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+            if best.as_ref().map(|(_, t)| modified > *t).unwrap_or(true) {
+                best = Some((path, modified));
+            }
+        }
+        let Some((newest, _)) = best else {
+            return;
+        };
+        if self.path.as_ref() == Some(&newest) {
+            return;
+        }
+        let switching = self.path.is_some();
+        let len = std::fs::metadata(&newest).map(|m| m.len()).unwrap_or(0);
+        self.path = Some(newest);
+        if switching {
+            self.offset = len;
+            return;
+        }
+        self.seed(now);
+    }
+
+    /// Gemini, Windsurf, Goose, Cline, Continue: the newest session file.
+    /// Switching sessions starts a fresh size watch and does not read bytes.
+    fn discover_sessions(&mut self, now: i64) {
+        let Some((newest, _)) = newest_session(&self.roots()) else {
+            return;
+        };
+        if self.path.as_ref() == Some(&newest) {
+            return;
+        }
+        self.path = Some(newest);
+        self.seed(now);
+    }
+
     /// Learns where a newly found file stands from its tail.
     fn seed(&mut self, now: i64) {
         self.machine = Machine::new(self.provider);
         self.carry.clear();
         self.offset = 0;
+        if self.provider.size_only() {
+            // Remember the current size and ignore everything already written.
+            self.offset = self
+                .path
+                .as_ref()
+                .and_then(|p| std::fs::metadata(p).ok())
+                .map(|m| m.len())
+                .unwrap_or(0);
+            return;
+        }
         let Some(path) = self.path.clone() else {
             return;
         };
@@ -430,6 +580,10 @@ impl Watch {
 
     /// Reads what was appended since the last poll.
     fn poll(&mut self, now: i64) {
+        if self.provider.size_only() {
+            self.poll_size(now);
+            return;
+        }
         let Some(path) = self.path.clone() else {
             return;
         };
@@ -449,6 +603,29 @@ impl Watch {
         let bytes = read_range(&path, self.offset, take);
         self.offset += bytes.len() as u64;
         self.consume(bytes, now);
+    }
+
+    /// Cursor: compare the file length. Never open it.
+    fn poll_size(&mut self, now: i64) {
+        let Some(path) = self.path.clone() else {
+            return;
+        };
+        let Ok(meta) = std::fs::metadata(&path) else {
+            return;
+        };
+        let len = meta.len();
+        if len < self.offset {
+            self.offset = len;
+            return;
+        }
+        if len > self.offset {
+            self.offset = len;
+            self.machine.note_growth(now);
+            return;
+        }
+        if self.machine.phase == Phase::Working && now - self.machine.last_write >= CURSOR_DONE_MS {
+            self.machine.finish(now);
+        }
     }
 
     fn consume(&mut self, bytes: Vec<u8>, at: i64) {
@@ -497,6 +674,171 @@ impl Watch {
         *self = Watch::new(self.provider);
         (was != State::Idle).then(|| self.activity())
     }
+
+    fn has_file(&self) -> bool {
+        self.path.is_some()
+    }
+}
+
+fn goose_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        roots.push(
+            home.join(".local")
+                .join("share")
+                .join("goose")
+                .join("sessions"),
+        );
+    }
+    if let Some(config) = dirs::config_dir() {
+        roots.push(config.join("goose").join("sessions"));
+    }
+    roots
+}
+
+// Cursor editor transcripts can be plain text; terminal snapshots and MCP
+// tool catalogs in the neighboring project folders are not agent activity.
+fn cursor_project_roots(projects: &std::path::Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(projects) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .map(|entry| entry.path().join("agent-transcripts"))
+        .filter(|path| path.is_dir())
+        .collect()
+}
+
+fn cursor_roots() -> Vec<PathBuf> {
+    let Some(home) = dirs::home_dir() else {
+        return Vec::new();
+    };
+    let base = home.join(".cursor");
+    let mut roots = cursor_project_roots(&base.join("projects"));
+    roots.push(base.join("chats"));
+    roots
+}
+
+fn cline_roots() -> Vec<PathBuf> {
+    let Some(config) = dirs::config_dir() else {
+        return Vec::new();
+    };
+    ["Code", "Cursor", "Windsurf", "Code - Insiders", "VSCodium"]
+        .into_iter()
+        .map(|app| {
+            config
+                .join(app)
+                .join("User")
+                .join("globalStorage")
+                .join("saoudrizwan.claude-dev")
+                .join("tasks")
+        })
+        .collect()
+}
+
+/// Names that hold credentials or settings, not a turn. Matched on the file
+/// or directory name only; the bytes are never read.
+fn sensitive_name(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    [
+        "auth",
+        "account",
+        "credential",
+        "secret",
+        "token",
+        "cookie",
+        "password",
+        "mcp-auth",
+        "settings",
+        "config",
+        "keychain",
+        ".env",
+    ]
+    .iter()
+    .any(|part| n.contains(part))
+}
+
+fn skip_session_dir(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    sensitive_name(&n)
+        || n.contains("cache")
+        || n.contains("crashpad")
+        || n.contains("blob_storage")
+        || n.contains("indexeddb")
+        || matches!(
+            n.as_str(),
+            "node_modules"
+                | "logs"
+                | "extensions"
+                | "local storage"
+                | "session storage"
+                | "shared proto db"
+                | "gpu"
+        )
+}
+
+const SESSION_WALK_CAP: u32 = 400;
+const SESSION_DEPTH: usize = 6;
+
+fn newest_session(roots: &[PathBuf]) -> Option<(PathBuf, std::time::SystemTime)> {
+    let mut best: Option<(PathBuf, std::time::SystemTime)> = None;
+    let mut seen = 0u32;
+    for root in roots {
+        walk_sessions(root, 0, &mut best, &mut seen);
+        if seen >= SESSION_WALK_CAP {
+            break;
+        }
+    }
+    best
+}
+
+fn walk_sessions(
+    dir: &std::path::Path,
+    depth: usize,
+    best: &mut Option<(PathBuf, std::time::SystemTime)>,
+    seen: &mut u32,
+) {
+    if depth > SESSION_DEPTH || *seen >= SESSION_WALK_CAP {
+        return;
+    }
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in read.flatten() {
+        if *seen >= SESSION_WALK_CAP {
+            return;
+        }
+        *seen += 1;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() {
+            if !skip_session_dir(&name) {
+                walk_sessions(&entry.path(), depth + 1, best, seen);
+            }
+            continue;
+        }
+        if !kind.is_file() || sensitive_name(&name) || !session_extension(&entry.path()) {
+            continue;
+        }
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
+        if best.as_ref().map(|(_, t)| modified > *t).unwrap_or(true) {
+            *best = Some((entry.path(), modified));
+        }
+    }
+}
+
+fn session_extension(path: &std::path::Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("json") | Some("jsonl") | Some("txt") | Some("db") | Some("sqlite")
+    )
 }
 
 fn read_range(path: &PathBuf, start: u64, len: u64) -> Vec<u8> {
@@ -529,14 +871,28 @@ pub fn start(
     emit: impl Fn(&Activity) + Send + 'static,
 ) {
     std::thread::spawn(move || {
-        let mut watches = [Watch::new(Provider::Claude), Watch::new(Provider::Codex)];
+        let mut watches = [
+            Watch::new(Provider::Claude),
+            Watch::new(Provider::Codex),
+            Watch::new(Provider::Cursor),
+            Watch::new(Provider::OpenCode),
+            Watch::new(Provider::Gemini),
+            Watch::new(Provider::Windsurf),
+            Watch::new(Provider::Goose),
+            Watch::new(Provider::Cline),
+            Watch::new(Provider::Continue),
+        ];
         let mut tick: u32 = 0;
         loop {
             let now = now_ms();
             let on = enabled();
             for watch in watches.iter_mut() {
                 let change = if on {
-                    if tick % DISCOVER_EVERY == 0 {
+                    let heavy = watch.provider.size_only()
+                        && !matches!(watch.provider, Provider::Cursor | Provider::OpenCode);
+                    let due = tick % DISCOVER_EVERY == 0
+                        && (!heavy || !watch.has_file() || tick % (DISCOVER_EVERY * 4) == 0);
+                    if due {
                         watch.discover(now);
                     }
                     watch.poll(now);
@@ -704,6 +1060,72 @@ mod tests {
         std::fs::write(&path, "").unwrap();
         w.poll(4_000);
         assert_eq!(w.change(4_000).map(|a| a.state), Some("idle"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn codex_error_is_not_a_success_and_new_work_clears_it() {
+        let mut m = Machine::new(Provider::Codex);
+        m.feed(
+            br#"{"type":"event_msg","payload":{"type":"task_started"}}"#,
+            1_000,
+        );
+        m.feed(
+            br#"{"type":"event_msg","payload":{"type":"error","message":"ignored"}}"#,
+            2_000,
+        );
+        assert_eq!(m.state(2_001), State::Error);
+        assert_eq!(m.state(2_000 + DONE_HOLD_MS), State::Idle);
+        m.feed(
+            br#"{"type":"event_msg","payload":{"type":"task_started"}}"#,
+            3_000,
+        );
+        assert_eq!(m.state(3_001), State::Working);
+    }
+
+    #[test]
+    fn cursor_follows_file_growth_without_reading_it() {
+        let mut m = Machine::new(Provider::Cursor);
+        m.note_growth(1_000);
+        assert_eq!(m.state(5_000), State::Working);
+        assert_eq!(m.state(1_000 + CURSOR_PAUSE_MS), State::Waiting);
+        m.finish(1_000 + CURSOR_DONE_MS);
+        assert_eq!(m.state(1_000 + CURSOR_DONE_MS), State::Done);
+        let mut o = Machine::new(Provider::OpenCode);
+        o.note_growth(1_000);
+        assert_eq!(o.state(1_000 + CURSOR_PAUSE_MS), State::Waiting);
+        let mut g = Machine::new(Provider::Gemini);
+        g.note_growth(1_000);
+        assert_eq!(g.state(1_000 + CURSOR_PAUSE_MS), State::Waiting);
+    }
+
+    #[test]
+    fn cursor_text_transcripts_exclude_neighboring_terminal_and_mcp_files() {
+        let root = std::env::temp_dir().join(format!("booki-cursor-roots-{}", std::process::id()));
+        let project = root.join("example-project");
+        std::fs::create_dir_all(project.join("agent-transcripts")).unwrap();
+        std::fs::create_dir_all(project.join("terminals")).unwrap();
+        std::fs::create_dir_all(project.join("mcps")).unwrap();
+        std::fs::write(project.join("agent-transcripts/turn.txt"), b"example event").unwrap();
+        std::fs::write(project.join("terminals/output.txt"), b"not an agent").unwrap();
+        std::fs::write(project.join("mcps/tools.json"), b"{}").unwrap();
+        let roots = cursor_project_roots(&root);
+        assert_eq!(roots, vec![project.join("agent-transcripts")]);
+        let found = newest_session(&roots).unwrap().0;
+        assert_eq!(found.file_name().unwrap(), "turn.txt");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn session_walk_skips_auth_and_settings() {
+        let dir = std::env::temp_dir().join(format!("booki-sessions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("auth")).unwrap();
+        std::fs::write(dir.join("auth").join("auth.json"), b"nope").unwrap();
+        std::fs::write(dir.join("settings.json"), b"{}").unwrap();
+        std::fs::write(dir.join("chats.json"), b"{}").unwrap();
+        let found = newest_session(std::slice::from_ref(&dir)).map(|(p, _)| p);
+        assert_eq!(found.unwrap().file_name().unwrap(), "chats.json");
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

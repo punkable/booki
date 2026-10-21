@@ -240,9 +240,10 @@ function bridgeSource(cfg, { stats = {} } = {}) {
 }
 
 /** Open a Booki page with the fake backend and collect any JS error. */
-export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats, initScript = '' } = {}) {
+export async function openPage(browser, port, page_ = "index.html", { cfg, viewport, stats, locale, initScript = '' } = {}) {
   const page = await browser.newPage({
     viewport: viewport || { width: 1600, height: 400 },
+    ...(locale ? { locale } : {}),
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e.stack || e)));

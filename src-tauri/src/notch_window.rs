@@ -170,7 +170,7 @@ fn show_toast_frame(app: &AppHandle, title: String, detail: Option<String>) {
             let m = (14.0 * dpr).round() as i32;
             let detail_len = detail.as_ref().map(|s| s.chars().count()).unwrap_or(0);
             let chars = title.chars().count().max(detail_len);
-            let desired_w = ((chars as f64 * 7.2) + 72.0).clamp(280.0, 420.0);
+            let desired_w = ((chars as f64 * 7.2) + 48.0).clamp(128.0, 320.0);
             let max_w = ((aw - m * 2).max(240) as f64 / dpr).max(240.0);
             let ww = (desired_w.min(max_w) * dpr).round() as i32;
             let two_line = detail.as_ref().map(|s| !s.is_empty()).unwrap_or(false);

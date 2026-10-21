@@ -1,0 +1,22 @@
+{
+  "productName": "Booki Dev",
+  "identifier": "com.booki.dock.dev",
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "icon": [
+      "icons-dev/32x32.png",
+      "icons-dev/128x128.png",
+      "icons-dev/128x128@2x.png",
+      "icons-dev/icon.png",
+      "icons-dev/icon.ico"
+    ],
+    "shortDescription": "Booki Dev, the local working copy.",
+    "longDescription": "Local Booki build used while refining the dock. It does not replace the installed Booki and it does not publish updates.",
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons-dev/icon.ico",
+        "installerHooks": "installer/hooks.dev.nsh"
+      }
+    }
+  }
+}

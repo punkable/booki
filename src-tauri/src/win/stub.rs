@@ -178,6 +178,18 @@ pub fn cursor_at_edge(_edge: &str) -> bool {
     false
 }
 
+pub fn foreground_is_code() -> bool {
+    false
+}
+
+pub fn foreground_is_video() -> bool {
+    false
+}
+
+pub fn foreground_place() -> &'static str {
+    "desk"
+}
+
 pub fn desktop_foreground() -> bool {
     false
 }

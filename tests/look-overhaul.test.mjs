@@ -63,13 +63,13 @@ test("the dock's menu changes its style in one click, and the notch opens the sa
   await fire(page, "booki://notch-menu");
   const styles = page.locator("#ctx-menu .menu-styles [role=menuitemradio]");
   await waitForAsyncCondition(page, () => !document.getElementById("ctx-menu").classList.contains("hidden"));
-  assert.equal(await styles.count(), 4);
+  assert.equal(await styles.count(), 3);
   assert.equal(await page.locator('#ctx-menu [data-style="glass"]').getAttribute("aria-checked"), "true");
   // The menu fills in after its async sections; wait instead of counting at once.
   await page.locator("#ctx-menu").getByRole("menuitem", { name: "App library" }).first().waitFor();
-  await page.locator('#ctx-menu [data-style="clear"]').click();
-  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).surfaceStyle === "clear");
-  assert.equal(await page.evaluate(() => document.body.classList.contains("look-clear")), true);
+  await page.locator('#ctx-menu [data-style="solid"]').click();
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).surfaceStyle === "solid");
+  assert.equal(await page.evaluate(() => document.body.classList.contains("look-solid")), true);
   assert.deepEqual(errors, []);
   await page.close();
 });

@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
+import { config as configApi, dock as dockApi, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
@@ -221,6 +221,10 @@ document.addEventListener("visibilitychange", () => {
 // seconds when something new happens (the next song, a timer ending).
 let presenceMode = "auto";
 let screenBusy = false;
+let scene = "desk";
+let codeForeground = false;
+let videoForeground = false;
+let place = "desk";
 let pointerNear = false;
 let nearLinger = null;
 let nudgeUntil = 0;
@@ -229,21 +233,69 @@ const NEAR_LINGER_MS = 900;
 const NUDGE_MS = 4000;
 
 function wantsAway(now = Date.now()) {
-  if (presenceMode === "always" || pointerNear || cardOpen || drag || draggingNotch) return false;
+  // The pointer at the edge, an open card, or a drag means they want Booki.
+  if (pointerNear || cardOpen || drag || draggingNotch) return false;
+  if (presenceMode === "always" && !videoForeground && place !== "game") return false;
+  // A player or a streaming page owns the picture, even in a normal window
+  // and even if the notch is set to stay visible. Leaving the edge hides it.
+  if (videoForeground || scene === "game") return true;
+  // A creative app keeps the notch even when its window is maximized.
+  if (place === "creative") return false;
+  if (presenceMode === "always") return false;
   if (document.body.classList.contains("toast") || now < nudgeUntil) return false;
   return presenceMode === "edge" || screenBusy;
 }
 
 function paintPresence() {
   const away = wantsAway();
-  if (document.body.classList.contains("away") === away) return;
+  const preparing = !away && (videoForeground || scene === "game") && !cardOpen;
+  const changed = document.body.classList.contains("away") !== away
+    || document.body.classList.contains("preparing") !== preparing;
   document.body.classList.toggle("away", away);
-  scheduleHitReport();
+  document.body.classList.toggle("preparing", preparing);
+  if (changed) scheduleHitReport();
 }
+
+function paintScene() {
+  // The streaming window itself, not "something is playing somewhere".
+  // A creative app stays, even maximized. A game, or any other maximized
+  // window, steps aside. Music on the desktop is not a video scene.
+  const watching = place === "video";
+  const creative = place === "creative";
+  const game = place === "game" || (screenBusy && !watching && !creative && !codeForeground);
+  const next = watching ? "video" : game ? "game" : creative ? "creative" : codeForeground ? "code" : "desk";
+  const changed = next !== scene;
+  scene = next;
+  document.body.classList.toggle("scene-game", scene === "game");
+  document.body.classList.toggle("scene-video", scene === "video");
+  document.body.classList.toggle("scene-code", scene === "code");
+  document.body.classList.toggle("scene-creative", scene === "creative");
+  // A video that just came forward should not keep a card open over the picture
+  // unless the pointer is already there to use it.
+  if ((watching || game) && !pointerNear && cardOpen) closeCard();
+  if (changed) paintActivity();
+  paintPresence();
+}
+
+async function pollForeground() {
+  if (!inTauri) return;
+  try {
+    place = String(await invoke("foreground_place") || "desk");
+    codeForeground = place === "code";
+    videoForeground = place === "video";
+  } catch (_) {
+    place = "desk";
+    codeForeground = false;
+    videoForeground = false;
+  }
+  paintScene();
+}
+setInterval(pollForeground, 3000);
+pollForeground();
 
 /** Show the tab for a moment because something changed worth a glance. */
 function nudgePresence(ms = NUDGE_MS) {
-  if (presenceMode === "always") return;
+  if (videoForeground || scene === "game" || presenceMode === "always") return;
   nudgeUntil = Date.now() + ms;
   clearTimeout(nudgeTimer);
   nudgeTimer = setTimeout(paintPresence, ms + 20);
@@ -252,6 +304,7 @@ function nudgePresence(ms = NUDGE_MS) {
 
 onScreenBusy((value) => {
   screenBusy = value;
+  paintScene();
   paintPresence();
 });
 onNotchNear((value) => {
@@ -314,6 +367,7 @@ let activityExpiry = null;
 const VOLUME_FLASH_MS = 2000;
 const CHARGE_FLASH_MS = 2500;
 let chargeFlash = null;
+let usageFlash = null; // { provider, name, until } after a plan window resets
 const FOCUS_DONE_MS = 60000;
 const ringEl = document.getElementById("nl-ring");
 const lText = document.getElementById("nl-text");
@@ -332,14 +386,21 @@ function focusTimersOf(items = []) {
 // emits only state changes. Waiting for approval outranks everything but a
 // volume flash and stays until answered; working stays quietly while it
 // lasts; a finished turn is a 5 s notice, several queue up one by one.
-const AGENT_NAMES = { claude: "Claude", codex: "Codex" };
-const AGENT_ICONS = { claude: "ai-claude", codex: "ai-openai" };
+const AGENT_NAMES = {
+  claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode",
+  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue",
+};
+const AGENT_ICONS = {
+  claude: "ai-claude", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode",
+  gemini: "ai-gemini", windsurf: "ai-windsurf", goose: "ai-goose", cline: "ai-cline", continue: "ai-continue",
+};
 const AGENT_DONE_MS = 5000;
 let agentsOn = true;
 const agents = new Map(); // provider -> { state: "working" | "waiting", since }
 let agentDone = null; // { provider, since, until }
 const agentDoneQueue = [];
 const lAgent = document.getElementById("nl-agent");
+const lState = document.getElementById("nl-state");
 
 function clearAgents() {
   agents.clear();
@@ -348,7 +409,9 @@ function clearAgents() {
 }
 
 function agentLabel(state, provider) {
-  const key = { working: "notch.agentWorking", waiting: "notch.agentWaiting", done: "notch.agentDone" }[state];
+  const key = state === "waiting"
+    ? "notch.agentPaused"
+    : { working: "notch.agentWorking", waiting: "notch.agentPaused", done: "notch.agentDone", error: "notch.agentError" }[state];
   return t(key).replace("{agent}", () => AGENT_NAMES[provider] || provider);
 }
 
@@ -363,6 +426,7 @@ function nextAgentDone(now) {
 /** The notch itself cannot show it (vertical edge, hover trigger): fall
  *  back to the notice chip, which also covers the tab stepping aside. */
 function agentNotice(state, provider) {
+  if (videoForeground || scene === "game" || (screenBusy && scene !== "code" && scene !== "creative")) return;
   if (canPeek) nudgePresence();
   else invoke("notch_notice", { title: agentLabel(state, provider), detail: "" }).catch(() => {});
 }
@@ -370,9 +434,10 @@ function agentNotice(state, provider) {
 function applyAgent({ provider, state, since } = {}, quiet = false) {
   if (!agentsOn || !AGENT_NAMES[provider]) return;
   const before = agents.get(provider)?.state;
-  if (state === "working" || state === "waiting") {
+  if (state === "working" || state === "waiting" || state === "error") {
     agents.set(provider, { state, since: Number(since) || Date.now() });
     if (state === "waiting" && before !== "waiting" && !quiet) agentNotice(state, provider);
+    if (state === "error" && before !== "error" && !quiet) agentNotice(state, provider);
   } else {
     agents.delete(provider);
     if (state === "done" && !quiet && !agentDoneQueue.some((d) => d.provider === provider) && agentDone?.provider !== provider) {
@@ -386,18 +451,38 @@ function applyAgent({ provider, state, since } = {}, quiet = false) {
 function agentActivity() {
   let pick = null;
   for (const [provider, a] of agents) {
-    if (!pick || (a.state === "waiting" && pick.state !== "waiting")) pick = { provider, ...a };
+    const row = { provider, ...a };
+    if (!pick) { pick = row; continue; }
+    const rowWaits = row.state === "waiting" || row.state === "error";
+    const pickWaits = pick.state === "waiting" || pick.state === "error";
+    if (rowWaits !== pickWaits) { if (rowWaits) pick = row; continue; }
+    if (Number(row.since) > Number(pick.since)) pick = row;
   }
   return pick;
 }
 
 onAgentActivity((payload) => applyAgent(payload));
+onUsageReady(({ provider, name } = {}) => {
+  if (!provider || videoForeground || scene === "game") return;
+  usageFlash = { provider, name, until: Date.now() + 5000 };
+  if (canPeek) nudgePresence();
+  paintActivity();
+});
 if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
 
 function currentActivity(now = Date.now()) {
+  // A movie, a game, or any maximized app that is not an editor: the notch
+  // stays out of the picture. At the edge they asked for it, so the card
+  // can still pause the video. Music peeks only when the desktop is free.
+  // Over a video or a game the notch stays a dot. The dock still opens from
+  // that dot, on hover or on click, whichever is already chosen.
+  if ((videoForeground || scene === "game") && !cardOpen) return null;
+  if (screenBusy && scene !== "code" && scene !== "creative") return null;
   if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
   const agent = agentsOn ? agentActivity() : null;
   if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
+  if (agent?.state === "error") return { kind: "agent-error", provider: agent.provider, since: agent.since };
+  if (usageFlash && usageFlash.until > now) return { kind: "usage", provider: usageFlash.provider, name: usageFlash.name, until: usageFlash.until };
   const done = agentsOn ? nextAgentDone(now) : null;
   if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
   if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
@@ -416,6 +501,7 @@ function currentActivity(now = Date.now()) {
   // merely low one waits behind it.
   const low = battery && !battery.charging && battery.level >= 0 ? battery.level : 101;
   if (low <= 10) return { kind: "battery", level: low };
+  if (scene === "code" && agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   // Music opens the notch for a few seconds when it starts or the track
   // changes, then lets it settle; it stays in the card on hover.
   if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
@@ -437,7 +523,7 @@ function paintActivity() {
     lastActivityKind = kind;
   }
   document.body.classList.toggle("live", !!activity);
-  for (const name of ["timer", "done", "volume", "media", "battery", "charging", "agent", "agent-waiting", "agent-done"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  for (const name of ["timer", "done", "volume", "media", "battery", "charging", "agent", "agent-waiting", "agent-done", "agent-error", "usage"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
     lText.textContent = mmss(activity.left);
     ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
@@ -448,13 +534,27 @@ function paintActivity() {
     lText.textContent = t("notch.focusDone");
   } else if (kind === "battery" || kind === "charging") {
     lText.textContent = `${activity.level}%`;
-  } else if (kind.startsWith("agent")) {
-    lText.textContent = agentLabel(kind === "agent" ? "working" : kind.slice(6), activity.provider);
-    const mark = AGENT_ICONS[activity.provider];
+  } else if (kind === "usage" || kind.startsWith("agent")) {
+    const state = kind === "usage" ? "ready" : kind === "agent" ? "working" : kind.slice(6);
+    const name = AGENT_NAMES[activity.provider] || activity.name || activity.provider;
+    const phrase = state === "ready"
+      ? t("notch.usageReady").replace("{agent}", () => name)
+      : agentLabel(state, activity.provider);
+    lText.textContent = state === "ready" ? phrase : name;
+    lText.title = phrase;
+    const mark = AGENT_ICONS[activity.provider] || "sparkles";
     if (lAgent.dataset.icon !== mark) {
       lAgent.innerHTML = icon(mark);
       lAgent.dataset.icon = mark;
     }
+    const statusMark = { working: "agent-working", waiting: "agent-waiting", done: "agent-done", ready: "agent-done", error: "agent-error" }[state] || "agent-working";
+    if (lState.dataset.icon !== statusMark) {
+      lState.innerHTML = icon(statusMark);
+      lState.dataset.icon = statusMark;
+    }
+    pill.setAttribute("aria-label", `${phrase}. ${t("notch.show")}`);
+  } else {
+    pill.setAttribute("aria-label", t("notch.show"));
   }
   for (const name of Object.keys(AGENT_NAMES)) document.body.classList.toggle(`agent-${name}`, kind.startsWith("agent") && activity.provider === name);
   // Tick once a second only while a timer is visible; a passing state
@@ -500,7 +600,7 @@ let lastTrack = "";
 function paintMedia() {
   // A new song is worth a glance even when the tab is out of the way.
   const track = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
-  if (track && lastTrack && track !== lastTrack) nudgePresence();
+  if (track && lastTrack && track !== lastTrack && !screenBusy && !videoForeground) nudgePresence();
   if (track) lastTrack = track;
   const art = imageSrc((media && media.thumb) || "");
   for (const img of [lArt, cArt]) {
@@ -597,8 +697,9 @@ const pollMedia = singleFlight(async () => {
     media = null;
   }
   const key = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
-  if (key && key !== mediaKey) mediaPeekUntil = Date.now() + MEDIA_PEEK_MS;
+  if (key && key !== mediaKey && !videoForeground) mediaPeekUntil = Date.now() + MEDIA_PEEK_MS;
   mediaKey = key;
+  paintScene();
   paintMedia();
   mediaTimer = setTimeout(pollMedia, recoveryInterval(nativeSupport, "media", media && media.playing ? 2500 : 6000));
 });
@@ -634,6 +735,7 @@ function cardHasContent() {
 }
 let cardWatch = null;
 function openCard() {
+  if (videoForeground || scene === "game") return;
   if (!canPeek || cardOpen || drag || !cardHasContent()) return;
   paintCard();
   // The window can turn click-through under a still pointer and never send

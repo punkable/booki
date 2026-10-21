@@ -27,6 +27,7 @@ import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-o
 // the imports never form a cycle.
 const deps = {};
 export function wireStack(fns) { Object.assign(deps, fns); }
+let groupMenuAbort = null;
 
 // ─────────────────── Folder stacks (flyout) ───────────────────
 
@@ -199,6 +200,15 @@ export async function openStack(tileEl, item) {
   close.addEventListener("click", closeStack);
   head.appendChild(close);
   stackEl.appendChild(head);
+  groupMenuAbort?.abort();
+  groupMenuAbort = new AbortController();
+  if (isGroup && deps.openMenu) {
+    const signal = groupMenuAbort.signal;
+    stackEl.addEventListener("contextmenu", (e) => {
+      if (e.target.closest("button, input, .stack-item")) return;
+      deps.openMenu(e, item);
+    }, { signal });
+  }
   if (!isGroup) {
     breadcrumbs = document.createElement("nav");
     breadcrumbs.className = "stack-breadcrumbs";

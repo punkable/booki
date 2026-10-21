@@ -32,7 +32,7 @@ import { refreshPreviewMarquees } from "./dock/widget-view.js";
 import { moveMenuFocus, isTextEditor } from "./dock/context-menu.js";
 import { materialTint, setMaterialTint, followFrames } from "./material.js";
 import { S } from "./dock/state.js";
-import { isVertical, findPinnedById, widgetLabel } from "./dock/helpers.js";
+import { isVertical, findPinnedById, widgetLabel, isDefaultGroupName } from "./dock/helpers.js";
 import { dockEl, ctxMenu, closestSel } from "./dock/dom.js";
 import {
   pointInLiveHitArea,
@@ -596,10 +596,11 @@ const dockTooltip = createDockTooltip(dockEl, {
   edge: () => S.cfg.edge,
   blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
-    const pin = S.cfg.pinned.find(item => item.id === el.dataset.id);
+    const pin = findPinnedById(el.dataset.id);
     if (!pin) return null;
     // A Windows tooltip: the name, and a second line only when it adds
     // something the tile can't show (text it cuts off, several windows).
+    if (pin.kind === "group" && isDefaultGroupName(pin.name)) return null;
     let name = pin.name || el.getAttribute("aria-label");
     let detail = "";
     if (pin.kind === "widget") { name = pin.style?.device || widgetLabel(pin.widget); detail = clippedText(el, name); }
@@ -667,7 +668,7 @@ wireLiveWidgets({ startRunningPoll });
 wireRender({ onPointerDown, openMenu, openBackgroundMenu, removeItem, openAddPanel });
 wireUndoToast({ persist });
 wireConfigSync({ hideTip, closeStack, cancelDrag });
-wireStack({ takeOutButton, wireStackDragOut, openFileMenu, addToFolderFromDock });
+wireStack({ takeOutButton, wireStackDragOut, openFileMenu, addToFolderFromDock, openMenu });
 wireLaunch({ hideTip });
 
 boot();

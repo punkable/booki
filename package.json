@@ -1,7 +1,7 @@
 {
   "name": "booki-dock",
   "private": true,
-  "version": "0.92.0",
+  "version": "0.93.0",
   "type": "module",
   "engines": {
     "node": ">=24.18.0 <25",
@@ -21,17 +21,22 @@
     "test": "node --test tests/*.test.mjs",
     "check:text": "node scripts/check-text-encoding.mjs",
     "check:icons": "node scripts/check-icons.mjs",
+    "check:publication": "node scripts/check-publication.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:node": "node scripts/check-node.mjs",
     "check:versions": "node scripts/check-versions.mjs",
     "typecheck": "tsc --project tsconfig.json",
     "capture:reference": "node scripts/capture-reference.mjs",
+    "release:prepare": "npm run build && node scripts/release-docs.mjs --sync && node scripts/capture-release.mjs && npm run release:check",
+    "release:check": "node scripts/release-docs.mjs",
     "test:validation": "node --test scripts/validation.test.mjs",
-    "check:all": "npm run check:node && npm run check:versions && npm run lint && npm run typecheck && npm run check:text && npm run check:icons && npm run check:i18n && npm run test:validation && npm run build && npm test",
+    "check:all": "npm run check:node && npm run check:versions && npm run lint && npm run typecheck && npm run check:text && npm run check:icons && npm run check:i18n && npm run check:publication && npm run test:validation && npm run build && npm test",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:dev:local": "node scripts/tauri-dev.mjs dev",
+    "tauri:build:dev": "node scripts/tauri-dev.mjs build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

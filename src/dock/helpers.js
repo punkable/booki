@@ -11,6 +11,13 @@ export function emitConfigChanged() { return emitConfigChangedRaw(); }
 export const iconCache = new Map();
 export const uid = () => Math.random().toString(36).slice(2, 9);
 export const isVertical = () => S.cfg.edge === "left" || S.cfg.edge === "right";
+
+/** "Grupo" / "Group" is the name Booki writes when you have not named it.
+ *  Saying that name back does not tell you anything. */
+export function isDefaultGroupName(name) {
+  const n = String(name || "").trim().toLowerCase();
+  return !n || n === "grupo" || n === "group" || n === "groupe" || n === "gruppe";
+}
 export const baseSize = () => S.cfg.iconSize || 48;
 export function findPinnedById(id, items = S.cfg?.pinned || []) {
   for (const item of items) {

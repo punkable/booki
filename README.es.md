@@ -8,11 +8,15 @@
 
 <p align="center">Un dock precioso para Windows 11: apps, carpetas y widgets en vivo en una sola barra tranquila.<br/>Gratis, privado y de código abierto.</p>
 
+<!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><b>Descargar para Windows</b></a> ·
-  <a href="docs/releases/v0.87.0.md"><b>Novedades de 0.87</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64-setup.exe"><b>Descargar para Windows v0.93.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.93.0.md">Novedades v0.93.0</a> ·
   <a href="README.md">English</a>
 </p>
+<!-- booki:download:end -->
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=versi%C3%B3n&style=flat-square&color=dfaa75" alt="Última versión" /></a>
@@ -21,13 +25,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-lightgrey?style=flat-square" alt="Licencia MIT" /></a>
 </p>
 
-<p align="center"><img src="docs/presentation/hero-es.jpg" width="1000" alt="Dock de Booki en un escritorio suave con apps, dos grupos de color, reloj, clima, sistema, temporizador y música, y la Isla del notch con el temporizador" /></p>
+<p align="center"><img src="docs/presentation/hero-es.jpg" width="1000" alt="Dock de Booki con apps de ejemplo, grupo, reloj, sistema, temporizador y Recolector" /></p>
 
 <table align="center">
 <tr>
 <td align="center" width="25%"><b>⚡ Ligero</b><br/><sub>Núcleo nativo en Rust. Los widgets se pausan cuando el dock se oculta.</sub></td>
 <td align="center" width="25%"><b>🔒 Privado</b><br/><sub>Sin cuentas, sin telemetría, sin nube.</sub></td>
-<td align="center" width="25%"><b>🎨 Tuyo</b><br/><sub>Barra de tareas, vidrio, claro o sólido. Cualquier borde. Cinco idiomas.</sub></td>
+<td align="center" width="25%"><b>🎨 Tuyo</b><br/><sub>Barra de tareas, vidrio o sólido. Cualquier borde. Cinco idiomas.</sub></td>
 <td align="center" width="25%"><b>🧡 Abierto</b><br/><sub>Licencia MIT. Hecho a la vista de todos.</sub></td>
 </tr>
 </table>
@@ -38,31 +42,31 @@
 
 <p align="center">Un punto discreto arriba de la pantalla que se abre en cápsula con tu temporizador, la canción que suena o la batería baja.<br/>Pasa el ratón para ver una tarjeta con más. ¿Prefieres algo más simple? Elige pestaña pegada o píldora flotante.</p>
 
-<p align="center"><img src="docs/presentation/island-es.jpg" width="1000" alt="La Isla del notch mostrando un temporizador sobre un dock oscuro de Booki" /></p>
+<p align="center"><img src="docs/presentation/island-es.jpg" width="1000" alt="Mascota de Claude Code, nombre e indicador de trabajo en el notch compacto de Booki" /></p>
 
 <h2 align="center">Grupos con tu estilo.</h2>
 
 <p align="center">Ancla apps, carpetas, archivos y sitios web, y júntalos en grupos.<br/>Dale a cada grupo un color de una paleta cuidada y un icono de la librería: se ve en el dock y en Ajustes.</p>
 
-<p align="center"><img src="docs/presentation/groups-es.jpg" width="1000" alt="Ajustes de Booki, Apps y carpetas: el dock como cuadrícula ordenada, biblioteca con iconos grandes e inspector de grupo con color e icono" /></p>
+<p align="center"><img src="docs/presentation/groups-es.jpg" width="1000" alt="Apps y carpetas de Booki con elementos de ejemplo y catálogo de aplicaciones" /></p>
 
 <h2 align="center">En vivo, de un vistazo.</h2>
 
 <p align="center">Reloj, calendario, clima, sistema (CPU, memoria, disco, red), batería, música, volumen, notas, portapapeles y enfoque (temporizador + tareas).<br/>Fichas compactas en la propia barra.<br/>Un bloque de enfoque activa No molestar de Windows (y lo desactiva al terminar), retiene los avisos de Booki y puede mantener el dock oculto.</p>
 
-<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Galería de widgets de Booki con vistas previas en vivo" /></p>
+<p align="center"><img src="docs/presentation/widgets-es.jpg" width="1000" alt="Galería actual de widgets de Booki" /></p>
 
 <h2 align="center">Ajustes que da gusto usar.</h2>
 
 <p align="center">Cinco páginas claras —Inicio, Dock, Widgets, Apps y Sistema— con una vista previa en vivo de tu dock y todo de un vistazo.</p>
 
-<p align="center"><img src="docs/presentation/settings-es.jpg" width="1000" alt="Inicio de Ajustes con el dock sobre un escritorio y fichas de resumen" /></p>
+<p align="center"><img src="docs/presentation/settings-es.jpg" width="1000" alt="Inicio actual de Ajustes de Booki con dock de ejemplo" /></p>
 
 <h2 align="center">Como en casa a oscuras.</h2>
 
-<p align="center">Sigue el tema y el color de Windows. Iguala la barra de tareas, desenfoca lo de atrás con vidrio o vidrio claro, o quédate en sólido.<br/>Cuando un juego o vídeo pasa a pantalla completa, Booki se aparta.</p>
+<p align="center">Sigue el tema y el color de Windows. Iguala la barra de tareas, desenfoca lo de atrás con vidrio, o quédate en sólido.<br/>Cuando un juego o vídeo pasa a pantalla completa, Booki se aparta.</p>
 
-<p align="center"><img src="docs/presentation/dark-es.jpg" width="1000" alt="Ajustes del dock de Booki en modo oscuro" /></p>
+<p align="center"><img src="docs/presentation/dark-es.jpg" width="1000" alt="Ajustes actuales del Dock de Booki en modo oscuro" /></p>
 
 ---
 
@@ -70,7 +74,9 @@
 
 <p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
-<p align="center"><sub>Las imágenes muestran la interfaz real de Booki 0.86 con datos y app de ejemplo.</sub></p>
+<!-- booki:media:start -->
+<p align="center"><sub>Capturas del frontend del código fuente v0.93.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
+<!-- booki:media:end -->
 
 ## Instalar y empezar
 
@@ -80,14 +86,20 @@
 
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
 
-## Novedades de 0.88
+<!-- booki:news:start -->
+## Novedades de 0.93.0
 
-- **Recolector**: suelta un enlace en el dock y guarda video o solo audio de cientos de sitios, galerías de imágenes o archivos.
-- **Dispositivos** rota entre audífonos, mouse y teclado con su icono; el color indica la batería y parpadea cuando hay que cargar.
-- **Uso de IA** con logos oficiales de Claude y ChatGPT, rotando: las ventanas del plan de Codex con su reinicio y los tokens de Claude Code en el bloque de 5 horas actual.
-- Widgets **Actualizaciones**, **Nube** e **Iluminación** (winget, rclone, OpenRGB) y avisos que nunca tapan el dock.
-- **Posición** con un clic sobre un dibujo de tu pantalla; carpetas sin nombres solapados.
-- Complementos con huellas SHA-256 fijadas y [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
+Agentes más claros, descargas que conservan tus archivos y actualizaciones al día.
+
+- El notch conserva nombre y logo, con indicadores separados de trabajo, pausa, final y error. Claude Code usa su mascota. Cursor reconoce transcripciones TXT y JSONL; los estados deducidos por actividad siguen siendo aproximados.
+- Los avisos recuerdan reinicios previstos de Codex y el final del bloque local de Claude, incluso con el dock oculto. Un bloque terminado no confirma cuota recuperada. Se respetan concentración, vídeo, juegos y No molestar; no se leen credenciales.
+- Guardar solo audio ya no elimina un vídeo guardado anteriormente. Archivos, vídeo y audio muestran progreso y resultado; títulos iniciales y errores se conservan correctamente.
+- Agentes compactos sin nombres cortados, contraste corregido para colores elegidos, grupos con color e icono desde el menú y mejoras en dispositivos Logitech.
+- El aviso abre Sistema. El historial carga al abrirlo, permite reintentar y muestra iconos legibles; instalar sigue requiriendo tu acción, guardado y copia previa.
+- README en inglés y español, descargas x64/ARM64/MSI e imágenes se preparan juntos. La publicación se bloquea si notas, enlaces o capturas quedan desactualizados.
+
+[Notas completas](docs/releases/v0.93.0.md)
+<!-- booki:news:end -->
 
 ## Novedades de 0.87
 

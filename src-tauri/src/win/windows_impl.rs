@@ -761,6 +761,203 @@ unsafe fn apply_tray_inset(work: &mut RECT, monitor: &RECT, hmon: HMONITOR, tray
     }
 }
 
+/// The foreground window is a movie, a player, or a streaming page.
+/// Windowed YouTube counts: the title is enough, the window need not be
+/// maximized. Spotify and a document do not.
+pub fn foreground_is_video() -> bool {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return false;
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
+    looks_like_video(&window_title(hwnd).to_lowercase(), exe)
+}
+
+fn window_title(hwnd: HWND) -> String {
+    unsafe {
+        let len = GetWindowTextLengthW(hwnd);
+        if len <= 0 {
+            return String::new();
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let copied = GetWindowTextW(hwnd, &mut buf);
+        if copied <= 0 {
+            return String::new();
+        }
+        String::from_utf16_lossy(&buf[..copied as usize])
+    }
+}
+
+/// Title and process name, both already lowercase. Players match by exe so a
+/// fullscreen file with no site name still counts. Streaming sites match by
+/// a distinctive word in the window title.
+pub(crate) fn looks_like_video(title: &str, exe: &str) -> bool {
+    const PLAYERS: &[&str] = &[
+        "vlc.exe",
+        "mpv.exe",
+        "mpc-hc.exe",
+        "mpc-hc64.exe",
+        "mpc-be.exe",
+        "mpc-be64.exe",
+        "potplayer.exe",
+        "potplayer64.exe",
+        "potplayermini.exe",
+        "potplayermini64.exe",
+        "kmplayer.exe",
+        "gom.exe",
+        "smplayer.exe",
+        "kodi.exe",
+        "wmplayer.exe",
+        "mpc-qt.exe",
+        "nvlc.exe",
+    ];
+    if PLAYERS.contains(&exe) {
+        return true;
+    }
+    const MARKS: &[&str] = &[
+        "youtube",
+        "netflix",
+        "twitch",
+        "disney+",
+        "disney plus",
+        "prime video",
+        "crunchyroll",
+        "hbo",
+        "vimeo",
+        "dailymotion",
+        "pluto tv",
+        "paramount+",
+        "paramount plus",
+        "hulu",
+        "mubi",
+        "jellyfin",
+        " - kick",
+        "| kick",
+    ];
+    MARKS.iter().any(|mark| title.contains(mark))
+}
+
+/// A creative app stays in front of the notch even when its window is maximized.
+/// Checked after video, so a YouTube tab titled "Figma tutorial" stays a video.
+pub(crate) fn looks_like_creative(title: &str, exe: &str) -> bool {
+    const EXES: &[&str] = &[
+        "blender.exe",
+        "figma.exe",
+        "resolve.exe",
+        "krita.exe",
+        "clipstudio.exe",
+        "clipstudiopaint.exe",
+        "audacity.exe",
+        "reaper.exe",
+        "inkscape.exe",
+        "gimp-2.10.exe",
+        "obs64.exe",
+        "obs32.exe",
+        "c4d.exe",
+        "maya.exe",
+        "zbrush.exe",
+    ];
+    if EXES.contains(&exe)
+        || exe.contains("photoshop")
+        || exe.contains("premiere")
+        || exe.contains("illustrator")
+        || exe.contains("afterfx")
+        || exe.contains("lightroom")
+        || exe.contains("affinity")
+    {
+        return true;
+    }
+    ["figma", "davinci resolve", "clip studio", "blender"]
+        .iter()
+        .any(|mark| title.contains(mark))
+}
+
+/// The game itself, not the store. A maximized window is decided separately.
+pub(crate) fn looks_like_game(exe: &str) -> bool {
+    const GAMES: &[&str] = &[
+        "cs2.exe",
+        "dota2.exe",
+        "hl2.exe",
+        "rocketleague.exe",
+        "league of legends.exe",
+        "robloxplayerbeta.exe",
+        "minecraft.windows.exe",
+        "r5apex.exe",
+        "gta5.exe",
+        "eldenring.exe",
+        "cyberpunk2077.exe",
+        "ffxiv_dx11.exe",
+        "overwatch.exe",
+        "wow.exe",
+        "osu!.exe",
+    ];
+    exe.contains("win64-shipping") || GAMES.contains(&exe)
+}
+
+fn looks_like_code(exe: &str) -> bool {
+    matches!(
+        exe,
+        "cursor.exe"
+            | "code.exe"
+            | "devenv.exe"
+            | "idea64.exe"
+            | "pycharm64.exe"
+            | "webstorm64.exe"
+            | "rider64.exe"
+            | "clion64.exe"
+            | "goland64.exe"
+            | "rustrover64.exe"
+            | "windowsterminal.exe"
+            | "wt.exe"
+            | "powershell.exe"
+            | "pwsh.exe"
+            | "cmd.exe"
+    )
+}
+
+/// What the person is doing in the foreground window: video, a creative app,
+/// code, a game, or the desk. Video wins over a creative word in the title.
+pub fn foreground_place() -> &'static str {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return "desk";
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
+    let title = window_title(hwnd).to_lowercase();
+    if looks_like_video(&title, exe) {
+        return "video";
+    }
+    if looks_like_creative(&title, exe) {
+        return "creative";
+    }
+    if looks_like_code(exe) {
+        return "code";
+    }
+    if looks_like_game(exe) {
+        return "game";
+    }
+    "desk"
+}
+
+/// The foreground app is one you write code in. Used so the notch prefers an
+/// agent over music. The window title is not read.
+pub fn foreground_is_code() -> bool {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return false;
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    looks_like_code(path.rsplit(['\\', '/']).next().unwrap_or(""))
+}
+
 /// A real desktop foreground, as opposed to a gap while switching apps.
 pub fn desktop_foreground() -> bool {
     unsafe {
@@ -1081,7 +1278,7 @@ pub fn toggle_window(hwnd: isize) -> bool {
 // state is deterministic and verifiable — no plugin between us and the registry.
 
 const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-const RUN_VALUE: &str = "Booki";
+const RUN_VALUE: &str = env!("BOOKI_RUN");
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
@@ -1516,7 +1713,10 @@ pub fn get_autostart() -> bool {
 /// MSI/portable copies use their original installer flow to avoid a second copy.
 pub fn quiet_update_supported() -> bool {
     use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
-    let key = wide("Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Booki");
+    let key = wide(&format!(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{}",
+        env!("BOOKI_RUN")
+    ));
     let value = wide("InstallLocation");
     let mut buffer = [0u16; 32768];
     let mut size = std::mem::size_of_val(&buffer) as u32;
@@ -2037,6 +2237,37 @@ pub fn cursor_at_edge(edge: &str) -> bool {
             "right" => p.x >= r.right - 2 && in_y,
             _ => p.y >= r.bottom - 2 && in_x,
         }
+    }
+}
+
+#[cfg(test)]
+mod video_tests {
+    use super::{looks_like_creative, looks_like_game, looks_like_video};
+
+    #[test]
+    fn streaming_titles_and_players_count_spotify_does_not() {
+        assert!(looks_like_video(
+            "lofi hip hop - youtube - google chrome",
+            "chrome.exe"
+        ));
+        assert!(looks_like_video("stranger things - netflix", "msedge.exe"));
+        assert!(looks_like_video("a film", "vlc.exe"));
+        assert!(!looks_like_video("album - spotify", "spotify.exe"));
+        assert!(!looks_like_video("document - word", "winword.exe"));
+        // Video is matched on its own. foreground_place asks this before
+        // the creative check, so a Figma tutorial on YouTube stays a video.
+        assert!(looks_like_video("figma tutorial - youtube", "chrome.exe"));
+    }
+
+    #[test]
+    fn creative_stays_and_a_game_exe_is_a_game() {
+        assert!(looks_like_creative("poster - figma", "chrome.exe"));
+        assert!(looks_like_creative("", "blender.exe"));
+        assert!(!looks_like_creative("inbox - gmail", "chrome.exe"));
+        assert!(looks_like_game("fortniteclient-win64-shipping.exe"));
+        assert!(looks_like_game("cs2.exe"));
+        assert!(!looks_like_game("steam.exe"));
+        assert!(!looks_like_game("photoshop.exe"));
     }
 }
 

@@ -3,7 +3,7 @@
 
    Three separate choices, each with one job:
    - the style (`surfaceStyle`): "taskbar" looks like the Windows taskbar,
-     "glass" is tinted acrylic, "clear" is barely tinted acrylic, "solid" is
+     "glass" is a light frost the wallpaper shows through, "solid" is
      opaque;
    - the fill (`surfaceColor`): "auto" (the style's own neutral), "wallpaper",
      "accent" or a colour picked by hand. The taskbar style ignores it and
@@ -19,9 +19,8 @@ const HEX = /^#[0-9a-f]{6}$/i;
 // The Windows 11 taskbar's own fills in dark and light mode.
 export const TASKBAR_DARK = "#202020";
 export const TASKBAR_LIGHT = "#eeeeee";
-// Neutral acrylic tints (the "auto" fill) for the glass styles.
-const GLASS_AUTO = { dark: "#2c2c2c", light: "#f3f3f3" };
-const CLEAR_AUTO = { dark: "#2c2c2c", light: "#f3f3f3" };
+// A light veil, not another dark gray. At the glass alpha it reads as frost.
+const GLASS_AUTO = { dark: "#f2f2f2", light: "#ffffff" };
 
 export function colorSource(cfg) {
   return COLOR_SOURCES.includes(cfg?.colorSource) ? cfg.colorSource : "custom";
@@ -78,9 +77,14 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
   // The taskbar style sits where the taskbar does, so it follows the Windows
   // mode (taskbar, Start), not the app mode, when the theme is left to the
   // system.
-  const theme = style === "taskbar" && (cfg.theme || "system") === "system" && platform
+  let theme = style === "taskbar" && (cfg.theme || "system") === "system" && platform
     ? (platform.systemLight ? "light" : "dark")
     : cfg.theme;
+  // A deliberately picked fill needs readable ink across the whole window.
+  if (style !== "taskbar" && HEX.test(surfaceColor(cfg))) {
+    const rgb = hexToRgb(surfaceColor(cfg));
+    theme = (rgb.r * 0.2126 + rgb.g * 0.7152 + rgb.b * 0.0722) < 128 ? "dark" : "light";
+  }
   const dark = themeIsDark(theme || "system", systemDark);
   const tone = dark ? "dark" : "light";
   let glassTint = "";
@@ -91,7 +95,6 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
     else if (fill === "wallpaper" && wall) glassTint = dark ? mixHex(wall, "#202020", 0.72) : mixHex(wall, "#ffffff", 0.72);
     else if (fill === "accent" && HEX.test(accent || "")) glassTint = dark ? mixHex(accent, "#202020", 0.72) : mixHex(accent, "#ffffff", 0.7);
     else if (style === "glass") glassTint = GLASS_AUTO[tone];
-    else if (style === "clear") glassTint = CLEAR_AUTO[tone];
   }
   return { ...cfg, accent, theme, surfaceStyle: style, glassTint };
 }

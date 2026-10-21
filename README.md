@@ -8,11 +8,15 @@
 
 <p align="center">A beautiful dock for Windows 11 — apps, folders and live widgets in one calm bar.<br/>Free, private and open source.</p>
 
+<!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="docs/releases/v0.87.0.md"><b>What's new in 0.87</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64-setup.exe"><b>Download for Windows v0.93.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.93.0.md">What's new v0.93.0</a> ·
   <a href="README.es.md">Español</a>
 </p>
+<!-- booki:download:end -->
 
 <p align="center">
   <a href="https://github.com/punkable/booki/releases/latest"><img src="https://img.shields.io/github/v/release/punkable/booki?label=latest&style=flat-square&color=dfaa75" alt="Latest release" /></a>
@@ -21,13 +25,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock on a soft desktop with apps, two colored groups, clock, weather, system, focus timer and music, and the notch Island showing the timer" /></p>
+<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock with example apps, a group, clock, system readings, focus timer and Collector" /></p>
 
 <table align="center">
 <tr>
 <td align="center" width="25%"><b>⚡ Light</b><br/><sub>Native Rust core. Widgets pause when the dock hides.</sub></td>
 <td align="center" width="25%"><b>🔒 Private</b><br/><sub>No accounts, no telemetry, no cloud.</sub></td>
-<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Taskbar, glass, clear or solid. Any edge. Five languages.</sub></td>
+<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Taskbar, glass or solid. Any edge. Five languages.</sub></td>
 <td align="center" width="25%"><b>🧡 Open</b><br/><sub>MIT licensed. Built in the open.</sub></td>
 </tr>
 </table>
@@ -38,31 +42,31 @@
 
 <p align="center">A quiet dot at the top of your screen that opens into a capsule for your focus timer, the song that's playing or a low battery.<br/>Hover it for a card with more. Prefer something simpler? Choose an attached tab or a floating pill.</p>
 
-<p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="The notch Island showing a running focus timer above a dark Booki dock" /></p>
+<p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="Claude Code mascot, name and working indicator in the compact Booki notch" /></p>
 
 <h2 align="center">Groups that look like yours.</h2>
 
 <p align="center">Pin apps, folders, files and websites, then gather them into groups.<br/>Give each group a colour from a curated palette and an icon from the library — it shows in the dock and in Settings.</p>
 
-<p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki Settings, Apps and folders: the dock as a tidy grid, a library with large icons and a group inspector with colour and icon pickers" /></p>
+<p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki Apps and folders page with example pins and the app catalog" /></p>
 
 <h2 align="center">Live, at a glance.</h2>
 
 <p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.<br/>A focus block turns on Windows Do not disturb (and turns it back off when it ends), holds Booki's own notices and can keep the dock tucked away.</p>
 
-<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki widget gallery with live previews" /></p>
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Current Booki widget gallery" /></p>
 
 <h2 align="center">Settings you actually enjoy.</h2>
 
 <p align="center">Five clear pages — Home, Dock, Widgets, Apps and System — with a live preview of your dock and everything at a glance.</p>
 
-<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Booki Settings home with the dock on a small desktop and at-a-glance tiles" /></p>
+<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Current Booki Settings home with example dock" /></p>
 
 <h2 align="center">At home in the dark.</h2>
 
-<p align="center">Follows your Windows theme and accent. Match the taskbar, blur what's behind with glass or clear glass, or stay solid.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center">Follows your Windows theme and accent. Match the taskbar, blur what's behind with glass, or stay solid.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
 
-<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Booki Dock settings in dark mode" /></p>
+<p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Current Booki Dock settings in dark mode" /></p>
 
 ---
 
@@ -70,16 +74,24 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><sub>Images show the actual Booki 0.86 interface with example data and generic sample icons.</sub></p>
+<!-- booki:media:start -->
+<p align="center"><sub>Source frontend captures for v0.93.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<!-- booki:media:end -->
 
-## What's new in 0.88
+<!-- booki:news:start -->
+## What's new in 0.93.0
 
-- **Collector**: drop a link on the dock to save video or audio only from hundreds of sites, image galleries or files.
-- **Devices** rotates through headset, mouse and keyboard with their icons; color shows the battery and pulses when it needs charging.
-- **AI usage** with official Claude and ChatGPT logos, in turn: Codex's plan windows with their resets, and Claude Code's tokens in the current 5-hour block.
-- **Updates**, **Cloud** and **Lighting** widgets (winget, rclone, OpenRGB), and notices that never cover the dock.
-- **Position** picked with one click on a drawing of your screen; folders without overlapping names.
-- Plugins pinned to SHA-256 checksums, with [terms of use](TERMS.md).
+Clearer agents, downloads that preserve your files and up-to-date releases.
+
+- The notch keeps the full name and logo beside separate working, paused, finished and error indicators. Claude Code uses its mascot. Cursor recognizes TXT and JSONL transcripts; activity-based states remain approximate.
+- Notices remember scheduled Codex resets and the end of a local Claude block, even while the dock is hidden. An ended block does not confirm recovered quota. Focus, video, games and Do not disturb are respected; credentials are never read.
+- Saving audio no longer removes a video saved earlier. Files, video and audio show progress and results; initial titles and errors are retained correctly.
+- Compact agents without cut-off names, corrected contrast for chosen colors, group colors and icons in the context menu, and Logitech device improvements.
+- The update notice opens System. History loads on opening, offers retry and uses readable icons; installing still requires your action, saved settings and a backup.
+- English and Spanish READMEs, x64/ARM64/MSI downloads and images are prepared together. Publication is blocked when notes, links or screenshots are stale.
+
+[Full release notes](docs/releases/v0.93.0.md)
+<!-- booki:news:end -->
 
 ## Get started
 

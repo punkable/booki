@@ -653,6 +653,25 @@ fn agent_activity() -> Vec<agent_activity::Activity> {
     agent_activity::current()
 }
 
+/// True when the foreground app is a code editor or a terminal.
+#[tauri::command]
+fn foreground_is_code() -> bool {
+    win::foreground_is_code()
+}
+
+/// True when the foreground window is a video player or a streaming page.
+#[tauri::command]
+fn foreground_is_video() -> bool {
+    win::foreground_is_video()
+}
+
+/// video, creative, code, game, or desk. One look, so the notch does not
+/// ask four times.
+#[tauri::command]
+fn foreground_place() -> &'static str {
+    win::foreground_place()
+}
+
 /// Plan usage of the AI services signed in on this PC, for the AI widget.
 /// The dock only asks while that widget is pinned.
 #[tauri::command]
@@ -1599,6 +1618,9 @@ pub fn run() {
             device_batteries,
             ai_usage,
             agent_activity,
+            foreground_is_code,
+            foreground_is_video,
+            foreground_place,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,
@@ -1828,7 +1850,7 @@ pub fn run() {
             let menu = tray_menu(app.handle(), native_text::current())?;
 
             let mut tray_builder = TrayIconBuilder::with_id("booki-tray")
-                .tooltip("Booki")
+                .tooltip(env!("BOOKI_RUN"))
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "toggle" => toggle_dock(app),

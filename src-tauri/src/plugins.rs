@@ -55,10 +55,31 @@ pub fn find(id: &str) -> Option<&'static Plugin> {
 fn dir(plugin: &Plugin) -> Option<PathBuf> {
     Some(
         dirs::data_local_dir()?
-            .join("Booki")
+            .join(env!("BOOKI_DATA"))
             .join("plugins")
             .join(&plugin.id),
     )
+}
+
+/// Where a plugin Booki itself downloaded actually sits, and who owns it.
+/// Booki Dev also sees the tools already installed for the normal Booki, but
+/// it does not treat that folder as its own: uninstall stays on this edition.
+fn located(plugin: &Plugin) -> Option<(PathBuf, &'static str)> {
+    let local = dirs::data_local_dir()?;
+    let own = local
+        .join(env!("BOOKI_DATA"))
+        .join("plugins")
+        .join(&plugin.id);
+    if own.join(&plugin.exe).is_file() {
+        return Some((own.join(&plugin.exe), "booki"));
+    }
+    if env!("BOOKI_DATA") != "Booki" {
+        let shared = local.join("Booki").join("plugins").join(&plugin.id);
+        if shared.join(&plugin.exe).is_file() {
+            return Some((shared.join(&plugin.exe), "shared"));
+        }
+    }
+    None
 }
 
 /// The installed executable, if the plugin is installed: Booki's own copy
@@ -69,12 +90,11 @@ pub fn executable(plugin: &Plugin) -> Option<PathBuf> {
 
 /// The copy Booki downloaded and verified into its own folder.
 fn own_executable(plugin: &Plugin) -> Option<PathBuf> {
-    let path = if plugin.external {
-        dirs::data_local_dir()?.join("Microsoft/WindowsApps/winget.exe")
-    } else {
-        dir(plugin)?.join(&plugin.exe)
-    };
-    path.is_file().then_some(path)
+    if plugin.external {
+        let path = dirs::data_local_dir()?.join("Microsoft/WindowsApps/winget.exe");
+        return path.is_file().then_some(path);
+    }
+    located(plugin).map(|(path, _)| path)
 }
 
 /// The same tool installed outside Booki: on PATH, or where winget, Scoop,
@@ -127,7 +147,8 @@ fn system_executable(plugin: &Plugin) -> Option<PathBuf> {
 pub struct Status {
     pub installed: bool,
     pub version: Option<String>,
-    /// "booki" for Booki's own copy, "system" for one already on the PC.
+    /// "booki" for this edition's copy, "shared" for the normal Booki's copy
+    /// (Booki Dev only), "system" for one already on the PC.
     pub source: Option<&'static str>,
 }
 
@@ -140,17 +161,26 @@ pub fn status(plugin: &Plugin) -> Status {
             .iter()
             .all(|id| find(id).is_some_and(|c| executable(c).is_some()));
     // Booki's copy of the plugin or of any companion: it stays removable.
-    let own = own_executable(plugin).is_some()
+    let place = located(plugin);
+    let own = place.is_some()
         || plugin
             .companions
             .iter()
-            .any(|id| find(id).is_some_and(|c| own_executable(c).is_some()));
-    let version = (installed && own)
-        .then(|| dir(plugin))
-        .flatten()
-        .and_then(|d| std::fs::read_to_string(d.join("VERSION")).ok())
+            .any(|id| find(id).is_some_and(|c| located(c).is_some()));
+    let version = place
+        .as_ref()
+        .and_then(|(path, _)| {
+            let folder = path.parent()?;
+            std::fs::read_to_string(folder.join("VERSION")).ok()
+        })
         .map(|v| v.trim().to_string());
-    let source = installed.then_some(if own { "booki" } else { "system" });
+    let source = installed.then_some(if let Some((_, kind)) = place {
+        kind
+    } else if own {
+        "shared"
+    } else {
+        "system"
+    });
     Status {
         installed,
         version,

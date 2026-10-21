@@ -94,7 +94,18 @@ body:not(.surface-glass) .menu { -webkit-backdrop-filter: none; backdrop-filter:
 .menu .ctx-recents:empty { display: none; }
 
 /* The dock's style, one click away: four painted samples in a row. */
-.menu .menu-styles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 2px 6px 4px; }
+.menu .menu-styles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 2px 6px 4px; }
+.menu .menu-swatches, .menu .menu-glyphs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 10px 6px; }
+.menu .menu-glyphs { max-height: 92px; overflow: auto; }
+.menu .menu-swatches button, .menu .menu-glyphs button {
+  width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; gap: 0;
+  border-radius: 50%; justify-content: center;
+}
+.menu .menu-swatches button { background: var(--sw, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent); }
+.menu .menu-swatches button.none { background: linear-gradient(135deg, transparent 46%, var(--ink-2) 48% 52%, transparent 54%); }
+.menu .menu-swatches button[aria-pressed="true"], .menu .menu-glyphs button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.menu .menu-glyphs button { width: 22px; height: 22px; border-radius: 4px; }
+.menu .menu-glyphs button svg { width: 14px; height: 14px; }
 .menu .menu-styles button {
   flex-direction: column;
   justify-content: center;

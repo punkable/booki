@@ -263,7 +263,7 @@ pub struct Config {
     #[serde(default = "default_notch_mode")]
     pub notch_mode: String,
     /// Unified dock + notch style: "taskbar" (the Windows taskbar's look),
-    /// "glass" (tinted acrylic), "clear" (barely tinted acrylic) or "solid".
+    /// "glass" (a light frost) or "solid". A saved "clear" becomes glass.
     #[serde(default = "default_surface_style")]
     pub surface_style: String,
     /// Real blurred material behind the dock and notch (win/material.rs).
@@ -520,7 +520,7 @@ pub fn config_dir() -> PathBuf {
         return PathBuf::from(dir);
     }
     let mut dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    dir.push("Booki");
+    dir.push(env!("BOOKI_DATA"));
     dir
 }
 
@@ -748,7 +748,9 @@ fn migrate_look_v11(cfg: &mut Config) {
 /// Only known styles and fills reach disk, whatever an older frontend sent.
 pub fn canonical_look(cfg: &mut Config) {
     let style = cfg.surface_style.trim().to_ascii_lowercase();
-    if !matches!(style.as_str(), "taskbar" | "glass" | "clear" | "solid") {
+    if style == "clear" {
+        cfg.surface_style = "glass".into();
+    } else if !matches!(style.as_str(), "taskbar" | "glass" | "solid") {
         migrate_surface_v9(cfg);
         if cfg.surface_style == "mica" {
             cfg.surface_style = "solid".into();
@@ -1145,7 +1147,7 @@ mod migration_tests {
         canonical_look(&mut cfg);
         assert_eq!(
             (cfg.surface_style.as_str(), cfg.surface_color.as_str()),
-            ("clear", "#aabbcc")
+            ("glass", "#aabbcc")
         );
     }
 

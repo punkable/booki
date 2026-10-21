@@ -10,6 +10,7 @@ import { AutoProfiles } from "../auto-profiles.jsx";
 import { HotkeyInput, LANG_OPTIONS, ModifierPicker } from "../controls.jsx";
 import { formatHotkey } from "../hotkey-labels.js";
 import { CollapsibleSection, Icon, PageHeader, Row, Select, SettingsSection, Toggle } from "../ui.jsx";
+import { isotype, appName, devEdition } from "../../brand-mark.js";
 
 const REPO = "https://github.com/punkable/booki";
 const CONTACT = "punkable@protonmail.com";
@@ -112,7 +113,7 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
     <SettingsSection icon="shield" title={t("system.privacy")} hint={t("faq.fact.net")}>
       <Toggle label={t("gen.captureVisible")} hint={t("gen.captureVisibleHint")} checked={!!cfg.captureVisible} onChange={(v) => set({ captureVisible: v })} />
       <Toggle label={t("gen.ctxMenu")} hint={t("gen.ctxMenuHint")} checked={cfg.contextMenu !== false} onChange={(v) => set({ contextMenu: v })} />
-      <Row label={t("faq.link.data")} hint={<code>%APPDATA%\Booki</code>}><button type="button" className="button" onClick={() => dockApi.openDataDir().catch(() => {})}>{t("system.open")}</button></Row>
+      <Row label={t("faq.link.data")} hint={<code>{devEdition ? "%APPDATA%\u005cBooki Dev" : "%APPDATA%\u005cBooki"}</code>}><button type="button" className="button" onClick={() => dockApi.openDataDir().catch(() => {})}>{t("system.open")}</button></Row>
       <Diagnostics />
     </SettingsSection>
 
@@ -122,9 +123,9 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
 
     <SettingsSection icon="info" title={t("ab.title")}>
       <div className="about">
-        <img className="about-logo" src="/brand/svg/isotype.svg" alt="" />
+        <img className="about-logo" src={isotype} alt="" />
         <div className="about-text">
-          <span className="about-name">Booki <span className="about-version">v{version || "…"}</span></span>
+          <span className="about-name">{appName} <span className="about-version">v{version || "…"}</span></span>
           <span className="about-tagline">{t("ab.tagline")}</span>
         </div>
         <button type="button" className="button" onClick={onWhatsNew}>{t("ab.whatsNew")}</button>

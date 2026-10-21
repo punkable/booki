@@ -3,10 +3,12 @@ import { dock } from '../api.js';
 import { updates } from '../update.js';
 import { t } from '../i18n.js';
 import { Button, Row } from './ui.jsx';
+import { devEdition } from '../brand-mark.js';
 export function UpdatesCard({ beforeApply }) {
   const [managed, setManaged] = useState(null);
   const [state, setState] = useState(updates.snapshot);
   useEffect(() => {
+    if (devEdition) return undefined;
     dock.quietUpdateSupported().then((supported) => setManaged(supported === true)).catch(() => setManaged(false));
     const unsubscribe = updates.subscribe(setState);
     if (['idle', 'none', 'error'].includes(updates.snapshot().phase)) updates.check().catch(() => {});
@@ -14,6 +16,7 @@ export function UpdatesCard({ beforeApply }) {
   }, []);
   const { phase, update, pct, error } = state;
   const busy = phase === 'downloading' || phase === 'installing';
+  if (devEdition) return <p role="status">{t('ab.devUpdates')}</p>;
   return <>
     {phase === 'error' && <p className="update-error" role="status">{t('ab.error')}</p>}
     {error && phase !== 'error' && <p className="update-error" role="alert">{t(phase === 'ready' ? 'premium.updateApplyError' : phase === 'available' ? 'premium.updateDownloadError' : 'ab.error')}</p>}

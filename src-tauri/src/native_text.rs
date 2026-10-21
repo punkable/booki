@@ -69,32 +69,72 @@ pub(crate) fn text(language: &str) -> NativeText {
         "es" => NativeText {
             toggle: "Mostrar / ocultar dock",
             settings: "Ajustes…",
-            quit: "Salir de Booki",
-            settings_title: "Booki — Ajustes",
+            quit: if cfg!(booki_dev) {
+                "Salir de Booki Dev"
+            } else {
+                "Salir de Booki"
+            },
+            settings_title: if cfg!(booki_dev) {
+                "Booki Dev — Ajustes"
+            } else {
+                "Booki — Ajustes"
+            },
         },
         "pt" => NativeText {
             toggle: "Mostrar / ocultar dock",
             settings: "Configurações…",
-            quit: "Sair do Booki",
-            settings_title: "Booki — Configurações",
+            quit: if cfg!(booki_dev) {
+                "Sair do Booki Dev"
+            } else {
+                "Sair do Booki"
+            },
+            settings_title: if cfg!(booki_dev) {
+                "Booki Dev — Configurações"
+            } else {
+                "Booki — Configurações"
+            },
         },
         "fr" => NativeText {
             toggle: "Afficher / masquer le dock",
             settings: "Réglages…",
-            quit: "Quitter Booki",
-            settings_title: "Booki — Réglages",
+            quit: if cfg!(booki_dev) {
+                "Quitter Booki Dev"
+            } else {
+                "Quitter Booki"
+            },
+            settings_title: if cfg!(booki_dev) {
+                "Booki Dev — Réglages"
+            } else {
+                "Booki — Réglages"
+            },
         },
         "de" => NativeText {
             toggle: "Dock ein-/ausblenden",
             settings: "Einstellungen…",
-            quit: "Booki beenden",
-            settings_title: "Booki — Einstellungen",
+            quit: if cfg!(booki_dev) {
+                "Booki Dev beenden"
+            } else {
+                "Booki beenden"
+            },
+            settings_title: if cfg!(booki_dev) {
+                "Booki Dev — Einstellungen"
+            } else {
+                "Booki — Einstellungen"
+            },
         },
         _ => NativeText {
             toggle: "Show / hide dock",
             settings: "Settings…",
-            quit: "Quit Booki",
-            settings_title: "Booki — Settings",
+            quit: if cfg!(booki_dev) {
+                "Quit Booki Dev"
+            } else {
+                "Quit Booki"
+            },
+            settings_title: if cfg!(booki_dev) {
+                "Booki Dev — Settings"
+            } else {
+                "Booki — Settings"
+            },
         },
     }
 }

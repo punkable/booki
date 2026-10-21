@@ -141,7 +141,7 @@ test('release dates follow the reader\'s language and keep text that does not pa
 });
 
 test('a failed first config read shows an error with Retry instead of an empty window', async () => {
-  const { page, errors } = await openPage(browser, port, 'settings.html', { initScript: `
+  const { page, errors } = await openPage(browser, port, 'settings.html', { locale: 'en-US', initScript: `
     const invoke = window.__TAURI__.core.invoke;
     window.__configReads = 0;
     window.__TAURI__.core.invoke = (cmd, args) => {

@@ -5,6 +5,7 @@ import { imageSrc } from "../image-src.js";
 import { setTileLabel } from "./tooltip.js";
 import { widgetWidth } from "./layout-model.js";
 import { icon } from "../icons.js";
+import { isotype } from "../brand-mark.js";
 import { emo } from "../emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "../icon-library.js";
 import { t } from "../i18n.js";
@@ -26,7 +27,7 @@ import {
 import { groupAppearance } from "../group-style.js";
 import { pinFallback } from "../pin-fallback.js";
 import { S } from "./state.js";
-import { iconCache, baseSize, widgetLabel, syncIcon, resolveIcon } from "./helpers.js";
+import { iconCache, baseSize, widgetLabel, syncIcon, resolveIcon, isDefaultGroupName } from "./helpers.js";
 import { dockEl, dockKeys } from "./dom.js";
 import { fitDock } from "./frame.js";
 import { cacheWidgetEls, tickClocks, syncPolls, refreshMedia } from "./live-widgets.js";
@@ -81,7 +82,7 @@ export async function render() {
     // The capybara mascot waves you in — friendlier than a bare "+".
     hint.innerHTML =
       `<span class="label">${t("dock.emptyAdd")}</span>` +
-      `<span class="hint-capy"><img src="/brand/svg/isotype.svg" alt="" draggable="false" />` +
+      `<span class="hint-capy"><img src="${isotype}" alt="" draggable="false" />` +
       `<span class="hint-plus-badge">${icon("plus")}</span></span>`;
     hint.addEventListener("click", () => deps.openAddPanel(hint));
     hint.addEventListener("contextmenu", (e) => deps.openBackgroundMenu(e));
@@ -197,7 +198,9 @@ function groupTile(item) {
   el.style.setProperty("--size", `${baseSize()}px`);
   const look = groupAppearance(item);
   if (look.color) { el.style.setProperty("--group-color", look.color); el.style.setProperty("--group-ink", look.ink); el.classList.add("tinted"); }
-  setTileLabel(el, item.name || t("group.new"));
+  const unnamed = isDefaultGroupName(item.name);
+  if (unnamed) el.classList.add("unnamed");
+  setTileLabel(el, unnamed ? t("m.group") : (item.name || t("group.new")));
 
   const grid = document.createElement("span");
   grid.className = "group-grid";
@@ -255,7 +258,7 @@ function groupTile(item) {
 
   const label = document.createElement("span");
   label.className = "label";
-  label.textContent = item.name || t("group.new");
+  label.textContent = unnamed ? "" : (item.name || t("group.new"));
   el.appendChild(label);
 
   const badge = document.createElement("span");

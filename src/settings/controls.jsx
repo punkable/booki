@@ -1,6 +1,6 @@
 /* Controls shared by the Settings pages. Native elements, styled in
    src/styles/settings.css; no component library. */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { dock as dockApi } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { formatHotkey, keyLabel } from "./hotkey-labels.js";
@@ -9,7 +9,7 @@ import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
 import { COLOR_SOURCES, SURFACE_COLORS, colorSource } from "../system-look.js";
-import { Icon, SegmentedControl, Select } from "./ui.jsx";
+import { Icon, Select } from "./ui.jsx";
 
 export const LANG_OPTIONS = [
   { value: "system", key: "lang.system" },
@@ -64,17 +64,28 @@ export function AccentPicker({ value, onChange, sources = false }) {
   </Swatches>;
 }
 
-/** Where the accent comes from, and what that currently gives. */
+/** Where the accent comes from. Each choice shows the colour it would use. */
 export function ColorSourcePicker({ cfg, set, children }) {
   const source = colorSource(cfg);
-  return <div className="look-source">
-    <SegmentedControl value={source} onChange={(value) => set({ colorSource: value })}
-      options={COLOR_SOURCES.map((value) => ({ value, label: t(`look.${value}`) }))} />
-    {source !== "custom" && <p className="swatch-caption look-now">
-      <span className="look-now-dot" aria-hidden="true" />
-      {t(`look.${source}Now`)}
-    </p>}
-    {children}
+  const [windows, setWindows] = useState("");
+  const [wall, setWall] = useState("");
+  useEffect(() => {
+    let live = true;
+    dockApi.systemAccent().then((hex) => { if (live && hex) setWindows(hex); }).catch(() => {});
+    dockApi.wallpaperAccent().then((hex) => { if (live && hex) setWall(hex); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const custom = /^#[0-9a-f]{6}$/i.test(cfg?.accent || "") ? cfg.accent : "#dfaa75";
+  const swatch = { windows: windows || "var(--accent)", wallpaper: wall || "#8a8a8a", custom };
+  return <div className="accent-sources">
+    <div className="accent-source-row" role="radiogroup" aria-label={t("look.source")}>
+      {COLOR_SOURCES.map((value) => <button key={value} type="button" role="radio" className="accent-source" aria-checked={source === value} onClick={() => set({ colorSource: value })}>
+        <span className="accent-swatch" style={{ "--sw": swatch[value] }} aria-hidden="true" />
+        <span className="accent-source-name">{t(`look.${value}`)}</span>
+      </button>)}
+    </div>
+    {source !== "custom" && <p className="swatch-caption">{t(`look.${source}Now`)}</p>}
+    {source === "custom" ? children : null}
   </div>;
 }
 

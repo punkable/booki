@@ -22,6 +22,8 @@ const look = (page) => page.evaluate(() => ({
   logo: !!document.querySelector("#nl-agent svg[fill='#D97757']"),
   logoShown: getComputedStyle(document.getElementById("nl-agent")).display !== "none",
   width: document.getElementById("notch-pill").getBoundingClientRect().width,
+  state: document.getElementById("nl-state").dataset.icon,
+  label: document.getElementById("notch-pill").getAttribute("aria-label"),
 }));
 
 test("Claude working, waiting for permission, then done", async () => {
@@ -31,18 +33,22 @@ test("Claude working, waiting for permission, then done", async () => {
   let now = await look(page);
   assert.ok(now.classes.includes("live") && now.classes.includes("act-agent"), JSON.stringify(now));
   assert.ok(now.logo && now.logoShown, "Claude's coral logo is on the tab");
-  assert.match(now.text, /Claude working/);
+  assert.equal(now.text, "Claude");
+  assert.equal(now.state, "agent-working");
+  assert.match(now.label, /Claude working/);
   assert.ok(now.width < 200, "compact, never a big banner");
 
   await event(page, "booki://agent-activity", { provider: "claude", state: "waiting", since: Date.now() });
   now = await look(page);
   assert.ok(now.classes.includes("act-agent-waiting"));
-  assert.match(now.text, /needs your permission/);
+  assert.equal(now.state, "agent-waiting");
+  assert.match(now.label, /Claude paused/);
 
   await event(page, "booki://agent-activity", { provider: "claude", state: "done", since: Date.now() });
   now = await look(page);
   assert.ok(now.classes.includes("act-agent-done"));
-  assert.match(now.text, /Claude finished/);
+  assert.equal(now.state, "agent-done");
+  assert.match(now.label, /Claude finished/);
   // A repeated "done" does not queue a second notice.
   await event(page, "booki://agent-activity", { provider: "claude", state: "done", since: Date.now() });
   await page.waitForTimeout(5300);
@@ -58,4 +64,27 @@ test("the setting turns agents off", async () => {
   assert.ok(!(await look(page)).classes.includes("act-agent"));
   assert.deepEqual(errors, []);
   await page.close();
+});
+
+test("Cursor keeps its logo and complete name beside each compact status", async () => {
+  for (const notchMode of ["attached", "floating", "smart"]) {
+    const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "always", notchMode, language: "es" }), viewport: { width: 320, height: 80 } });
+    await page.mouse.move(0, 0);
+    for (const state of ["working", "waiting", "error", "done"]) {
+      await event(page, "booki://agent-activity", { provider: "cursor", state, since: Date.now() });
+      await page.waitForTimeout(450);
+      const measured = await page.evaluate(() => {
+        const pill = document.getElementById("notch-pill").getBoundingClientRect();
+        const label = document.getElementById("nl-text");
+        const text = label.getBoundingClientRect();
+        return { width: pill.width, height: pill.height, label: label.textContent, fits: text.left >= pill.left && text.right <= pill.right, logo: document.getElementById("nl-agent").dataset.icon, status: document.getElementById("nl-state").dataset.icon };
+      });
+      assert.equal(measured.label, "Cursor");
+      assert.equal(measured.logo, "ai-cursor");
+      assert.equal(measured.status, `agent-${state}`);
+      assert.ok(measured.width >= 100 && measured.width <= 128 && measured.height <= 26 && measured.fits, JSON.stringify(measured));
+    }
+    assert.deepEqual(errors, []);
+    await page.close();
+  }
 });

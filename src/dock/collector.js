@@ -16,14 +16,17 @@ export function paintDownloads() {
   eachWidget("collector", (el) => {
     el.dataset.state = download.state;
     if (download.state === "progress" || download.state === "start") {
-      setMetric(el, download.title || t("w.collector"), Math.round(download.percent));
+      setMetric(el, t("w.collector"), Math.round(download.percent));
       setTileLabel(el, `${download.title || t("w.collector")} · ${Math.round(download.percent)}%`);
     } else if (download.state === "done") {
-      setMetric(el, baseName(download.path) || t("dl.done"), 100);
+      setMetric(el, t("dl.done"), 100);
       setTileLabel(el, `${t("dl.done")} · ${baseName(download.path)}`);
+    } else if (download.state === "error") {
+      setText(el, t("w.collector"), "!");
+      setTileLabel(el, t("dl.failed"));
     } else {
-      setText(el, t("w.collector"), "—");
-      setTileLabel(el, download.state === "error" ? t("dl.failed") : t("dl.drop"));
+      setText(el, t("w.collector"), "0");
+      setTileLabel(el, t("dl.drop"));
     }
   });
 }
@@ -32,10 +35,12 @@ export function onDownloadChange(fn) { listeners.add(fn); return () => listeners
 function changed() { paintDownloads(); for (const fn of listeners) { try { fn(download); } catch (_) { /* closed panel */ } } }
 
 onDownloadEvent((event) => {
-  if (!event) return;
-  Object.assign(download, { state: event.state, percent: event.percent ?? 0 });
-  if (event.title) download.title = event.title;
+  if (!event || !["start", "progress", "done", "error"].includes(event.state)) return;
+  const percent = Number(event.percent);
+  Object.assign(download, { state: event.state, percent: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0 });
   if (event.state === "start") Object.assign(download, { title: "", path: "", error: "" });
+  if (event.title) download.title = event.title;
+  if (event.state === "error" && event.error) download.error = String(event.error);
   if (event.path) download.path = event.path;
   changed();
 });

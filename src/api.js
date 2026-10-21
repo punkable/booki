@@ -710,6 +710,16 @@ export async function emitNotchShape(shape) {
 export async function emitNotchMenu() {
   if (T && T.event && T.event.emit) await T.event.emit("booki://notch-menu", null);
 }
+
+/** A plan window just reset. The notch paints a short chip; no files move. */
+export async function emitUsageReady(payload) {
+  if (T && T.event && T.event.emit) await T.event.emit("booki://usage-ready", payload);
+}
+
+export function onUsageReady(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://usage-ready", (e) => { if (e.payload && typeof e.payload === "object") cb(e.payload); });
+}
 export async function onNotchMenu(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://notch-menu", () => cb());

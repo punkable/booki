@@ -1,13 +1,14 @@
 /* Live widget read-outs (clock, focus, weather, stats, media, volume, clipboard)
    and the single poll loop that drives them while the dock is visible. */
 
-import { dock as dockApi } from "../api.js";
+import { dock as dockApi, invoke } from "../api.js";
+import { usageResets, usageSnapshot } from "../usage-reset.js";
 import { setTileLabel } from "./tooltip.js";
 import { timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { recoveryInterval } from "./system-observer.js";
 import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
-import { notify } from "./notices.js";
+import { notify, quiet } from "./notices.js";
 import { pollDnd, dndActive, onFocusDndChange } from "./focus-dnd.js";
 import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
@@ -296,11 +297,62 @@ function paintAi(providers) {
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }
+let usageBefore = null;
+const usageSeen = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem("booki.usageResets") || "null");
+  if (saved && Date.now() - saved.at < 8 * 86400000 && saved.at <= Date.now()) {
+    usageBefore = usageSnapshot(saved.providers);
+    for (const key of Array.isArray(saved.seen) ? saved.seen.slice(-64) : []) if (typeof key === "string") usageSeen.add(key);
+  }
+} catch (_) { /* A missing/corrupt local snapshot starts quietly. */ }
+const usageQueue = [];
+let usageRetry = 0;
+let usageFlushing = false;
+async function pictureBusy() {
+  try { return ["video", "game"].includes(String(await invoke("foreground_place") || "")); }
+  catch (_) { return false; }
+}
+async function flushUsage() {
+  if (usageFlushing) return;
+  if (S.cfg?.notchAgents === false) usageQueue.length = 0;
+  if (!usageQueue.length) { if (usageRetry) { clearInterval(usageRetry); usageRetry = 0; } return; }
+  usageFlushing = true;
+  try {
+  if (quiet() || await pictureBusy()) return;
+  const ev = usageQueue.shift();
+  if (usageRetry) { clearInterval(usageRetry); usageRetry = 0; }
+  const title = t(ev.kind === "block" ? "notch.usageBlockEnded" : "notch.usageReady").replace("{agent}", () => ev.name);
+  await notify(title);
+  if (usageQueue.length) usageRetry = setInterval(flushUsage, 6000);
+  } finally { usageFlushing = false; }
+}
+function noteUsage(providers) {
+  if (S.cfg?.notchAgents === false) { usageQueue.length = 0; return; }
+  const now = Math.floor(Date.now() / 1000);
+  for (const ev of usageBefore ? usageResets(usageBefore, providers, now) : []) {
+    if (usageSeen.has(ev.key)) continue;
+    usageSeen.add(ev.key);
+    usageQueue.push(ev);
+  }
+  usageBefore = usageSnapshot(providers);
+  while (usageSeen.size > 64) usageSeen.delete(usageSeen.values().next().value);
+  try { localStorage.setItem("booki.usageResets", JSON.stringify({ at: Date.now(), providers: usageBefore, seen: [...usageSeen] })); } catch (_) { /* storage unavailable */ }
+  if (usageQueue.length && !usageRetry) usageRetry = setInterval(flushUsage, 20000);
+  flushUsage();
+}
 const pollAi = singleFlight(async () => {
   let providers = [];
-  try { providers = (await aiReading.refresh()) || []; } catch (_) { providers = []; }
-  paintAi(providers); syncRotation();
+  try { providers = (await aiReading.fresh(300000)) || []; } catch (_) { return; }
+  if (!Array.isArray(providers)) return;
+  paintAi(providers); syncRotation(); noteUsage(providers);
 });
+
+// Reset notices keep working with the bar tucked away and with no AI tile.
+// Only the existing read-only usage command runs, at most once per 5 minutes.
+setInterval(() => {
+  if (S.cfg && S.cfg.notchAgents !== false && !S.displayOff) pollAi();
+}, 300000);
 
 // Updates (winget): how many apps have an update; asked every six hours.
 // A rise in the count is announced once.
@@ -549,6 +601,7 @@ export function syncPolls({ repaint = true } = {}) {
 export function startPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  if (S.cfg?.notchAgents !== false && !S.displayOff) pollAi();
   if (S.hiddenState || S.displayOff) return; // tucked away or screen off → stay idle
   deps.startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const k = pollKinds();

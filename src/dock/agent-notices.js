@@ -4,17 +4,20 @@
    change: the backend only emits on a state change, and repeats are dropped. */
 import { onAgentActivity } from "../api.js";
 import { t } from "../i18n.js";
-import { showNoticeToast } from "./undo-toast.js";
+import { notify } from "./notices.js";
 
-export const AGENT_NAMES = { claude: "Claude", codex: "Codex" };
+export const AGENT_NAMES = {
+  claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode",
+  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue",
+};
 
 const last = new Map();
 onAgentActivity((activity) => {
   const { provider, state } = activity;
   const before = last.get(provider);
   last.set(provider, state);
-  if (before === state || (state !== "done" && state !== "waiting")) return;
+  if (before === state || !["done", "waiting", "error"].includes(state)) return;
   if (document.visibilityState !== "visible") return;
-  const key = state === "done" ? "notch.agentDone" : "notch.agentWaiting";
-  showNoticeToast(t(key).replace("{agent}", () => AGENT_NAMES[provider] || provider));
+  const key = state === "done" ? "notch.agentDone" : state === "error" ? "notch.agentError" : "notch.agentPaused";
+  notify(t(key).replace("{agent}", () => AGENT_NAMES[provider] || provider)).catch(() => {});
 });

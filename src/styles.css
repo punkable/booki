@@ -921,12 +921,16 @@ body.notch-body.act-battery .nl-text { color: var(--danger-text); }
 body.notch-body.act-charging .nl { justify-content: center; gap: 6px; }
 body.notch-body.act-charging .nl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #6ccb5f; }
 
-/* AI agents (Claude Code, Codex): the provider's logo and a short status.
-   Working breathes three quiet dots; waiting for approval pulses the logo
-   gently until it is answered; done is a short notice. */
+/* AI agents: a status mark and the name. The longer phrase stays on the
+   tooltip and in the card. Working spins the mark; waiting and done hold still. */
 .nl-agent, .nl-dots { display: none; }
 .nl-agent { width: 12px; height: 12px; flex: none; color: var(--ink); }
 .nl-agent svg { width: 12px; height: 12px; display: block; }
+.nl-state { display: none; width: 12px; height: 12px; flex: none; }
+.nl-state svg { width: 12px; height: 12px; display: block; }
+body.notch-body:is(.act-agent, .act-agent-waiting, .act-agent-done, .act-agent-error, .act-usage) .nl-state { display: block; }
+body.notch-body:is(.act-agent-done, .act-agent-error, .act-usage) .nl-state { color: var(--success, #30a46c); }
+body.notch-body.act-agent-waiting .nl-state { color: #e8a317; }
 .nl-dots { align-items: center; gap: 2px; flex: none; }
 .nl-dots i { width: 3px; height: 3px; border-radius: 50%; background: var(--agent-tint, var(--accent)); animation: nl-dots 1.2s var(--ease-in-out) infinite; }
 .nl-dots i:nth-child(2) { animation-delay: 0.2s; }
@@ -934,33 +938,91 @@ body.notch-body.act-charging .nl::before { content: ""; width: 6px; height: 6px;
 @keyframes nl-dots { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 @keyframes nl-agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 body.notch-body.agent-claude { --agent-tint: #D97757; }
+body.notch-body.agent-codex { --agent-tint: #10a37f; }
+body.notch-body.agent-cursor { --agent-tint: #7c6aef; }
+body.notch-body.agent-opencode { --agent-tint: #3dbeb3; }
+body.notch-body.agent-gemini { --agent-tint: #8ab4f8; }
+body.notch-body.agent-windsurf { --agent-tint: #3dceb6; }
+body.notch-body.agent-goose { --agent-tint: #e2b340; }
+body.notch-body.agent-cline { --agent-tint: #c084fc; }
+body.notch-body.agent-continue { --agent-tint: #7aa2f7; }
+body.notch-body.act-media .notch-pill {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
 body.notch-body.act-agent .nl-art, body.notch-body.act-agent .nl-eq,
 body.notch-body.act-agent-waiting .nl-art, body.notch-body.act-agent-waiting .nl-eq,
+body.notch-body.act-agent-error .nl-art, body.notch-body.act-agent-error .nl-eq,
 body.notch-body.act-agent-done .nl-art, body.notch-body.act-agent-done .nl-eq { display: none; }
-body.notch-body.act-agent .nl-agent, body.notch-body.act-agent-waiting .nl-agent, body.notch-body.act-agent-done .nl-agent { display: block; }
-body.notch-body.act-agent .nl-text, body.notch-body.act-agent-waiting .nl-text, body.notch-body.act-agent-done .nl-text {
+body.notch-body.act-agent .nl-agent, body.notch-body.act-agent-waiting .nl-agent, body.notch-body.act-agent-done .nl-agent, body.notch-body.act-agent-error .nl-agent { display: block; }
+body.notch-body.act-agent .nl-text, body.notch-body.act-agent-waiting .nl-text, body.notch-body.act-agent-done .nl-text,
+body.notch-body.act-agent-error .nl-text,
+body.notch-body.act-usage .nl-text {
   display: block;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
+  flex: 0 1 auto;
+  overflow: visible;
   white-space: nowrap;
-  text-overflow: ellipsis;
+  text-overflow: clip;
 }
-body.notch-body.act-agent .nl-dots { display: flex; }
-body.notch-body.act-agent .nl, body.notch-body.act-agent-waiting .nl, body.notch-body.act-agent-done .nl { justify-content: flex-start; gap: 6px; }
-body.notch-body.act-agent-waiting .nl-agent { animation: nl-agent-pulse 1.8s var(--ease-in-out) infinite; }
-body.notch-body.smart.act-agent .nl-dots { display: none; }
+body.notch-body.act-agent .nl-dots { display: none; }
+body.notch-body.act-usage .nl-art, body.notch-body.act-usage .nl-eq { display: none; }
+body.notch-body.act-usage .nl-agent { display: block; }
+body.notch-body.act-agent .nl, body.notch-body.act-agent-waiting .nl, body.notch-body.act-agent-done .nl,
+body.notch-body.act-agent-error .nl,
+body.notch-body.act-usage .nl { justify-content: flex-start; gap: 6px; padding-inline: 8px; }
+@keyframes nl-spin { to { transform: rotate(360deg); } }
+body.notch-body.act-agent .nl-state { animation: nl-spin 0.9s linear infinite; }
+body.notch-body.act-agent .notch-pill,
+body.notch-body.act-agent-done .notch-pill {
+  border-color: var(--agent-tint, var(--accent));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent-tint, var(--accent)) 70%, transparent), 0 0 14px color-mix(in srgb, var(--agent-tint, var(--accent)) 35%, transparent);
+}
+body.notch-body.act-agent-waiting .notch-pill {
+  border-color: #e8a317;
+  box-shadow: 0 0 0 1px #e8a317, 0 0 16px color-mix(in srgb, #e8a317 50%, transparent);
+  animation: nl-wait-border 1.8s var(--ease-in-out) infinite;
+}
+@keyframes nl-wait-border { 0%, 100% { box-shadow: 0 0 0 1px #e8a317, 0 0 8px color-mix(in srgb, #e8a317 30%, transparent); } 50% { box-shadow: 0 0 0 1px #e8a317, 0 0 18px color-mix(in srgb, #e8a317 65%, transparent); } }
+body.notch-body.peekable.live.act-agent .notch-pill,
+body.notch-body.peekable.live.act-agent-done .notch-pill,
+body.notch-body.peekable.live.act-agent-waiting .notch-pill,
+body.notch-body.peekable.live.act-agent-error .notch-pill,
+body.notch-body.peekable.live.act-usage .notch-pill { width: 112px; height: 24px; }
 @media (prefers-reduced-motion: reduce) {
   .nl-dots i { animation: none; opacity: 0.7; }
-  body.notch-body.act-agent-waiting .nl-agent { animation: none; }
+  body.notch-body.act-agent .nl-state,
+  body.notch-body.act-agent-waiting .notch-pill,
+  body.notch-body.preparing .nl-rest { animation: none; }
 }
 
 /* Smart notch: a quiet dot at rest that becomes a capsule for an activity
    and a card on hover — the same morph as the tab, from a smaller start. */
+body.notch-body.scene-code { --scene-tint: #7c9cff; }
+body.notch-body.scene-creative { --scene-tint: #e0a06a; }
+body.notch-body.scene-game { --scene-tint: #8fd18a; }
+body.notch-body.scene-video { --scene-tint: #d5d5d5; }
 body.notch-body.smart .notch-pill { width: 18px; height: 18px; border-radius: 999px; }
+body.notch-body.smart:not(.live):not(.card) .notch-pill {
+  box-shadow: inset 0 0 0 1px var(--scene-tint, transparent);
+}
+body.notch-body.preparing .nl-rest { animation: nl-prepare 1.4s var(--ease-in-out) infinite; }
+@keyframes nl-prepare { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.nl-rest { display: none; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 70%, transparent); }
+body.notch-body.smart:not(.live):not(.card) .nl { opacity: 1; justify-content: center; padding: 0; }
+body.notch-body.smart:not(.live):not(.card) .nl-art,
+body.notch-body.smart:not(.live):not(.card) .nl-eq,
+body.notch-body.smart:not(.live):not(.card) .nl-agent,
+body.notch-body.smart:not(.live):not(.card) .nl-text,
+body.notch-body.smart:not(.live):not(.card) .nl-dots,
+body.notch-body.smart:not(.live):not(.card) .nl-ring { display: none !important; }
+body.notch-body.smart:not(.live):not(.card) .nl-rest { display: block; }
 body.notch-body.smart .notch-pill::before,
 body.notch-body.smart .notch-pill::after { display: none; }
 body.notch-body.smart.peekable.live .notch-pill { width: 112px; height: 24px; }
+body.notch-body.smart.peekable.live.act-agent .notch-pill,
+body.notch-body.smart.peekable.live.act-agent-waiting .notch-pill,
+body.notch-body.smart.peekable.live.act-agent-done .notch-pill,
+body.notch-body.smart.peekable.live.act-usage .notch-pill { width: 112px; height: 24px; }
 body.notch-body.smart.peekable.card .notch-pill { width: 300px; height: 54px; border-radius: 22px; }
 /* The tab, the live capsule and the dot are too small for Windows' blur
    (notch.js reports it only for the card), so they take the bar's denser
@@ -1077,6 +1139,7 @@ body.edge-right .tile { transform-origin: right center; }
 .tile:active { background: color-mix(in srgb, var(--hover) 80%, var(--accent)); transform: scale(0.97); }
 .tile .label { display: none; }
 body.show-labels .tile .label { display: block; }
+body.show-labels .tile.group.unnamed .label { display: none; }
 
 /* Focused tile — contact shadow only (no accent bloom / game-UI glow). */
 .tile.focus { z-index: 5; }
@@ -2641,9 +2704,22 @@ body.surface-glass :is(.dock, .stack, #ctx-menu, .productivity-panel, .note-edit
 .notch-dnd { display: none; position: absolute; right: 7px; top: 50%; width: 9px; height: 9px; translate: 0 -50%; color: var(--ink); opacity: 0.55; pointer-events: none; }
 .notch-dnd svg { display: block; width: 100%; height: 100%; }
 body.notch-body.dnd .notch-dnd { display: block; }
-body.notch-body.dnd.live .notch-dnd { display: none; }
+body.notch-body.dnd.live .notch-dnd,
+body.notch-body.smart .notch-dnd,
+body.notch-body.floating .notch-dnd,
+body.notch-body.card .notch-dnd { display: none !important; }
+/* On the round notch the moon does not fit: it read as a stray glyph.
+   A hairline is enough to say Do not disturb is on. */
+body.notch-body.smart.dnd:not(.live):not(.card) .notch-pill {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 32%, transparent);
+}
 /* The Focus card's moon and its quiet-time options. */
 .focus-dnd-badge { position: absolute; top: 4px; right: 4px; width: 10px; height: 10px; color: var(--ink); opacity: 0.7; pointer-events: none; }
 .focus-dnd-badge svg { display: block; width: 100%; height: 100%; }
 .focus-options { display: grid; gap: 6px; margin-top: 12px; }
 .focus-option { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+
+body.notch-body.act-agent-error .nl-state { color: var(--danger-text); }
+
+body.notch-body.peekable.live.act-usage:not(.card) .notch-pill { width: min(296px, calc(100vw - 16px)); }
+body.notch-body.act-usage .nl-text { overflow: hidden; text-overflow: ellipsis; }

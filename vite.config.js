@@ -2,6 +2,20 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
+function bookiDevHtml() {
+  const dev = process.env.VITE_BOOKI_EDITION === "dev" || process.env.BOOKI_EDITION === "dev";
+  return {
+    name: "booki-dev-html",
+    transformIndexHtml(html) {
+      if (!dev) return html;
+      return html
+        .replaceAll("/brand/svg/isotype.svg", "/brand/svg/isotype-dev.svg")
+        .replaceAll("<title>Booki</title>", "<title>Booki Dev</title>")
+        .replaceAll("Show Booki", "Show Booki Dev");
+    },
+  };
+}
+
 // Tauri expects a fixed port and serves the `src/` folder as the web root.
 const host = process.env.TAURI_DEV_HOST;
 
@@ -9,7 +23,7 @@ export default defineConfig({
   root: "src",
   publicDir: resolve(process.cwd(), "assets"),
   // The dock is vanilla JS; the settings window is React (JSX).
-  plugins: [react()],
+  plugins: [react(), bookiDevHtml()],
   // Prevent Vite from obscuring Rust errors
   clearScreen: false,
   server: {

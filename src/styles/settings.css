@@ -118,6 +118,7 @@
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 10px; }
 .brand > img:first-child { width: 30px; height: 30px; }
 .brand-word { height: 18px; }
+.brand-dev { padding: 2px 7px; border-radius: 999px; background: #dbe7ff; color: #1d4ed8; font-size: 11px; font-weight: 650; letter-spacing: 0.04em; }
 .brand-version { margin-left: auto; padding: 2px 8px; color: var(--ink-2); font-size: calc(11px * var(--os-text-scale, 1)); font-weight: 400; background: var(--subtle-hover); border-radius: var(--r-control); }
 .settings-main { background: var(--page-bg); flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
 .page { position: relative; max-width: 960px; margin: 0 auto; padding: 32px 40px 48px; container: page / inline-size; }
@@ -285,7 +286,16 @@
 .swatch-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .swatches-block { display: grid; gap: 6px; }
 .swatch-caption { margin: 0; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
-.look-source { display: grid; justify-items: start; gap: 8px; }
+.look-source, .accent-sources { display: grid; justify-items: stretch; gap: 8px; }
+.accent-source-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.accent-source {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px;
+  border: 1px solid var(--stroke-control); border-radius: var(--r-control); background: transparent;
+  color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+}
+.accent-source[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.accent-swatch { width: 18px; height: 18px; border-radius: 50%; background: var(--sw, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent); flex: none; }
+.accent-source-name { font-size: calc(13px * var(--os-text-scale, 1)); }
 .look-now { display: flex; align-items: flex-start; gap: 8px; max-width: 60ch; }
 .look-now-dot { flex: none; width: 14px; height: 14px; margin-top: 1px; background: var(--accent); border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); border-radius: 50%; }
 

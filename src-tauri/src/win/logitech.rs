@@ -55,8 +55,18 @@ pub fn batteries() -> Vec<DeviceBattery> {
 }
 
 fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
-    let (level, charging) =
-        unified_battery(device, slot).or_else(|| battery_status(device, slot))?;
+    let unified = unified_battery(device, slot);
+    let (level, mut charging) = match unified {
+        Some(pair) => pair,
+        None => battery_status(device, slot)?,
+    };
+    // MX Keys Mini often reports a percent on 0x1004 with charging status 0
+    // while it is on the charger. The legacy feature still says so.
+    if unified.is_some() && !charging {
+        if let Some((_, legacy)) = battery_status(device, slot) {
+            charging = legacy;
+        }
+    }
     let name = device_name(device, slot).unwrap_or_else(|| "Logitech".to_string());
     let kind = device_type(device, slot).unwrap_or_else(|| super::devices::kind_from_name(&name));
     Some(DeviceBattery {
@@ -68,14 +78,21 @@ fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
     })
 }
 
-/// Feature 0x1004, get_status: state of charge in percent, then the level
-/// flags and the charging status (1 charging, 2 slow charging, 3 full on
-/// power; 0 discharging, 4 error).
+/// Feature 0x1004, get_status. Parameters, from the first one: percent,
+/// level flags (1 critical, 2 low, 4 good, 8 full), charging status
+/// (0 discharging, 1 charging, 2 slow, 3 complete, 4 error), external power
+/// (1 when the cable is in).
+pub fn unified_charging(params: &[u8]) -> bool {
+    let status = params.get(2).copied().unwrap_or(0);
+    let external = params.get(3).copied().unwrap_or(0);
+    matches!(status, 1..=3) || external == 1
+}
+
 fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let index = feature_index(device, slot, UNIFIED_BATTERY)?;
     let reply = request(device, slot, index, 1, &[])?;
     let level = reply[4];
-    let charging = matches!(reply.get(6), Some(1..=3));
+    let charging = unified_charging(&reply[4..]);
     (1..=100).contains(&level).then_some((level, charging))
 }
 
@@ -203,5 +220,18 @@ mod tests {
             classify(&[SHORT, 3, 0x8f, 0x00, 0x0b, 0x09, 0], 0x00, 0x0b),
             Reply::Error
         );
+    }
+
+    #[test]
+    fn mx_keys_on_the_charger_is_charging_and_a_plain_battery_is_not() {
+        // percent, level "good", status still discharging, external power on.
+        assert!(unified_charging(&[78, 4, 0, 1]));
+        assert!(unified_charging(&[40, 2, 1, 0]));
+        assert!(unified_charging(&[100, 8, 3, 1]));
+        assert!(!unified_charging(&[78, 4, 0, 0]));
+        // Status 4 is an error, not "on the charger".
+        assert!(!unified_charging(&[10, 1, 4, 0]));
+        // A level flag is not external power.
+        assert!(!unified_charging(&[50, 0x10, 0, 0]));
     }
 }

@@ -19,6 +19,7 @@ node_modules/
 
 # Build output
 dist/
+test-results/
 
 # Rust / Tauri
 src-tauri/target/
@@ -35,3 +36,4 @@ CLAUDE.local.md
 .agents/
 .claude/
 docs/HANDOFF.md
+docs/quality/booki-local-audit-*.md

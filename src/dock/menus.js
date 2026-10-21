@@ -6,7 +6,7 @@ import { t, ensureLang } from "../i18n.js";
 import { menuActions } from "./context-menu.js";
 import { S } from "./state.js";
 import { widgetLabel, findWidgetPin, baseName, menuPinTitle } from "./helpers.js";
-import { dockEl, ctxMenu, esc } from "./dom.js";
+import { dockEl, ctxMenu, esc, stackEl } from "./dom.js";
 import { reframe } from "./frame.js";
 import { addMenuHead, placeMenu, closeMenu } from "./menu-core.js";
 import { render } from "./render.js";
@@ -14,6 +14,8 @@ import { windowsFor } from "./running-windows.js";
 import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
 import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
+import { GROUP_PALETTE, groupAppearance } from "../group-style.js";
+import { ICON_LIBRARY, libGlyphSVG } from "../icon-library.js";
 import { paintedLook } from "../system-look.js";
 import { openProductivity, openSystemPanel } from "./widget-editors.js";
 import {
@@ -73,6 +75,7 @@ export function openMenu(e, item) {
       const tileEl = dockEl.querySelector(`.tile[data-id="${item.id}"]`);
       if (tileEl) openStack(tileEl, item);
     });
+    if (item.kind === "group") addGroupLook(item);
   } else if (item.kind === "trash") {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
@@ -203,7 +206,83 @@ export function openBackgroundMenu(e) {
   }).catch(() => {});
 }
 
-/** The four styles as small samples, so changing the dock's look is one
+async function applyGroupLook(item, patch) {
+  const style = { ...(item.style && typeof item.style === "object" ? item.style : {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value) style[key] = value;
+    else delete style[key];
+  }
+  if (Object.keys(style).length) item.style = style;
+  else delete item.style;
+  if (!(await persist())) return;
+  await render();
+  if (S.stackItemId !== item.id || !stackEl) return;
+  const look = groupAppearance(item);
+  if (look.color) stackEl.style.setProperty("--group-color", look.color);
+  else stackEl.style.removeProperty("--group-color");
+  stackEl.classList.toggle("tinted", !!look.color);
+  const glyph = stackEl.querySelector(".stack-head-icon");
+  if (glyph) glyph.innerHTML = look.glyph ? libGlyphSVG(look.glyph) : icon("folder");
+}
+
+function addSwatch(row, pressed, title, onClick, swatch) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.tabIndex = -1;
+  button.title = title;
+  button.setAttribute("aria-pressed", pressed ? "true" : "false");
+  button.setAttribute("aria-label", title);
+  if (swatch) button.style.setProperty("--sw", swatch);
+  else button.classList.add("none");
+  button.addEventListener("click", () => { closeMenu(); onClick(); });
+  row.appendChild(button);
+}
+
+/** Colour and glyph for this group, the same style the flyout already paints. */
+function addGroupLook(item) {
+  const look = groupAppearance(item);
+  const colorLabel = document.createElement("div");
+  colorLabel.className = "menu-label";
+  colorLabel.textContent = t("group.color");
+  ctxMenu.appendChild(colorLabel);
+  const colors = document.createElement("div");
+  colors.className = "menu-swatches";
+  addSwatch(colors, !look.color, t("group.auto"), () => applyGroupLook(item, { color: "" }));
+  for (const [name, shades] of GROUP_PALETTE) {
+    const hex = shades[1];
+    addSwatch(colors, look.color === hex, t(`color.${name}`), () => applyGroupLook(item, { color: hex }), hex);
+  }
+  ctxMenu.appendChild(colors);
+  const glyphLabel = document.createElement("div");
+  glyphLabel.className = "menu-label";
+  glyphLabel.textContent = t("group.icon");
+  ctxMenu.appendChild(glyphLabel);
+  const glyphs = document.createElement("div");
+  glyphs.className = "menu-glyphs";
+  const none = document.createElement("button");
+  none.type = "button";
+  none.tabIndex = -1;
+  none.title = t("group.auto");
+  none.setAttribute("aria-label", t("group.auto"));
+  none.setAttribute("aria-pressed", look.glyph ? "false" : "true");
+  none.innerHTML = icon("grid");
+  none.addEventListener("click", () => { closeMenu(); applyGroupLook(item, { glyph: "" }); });
+  glyphs.appendChild(none);
+  for (const name of ICON_LIBRARY) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.tabIndex = -1;
+    button.title = name;
+    button.setAttribute("aria-label", name);
+    button.setAttribute("aria-pressed", look.glyph === name ? "true" : "false");
+    button.innerHTML = libGlyphSVG(name);
+    button.addEventListener("click", () => { closeMenu(); applyGroupLook(item, { glyph: name }); });
+    glyphs.appendChild(button);
+  }
+  ctxMenu.appendChild(glyphs);
+}
+
+/** The three styles as small samples, so changing the dock's look is one
  * click from the dock itself. Each sample is painted with that style's real
  * fill for the current theme and colours. */
 function addStyleRow() {

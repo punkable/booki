@@ -1,19 +1,19 @@
 /* One material for the dock, the notch and their flyouts.
 
-   Four styles, each visibly different:
-   - taskbar: the Windows 11 taskbar's acrylic. Its colour comes from Windows
-     (look-model.js), so the dock and the taskbar match.
-   - glass:   tinted acrylic. Windows blurs what is behind; `materialStrength`
-     (0–100) sets how much of the fill colour covers it.
-   - clear:   acrylic with a faint tint, so the blurred wallpaper shows
-     through.
+   Three styles, each visibly different:
+   - taskbar: the Windows 11 taskbar. Its colour comes from Windows
+     (look-model.js) and it stays nearly opaque, like the bar itself.
+   - glass:   a light frost. Windows blurs what is behind and the fill stays
+     thin, so the wallpaper shows through. `materialStrength` (0–100) only
+     moves it within that thin range.
    - solid:   opaque, no effects.
+   A saved "clear" finish is glass: it was the same gray as glass, only thinner.
 
    Older configs ("acrylic", "tinted", "mica", a notch-only `notchStyle`) are
    read as their closest style; the backend migrates them on load (config
    rev 11). */
 
-export const SURFACE_STYLES = ["taskbar", "glass", "clear", "solid"];
+export const SURFACE_STYLES = ["taskbar", "glass", "solid"];
 
 /** Preset fill colours. Labels live in i18n (`tint.<id>`). */
 export const SURFACE_TINT_PRESETS = [
@@ -27,7 +27,7 @@ export const SURFACE_TINT_PRESETS = [
   ["cloud", "#f0eee9"],
 ];
 
-const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", windows: "solid", mica: "solid" };
+const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", clear: "glass", windows: "solid", mica: "solid" };
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 /** Active style, accepting every value older builds wrote. */
@@ -66,9 +66,10 @@ export function surfaceAlpha(cfg) {
   const style = effectiveSurface(cfg);
   if (style === "solid") return 1;
   if (style === "taskbar") return 0.82;
-  if (style === "clear") return 0.14;
+  // Glass stays a frost. Even at full strength it is clearly thinner than
+  // the taskbar, so the two cannot be mistaken for each other.
   const strength = Math.max(0, Math.min(100, Number(cfg?.materialStrength ?? 60))) / 100;
-  return Math.round((0.2 + strength * 0.6) * 100) / 100;
+  return Math.round((0.22 + strength * 0.28) * 100) / 100;
 }
 
 /** Menus and flyouts carry text, so they never get thinner than this. */

@@ -6,7 +6,7 @@ use super::*;
 /// tauri.conf.json: the NSIS and MSI installers stamp that value on the
 /// Start-menu shortcut, and Windows only shows toasts for an ID that a
 /// shortcut carries. A test keeps the two in step.
-pub(crate) const APP_USER_MODEL_ID: &str = "com.booki.dock";
+pub(crate) const APP_USER_MODEL_ID: &str = env!("BOOKI_ID");
 
 /// Toast text limits. Windows trims long text anyway; capping here keeps a
 /// runaway string from producing a huge XML document.

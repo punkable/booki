@@ -2,6 +2,10 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { checkReleaseDocs } from "./release-docs.mjs";
+
+checkReleaseDocs();
+execFileSync(process.execPath, ["scripts/check-publication.mjs"], { stdio: "inherit" });
 
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 const tag = `v${version}`;

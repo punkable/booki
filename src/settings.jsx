@@ -1,6 +1,7 @@
 /* Booki Settings: a sidebar with dedicated pages and a search box.
    State lives in settings/store.js; each page is its own module. */
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { appName, devEdition, isotype } from "./brand-mark.js";
 import { createRoot } from "react-dom/client";
 import { dock as dockApi, onShowChangelog, onShowTab } from "./api.js";
 import { t } from "./i18n.js";
@@ -165,9 +166,10 @@ function App() {
   return <div className="settings">
     <aside className="sidebar">
       <div className="brand">
-        <img src="/brand/svg/isotype.svg" alt="" />
-        <img className="brand-word only-light" src="/brand/svg/logoonlytextblack.svg" alt="Booki" />
-        <img className="brand-word only-dark" src="/brand/svg/logoonlytextwhite.svg" alt="Booki" />
+        <img src={isotype} alt="" />
+        <img className="brand-word only-light" src="/brand/svg/logoonlytextblack.svg" alt={appName} />
+        <img className="brand-word only-dark" src="/brand/svg/logoonlytextwhite.svg" alt={appName} />
+        {devEdition && <span className="brand-dev">Dev</span>}
         {version && <span className="brand-version">v{version}</span>}
       </div>
       <Search onChoose={(result) => { navigate(result.tab); setSearchTarget(result); }} />

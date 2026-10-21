@@ -34,20 +34,21 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
   return <article className="card plugin-card" data-setting-label={name}>
     <header className="plugin-head">
       <h3 className="plugin-name">{name}</h3>
-      {state.installed && <span className="plugin-badge"><Icon name="check" />{t(state.source === "system" ? "plugins.onPc" : "plugins.active")}</span>}
+      {state.installed && <span className="plugin-badge"><Icon name="check" />{t(state.source === "system" || state.source === "shared" ? "plugins.onPc" : "plugins.active")}</span>}
     </header>
     <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span>
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
     {companions?.length > 0 && <p className="plugin-desc plugin-fine">{t("plugins.includes").replace("{list}", () => companions.map((c) => { const p = PLUGINS.find((x) => x.id === c); return p ? `${p.name} (${p.license})` : c; }).join(", "))}</p>}
     {external && <p className="plugin-desc plugin-fine">{t("plugins.winget.managed")}</p>}
     {state.source === "system" && <p className="plugin-desc plugin-fine">{t("plugins.onPcHint")}</p>}
+    {state.source === "shared" && <p className="plugin-desc plugin-fine">{t("plugins.sharedHint")}</p>}
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
     <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}</p>
     {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}
     <div className="plugin-actions">
       {state.installed && ["openrgb", "librehardwaremonitor"].includes(id) && <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginOpen(id))}>{t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open")}</button>}
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}
-      {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.source === "system" ? null : state.installed
+      {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.source === "system" || state.source === "shared" ? null : state.installed
         ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
         : <button type="button" className="button button-accent" disabled={busy || !termsOk} title={termsOk ? undefined : t("plugins.acceptTerms")}
             onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
