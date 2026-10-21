@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { serveDist, launchBrowser, openPage, makeConfig } from "./harness.mjs";
 const { srv, port } = await serveDist();
 const browser = await launchBrowser();
@@ -94,7 +95,9 @@ test("changing language refreshes widget names and context menus", async () => {
 
 test("cancelling a group drag leaves the child inside its group", async () => {
   const child = { id: "child", name: "Child", kind: "app", path: "C:/child.exe" };
-  const cfg = makeConfig({ pinned: [{ id: "group", name: "Group", kind: "group", children: [child, { ...child, id: "other", name: "Other" }] }] });
+  // Keep the unrelated first-boot changelog acknowledgement out of the save count.
+  const seenVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+  const cfg = makeConfig({ seenVersion, pinned: [{ id: "group", name: "Group", kind: "group", children: [child, { ...child, id: "other", name: "Other" }] }] });
   const { page, errors } = await openPage(browser, port, "index.html", { cfg });
   await page.evaluate(() => {
     const old = window.__TAURI__.core.invoke;

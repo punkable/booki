@@ -51,26 +51,16 @@ test("clipboard rows copy with Enter and Space, and a failed action says so", as
   await page.close();
 });
 
-test("the take-out control is a real button beside the cell, not inside it", async () => {
+test("a group member can be taken out with its keyboard context menu", async () => {
   const group = { id: "g", kind: "group", name: "Work", path: "", args: [], children: [app("c", "Child"), app("e", "Echo")] };
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [app("a", "Alpha"), group] }) });
   await page.locator('#dock > .tile[data-id="g"]').click();
   const cell = page.locator('.stack-item[data-child-id="c"]');
   await cell.waitFor();
-  const shape = await page.evaluate(() => {
-    const out = document.querySelector('.stack-item[data-child-id="c"]').parentElement.querySelector(".stack-rm");
-    return { tag: out.tagName, nested: !!out.parentElement.closest("button"), label: out.getAttribute("aria-label") };
-  });
-  assert.deepEqual(shape, { tag: "BUTTON", nested: false, label: "Take out of group: Child" });
-  // Tab order is cell, its take-out button, next cell; Enter takes it out.
-  await page.locator('.stack-item[data-child-id="c"]').focus();
-  await page.keyboard.press("Tab");
-  const focused = await page.evaluate(() => {
-    const a = document.activeElement;
-    return { cls: a.className, of: a.parentElement.querySelector(".stack-item")?.dataset.childId, shown: getComputedStyle(a).opacity };
-  });
-  assert.deepEqual(focused, { cls: "stack-rm", of: "c", shown: "1" });
-  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#stack .stack-rm").count(), 0);
+  await cell.focus();
+  await page.keyboard.press("Shift+F10");
+  await page.getByRole("menuitem", { name: "Take out of group", exact: true }).click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned.some((p) => p.id === "c"));
   assert.deepEqual(errors, []);
   await page.close();

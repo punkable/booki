@@ -7,13 +7,14 @@ import { kindForPath } from "../pins.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { uid, isVertical, baseName, menuPinTitle, findWidgetPin } from "./helpers.js";
-import { dockEl, dropOverlay } from "./dom.js";
+import { dockEl, dropOverlay, stackEl } from "./dom.js";
 import { reframe } from "./frame.js";
 import { setHidden, scheduleHide } from "./autohide.js";
 import { render } from "./render.js";
 import { confirmTrash, confirmMove } from "./popovers.js";
 import { persist } from "./config-sync.js";
 import { addPaths, openWith } from "./pin-ops.js";
+import { closeStack, openStack } from "./stack.js";
 
 // ─────────────────── Desktop file drop ───────────────────
 
@@ -28,6 +29,10 @@ function dropSpot(position) {
   const x = position.x / dpr;
   const y = position.y / dpr;
   const el = document.elementFromPoint(x, y);
+  if (S.stackOpen && el && stackEl.contains(el)) {
+    const group = S.cfg.pinned.find((p) => p.id === S.stackItemId && p.kind === "group");
+    if (group) return { target: stackEl, index: null };
+  }
   const tile = el ? el.closest(".tile[data-id]") : null;
   if (tile) {
     const item = S.cfg.pinned.find((p) => p.id === tile.dataset.id);
@@ -241,8 +246,19 @@ export function setupFileDrop() {
         const before = item.children || [];
         item.children = [...before, ...added];
         if (!(await persist())) { item.children = before; return; }
+        const reopen = S.stackOpen && S.stackItemId === item.id;
+        const scroll = reopen ? stackEl.querySelector(".stack-grid")?.scrollTop || 0 : 0;
+        if (reopen) closeStack();
         await render();
         reframe();
+        if (reopen) {
+          const tile = [...dockEl.querySelectorAll(".tile[data-id]")].find((el) => el.dataset.id === item.id);
+          if (tile) {
+            await openStack(tile, item);
+            const grid = stackEl.querySelector(".stack-grid");
+            if (grid) grid.scrollTop = scroll;
+          }
+        }
         return;
       }
       // Otherwise pin them exactly where the gap showed.

@@ -10,7 +10,7 @@ import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { download, startDownload, onDownloadChange, classifyLink } from "./collector.js";
 import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
-import { refreshUpdates, paintLighting } from "./live-widgets.js";
+import { refreshUpdates, refreshDevices, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
 function text(tag, value, className = "") {
@@ -176,6 +176,10 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
+    const actions = document.createElement("div"); actions.className = "plugin-panel-actions";
+    body.append(actions);
+    button(actions, t("plugins.refresh"), refreshDevices);
+    button(actions, t("dev.bluetoothSettings"), () => api.launch("ms-settings:bluetooth", []));
     live(devices, deviceReading, 30000, (values) => {
       if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       const own = item.style?.device;

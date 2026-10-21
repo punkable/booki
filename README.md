@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64-setup.exe"><b>Download for Windows v0.93.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.93.0.md">What's new v0.93.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64-setup.exe"><b>Download for Windows v0.94.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.94.0.md">What's new v0.94.0</a> ·
   <a href="README.es.md">Español</a>
 </p>
 <!-- booki:download:end -->
@@ -42,7 +42,7 @@
 
 <p align="center">A quiet dot at the top of your screen that opens into a capsule for your focus timer, the song that's playing or a low battery.<br/>Hover it for a card with more. Prefer something simpler? Choose an attached tab or a floating pill.</p>
 
-<p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="Claude Code mascot, name and working indicator in the compact Booki notch" /></p>
+<p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="Claude Code, Cursor and Codex with working, waiting and finished states in the compact Booki notch" /></p>
 
 <h2 align="center">Groups that look like yours.</h2>
 
@@ -58,7 +58,7 @@
 
 <h2 align="center">Settings you actually enjoy.</h2>
 
-<p align="center">Five clear pages — Home, Dock, Widgets, Apps and System — with a live preview of your dock and everything at a glance.</p>
+<p align="center">Six clear sections — Home, Dock, Widgets, Apps, Plugins and System — with a live preview of your dock and everything at a glance.</p>
 
 <p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Current Booki Settings home with example dock" /></p>
 
@@ -75,22 +75,24 @@
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.93.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v0.94.0, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.93.0
+## What's new in 0.94.0
 
-Clearer agents, downloads that preserve your files and up-to-date releases.
+More flexible groups, clearer widgets and a refreshed README.
 
-- The notch keeps the full name and logo beside separate working, paused, finished and error indicators. Claude Code uses its mascot. Cursor recognizes TXT and JSONL transcripts; activity-based states remain approximate.
-- Notices remember scheduled Codex resets and the end of a local Claude block, even while the dock is hidden. An ended block does not confirm recovered quota. Focus, video, games and Do not disturb are respected; credentials are never read.
-- Saving audio no longer removes a video saved earlier. Files, video and audio show progress and results; initial titles and errors are retained correctly.
-- Compact agents without cut-off names, corrected contrast for chosen colors, group colors and icons in the context menu, and Logitech device improvements.
-- The update notice opens System. History loads on opening, offers retry and uses readable icons; installing still requires your action, saved settings and a backup.
-- English and Spanish READMEs, x64/ARM64/MSI downloads and images are prepared together. Publication is blocked when notes, links or screenshots are stale.
+- Drop files and folders directly into an open group. Contents scroll beneath a fixed header; take members out through the context menu or dragging, with keyboard access too.
+- The header icon opens Pantone colours and icons. Appearance edits preserve live widgets and save against the current group. Glass panels report their geometry throughout opening.
+- Visible batteries refresh every 15 seconds, less often in energy-saving mode. Refresh manually or open Bluetooth settings. A missing reading shows ? instead of retaining an old percentage indefinitely.
+- The card rotates through detected providers with their logos and colours. Codex shows the remaining percentage of its most restrictive window. Claude shows tokens and unknown quota when its logs carry no allowance.
+- The notch player retires its card after one minute paused and becomes available again on playback.
+- Late progress events no longer replace the Collector’s completed result. Its card also includes the failure detail.
+- Update notices wait during focus, Do not disturb, video or games. Download and installation remain separate actions, with saving and backup before applying.
+- Twelve English/Spanish images with real UI, example icons and a recent-release history synchronized with the changelog.
 
-[Full release notes](docs/releases/v0.93.0.md)
+[Full release notes](docs/releases/v0.94.0.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -101,59 +103,17 @@ Clearer agents, downloads that preserve your files and up-to-date releases.
 
 Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so SmartScreen may warn you. Updates are signature-checked and keep your settings. The new background updater applies to the registered per-user setup installation; MSI/portable copies should use the same installer type from Releases.
 
-### New in 0.87
+<!-- booki:history:start -->
+## Recent updates
 
-- A shared catalog for HeadsetControl, yt-dlp, OpenRGB, Rclone and LibreHardwareMonitor, plus checks through the winget managed by Windows App Installer.
-- Widget detail panels and a native Windows volume mixer for individual apps.
-- Layered light/dark WinUI neutrals and a continuous dynamic-notch/dock spring transition in both directions.
+| Version | What changed |
+|---|---|
+| [0.93.0](docs/releases/v0.93.0.md) | Clearer agents, downloads that preserve your files and up-to-date releases. |
+| [0.92.0](docs/releases/v0.92.0.md) | Claude and Codex in the notch, focus with Do not disturb, and automatic backup. |
+| [0.91.0](docs/releases/v0.91.0.md) | AI usage without credentials, devices that are recognised and panels within the dock. |
 
-See the [0.87 release notes](docs/releases/v0.87.0.md) for setup requirements and validation limits.
-
-### New in 0.86
-
-- **Feels like Windows 11** — WinUI-style menus, Windows' accent colours, 4/8 px corners, Windows type sizes and motion steps, taskbar-style hints and thin scrollbars.
-- **A live notch widens into the dock** from wherever it sits, with one spring for the whole move, and the dock no longer blinks behind the active app.
-- **Devices widget** — battery of Bluetooth headphones, mice and keyboards, Logitech devices on a Bolt or Unifying receiver, and wireless headsets through the optional HeadsetControl plugin.
-- **AI usage widget (opt-in)** — your Claude Code and Codex usage, read only from the local usage logs those tools already write on your PC.
-- **Plugins** — optional open-source tools you install from Settings, verified before they run.
-- **Smarter start with Windows** — the dock appears at once while Booki stays out of the way during sign-in.
-- **A first dock that already looks like yours**, a simpler Dock page with More settings, a "Charging" moment on the notch, and many fixes.
-
-### New in 0.85
-
-- **Four dock styles you can tell apart** — Taskbar, Glass, Clear glass and Solid, each previewed as it really looks in Settings and switchable from the dock's right-click menu.
-- **Dock fill and accent are separate** — the fill can follow the wallpaper, the accent or a color you pick; the Taskbar style matches your Windows taskbar.
-- **Real blurred glass** on Windows 11, clipped to the dock's rounded shape, with no sheen or inner rectangle.
-- **A fuller right-click menu** on the dock and the notch, and a notch that no longer stays cut in half.
-
-### New in 0.84.1
-
-- **The theme you pick is the one you get**, without light and dark pieces mixed in the dock and its menus.
-- **An even notch dot**, drawn whole at rest.
-- **The dock grows out of the notch** when something is playing or a timer is running.
-
-### New in 0.84
-
-- **Keyboard and clicks like the taskbar** — arrow keys move along the dock; Shift+click opens another window and Ctrl+Shift+click runs as administrator.
-- **More at home in Windows** — native notifications, each app's recent files in its menu, high contrast, and apps asking for attention marked in the dock.
-- **The dock wears the taskbar's color** in every finish, and groups open in place in Settings.
-- **Many fixes** found in a full review of the dock, Settings and the native core.
-
-### New in 0.83
-
-- **Colors like Windows** — follow the Windows accent and taskbar, or tint the dock with your wallpaper.
-- **A suggested palette** — Pantone Colors of the Year that suit Booki, with any other color one click away.
-- **Group dragging in Settings works on Windows**, and resting on a group opens it to drop between its members.
-
-### New in 0.82
-
-- **Open apps, not new copies** — clicking an open app goes to its window; clicking the one in front minimizes it.
-- **Quick launcher** — Ctrl+Alt+Space searches apps, folders and open windows.
-- **A notch that steps aside** — it hides over maximized apps and comes back when you reach for it.
-- **Easier groups** — drop an app across the middle of another, and drag apps in and out of groups in Settings.
-- **Weather forecast and new panels**, plus automatic profiles by monitor or schedule.
-
-See the [0.86 release notes](docs/releases/v0.86.0.md), the [0.85 release notes](docs/releases/v0.85.0.md), the [0.84.1 fixes](docs/releases/v0.84.1.md), the [complete 0.84 release notes](docs/releases/v0.84.0.md), [0.83](docs/releases/v0.83.0.md), [0.82](docs/releases/v0.82.0.md), [0.81](docs/releases/v0.81.0.md) and the [0.80 overhaul](docs/releases/v0.80.0.md).
+[All published releases](https://github.com/punkable/booki/releases)
+<!-- booki:history:end -->
 
 ## Everyday controls
 
@@ -173,8 +133,8 @@ See the [0.86 release notes](docs/releases/v0.86.0.md), the [0.85 release notes]
 ## Privacy and your data
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
-- Network requests are limited to update checks/downloads and website favicons, plus three things that happen only when you turn them on: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source), and the AI usage widget.
-- The AI usage widget only reads the local usage logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions`), read-only and only while the widget is on the dock. Booki never reads, uses, stores or sends your Claude or ChatGPT credentials, keeps no message content, and makes no network request for it. Claude's local logs hold no plan limits, so the widget shows tokens in the current 5-hour block and this week; Codex's logs include its plan percentages.
+- Network requests are limited to update checks/downloads and website favicons, plus features you explicitly enable: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source). The AI usage widget makes no network requests.
+- The AI usage widget only reads the local usage logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions`), read-only, when the widget or local usage notices are enabled. Booki never reads, uses, stores or sends your Claude or ChatGPT credentials, keeps no message content, and makes no network request for it. Claude's local logs hold no plan limits, so the widget shows tokens in the current 5-hour block and this week; Codex's logs include its plan percentages.
 - Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
 - Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.

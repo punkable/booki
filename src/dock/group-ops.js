@@ -1,11 +1,9 @@
 /* Changing a group from its open flyout: take members out, reorder, add, ungroup. */
 
 import { dock as dockApi, pickAppFile, pickFolder } from "../api.js";
-import { icon } from "../icons.js";
-import { t } from "../i18n.js";
 import { kindForPath, placePin, takeOutOfGroup } from "../pins.js";
 import { S } from "./state.js";
-import { uid, isVertical, widgetLabel, baseName } from "./helpers.js";
+import { uid, isVertical, baseName } from "./helpers.js";
 import { dockEl, closestSel, stackEl } from "./dom.js";
 import { reframe } from "./frame.js";
 import { render } from "./render.js";
@@ -56,12 +54,17 @@ async function reorderGroupChild(group, childId, beforeId) {
   S.pinnedReveal = true;
   try {
     if (!(await persist())) return;
+    const scroll = stackEl.querySelector(".stack-grid")?.scrollTop || 0;
     closeStack();
     await render();
     reframe();
     const el = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
     const it = S.cfg.pinned.find((p) => p.id === group.id);
-    if (el && it) await openStack(el, it);
+    if (el && it) {
+      await openStack(el, it);
+      const grid = stackEl.querySelector(".stack-grid");
+      if (grid) grid.scrollTop = scroll;
+    }
   } finally {
     S.pinnedReveal = false;
   }
@@ -108,18 +111,6 @@ async function moveChildTo(group, child, slot) {
   reframe();
 }
 
-/** The hover control that takes a child out of its group, back onto the dock. */
-export function takeOutButton(group, child) {
-  const out = document.createElement("button");
-  out.type = "button";
-  out.className = "stack-rm";
-  out.innerHTML = icon("take-out");
-  out.title = t("group.takeOut");
-  out.setAttribute("aria-label", `${t("group.takeOut")}: ${child.name || widgetLabel(child.widget)}`);
-  out.addEventListener("click", (ev) => { ev.stopPropagation(); takeOutChild(group, child.id); });
-  return out;
-}
-
 // Let a flyout child be dragged to reorder inside the panel, or dragged out to
 // return it to the dock. Pointer-based (no native drag → no stray files).
 export function wireStackDragOut(cell, group, child) {
@@ -150,6 +141,20 @@ export function wireStackDragOut(cell, group, child) {
       st.gy = e.clientY - r.top;
       document.body.appendChild(st.clone);
       cell.classList.add("dragging");
+    }
+    st.pointerY = e.clientY;
+    if (!st.scrollFrame) {
+      const scroll = () => {
+        if (!st?.moved) return;
+        const grid = stackEl.querySelector(".stack-grid");
+        if (grid && !st.out) {
+          const r = grid.getBoundingClientRect();
+          const speed = st.pointerY < r.top + 32 ? -6 : st.pointerY > r.bottom - 32 ? 6 : 0;
+          if (speed) grid.scrollTop += speed;
+        }
+        st.scrollFrame = requestAnimationFrame(scroll);
+      };
+      st.scrollFrame = requestAnimationFrame(scroll);
     }
     st.clone.style.left = `${e.clientX - st.gx}px`;
     st.clone.style.top = `${e.clientY - st.gy}px`;
@@ -200,6 +205,7 @@ export function wireStackDragOut(cell, group, child) {
   const finish = async () => {
     if (!st) return;
     const s = st;
+    cancelAnimationFrame(s.scrollFrame);
     st = null;
     try { cell.releasePointerCapture(s.pointerId); } catch (_) {}
     cell.classList.remove("dragging");
@@ -233,6 +239,7 @@ export function wireStackDragOut(cell, group, child) {
     if (!st) return;
     markOutTarget(null);
     const cancelled = st;
+    cancelAnimationFrame(cancelled.scrollFrame);
     st = null;
     try { cell.releasePointerCapture(cancelled.pointerId); } catch (_) {}
     cell.classList.remove("dragging");

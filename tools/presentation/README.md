@@ -6,21 +6,22 @@ Every product image is a capture of the actual built frontend, driven by safe fi
 
 ## README stills
 
-The twelve images in `docs/presentation/` (`hero`, `widgets`, `island`, `groups`, `settings` and `dark`, each in `-en` and `-es`, 1920×1080) come from `stills.mjs`. It uses Playwright directly, not Remotion:
+The current twelve README images are composed screenshots of the actual frontend, generated through `scripts/capture-release.mjs` and `stills.mjs`. They use the Booki mark, Inter, offline coloured app placeholders, example data and current agent marks. No installed-app list or personal desktop is captured.
+
+For a branch that includes unpublished interface changes:
 
 ```bash
 npm ci
 npm run build
-npm run stills --prefix tools/presentation
+node scripts/release-docs.mjs --sync --preview
+node scripts/capture-release.mjs --preview
 ```
 
-- It serves `dist/` through the test harness (`tests/harness.mjs`), captures the dock, the notch Island and four Settings pages at 2× with sample data, then lays each still out as an HTML page (wallpaper, headline, captured UI) and screenshots it.
-- The clock is frozen at 9:41 on Tuesday 6 October 2026 (`studioPatch(font, { frozen: true })`, pages run in UTC), and the focus timer ends 18 minutes later, so the dock clock, the focus widget and the Island all agree: 9:41, 18:00 and 18:00 on every run.
-- The sample dock: Files, Browser, Mail, Music, Photos and Code, a Work group (indigo, lightning icon) and a Play group (orange, gamepad icon), then clock, weather, system, focus and media widgets.
-- It exits with an error if a page logs a JavaScript error or a headline overflows its box. Captures go to the ignored `public/stills/`.
-- `BOOKI_STILLS_LANGUAGE=en` (or `es`) limits the languages; `BOOKI_CHROMIUM` reuses an installed Chromium.
+The images and README captions explicitly say preview, while download links and the recent-update table continue to describe the current stable release. A preview manifest intentionally fails `npm run release:check`.
 
-The Settings preview strip shows the product's own fixed examples (21°, 25:00), not the sample dock's values.
+For an approved release, first update versions and changelog, then run `npm run release:prepare`. This synchronizes both READMEs, captures all twelve images and verifies their source fingerprint and SHA-256 values. The fingerprint includes capture composition, fixtures and font files. Follow the complete [release process](../../docs/distribution/release-process.md), including Windows validation.
+
+`stills.mjs` captures the dock, the agent notch and Settings at 3×, then lays those captures into 1920×1080 compositions. It checks for JavaScript errors and overflowing headings. Temporary UI pieces live in ignored `public/stills/`. `BOOKI_CHROMIUM` reuses an installed browser. Do not overwrite the current README images with historical film poster frames.
 
 ## Film scenes
 
@@ -49,7 +50,7 @@ npm run render --prefix tools/presentation
 
 - `capture.mjs`: wallpapers, dock (light/dark), tasks panel, widget cards and Settings windows into ignored `public/`.
 - `src/copy.mjs`: all film copy in both languages; `src/index.jsx`: scenes and motion (30 fps, 5 s per scene).
-- `render.mjs`: poster frames, H.264 MP4 and WebVTT captions into `docs/presentation/`. Its poster frames are the older 0.70 set and share file names with the README stills (`hero`, `widgets`, `settings`, `dark`), so run `npm run stills` afterwards to restore them.
+- `render.mjs`: poster frames, H.264 MP4 and WebVTT captions into `docs/presentation/`. Its poster frames are the older 0.70 set and share file names with the README stills (`hero`, `widgets`, `settings`, `dark`), so run the current capture workflow afterwards to restore them.
 
 Environment: `BOOKI_CHROMIUM` reuses an installed Chrome/headless shell; `BOOKI_FILM_LANGUAGE=en` (or `es`) limits the languages; `BOOKI_STILLS_ONLY=1` skips the films; `BOOKI_CONCURRENCY` sets render workers.
 

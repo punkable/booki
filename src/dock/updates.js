@@ -5,6 +5,7 @@ import { checkForUpdate } from "../update.js";
 import { t } from "../i18n.js";
 import { placeBesideBar } from "./placement.js";
 import { S } from "./state.js";
+import { quiet } from "./notices.js";
 import { dockEl } from "./dom.js";
 
 // ─────────────────── Update check ───────────────────
@@ -60,7 +61,7 @@ export async function checkUpdates() {
   if (!pill) return;
   const update = waitingUpdate || await checkForUpdate();
   if (!update?.version || toldVersion === update.version) return;
-  if (await pictureBusy()) {
+  if (quiet() || await pictureBusy()) {
     waitingUpdate = update;
     if (!updateRetry) updateRetry = setInterval(() => { checkUpdates(); }, 30000);
     return;

@@ -349,6 +349,9 @@ const cPlay = document.getElementById("nc-play");
 let media = null; // { title, artist, playing, thumb } or null
 let mediaPeekUntil = 0;
 let mediaKey = "";
+let mediaSeenAt = 0;
+const PAUSED_MEDIA_MS = 60000;
+const hasRecentMedia = () => !!(media && (media.title || media.artist) && (media.playing || Date.now() - mediaSeenAt < PAUSED_MEDIA_MS));
 const MEDIA_PEEK_MS = 5000;
 let mediaTimer = null;
 let cardTimer = null;
@@ -651,7 +654,7 @@ function paintCard() {
     document.body.classList.add("card-clock");
     return;
   }
-  if (media && (media.title || media.artist)) {
+  if (hasRecentMedia()) {
     cTitle.textContent = media.title || media.artist;
     cSub.textContent = media.title ? media.artist : "";
     cPlay.hidden = false;
@@ -696,6 +699,8 @@ const pollMedia = singleFlight(async () => {
   } catch (_) {
     media = null;
   }
+  if (media?.playing || !mediaSeenAt) mediaSeenAt = Date.now();
+  if (!hasRecentMedia() && cardOpen && !currentActivity()) closeCard();
   const key = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
   if (key && key !== mediaKey && !videoForeground) mediaPeekUntil = Date.now() + MEDIA_PEEK_MS;
   mediaKey = key;
@@ -731,7 +736,7 @@ function followMorph(ms = 520) { // --dur-spring
  *  not — the taskbar already shows it, and a big empty card just covers
  *  what the person is working on. */
 function cardHasContent() {
-  return !!currentActivity() || !!(media && (media.title || media.artist));
+  return !!currentActivity() || hasRecentMedia();
 }
 let cardWatch = null;
 function openCard() {

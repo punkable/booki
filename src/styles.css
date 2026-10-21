@@ -2723,3 +2723,23 @@ body.notch-body.act-agent-error .nl-state { color: var(--danger-text); }
 
 body.notch-body.peekable.live.act-usage:not(.card) .notch-pill { width: min(296px, calc(100vw - 16px)); }
 body.notch-body.act-usage .nl-text { overflow: hidden; text-overflow: ellipsis; }
+
+/* Large groups keep their header and colour picker in reach. */
+.stack.group-stack { display: flex; flex-direction: column; overflow: hidden; }
+.group-stack .stack-head { flex: 0 0 auto; }
+.group-stack .stack-grid {
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain; scrollbar-width: thin;
+  scrollbar-color: var(--stroke-flyout) transparent; scrollbar-gutter: stable;
+}
+.group-stack .stack-grid:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+button.stack-head-icon { border: 0; cursor: pointer; padding: 0; }
+button.stack-head-icon:hover { background: var(--hover); }
+button.stack-head-icon:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.stack.drop-target { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tile.widget[data-widget="ai"] .w-ring-num { font-size: clamp(9px, calc(var(--size) * 0.23), 15px); }
+.tile.widget[data-widget="ai"] .w-ring-ico { color: var(--ai-brand, var(--w-accent)); }
+
+body.surface-glass.native-material .stack.open {
+  transition: transform var(--dur-4) var(--ease-out);
+}

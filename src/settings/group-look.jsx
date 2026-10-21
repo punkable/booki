@@ -2,7 +2,8 @@
    Colours come only from the curated palette, so groups stay on-brand. */
 import React, { useEffect, useRef, useState } from "react";
 import { t } from "../i18n.js";
-import { GROUP_PALETTE, groupAppearance } from "../group-style.js";
+import { groupAppearance } from "../group-style.js";
+import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
 import { ICON_LIBRARY, libGlyphSVG } from "../icon-library.js";
 import { Icon } from "./ui.jsx";
 
@@ -32,16 +33,16 @@ export function GroupLook({ item, onChange }) {
     for (const key of Object.keys(patch)) if (!next[key]) delete next[key];
     onChange(Object.keys(next).length ? next : null);
   };
-  const family = GROUP_PALETTE.find(([, shades]) => shades.includes(color))?.[0];
+  const family = paletteEntry(color)?.name;
   return <div className="group-look" style={{ "--group-color": color || "var(--accent)", "--group-ink": ink || "var(--accent-contrast)" }}>
-    <Popover label={family ? t(`color.${family}`) : t("group.color")}
+    <Popover label={family || t("group.color")}
       preview={<span className={"look-dot" + (color ? "" : " auto")} style={color ? { "--sw": color } : undefined} />}>
       {(close) => <>
         <button type="button" className="look-auto" aria-pressed={!color} onClick={() => { style({ color: "" }); close(); }}>{t("group.auto")}</button>
         <div className="look-palette" role="radiogroup" aria-label={t("group.color")}>
-          {GROUP_PALETTE.map(([name, shades]) => <div key={name} className="look-family" title={t(`color.${name}`)}>
-            {shades.map((hex, i) => <button key={hex} type="button" role="radio" className="group-swatch" style={{ "--sw": hex }}
-              aria-checked={color === hex} aria-label={`${t(`color.${name}`)} ${i + 1}`} onClick={() => { style({ color: hex }); close(); }} />)}
+          {ACCENT_PALETTE.map(({ name, hex, code }) => <div key={hex} className="look-family" title={name}>
+            <button type="button" role="radio" className="group-swatch" style={{ "--sw": hex }}
+              aria-checked={color === hex} aria-label={code ? `${name} · ${code}` : name} onClick={() => { style({ color: hex }); close(); }} />
           </div>)}
         </div>
       </>}

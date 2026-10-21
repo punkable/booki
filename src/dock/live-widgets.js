@@ -10,7 +10,7 @@ import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify, quiet } from "./notices.js";
 import { pollDnd, dndActive, onFocusDndChange } from "./focus-dnd.js";
-import { deviceReading, aiReading, aiActive, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
+import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -177,7 +177,7 @@ let rotationTimer = 0;
 function syncRotation() {
   // Only cards still on the dock rotate; unpinning one lets the timer go.
   const devices = widgetPresent("devices") && (deviceReading.last || []).length > 1;
-  const ai = widgetPresent("ai") && (aiReading.last || []).filter(aiActive).length > 1;
+  const ai = widgetPresent("ai") && (aiReading.last || []).length > 1;
   if (!devices && !ai) { clearInterval(rotationTimer); rotationTimer = 0; return; }
   if (rotationTimer) return;
   rotationTimer = setInterval(() => {
@@ -188,22 +188,23 @@ function syncRotation() {
     paintDevices(deviceReading.last || []); paintAi(aiReading.last || []);
   }, 6000);
 }
-const lastOwnReading = new Map();
 function paintDevices(list) {
   eachWidget("devices", (el) => {
     // A card made for one device follows only that one, under its short name.
     const style = findWidgetPin(el.dataset.id)?.style;
     const own = style?.device;
-    // A card made for one device keeps showing its last reading when that
-    // device skips one poll, instead of falling back to an empty card.
+    // Missing from a completed query means unavailable; an old percentage
+    // would imply a disconnected device was still reporting live.
     const found = own ? matchDevice(list, own, style.deviceKind) : null;
-    if (own && found) lastOwnReading.set(el.dataset.id, found);
-    const mine = own ? [found || lastOwnReading.get(el.dataset.id)].filter(Boolean) : list;
+    const mine = own ? [found].filter(Boolean) : list;
     setWidgetAvailable(el, mine.length > 0);
     if (!mine.length) {
       resetGlyph(el, "devices");
-      setText(el, own ? shortDeviceName(own) : t("w.devices"), "—");
-      setTileLabel(el, own ? `${own} · ${t("w.devicesNone")}` : t("w.devicesNone"));
+      el.classList.remove("charging", "needs-attention");
+      el.dataset.tone = "unknown";
+      if (el.dataset.autoAccent) el.style.setProperty("--w-accent", "var(--ink-2)");
+      setText(el, own ? shortDeviceName(own) : t("w.devices"), "?");
+      setTileLabel(el, own ? `${own} · ${t("dev.disconnected")}` : t("w.devicesNone"));
       return;
     }
     const shown = own ? mine[0] : mine[deviceTurn % mine.length];
@@ -240,9 +241,9 @@ function warnLowDevices(list) {
 
 // AI usage of the tools found on this PC (Claude Code, Codex), read by the
 // backend from their own local usage logs only: no sign-in, no network.
-// Codex logs carry its plan's windows (real percentages); Claude's logs carry
-// only token counts, so its ring shows how much of the 5-hour block has
-// elapsed, never a guessed share of a plan limit. Asked every five minutes,
+// Codex logs carry its plan's windows (used percentages); the card shows
+// the remaining share. Claude's logs carry only token counts, so quota is
+// explicitly unknown instead of displaying elapsed time as an allowance. Asked every five minutes,
 // only while pinned.
 const resetClock = (seconds) => seconds > 0
   ? new Date(seconds * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" })
@@ -261,16 +262,17 @@ function aiHintLines(p) {
       `${p.name} · ${t("w.aiBlock")}: ${tokensText(p.block.tokens)}${resetsText(p.block.resets_at)}`,
       `${p.name} · ${t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent))}`,
       week,
+      `${p.name} · ${t("w.aiQuotaUnknown")}`,
     ];
   }
-  return [`${p.name} · ${t("w.aiIdle")}`, ...(p.week_tokens > 0 ? [week] : [])];
+  return [`${p.name} · ${t("w.aiIdle")}`, `${p.name} · ${t("w.aiQuotaUnknown")}`, ...(p.week_tokens > 0 ? [week] : [])];
 }
 // Every active provider takes a turn on the card (about every 6 s);
 // rotating repaints the cached reading, it never reads the logs again.
 let aiTurn = 0;
 const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
 function paintAi(providers) {
-  const shown = providers.filter(aiActive);
+  const shown = providers;
   eachWidget("ai", (el) => {
     setWidgetAvailable(el, shown.length > 0);
     const hint = providers.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
@@ -281,16 +283,18 @@ function paintAi(providers) {
       return;
     }
     const current = shown[aiTurn % shown.length];
+    el.style.setProperty("--ai-brand", current.id === "claude" ? "#d97757" : "#10a37f");
     setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
     setTileLabel(el, hint);
     let tone = "good";
     if ((current.windows || []).length) {
       const top = current.windows.reduce((a, b) => (b.percent > a.percent ? b : a));
-      setMetric(el, `${current.name} · ${windowName(top.label)}`, Math.round(top.percent));
+      setMetric(el, `${current.name} · ${t("w.aiRemaining")}`, Math.round(100 - Math.min(100, Math.max(0, top.percent))), undefined, "%");
       tone = usageTone(top.percent);
     } else {
-      // Claude: tokens in the label; the ring is time elapsed in the block.
-      setMetric(el, `${current.name} · ${tokensText(current.block.tokens)}`, Math.round(current.block.elapsed_percent));
+      // Local Claude logs have token counts, not the subscription allowance.
+      // An elapsed-time ring must never masquerade as remaining quota.
+      setText(el, `${current.name} · ${current.block ? tokensText(current.block.tokens) : t("w.aiIdle")}`, "?");
     }
     el.dataset.tone = tone;
     el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
@@ -622,7 +626,7 @@ export function startPolls() {
   const t0 = Date.now();
   const slow = pollSlowdown();
   // Device batteries change slowly and the query walks Windows' device list.
-  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 60000 * slow, ai: t0 + 300000 * slow, slow: t0 + 600000 };
+  pollDue = { stats: t0 + 2400 * slow, media: t0 + 3000 * slow, volume: t0 + 4000 * slow, clipboard: t0 + 4000 * slow, devices: t0 + 15000 * slow, ai: t0 + 300000 * slow, slow: t0 + 600000 };
   // Base cadence: 1 s only when a clock needs the second/minute rollover;
   // otherwise 1.5 s is plenty and lighter.
   const base = hasClock ? 1000 : hasStats || hasMedia || hasVolume || hasClipboard ? 1500 * slow : hasDevices || hasAi ? 15000 : 60000;
@@ -634,13 +638,14 @@ export function startPolls() {
     if (hasMedia && now >= pollDue.media) { pollDue.media = now + recoveryInterval(S.nativeSupport, "media", 3000) * slow; pollMedia(); }
     if (hasVolume && now >= pollDue.volume) { pollDue.volume = now + recoveryInterval(S.nativeSupport, "volume", 4000) * slow; pollVolume(); }
     if (hasClipboard && now >= pollDue.clipboard) { pollDue.clipboard = now + 4000 * slow; pollClipboard(); }
-    if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 60000 * slow; pollDevices(); }
+    if (hasDevices && now >= pollDue.devices) { pollDue.devices = now + 15000 * slow; pollDevices(); }
     if (hasAi && now >= pollDue.ai) { pollDue.ai = now + 300000 * slow; pollAi(); }
     if (hasSlow && now >= pollDue.slow) { pollDue.slow = now + 600000; if (k.updates) pollUpdates(); }
   }, base);
 }
 // Nudge a specific poll right away (e.g. after a transport/volume button).
 export function refreshMedia() { pollDue.media = Date.now() + recoveryInterval(S.nativeSupport, "media", 3000); if (!S.hiddenState) pollMedia(); }
+export function refreshDevices() { return pollDevices(); }
 export function refreshVolume() { pollDue.volume = Date.now() + recoveryInterval(S.nativeSupport, "volume", 4000); if (!S.hiddenState) pollVolume(); }
 export function refreshClipboard() { pollDue.clipboard = 0; if (!S.hiddenState) pollClipboard(); }
 

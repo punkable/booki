@@ -48,14 +48,14 @@ test("the devices widget turns to the next device with its kind icon", async () 
 test("with no device reporting a battery the widget says so instead of a number", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [widget] }) });
   const card = page.locator('.tile[data-id="dev"]');
-  await card.locator(".w-ring-num", { hasText: "—" }).waitFor();
+  await card.locator(".w-ring-num", { hasText: "?" }).waitFor();
   assert.deepEqual(errors, []);
   await page.close();
 });
 
 const ai = { id: "ai", name: "AI", path: "", args: [], kind: "widget", widget: "ai" };
 
-test("the AI widget shows Codex's fullest window and Claude's 5-hour block from local logs", async () => {
+test("the AI widget shows remaining Codex quota and never presents Claude elapsed time as quota", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [ai] }),
     initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "ai_usage"
@@ -65,15 +65,15 @@ test("the AI widget shows Codex's fullest window and Claude's 5-hour block from 
       : old(c, a); }`,
   });
   const card = page.locator('.tile[data-id="ai"]');
-  await card.locator(".w-ring-num", { hasText: "81" }).waitFor();
+  await card.locator(".w-ring-num", { hasText: "19%" }).waitFor();
   assert.match((await card.locator(".w-label").textContent()).trim(), /^Codex · /);
   const hint = await card.getAttribute("aria-label");
   assert.ok(hint.includes("Codex 5h · 42%") && hint.includes("Codex week · 81%"), hint);
   assert.ok(hint.includes("Claude · 5-h block: 1.2 M tokens") && hint.includes("37% of the 5-h block elapsed") && hint.includes("4.1 M tokens"), hint);
   assert.match(hint, /nothing leaves your PC/);
-  // Claude's turn: tokens in the label, elapsed share of the block in the ring.
+  // Claude's turn: token counts are known; the remaining allowance is not.
   await page.mouse.move(0, 0);
-  await card.locator(".w-ring-num", { hasText: "37" }).waitFor({ timeout: 8000 });
+  await card.locator(".w-ring-num", { hasText: "?" }).waitFor({ timeout: 8000 });
   assert.equal((await card.locator(".w-label").textContent()).trim(), "Claude · 1.2 M tokens");
   assert.deepEqual(errors, []);
   await page.close();
@@ -89,7 +89,7 @@ test("the AI widget lists a detected tool with no recent activity", async () => 
       : old(c, a); }`,
   });
   const card = page.locator('.tile[data-id="ai"]');
-  await card.locator(".w-ring-num", { hasText: "12" }).waitFor();
+  await card.locator(".w-ring-num", { hasText: "88%" }).waitFor();
   const hint = await card.getAttribute("aria-label");
   assert.ok(hint.includes("Codex 5h · 12%") && hint.includes("Claude · No activity in the last 5 h"), hint);
   assert.deepEqual(errors, []);
@@ -152,6 +152,23 @@ test("a charging device shows the bolt and says it is charging", async () => {
   assert.equal(await card.getAttribute("data-glyph"), "device-charging");
   assert.equal(await card.evaluate((el) => el.classList.contains("charging")), true);
   assert.match(await card.locator(".w-label").textContent(), /charging/i);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("manual refresh updates the device panel and dock from the same new reading", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", {
+    cfg: makeConfig({ pinned: [widget] }),
+    initScript: `window.__level = 15; const old = window.__TAURI__.core.invoke;
+      window.__TAURI__.core.invoke = (cmd, args) => cmd === "device_batteries" ? Promise.resolve([{ name: "MX Keys Mini", level: window.__level, kind: "keyboard", charging: true }]) : old(cmd, args);`,
+  });
+  const card = page.locator('#dock > [data-id="dev"]');
+  await card.locator(".w-ring-num", { hasText: "15" }).waitFor();
+  await card.click();
+  await page.evaluate(() => { window.__level = 85; });
+  await page.locator(".system-widget-panel").getByRole("button", { name: "Refresh data", exact: true }).click();
+  await card.locator(".w-ring-num", { hasText: "85" }).waitFor();
+  assert.match(await page.locator(".system-widget-panel .reading-card").textContent(), /85%/);
   assert.deepEqual(errors, []);
   await page.close();
 });

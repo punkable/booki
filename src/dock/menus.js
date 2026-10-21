@@ -9,13 +9,14 @@ import { widgetLabel, findWidgetPin, baseName, menuPinTitle } from "./helpers.js
 import { dockEl, ctxMenu, esc, stackEl } from "./dom.js";
 import { reframe } from "./frame.js";
 import { addMenuHead, placeMenu, closeMenu } from "./menu-core.js";
-import { render } from "./render.js";
+import { render, refreshGroupTile } from "./render.js";
 import { windowsFor } from "./running-windows.js";
 import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
 import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
-import { GROUP_PALETTE, groupAppearance } from "../group-style.js";
+import { groupAppearance } from "../group-style.js";
 import { ICON_LIBRARY, libGlyphSVG } from "../icon-library.js";
+import { ACCENT_PALETTE } from "../palette.js";
 import { paintedLook } from "../system-look.js";
 import { openProductivity, openSystemPanel } from "./widget-editors.js";
 import {
@@ -207,6 +208,10 @@ export function openBackgroundMenu(e) {
 }
 
 async function applyGroupLook(item, patch) {
+  // Leaving the rename field may have saved and normalized the pin objects.
+  // Resolve by id so the colour is applied to the current snapshot.
+  item = S.cfg.pinned.find((pin) => pin.id === item.id && pin.kind === "group");
+  if (!item) return;
   const style = { ...(item.style && typeof item.style === "object" ? item.style : {}) };
   for (const [key, value] of Object.entries(patch)) {
     if (value) style[key] = value;
@@ -215,7 +220,7 @@ async function applyGroupLook(item, patch) {
   if (Object.keys(style).length) item.style = style;
   else delete item.style;
   if (!(await persist())) return;
-  await render();
+  refreshGroupTile(item);
   if (S.stackItemId !== item.id || !stackEl) return;
   const look = groupAppearance(item);
   if (look.color) stackEl.style.setProperty("--group-color", look.color);
@@ -239,6 +244,14 @@ function addSwatch(row, pressed, title, onClick, swatch) {
 }
 
 /** Colour and glyph for this group, the same style the flyout already paints. */
+export function openGroupLook(e, item) {
+  e.preventDefault(); e.stopPropagation(); ++S.menuGeneration;
+  ctxMenu.replaceChildren();
+  addMenuHead(item.name || t("group.new"), t("m.group"));
+  addGroupLook(item);
+  placeMenu(e);
+}
+
 function addGroupLook(item) {
   const look = groupAppearance(item);
   const colorLabel = document.createElement("div");
@@ -248,9 +261,8 @@ function addGroupLook(item) {
   const colors = document.createElement("div");
   colors.className = "menu-swatches";
   addSwatch(colors, !look.color, t("group.auto"), () => applyGroupLook(item, { color: "" }));
-  for (const [name, shades] of GROUP_PALETTE) {
-    const hex = shades[1];
-    addSwatch(colors, look.color === hex, t(`color.${name}`), () => applyGroupLook(item, { color: hex }), hex);
+  for (const { name, hex, code } of ACCENT_PALETTE) {
+    addSwatch(colors, look.color === hex, code ? `${name} · ${code}` : name, () => applyGroupLook(item, { color: hex }), hex);
   }
   ctxMenu.appendChild(colors);
   const glyphLabel = document.createElement("div");

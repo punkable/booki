@@ -8,7 +8,7 @@
    widget and the notch pill all agree with each other on every run.
 
    Run `npm run build` at the repository root first. */
-/* global document */ // used inside page.evaluate() callbacks, which run in the browser
+/* global document, window */ // used inside page.evaluate() callbacks, which run in the browser
 import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -21,10 +21,12 @@ const out = resolve(here, '../../docs/presentation'); mkdirSync(out, { recursive
 const fontPath = resolve(here, 'fonts/Inter.ttf');
 
 // Every page runs in UTC, so this instant reads 9:41 wherever the script runs.
-const CLOCK = '2026-10-06T09:41:00Z';
+const CLOCK = '2026-10-21T09:41:00Z';
+const VERSION = JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')).version;
+const PREVIEW = process.env.BOOKI_STILLS_PREVIEW === '1';
 const NOW = Date.parse(CLOCK);
 const FOCUS = { minutes: 25, endsAt: NOW + 18 * 60 * 1000 }; // 18:00 left, everywhere
-const SCALE = 2; // capture at 2x so the composited UI stays crisp
+const SCALE = 3; // capture at 2x so the composited UI stays crisp
 const WINDOW = { width: 1180, height: 760 }; // Settings window, shown at 1120 wide
 
 /* Sample apps: generic glyph icons from fixtures.mjs under short names. */
@@ -51,7 +53,7 @@ const PINNED = [
   widget('weather', { city: 'Lisboa', latitude: 38.72, longitude: -9.14 }),
   widget('system', { metrics: ['cpu', 'ram'] }),
   widget('focus', FOCUS),
-  widget('media'),
+  widget('collector'),
   widget('devices'),
 ];
 
@@ -73,9 +75,9 @@ const browser = await launchBrowser();
 const problems = [];
 // openPage() calls newPage(); add the 2x scale and the fixed time zone there.
 const camera = { newPage: (options) => browser.newPage({ ...options, deviceScaleFactor: SCALE, timezoneId: 'UTC' }) };
-const config = (locale, theme, extra = {}) => makeConfig({ captureVisible: true, theme, language: locale, pinned: PINNED, ...extra });
-const open = async (file, cfg, viewport) => {
-  const opened = await openPage(camera, port, file, { cfg, viewport, initScript });
+const config = (locale, theme, extra = {}) => makeConfig({ captureVisible: true, theme, surfaceStyle: theme === "dark" ? "solid" : "taskbar", language: locale, pinned: PINNED, ...extra });
+const open = async (file, cfg, viewport, extraScript = "") => {
+  const opened = await openPage(camera, port, file, { cfg, viewport, initScript: initScript + extraScript });
   await opened.page.evaluate(() => document.fonts.ready);
   return opened;
 };
@@ -98,15 +100,22 @@ async function shootDock(locale, theme) {
   return { file, width: box.width, height: box.height, pad: 40 };
 }
 
-async function shootNotch(locale, theme) {
+async function shootNotch(locale, theme, provider = "claude", state = "working") {
   // The floating capsule, rounded all round, reads as the Island on its own.
-  const opened = await open('notch.html', config(locale, theme, { autoHideMode: 'smart', notchMode: 'floating' }), { width: 360, height: 100 });
+  const opened = await open('notch.html', config(locale, theme, { autoHideMode: 'smart', notchMode: 'floating', notchVisibility: 'always', pinned: [] }), { width: 360, height: 100 }, `{
+    const old = window.__TAURI__.core.invoke;
+    window.__TAURI__.core.invoke = (cmd, args) => cmd === 'media_info' ? Promise.resolve(null) : old(cmd, args);
+  }`);
   const { page } = opened;
   // Lift the capsule off the window edge so its shadow is not cut off.
   await page.addStyleTag({ content: '#notch-pill { translate: 0 -20px; }' });
-  await page.waitForTimeout(700); // let the pill finish morphing into the live capsule
+  await page.evaluate(({ provider, state }) => {
+    for (const cb of window.__listeners['booki://agent-activity'] || []) cb({ payload: { provider, state, since: Date.now() } });
+  }, { provider, state });
+  await page.waitForFunction((state) => document.body.classList.contains(state === 'working' ? 'act-agent' : `act-agent-${state}`), state);
+  await page.waitForTimeout(700); // let the compact agent capsule settle
   const box = await page.locator('#notch-pill').boundingBox();
-  const file = resolve(shots, `notch-${theme}-${locale}.png`);
+  const file = resolve(shots, `notch-${provider}-${state}-${theme}-${locale}.png`);
   await page.screenshot({ path: file, omitBackground: true, clip: pad(box, 12) });
   await finish(opened, `notch ${theme} ${locale}`);
   return { file, width: box.width, height: box.height, pad: 12 };
@@ -143,22 +152,22 @@ async function shootSettings(locale, theme, pageName) {
 
 const COPY = {
   en: {
-    note: 'Actual interface · example data',
+    note: PREVIEW ? `Branch preview · base v${VERSION} · example icons and data` : `v${VERSION} · actual interface · example icons and data`,
     hero: [['Your desktop,', 'calmer.'], 'One beautiful dock for your apps, folders and live widgets. Free and open source for Windows 11.'],
     widgets: [['Live, at', 'a glance.'], 'Clock, weather, system, focus, media, notes and more, right on the bar.'],
-    island: [['The notch that', 'tells you things.'], 'A quiet dot that becomes a capsule for your focus timer, your music or a low battery.'],
+    island: [['The notch that', 'tells you things.'], 'Claude Code, Codex and Cursor. Their status on your desktop, with local signals and clear indicators.'],
     groups: [['Groups that look', 'like yours.'], 'Give any group a colour from a curated palette and an icon from the library.'],
-    settings: [['Settings you', 'actually enjoy.'], 'Five clear pages, a live preview of your dock and everything at a glance.'],
-    dark: [['At home in', 'the dark.'], 'Glass, Mica or solid. Light or dark. Booki follows Windows.'],
+    settings: [['Settings you', 'actually enjoy.'], 'Six clear sections for your dock, widgets, apps, plugins and system.'],
+    dark: [['At home in', 'the dark.'], 'Taskbar, glass or solid. Light or dark. Booki follows Windows.'],
   },
   es: {
-    note: 'Interfaz real · datos de ejemplo',
+    note: PREVIEW ? `Vista previa · base v${VERSION} · iconos y datos de ejemplo` : `v${VERSION} · interfaz real · iconos y datos de ejemplo`,
     hero: [['Tu escritorio,', 'más en calma.'], 'Un dock precioso para tus apps, carpetas y widgets en vivo. Gratis y de código abierto para Windows 11.'],
     widgets: [['En vivo,', 'de un vistazo.'], 'Reloj, clima, sistema, enfoque, música, notas y más, en la propia barra.'],
-    island: [['El notch que', 'te cuenta cosas.'], 'Un punto discreto que se vuelve cápsula con tu temporizador, tu música o la batería baja.'],
+    island: [['El notch que', 'te cuenta cosas.'], 'Claude Code, Codex y Cursor. Su estado en tu escritorio, con señales locales e indicadores claros.'],
     groups: [['Grupos con', 'tu estilo.'], 'Dale a cada grupo un color de una paleta cuidada y un icono de la librería.'],
-    settings: [['Ajustes que', 'da gusto usar.'], 'Cinco páginas claras, una vista previa en vivo de tu dock y todo de un vistazo.'],
-    dark: [['Como en casa', 'a oscuras.'], 'Vidrio, Mica o sólido. Claro u oscuro. Booki sigue a Windows.'],
+    settings: [['Ajustes que', 'da gusto usar.'], 'Seis secciones para tu dock, widgets, apps, complementos y sistema.'],
+    dark: [['Como en casa', 'a oscuras.'], 'Barra de tareas, vidrio o sólido. Claro u oscuro. Booki sigue a Windows.'],
   },
 };
 
@@ -176,6 +185,7 @@ const INK = {
 };
 const dataUri = (file) => `data:image/png;base64,${readFileSync(file).toString('base64')}`;
 const font = readFileSync(fontPath).toString('base64');
+const mark = `data:image/svg+xml;base64,${readFileSync(resolve(here, '../../assets/brand/svg/isotype.svg')).toString('base64')}`;
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 /** A captured piece placed at a CSS size; the PNG holds it at SCALE. */
@@ -207,7 +217,7 @@ function page(theme, note, inner) {
     html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
     body { position: relative; font-family: Inter, sans-serif; font-feature-settings: 'cv11', 'ss01'; background: ${WALLPAPER[theme]}; -webkit-font-smoothing: antialiased; }
     .note { position: absolute; left: 96px; top: 1021px; font-size: 15px; letter-spacing: .24em; text-transform: uppercase; color: ${ink.note}; }
-  </style></head><body>${inner}<div class="note">${esc(note)}</div></body></html>`;
+  </style></head><body><div style="position:absolute;left:96px;top:62px;display:flex;align-items:center;gap:14px;color:${ink.main};font-weight:700;font-size:26px;letter-spacing:-.04em"><img src="${mark}" width="42" height="42" alt="">booki<span style="margin-left:12px;font-size:13px;font-weight:500;letter-spacing:.12em;color:${ink.note}">WINDOWS · OPEN SOURCE</span></div>${inner}<div class="note">${esc(note)}</div></body></html>`;
 }
 
 const DOCK_WIDTH = 1720; // the bar spans the frame, 100px in from each side
@@ -219,22 +229,21 @@ function compose(name, locale, s) {
       const pill = 300;
       return page('light', note, `${piece(s.notch, { left: (1920 - pill) / 2, top: 36, width: pill })}
         <div style="position:absolute;left:0;right:0;top:250px;display:flex;justify-content:center">${headline(title, body, { theme: 'light', align: 'center', width: 1400 })}</div>
-        ${dockAt(s.dockLight)}`);
+        <div style="position:absolute;left:0;right:0;top:680px;display:flex;justify-content:center;gap:16px">
+          ${(locale === 'es' ? ['Apps y grupos', 'Widgets en vivo', 'Agentes locales', 'Sin cuenta'] : ['Apps & groups', 'Live widgets', 'Local agents', 'No account']).map((label) => `<span style="padding:14px 22px;border:1px solid #ffffffb3;border-radius:40px;background:#ffffff66;font-size:19px;color:#57524e">${label}</span>`).join('')}
+        </div>${dockAt(s.dockLight)}`);
     }
     case 'island': {
       const pill = 560;
       return page('dark', note, `<div style="position:absolute;left:120px;top:205px">${headline(title, body, { theme: 'dark', align: 'left', width: 900 })}</div>
-        ${piece(s.notchDark, { left: 1180, top: 300 - s.notchDark.height * (pill / s.notchDark.width) / 2, width: pill })}
+        ${[s.notchDark, s.notchWaiting, s.notchDone].map((shot, i) => piece(shot, { left: 1180, top: 220 + i * 150, width: pill })).join('')}
         ${dockAt(s.dockDark)}`);
     }
-    case 'widgets': case 'groups': case 'settings': {
-      const theme = name === 'widgets' ? 'dark' : 'light';
-      return page(theme, note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme, align: 'left', width: 570 })}</div>
+    case 'widgets': case 'groups': case 'settings': case 'dark': {
+      const theme = name === 'widgets' || name === 'dark' ? 'dark' : 'light';
+      return page(theme, note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme, align: 'left', width: 570, size: name === 'dark' ? 98 : 118 })}</div>
         ${windowFrame(s.window, { left: 710, top: 110, width: 1120, theme })}`);
     }
-    case 'dark':
-      return page('dark', note, `<div style="position:absolute;left:0;right:0;top:225px;display:flex;justify-content:center">${headline(title, body, { theme: 'dark', align: 'center', width: 1400 })}</div>
-        ${windowFrame(s.window, { left: 460, top: 560, width: 1000, crop: 430, theme: 'dark' })}`);
     default: throw new Error(`Unknown still ${name}`);
   }
 }
@@ -257,9 +266,11 @@ try {
     if (!COPY[locale]) throw new Error('BOOKI_STILLS_LANGUAGE must list en and/or es.');
     const dockLight = await shootDock(locale, 'light'), dockDark = await shootDock(locale, 'dark');
     const notchDark = await shootNotch(locale, 'dark');
+    const notchWaiting = await shootNotch(locale, 'dark', 'cursor', 'waiting');
+    const notchDone = await shootNotch(locale, 'dark', 'codex', 'done');
     const scenes = {
       hero: { dockLight, notch: notchDark }, // the Island reads as dark on any wallpaper
-      island: { dockDark, notchDark },
+      island: { dockDark, notchDark, notchWaiting, notchDone },
       widgets: { window: await shootSettings(locale, 'dark', 'widgets') },
       groups: { window: await shootSettings(locale, 'light', 'apps') },
       settings: { window: await shootSettings(locale, 'light', 'home') },

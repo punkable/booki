@@ -16,6 +16,7 @@ import { isVertical, widgetLabel, syncIcon, resolveIcon, menuPinTitle } from "./
 import { dockEl, esc, stackEl } from "./dom.js";
 import { reframe, applyFrame } from "./frame.js";
 import { reportDockMaterial } from "./hit-regions.js";
+import { followFrames } from "../material.js";
 import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
@@ -120,11 +121,18 @@ export async function openStack(tileEl, item) {
   stackEl.setAttribute("aria-label", item.name || t("group.new"));
   const head = document.createElement("div");
   head.className = "stack-head";
-  const glyph = document.createElement("span");
+  const glyph = document.createElement(isGroup ? "button" : "span");
   glyph.className = "stack-head-icon";
   glyph.innerHTML = icon("folder");
   head.appendChild(glyph);
+  stackEl.classList.toggle("group-stack", isGroup);
+  stackEl.dataset.id = isGroup ? item.id : "";
   if (isGroup) {
+    glyph.type = "button";
+    glyph.title = t("group.color");
+    glyph.setAttribute("aria-label", t("group.color"));
+    glyph.setAttribute("aria-haspopup", "menu");
+    glyph.addEventListener("click", (e) => deps.openGroupLook(e, item));
     const look = groupAppearance(item);
     if (look.glyph) glyph.innerHTML = libGlyphSVG(look.glyph);
     stackEl.style.setProperty("--group-color", look.color || "");
@@ -218,6 +226,19 @@ export async function openStack(tileEl, item) {
   }
   const grid = document.createElement("div");
   grid.className = "stack-grid";
+  if (isGroup) {
+    grid.tabIndex = 0;
+    grid.setAttribute("aria-label", item.name || t("group.new"));
+    grid.addEventListener("keydown", (e) => {
+      if (e.key !== "ContextMenu" && !(e.shiftKey && e.key === "F10")) return;
+      const cell = e.target.closest("[data-child-id]");
+      const child = (item.children || []).find((it) => it.id === cell?.dataset.childId);
+      if (!child) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = cell.getBoundingClientRect();
+      deps.openFileMenu(new MouseEvent("contextmenu", { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }), child, item);
+    });
+  }
   const fillGrid = (items) => {
     grid.innerHTML = "";
     if (!items.length) {
@@ -233,7 +254,8 @@ export async function openStack(tileEl, item) {
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
         wCell.appendChild(widgetTile(it, { inFlyout: true }));
         deps.wireStackDragOut(wCell, item, it);
-        wCell.appendChild(deps.takeOutButton(item, it));
+        wCell.dataset.childId = it.id;
+        wCell.addEventListener("contextmenu", (e) => deps.openFileMenu(e, it, item));
         grid.appendChild(wCell);
         continue;
       }
@@ -304,14 +326,12 @@ export async function openStack(tileEl, item) {
         closeStack();
       });
       if (isGroup) {
-        // Drag a child OUT of the flyout to unpin it (parity with the dock's
-        // pull-out-to-remove gesture); hover control pops it back onto the dock.
+        // Drag out or use the context menu to return a member to the dock.
         deps.wireStackDragOut(cell, item, it);
-        // The take-out control is a real button, so it sits beside the cell
-        // button (a button inside a button is invalid and unreachable by Tab).
+        // The wrapper keeps grid sizing independent of each item's contents.
         holder = document.createElement("div");
         holder.className = "stack-cell";
-        holder.append(cell, deps.takeOutButton(item, it));
+        holder.append(cell);
       } else if (it.path && !it.is_dir) {
         // Real files: hover actions (copy path · reveal in Explorer · open
         // with…) and drag-out — pull the file into Explorer or any other app.
@@ -493,6 +513,7 @@ export async function openStack(tileEl, item) {
     placeStack();
     requestAnimationFrame(() => {
       stackEl.classList.add("open", "just-opened");
+      followFrames(reportDockMaterial);
       clearTimeout(stackEl._justOpenedTimer);
       stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
     });
@@ -515,7 +536,7 @@ export function placeStackNear(tileEl) {
     : edge === "left" ? window.innerWidth - bar.right - gap - pad : bar.left - gap - pad;
   // Leave the header/close action visible and scroll the contents. On a
   // small stage the old fixed-height panel started above the viewport.
-  stackEl.style.maxHeight = `${Math.max(1, Math.min(window.innerHeight - pad * 2, Math.max(160, availableHeight)))}px`;
+  stackEl.style.maxHeight = `${Math.max(1, Math.min(stackEl.classList.contains("group-stack") ? 480 : Infinity, window.innerHeight - pad * 2, Math.max(160, availableHeight)))}px`;
   stackEl.style.maxWidth = `${Math.max(1, Math.min(window.innerWidth - pad * 2, Math.max(240, availableWidth)))}px`;
   const box = { width: stackEl.offsetWidth, height: stackEl.offsetHeight };
   const { left, top } = placeBesideBar({
@@ -578,6 +599,7 @@ export function openAddPanel(anchorEl = dockEl, tab = "apps") {
     place();
     requestAnimationFrame(() => {
       stackEl.classList.add("open", "just-opened");
+      followFrames(reportDockMaterial);
       clearTimeout(stackEl._justOpenedTimer);
       stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
       panel.focus();
@@ -623,6 +645,7 @@ export function openLauncher() {
     place();
     requestAnimationFrame(() => {
       stackEl.classList.add("open", "just-opened");
+      followFrames(reportDockMaterial);
       clearTimeout(stackEl._justOpenedTimer);
       stackEl._justOpenedTimer = setTimeout(() => stackEl.classList.remove("just-opened"), 220);
       panel.focus();
@@ -643,7 +666,8 @@ export function closeStack() {
   S.stackItemId = null;
   S.pendingReplace = null;
   document.body.classList.remove("stack-open");
-  stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode");
+  stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode", "group-stack");
+  delete stackEl.dataset.id;
   reportDockMaterial(); // its blur goes with it, before the window shrinks
   cacheWidgetEls();
   syncPolls({ repaint: false });

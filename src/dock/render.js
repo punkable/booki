@@ -191,6 +191,20 @@ function appTile(item) {
 
 // A "folder"/group tile — shows up to four child icons in a mini grid (iOS-style)
 // and opens a flyout with its contents on click.
+export function refreshGroupTile(item) {
+  const el = [...dockEl.querySelectorAll(".tile.group")].find((node) => node.dataset.id === item.id);
+  if (!el) return;
+  const next = groupTile(item);
+  el.classList.toggle("tinted", next.classList.contains("tinted"));
+  el.classList.toggle("badge-group", next.classList.contains("badge-group"));
+  for (const key of ["--group-color", "--group-ink"]) {
+    const value = next.style.getPropertyValue(key);
+    if (value) el.style.setProperty(key, value);
+    else el.style.removeProperty(key);
+  }
+  el.querySelector(".group-grid")?.replaceWith(next.querySelector(".group-grid"));
+}
+
 function groupTile(item) {
   const el = document.createElement("button");
   el.className = "tile group";

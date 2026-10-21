@@ -23,7 +23,7 @@ export function paintDownloads() {
       setTileLabel(el, `${t("dl.done")} · ${baseName(download.path)}`);
     } else if (download.state === "error") {
       setText(el, t("w.collector"), "!");
-      setTileLabel(el, t("dl.failed"));
+      setTileLabel(el, [t("dl.failed"), download.error].filter(Boolean).join(" · "));
     } else {
       setText(el, t("w.collector"), "0");
       setTileLabel(el, t("dl.drop"));
@@ -36,6 +36,7 @@ function changed() { paintDownloads(); for (const fn of listeners) { try { fn(do
 
 onDownloadEvent((event) => {
   if (!event || !["start", "progress", "done", "error"].includes(event.state)) return;
+  if (event.state === "progress" && ["done", "error"].includes(download.state)) return;
   const percent = Number(event.percent);
   Object.assign(download, { state: event.state, percent: Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 0 });
   if (event.state === "start") Object.assign(download, { title: "", path: "", error: "" });

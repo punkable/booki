@@ -10,6 +10,7 @@ test("publication rejects old versions, stale UI, Dev captures and missing/repla
   assert.throws(() => validateCaptures({ ...manifest, version: "1.2.2" }, expected), /version/);
   assert.throws(() => validateCaptures({ ...manifest, source: "old UI" }, expected), /source/);
   assert.throws(() => validateCaptures({ ...manifest, edition: "dev" }, expected), /edition/);
+  assert.throws(() => validateCaptures({ ...manifest, edition: "preview" }, expected), /edition/);
   assert.throws(() => validateCaptures({ ...manifest, files: {} }, expected), /Unverified screenshot/);
   assert.throws(() => validateCaptures(manifest, { ...expected, hash: () => "changed bytes" }), /Unverified screenshot/);
 });

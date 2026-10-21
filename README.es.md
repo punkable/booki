@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64-setup.exe"><b>Descargar para Windows v0.93.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.93.0/Booki_0.93.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.93.0.md">Novedades v0.93.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64-setup.exe"><b>Descargar para Windows v0.94.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.94.0/Booki_0.94.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.94.0.md">Novedades v0.94.0</a> ·
   <a href="README.md">English</a>
 </p>
 <!-- booki:download:end -->
@@ -42,7 +42,7 @@
 
 <p align="center">Un punto discreto arriba de la pantalla que se abre en cápsula con tu temporizador, la canción que suena o la batería baja.<br/>Pasa el ratón para ver una tarjeta con más. ¿Prefieres algo más simple? Elige pestaña pegada o píldora flotante.</p>
 
-<p align="center"><img src="docs/presentation/island-es.jpg" width="1000" alt="Mascota de Claude Code, nombre e indicador de trabajo en el notch compacto de Booki" /></p>
+<p align="center"><img src="docs/presentation/island-es.jpg" width="1000" alt="Claude Code, Cursor y Codex con estados de trabajo, espera y finalización en el notch compacto de Booki" /></p>
 
 <h2 align="center">Grupos con tu estilo.</h2>
 
@@ -58,7 +58,7 @@
 
 <h2 align="center">Ajustes que da gusto usar.</h2>
 
-<p align="center">Cinco páginas claras —Inicio, Dock, Widgets, Apps y Sistema— con una vista previa en vivo de tu dock y todo de un vistazo.</p>
+<p align="center">Seis secciones claras —Inicio, Dock, Widgets, Apps, Complementos y Sistema— con una vista previa en vivo de tu dock y todo de un vistazo.</p>
 
 <p align="center"><img src="docs/presentation/settings-es.jpg" width="1000" alt="Inicio actual de Ajustes de Booki con dock de ejemplo" /></p>
 
@@ -75,7 +75,7 @@
 <p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Capturas del frontend del código fuente v0.93.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
+<p align="center"><sub>Capturas del frontend del código fuente v0.94.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
 <!-- booki:media:end -->
 
 ## Instalar y empezar
@@ -87,39 +87,33 @@
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
 
 <!-- booki:news:start -->
-## Novedades de 0.93.0
+## Novedades de 0.94.0
 
-Agentes más claros, descargas que conservan tus archivos y actualizaciones al día.
+Grupos más ágiles, widgets más claros y un README renovado.
 
-- El notch conserva nombre y logo, con indicadores separados de trabajo, pausa, final y error. Claude Code usa su mascota. Cursor reconoce transcripciones TXT y JSONL; los estados deducidos por actividad siguen siendo aproximados.
-- Los avisos recuerdan reinicios previstos de Codex y el final del bloque local de Claude, incluso con el dock oculto. Un bloque terminado no confirma cuota recuperada. Se respetan concentración, vídeo, juegos y No molestar; no se leen credenciales.
-- Guardar solo audio ya no elimina un vídeo guardado anteriormente. Archivos, vídeo y audio muestran progreso y resultado; títulos iniciales y errores se conservan correctamente.
-- Agentes compactos sin nombres cortados, contraste corregido para colores elegidos, grupos con color e icono desde el menú y mejoras en dispositivos Logitech.
-- El aviso abre Sistema. El historial carga al abrirlo, permite reintentar y muestra iconos legibles; instalar sigue requiriendo tu acción, guardado y copia previa.
-- README en inglés y español, descargas x64/ARM64/MSI e imágenes se preparan juntos. La publicación se bloquea si notas, enlaces o capturas quedan desactualizados.
+- Arrastra archivos y carpetas directamente a un grupo abierto. El contenido tiene scroll interno con cabecera fija; sacar miembros queda en el menú contextual o el arrastre, también por teclado.
+- El icono de la cabecera abre colores Pantone e iconos. Cambiar la apariencia conserva los widgets y guarda sobre el grupo actual. Los paneles de vidrio reportan su geometría durante la apertura.
+- Las baterías visibles se consultan cada 15 segundos, con menor frecuencia en ahorro de energía. Puedes actualizar manualmente y abrir los ajustes Bluetooth. Sin lectura actual se muestra ?, sin conservar indefinidamente un porcentaje antiguo.
+- La tarjeta rota entre los proveedores detectados con sus logos y colores. Codex muestra el porcentaje restante de la ventana más restrictiva. Claude muestra tokens y cuota desconocida cuando sus registros no incluyen el límite.
+- El reproductor del notch deja de ofrecer una tarjeta tras un minuto en pausa y vuelve al reanudar.
+- Un evento tardío de progreso ya no reemplaza el resultado final del Recolector. El detalle del fallo también aparece en su tarjeta.
+- Los avisos de actualización esperan durante concentración, No molestar, vídeo o juegos. La descarga y la instalación siguen siendo acciones separadas, con guardado y respaldo antes de aplicar.
+- Doce imágenes en inglés y español con interfaz real, iconos de ejemplo e historial reciente sincronizado con el changelog.
 
-[Notas completas](docs/releases/v0.93.0.md)
+[Notas completas](docs/releases/v0.94.0.md)
 <!-- booki:news:end -->
 
-## Novedades de 0.87
+<!-- booki:history:start -->
+## Actualizaciones recientes
 
-- Un catálogo común para HeadsetControl, yt-dlp, OpenRGB, Rclone y LibreHardwareMonitor, más consultas mediante el winget administrado por App Installer de Windows.
-- Paneles de detalles de widgets y un mezclador nativo de Windows por aplicación.
-- Grises por capas de WinUI en los temas claro y oscuro, y una transición continua con resorte entre el notch dinámico y el dock en ambos sentidos.
+| Versión | Qué cambió |
+|---|---|
+| [0.93.0](docs/releases/v0.93.0.md) | Agentes más claros, descargas que conservan tus archivos y actualizaciones al día. |
+| [0.92.0](docs/releases/v0.92.0.md) | Claude y Codex en el notch, concentración con No molestar y copia automática. |
+| [0.91.0](docs/releases/v0.91.0.md) | Uso de IA sin credenciales, dispositivos que se reconocen y paneles dentro del dock. |
 
-Consulta los requisitos de configuración y los límites de validación en las [notas de 0.87](docs/releases/v0.87.0.md).
-
-## Novedades de 0.86
-
-- **Se siente como Windows 11**: menús al estilo WinUI, colores de acento de Windows, esquinas de 4/8 px, tamaños de texto y ritmos de animación de Windows, avisos como los de la barra de tareas y barras de desplazamiento finas.
-- **El notch en vivo se estira hasta ser el dock** desde donde esté, con un solo muelle para todo el movimiento, y el dock ya no parpadea detrás de la app activa.
-- **Widget Dispositivos**: batería de audífonos, mouse y teclados Bluetooth, de dispositivos Logitech con receptor Bolt o Unifying y de audífonos inalámbricos con el complemento opcional HeadsetControl.
-- **Widget Uso de IA (opcional)**: tu uso de Claude Code y Codex, leído solo de los registros de uso locales que esas herramientas ya escriben en tu PC.
-- **Complementos**: herramientas de código abierto opcionales que instalas desde Ajustes y que se verifican antes de usarse.
-- **Inicio con Windows más inteligente**: el dock aparece al instante y Booki no compite con el resto de programas al iniciar sesión.
-- **Un primer dock que ya se parece a ti**, una página Dock más simple con "Más ajustes", un aviso de "Cargando" en el notch y muchos arreglos.
-
-Detalles en las [notas de 0.86](docs/releases/v0.86.0.md).
+[Todas las versiones publicadas](https://github.com/punkable/booki/releases)
+<!-- booki:history:end -->
 
 ## Uso diario
 
@@ -137,9 +131,9 @@ Detalles en las [notas de 0.86](docs/releases/v0.86.0.md).
 
 No hay cuentas, telemetría ni sincronización en la nube. La configuración y las recomendaciones de uso permanecen en tu equipo, en `%APPDATA%\Booki`. El portapapeles persistente está desactivado inicialmente y, al activarlo, se protege para tu usuario de Windows.
 
-Las consultas de red se usan para actualizaciones y favicons, más tres cosas que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su página de versiones oficial (verificada con una suma SHA-256 fijada en el código de Booki) y el widget Uso de IA.
+Las consultas de red se usan para actualizaciones y favicons, más funciones que solo ocurren si las activas: el clima de Open-Meteo al elegir una ciudad (nunca la ubicación del dispositivo), la descarga de complementos desde su página de versiones oficial (verificada con una suma SHA-256 fijada en el código de Booki). El widget Uso de IA no consulta la red.
 
-El widget Uso de IA solo lee, en modo lectura, los registros de uso locales de Claude Code (`~/.claude/projects`) y Codex (`~/.codex/sessions`), y solo mientras el widget está en el dock. Booki nunca lee, usa, guarda ni envía tus credenciales de Claude o ChatGPT, no conserva el contenido de los mensajes y no hace ninguna petición de red para él. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta. Son herramientas independientes de terceros, con sus propias licencias, que solo se instalan si tú lo decides; usarlas conforme a la ley es tu responsabilidad. Consulta los [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
+El widget Uso de IA solo lee, en modo lectura, los registros de uso locales de Claude Code (`~/.claude/projects`) y Codex (`~/.codex/sessions`), cuando activas el widget o los avisos locales de uso. Booki nunca lee, usa, guarda ni envía tus credenciales de Claude o ChatGPT, no conserva el contenido de los mensajes y no hace ninguna petición de red para él. La batería de los dispositivos sale de Windows, de los receptores Logitech por USB y, si lo instalaste, de HeadsetControl en tu PC: nada sale de tu equipo. Los complementos viven en `%LOCALAPPDATA%\Booki\plugins` y quitarlos desde Ajustes borra su carpeta. Son herramientas independientes de terceros, con sus propias licencias, que solo se instalan si tú lo decides; usarlas conforme a la ley es tu responsabilidad. Consulta los [términos de uso](TERMS.md#términos-de-uso-y-aviso-sobre-complementos).
 
 La desinstalación conserva los ajustes salvo que marques **Eliminar datos de la aplicación**.
 

@@ -199,3 +199,20 @@ test("a Cloud card from an older version leaves the dock quietly", async () => {
   assert.equal(await page.locator('.tile[data-widget="cloud"]').count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test("Collector keeps terminal results when delayed progress arrives, and a new start clears them", async () => {
+  const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [pin("collector")] }) });
+  const card = page.locator('#dock > [data-id="collector"]');
+  await emit(page, "plugin-download", { state: "start", title: "Example" });
+  await emit(page, "plugin-download", { state: "done", percent: 100, path: "C:/Examples/example.pdf" });
+  await emit(page, "plugin-download", { state: "progress", percent: 40 });
+  assert.equal(await card.getAttribute("data-state"), "done");
+  assert.match(await card.getAttribute("aria-label"), /example\.pdf/);
+  await emit(page, "plugin-download", { state: "start" });
+  await emit(page, "plugin-download", { state: "error", error: "Example connection failed" });
+  await emit(page, "plugin-download", { state: "progress", percent: 90 });
+  assert.equal(await card.getAttribute("data-state"), "error");
+  assert.match(await card.getAttribute("aria-label"), /Example connection failed/);
+  assert.deepEqual(errors, []);
+  await page.close();
+});

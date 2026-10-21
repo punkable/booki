@@ -184,6 +184,7 @@ export function tweenNumber(el, to, fmt) {
   const t0 = performance.now();
   const dur = 320;
   const step = (now) => {
+    if (el.dataset.v !== String(to)) return;
     const p = Math.min(1, (now - t0) / dur);
     const e = 1 - Math.pow(1 - p, 3);
     el.textContent = fmt(Math.round(from + (to - from) * e));
@@ -195,13 +196,13 @@ export function tweenNumber(el, to, fmt) {
 
 /* Set a percentage metric (CPU/RAM/disk): label + value% + bar. Extra detail
    goes in the tooltip so nothing overflows the compact card. */
-export function setMetric(el, label, val, title) {
+export function setMetric(el, label, val, title, unit = "") {
   el.querySelector(".w-label").textContent = label;
   const pct = Math.min(100, Math.max(0, val));
   const ring = el.querySelector(".w-ring-fill");
   if (ring) {
     // Ring widget: the number lives INSIDE the ring, not the label row.
-    tweenNumber(el.querySelector(".w-ring-num"), val, (n) => `${n}`);
+    tweenNumber(el.querySelector(".w-ring-num"), val, (n) => `${n}${unit}`);
     ring.style.strokeDashoffset = `${(RING_C * (1 - pct / 100)).toFixed(2)}`;
   } else {
     tweenNumber(el.querySelector(".w-value"), val, (n) => `${n}%`);

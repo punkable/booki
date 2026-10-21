@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -165,10 +165,18 @@ function release92() {
   ] };
 }
 
-export function currentRelease() {
+function release93() {
   return { version: "0.93.0", date: "2026-10-21", headline: t("release93.headline"), sections: [
     { icon: "sparkles", title: t("release93.agentsTitle"), notes: [t("release93.agents"), t("release93.usage")] },
     { icon: "settings", title: t("release93.toolsTitle"), notes: [t("release93.collector"), t("release93.dock")] },
     { icon: "search", title: t("release93.updatesTitle"), notes: [t("release93.updates"), t("release93.docs")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.94.0", date: "2026-10-21", headline: t("release94.headline"), sections: [
+    { icon: "folder", title: t("release94.groupsTitle"), notes: [t("release94.groups"), t("release94.appearance")] },
+    { icon: "sparkles", title: t("release94.widgetsTitle"), notes: [t("release94.devices"), t("release94.ai"), t("release94.media")] },
+    { icon: "download", title: t("release94.finishTitle"), notes: [t("release94.collector"), t("release94.updates"), t("release94.docs")] },
   ] };
 }

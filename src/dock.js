@@ -90,8 +90,8 @@ import { openAddPanel, openLauncher, closeStack, wireStack } from "./dock/stack.
 import { launchModifiers, launch, wireLaunch } from "./dock/launch.js";
 import { setupFileDrop } from "./dock/file-drop.js";
 import { exitEdit, onPointerDown, cancelDrag } from "./dock/edit-reorder.js";
-import { takeOutButton, wireStackDragOut, addToFolderFromDock } from "./dock/group-ops.js";
-import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu } from "./dock/menus.js";
+import { wireStackDragOut, addToFolderFromDock } from "./dock/group-ops.js";
+import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu, openGroupLook } from "./dock/menus.js";
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
@@ -668,7 +668,7 @@ wireLiveWidgets({ startRunningPoll });
 wireRender({ onPointerDown, openMenu, openBackgroundMenu, removeItem, openAddPanel });
 wireUndoToast({ persist });
 wireConfigSync({ hideTip, closeStack, cancelDrag });
-wireStack({ takeOutButton, wireStackDragOut, openFileMenu, addToFolderFromDock, openMenu });
+wireStack({ wireStackDragOut, openFileMenu, addToFolderFromDock, openMenu, openGroupLook });
 wireLaunch({ hideTip });
 
 boot();
