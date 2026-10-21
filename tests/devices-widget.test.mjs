@@ -165,10 +165,13 @@ test("manual refresh updates the device panel and dock from the same new reading
   const card = page.locator('#dock > [data-id="dev"]');
   await card.locator(".w-ring-num", { hasText: "15" }).waitFor();
   await card.click();
+  await page.locator(".system-widget-panel .reading-card summary").click();
   await page.evaluate(() => { window.__level = 85; });
   await page.locator(".system-widget-panel").getByRole("button", { name: "Refresh data", exact: true }).click();
   await card.locator(".w-ring-num", { hasText: "85" }).waitFor();
   assert.match(await page.locator(".system-widget-panel .reading-card").textContent(), /85%/);
+  assert.equal(await page.locator(".system-widget-panel .reading-card").getAttribute("open"), "");
+  assert.match(await page.locator(".system-widget-panel .reading-card").textContent(), /does not guarantee a new sensor value/);
   assert.deepEqual(errors, []);
   await page.close();
 });

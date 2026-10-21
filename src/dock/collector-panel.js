@@ -20,11 +20,11 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
   const defaultLabel = text("label", t("refine.defaultFormat"), "collector-field");
   const defaultFormat = document.createElement("select"); defaultFormat.setAttribute("aria-label", t("refine.defaultFormat"));
   for (const mode of ["video", "audio"]) defaultFormat.append(new Option(t(`dl.${mode}`), mode));
-  defaultFormat.value = S.cfg.collectorFormat || "video";
+  defaultFormat.value = (S.cfg.collectorFormat === "audio" ? "audio" : "video");
   defaultFormat.addEventListener("change", async () => {
     defaultFormat.disabled = true;
     try { await save({ collectorFormat: defaultFormat.value }); }
-    catch (_) { defaultFormat.value = S.cfg.collectorFormat || "video"; folder.textContent = t("status.saveError"); }
+    catch (_) { defaultFormat.value = (S.cfg.collectorFormat === "audio" ? "audio" : "video"); folder.textContent = t("status.saveError"); }
     finally { defaultFormat.disabled = false; }
   });
   defaultLabel.append(defaultFormat); preferences.append(defaultLabel); box.append(preferences);
@@ -44,7 +44,7 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
       try { url = new URL(line); } catch (_) { throw new Error(t("perr.link")); }
       if (!["https:", "http:"].includes(url.protocol) || url.username || url.password || line.length > 8192) throw new Error(t("perr.link"));
       const kind = classifyLink(url.href);
-      return { url: url.href, directory: S.cfg.collectorDirectory || null, format: mode.value === "auto" ? (kind === "media" ? S.cfg.collectorFormat || "video" : kind) : mode.value };
+      return { url: url.href, directory: S.cfg.collectorDirectory || null, format: mode.value === "auto" ? (kind === "media" ? (S.cfg.collectorFormat === "audio" ? "audio" : "video") : kind) : mode.value };
     });
     try { collectorQueue.enqueue(entries); }
     catch (_) { throw new Error(t("refine.queueFull")); }
@@ -92,5 +92,5 @@ export function buildCollectorPanel(item, { box, button, installButton, isDispos
   };
   onDispose(onDownloadChange(draw)); draw();
   if (item.url && (item.autoStart || classifyLink(item.url) !== "media")) add().catch((failure) => { if (!isDisposed()) { error.textContent = String(failure); error.hidden = false; } });
-  if (!item.url) requestAnimationFrame(() => { if (!isDisposed()) input.focus(); });
+  if (!item.url) requestAnimationFrame(() => { if (!isDisposed()) input.focus({ preventScroll: true }); });
 }

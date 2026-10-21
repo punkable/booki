@@ -2797,3 +2797,5 @@ body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-wo
 body:is(.edge-left, .edge-right) .tile:is(.group-drop-before, .group-drop-after)::before { left: 4px; right: 4px; width: auto; height: 3px; }
 body:is(.edge-left, .edge-right) .tile.group-drop-before::before { top: -4px; bottom: auto; }
 body:is(.edge-left, .edge-right) .tile.group-drop-after::before { top: auto; bottom: -4px; }
+
+.edge-move-hint { position: absolute; left: 50%; top: 50%; translate: -50% -50%; padding: 10px 16px; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke); border-radius: var(--r-card); pointer-events: none; font: 13px/20px var(--font); }

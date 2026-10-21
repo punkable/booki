@@ -1,5 +1,6 @@
 /* Dragging the empty bar to move the dock to another screen edge. */
 
+import { t } from "../i18n.js";
 import { dock as dockApi } from "../api.js";
 import { applyEdge } from "../theme.js";
 import { S } from "./state.js";
@@ -24,6 +25,7 @@ function buildEdgeOverlay() {
     ["top", "bottom", "left", "right"]
       .map((ed) => `<div class="edge-zone edge-zone-${ed}" data-edge="${ed}"><span class="edge-zone-dot"></span></div>`)
       .join("") + `<div class="edge-ghost" aria-hidden="true"></div>`;
+  const hint = document.createElement("span"); hint.className = "edge-move-hint"; hint.textContent = t("refine.monitorMove"); o.append(hint);
   document.body.appendChild(o);
   edgeOverlay = o;
   return o;

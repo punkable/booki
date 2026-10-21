@@ -58,7 +58,7 @@ test("Collector default format is saved from its gear panel and used for automat
     initScript: `window.__jobs=[]; const old=window.__TAURI__.core.invoke; window.__TAURI__.core.invoke=(cmd,args)=>cmd==='plugin_download' ? (window.__jobs.push(args),Promise.resolve('C:/Downloads/audio.m4a')) : old(cmd,args);`,
   });
   await page.locator('#dock > [data-id="collector"]').click();
-  await page.locator(".collector-settings summary").click();
+  await page.getByRole("button", { name: "Collector settings", exact: true }).click();
   await page.getByRole("combobox", { name: "Format for video pages", exact: true }).selectOption("audio");
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).collectorFormat === "audio");
   await page.getByRole("textbox", { name: "Paste a link" }).fill("https://example.com/watch?v=123");

@@ -75,7 +75,17 @@ export function buildSystemPanel(item, { close }) {
   // Cards from a shared reading: the last value paints at once (no "Loading"
   // on reopen), then a fresh one replaces it when it lands.
   const live = (container, reading, maxAge, paint) => {
-    const draw = (data) => { if (!disposed) { container.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .productivity-button").forEach((el) => el.remove()); paint(data); } };
+    const draw = (data) => {
+      if (disposed) return;
+      const open = new Set([...container.querySelectorAll("details.reading-card[open]")].map((card) => card.dataset.readingKey));
+      const focused = container.contains(document.activeElement) ? document.activeElement.closest("details.reading-card")?.dataset.readingKey : null;
+      container.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .productivity-button").forEach((el) => el.remove());
+      paint(data);
+      container.querySelectorAll("details.reading-card").forEach((card) => {
+        card.open = open.has(card.dataset.readingKey);
+        if (focused && card.dataset.readingKey === focused) card.querySelector("summary")?.focus({ preventScroll: true });
+      });
+    };
     unsubscribe.push(reading.subscribe(draw));
     if (reading.last !== undefined) { draw(reading.last); reading.fresh(maxAge).catch(() => {}); }
     else load(container, () => reading.fresh(maxAge), () => {});
@@ -83,7 +93,7 @@ export function buildSystemPanel(item, { close }) {
   const cards = (container, rows) => {
     const grid = document.createElement("div"); grid.className = "reading-cards";
     for (const row of rows) {
-      const card = document.createElement(row.details ? "details" : "div"); card.className = "reading-card"; if (row.tone) card.dataset.tone = row.tone;
+      const card = document.createElement(row.details ? "details" : "div"); card.className = "reading-card"; card.dataset.readingKey = row.name; if (row.tone) card.dataset.tone = row.tone;
       const top = document.createElement(row.details ? "summary" : "div"); top.className = "reading-card-top";
       if (row.glyph) { const g = text("span", "", "reading-card-glyph"); g.innerHTML = icon(row.glyph); top.append(g); }
       const names = document.createElement("div"); names.className = "reading-card-names";
@@ -213,6 +223,10 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "collector") {
     buildCollectorPanel(item, { box: section(t("w.collector")), button, installButton, isDisposed: () => disposed, onDispose: (off) => unsubscribe.push(off) });
+    const gear = document.createElement("button"); gear.type = "button"; gear.className = "stack-close";
+    gear.innerHTML = icon("settings"); gear.title = t("refine.collectorSettings"); gear.setAttribute("aria-label", t("refine.collectorSettings"));
+    gear.addEventListener("click", () => { const preferences = body.querySelector(".collector-settings"); preferences.open = !preferences.open; preferences.scrollIntoView({ block: "nearest" }); });
+    head.insertBefore(gear, done);
   }
   // A widget whose plugin is missing offers it in one line, terms included.
   const needsPlugin = (id, container, onReady) => api.pluginStatus(id).then((state) => {
