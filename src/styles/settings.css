@@ -1156,3 +1156,23 @@
 /* Windows 11: a disabled accent button turns neutral grey, not a washed-out accent. */
 .button-accent:disabled { opacity: 1; color: var(--ink-3); background: var(--subtle-pressed); border-color: transparent; }
 .plugin-badge-update { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }
+
+/* Colour pickers, Windows 11 style: rounded-square swatches, a check on the
+   chosen one, a custom well and an exact hex field. */
+.swatches { gap: 6px; }
+.swatch { width: 32px; height: 32px; border-radius: 6px; transition: transform var(--dur-1, .12s) var(--ease, ease), box-shadow var(--dur-1, .12s) var(--ease, ease); }
+.swatch:hover { transform: scale(1.06); }
+.swatch:active { transform: scale(0.96); }
+.swatch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.swatch[aria-pressed="true"], .swatch[data-active] { box-shadow: 0 0 0 2px var(--card, var(--page-bg)), 0 0 0 4px var(--ink); }
+.swatch[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; background: #fff; filter: drop-shadow(0 0 1px rgba(0,0,0,.6));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.swatch-custom { border-radius: 6px; }
+.swatch-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hex-field { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 6px; background: var(--field, var(--ctrl-fill)); border: 1px solid var(--control-stroke); border-bottom-color: var(--ctrl-strong-stroke, var(--control-stroke)); border-radius: var(--r-control); }
+.hex-field:focus-within { border-bottom: 2px solid var(--accent); }
+.hex-field[data-invalid] { border-bottom-color: var(--danger, #c42b1c); }
+.hex-chip { width: 18px; height: 18px; border-radius: 4px; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); }
+.hex-field input { width: 76px; padding: 0; color: var(--ink); font: inherit; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; text-transform: uppercase; background: transparent; border: 0; outline: none; }
+@media (prefers-reduced-motion: reduce) { .swatch { transition: none; } .swatch:hover, .swatch:active { transform: none; } }

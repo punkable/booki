@@ -36,8 +36,25 @@ function Swatches({ value, presets, onChange, label, caption, lead, children }) 
       </label>
       {children}
     </div>
-    {caption && <p className="swatch-caption">{caption}</p>}
+    <div className="swatch-foot">
+      <HexField value={current} onChange={onChange} />
+      {caption && <p className="swatch-caption">{caption}</p>}
+    </div>
   </div>;
+}
+
+/** Type or paste an exact colour. Applies once it is a valid #rrggbb. */
+function HexField({ value, onChange }) {
+  const valid = (v) => /^#?[0-9a-f]{6}$/i.test(v);
+  const [text, setText] = useState(valid(value) ? value.toUpperCase() : "");
+  useEffect(() => { if (valid(value)) setText(value.toUpperCase()); }, [value]);
+  const commit = (v) => { const hex = `#${v.replace(/^#/, "").toLowerCase()}`; if (valid(v) && hex !== value) onChange(hex); };
+  return <label className="hex-field" data-invalid={text && !valid(text) || undefined}>
+    <span className="hex-chip" style={{ "--sw": valid(text) ? `#${text.replace(/^#/, "")}` : "transparent" }} aria-hidden="true" />
+    <input type="text" spellCheck={false} maxLength={7} aria-label={t("ap.hex")} placeholder="#RRGGBB" value={text}
+      onChange={(e) => { setText(e.target.value); commit(e.target.value); }}
+      onBlur={() => { if (!valid(text) && valid(value)) setText(value.toUpperCase()); }} />
+  </label>;
 }
 
 /** Name of the picked colour: its palette name and Pantone reference, or
@@ -46,7 +63,8 @@ function paletteCaption(value) {
   const entry = paletteEntry(value);
   if (entry?.code) return `${entry.name} · PANTONE ${entry.code} · ${t("palette.year").replace("{year}", entry.year)}`;
   if (entry) return t("palette.brand");
-  return /^#[0-9a-f]{6}$/i.test(value || "") ? `${t("ap.custom")} · ${value.toUpperCase()}` : "";
+  // A custom colour is already spelled out in the hex field beside it.
+  return "";
 }
 
 /** The suggested palette first; a custom colour stays available. `sources`

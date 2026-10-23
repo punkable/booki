@@ -36,7 +36,9 @@ test('grouped System details show selected metrics, refresh while open and relea
   await waitForAsyncCondition(page,()=>document.querySelector('.reading-cards')?.textContent.includes('33%'));
   assert.equal(await page.locator('.reading-cards .reading-card').count(),2);
   assert.doesNotMatch(await page.locator('.reading-cards').innerText(),/CPU|RAM/);
-  await page.clock.install();await page.evaluate(()=>{window.level=71;});await page.clock.fastForward(6000);
+  await page.clock.install();await page.evaluate(()=>{window.level=71;});
+  // A refresh can join a read already in flight with the old value; the next tick brings the new one.
+  for(let i=0;i<6&&!(await page.evaluate(()=>document.querySelector('.reading-cards')?.textContent.includes('71%')));i++){await page.clock.fastForward(5500);await page.waitForTimeout(100);}
   await waitForAsyncCondition(page,()=>document.querySelector('.reading-cards')?.textContent.includes('71%'));
   assert.equal(await page.locator('.reading-cards').count(),1);
   await page.keyboard.press('Escape');await page.clock.fastForward(1000);

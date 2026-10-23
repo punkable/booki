@@ -37,8 +37,6 @@ const LEGACY_COLORS = {
   "#a8e6ef": "#a6e9ed", "#40c8e0": "#00b7c3", "#0b7f8f": "#038387",
   "#d1d1d6": "#d2d0ce", "#8e8e93": "#7a7574", "#3a3a3c": "#484644",
 };
-export const GROUP_COLORS = GROUP_PALETTE.flatMap(([name, shades]) => shades.map((hex, i) => [name, hex, i]));
-
 export function groupAppearance(item) {
   const style = item?.style && typeof item.style === "object" ? item.style : {};
   const saved = /^#[0-9a-fA-F]{6}$/.test(style.color || "") ? style.color.toLowerCase() : "";

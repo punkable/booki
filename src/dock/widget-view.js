@@ -20,8 +20,6 @@ import { reduceMotion } from "./motion.js";
 
 export const RING_R = 15.5; // SVG viewBox 0 0 36 36
 export const RING_C = 2 * Math.PI * RING_R;
-export const BATTERY_LOW = "#e5484d";
-
 /** Transport glyphs for the media card — filled, rounded, Fluent-like SVGs. */
 export const MEDIA_SVG = {
   prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',

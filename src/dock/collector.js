@@ -7,8 +7,6 @@ import { setMetric, setText } from "./widget-view.js";
 import { setTileLabel } from "./tooltip.js";
 import { createDownloadQueue } from "./download-queue.js";
 import { notify } from "./notices.js";
-import { collectorPreferences } from "../collector-preferences.js";
-import { S } from "./state.js";
 
 export const download = { state: "idle", percent: 0, title: "", path: "", error: "" };
 const listeners = new Set();
@@ -50,11 +48,6 @@ export function paintDownloads() {
 }
 export function onDownloadChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 onDownloadEvent((event) => collectorQueue.progress(event));
-
-export function startDownload(url, format, directory = null) {
-  const preferences = collectorPreferences(S.cfg);
-  return collectorQueue.enqueue([{ url, format, directory: directory || preferences.directory || null, quality: preferences.quality }])[0];
-}
 
 /** What a link most likely is, so only video pages ask Video or Audio:
  *  "file" (a direct link to a document, archive, image…), "gallery" (image
