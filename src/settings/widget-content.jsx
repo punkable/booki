@@ -85,9 +85,9 @@ export function WidgetContent({ item, cfg, set, patch }) {
     {widget === "devices" && <DeviceSelection style={style} patch={patch} />}
     {["media", "battery", "devices", "ai"].includes(widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!style.hideWhenUnavailable} onChange={(hideWhenUnavailable) => patch({ hideWhenUnavailable })} />}
     {widget === "ai" && <>
-      <Row label={t("widgetFlow.provider")}><Select label={t("widgetFlow.provider")} value={style.provider || "auto"} onChange={(value) => patch({ provider: value === "auto" ? null : value })} options={[{ value: "auto", label: t("widgetFlow.allProviders") }, ...["claude", "codex", "chatgpt"].map((value) => ({ value, label: { claude: "Claude", codex: "Codex", chatgpt: "ChatGPT" }[value] }))]} /></Row>
+      <Row label={t("widgetFlow.provider")}><Select label={t("widgetFlow.provider")} value={style.provider || "auto"} onChange={(value) => patch({ provider: value === "auto" ? null : value })} options={[{ value: "auto", label: t("widgetFlow.allProviders") }, ...["claude", "codex", "cursor", "opencode"].map((value) => ({ value, label: { claude: "Claude", codex: "Codex", chatgpt: "ChatGPT", cursor: "Cursor", opencode: "OpenCode" }[value] }))]} /></Row>
       {!style.provider && <Toggle label={t("widgetFlow.rotate")} checked={style.rotate !== false} onChange={(rotate) => patch({ rotate })} />}
-      <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p>
+      <p className="inline-note"><Icon name="info" />{t("panelFlow.aiSources")}</p><p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p>
       <Toggle label={t("be.notchAgents")} hint={t("widgetFlow.sharedNotch")} checked={cfg.notchAgents !== false} onChange={(notchAgents) => set({ notchAgents })} />
     </>}
     {widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(scrollVolume) => patch({ scrollVolume })} />}

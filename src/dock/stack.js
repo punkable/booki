@@ -682,7 +682,7 @@ export function closeStack() {
   S.stackItemId = null;
   S.pendingReplace = null;
   document.body.classList.remove("stack-open");
-  stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode", "group-stack");
+  stackEl.classList.remove("open", "just-opened", "add-mode", "launcher-mode", "group-stack", "clipboard-stack");
   delete stackEl.dataset.id;
   reportDockMaterial(); // its blur goes with it, before the window shrinks
   cacheWidgetEls();

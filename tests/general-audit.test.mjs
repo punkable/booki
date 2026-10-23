@@ -162,6 +162,7 @@ test('plugin installation waits for its terms preference to save and offers a re
       return old(cmd,args);
     };` });
   await page.locator('[data-id=devices]').click();
+  await page.locator('.device-offer > summary').click();
   await page.getByRole('checkbox', { name: /I accept the plugin terms/ }).check();
   await page.getByRole('button', { name: 'Turn on', exact: true }).click();
   await page.locator('.system-widget-panel .plugin-action-error').waitFor();

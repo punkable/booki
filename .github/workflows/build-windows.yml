@@ -4,12 +4,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      edition:
-        description: "Build the official app or the isolated Booki Dev edition (no publishing)"
-        type: choice
-        options: [official, dev]
-        default: official
 permissions:
   contents: read
 concurrency:
@@ -58,27 +52,23 @@ jobs:
         if: matrix.arch == 'x64'
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --target ${{ matrix.target }}
       - run: npm ci
-      # PRs (including forks) must build without production signing secrets.
       - name: Remove stale bundle outputs from the build cache
         shell: pwsh
         run: |
           $bundlePath = Join-Path $PWD "src-tauri/target/${{ matrix.target }}/release/bundle"
           if (Test-Path $bundlePath) { Remove-Item -LiteralPath $bundlePath -Recurse -Force }
+      # PRs (including forks) must build without production signing secrets.
       - name: Package without updater signatures
-        if: inputs.edition != 'dev'
         shell: bash
         run: >-
           npm run tauri:build -- --target ${{ matrix.target }}
           --bundles ${{ matrix.bundles }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
           -- --locked
-      - name: Package isolated Booki Dev without updater signatures
-        if: inputs.edition == 'dev'
-        run: npm run tauri:build:dev -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} -- --locked
       - name: Validate architecture bundle set
-        run: node scripts/check-bundles.mjs ${{ matrix.arch }} ${{ inputs.edition || 'official' }}
+        run: node scripts/check-bundles.mjs ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ inputs.edition == 'dev' && 'booki-dev-windows' || 'booki-windows' }}-${{ matrix.arch }}
+          name: booki-windows-${{ matrix.arch }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi

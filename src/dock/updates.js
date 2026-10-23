@@ -3,29 +3,13 @@
 import { dock as dockApi, invoke } from "../api.js";
 import { checkForUpdate } from "../update.js";
 import { t } from "../i18n.js";
-import { placeBesideBar } from "./placement.js";
-import { S } from "./state.js";
+import { placeDockNotices } from "./notice-layout.js";
+import { showErrorToast } from "./undo-toast.js";
 import { quiet } from "./notices.js";
-import { dockEl } from "./dom.js";
 
 // ─────────────────── Update check ───────────────────
 
-// Keep the pill centered over the BAR (not the window — the window grows for
-// popovers/flyouts, which would leave a fixed-centered pill visibly off-axis).
-export function placeUpdatePill() {
-  const pill = document.getElementById("update-pill");
-  if (!pill || pill.classList.contains("hidden")) return;
-  pill.style.left = pill.style.right = pill.style.top = pill.style.bottom = "";
-  const { left, top } = placeBesideBar({
-    bar: dockEl.getBoundingClientRect(),
-    box: { width: pill.offsetWidth, height: pill.offsetHeight },
-    edge: S.cfg.edge || "bottom",
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    gap: 8,
-  });
-  pill.style.left = `${left}px`;
-  pill.style.top = `${top}px`;
-}
+export const placeUpdatePill = placeDockNotices;
 
 let toldVersion = "";
 let waitingUpdate = null;
@@ -46,12 +30,14 @@ function showUpdate(update) {
   toldVersion = version;
   waitingUpdate = null;
   if (updateRetry) { clearInterval(updateRetry); updateRetry = 0; }
-  pill.textContent = t("toast.updateBody").replace("{version}", () => version);
+  pill.dataset.version = version;
+  pill.querySelector("[data-update-label]").textContent = t("toast.updateBody").replace("{version}", () => version);
   pill.classList.remove("hidden");
   placeUpdatePill();
   if (!pill.dataset.bound) {
     pill.dataset.bound = "1";
-    pill.addEventListener("click", () => dockApi.openSettingsTab("system"));
+    pill.querySelector("[data-update-open]").addEventListener("click", () => dockApi.openSettingsTab("system").catch(() => showErrorToast(t("overhaul.failed"))));
+    pill.querySelector("[data-update-dismiss]").addEventListener("click", () => { pill.classList.add("hidden"); placeDockNotices(); });
   }
 }
 

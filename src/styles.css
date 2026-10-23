@@ -116,7 +116,7 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
   --bg: var(--glass-tint, var(--surface-tint));
   --layer-strong: var(--glass-tint, var(--surface-tint));
   --focus-ring: var(--ink);
-  --danger-text: light-dark(#c42b1c, #ff99a4);
+  --danger-text: light-dark(#9f1239, #ffb6bf);
   color: var(--ink);
 }
 :root[data-high-contrast] :is(.menu, .stack, .productivity-panel, .note-editor, .trash-pop) {
@@ -2837,3 +2837,34 @@ body.notch-body.toast.toast-actionable .notch-toast { display: grid; grid-templa
 
 .widget-hub-empty { grid-column: 1 / -1; color: var(--ink-2); font: 13px/1.5 var(--font); }
 body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-workspace).is-closing { opacity: 0; transition: none; }
+
+/* Notices share one measured lane outside the live dock, on every edge. */
+.update-pill { display: flex; align-items: stretch; padding: 0; color: var(--ink); background: var(--layer-strong); border: 1px solid var(--stroke-light); border-radius: var(--r-overlay); overflow: auto; box-sizing: border-box; }
+.update-pill button { color: inherit; background: transparent; border: 0; padding: 9px 12px; font: inherit; cursor: pointer; }
+.update-pill [data-update-open] { min-width: 0; overflow-wrap: anywhere; text-align: start; border-inline-start: 3px solid var(--accent); }
+.update-pill [data-update-dismiss] { flex: none; font-size: 18px; }
+.update-pill button:hover { background: var(--hover); }
+.undo-toast { box-sizing: border-box; overflow: auto; scrollbar-width: thin; }
+.undo-toast:has(.notice-copy) { align-content: start; }
+.undo-toast .notice-copy strong, .undo-toast .notice-copy small { white-space: normal; overflow-wrap: anywhere; max-width: none; }
+
+/* Compact, consistent flyout tools: content first, help on demand. */
+.clip-guide[hidden] { display: none; }
+.stack-head { gap: 8px; }
+.stack-head .stack-title { min-width: 0; flex: 1; }
+.stack-head .stack-close { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }
+.group-toolbar { gap: 8px; padding: 0 0 10px; }
+.group-search-field, .group-view-field { min-width: 0; display: flex; align-items: center; gap: 7px; border: 1px solid var(--stroke); border-radius: 9px; padding-inline: 9px; background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.group-search-field { flex: 1; }
+.group-search-field > span, .group-view-field > span { display: flex; color: var(--ink-2); }
+.group-toolbar svg { width: 14px; height: 14px; flex: none; }
+.group-toolbar .group-search-field input, .group-toolbar .group-view-field select { min-width: 0; width: 100%; height: 34px; margin: 0; padding: 0; color: var(--ink); border: 0; background: transparent; box-shadow: none; font: inherit; font-size: 12px; }
+.group-search-field:focus-within, .group-view-field:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.group-toolbar .group-view-field select { max-width: 136px; cursor: pointer; }
+.group-toolbar select option { color: var(--ink); background: var(--layer-strong); }
+.group-toolbar :is(input, select):focus-visible { outline: none; }
+.clipboard-stack { display: flex; flex-direction: column; overflow: hidden; }
+.clipboard-stack > :not(.clip-list) { flex: none; }
+.clipboard-stack .clip-guide { max-height: 120px; overflow-y: auto; }
+.clipboard-stack .clip-list { min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.clipboard-stack .clip-row { flex-shrink: 0; }

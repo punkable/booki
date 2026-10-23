@@ -4,7 +4,7 @@ import { dock as api, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
-import { systemMetrics, metricLabel } from "../widgets-meta.js";
+import { systemMetrics, metricLabel, WIDGET_GLYPHS } from "../widgets-meta.js";
 import { fmtRate } from "./widget-view.js";
 import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
@@ -27,7 +27,9 @@ export function buildSystemPanel(item, { close }) {
   const head = document.createElement("div"); head.className = "productivity-head";
   const done = document.createElement("button"); done.type = "button"; done.className = "stack-close";
   done.innerHTML = icon("x"); done.setAttribute("aria-label", t("stack.close")); done.addEventListener("click", close);
-  head.append(text("strong", t(`w.${item.widget}`)), done); panel.append(head);
+  const heading = document.createElement("div"); heading.className = "widget-panel-title";
+  const headingIcon = text("span", "", "widget-panel-icon"); headingIcon.innerHTML = icon(WIDGET_GLYPHS[item.widget] || "sparkles");
+  heading.append(headingIcon, text("strong", t(`w.${item.widget}`))); head.append(heading, done); panel.append(head);
   const body = document.createElement("div"); body.className = "system-widget-sections"; panel.append(body);
   const button = (container, label, action) => {
     const b = text("button", label, "productivity-button"); b.type = "button";
@@ -138,7 +140,7 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
-    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
+    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
     const clock = (s) => (s > 0 ? new Date(s * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "");
     const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
@@ -151,26 +153,27 @@ export function buildSystemPanel(item, { close }) {
         const sub = t("w.aiWeekTokens").replace("{n}", () => tokens(p.week_tokens));
         if (windows.length) {
           return {
-            name: p.name, glyph: icons[p.id] || "sparkles", sub,
+            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: `${Math.round(100 - Math.max(...windows.map((window) => window.percent)))}% ${t("w.aiRemaining")}`,
             tone: usageTone(Math.max(0, ...windows.map((w) => w.percent))),
-            bars: windows.map((w) => ({ label: withReset(windowName(w.label), w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
+            bars: windows.map((w) => ({ label: withReset(`${windowName(w.label)} · ${t("panelFlow.used")}`, w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
           };
         }
         if (p.block) {
-          // Local logs hold no plan limit: the bar is time elapsed in the
-          // 5-hour block, the value is the tokens spent in it.
+          // Local consumption never masquerades as a subscription allowance.
           return {
-            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: tokens(p.block.tokens),
-            bars: [{ label: withReset(t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent)), p.block.resets_at), percent: p.block.elapsed_percent, tone: "good" }],
+            name: p.name, glyph: icons[p.id] || "sparkles", sub: withReset(sub, p.block.resets_at), value: `~${tokens(p.block.tokens)}`, error: t("w.aiQuotaUnknown"), bars: [],
           };
         }
-        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.week_tokens > 0 ? sub : "", error: t("w.aiIdle"), bars: [] };
+        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.detected === false ? t("panelFlow.notDetected") : p.week_tokens > 0 ? sub : t("panelFlow.detected"), error: t("w.aiQuotaUnknown"), bars: [] };
       }));
-      const ids = new Set(all.map((p) => p.id));
-      if (!item.style?.provider && !ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
-      if (!item.style?.provider && !ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
-      ai.append(text("p", t("w.aiLocal")));
+
     });
+  }
+  if (item.widget === "ai") {
+    const actions = document.createElement("div"); actions.className = "plugin-panel-actions"; body.append(actions);
+    button(actions, t("plugins.refresh"), () => aiReading.refresh());
+    const guide = document.createElement("details"); guide.className = "widget-diagnostics";
+    guide.append(text("summary", t("panelFlow.aiDetection")), text("p", t("panelFlow.aiSources")), text("p", t("w.aiLocal"))); body.append(guide);
   }
   if (item.widget === "volume") {
     const master = section(t("w.volume"));
@@ -202,7 +205,7 @@ export function buildSystemPanel(item, { close }) {
       const shown = own ? [matchDevice(values, own, item.style?.deviceKind)].filter(Boolean) : values;
       if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
       cards(devices, shown.map((d) => ({
-        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
+        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : t("panelFlow.deviceReady"), tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
         value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
         details: [[t("refine.source"), ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[d.source] || d.source || t("plugins.noData")], [t("refine.readAt"), deviceReading.checkedAt ? new Date(deviceReading.checkedAt).toLocaleTimeString(curLang(), { hour: "2-digit", minute: "2-digit" }) : "—"]],
       })));
@@ -349,10 +352,10 @@ export function buildSystemPanel(item, { close }) {
   // Devices: support for USB headsets is a one-line offer while it is off,
   // and invisible once it is on. No plugin name, no description.
   if (item.widget === "devices") {
-    const offer = document.createElement("div"); offer.className = "device-offer";
+    const offer = document.createElement("details"); offer.className = "device-offer widget-diagnostics";
     api.pluginStatus("headsetcontrol").then((status) => {
       if (disposed || status?.installed) return;
-      offer.append(text("span", t("dev.missingHeadset")));
+      offer.append(text("summary", t("dev.missingHeadset")));
       installButton(offer, t("dev.enable"), "headsetcontrol", () => { offer.remove(); deviceReading.refresh().catch(() => {}); });
       body.append(offer);
     }).catch(() => {});

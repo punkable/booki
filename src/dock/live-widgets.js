@@ -253,6 +253,7 @@ const resetsText = (seconds) => { const r = resetClock(seconds); return r ? ` ·
 const tokensText = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
 /** Every hint line for one provider. */
 function aiHintLines(p) {
+  if (p.detected === false) return [`${p.name} · ${t("panelFlow.notDetected")}`];
   const week = `${p.name} · ${t("w.aiWeekTokens").replace("{n}", () => tokensText(p.week_tokens))}`;
   if ((p.windows || []).length) {
     return p.windows.map((w) => `${p.name} ${windowName(w.label)} · ${Math.round(w.percent)}%${resetsText(w.resets_at)}`);
@@ -277,15 +278,15 @@ onAgentActivity(({ provider, state }) => {
   aiTurn = 0;
   if (aiReading.last) paintAi(aiReading.last);
 });
-const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
+const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode" };
 function paintAi(providers) {
   eachWidget("ai", (el) => {
     const style = findWidgetPin(el.dataset.id)?.style || {};
-    const available = style.provider ? providers.filter((provider) => provider.id === style.provider) : providers;
+    const available = style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false);
     const urgent = available.filter((provider) => ["waiting", "error"].includes(aiStages.get(provider.id)));
     const working = available.filter((provider) => aiStages.get(provider.id) === "working");
     const shown = urgent.length ? urgent : working.length ? working : available;
-    setWidgetAvailable(el, shown.length > 0);
+    setWidgetAvailable(el, shown.some((provider) => provider.detected !== false));
     const hint = available.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
     if (!shown.length) {
       resetGlyph(el, "ai");
@@ -294,7 +295,7 @@ function paintAi(providers) {
       return;
     }
     const current = shown[(style.rotate === false ? 0 : aiTurn) % shown.length];
-    el.style.setProperty("--ai-brand", current.id === "claude" ? "#d97757" : "#10a37f");
+    el.style.setProperty("--ai-brand", ({ claude: "#d97757", cursor: "#c6ccd8", opencode: "#b3a1ff" })[current.id] || "#10a37f");
     setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
     setTileLabel(el, hint);
     let tone = "good";
@@ -306,7 +307,7 @@ function paintAi(providers) {
       // Local Claude logs have token counts, not the subscription allowance.
       // An elapsed-time ring must never masquerade as remaining quota.
       const recorded = current.block?.tokens || current.week_tokens || 0;
-      setText(el, `${current.name} · ${t("refine.estimate")}`, recorded > 0 ? `~${tokenText(recorded)}` : "?");
+      setText(el, recorded > 0 ? `${current.name} · ${t("refine.estimate")}` : current.name, recorded > 0 ? `~${tokenText(recorded)}` : "?");
     }
     el.dataset.tone = tone;
     el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));

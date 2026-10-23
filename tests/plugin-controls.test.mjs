@@ -43,6 +43,7 @@ test("an unavailable device provider installs only after its inline button is pr
       };`,
   });
   await page.locator('.tile[data-id="devices"]').click();
+  await page.locator(".device-offer > summary").click();
   await page.getByRole("button", { name: "Turn on", exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.__pluginInstalls), []);
   assert.equal(await page.getByRole("button", { name: "Turn on", exact: true }).isDisabled(), true, "nothing installs before the terms are accepted");

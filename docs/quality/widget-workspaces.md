@@ -1,6 +1,6 @@
 # Widget content and settings workspaces
 
-Development after 0.95.1. These changes are grouped on one branch for local Dev testing; this document does not announce a public release.
+Widget interaction and settings changes in 0.96.0, grouped with notification and Windows work-area corrections in one update.
 
 ## Interaction contract
 
@@ -34,8 +34,8 @@ Development after 0.95.1. These changes are grouped on one branch for local Dev 
 
 Explicit capability mapping: HeadsetControl → Devices, LibreHardwareMonitor → System, yt-dlp/FFmpeg/gallery-dl → Collector, OpenRGB → Lighting, winget → Updates. Existing widgets anywhere in the pinned tree get Configure, not another Add button. Adding a widget names the actual widget; unrelated plugins never say Add Collector. Installation from Settings waits for the terms acceptance write to finish successfully.
 
-## Dev delivery and verification limits
+## Delivery and verification limits
 
-The existing Windows build workflow accepts `edition=dev` on manual dispatch. It runs the same checks and uses `tauri.dev.conf.json`, the Dev identifier/icons/hooks and disabled updater artifact creation. Dev artifacts are separately named and validated; the production release workflow is not invoked. Installers must be run on the user's Windows PC to update that local Dev installation; this Linux workspace cannot install software on that PC.
+This update is intended for Booki main and the official signed update feed. CI checks the official installer set and both configured MSI languages.
 
-Browser tests use native-bridge fixtures, not the user's data or real plugin downloads. Real Windows hardware, compositor behavior and installed upgrades still require a Windows check. The public 0.95.1 release remains the stable baseline until a new release is explicitly requested.
+Browser tests use native-bridge fixtures, not the user's data or real plugin downloads. Native tests use isolated fixtures for local AI discovery. Real Windows hardware, compositor behavior and installed upgrades still require a Windows check. Publication is verified separately against the GitHub release and signed updater manifest.

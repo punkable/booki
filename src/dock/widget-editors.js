@@ -13,7 +13,7 @@ import { placeBesideBar } from "./placement.js";
 import { setPreviewSubText } from "./widget-view.js";
 import { S } from "./state.js";
 import { findPinnedById, widgetLabel, findWidgetPin } from "./helpers.js";
-import { dockEl } from "./dom.js";
+import { dockEl, liveDockRect } from "./dom.js";
 import { scheduleHitReport } from "./hit-regions.js";
 import { reframe, applyFrame } from "./frame.js";
 import { eachWidget, tickProductivity, cacheWidgetEls, syncPolls } from "./live-widgets.js";
@@ -53,7 +53,7 @@ export function openWidget(item, tile = dockEl) {
   if (item.widget === "clipboard") {
     closeProductivityPanel();
     if (S.stackItemId) closeStack();
-    return toggleClipboardStack(tile);
+    return toggleClipboardStack(tile, item.id);
   }
   return openSystemPanel(item, tile);
 }
@@ -91,10 +91,19 @@ export function openWidgetHub() {
   const open = (pin) => openWidget(pin, dockEl);
   mountWidgetPanel(item, dockEl, buildWidgetHub(S.cfg.pinned, { open, close: closeProductivityPanel, settings: () => dockApi.openSettingsTab("widgets") }));
 }
+function placeWidgetPanel(panel, tile) {
+  const bar = liveDockRect(), anchor = tile.getBoundingClientRect(), edge = S.cfg.edge || "bottom", gap = 10, pad = 8;
+  const vertical = edge === "left" || edge === "right";
+  const height = vertical ? innerHeight - pad * 2 : edge === "top" ? innerHeight - bar.bottom - gap - pad : bar.top - gap - pad;
+  const width = !vertical ? innerWidth - pad * 2 : edge === "left" ? innerWidth - bar.right - gap - pad : bar.left - gap - pad;
+  panel.style.maxHeight = `${Math.max(1, height)}px`; panel.style.maxWidth = `${Math.max(1, width)}px`;
+  const pos = placeBesideBar({ bar, box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge, viewport: { width: innerWidth, height: innerHeight }, along: vertical ? anchor.top + anchor.height / 2 : anchor.left + anchor.width / 2, inside: bar, gap, pad });
+  panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
+}
 function mountWidgetPanel(item, tile, panel) {
   // One flyout at a time: a widget panel replaces an open folder or menu.
   closeStack(); closeMenu();
-  panel._opener = tile; panel._itemId = item.id;
+  panel._opener = tile; panel._itemId = item.id; panel.tabIndex = -1;
   if (item.id !== "__widgets") {
     const settings = document.createElement("button"); settings.type = "button"; settings.className = "stack-close widget-settings-action";
     settings.innerHTML = icon("settings");
@@ -107,13 +116,12 @@ function mountWidgetPanel(item, tile, panel) {
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; cacheWidgetEls(); syncPolls(); applyFrame();
   const place = () => {
     if (!panel.isConnected) return;
-    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
-    panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
+    placeWidgetPanel(panel, tile);
   };
   const dispose = panel.dispose;
   const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
+  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); const search = item.widget === "weather" ? panel.querySelector("input") : null; if (search?.offsetParent) search.focus(); else panel.focus({ preventScroll: true }); });
 }
 
 // Notes use a serialized autosave and keep their draft visible on failure.
@@ -213,8 +221,7 @@ export async function editNote(item) {
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
-    panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
+    placeWidgetPanel(panel, tile);
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };

@@ -415,6 +415,7 @@ struct Watch {
     provider: Provider,
     path: Option<PathBuf>,
     offset: u64,
+    modified: Option<std::time::SystemTime>,
     carry: Vec<u8>,
     machine: Machine,
     reported: State,
@@ -427,6 +428,7 @@ impl Watch {
             provider,
             path: None,
             offset: 0,
+            modified: None,
             carry: Vec::new(),
             machine: Machine::new(provider),
             reported: State::Idle,
@@ -440,18 +442,17 @@ impl Watch {
                 .into_iter()
                 .map(|d| d.join("projects"))
                 .collect(),
-            Provider::Codex => crate::ai_usage::codex_home()
-                .map(|h| vec![h.join("sessions")])
-                .unwrap_or_default(),
+            Provider::Codex => crate::ai_usage::codex_homes()
+                .into_iter()
+                .map(|home| home.join("sessions"))
+                .collect(),
             Provider::Cursor => cursor_roots(),
             // The database only. account.json, auth.json and mcp-auth.json
             // are never named here.
-            Provider::OpenCode => dirs::home_dir()
-                .map(|h| {
-                    let base = h.join(".local").join("share").join("opencode");
-                    vec![base.join("opencode.db"), base.join("opencode.db-wal")]
-                })
-                .unwrap_or_default(),
+            Provider::OpenCode => crate::ai_usage::opencode_data_dirs()
+                .into_iter()
+                .flat_map(|base| [base.join("opencode.db"), base.join("opencode.db-wal")])
+                .collect(),
             Provider::Gemini => dirs::home_dir()
                 .map(|h| vec![h.join(".gemini").join("tmp")])
                 .unwrap_or_default(),
@@ -503,6 +504,18 @@ impl Watch {
                 best = Some((path, modified));
             }
         }
+        let legacy: Vec<_> = crate::ai_usage::opencode_data_dirs()
+            .into_iter()
+            .flat_map(|base| [base.join("storage/message"), base.join("storage/part")])
+            .collect();
+        if let Some((path, modified)) = newest_session(&legacy) {
+            if best
+                .as_ref()
+                .map_or(true, |(_, previous)| modified > *previous)
+            {
+                best = Some((path, modified));
+            }
+        }
         let Some((newest, _)) = best else {
             return;
         };
@@ -514,6 +527,10 @@ impl Watch {
         self.path = Some(newest);
         if switching {
             self.offset = len;
+            self.modified = std::fs::metadata(self.path.as_ref().unwrap())
+                .ok()
+                .and_then(|meta| meta.modified().ok());
+            self.machine.note_growth(now);
             return;
         }
         self.seed(now);
@@ -538,13 +555,13 @@ impl Watch {
         self.carry.clear();
         self.offset = 0;
         if self.provider.size_only() {
-            // Remember the current size and ignore everything already written.
-            self.offset = self
+            // Remember current metadata and ignore everything already written.
+            let metadata = self
                 .path
                 .as_ref()
-                .and_then(|p| std::fs::metadata(p).ok())
-                .map(|m| m.len())
-                .unwrap_or(0);
+                .and_then(|path| std::fs::metadata(path).ok());
+            self.offset = metadata.as_ref().map_or(0, |meta| meta.len());
+            self.modified = metadata.and_then(|meta| meta.modified().ok());
             return;
         }
         let Some(path) = self.path.clone() else {
@@ -605,7 +622,7 @@ impl Watch {
         self.consume(bytes, now);
     }
 
-    /// Cursor: compare the file length. Never open it.
+    /// Metadata-only providers: compare length and modification time. Never open it.
     fn poll_size(&mut self, now: i64) {
         let Some(path) = self.path.clone() else {
             return;
@@ -614,12 +631,14 @@ impl Watch {
             return;
         };
         let len = meta.len();
-        if len < self.offset {
-            self.offset = len;
-            return;
-        }
-        if len > self.offset {
-            self.offset = len;
+        let modified = meta.modified().ok();
+        // SQLite/WAL and older JSON storage can be rewritten in place. A
+        // changed timestamp is activity even when the byte length is equal.
+        let changed = len != self.offset
+            || modified.is_some_and(|time| self.modified.is_some_and(|previous| time > previous));
+        self.offset = len;
+        self.modified = modified;
+        if changed {
             self.machine.note_growth(now);
             return;
         }
@@ -711,13 +730,14 @@ fn cursor_project_roots(projects: &std::path::Path) -> Vec<PathBuf> {
 }
 
 fn cursor_roots() -> Vec<PathBuf> {
-    let Some(home) = dirs::home_dir() else {
-        return Vec::new();
-    };
-    let base = home.join(".cursor");
-    let mut roots = cursor_project_roots(&base.join("projects"));
-    roots.push(base.join("chats"));
-    roots
+    crate::ai_usage::cursor_data_dirs()
+        .into_iter()
+        .flat_map(|base| {
+            let mut roots = cursor_project_roots(&base.join("projects"));
+            roots.push(base.join("chats"));
+            roots
+        })
+        .collect()
 }
 
 fn cline_roots() -> Vec<PathBuf> {
@@ -1127,5 +1147,22 @@ mod tests {
         let found = newest_session(std::slice::from_ref(&dir)).map(|(p, _)| p);
         assert_eq!(found.unwrap().file_name().unwrap(), "chats.json");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn size_watch_detects_equal_length_database_writes_without_reading_content() {
+        let path =
+            std::env::temp_dir().join(format!("booki-agent-mtime-{}.db", std::process::id()));
+        std::fs::write(&path, b"fixture database bytes").unwrap();
+        let mut watch = Watch::new(Provider::OpenCode);
+        watch.path = Some(path.clone());
+        watch.seed(1000);
+        // Simulate an earlier metadata observation, with the same byte length.
+        watch.modified = Some(std::time::UNIX_EPOCH);
+        watch.poll_size(2000);
+        assert_eq!(watch.machine.state(2001), State::Working);
+        let written = watch.machine.last_write;
+        watch.poll_size(3000);
+        assert_eq!(watch.machine.last_write, written);
+        std::fs::remove_file(path).unwrap();
     }
 }

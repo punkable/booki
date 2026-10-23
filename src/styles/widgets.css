@@ -629,3 +629,23 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .productivity-clock time { font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 600; }
 .productivity-clock p { margin: 5px 0; }
 .widget-provider-details > summary, .weather-location-settings > summary { padding: 10px 0; cursor: pointer; }
+
+/* Detail surfaces use a quiet shared header and scroll only their contents. */
+.system-widget-panel { display: flex; flex-direction: column; overflow: hidden; }
+.system-widget-panel .productivity-head { flex: none; gap: 6px; margin-bottom: 0; padding-bottom: 10px; }
+.widget-panel-title { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+.widget-panel-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.widget-panel-icon svg { width: 16px; height: 16px; }
+.system-widget-sections { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-top: 12px; }
+.system-widget-panel .stack-close { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }
+.system-widget-panel .plugin-panel-actions { gap: 7px; padding-top: 8px; }
+.reading-card-top { flex-wrap: wrap; }
+.reading-card-names { flex-basis: 100px; }
+.reading-card-note { white-space: normal; overflow-wrap: anywhere; }
+.widget-diagnostics { margin-top: 12px; border-top: 1px solid var(--stroke); padding-top: 10px; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.widget-diagnostics summary { cursor: pointer; font-weight: 600; }
+.system-widget-panel { width: min(380px, calc(100vw - 24px)); }
+.reading-card > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin-inline: 3px; opacity: .7; }
+.reading-card[open] > summary::after { transform: rotate(225deg); }
+.reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value,
+.reading-card[data-tone="low"] .reading-card-names small, .reading-card[data-tone="critical"] .reading-card-names small { color: var(--danger-text); }
