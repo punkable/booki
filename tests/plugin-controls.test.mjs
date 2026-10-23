@@ -129,15 +129,15 @@ test("Updates counts apps with an update and updates them all from its panel", a
   assert.deepEqual(errors, []); await page.close();
 });
 
-test("a click on the volume card mutes; its panel is one right-click away", async () => {
+test("a click on the volume card opens its mixer without changing mute", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [pin("volume")] }),
     initScript: `window.__vol=[];const invoke=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==="volume_info"?Promise.resolve([40,false]):cmd==="volume_set_state"?(window.__vol.push(args),Promise.resolve(true)):invoke(cmd,args);`,
   });
   await page.locator('.tile[data-id="volume"]').click();
-  await waitForAsyncCondition(page, () => window.__vol.length === 1);
-  assert.deepEqual(await page.evaluate(() => window.__vol[0]), { percent: 40, muted: true });
-  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 0);
+  await page.locator(".system-widget-panel.is-open").waitFor();
+  assert.deepEqual(await page.evaluate(() => window.__vol), []);
+  assert.equal(await page.locator(".system-widget-panel:not(.is-closing)").count(), 1);
   assert.deepEqual(errors, []); await page.close();
 });
 

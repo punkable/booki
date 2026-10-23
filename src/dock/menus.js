@@ -18,7 +18,7 @@ import { groupAppearance } from "../group-style.js";
 import { libGlyphSVG } from "../icon-library.js";
 import { buildGroupCustomizer } from "./group-customizer.js";
 import { paintedLook } from "../system-look.js";
-import { openProductivity, openSystemPanel } from "./widget-editors.js";
+import { openWidget, openSystemPanel } from "./widget-editors.js";
 import {
   promptRename,
   relocateShortcut,
@@ -82,7 +82,11 @@ export function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
-  if (item.kind === "widget") { if (["media", "volume"].includes(item.widget)) add("sliders", t("m.details"), () => openSystemPanel(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); add("sliders", t("m.settings"), () => dockApi.openWidgetSettings(item.id)); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
+  if (item.kind === "widget") {
+    add("app", t("m.open"), () => openWidget(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`) || dockEl));
+    if (["media", "volume"].includes(item.widget)) add("sliders", t("m.details"), () => openSystemPanel(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`) || dockEl));
+    add("settings", t("m.settings"), () => dockApi.openWidgetSettings(item.id));
+  }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
   if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
   if (wins.length === 1) add("x", t("m.closeWindow"), () => dockApi.closeWindow(Number(wins[0].hwnd)));
@@ -264,8 +268,9 @@ function addStyleRow() {
 export function openFileMenu(e, item, parent, openFolder) {
   e.preventDefault(); e.stopPropagation(); ++S.menuGeneration;
   resetMenu();
-  addMenuHead(item.name, item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
+  addMenuHead(item.name || (item.kind === "widget" ? widgetLabel(item.widget) : ""), item.kind === "widget" ? widgetLabel(item.widget) : item.is_dir || item.kind === "folder" ? t("m.folder") : t("m.app"));
   const { add, sep } = menuActions(ctxMenu, closeMenu);
+  if (item.kind === "widget") add("app", t("m.open"), () => openWidget(item, dockEl.querySelector(`[data-id="${parent?.id}"]`) || dockEl));
   if (item.kind !== "widget") add("external", t("m.open"), () => { if (item.is_dir && openFolder) return openFolder(); if (item.kind === "action") return dockApi.openSettings(); return dockApi.launch(item.path, item.args || []); });
   if (item.path) {
     add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));

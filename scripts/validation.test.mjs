@@ -44,3 +44,19 @@ test("missing updater signature blocks release preparation", () => {
     assert.throws(() => execFileSync(process.execPath, [script], { cwd: dir, stdio: "pipe" }), /Missing/);
   } finally { cleanup(dir); }
 });
+
+test("Dev and official bundle validation rejects installers from the other edition", () => {
+  const { dir, version } = fixture();
+  const validator = join(dirname(script), 'check-bundles.mjs');
+  try {
+    execFileSync(process.execPath, [validator, 'x64', 'official'], { cwd: dir });
+    assert.throws(() => execFileSync(process.execPath, [validator, 'x64', 'dev'], { cwd: dir, stdio: 'pipe' }));
+    for (const [folder, suffix] of [['nsis', '_x64-setup.exe'], ['msi', '_x64_en-US.msi']]) {
+      const target=join(dir,'src-tauri','target','x86_64-pc-windows-msvc','release','bundle',folder);
+      rmSync(join(target,`Booki_${version}${suffix}`));
+      writeFileSync(join(target,`Booki Dev_${version}${suffix}`),'dev fixture');
+    }
+    execFileSync(process.execPath, [validator, 'x64', 'dev'], { cwd: dir });
+    assert.throws(() => execFileSync(process.execPath, [validator, 'x64', 'official'], { cwd: dir, stdio: 'pipe' }));
+  } finally { cleanup(dir); }
+});

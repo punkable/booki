@@ -211,7 +211,7 @@ dockEl.addEventListener("dblclick", (e) => {
     dockApi.openSettings(); // double-click the empty bar → Settings
     return;
   }
-  if (tile.classList.contains("widget")) dockApi.openWidgetSettings(tile.dataset.id);
+  // Widgets are used from their tile; configuration is an explicit context action.
 });
 
 // Middle-click works like the taskbar: an app opens a new instance and a
@@ -284,7 +284,8 @@ dockEl.addEventListener(
       // Read the settled value (dataset.v), not the tween's mid-animation text.
       const vEl = w.querySelector(".w-ring-num");
       const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
-      const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
+      const step = Math.max(1, Math.min(10, Number(item.style?.volumeStep) || 3));
+      const next = Math.max(0, Math.min(100, cur + ((e.deltaY || e.deltaX) > 0 ? -step : step)));
       queueVolumeSet(next);
       return;
     }

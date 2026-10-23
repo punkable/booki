@@ -398,8 +398,7 @@ export function widgetTile(item, { inFlyout = false } = {}) {
     el.querySelector(".w-label").textContent = t("w.media");
     el.querySelector(".w-value").textContent = "—";
     el.querySelector(".w-bar").style.display = "none";
-    // Hover controls: previous · play/pause · next (click on the card itself
-    // still toggles play/pause). Crisp SVG glyphs, not text emoji.
+    // Explicit quick controls remain available; clicking the card opens its panel.
     const controls = document.createElement("span");
     controls.className = "w-controls";
     const mkCtl = (label, svg, fn, cls) => {

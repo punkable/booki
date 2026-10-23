@@ -68,13 +68,19 @@ const CLOCK_LOCALE = { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "
    does. The poll loop still ticks every second (that is what makes the
    rollover feel immediate) but skips the two Intl formats and the DOM writes
    while the displayed minute is unchanged — 59 of every 60 ticks. */
-export function clockParts(now, lang) {
+const clockCache = new Map();
+export function clockParts(now, lang, style = {}) {
   const loc = CLOCK_LOCALE[lang] || "en-US";
-  return {
-    key: `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}`,
-    time: now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" }),
-    date: now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" }),
+  const key = `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}|${style.showSeconds ? now.getSeconds() : ""}|${style.hourCycle || "system"}|${style.showDate !== false}`;
+  if (clockCache.has(key)) return clockCache.get(key);
+  const result = {
+    key,
+    time: now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", ...(style.showSeconds ? { second: "2-digit" } : {}), ...(["12", "24"].includes(style.hourCycle) ? { hour12: style.hourCycle === "12" } : {}) }),
+    date: style.showDate === false ? "" : now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" }),
   };
+  clockCache.set(key, result);
+  if (clockCache.size > 32) clockCache.delete(clockCache.keys().next().value);
+  return result;
 }
 
 // ── markup ────────────────────────────────────────────────────────────────

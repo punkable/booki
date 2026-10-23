@@ -4,12 +4,14 @@ import { dock as api, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
+import { systemMetrics, metricLabel } from "../widgets-meta.js";
+import { fmtRate } from "./widget-view.js";
 import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { buildCollectorPanel } from "./collector-panel.js";
-import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, statsReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, refreshDevices, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -82,7 +84,7 @@ export function buildSystemPanel(item, { close }) {
       if (disposed) return;
       const open = new Set([...container.querySelectorAll("details.reading-card[open]")].map((card) => card.dataset.readingKey));
       const focused = container.contains(document.activeElement) ? document.activeElement.closest("details.reading-card")?.dataset.readingKey : null;
-      container.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .productivity-button").forEach((el) => el.remove());
+      container.querySelectorAll(":scope > .reading-cards, :scope > .system-widget-readings, :scope > p, :scope > .productivity-button").forEach((el) => el.remove());
       paint(data);
       container.querySelectorAll("details.reading-card").forEach((card) => {
         card.open = open.has(card.dataset.readingKey);
@@ -129,7 +131,7 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "battery") {
     const battery = section(t("w.battery"));
-    load(battery, api.systemStats, (stats) => {
+    live(battery, statsReading, 2500, (stats) => {
       if (!(stats?.battery >= 0)) { battery.append(text("p", t("plugins.noData"))); return; }
       cards(battery, [{ name: t(stats.charging ? "dev.charging" : "w.battery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
     });
@@ -142,7 +144,7 @@ export function buildSystemPanel(item, { close }) {
     const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
     const tokens = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
     live(ai, aiReading, 60000, (providers) => {
-      const all = Array.isArray(providers) ? providers : [];
+      const all = (Array.isArray(providers) ? providers : []).filter((provider) => !item.style?.provider || provider.id === item.style.provider);
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
       cards(ai, all.map((p) => {
         const windows = p.windows || [];
@@ -165,8 +167,8 @@ export function buildSystemPanel(item, { close }) {
         return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.week_tokens > 0 ? sub : "", error: t("w.aiIdle"), bars: [] };
       }));
       const ids = new Set(all.map((p) => p.id));
-      if (!ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
-      if (!ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
+      if (!item.style?.provider && !ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
+      if (!item.style?.provider && !ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
       ai.append(text("p", t("w.aiLocal")));
     });
   }
@@ -219,17 +221,18 @@ export function buildSystemPanel(item, { close }) {
   }
   if (item.widget === "system") {
     const native = section(t("w.system"));
-    load(native, api.systemStats, (stats) => {
+    live(native, statsReading, 2500, (stats) => {
       if (!stats) { native.append(text("p", t("plugins.noData"))); return; }
-      list(native, [["CPU", `${Math.round(stats.cpu || 0)}%`], ["RAM", `${Math.round(stats.mem || 0)}%`]]);
+      const values = { cpu: stats.cpu, ram: stats.mem, disk: stats.disk };
+      list(native, systemMetrics(item.style).map((metric) => [metricLabel(metric, t), metric === "net" ? `↓ ${fmtRate(stats.net_down_kbps || 0)} · ↑ ${fmtRate(stats.net_up_kbps || 0)}` : `${Math.round(values[metric] || 0)}%`]));
     });
+  }
+  if (["system", "battery"].includes(item.widget)) {
+    const timer = setInterval(() => { if (!disposed && !document.hidden) statsReading.fresh(2000).catch(() => {}); }, 5000);
+    unsubscribe.push(() => clearInterval(timer));
   }
   if (item.widget === "collector") {
     buildCollectorPanel(item, { box: section(t("w.collector")), button, installButton, isDisposed: () => disposed, onDispose: (off) => unsubscribe.push(off) });
-    const gear = document.createElement("button"); gear.type = "button"; gear.className = "stack-close";
-    gear.innerHTML = icon("settings"); gear.title = t("refine.collectorSettings"); gear.setAttribute("aria-label", t("refine.collectorSettings"));
-    gear.addEventListener("click", () => { const preferences = body.querySelector(".collector-settings"); preferences.open = !preferences.open; preferences.scrollIntoView({ block: "nearest" }); });
-    head.insertBefore(gear, done);
   }
   // A widget whose plugin is missing offers it in one line, terms included.
   const needsPlugin = (id, container, onReady) => api.pluginStatus(id).then((state) => {
@@ -255,7 +258,11 @@ export function buildSystemPanel(item, { close }) {
       if (running) return;
       const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
       box.querySelectorAll(":scope > *:not(strong)").forEach((el) => el.remove());
-      if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
+      if (!Array.isArray(list)) {
+        box.append(text("p", t("perr.appInstaller")));
+        button(box, t("plugins.appInstaller"), () => api.launch("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", []));
+        return;
+      }
       if (!list.length) { box.append(text("p", t("up.none"), "update-empty")); return; }
       const bar = document.createElement("div"); bar.className = "update-bar";
       const count = text("span", t("up.some").replace("{n}", () => list.length), "update-count");
@@ -353,6 +360,8 @@ export function buildSystemPanel(item, { close }) {
   for (const id of ids.filter((id) => id !== "headsetcontrol")) {
     const plugin = PLUGINS.find((p) => p.id === id);
     const box = section(plugin.name);
+    const details = document.createElement("details"); details.className = "widget-provider-details";
+    details.append(text("summary", t("widgetFlow.connections")), box); body.append(details);
     box.append(text("p", t(`plugins.${id}.desc`)));
     if (id === "librehardwaremonitor") box.append(text("p", t("plugins.sensorWarning"), "plugin-warning"));
     const controls = document.createElement("div"); controls.className = "plugin-panel-actions"; box.append(controls);

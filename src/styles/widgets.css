@@ -624,3 +624,8 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .collector-job-progress[hidden] { display: none; }
 .collector-job-progress::-webkit-progress-bar { background: var(--track); }
 .collector-job-progress::-webkit-progress-value { background: var(--accent); }
+.tile.widget[data-widget="clock"].clock-no-date .w-label { display: none; }
+.productivity-clock { text-align: center; padding: 12px; }
+.productivity-clock time { font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.productivity-clock p { margin: 5px 0; }
+.widget-provider-details > summary, .weather-location-settings > summary { padding: 10px 0; cursor: pointer; }

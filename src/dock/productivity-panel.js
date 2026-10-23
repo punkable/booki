@@ -3,6 +3,7 @@ import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTime
 import { dock as dockApi } from "../api.js";
 import { icon } from "../icons.js";
 import { weatherKind, formatDegrees, formatHour, formatWeekday } from "./weather-codes.js";
+import { clockParts } from "./widget-view.js";
 
 // One forecast per city for ten minutes, however often the panel is reopened.
 const forecastCache = new Map();
@@ -55,7 +56,7 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     });
     return queue;
   };
-  const SECTIONS = { timer: ["timer"], tasks: ["tasks"], focus: ["timer", "tasks"], calendar: ["calendar"], clock: ["calendar"], weather: ["weather"] };
+  const SECTIONS = { timer: ["timer"], tasks: ["tasks"], focus: ["timer", "tasks"], calendar: ["calendar"], clock: ["clock", "calendar"], weather: ["weather"] };
   function draw() {
     if (disposed) return;
     clearInterval(timer);
@@ -68,6 +69,16 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     }
   }
   const DRAW = {
+    clock(body, st) {
+      const time = document.createElement("time"); const date = document.createElement("p");
+      body.append(time, date);
+      const paint = () => {
+        const now = new Date(); const value = clockParts(now, curLang(), st);
+        if (time.textContent !== value.time) { time.textContent = value.time; time.dateTime = now.toISOString(); }
+        if (date.textContent !== value.date) date.textContent = value.date;
+      };
+      paint(); timer = setInterval(() => { if (disposed) clearInterval(timer); else paint(); }, 1000);
+    },
     timer(body, st) {
       // Countdown inside a ring that empties as the block runs.
       const total = Math.min(180, Math.max(1, Number(st.minutes) || 25)) * 60;
@@ -151,7 +162,7 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
         });
       }); body.appendChild(form);
     },
-    calendar(body) {
+    calendar(body, st) {
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
       const nav = document.createElement("div"); nav.className = "focus-month"; body.appendChild(nav);
@@ -162,7 +173,7 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
         go.addEventListener("click", () => { monthOffset += step; draw(); }); nav.appendChild(go);
       }
       const grid = document.createElement("div"); grid.className = "focus-calendar";
-      const weekStart = calendarWeekStart(navigator.language || curLang());
+      const weekStart = [0, 1].includes(st.weekStart) ? st.weekStart : calendarWeekStart(navigator.language || curLang());
       for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "narrow" }); grid.appendChild(cell); }
       for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", `${t("focus.today")}, ${day}`); cell.setAttribute("aria-current", "date"); } grid.appendChild(cell); } body.appendChild(grid);
     },
@@ -175,6 +186,12 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
         empty.append(art, text("strong", "", t("focus.noCity")), text("span", "", t("weather.emptyHint")));
         body.appendChild(empty);
       }
+      // A configured widget opens its forecast, with location editing on demand.
+      let location = body;
+      if (hasCity) {
+        location = document.createElement("details"); location.className = "weather-location-settings";
+        const summary = document.createElement("summary"); summary.textContent = t("widgetFlow.changeCity"); location.append(summary); body.append(location);
+      }
       // City search: one field, Enter or the button searches, results are rows.
       const form = document.createElement("form"); form.className = "weather-search"; form.setAttribute("role", "search");
       const lens = document.createElement("span"); lens.className = "weather-search-icon"; lens.setAttribute("aria-hidden", "true"); lens.innerHTML = icon("search");
@@ -182,8 +199,8 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       input.setAttribute("aria-label", t("focus.city")); input.maxLength = 100; input.autocomplete = "off"; input.spellcheck = false;
       const submit = document.createElement("button"); submit.type = "submit"; submit.className = "weather-search-go";
       submit.innerHTML = icon("chevron-right"); submit.title = t("focus.search"); submit.setAttribute("aria-label", t("focus.search"));
-      form.append(lens, input, submit); body.appendChild(form);
-      const results = document.createElement("ul"); results.className = "weather-results"; results.setAttribute("aria-live", "polite"); body.appendChild(results);
+      form.append(lens, input, submit); location.appendChild(form);
+      const results = document.createElement("ul"); results.className = "weather-results"; results.setAttribute("aria-live", "polite"); location.appendChild(results);
       const status = (message) => { results.replaceChildren(); if (message) results.appendChild(text("li", "weather-results-note", message)); };
       form.addEventListener("submit", async (event) => {
         event.preventDefault();

@@ -38,7 +38,7 @@ export function WidgetPreview({ widget: rawWidget, style: rawStyle, size = 48, g
     } else if (RING_WIDGETS.includes(widget)) {
       setMetric(el, widgetDisplayName(widget, t), { battery: 78, devices: 72, ai: 42, volume: 55 }[widget] || 0);
     } else if (widget === "clock") {
-      const parts = clockParts(new Date(), curLang());
+      const parts = clockParts(new Date(), curLang(), style);
       setText(el, parts.date, parts.time);
     } else {
       const examples = { media: [t("w.media"), t("w.mediaIdle")], focus: [t("w.focus"), "25:00"], calendar: [new Date().toLocaleDateString(curLang(), { month: "short", weekday: "short" }), String(new Date().getDate())], weather: [t("w.weather"), "21°"] };

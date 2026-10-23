@@ -52,12 +52,12 @@ test('widget targets select the exact nested copy, including a repeated request 
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: pins }), initScript: `
     const old=window.__TAURI__.core.invoke; window.target='widget:two';
     window.__TAURI__.core.invoke=(cmd,args)=>cmd==='take_pending_tab'?Promise.resolve(window.target):old(cmd,args);` });
-  await page.locator('.inspector input[type=text]').waitFor();
-  assert.equal(await page.locator('.inspector input[type=text]').inputValue(), 'Second');
-  await page.locator('.catalog-card').filter({ hasText: 'Quick note editable' }).click();
-  assert.equal(await page.locator('.inspector input[type=text]').inputValue(), 'First');
+  await page.locator('.inspector textarea').waitFor();
+  assert.equal(await page.locator('.inspector textarea').inputValue(), 'Second');
+  await page.getByRole('combobox', { name: 'Widget being configured', exact: true }).selectOption('one');
+  assert.equal(await page.locator('.inspector textarea').inputValue(), 'First');
   await signal(page, 'booki://show-tab', null);
-  await waitForAsyncCondition(page, () => document.querySelector('.inspector input[type=text]')?.value === 'Second');
+  await waitForAsyncCondition(page, () => document.querySelector('.inspector textarea')?.value === 'Second');
   assert.deepEqual(errors, []); await page.close();
 });
 

@@ -4,6 +4,7 @@ import { sharedReading } from "./async-cache.js";
 
 export const deviceReading = sharedReading(() => api.deviceBatteries());
 export const aiReading = sharedReading(() => api.aiUsage());
+export const statsReading = sharedReading(() => api.systemStats());
 /** A provider has something current to show: plan windows (Codex) or an
  *  active 5-hour block (Claude). See ai_usage.rs. */
 export const aiActive = (p) => (p?.windows || []).length > 0 || !!p?.block;

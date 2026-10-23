@@ -9,10 +9,8 @@ import { ctxMenu } from "./dom.js";
 import { scheduleHide } from "./autohide.js";
 import { addMenuHead, placeMenu, closeMenu, resetMenu } from "./menu-core.js";
 import { windowsFor, clearAttention } from "./running-windows.js";
-import { openProductivity, openSystemPanel, editNote } from "./widget-editors.js";
+import { openWidget } from "./widget-editors.js";
 import { toggleStack } from "./stack.js";
-import { refreshMedia, refreshVolume } from "./live-widgets.js";
-import { toggleClipboardStack } from "./clipboard-stack.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
 // the imports never form a cycle.
@@ -30,20 +28,9 @@ export function launchModifiers(e) {
 
 export function launch(el, item, mods = {}) {
   if (item.kind === "action") { if (item.action === "settings") dockApi.openSettings(); return; }
-  // Widgets: the media card plays/pauses and the volume card mutes on a
-  // click, like the keys on a keyboard; their panel is on right-click or a
-  // long press. The other live cards open their panel.
+  // A tile opens its actual content. Explicit playback buttons remain quick actions.
   if (item.kind === "widget") {
-    if (item.widget === "media") { dockApi.mediaToggle().catch(() => {}).finally(refreshMedia); return; }
-    if (item.widget === "volume") {
-      dockApi.volumeInfo().then((v) => Array.isArray(v) && dockApi.masterVolumeSet(v[0], !v[1])).catch(() => {}).finally(refreshVolume);
-      return;
-    }
-    if (["devices", "system", "ai", "battery", "collector", "updates", "lighting"].includes(item.widget)) openSystemPanel(item, el);
-    if (item.widget === "notes") editNote(item);
-    if (item.widget === "clipboard") toggleClipboardStack(el);
-    if (["clock", "focus", "calendar", "weather"].includes(item.widget)) openProductivity(item, el);
-    return;
+    return openWidget(item, el);
   }
   // The trash pin opens the Recycle Bin.
   if (item.kind === "trash") {

@@ -22,7 +22,7 @@ import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
-import { closeProductivityPanel, openSystemPanel, openWidgetHub } from "./widget-editors.js";
+import { closeProductivityPanel, openSystemPanel, openWidgetHub, openWidget } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -255,6 +255,11 @@ export async function openStack(tileEl, item) {
         wCell.className = "stack-item stack-widget";
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
         wCell.appendChild(widgetTile(it, { inFlyout: true }));
+        wCell.addEventListener("click", (event) => {
+          if (wCell._suppressClick || event.target.closest(".w-controls")) return;
+          event.stopPropagation();
+          openWidget(it, tileEl);
+        });
         deps.wireStackDragOut(wCell, item, it);
         wCell.dataset.childId = it.id;
         wCell.addEventListener("contextmenu", (e) => deps.openFileMenu(e, it, item), { capture: true });

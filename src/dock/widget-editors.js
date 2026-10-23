@@ -46,6 +46,17 @@ export function insideWidgetPanel(target) {
   const panel = S.productivityPanel;
   return !!panel && (panel.contains(target) || !!panel._opener?.contains?.(target));
 }
+/** One route for using a widget, from the bar, a group or the widget hub. */
+export function openWidget(item, tile = dockEl) {
+  if (["clock", "calendar", "weather", "focus"].includes(item.widget)) return openProductivity(item, tile);
+  if (item.widget === "notes") return editNote(item);
+  if (item.widget === "clipboard") {
+    closeProductivityPanel();
+    if (S.stackItemId) closeStack();
+    return toggleClipboardStack(tile);
+  }
+  return openSystemPanel(item, tile);
+}
 export function openProductivity(item, tile) {
   if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
@@ -77,18 +88,21 @@ export function openSystemPanel(item, tile) {
 export function openWidgetHub() {
   closeProductivityPanel();
   const item = { id: "__widgets", widget: "hub" };
-  const open = (pin) => {
-    if (["focus", "clock", "calendar", "weather"].includes(pin.widget)) openProductivity(pin, dockEl);
-    else if (pin.widget === "notes") editNote(pin);
-    else if (pin.widget === "clipboard") { closeProductivityPanel(); toggleClipboardStack(dockEl); }
-    else openSystemPanel(pin, dockEl);
-  };
+  const open = (pin) => openWidget(pin, dockEl);
   mountWidgetPanel(item, dockEl, buildWidgetHub(S.cfg.pinned, { open, close: closeProductivityPanel, settings: () => dockApi.openSettingsTab("widgets") }));
 }
 function mountWidgetPanel(item, tile, panel) {
   // One flyout at a time: a widget panel replaces an open folder or menu.
   closeStack(); closeMenu();
   panel._opener = tile; panel._itemId = item.id;
+  if (item.id !== "__widgets") {
+    const settings = document.createElement("button"); settings.type = "button"; settings.className = "stack-close widget-settings-action";
+    settings.innerHTML = icon("settings");
+    const label = t("widgetFlow.configureNamed").replace("{name}", () => widgetLabel(item.widget));
+    settings.title = label; settings.setAttribute("aria-label", label);
+    settings.addEventListener("click", () => dockApi.openWidgetSettings(item.id));
+    const head = panel.querySelector(".productivity-head"); head?.insertBefore(settings, head.lastElementChild);
+  }
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; cacheWidgetEls(); syncPolls(); applyFrame();
   const place = () => {

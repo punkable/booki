@@ -3,9 +3,10 @@ import { CollectorSettings } from "../collector-settings.jsx";
 import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
-import { WIDGET_META, widgetDisplayName } from "../../widgets-meta.js";
+import { widgetDisplayName } from "../../widgets-meta.js";
 import { dock as dockApi, pickRgbProfile } from "../../api.js";
 import { t } from "../../i18n.js";
+import { PLUGIN_WIDGETS, pinnedWidgetInstances } from "../../widget-integrations.js";
 import { Icon, PageHeader } from "../ui.jsx";
 
 /** An optional open-source tool Booki can download into its own folder. It
@@ -14,10 +15,8 @@ import { Icon, PageHeader } from "../ui.jsx";
 /** The dock widget a plugin brings, if any (yt-dlp → Downloads). */
 export const TERMS_URL = "https://github.com/punkable/booki/blob/main/TERMS.md";
 
-const widgetFor = (id) => Object.keys(WIDGET_META).find((w) => WIDGET_META[w].plugin === id);
-const pinnedWidget = (pins, widget) => (pins || []).some((p) => p.widget === widget || (p.children || []).some((c) => c.widget === widget));
 
-function PluginCard({ id, name, repo, source, external, license, open, cfg, set, companions }) {
+function PluginCard({ id, name, repo, source, external, license, open, cfg, set, companions, beforeInstall }) {
   const [state, setState] = useState({ installed: false, version: null, source: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,10 +52,15 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
       {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.source === "system" || state.source === "shared" ? null : state.installed
         ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
         : <button type="button" className="button button-accent" disabled={busy || !termsOk} title={termsOk ? undefined : t("plugins.acceptTerms")}
-            onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
-      {state.installed && widgetFor(id) && cfg && !pinnedWidget(cfg.pinned, widgetFor(id)) && <button type="button" className="button button-accent"
-        onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget: widgetFor(id), name: widgetDisplayName(widgetFor(id), t), path: "", args: [], style: {} }] })}>
-        <Icon name="plus" />{t("dl.addWidget")}</button>}
+            onClick={() => run(async () => { if (beforeInstall && !(await beforeInstall())) throw new Error(t("status.saveError")); await dockApi.pluginInstall(id); })}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
+      {state.installed && cfg && (PLUGIN_WIDGETS[id] || []).map((widget) => {
+        const instance = pinnedWidgetInstances(cfg.pinned, widget)[0];
+        return instance ? <button key={widget} type="button" className="button" onClick={() => dockApi.openWidgetSettings(instance.id)}>
+          <Icon name="settings" />{t("widgetFlow.configureNamed").replace("{name}", () => widgetDisplayName(widget, t))}
+        </button> : <button key={widget} type="button" className="button button-accent" onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget, name: widgetDisplayName(widget, t), path: "", args: [], style: {} }] })}>
+          <Icon name="plus" />{t("widgetFlow.addNamed").replace("{name}", () => widgetDisplayName(widget, t))}
+        </button>;
+      })}
       <button type="button" className="link plugin-source" onClick={() => open(source || `https://github.com/${repo}`)}>{t("plugins.source")}<Icon name="external" /></button>
     </div>
   </article>;
@@ -74,12 +78,12 @@ function PluginTerms({ cfg, set, open }) {
   </div>;
 }
 
-export function PluginsPage({ cfg, set }) {
+export function PluginsPage({ cfg, set, beforeInstall }) {
   return <>
     <PageHeader title={t("plugins.title")}>{t("plugins.hint")}</PageHeader>
     <PluginTerms cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />
     <div className="plugin-grid">
-      {PLUGINS.filter((plugin) => !plugin.companion).map((plugin) => <PluginCard key={plugin.id} {...plugin} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />)}
+      {PLUGINS.filter((plugin) => !plugin.companion).map((plugin) => <PluginCard key={plugin.id} {...plugin} beforeInstall={beforeInstall} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />)}
     </div>
   </>;
 }
