@@ -76,7 +76,9 @@ export function useSettingsStore() {
       setSaveState("saved");
       await emitConfigChanged().catch(() => {});
       if (closeErrorRef.current === "unsaved" && !dirtyKeys.current.size) setCloseError(null);
-      if (typeof cb === "function") cb(toSave);
+      // A preview is optional; its failure must not turn a durable save into
+      // an unsaved draft or an unhandled rejection.
+      if (typeof cb === "function") void Promise.resolve().then(() => cb(toSave)).catch(() => {});
     } catch (error) {
       const conflict = parseConfigConflict(error);
       if (conflict) setConfigConflict(conflict);
@@ -136,8 +138,12 @@ export function useSettingsStore() {
     await ensureLang(fresh.language);
     cfgRef.current = fresh;
     setCfg(fresh);
+    setConfigConflict(null);
+    setSaveState("saved");
+    setCloseError(null);
+    afterSaveCb.current = null;
     paint(fresh);
-    await emitConfigChanged();
+    await emitConfigChanged().catch(() => {});
     return fresh;
   };
 

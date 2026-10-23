@@ -42,3 +42,25 @@ verificada la corrección en una instalación real:
 
 Estas comprobaciones físicas siguen pendientes; no equivalen a CI ni a una
 captura del navegador de desarrollo.
+
+## Revisión general adicional
+
+- Un fallo de la vista previa posterior al guardado no produce un rechazo sin
+  tratar ni marca como perdidas preferencias que ya están guardadas.
+- La recuperación explícita de una configuración limpia elimina los conflictos,
+  errores de cierre y callbacks pendientes de la configuración anterior.
+- Las consultas de captura descartan respuestas anteriores a una señal nueva;
+  una respuesta tardía no puede cerrar un panel recién retenido.
+- Un fallo de guardado de densidad de grupo no revierte una selección posterior
+  mientras la lectura de configuración está temporalmente indisponible.
+- Los avisos diferidos vuelven a comprobar el enfoque y No molestar al llegar su
+  turno. Consultan el estado actual de Windows antes de mostrar un aviso normal.
+- La entrega de avisos retenidos funciona sin widget Enfoque y con el dock
+  oculto: solo hay una consulta periódica mientras queden avisos pendientes.
+  Una lectura fallida conserva el último estado conocido de No molestar.
+
+Estos casos tienen pruebas de regresión con el puente nativo simulado en
+`tests/general-audit.test.mjs`. La interacción real con No molestar de Windows
+requiere comprobación en una instalación real, igual que Recortes.
+
+La carga diferida de traducciones respeta la selección más reciente: cambiar de idioma rápidamente no permite que una descarga anterior sobrescriba el idioma elegido. Dos pruebas cubren las selecciones síncronas y asíncronas.

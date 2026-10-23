@@ -84,7 +84,9 @@ export async function pollDnd(minInterval = 10000) {
   lastRead = now;
   let value = null;
   try { value = await invoke("dnd_state"); } catch (_) { value = null; }
-  const next = typeof value === "boolean" ? value : null;
+  // A temporary read failure does not mean the user's quiet mode ended.
+  if (typeof value !== "boolean") return windowsDnd;
+  const next = value;
   if (next !== windowsDnd) { windowsDnd = next; changed(); }
   return windowsDnd;
 }

@@ -1242,7 +1242,10 @@ export function resolveLang(value) {
 
 // Load the extra-language dictionaries (pt/fr/de) on demand, then set the
 // language. es/en ship inline; only these three are fetched when actually used.
+let languageGeneration = 0;
+
 export async function ensureLang(value) {
+  const generation = ++languageGeneration;
   const l = resolveLang(value);
   if (!extraLoaded && (l === "pt" || l === "fr" || l === "de")) {
     try {
@@ -1251,10 +1254,11 @@ export async function ensureLang(value) {
       extraLoaded = true;
     } catch (_) { /* fall back to English */ }
   }
-  setLang(l);
+  if (generation === languageGeneration) setLang(l);
 }
 
 export function setLang(value) {
+  languageGeneration += 1;
   lang = resolveLang(value);
   // Tell the document what language it is actually in. The three pages ship
   // with a hard-coded lang attribute (two said "es", one said "en") that was

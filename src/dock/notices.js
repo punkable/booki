@@ -6,10 +6,11 @@ import { invoke, onNoticeAction } from "../api.js";
 import { t } from "../i18n.js";
 import { createNoticeActions } from "./notice-actions.js";
 import { showNoticeToast } from "./undo-toast.js";
-import { isFocusing, dndActive, onFocusDndChange } from "./focus-dnd.js";
+import { isFocusing, dndActive, onFocusDndChange, pollDnd } from "./focus-dnd.js";
 
 const HELD_MAX = 5;
 const held = [];
+let heldTimer = null;
 const noticeActions = createNoticeActions();
 onNoticeAction((payload) => noticeActions.dispatch(payload).catch(() => showNoticeToast(t("overhaul.failed"))));
 
@@ -23,9 +24,11 @@ async function show(title, detail, actions = []) {
 export const quiet = () => isFocusing() || dndActive();
 
 export async function notify(title, detail = "", { critical = false, actions = [] } = {}) {
+  if (!critical) await pollDnd(0);
   if (!critical && quiet()) {
     if (!held.some((entry) => entry.title === title && entry.detail === detail)) held.push({ title, detail, actions });
     if (held.length > HELD_MAX) held.shift();
+    watchHeld();
     return;
   }
   await show(title, detail, actions);
@@ -34,7 +37,20 @@ export async function notify(title, detail = "", { critical = false, actions = [
 /** Notices held so far (for tests and the Focus card). */
 export const heldNotices = () => held.slice();
 
-onFocusDndChange(() => {
+function flushHeld() {
   if (quiet() || !held.length) return;
-  held.splice(0).forEach(({ title, detail, actions }, i) => setTimeout(() => show(title, detail, actions), i * 4000));
-});
+  clearTimeout(heldTimer); heldTimer = null;
+  held.splice(0).forEach(({ title, detail, actions }, i) => setTimeout(() => { void notify(title, detail, { actions }).catch(() => {}); }, i * 4000));
+}
+// A held notice must resume even with no Focus widget or a hidden dock.
+// Keep a timer only while there is work to deliver.
+function watchHeld() {
+  if (heldTimer || !held.length) return;
+  heldTimer = setTimeout(async () => {
+    heldTimer = null;
+    await pollDnd(0);
+    flushHeld();
+    watchHeld();
+  }, 10000);
+}
+onFocusDndChange(flushHeld);
