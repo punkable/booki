@@ -82,7 +82,7 @@ export function openMenu(e, item) {
     add("trash", t("m.open"), () => dockApi.launch("shell:RecycleBinFolder", []));
     add("trash", t("trash.empty"), () => confirmTrash([], true), "danger");
   }
-  if (item.kind === "widget") { if (["media", "volume"].includes(item.widget)) add("sliders", t("m.details"), () => openSystemPanel(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); add("sliders", t("w.styleTitle"), () => dockApi.openSettingsTab("widgets")); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
+  if (item.kind === "widget") { if (["media", "volume"].includes(item.widget)) add("sliders", t("m.details"), () => openSystemPanel(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); add("sliders", t("m.settings"), () => dockApi.openWidgetSettings(item.id)); if (["clock", "focus", "calendar", "weather"].includes(item.widget)) add("app", t("m.open"), () => openProductivity(item, dockEl.querySelector(`.tile[data-id="${item.id}"]`))); }
   if (item.kind === "folder") add("external", t("stack.openExplorer"), () => dockApi.launch(item.path, []));
   if (item.kind === "app" && item.path) add("folder", t("m.showInExplorer"), () => dockApi.openLocation(item.path));
   if (wins.length === 1) add("x", t("m.closeWindow"), () => dockApi.closeWindow(Number(wins[0].hwnd)));
@@ -273,7 +273,7 @@ export function openFileMenu(e, item, parent, openFolder) {
     if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
   }
   if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
-  sep(); add("settings", t("m.settings"), () => dockApi.openSettingsTab("dock"));
+  sep(); add("settings", t("m.settings"), () => item.kind === "widget" ? dockApi.openWidgetSettings(item.id) : dockApi.openSettingsTab("dock"));
   placeMenu(e);
 }
 

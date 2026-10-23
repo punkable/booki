@@ -29,7 +29,7 @@ export function enhanceGroupView(stack, grid, item) {
     const next = view;
     live.style = { ...live.style, groupView: next };
     if (await persist()) savedView = next;
-    else setView(savedView);
+    else if (view === next) setView(savedView);
   };
   const changed = (next) => { setView(next); clearTimeout(timer); timer = setTimeout(save, 350); };
   select.addEventListener("change", () => changed(select.value)); setView(view);

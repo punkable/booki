@@ -104,6 +104,31 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
 /* Solid needs no rule: it is the body default. */
 
 :root { --surface-ink: var(--ink); }
+.menu, .stack, .productivity-panel, .note-editor, .trash-pop {
+  color-scheme: var(--panel-color-scheme, inherit);
+  --ink: var(--panel-ink, var(--surface-ink));
+  --ink-2: color-mix(in srgb, var(--ink) 76%, transparent);
+  --ink-3: color-mix(in srgb, var(--ink) 65%, transparent);
+  --hover: color-mix(in srgb, var(--ink) 9%, transparent);
+  --pressed: color-mix(in srgb, var(--ink) 14%, transparent);
+  --ctrl-fill: color-mix(in srgb, var(--ink) 5%, transparent);
+  --ctrl-stroke: color-mix(in srgb, var(--ink) 18%, transparent);
+  --bg: var(--glass-tint, var(--surface-tint));
+  --layer-strong: var(--glass-tint, var(--surface-tint));
+  --focus-ring: var(--ink);
+  --danger-text: light-dark(#c42b1c, #ff99a4);
+  color: var(--ink);
+}
+:root[data-high-contrast] :is(.menu, .stack, .productivity-panel, .note-editor, .trash-pop) {
+  --ink: CanvasText; --ink-2: CanvasText; --ink-3: CanvasText;
+  --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText; --danger-text: CanvasText;
+}
+@media (forced-colors: active) {
+  :is(.menu, .stack, .productivity-panel, .note-editor, .trash-pop) {
+    --ink: CanvasText; --ink-2: CanvasText; --ink-3: CanvasText;
+    --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText; --danger-text: CanvasText;
+  }
+}
 .dock, .notch-pill {
   --ink: var(--surface-ink);
   --ink-2: color-mix(in srgb, var(--ink) 72%, transparent);
@@ -2749,6 +2774,7 @@ body.surface-glass.native-material .stack.open {
 .group-toolbar input, .group-toolbar select { min-width: 0; min-height: 32px; padding: 5px 8px; font: 12px/20px var(--font); color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-bottom-color: var(--ctrl-stroke-bottom); border-radius: var(--r-control); }
 .group-toolbar input { flex: 1; width: 100%; }
 .group-toolbar select { max-width: 142px; }
+.group-toolbar select option { color: var(--ink); background: var(--bg); }
 .group-toolbar :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .group-stack .stack-grid { --group-icon: 40px; --group-cell: 92px; grid-template-columns: repeat(auto-fill, minmax(var(--group-cell), 1fr)); }
 .group-stack .stack-grid[data-view="small"] { --group-icon: 28px; --group-cell: 72px; }

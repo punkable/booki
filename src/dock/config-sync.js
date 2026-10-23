@@ -242,7 +242,9 @@ async function performPersist(patch, showError) {
     maybeSyncCtxMenu();
     // A started or paused focus timer is saved without a re-render.
     scheduleFocusAlerts(S.cfg.pinned);
-    await emitConfigChanged();
+    // The write is already durable. A broadcast failure must not offer a
+    // retry of that old snapshot or report it as an unsaved edit.
+    await emitConfigChanged().catch(() => {});
     return true;
   } catch (error) {
     logMessage("error", `dock save failed: ${error}`);
@@ -260,7 +262,7 @@ async function performPersist(patch, showError) {
         try {
           await configApi.get(); // Retry is an explicit decision against the latest snapshot.
           await configApi.patch(changes);
-          await emitConfigChanged();
+          await emitConfigChanged().catch(() => {});
           await reloadConfig();
           if (undoToast.contains(retryButton)) hideUndoToast();
         } catch (retryError) {

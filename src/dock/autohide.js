@@ -40,6 +40,7 @@ function clearFsTimers() {
 }
 
 export function onFullscreenSignal(value) {
+  if (value && S.cfg.captureVisible && S.captureActive) return;
   clearFsTimers();
   if (value) {
     // Already blacked out — ignore repeat signals.
@@ -177,6 +178,7 @@ function visibilityState() {
     draggingFile: S.draggingFile,
     pointerInside: S.pointerInside,
     focusTuck: focusTuckWanted(),
+    capturing: !!S.cfg.captureVisible && S.captureActive,
   };
 }
 
@@ -327,7 +329,7 @@ export function pinOpen() {
 // Only act when JS still thinks we're tucked; otherwise reveal_dock's emit
 // (also used by setHidden / setupAutoHide) would clear pending hide timers.
 export function softOpen() {
-  if (S.fullscreen || !S.hiddenState) return;
+  if (S.fullscreen || !S.hiddenState || S.cfg.notchTrigger !== "hover") return;
   S.manualHide = false;
   clearTimeout(S.hideTimer);
   setHidden(false);

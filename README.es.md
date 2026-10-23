@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64-setup.exe"><b>Descargar para Windows v0.95.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.95.0.md">Novedades v0.95.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_x64-setup.exe"><b>Descargar para Windows v0.95.1 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.95.1.md">Novedades v0.95.1</a> ·
   <a href="README.md">English</a>
 </p>
 <!-- booki:download:end -->
@@ -75,7 +75,7 @@
 <p align="center">Sin cuentas. Sin telemetría. Sin sincronización en la nube. Tus tareas, notas y uso se quedan en tu PC.<br/>El clima solo pide la ciudad que eliges, nunca tu ubicación.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Capturas del frontend del código fuente v0.95.0, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
+<p align="center"><sub>Capturas del frontend del código fuente v0.95.1, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.</sub></p>
 <!-- booki:media:end -->
 
 ## Instalar y empezar
@@ -87,20 +87,19 @@
 Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así que SmartScreen puede mostrar un aviso. Las actualizaciones se verifican y conservan tu configuración.
 
 <!-- booki:news:start -->
-## Novedades de 0.95.0
+## Novedades de 0.95.1
 
-Un Booki más fluido: grupos claros, notch discreto y Recolector completo.
+Ajustes más claros, modo clic coherente y correcciones de guardado, capturas y avisos.
 
-- Busca dentro del grupo y cambia entre lista e iconos pequeños, medianos o grandes con Ctrl + rueda. Al reorganizar se conservan búsqueda, vista y desplazamiento.
-- Al arrastrar desde un grupo ves el icono o inicial, el nombre, el destino y dónde se insertará. Escape cancela. Arrastra el fondo del dock para cambiar de borde o pantalla.
-- Menús contextuales más cortos: Personalizar reúne nombre, icono y color en un panel con paletas desplegables y Aplicar/Cancelar. Apariencia, organización, ventanas, recientes y perfiles se abren por separado.
-- Tres estilos de partida opcionales, desplazamiento suave y animaciones más contenidas. El punto en reposo es el inicio para instalaciones nuevas y presets; tus preferencias guardadas se conservan.
-- Los agentes ocupan solo logo y estado. Rotan según la actividad, con prioridad para espera y error. La música aparece brevemente y sus controles siguen disponibles al acercarte mientras un agente trabaja.
-- Un panel reúne tus widgets en vivo. El menú y el lanzador ofrecen controles de audio y acciones rápidas. Al abrir un dispositivo puedes ver fuente y hora de consulta; el consumo de IA sin cuota publicada aparece como aproximado.
-- Vídeo, audio, archivos y galerías visibles desde el inicio. Añade varios enlaces a una cola de sesión, cancela o reintenta, elige calidad y carpeta, y abre, muestra o copia el archivo al terminar, también desde el aviso del notch.
-- Las actualizaciones de Booki se anuncian discretamente junto al dock. Descargar e instalar siguen separados, con guardado y respaldo antes de aplicar.
+- Los estilos predefinidos son opcionales y están plegados. Los conflictos conservan tus cambios y permiten guardar otros ajustes; los avisos ya no se superponen. Cambiar rápido de idioma conserva la última selección.
+- Ajustes abre la instancia exacta del widget, también en grupos o si tienes varias copias. Un fallo al guardar la aceptación de términos muestra un error antes de instalar un complemento.
+- Menús de grupo, listas y controles usan colores legibles según el tinte real del panel, incluso con vidrio claro y tema oscuro. Un fallo al guardar la densidad no descarta una selección posterior.
+- Con Booki visible en capturas, se añade retención temporal de paneles, ampliación y etiquetas mientras Recortes tiene el foco. Las respuestas antiguas no cierran paneles recién retenidos. No se lee el contenido capturado.
+- El modo clic espera al clic y descarta señales tardías de hover o del borde. Los controles multimedia siguen accesibles con teclado.
+- Los avisos respetan el estado actual de No molestar y se reanudan aunque no tengas el widget Enfoque. Las acciones evitan ejecuciones duplicadas mientras están pendientes y permiten reintentar si fallan.
+- Las notas siguen guardando el texto nuevo tras fallar una escritura anterior. Un fallo al notificar a otras ventanas no marca como perdido un guardado confirmado. Las descargas terminadas retiran Cancelando y conservan el archivo ante errores tardíos de cancelación.
 
-[Notas completas](docs/releases/v0.95.0.md)
+[Notas completas](docs/releases/v0.95.1.md)
 <!-- booki:news:end -->
 
 <!-- booki:history:start -->
@@ -108,9 +107,9 @@ Un Booki más fluido: grupos claros, notch discreto y Recolector completo.
 
 | Versión | Qué cambió |
 |---|---|
+| [0.95.0](docs/releases/v0.95.0.md) | Un Booki más fluido: grupos claros, notch discreto y Recolector completo. |
 | [0.94.0](docs/releases/v0.94.0.md) | Grupos más ágiles, widgets más claros y un README renovado. |
 | [0.93.0](docs/releases/v0.93.0.md) | Agentes más claros, descargas que conservan tus archivos y actualizaciones al día. |
-| [0.92.0](docs/releases/v0.92.0.md) | Claude y Codex en el notch, concentración con No molestar y copia automática. |
 
 [Todas las versiones publicadas](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->

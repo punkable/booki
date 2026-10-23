@@ -22,6 +22,7 @@ export const S = {
   manualHide: false, // user swiped the bar away → hover must not bring it back
   pointerInside: false,
   displayOff: false,
+  captureActive: false,
 
   // Gestures on the bar.
   editMode: false,

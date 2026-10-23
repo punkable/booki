@@ -159,7 +159,9 @@
 .ui-page-head h1 { margin: 0; font-family: var(--font-display); font-size: calc(28px * var(--os-text-scale, 1)); line-height: calc(36px * var(--os-text-scale, 1)); font-weight: 600; letter-spacing: 0; }
 .ui-page-head p { margin: 6px 0 0; color: var(--ink-2); font-size: calc(14px * var(--os-text-scale, 1)); }
 .ui-page-meta { display: flex; gap: 8px; }
-.save-status { position: absolute; top: 40px; right: 40px; margin: 0; color: var(--ink-3); font-size: calc(12px * var(--os-text-scale, 1)); }
+.save-status { margin: 0 0 8px; min-height: 16px; text-align: right; color: var(--ink-3); font-size: calc(12px * var(--os-text-scale, 1)); }
+.conflict-error { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.conflict-error > span { flex: 1 1 100%; }
 .save-status.is-error { color: var(--danger-text); }
 
 .ui-group-wrap { margin: 0 0 24px; }

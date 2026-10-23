@@ -12,6 +12,9 @@ export function createDraftSaver(save, onState = () => {}, delay = 300) {
           if (await save(current) === false) throw new Error('draft not saved');
           savedVersion = currentVersion;
         } catch {
+          // A debounce fired during the failed write may already have joined
+          // this flush. Drain newer text here instead of leaving it stranded.
+          if (version !== currentVersion) continue;
           onState('error');
           return false;
         }

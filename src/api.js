@@ -620,6 +620,8 @@ export const dock = {
   openChangelog: () => invoke("open_changelog"),
   takePendingChangelog: () => invoke("take_pending_changelog"),
   openSettingsTab: (tab) => invoke("open_settings_tab", { tab }),
+  openWidgetSettings: (id) => invoke("open_settings_tab", { tab: `widget:${encodeURIComponent(id)}` }),
+  captureSessionActive: () => invoke("capture_session_active"),
   takePendingTab: () => invoke("take_pending_tab"),
   trashPaths: (paths) => invoke("trash_paths", { paths }),
   trashIsEmpty: () => invoke("trash_is_empty"),
@@ -743,6 +745,11 @@ export async function onReveal(cb) {
 export async function onSoftReveal(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};
   return T.event.listen("booki://soft-reveal", () => cb());
+}
+
+export async function onCaptureSession(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://capture-session", (e) => cb(!!e.payload));
 }
 
 /** Listen for the "show what's new" signal (settings shows the changelog modal). */

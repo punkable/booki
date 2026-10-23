@@ -63,3 +63,14 @@ test("a system locale resolves to the closest language we have", () => {
   assert.ok(LANGS.includes(resolveLang("kl")));
   assert.ok(LANGS.includes(resolveLang(undefined)));
 });
+
+for (const explicit of [false, true]) {
+  test(`a delayed language load preserves a newer ${explicit ? "synchronous" : "async"} selection`, async () => {
+    const locale = await import(`../src/i18n.js?language-race=${explicit}`);
+    const earlier = locale.ensureLang("fr");
+    if (explicit) locale.setLang("es");
+    else await locale.ensureLang("es");
+    await earlier;
+    assert.equal(locale.curLang(), "es");
+  });
+}

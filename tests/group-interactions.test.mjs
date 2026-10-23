@@ -101,13 +101,13 @@ test("a paused media card retires after one minute and becomes available again o
   await page.clock.install();
   await page.clock.fastForward(65000);
   await event(page, "booki://media-changed", null);
-  await page.locator("#notch-pill").hover();
+  await page.keyboard.press("Tab");
   await page.clock.fastForward(1000);
   assert.equal(await page.evaluate(() => document.body.classList.contains("card")), false);
   await page.evaluate(() => { window.__playing = true; });
   await event(page, "booki://media-changed", null);
-  await page.mouse.move(0, 0);
-  await page.locator("#notch-pill").hover();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
   await page.clock.fastForward(1000);
   assert.equal(await page.evaluate(() => document.body.classList.contains("card")), true);
   assert.deepEqual(errors, []);

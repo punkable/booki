@@ -93,8 +93,14 @@ export function glassFillColor(cfg) {
 
 /** Ink that stays readable when the fill colour overrides the theme. */
 export function surfaceForeground(cfg) {
+  if (surfaceAlpha(cfg) < 0.6) return "";
+  return panelForeground(cfg);
+}
+
+/** Flyouts have a denser tint than the bar, including thin glass. */
+export function panelForeground(cfg) {
   const tint = resolveGlassTint(cfg);
-  if (!tint || surfaceAlpha(cfg) < 0.6) return "";
+  if (!tint) return "";
   const linear = [1, 3, 5].map((start) => {
     const value = parseInt(tint.slice(start, start + 2), 16) / 255;
     return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -118,6 +124,14 @@ export function applySurfaceVars(cfg, roots = [document.documentElement, documen
     else el.style.removeProperty("--glass-tint");
     if (ink) el.style.setProperty("--surface-ink", ink);
     else el.style.removeProperty("--surface-ink");
+    const panelInk = panelForeground(cfg);
+    if (panelInk) {
+      el.style.setProperty("--panel-ink", panelInk);
+      el.style.setProperty("--panel-color-scheme", panelInk === "#1b1b1b" ? "light" : "dark");
+    } else {
+      el.style.removeProperty("--panel-ink");
+      el.style.removeProperty("--panel-color-scheme");
+    }
   }
   const body = document.body;
   body.classList.toggle("surface-glass", style !== "solid");

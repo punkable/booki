@@ -776,6 +776,22 @@ pub fn foreground_is_video() -> bool {
     looks_like_video(&window_title(hwnd).to_lowercase(), exe)
 }
 
+/// Only identify the foreground capture UI; never read captured content.
+pub fn foreground_is_capture() -> bool {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return false;
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
+    matches!(
+        exe.to_ascii_lowercase().as_str(),
+        "snippingtool.exe" | "screenclippinghost.exe" | "snipandsketch.exe"
+    )
+}
+
 fn window_title(hwnd: HWND) -> String {
     unsafe {
         let len = GetWindowTextLengthW(hwnd);

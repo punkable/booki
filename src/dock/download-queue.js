@@ -16,11 +16,12 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
       job.path = path || job.path;
       job.state = "done";
       job.percent = 100;
-      try { completed(job); } catch (_) { /* notification failure cannot fail a saved file */ }
+      try { Promise.resolve(completed(job)).catch(() => {}); } catch (_) { /* notification failure cannot fail a saved file */ }
     } catch (error) {
       job.state = job.cancelRequested ? "cancelled" : "error";
       job.error = String(error?.message ?? error ?? "");
     } finally {
+      job.cancelRequested = false;
       job.finished = ++finished;
       active = null; publish(); void pump();
     }
@@ -57,8 +58,12 @@ export function createDownloadQueue({ run, cancel, changed = () => {}, completed
       if (active !== job || job.cancelRequested) return;
       // Do not advance until the native process has actually stopped.
       job.cancelRequested = true; publish();
-      try { if (await cancel(job.id) === false) { job.cancelRequested = false; publish(); } }
-      catch (error) { job.cancelRequested = false; job.error = String(error); publish(); throw error; }
+      try { if (await cancel(job.id) === false && active === job) { job.cancelRequested = false; publish(); } }
+      catch (error) {
+        // Completion may have won while the cancellation command was pending.
+        if (active !== job) return;
+        job.cancelRequested = false; job.error = String(error); publish(); throw error;
+      }
     },
     retry(id) {
       const job = jobs.find((row) => row.id === id);

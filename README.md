@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64-setup.exe"><b>Download for Windows v0.95.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.95.0/Booki_0.95.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.95.0.md">What's new v0.95.0</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_x64-setup.exe"><b>Download for Windows v0.95.1 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.95.1/Booki_0.95.1_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.95.1.md">What's new v0.95.1</a> ·
   <a href="README.es.md">Español</a>
 </p>
 <!-- booki:download:end -->
@@ -75,24 +75,23 @@
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.95.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v0.95.1, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.95.0
+## What's new in 0.95.1
 
-A smoother Booki: clearer groups, a quieter notch and a fuller Collector.
+Clearer settings, consistent click activation and fixes for saving, captures and notices.
 
-- Search inside groups and switch between list, small, medium or large icons with Ctrl + wheel. Reorganizing retains search, view and scroll.
-- Dragging from a group shows its icon or initial, name, destination and insertion marker. Escape cancels. Drag the dock background to change edge or screen.
-- Shorter context menus: Customize brings name, icon and color into a staged panel with expandable pickers and Apply/Cancel. Appearance, organization, windows, recents and profiles open separately.
-- Three optional starting styles, smooth scrolling and restrained motion. New installations and presets start with an idle dot; existing saved preferences are retained.
-- Agents show just logo and status, rotating with activity while waiting and errors take priority. Music appears briefly; hover still offers playback controls while an agent works.
-- One panel brings your live widgets together. The menu and launcher expose audio controls and quick actions. Device details show source and query time; AI usage without a published allowance is marked approximate.
-- Video, audio, files and galleries are explicit. Add multiple links to a session queue, cancel or retry, choose quality and folder, then open, reveal or copy the saved file, including from the notch notice.
-- Booki updates are announced discreetly beside the dock. Download and installation remain separate, with settings saved and backed up before applying.
+- Optional style presets start collapsed. Conflicts preserve your edits while allowing other settings to save; status messages no longer overlap. Quick language changes keep the latest selection.
+- Settings opens the exact widget instance, including grouped and duplicate widgets. A failed terms acceptance save shows an error before installing a plugin.
+- Group menus, lists and controls use readable colors based on the actual panel tint, including light glass in a dark theme. A failed density save preserves a newer selection.
+- When Booki is included in captures, a temporary hold preserves panels, magnification and hints while Snipping Tool owns focus. Stale replies cannot close newly held panels. Captured content is not read.
+- Click mode waits for a click and rejects delayed hover or edge signals. Playback controls remain accessible by keyboard.
+- Notices respect the current Do not disturb state and resume even without a Focus widget. Actions prevent duplicate execution while pending and remain retryable after failure.
+- Notes keep saving newer text after an earlier write fails. A failed cross-window notification does not mark a confirmed save as lost. Finished downloads clear Cancelling and retain the file after late cancellation errors.
 
-[Full release notes](docs/releases/v0.95.0.md)
+[Full release notes](docs/releases/v0.95.1.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -108,9 +107,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [0.95.0](docs/releases/v0.95.0.md) | A smoother Booki: clearer groups, a quieter notch and a fuller Collector. |
 | [0.94.0](docs/releases/v0.94.0.md) | More flexible groups, clearer widgets and a refreshed README. |
 | [0.93.0](docs/releases/v0.93.0.md) | Clearer agents, downloads that preserve your files and up-to-date releases. |
-| [0.92.0](docs/releases/v0.92.0.md) | Claude and Codex in the notch, focus with Do not disturb, and automatic backup. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->

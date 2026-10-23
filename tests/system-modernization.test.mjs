@@ -57,3 +57,19 @@ test('autosave drains newer typing after a slow write and retains failed drafts 
   fail = false; assert.equal(await saver.flush(), true);
   assert.equal(values.at(-1), 'retry me'); saver.cancelTimer();
 });
+
+test('newer note text is saved when its debounce joined an earlier failed write', async () => {
+  const { createDraftSaver } = await import('../src/dock/draft-saver.js');
+  let failFirst;
+  const values = [];
+  const saver = createDraftSaver((value) => {
+    values.push(value);
+    return value === 'first' ? new Promise((_, reject) => { failFirst = reject; }) : Promise.resolve(true);
+  }, () => {}, 10000);
+  saver.change('first'); const pending = saver.flush();
+  saver.change('newer'); assert.equal(saver.flush(), pending);
+  failFirst(new Error('temporary write failure'));
+  assert.equal(await pending, true);
+  assert.deepEqual(values, ['first', 'newer']);
+  saver.cancelTimer();
+});

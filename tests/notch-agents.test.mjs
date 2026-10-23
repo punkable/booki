@@ -90,7 +90,7 @@ test("Cursor shows its logo and status in a compact capsule with a complete acce
   }
 });
 
-test("hovering a working agent keeps music controls available after the brief music introduction", async () => {
+test("keyboard focus on a working agent keeps music controls available after the brief music introduction", async () => {
   const { page, errors } = await openPage(browser, port, "notch.html", {
     cfg: makeConfig({ notchVisibility: "always", notchMode: "smart" }),
     initScript: `window.__toggles=0; const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>{
@@ -102,7 +102,7 @@ test("hovering a working agent keeps music controls available after the brief mu
   await page.clock.install();
   await event(page, "booki://agent-activity", { provider: "codex", state: "working", since: Date.now() });
   await page.clock.fastForward(12000);
-  await page.locator("#notch-pill").hover();
+  await page.keyboard.press("Tab");
   await page.clock.fastForward(500);
   await page.getByRole("button", { name: "Play / pause", exact: true }).click();
   assert.equal(await page.evaluate(() => window.__toggles), 1);

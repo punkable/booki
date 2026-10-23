@@ -35,6 +35,7 @@
  * @property {boolean} draggingFile an OS file drag is over the dock
  * @property {boolean} pointerInside the pointer is within the dock's live area
  * @property {boolean} [focusTuck] a focus block asks the dock to stay tucked away
+ * @property {boolean} [capturing] preserve the scene during a Windows capture
  */
 /**
  * @param {VisibilityState} s
@@ -44,6 +45,7 @@
  *   the notch brings it back.
  */
 export function decideVisible(s) {
+  if (s.capturing) return null;
   // A fullscreen game or video wins over every other consideration, including
   // an explicit summon: Booki must not paint over it.
   if (s.fullscreen) return false;
