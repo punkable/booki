@@ -3,7 +3,9 @@ import { CollectorSettings } from "../collector-settings.jsx";
 import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
-import { widgetDisplayName } from "../../widgets-meta.js";
+import { widgetDisplayName, WIDGET_META, WIDGET_GLYPHS } from "../../widgets-meta.js";
+
+const PLUGIN_GLYPHS = { headsetcontrol: "headphones", "yt-dlp": "download", openrgb: "lightbulb", librehardwaremonitor: "thermometer", winget: "refresh" };
 import { dock as dockApi, pickRgbProfile } from "../../api.js";
 import { t } from "../../i18n.js";
 import { PLUGIN_WIDGETS, pinnedWidgetInstances } from "../../widget-integrations.js";
@@ -33,19 +35,20 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
   };
   return <article className="card plugin-card" data-setting-label={name}>
     <header className="plugin-head">
-      <h3 className="plugin-name">{name}</h3>
+      <span className="plugin-icon" style={{ "--widget-accent": WIDGET_META[(PLUGIN_WIDGETS[id] || [])[0]]?.accent || "var(--accent)" }}><Icon name={PLUGIN_GLYPHS[id] || "sparkles"} /></span>
+      <span className="plugin-title"><h3 className="plugin-name">{name}</h3>
+        <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span></span>
       {state.installed && <span className="plugin-badge"><Icon name="check" />{t(state.source === "system" || state.source === "shared" ? "plugins.onPc" : "plugins.active")}</span>}
     </header>
-    <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span>
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
     {companions?.length > 0 && <p className="plugin-desc plugin-fine">{t("plugins.includes").replace("{list}", () => companions.map((c) => { const p = PLUGINS.find((x) => x.id === c); return p ? `${p.name} (${p.license})` : c; }).join(", "))}</p>}
     {external && <p className="plugin-desc plugin-fine">{t("plugins.winget.managed")}</p>}
     {state.source === "system" && <p className="plugin-desc plugin-fine">{t("plugins.onPcHint")}</p>}
     {state.source === "shared" && <p className="plugin-desc plugin-fine">{t("plugins.sharedHint")}</p>}
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
-    <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}</p>
+    <p className="plugin-feeds"><Icon name={WIDGET_GLYPHS[(PLUGIN_WIDGETS[id] || [])[0]] || "sparkles"} />{t(`plugins.${id}.feeds`)}</p>
     {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}
-    {id === "yt-dlp" && <details className="collector-settings"><summary>{t("refine.collectorSettings")}</summary><CollectorSettings cfg={cfg} set={set} /></details>}
+    {id === "yt-dlp" && state.installed && <details className="collector-settings"><summary>{t("refine.collectorSettings")}</summary><CollectorSettings cfg={cfg} set={set} /></details>}
     <div className="plugin-actions">
       {state.installed && ["openrgb", "librehardwaremonitor"].includes(id) && <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginOpen(id))}>{t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open")}</button>}
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}
@@ -70,8 +73,10 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
  *  the one acceptance that unlocks every Install button. */
 function PluginTerms({ cfg, set, open }) {
   const accepted = (cfg?.pluginTerms || 0) >= 1;
+  // Once accepted, the legal block folds into one confirming line.
+  if (accepted) return <p className="plugin-terms-done"><label className="terms-check"><input type="checkbox" checked disabled readOnly />{t("plugins.acceptTerms")}</label> <button type="button" className="link" onClick={() => open(TERMS_URL)}>{t("plugins.termsLink")}</button></p>;
   return <div className="card plugin-terms">
-    <p className="plugin-desc">{t("plugins.howItWorks")}</p>
+    <p className="plugin-terms-title"><Icon name="shield" />{t("plugins.howItWorks")}</p>
     <p className="plugin-desc">{t("plugins.terms")} <button type="button" className="link" onClick={() => open(TERMS_URL)}>{t("plugins.termsLink")}</button></p>
     <label className="terms-check"><input type="checkbox" checked={accepted} disabled={accepted}
       onChange={(e) => { if (e.target.checked) set({ pluginTerms: 1 }, { flush: true }); }} />{t("plugins.acceptTerms")}</label>

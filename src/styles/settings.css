@@ -1140,3 +1140,18 @@
 .catalog-badge svg { width: 11px; height: 11px; }
 .catalog-badge b { font-weight: 700; }
 .widget-sheet .ui-seg:has(> :nth-child(5)) { grid-template-columns: repeat(2, 1fr); }
+/* Plugin cards: an icon tile, name and licence, then what it feeds. */
+.plugin-head { display: flex; align-items: center; gap: 12px; }
+.plugin-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; color: var(--widget-accent); background: color-mix(in srgb, var(--widget-accent) 15%, transparent); border-radius: 10px; }
+.plugin-icon svg, .plugin-icon .ui-icon { width: 20px; height: 20px; }
+.plugin-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.plugin-title .plugin-name { margin: 0; }
+.plugin-card { gap: 10px; padding: 16px; }
+.plugin-terms-title { display: flex; gap: 10px; align-items: flex-start; margin: 0; color: var(--ink-2); font-size: 0.8125rem; line-height: 1.45; }
+.plugin-terms-title .ui-icon, .plugin-terms-title svg, .plugin-terms-done svg { flex: none; width: 16px; height: 16px; color: var(--accent); margin-top: 1px; }
+.plugin-terms-done { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; color: var(--ink-2); font-size: 0.8125rem; }
+.collector-settings > summary { cursor: pointer; padding: 8px 0; color: var(--ink-2); font-size: 0.8125rem; }
+.plugin-terms .plugin-desc { font-size: 0.8125rem; color: var(--ink-2); margin: 0 0 0 26px; }
+.plugin-terms .terms-check { margin-left: 26px; }
+/* Windows 11: a disabled accent button turns neutral grey, not a washed-out accent. */
+.button-accent:disabled { opacity: 1; color: var(--ink-3); background: var(--subtle-pressed); border-color: transparent; }
