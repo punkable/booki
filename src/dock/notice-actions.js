@@ -8,7 +8,7 @@ export function createNoticeActions({ now = Date.now, token = () => crypto.rando
       prune();
       const id = token();
       const entries = actions.slice(0, 3);
-      pending.set(id, { actions: entries, until: now() + 12000 });
+      pending.set(id, { actions: entries, running: new Set(), until: now() + 12000 });
       while (pending.size > 5) pending.delete(pending.keys().next().value);
       return { id, labels: entries.map((action) => String(action.label).slice(0, 80)) };
     },
@@ -18,9 +18,10 @@ export function createNoticeActions({ now = Date.now, token = () => crypto.rando
       const { id, index } = payload;
       prune();
       const notice = pending.get(id);
-      if (!notice || !Number.isInteger(index) || index < 0 || index >= notice.actions.length) return false;
-      await notice.actions[index].run();
-      return true;
+      if (!notice || !Number.isInteger(index) || index < 0 || index >= notice.actions.length || notice.running.has(index)) return false;
+      notice.running.add(index);
+      try { await notice.actions[index].run(); return true; }
+      finally { notice.running.delete(index); }
     },
   };
 }

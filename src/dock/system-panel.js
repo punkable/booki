@@ -53,7 +53,10 @@ export function buildSystemPanel(item, { close }) {
       container.append(row);
     }
     const b = button(container, label, async () => {
-      if (!accepted()) { await persist({ pluginTerms: 1 }); S.cfg.pluginTerms = 1; }
+      if (!accepted()) {
+        if (!(await persist({ pluginTerms: 1 }))) throw new Error(t("status.saveError"));
+        S.cfg.pluginTerms = 1;
+      }
       await api.pluginInstall(id); await after?.();
     });
     if (box) { b.disabled = true; box.addEventListener("change", () => { b.disabled = !box.checked; }); }

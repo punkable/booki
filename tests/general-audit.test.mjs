@@ -138,3 +138,38 @@ test('a download notice observes a newly enabled Windows Do not disturb before t
   assert.deepEqual(await page.evaluate(() => window.notices), ['a.pdf']);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('a failed cross-window broadcast does not undo or report a durable group preference as unsaved', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [group] }), initScript: `
+    window.__TAURI__.event.emit=(name)=>name==='booki://config-changed'?Promise.reject(new Error('event channel unavailable')):Promise.resolve();` });
+  await page.locator('[data-id=g]').click();
+  const view = page.locator('.group-toolbar select');
+  await view.selectOption('small');
+  await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style?.groupView === 'small');
+  await page.waitForTimeout(150);
+  assert.equal(await view.inputValue(), 'small');
+  assert.equal(await page.locator('#undo-toast:not(.hidden)').count(), 0);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('plugin installation waits for its terms preference to save and offers a recoverable error', async () => {
+  const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pluginTerms: 0, pinned: [{ id: 'devices', kind: 'widget', widget: 'devices' }] }), initScript: `
+    const old=window.__TAURI__.core.invoke;window.installs=[];window.failTerms=true;
+    window.__TAURI__.core.invoke=(cmd,args)=>{
+      if(cmd==='plugin_status')return Promise.resolve({installed:false});
+      if(cmd==='plugin_install'){window.installs.push(args.id);return Promise.resolve('test');}
+      if(cmd==='save_config' && args.patch?.pluginTerms===1 && window.failTerms)return Promise.reject(new Error('disk unavailable'));
+      return old(cmd,args);
+    };` });
+  await page.locator('[data-id=devices]').click();
+  await page.getByRole('checkbox', { name: /I accept the plugin terms/ }).check();
+  await page.getByRole('button', { name: 'Turn on', exact: true }).click();
+  await page.locator('.system-widget-panel .plugin-action-error').waitFor();
+  assert.deepEqual(await page.evaluate(() => window.installs), []);
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pluginTerms), 0);
+  await page.evaluate(() => { window.failTerms=false; });
+  await page.getByRole('button', { name: 'Turn on', exact: true }).click();
+  await waitForAsyncCondition(page, () => window.installs.length === 1);
+  assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pluginTerms), 1);
+  assert.deepEqual(errors, []); await page.close();
+});

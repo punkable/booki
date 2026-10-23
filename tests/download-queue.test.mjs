@@ -60,3 +60,37 @@ test("queue capacity is atomic and never evicts pending jobs", () => {
   assert.throws(() => queue.enqueue([{ url: "a" }, { url: "b" }]));
   assert.equal(queue.jobs.length, 49);
 });
+
+test("completion wins over a pending cancellation without leaving a cancelling label", async () => {
+  let finish, rejectCancel;
+  const queue = createDownloadQueue({
+    run: () => new Promise((resolve) => { finish = resolve; }),
+    cancel: () => new Promise((_, reject) => { rejectCancel = reject; }),
+  });
+  const [job] = queue.enqueue([{ url: "a" }]);
+  const cancellation = queue.cancel(job.id);
+  assert.equal(job.cancelRequested, true);
+  finish("saved.pdf"); await tick();
+  assert.equal(job.state, "done");
+  assert.equal(job.cancelRequested, false);
+  rejectCancel(new Error("process already exited"));
+  await cancellation;
+  assert.equal(job.error, "");
+  assert.equal(job.path, "saved.pdf");
+});
+
+test("a rejected completion notification does not interrupt the next download", async () => {
+  const runs = [];
+  const queue = createDownloadQueue({
+    run: (job) => new Promise((resolve) => runs.push({ job, resolve })),
+    cancel: async () => true,
+    completed: async () => { throw new Error("notification unavailable"); },
+  });
+  const [a, b] = queue.enqueue([{ url: "a" }, { url: "b" }]);
+  runs[0].resolve("a.pdf"); await tick();
+  assert.equal(a.state, "done");
+  assert.equal(runs[1].job.id, b.id);
+  runs[1].resolve("b.pdf"); await tick();
+  assert.equal(b.state, "done");
+  assert.equal(queue.active, null);
+});

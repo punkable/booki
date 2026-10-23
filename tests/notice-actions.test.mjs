@@ -27,3 +27,19 @@ test("revoked and superseded callbacks cannot be invoked", async () => {
   registry.revoke("notice-6");
   assert.equal(await registry.dispatch({ id: "notice-6", index: 0 }), false);
 });
+
+test("a rapid repeated notice action runs once in flight and remains retryable after failure", async () => {
+  let calls = 0, reject;
+  const registry = createNoticeActions();
+  const notice = registry.register([{ label: "Open", run: () => { calls++; return new Promise((_, fail) => { reject = fail; }); } }]);
+  const payload = { id: notice.id, index: 0 };
+  const first = registry.dispatch(payload);
+  assert.equal(await registry.dispatch(payload), false);
+  assert.equal(calls, 1);
+  const rejected = assert.rejects(first, /unavailable/);
+  reject(new Error("unavailable")); await rejected;
+  const retry = registry.dispatch(payload);
+  assert.equal(calls, 2);
+  const retryRejected = assert.rejects(retry, /unavailable/);
+  reject(new Error("unavailable")); await retryRejected;
+});

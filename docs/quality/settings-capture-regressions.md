@@ -64,3 +64,22 @@ Estos casos tienen pruebas de regresión con el puente nativo simulado en
 requiere comprobación en una instalación real, igual que Recortes.
 
 La carga diferida de traducciones respeta la selección más reciente: cambiar de idioma rápidamente no permite que una descarga anterior sobrescriba el idioma elegido. Dos pruebas cubren las selecciones síncronas y asíncronas.
+
+## Segunda revisión general
+
+- El dock distingue un guardado confirmado de un fallo posterior del canal de
+  eventos. Un error al avisar a otras ventanas no muestra «no guardado» ni ofrece
+  reintentar una copia antigua sobre cambios posteriores.
+- Si una descarga termina mientras su cancelación sigue pendiente, conserva el
+  archivo terminado, retira «Cancelando» e ignora el error tardío de cancelar un
+  proceso que ya salió. Un aviso de finalización rechazado no bloquea la cola.
+- Los botones de avisos del notch evitan ejecutar dos veces la misma acción
+  mientras está pendiente, y permiten reintentar cuando la acción falla.
+- La instalación de un complemento espera a guardar la aceptación de sus
+  términos. Si falla el guardado, muestra un error y permite volver a intentar.
+- Las notas guardan el texto nuevo aunque su autoguardado haya coincidido con
+  una escritura anterior fallida; no queda esperando a otra pulsación.
+
+Las pruebas de cola y acciones son unitarias. Los casos de guardado e instalación
+usan el puente simulado del navegador: no descargan ni instalan complementos
+reales y no modifican datos personales.
