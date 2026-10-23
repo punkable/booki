@@ -504,11 +504,14 @@ impl Watch {
                 best = Some((path, modified));
             }
         }
-        let legacy: Vec<_> = crate::ai_usage::opencode_data_dirs()
+        // Older releases write one folder per session under storage/message.
+        // The folder's own timestamp moves when a message lands in it, so the
+        // newest folder is watched by metadata, without listing its files.
+        let legacy = crate::ai_usage::opencode_data_dirs()
             .into_iter()
-            .flat_map(|base| [base.join("storage/message"), base.join("storage/part")])
-            .collect();
-        if let Some((path, modified)) = newest_session(&legacy) {
+            .filter_map(|base| newest_child_dir(&base.join("storage").join("message")))
+            .max_by_key(|(_, modified)| *modified);
+        if let Some((path, modified)) = legacy {
             if best
                 .as_ref()
                 .map_or(true, |(_, previous)| modified > *previous)
@@ -800,6 +803,17 @@ fn skip_session_dir(name: &str) -> bool {
 
 const SESSION_WALK_CAP: u32 = 400;
 const SESSION_DEPTH: usize = 6;
+
+/// The most recently modified direct subfolder, capped like the session walk.
+fn newest_child_dir(dir: &std::path::Path) -> Option<(PathBuf, std::time::SystemTime)> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .take(SESSION_WALK_CAP as usize * 10)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| Some((entry.path(), entry.metadata().ok()?.modified().ok()?)))
+        .max_by_key(|(_, modified)| *modified)
+}
 
 fn newest_session(roots: &[PathBuf]) -> Option<(PathBuf, std::time::SystemTime)> {
     let mut best: Option<(PathBuf, std::time::SystemTime)> = None;

@@ -310,7 +310,7 @@ function paintAi(providers) {
       setText(el, recorded > 0 ? `${current.name} · ${t("refine.estimate")}` : current.name, recorded > 0 ? `~${tokenText(recorded)}` : "?");
     }
     el.dataset.tone = tone;
-    el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
+    el.classList.toggle("needs-attention", available.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }
