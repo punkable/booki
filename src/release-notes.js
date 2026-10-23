@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -181,11 +181,19 @@ function release94() {
   ] };
 }
 
-export function currentRelease() {
+function release95() {
   return { version: "0.95.0", date: "2026-10-21", headline: t("release95.headline"), sections: [
     { icon: "folder", title: t("release95.groupsTitle"), notes: [t("release95.groups"), t("release95.drag"), t("release95.menus")] },
     { icon: "sparkles", title: t("release95.lookTitle"), notes: [t("release95.look"), t("release95.notch")] },
     { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release95.widgets")] },
     { icon: "download", title: t("release95.collectorTitle"), notes: [t("release95.collector"), t("release95.updates")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.95.1", date: "2026-10-23", headline: t("release951.headline"), sections: [
+    { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release951.settings"), t("release951.widgets")] },
+    { icon: "sparkles", title: t("release95.lookTitle"), notes: [t("release951.contrast"), t("release951.capture"), t("release951.notch")] },
+    { icon: "download", title: t("release95.collectorTitle"), notes: [t("release951.notices"), t("release951.durability")] },
   ] };
 }
