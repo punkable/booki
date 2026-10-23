@@ -486,7 +486,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .reading-card-value { margin-left: auto; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value { color: #ff8b8f; }
 .reading-bar-track { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
-.reading-bar-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transition: width var(--dur-4) var(--ease-out); }
+.reading-bar-track i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transform-origin: left center; transition: transform var(--dur-4) var(--ease-out); }
 .reading-bar-track i[data-tone="good"], .reading-bar-track i[data-tone="charging"] { background: #30a46c; }
 .reading-bar-track i[data-tone="fair"] { background: #f5a524; }
 .reading-bar-track i[data-tone="low"], .reading-bar-track i[data-tone="critical"] { background: #e5484d; }

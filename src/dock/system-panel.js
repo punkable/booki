@@ -131,7 +131,7 @@ export function buildSystemPanel(item, { close }) {
         const track = document.createElement("div"); track.className = "reading-bar-track";
         track.setAttribute("role", "meter"); track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", "100");
         track.setAttribute("aria-valuenow", String(Math.round(bar.percent))); track.setAttribute("aria-label", `${row.name} ${bar.label || t("w.battery")}`);
-        const fill = document.createElement("i"); fill.style.width = `${Math.max(0, Math.min(100, bar.percent))}%`;
+        const fill = document.createElement("i"); fill.style.transform = `scaleX(${Math.max(0, Math.min(100, bar.percent)) / 100})`;
         if (bar.tone) fill.dataset.tone = bar.tone;
         track.append(fill); line.append(track); card.append(line);
       }

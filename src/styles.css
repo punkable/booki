@@ -2868,3 +2868,9 @@ body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-wo
 .clipboard-stack .clip-guide { max-height: 120px; overflow-y: auto; }
 .clipboard-stack .clip-list { min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
 .clipboard-stack .clip-row { flex-shrink: 0; }
+/* Group toolbar fields read as WinUI text boxes: 4px corners, a stronger
+   bottom stroke, the accent underline on focus, and one chevron style. */
+.group-search-field, .group-view-field { border-radius: var(--r-control, 4px); border-color: var(--ctrl-stroke); border-bottom-color: var(--ctrl-strong-stroke, var(--ctrl-stroke)); background: var(--ctrl-fill); }
+.group-search-field:hover, .group-view-field:hover { background: var(--ctrl-fill-hover, var(--ctrl-fill)); }
+.group-search-field:focus-within, .group-view-field:focus-within { outline: none; border-bottom: 2px solid var(--accent); }
+.group-toolbar .group-view-field select { appearance: none; -webkit-appearance: none; padding-right: 18px; background: no-repeat right 2px center / 12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
