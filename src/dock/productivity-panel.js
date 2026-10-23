@@ -2,6 +2,7 @@ import { t, curLang } from "../i18n.js";
 import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { dock as dockApi } from "../api.js";
 import { icon } from "../icons.js";
+import { WIDGET_GLYPHS } from "../widgets-meta.js";
 import { weatherKind, formatDegrees, formatHour, formatWeekday } from "./weather-codes.js";
 import { clockParts } from "./widget-view.js";
 
@@ -24,7 +25,10 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", t(`w.${item.widget}`));
   const head = document.createElement("div"); head.className = "productivity-head";
-  const title = document.createElement("strong"); title.textContent = t(`w.${item.widget}`); head.appendChild(title);
+  // Same title row as the system panels: the widget's glyph, then its name.
+  const title = document.createElement("div"); title.className = "widget-panel-title";
+  const titleGlyph = document.createElement("span"); titleGlyph.className = "widget-panel-icon"; titleGlyph.innerHTML = icon(WIDGET_GLYPHS[item.widget] || "sparkles");
+  const name = document.createElement("strong"); name.textContent = t(`w.${item.widget}`); title.append(titleGlyph, name); head.appendChild(title);
   const button = (label, fn, container = panel) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.className = "productivity-button"; b.addEventListener("click", fn); container.appendChild(b); return b;

@@ -52,7 +52,7 @@ test('widget gallery previews a draft and commits its appearance only when added
   await page.locator('.catalog-card', { hasText: 'Clock' }).first().click();
   assert.equal(await page.locator('.modal[role="dialog"]').count(), 0);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
-  await page.getByRole('tab', { name: '2 Appearance', exact: true }).click();
+  await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await page.locator('.inspector').getByRole('radio', { name: 'Solid', exact: true }).click();
   await page.locator('.inspector').getByRole('button', { name: 'Add', exact: true }).click();
   await page.waitForTimeout(250);
@@ -303,7 +303,7 @@ test('widget filtering preserves a customized draft and keeps the inspector in v
   await search.fill('focus');
   assert.equal(await page.locator('.catalog-card').count(),1);
   await page.locator('.catalog-card',{hasText:'Focus'}).first().click();
-  await page.getByRole('tab', { name: '2 Appearance', exact: true }).click();
+  await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).click();
   await search.fill('not-a-widget');
   await page.getByRole('status').filter({hasText:'No results'}).waitFor();

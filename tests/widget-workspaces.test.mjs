@@ -40,15 +40,15 @@ test('double clicking a widget never routes into its configuration', async () =>
 test('settings advance by accessible steps and retain functional choices separately from appearance', async () => {
   const { page, errors } = await settings({ pinned: [widget('clock')] }, '', { width: 520, height: 760 });
   await inspect(page, 'Clock');
-  const content = page.getByRole('tab', { name: '1 Content', exact: true });
+  const content = page.getByRole('tab', { name: 'Content', exact: true });
   assert.equal(await content.getAttribute('aria-selected'), 'true');
   assert.equal(await page.getByRole('radiogroup', { name: 'Look', exact: true }).count(), 0);
   await page.getByRole('combobox', { name: 'Time format', exact: true }).selectOption('24');
   await page.getByRole('switch', { name: 'Show seconds', exact: true }).click();
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await page.getByRole('radio', { name: 'Solid', exact: true }).click();
   await waitForAsyncCondition(page, async () => { const style=(await window.__TAURI__.core.invoke('get_config')).pinned[0].style;return style.hourCycle==='24'&&style.showSeconds&&style.variant==='solid'; });
-  await page.getByRole('tab', { name: '2 Appearance', exact: true }).focus();
+  await page.getByRole('tab', { name: 'Appearance', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
   assert.equal(await content.getAttribute('aria-selected'), 'true');
   assert.equal(await page.getByRole('combobox', { name: 'Time format', exact: true }).inputValue(), '24');
@@ -59,9 +59,9 @@ test('settings advance by accessible steps and retain functional choices separat
 test('all 15 widgets have a content step and a separate appearance step', async () => {
   for (const type of WIDGET_ORDER) {
     const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [widget(type)] }), initScript: `const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='take_pending_tab'?Promise.resolve('widget:${type}'):old(cmd,args);` });
-    await page.getByRole('tab', { name: '1 Content', exact: true }).waitFor();
+    await page.getByRole('tab', { name: 'Content', exact: true }).waitFor();
     assert.ok((await page.getByRole('tabpanel').innerText()).trim().length > 0, type);
-    await page.getByRole('tab', { name: '2 Appearance', exact: true }).click();
+    await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
     await page.getByRole('radiogroup', { name: 'Look', exact: true }).waitFor();
     assert.deepEqual(errors, [], type); await page.close();
   }
