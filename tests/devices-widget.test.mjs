@@ -73,7 +73,7 @@ test("the AI widget shows remaining Codex quota and never presents Claude elapse
   assert.match(hint, /nothing leaves your PC/);
   // Claude's turn: token counts are known; the remaining allowance is not.
   await page.mouse.move(0, 0);
-  await card.locator(".w-ring-num", { hasText: "~1.2 M" }).waitFor({ timeout: 8000 });
+  await card.locator(".w-ring-num", { hasText: "~1.2M" }).waitFor({ timeout: 8000 });
   assert.equal((await card.locator(".w-label").textContent()).trim(), "Claude · Approx. recorded usage");
   assert.deepEqual(errors, []);
   await page.close();

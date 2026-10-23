@@ -8,9 +8,10 @@ const providers=[{id:'claude',name:'Claude',detected:false,windows:[],week_token
 const aiSetup=`window.providers=${JSON.stringify(providers)};const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='ai_usage'?Promise.resolve(structuredClone(window.providers)):old(cmd,args);`;
 test('AI details expose all four providers, explain missing data and refresh without fabricating quota',async()=>{
  const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[pin('ai')]}),initScript:aiSetup});
- await page.locator('[data-id=ai]').click();const panel=page.locator('.system-widget-panel.is-open');await panel.locator('.reading-card').nth(3).waitFor();
- assert.equal(await panel.locator('.reading-card').count(),4);
- for(const name of ['Cursor','OpenCode','Claude']){
+ await page.locator('[data-id=ai]').click();const panel=page.locator('.system-widget-panel.is-open');await panel.locator('.reading-card').nth(1).waitFor();
+ assert.equal(await panel.locator('.reading-card').count(),2);
+ assert.match(await panel.locator('.ai-missing').innerText(),/Claude, OpenCode/);
+ for(const name of ['Cursor']){
   const card=panel.locator('.reading-card').filter({has:page.locator('strong',{hasText:new RegExp(`^${name}$`)})});
   assert.equal(await card.getByRole('meter').count(),0,name);
   assert.doesNotMatch(await card.innerText(),/\b0%/);
@@ -18,13 +19,13 @@ test('AI details expose all four providers, explain missing data and refresh wit
  assert.match(await panel.locator('.reading-card').filter({hasText:'Codex'}).innerText(),/70%/);
  assert.equal(await panel.locator('.widget-diagnostics').getAttribute('open'),null);
  await page.evaluate(()=>{window.providers[3].detected=true;});await panel.getByRole('button',{name:'Refresh data',exact:true}).click();
- await waitForAsyncCondition(page,()=>[...document.querySelectorAll('.reading-card')].some(card=>card.textContent.includes('OpenCode')&&card.textContent.includes('Provider data detected')));
+ await waitForAsyncCondition(page,()=>[...document.querySelectorAll('.reading-card')].some(card=>card.textContent.includes('OpenCode')&&card.textContent.includes('keeps no quota')));
  assert.deepEqual(errors,[]);await page.close();
 });
 for(const edge of ['bottom','top','left','right'])test(`large widget details fit beside the ${edge} dock with their header visible`,async()=>{
  const viewport=['left','right'].includes(edge)?{width:500,height:850}:{width:1100,height:480};
  const {page,errors}=await openPage(browser,port,'index.html',{viewport,cfg:makeConfig({edge,pinned:[pin('ai')]}),initScript:aiSetup});
- await page.locator('[data-id=ai]').click();const panel=page.locator('.system-widget-panel.is-open');await panel.locator('.reading-card').nth(3).waitFor();await page.waitForTimeout(250);
+ await page.locator('[data-id=ai]').click();const panel=page.locator('.system-widget-panel.is-open');await panel.locator('.reading-card').nth(1).waitFor();await page.waitForTimeout(250);
  const geometry=await page.evaluate(()=>{const rect=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom}};return {bar:rect(document.querySelector('#dock')),panel:rect(document.querySelector('.system-widget-panel')),head:rect(document.querySelector('.productivity-head')),w:innerWidth,h:innerHeight};});
  const {bar,panel:box,head,w,h}=geometry;
  assert.ok(box.x>=0&&box.y>=0&&box.right<=w+1&&box.bottom<=h+1,JSON.stringify(geometry));

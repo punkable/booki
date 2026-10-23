@@ -307,7 +307,7 @@ function paintAi(providers) {
       // Local Claude logs have token counts, not the subscription allowance.
       // An elapsed-time ring must never masquerade as remaining quota.
       const recorded = current.block?.tokens || current.week_tokens || 0;
-      setText(el, recorded > 0 ? `${current.name} · ${t("refine.estimate")}` : current.name, recorded > 0 ? `~${tokenText(recorded)}` : "?");
+      setText(el, recorded > 0 ? `${current.name} · ${t("refine.estimate")}` : current.name, recorded > 0 ? `~${tokenText(recorded).replace(/\s+/g, "")}` : "?");
     }
     el.dataset.tone = tone;
     el.classList.toggle("needs-attention", available.some((p) => (p.windows || []).some((w) => w.percent >= 95)));

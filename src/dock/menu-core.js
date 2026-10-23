@@ -80,13 +80,15 @@ export function placeMenu(e, focus = true) {
   if (S.pendingReplace && !S.pendingReplace._menu) menuPrevReplace = S.pendingReplace;
   put._menu = true;
   S.pendingReplace = put;
+  // Like Windows: a menu opened with the mouse shows no focus ring until a key is used.
+  const byPointer = !!(e?.pointerType || e?.button === 2);
   const generation = S.menuGeneration;
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       if (generation !== S.menuGeneration) return;
       put();
       ctxMenu.classList.remove("measuring");
-      if (focus && !ctxMenu.classList.contains("hidden")) (ctxMenu.querySelector("[data-menu-focus]") || menuItems(ctxMenu)[0])?.focus();
+      if (focus && !ctxMenu.classList.contains("hidden")) (ctxMenu.querySelector("[data-menu-focus]") || menuItems(ctxMenu)[0])?.focus({ focusVisible: !byPointer });
     });
   });
 }

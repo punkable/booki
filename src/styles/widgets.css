@@ -456,7 +456,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 
 /* Calendar: month and arrows on one line, round days, today in the accent. */
 .focus-month { display: flex; align-items: center; gap: 2px; margin-bottom: 8px; }
-.focus-month-title { flex: 1; font-size: 14px; text-transform: capitalize; }
+.focus-month-title { flex: 1; font-size: 14px; }
 .focus-today { padding: 5px 10px; border: 0; border-radius: var(--r-control); font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); cursor: pointer; }
 .focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
 .focus-calendar > * { display: grid; place-items: center; height: 32px; font-size: 12px; }
@@ -619,6 +619,8 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .reading-card > summary::-webkit-details-marker { display: none; }
 .reading-card[open] > summary { margin-bottom: 10px; }
 .device-reading-note { display: block; color: var(--ink-2); line-height: 1.5; }
+.ai-missing, .ai-quota-note { display: block; margin: 8px 2px 0; color: var(--ink-2); font-size: 12px; line-height: 1.45; }
+.ai-quota-note { margin: 8px 2px 0; }
 
 .collector-job-progress { display: block; width: 100%; height: 4px; margin: 0 0 10px; accent-color: var(--accent); border: 0; border-radius: 4px; overflow: hidden; }
 .collector-job-progress[hidden] { display: none; }
@@ -649,3 +651,33 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .reading-card[open] > summary::after { transform: rotate(225deg); }
 .reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value,
 .reading-card[data-tone="low"] .reading-card-names small, .reading-card[data-tone="critical"] .reading-card-names small { color: var(--danger-text); }
+
+/* One type scale inside widget details: 13px body, 14px section titles. */
+.system-widget-panel .productivity-section > strong { font-size: 0.875rem; }
+.system-widget-panel .productivity-section p,
+.system-widget-panel details > summary,
+.system-widget-panel details > p { font-size: 0.8125rem; line-height: 1.45; }
+.system-widget-panel .productivity-section p { color: var(--ink-2); }
+.system-widget-panel details > summary { cursor: pointer; color: var(--ink-2); }
+.system-widget-panel .volume-row label, .system-widget-panel .volume-row span { font-size: 0.8125rem; }
+/* The settings gear sits with the close button, never mid-header. */
+.productivity-head .widget-settings-action { margin-left: auto; }
+.productivity-head .widget-settings-action + * { margin-left: 4px; }
+.media-now { display: grid; gap: 2px; min-width: 0; padding: 4px 2px 10px; }
+.media-now strong { font-size: 0.9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-now small { color: var(--ink-2); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-transport { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.media-transport .productivity-button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.media-transport .media-play { width: 48px; height: 48px; background: var(--accent, #d9a066); color: #1b1b1b; border-color: transparent; }
+.panel-head-action.is-busy svg { animation: settings-spin 0.9s linear infinite; }
+.panel-head-action.has-error { color: var(--danger, #c42b1c); }
+.productivity-head .panel-head-action { margin-left: 4px; }
+.panel-stamp { margin: 6px 2px 0 !important; font-size: 0.75rem !important; color: var(--ink-3, var(--ink-2)) !important; text-align: right; }
+.sensor-offer > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; list-style: none; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.sensor-offer > summary::-webkit-details-marker { display: none; }
+.sensor-offer > summary svg { width: 16px; height: 16px; flex: none; }
+.sensor-offer > summary:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+@keyframes settings-spin { to { transform: rotate(360deg); } }
+.productivity-head { justify-content: flex-start; gap: 4px; }
+.productivity-head > :first-child { margin-right: auto; }
+.productivity-head .widget-settings-action { margin-left: 0; }

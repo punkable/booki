@@ -166,7 +166,7 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
       const nav = document.createElement("div"); nav.className = "focus-month"; body.appendChild(nav);
-      const label = text("strong", "focus-month-title", date.toLocaleDateString(curLang(), { month: "long", year: "numeric" })); label.setAttribute("aria-live", "polite"); nav.appendChild(label);
+      const label = text("strong", "focus-month-title", ((s) => s.charAt(0).toLocaleUpperCase(curLang()) + s.slice(1))(date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }))); label.setAttribute("aria-live", "polite"); nav.appendChild(label);
       if (monthOffset !== 0) { const today = document.createElement("button"); today.type = "button"; today.className = "focus-today"; today.textContent = t("focus.today"); today.addEventListener("click", () => { monthOffset = 0; draw(); }); nav.appendChild(today); }
       for (const [name, step, key] of [["chevron-left", -1, "premium.previousMonth"], ["chevron-right", 1, "premium.nextMonth"]]) {
         const go = document.createElement("button"); go.type = "button"; go.className = "stack-close"; go.innerHTML = icon(name); go.title = t(key); go.setAttribute("aria-label", t(key));
