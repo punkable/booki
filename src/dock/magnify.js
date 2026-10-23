@@ -155,10 +155,15 @@ export function edgeAutoScroll() {
   else if (pos > hi - zone) edgeScrollVel = Math.ceil((pos - (hi - zone)) / 6);
   else edgeScrollVel = 0;
   if (edgeScrollVel && !edgeScrollRaf) {
-    const tick = () => {
+    // Speed is per 60 Hz frame, scaled by the real frame time, so a 144 Hz
+    // monitor scrolls at the same pace as a 60 Hz one, only smoother.
+    let last = performance.now();
+    const tick = (now) => {
       if (!edgeScrollVel || !document.body.classList.contains("dock-overflow")) { edgeScrollRaf = 0; return; }
-      if (isVertical()) dockEl.scrollTop += edgeScrollVel;
-      else dockEl.scrollLeft += edgeScrollVel;
+      const step = edgeScrollVel * Math.min(4, (now - last) / (1000 / 60));
+      last = now;
+      if (isVertical()) dockEl.scrollTop += step;
+      else dockEl.scrollLeft += step;
       edgeScrollRaf = requestAnimationFrame(tick);
     };
     edgeScrollRaf = requestAnimationFrame(tick);

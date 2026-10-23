@@ -97,6 +97,7 @@ import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu, openGrou
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
+import { startPluginUpdateChecks } from "./dock/plugin-updates.js";
 import "./dock/agent-notices.js";
 
 
@@ -665,6 +666,7 @@ window.addEventListener("pointerdown", (e) => {
 
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.
 setInterval(checkUpdates, 4 * 3600 * 1000);
+startPluginUpdateChecks();
 
 // Easter egg: Konami party.
 const KONAMI = [

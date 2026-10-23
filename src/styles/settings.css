@@ -1155,3 +1155,4 @@
 .plugin-terms .terms-check { margin-left: 26px; }
 /* Windows 11: a disabled accent button turns neutral grey, not a washed-out accent. */
 .button-accent:disabled { opacity: 1; color: var(--ink-3); background: var(--subtle-pressed); border-color: transparent; }
+.plugin-badge-update { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }

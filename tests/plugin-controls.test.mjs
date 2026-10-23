@@ -225,3 +225,16 @@ test("Collector ignores late and foreign progress after the native result", asyn
   assert.equal(await page.locator(".collector-job").getByRole("button", { name: "Open file", exact: true }).count(), 1);
   assert.deepEqual(errors, []); await page.close();
 });
+
+test('an outdated plugin offers its pinned update and keeps the dock widget', async () => {
+  const init = `const old=window.__TAURI__.core.invoke;window.installs=[];window.__TAURI__.core.invoke=(cmd,args)=>{if(cmd==='plugin_status')return Promise.resolve(args.id==='yt-dlp'?{installed:true,source:'booki',version:'2024.01.01',outdated:true,latest:'2099.01.01'}:{installed:false});if(cmd==='plugin_install'){window.installs.push(args.id);return Promise.resolve('2099.01.01');}return old(cmd,args);};`;
+  const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pluginTerms: 1, pinned: [{ id: 'c', kind: 'widget', widget: 'collector', style: {} }] }), initScript: init });
+  await page.getByRole('navigation').getByRole('button', { name: 'Plugins', exact: true }).click();
+  const card = page.locator('.plugin-card[data-setting-label="yt-dlp"]');
+  await card.getByText('Update available').waitFor();
+  await card.getByRole('button', { name: 'Update to 2099.01.01' }).click();
+  await page.waitForFunction(() => window.installs.length === 1);
+  const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
+  assert.equal(saved.pinned[0].widget, 'collector');
+  assert.deepEqual(errors, []); await page.close();
+});
