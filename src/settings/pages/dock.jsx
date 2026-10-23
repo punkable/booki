@@ -28,11 +28,6 @@ export function DockPage({ cfg, set }) {
   return <>
     <PageHeader title={t("tab.dock")}>{t("dock.pageHint")}</PageHeader>
     <div className="sticky-preview"><DockPreview cfg={cfg} stage /></div>
-    <SettingsSection icon="sparkles" title={t("refine.presets")} hint={t("refine.presetsHint")}>
-      <div className="chips dock-presets">
-        {DOCK_PRESETS.map((preset) => <button key={preset.id} type="button" className="chip" onClick={() => set(preset.patch, afterSurface)}>{t(`refine.${preset.id}`)}</button>)}
-      </div>
-    </SettingsSection>
 
 
     {/* What most people change, in the order they reach for it. Everything
@@ -72,6 +67,12 @@ export function DockPage({ cfg, set }) {
     <SettingsSection icon="sliders" title={t("gp.size")}>
       <Row label={t("ap.iconSize")}><Slider value={cfg.iconSize ?? 48} min={28} max={80} step={4} fmt={(v) => `${v}px`} onChange={(v) => set({ iconSize: v })} /></Row>
     </SettingsSection>
+
+    <CollapsibleSection title={t("refine.presets")} hint={t("refine.presetsHint")}>
+      {DOCK_PRESETS.map((preset) => <Row key={preset.id} label={t(`refine.${preset.id}`)} hint={t(`refine.${preset.id}Hint`)}>
+        <button type="button" className="button" aria-label={`${t("refine.applyPreset")} ${t(`refine.${preset.id}`)}`} onClick={() => set(preset.patch, afterSurface)}>{t("refine.applyPreset")}</button>
+      </Row>)}
+    </CollapsibleSection>
 
     <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
       {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}

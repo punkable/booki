@@ -94,7 +94,7 @@ Un Booki más fluido: grupos claros, notch discreto y Recolector completo.
 - Busca dentro del grupo y cambia entre lista e iconos pequeños, medianos o grandes con Ctrl + rueda. Al reorganizar se conservan búsqueda, vista y desplazamiento.
 - Al arrastrar desde un grupo ves el icono o inicial, el nombre, el destino y dónde se insertará. Escape cancela. Arrastra el fondo del dock para cambiar de borde o pantalla.
 - Menús contextuales más cortos: Personalizar reúne nombre, icono y color en un panel con paletas desplegables y Aplicar/Cancelar. Apariencia, organización, ventanas, recientes y perfiles se abren por separado.
-- Tres estilos de partida opcionales, desplazamiento suave y animaciones más contenidas. El punto en reposo es el inicio para instalaciones nuevas y presets; tus preferencias guardadas se conservan.
+- Los estilos predefinidos son opcionales y empiezan plegados: Windows, Compacto y Con aumento explican qué aplican. Desplazamiento suave y animaciones contenidas; los estilos conservan la forma y activación del notch.
 - Los agentes ocupan solo logo y estado. Rotan según la actividad, con prioridad para espera y error. La música aparece brevemente y sus controles siguen disponibles al acercarte mientras un agente trabaja.
 - Un panel reúne tus widgets en vivo. El menú y el lanzador ofrecen controles de audio y acciones rápidas. Al abrir un dispositivo puedes ver fuente y hora de consulta; el consumo de IA sin cuota publicada aparece como aproximado.
 - Vídeo, audio, archivos y galerías visibles desde el inicio. Añade varios enlaces a una cola de sesión, cancela o reintenta, elige calidad y carpeta, y abre, muestra o copia el archivo al terminar, también desde el aviso del notch.

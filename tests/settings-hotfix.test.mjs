@@ -52,7 +52,7 @@ test('native material reports four corners and retains fallback after failure', 
   const { page, errors } = await openPage(browser, port, 'notch.html', { cfg: makeConfig({ notchMode: 'attached', notchPeek: true }), initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "media_info" ? Promise.resolve({ title: "Song", artist: "Band", playing: true, thumb: "" }) : old(c, a); }` });
   // The card opens only with something to show; music gives it one.
   // Only the open card sits on Windows' blur; the slim tab is CSS-only.
-  await page.hover('#notch-pill');
+  await page.keyboard.press('Tab');
   await page.waitForFunction(() => document.body.classList.contains('card'));
   await page.evaluate(() => {
     const old = window.__TAURI__.core.invoke;
@@ -80,7 +80,7 @@ test('native material reports four corners and retains fallback after failure', 
 
 test('a late material reply cannot re-enable glass after the user disables it', async () => {
   const { page, errors } = await openPage(browser, port, 'notch.html', { initScript: `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c, a) => c === "media_info" ? Promise.resolve({ title: "Song", artist: "Band", playing: true, thumb: "" }) : old(c, a); }` });
-  await page.hover('#notch-pill');
+  await page.keyboard.press('Tab');
   await page.waitForFunction(() => document.body.classList.contains('card'));
   await page.evaluate(async () => {
     const old = window.__TAURI__.core.invoke;

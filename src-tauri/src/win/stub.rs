@@ -30,6 +30,9 @@ pub fn close_window(_hwnd: isize) -> bool {
 }
 
 pub fn set_capture_visible(_hwnd: isize, _visible: bool) {}
+pub fn foreground_is_capture() -> bool {
+    false
+}
 
 pub fn protect_data(data: &[u8]) -> Option<Vec<u8>> {
     Some(data.to_vec())

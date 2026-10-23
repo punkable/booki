@@ -86,7 +86,7 @@ A smoother Booki: clearer groups, a quieter notch and a fuller Collector.
 - Search inside groups and switch between list, small, medium or large icons with Ctrl + wheel. Reorganizing retains search, view and scroll.
 - Dragging from a group shows its icon or initial, name, destination and insertion marker. Escape cancels. Drag the dock background to change edge or screen.
 - Shorter context menus: Customize brings name, icon and color into a staged panel with expandable pickers and Apply/Cancel. Appearance, organization, windows, recents and profiles open separately.
-- Three optional starting styles, smooth scrolling and restrained motion. New installations and presets start with an idle dot; existing saved preferences are retained.
+- Optional style presets are folded away and explain what Windows, Compact and Magnified apply. Smooth scrolling and restrained motion refine daily use; presets preserve the notch shape and activation.
 - Agents show just logo and status, rotating with activity while waiting and errors take priority. Music appears briefly; hover still offers playback controls while an agent works.
 - One panel brings your live widgets together. The menu and launcher expose audio controls and quick actions. Device details show source and query time; AI usage without a published allowance is marked approximate.
 - Video, audio, files and galleries are explicit. Add multiple links to a session queue, cancel or retry, choose quality and folder, then open, reveal or copy the saved file, including from the notch notice.

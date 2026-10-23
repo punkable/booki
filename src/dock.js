@@ -25,6 +25,7 @@ import {
   isTauri,
 } from "./api.js";
 import { createDockTooltip } from "./dock/tooltip.js";
+import { captureHeld, dismissAfterCaptureCheck } from "./dock/capture-session.js";
 import { observeSystem } from "./dock/system-observer.js";
 import { paintedLook } from "./system-look.js";
 import { t, ensureLang } from "./i18n.js";
@@ -210,8 +211,7 @@ dockEl.addEventListener("dblclick", (e) => {
     dockApi.openSettings(); // double-click the empty bar → Settings
     return;
   }
-  // Double-click a widget → jump to its editor (styles/colors live in Apps).
-  if (tile.classList.contains("widget")) dockApi.openSettingsTab("widgets");
+  if (tile.classList.contains("widget")) dockApi.openWidgetSettings(tile.dataset.id);
 });
 
 // Middle-click works like the taskbar: an app opens a new instance and a
@@ -307,6 +307,7 @@ dockEl.addEventListener("pointermove", (e) => {
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
   magPointer.x = e.clientX;
   magPointer.y = e.clientY;
+  if (captureHeld()) return;
   if (S.edgeMove) return; // moving the whole dock to another edge — no magnify
   if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
   if (magnifyRaf) return;
@@ -315,7 +316,10 @@ dockEl.addEventListener("pointermove", (e) => {
     magnify(magPointer.x, magPointer.y);
   });
 });
-dockEl.addEventListener("pointerleave", () => { resetMagnify(); stopEdgeScroll(); });
+dockEl.addEventListener("pointerleave", () => {
+  stopEdgeScroll();
+  dismissAfterCaptureCheck(() => { if (!dockEl.matches(":hover")) resetMagnify(); });
+});
 
 window.addEventListener("pointercancel", cancelDrag);
 
@@ -405,7 +409,7 @@ ctxMenu.addEventListener("keydown", (e) => {
   if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); e.stopPropagation(); closeMenu(); }
 });
 window.addEventListener("click", closeMenu);
-window.addEventListener("blur", () => {
+function dismissUnfocusedPanels() {
   closeMenu();
   closeStack();
   if (S.productivityPanel) closeProductivityPanel();
@@ -416,6 +420,14 @@ window.addEventListener("blur", () => {
     S.pinnedReveal = false;
     scheduleHide();
   }
+}
+window.addEventListener("blur", () => dismissAfterCaptureCheck(() => {
+  if (!S.cfg?.captureVisible || !document.hasFocus()) dismissUnfocusedPanels();
+}));
+window.addEventListener("booki:capture-ended", () => {
+  if (!document.hasFocus()) dismissUnfocusedPanels();
+  if (!dockEl.matches(":hover")) { resetMagnify(); dockTooltip.hide(); }
+  if (wantsHideNow()) scheduleHide();
 });
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
@@ -591,7 +603,7 @@ onSoftReveal(softOpen);
 // Hot edge: the cursor was pushed against the dock's screen edge — an explicit
 // "come out" gesture, treated exactly like clicking the notch.
 onHotEdge(() => {
-  if (S.fullscreen || !S.hiddenState) return;
+  if (S.fullscreen || !S.hiddenState || S.cfg.notchTrigger !== "hover") return;
   pinOpen();
 });
 
@@ -606,6 +618,8 @@ window.addEventListener("pointerdown", (e) => {
 
 // ─────────────────────── Booki tooltips ───────────────────────
 const dockTooltip = createDockTooltip(dockEl, {
+  dismiss: dismissAfterCaptureCheck,
+  preserve: captureHeld,
   edge: () => S.cfg.edge,
   blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {

@@ -8,7 +8,7 @@ export function setTileLabel(tile, label) {
   if (tile.getAttribute('aria-label') !== next) tile.setAttribute('aria-label', next);
 }
 
-export function createDockTooltip(root, { edge, describe, blocked }) {
+export function createDockTooltip(root, { edge, describe, blocked, dismiss = (action) => action(), preserve = () => false }) {
   const tip = document.createElement('div');
   tip.id = 'booki-dock-tooltip'; tip.className = 'dock-tip';
   tip.setAttribute('role', 'tooltip'); tip.setAttribute('aria-hidden', 'true');
@@ -74,7 +74,9 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
     timer = setTimeout(show, event.type === 'focusin' ? 0 : warm ? 40 : 400);
   }
   function leave(event) {
-    if (anchor && (!event.relatedTarget || !anchor.contains(event.relatedTarget))) hide();
+    if (preserve()) return;
+    const previous = anchor;
+    if (anchor && (!event.relatedTarget || !anchor.contains(event.relatedTarget))) dismiss(() => { if (anchor === previous && !anchor?.matches(":hover")) hide(); });
   }
   // A click opens the tile's panel or flyout; the hint makes way at once.
   root.addEventListener('pointerdown', hide);
@@ -83,7 +85,7 @@ export function createDockTooltip(root, { edge, describe, blocked }) {
   root.addEventListener('pointerdown', hide, true);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
   document.addEventListener('contextmenu', hide, true);
-  window.addEventListener('blur', hide); window.addEventListener('resize', hide);
+  window.addEventListener('blur', () => dismiss(() => { if (!document.hasFocus()) hide(); })); window.addEventListener('resize', hide);
   document.addEventListener('visibilitychange', hide);
   // A Settings rerender can replace a hovered tile without pointerout.
   const observer = new MutationObserver(() => { if (anchor && (!anchor.isConnected || blocked())) hide(); });

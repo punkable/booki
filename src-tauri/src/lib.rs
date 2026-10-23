@@ -73,6 +73,11 @@ fn quiet_update_supported() -> bool {
     win::quiet_update_supported()
 }
 
+#[tauri::command]
+fn capture_session_active() -> bool {
+    config::load().capture_visible && win::foreground_is_capture()
+}
+
 static UPDATE_LOCK: AtomicBool = AtomicBool::new(false);
 #[tauri::command]
 fn acquire_update_lock() -> bool {
@@ -1614,6 +1619,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            capture_session_active,
             launched_at_login,
             device_batteries,
             ai_usage,
@@ -1964,6 +1970,7 @@ pub fn run() {
                         // the notch answers an approach within one tick).
                         let mut busy = (false, false, 0u8);
                         let mut near_last = false;
+                        let mut capture_last = false;
                         fn n_scale(w: Option<&tauri::WebviewWindow>) -> f64 {
                             w.and_then(|w| w.scale_factor().ok()).unwrap_or(1.0)
                         }
@@ -1992,6 +1999,12 @@ pub fn run() {
                         loop {
                             std::thread::sleep(std::time::Duration::from_millis(300));
                             tick = tick.wrapping_add(1);
+                            let capturing =
+                                cfg_cache.capture_visible && win::foreground_is_capture();
+                            if capturing != capture_last {
+                                capture_last = capturing;
+                                let _ = handle.emit("booki://capture-session", capturing);
+                            }
                             if tick % 10 == 0 {
                                 cfg_cache = config::load();
                                 // Some apps create their own topmost window after Booki
@@ -2000,6 +2013,7 @@ pub fn run() {
                                 // Never lift Booki over a fullscreen game or movie.
                                 let busy = FULLSCREEN_BLACKOUT
                                     .load(std::sync::atomic::Ordering::Relaxed)
+                                    || capturing
                                     || win::is_fullscreen_on(self_hwnd);
                                 if cfg_cache.always_on_top
                                     && !busy
@@ -2027,7 +2041,7 @@ pub fn run() {
                             }
                             // foreground_occludes = "the user is in an app". Smart
                             // auto-hide and the smart notch both consume this.
-                            if cfg_cache.auto_hide_mode == "smart" {
+                            if cfg_cache.auto_hide_mode == "smart" && !capturing {
                                 let (dl, dt, dr, db) =
                                     *DOCK_HOME_RECT.lock().unwrap_or_else(|e| e.into_inner());
                                 if let Some(v) = debounce(
@@ -2044,8 +2058,9 @@ pub fn run() {
                             // Feeding `false` instead still sends the "fullscreen
                             // ended" edge, so turning the option off mid-game
                             // can't leave the dock blacked out.
-                            let fullscreen =
-                                cfg_cache.hide_in_fullscreen && win::is_fullscreen_on(self_hwnd);
+                            let fullscreen = cfg_cache.hide_in_fullscreen
+                                && !capturing
+                                && win::is_fullscreen_on(self_hwnd);
                             if let Some(v) = debounce(&mut fs, fullscreen) {
                                 let _ = handle.emit("booki://fullscreen", v);
                             }

@@ -42,10 +42,13 @@ const toastTitleEl = document.getElementById("notch-toast-title");
 const toastSubEl = document.getElementById("notch-toast-sub");
 const toastActionsEl = document.getElementById("notch-toast-actions");
 
+let lookGeneration = 0;
 async function applyLook() {
+  const generation = ++lookGeneration;
   try {
     const cfg = await configApi.get();
     await ensureLang(cfg.language || "system");
+    if (generation !== lookGeneration) return;
     setLang(cfg.language || "system");
     const label = t("notch.show");
     pill.title = label;
@@ -54,6 +57,9 @@ async function applyLook() {
     const look = paintedLook(cfg);
     if (look.accent) applyAccent(root, look.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
+    clearTimeout(hoverTimer);
+    clearTimeout(cardTimer);
+    if (!hoverTrigger && !pill.matches(":focus-visible")) closeCard();
     presenceMode = ["always", "edge"].includes(cfg.notchVisibility) ? cfg.notchVisibility : "auto";
     // The notch always lives on the dock's edge now.
     const edge = cfg.edge || "bottom";
@@ -791,6 +797,7 @@ function closeCard() {
 // Intent delay in, a short grace out: brushing past the edge does nothing,
 // and leaving by a pixel does not snap it shut.
 pill.addEventListener("pointerenter", () => {
+  if (!hoverTrigger) return;
   clearTimeout(cardTimer);
   cardTimer = setTimeout(openCard, 350);
 });
@@ -800,7 +807,7 @@ pill.addEventListener("pointerleave", () => {
 });
 
 // Keyboard: focusing the pill opens the same card, so play/pause is reachable.
-pill.addEventListener("focus", () => { clearTimeout(cardTimer); openCard(); });
+pill.addEventListener("focus", () => { if (!pill.matches(":focus-visible")) return; clearTimeout(cardTimer); openCard(); });
 pill.addEventListener("blur", (e) => { if (!pill.contains(e.relatedTarget)) { clearTimeout(cardTimer); cardTimer = setTimeout(closeCard, 220); } });
 
 cPlay.addEventListener("pointerdown", (e) => e.stopPropagation());
@@ -840,7 +847,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => invoke("reveal_dock").catch(() => {}), 90);
+  hoverTimer = setTimeout(() => { if (hoverTrigger) invoke("reveal_dock").catch(() => {}); }, 90);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 

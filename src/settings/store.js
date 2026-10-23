@@ -29,7 +29,9 @@ export function useSettingsStore() {
   const [closeError, setCloseErrorState] = useState(null);
   const closeErrorRef = useRef(null);
   const setCloseError = (value) => { closeErrorRef.current = value; setCloseErrorState(value); };
-  const [configConflict, setConfigConflict] = useState(null);
+  const [configConflict, setConflictState] = useState(null);
+  const conflictRef = useRef(null);
+  const setConfigConflict = (value) => { conflictRef.current = value; setConflictState(value); };
   const cfgRef = useRef(null);
   const saveTimer = useRef(null);
   const dirtyKeys = useRef(new Set());
@@ -38,15 +40,15 @@ export function useSettingsStore() {
   const closing = useRef(false);
   const afterSaveCb = useRef(null);
   const saveQueue = useRef(Promise.resolve());
-  cfgRef.current = cfg;
+  const flushLatest = useRef(() => Promise.resolve());
 
   const performSave = async () => {
     clearTimeout(saveTimer.current);
     saveTimer.current = null;
-    const keys = [...dirtyKeys.current];
+    const conflicts = new Set(conflictRef.current?.keys || []);
+    const keys = [...dirtyKeys.current].filter((key) => !conflicts.has(key));
     const base = Object.fromEntries(keys.map((key) => [key, dirtyBase.current.get(key)]));
-    for (const key of keys) dirtyBase.current.delete(key);
-    dirtyKeys.current.clear();
+    for (const key of keys) { dirtyBase.current.delete(key); dirtyKeys.current.delete(key); }
     savingKeys.current = new Set(keys);
     const cb = afterSaveCb.current;
     afterSaveCb.current = null;
@@ -59,12 +61,20 @@ export function useSettingsStore() {
       for (const key of keys) if (key in snap) patch[key] = snap[key];
       if (keys.includes("pinned")) patch.pinned = normalizePinned(snap.pinned || []);
       const toSave = await configApi.patch(patch, { base, expectedRevision: snap.revision }) || { ...snap, ...patch };
-      await emitConfigChanged();
-      if (!dirtyKeys.current.size) cfgRef.current = toSave;
-      // Keep any edits typed while the save was in flight.
-      setCfg((prev) => (!prev ? toSave : dirtyKeys.current.size ? prev : { ...prev, ...toSave }));
+      // A second edit to the same field started from our pending write, not
+      // from another panel. Rebase it on the canonical acknowledgement.
+      for (const key of keys) {
+        if (dirtyKeys.current.has(key) && JSON.stringify(dirtyBase.current.get(key)) === JSON.stringify(patch[key])) {
+          dirtyBase.current.set(key, structuredClone(toSave[key]));
+        }
+      }
+      const draft = cfgRef.current;
+      const next = { ...(draft?.revision > toSave.revision ? draft : toSave) };
+      for (const key of dirtyKeys.current) next[key] = draft[key];
+      cfgRef.current = next;
+      setCfg(next);
       setSaveState("saved");
-      setConfigConflict(null);
+      await emitConfigChanged().catch(() => {});
       if (closeErrorRef.current === "unsaved" && !dirtyKeys.current.size) setCloseError(null);
       if (typeof cb === "function") cb(toSave);
     } catch (error) {
@@ -82,17 +92,27 @@ export function useSettingsStore() {
     saveQueue.current = queued.catch(() => {});
     return queued;
   };
+  flushLatest.current = flushSave;
   const settled = async () => { await flushSave(); return !dirtyKeys.current.size; };
 
   /** Apply a patch now; save it shortly (or immediately with `flush`). */
   const set = (patch, opts = {}) => {
     const prev = cfgRef.current;
+    patch = Object.fromEntries(Object.entries(patch).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(prev?.[key])));
+    if (!Object.keys(patch).length) return;
     const next = { ...prev, ...patch };
     if (patch.pinned) next.pinned = normalizePinned(patch.pinned);
     // Record the draft synchronously: a native close can arrive before React
     // renders the edit, and must still wait for those keys to reach disk.
     for (const key of Object.keys(patch)) {
       if (!dirtyKeys.current.has(key)) dirtyBase.current.set(key, structuredClone(prev?.[key]));
+      if (conflictRef.current?.keys.includes(key)) {
+        // Choosing a new value in this window is an explicit new edit against
+        // the latest conflicting value. Other unresolved fields stay pending.
+        dirtyBase.current.set(key, structuredClone(conflictRef.current.current[key]));
+        const remaining = conflictRef.current.keys.filter((field) => field !== key);
+        setConfigConflict(remaining.length ? { ...conflictRef.current, keys: remaining } : null);
+      }
       dirtyKeys.current.add(key);
     }
     cfgRef.current = next;
@@ -259,6 +279,22 @@ export function useSettingsStore() {
         // updaters twice, and painting or loading a language is a side effect.
         // cfgRef always holds the newest draft (set() writes it synchronously).
         const prev = cfgRef.current;
+        if (prev?.revision > c.revision) return;
+        // A remote update may already contain our desired value, or may have
+        // returned to our baseline. Neither needs a permanent conflict banner.
+        if (conflictRef.current && !savingKeys.current.size) {
+          const remaining = conflictRef.current.keys.filter((key) => {
+            if (JSON.stringify(c[key]) === JSON.stringify(prev[key])) {
+              dirtyKeys.current.delete(key); dirtyBase.current.delete(key); return false;
+            }
+            return JSON.stringify(c[key]) !== JSON.stringify(dirtyBase.current.get(key));
+          });
+          setConfigConflict(remaining.length ? { keys: remaining, current: c } : null);
+          if (!remaining.length) {
+            setSaveState(dirtyKeys.current.size ? "saving" : "saved");
+            if (dirtyKeys.current.size) saveTimer.current = setTimeout(() => flushLatest.current(), 0);
+          }
+        }
         let next = Array.isArray(c.pinned) ? c : { ...c, pinned: [] };
         if (prev) {
           next = { ...c };

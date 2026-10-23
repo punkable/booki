@@ -109,12 +109,15 @@ function App() {
   const [showChangelog, setShowChangelog] = useState(false);
   const [searchTarget, setSearchTarget] = useState(null);
   const [focusedPin, setFocusedPin] = useState(null);
+  const [targetVisit, setTargetVisit] = useState(0);
   const [page, setPageRaw] = useState(() => {
     try { return pageOf(localStorage.getItem("booki.lastTab")) || "home"; } catch (_) { return "home"; }
   });
   const navigate = (id) => {
-    const next = pageOf(id) || "home";
-    setFocusedPin(null);
+    const widgetId = id?.startsWith("widget:") ? decodeURIComponent(id.slice(7)) : null;
+    const next = widgetId ? "widgets" : pageOf(id) || "home";
+    setFocusedPin(widgetId);
+    setTargetVisit((visit) => visit + 1);
     // A search result already revealed belongs to that visit; without this,
     // coming back to its page would scroll and focus it again.
     setSearchTarget(null);
@@ -188,7 +191,7 @@ function App() {
     <main ref={main} className="settings-main">
       <div className={"page page-" + page}>
         <p className={"save-status is-" + saveState} role="status" aria-live="polite">
-          {saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
+          {configConflict ? "" : saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
         </p>
         {configConflict && <div className="notice notice-error conflict-error" role="alert"><span>{t("workspace.conflict")}</span>
           <button type="button" className="button" onClick={() => store.resolveConfigConflict(true)}>{t("workspace.keepMine")}</button>
@@ -203,7 +206,7 @@ function App() {
         <SettingsBoundary key={page} onHome={() => navigate("home")}>
           {page === "home" && <HomePage cfg={cfg} set={set} navigate={navigate} reveal={(tab, key) => { navigate(tab); setSearchTarget({ key, tab, label: t(key) }); }} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
           {page === "dock" && <DockPage {...pageProps} />}
-          {page === "widgets" && <WidgetsPage {...pageProps} />}
+          {page === "widgets" && <WidgetsPage key={targetVisit} {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}
           {page === "plugins" && <PluginsPage cfg={cfg} set={set} />}
           {page === "system" && <SystemPage {...pageProps} version={version} store={store} onWhatsNew={() => setShowChangelog(true)} />}
