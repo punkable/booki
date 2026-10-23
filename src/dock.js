@@ -302,8 +302,6 @@ dockEl.addEventListener(
   { passive: false }
 );
 
-let magnifyRaf = 0;
-
 dockEl.addEventListener("pointermove", (e) => {
   // Always keep the freshest pointer position; coalesce to one magnify per frame
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
@@ -312,11 +310,16 @@ dockEl.addEventListener("pointermove", (e) => {
   if (captureHeld()) return;
   if (S.edgeMove) return; // moving the whole dock to another edge — no magnify
   if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
-  if (magnifyRaf) return;
-  magnifyRaf = requestAnimationFrame(() => {
-    magnifyRaf = 0;
-    magnify(magPointer.x, magPointer.y);
-  });
+  // magnify() only records the target; its own frame loop paints at the
+  // display's refresh and reads the freshest pointer position.
+  magnify(magPointer.x, magPointer.y);
+});
+// High-rate mice report positions between frames. pointerrawupdate delivers
+// them without waiting for the frame's coalesced pointermove, so the wave
+// uses where the pointer is now, not where it was a few milliseconds ago.
+if ("onpointerrawupdate" in window) dockEl.addEventListener("pointerrawupdate", (e) => {
+  magPointer.x = e.clientX;
+  magPointer.y = e.clientY;
 });
 dockEl.addEventListener("pointerleave", () => {
   stopEdgeScroll();

@@ -144,6 +144,7 @@ test('a capture keeps the magnified tile and tooltip after pointer leave and rel
   const tile = page.locator('#dock > [data-id=a]');
   await tile.hover();
   await page.locator('#booki-dock-tooltip.show').waitFor();
+  await page.waitForTimeout(400); // the wave eases in; read it once it rests
   const transform = await tile.evaluate(el => el.style.transform);
   assert.ok(transform, 'hover has magnified the tile');
   await signal(page, 'booki://capture-session', true);
@@ -155,6 +156,7 @@ test('a capture keeps the magnified tile and tooltip after pointer leave and rel
   await page.evaluate(() => { window.capturing=false; });
   await signal(page, 'booki://capture-session', false);
   await waitForAsyncCondition(page, () => !document.querySelector('#booki-dock-tooltip.show'));
-  assert.equal(await tile.evaluate(el => el.style.transform), '');
+  // Released, the wave springs back to rest instead of snapping.
+  await waitForAsyncCondition(page, () => document.querySelector('#dock > [data-id=a]').style.transform === '');
   assert.deepEqual(errors, []); await page.close();
 });

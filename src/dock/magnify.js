@@ -21,14 +21,22 @@ export function setAllSizes(size) {
 }
 
 export function resetMagnify() {
-  // Drop "live" mode first so restoring the transform transition lets the tiles
-  // ease smoothly back to rest instead of snapping.
+  // The wave springs back to rest from wherever it is; the loop clears the
+  // inline styles and drops "live" mode once every tile has settled.
+  magPointerActive = false;
+  if (magCache && !reduceMotion() && dockEl.classList.contains("mag-live")) { startMagLoop(); return; }
+  stopMagLoop();
+  clearMagnify();
+}
+
+function clearMagnify() {
   dockEl.classList.remove("mag-live");
   dockEl.querySelectorAll(".tile").forEach((t) => {
     t.style.transform = "";
     t.style.zIndex = "";
     t.classList.remove("focus");
   });
+  if (magCache) for (const item of magCache) item.cur = null;
   magFocus = null;
   // Resting hit-rects — don't leave the inflated mag union clickable.
   S.lastHitSig = "";
@@ -41,6 +49,7 @@ export function resetMagnify() {
 let magCache = null;
 let magFocus = null;
 export function invalidateMag() {
+  stopMagLoop();
   magCache = null;
   S.magDockRect = null;
   magFocus = null;
@@ -60,9 +69,18 @@ function buildMagCache() {
   }));
 }
 
-// Booki magnify — Apple/Cool Dock style wave: tiles scale + lift toward the
-// screen interior AND nudge along the main axis so neighbours make room
-// instead of stacking. Geometry is cached; this loop only writes transforms.
+// Booki magnify — a wave: tiles scale + lift toward the screen interior AND
+// nudge along the main axis so neighbours make room instead of stacking.
+// Geometry is cached; the loop only writes transforms.
+//
+// Motion is a critically damped follow driven by the real frame time: each
+// frame closes the same fraction of the gap per millisecond, so 60, 144 and
+// 240 Hz feel equally quick, the higher rates only smoother, and nothing
+// overshoots. The pointer position is read fresh every frame.
+const MAG_TAU = 0.045; // seconds to close ~63% of the gap
+let magPointerActive = false;
+let magRaf = 0;
+let magLast = 0;
 export function magnify(clientX, clientY) {
   if (S.cfg.magnification === false || (S.cfg.magnifyStyle || "spring") === "off") return;
   if (dockEl.classList.contains("dragging") || S.editMode) return;
@@ -70,21 +88,37 @@ export function magnify(clientX, clientY) {
   // cut off — skip magnify; the name still shows via tooltip on hover.
   if (document.body.classList.contains("dock-overflow")) return;
   if (!magCache) buildMagCache();
-  // Follow the pointer 1:1 this frame (no CSS transition lag) — the settle when
-  // you leave still eases. This is what makes it feel crisp at high refresh.
+  magPointer.x = clientX; magPointer.y = clientY;
+  magPointerActive = true;
   // Guarded: re-adding a class that is already there still queues a mutation
-  // record, and this runs every frame — that single write was waking the
-  // observer below once per frame, which scheduled a full hit-rect report that
-  // raced the one magnify schedules itself.
+  // record, which would wake the hit-rect observer every frame.
   if (!dockEl.classList.contains("mag-live")) dockEl.classList.add("mag-live");
+  // Reduced motion: no easing, the wave follows the pointer directly.
+  if (reduceMotion()) { magStep(1); return; }
+  startMagLoop();
+}
+
+function startMagLoop() {
+  if (magRaf) return;
+  magLast = performance.now();
+  const frame = (now) => {
+    magRaf = 0;
+    if (!magCache) return;
+    const dt = Math.min(0.1, Math.max(0, (now - magLast) / 1000));
+    magLast = now;
+    const settled = magStep(1 - Math.exp(-dt / MAG_TAU));
+    if (settled && !magPointerActive) { clearMagnify(); return; }
+    if (!settled || magPointerActive) magRaf = requestAnimationFrame(frame);
+  };
+  magRaf = requestAnimationFrame(frame);
+}
+function stopMagLoop() { if (magRaf) cancelAnimationFrame(magRaf); magRaf = 0; }
+
+/** Move every tile `k` (0..1) of the way to its target; true once all rest there. */
+function magStep(k) {
   const base = baseSize();
-  // Reduced motion reaches magnify here, not through CSS: the wave is written
-  // as an inline transform every frame, which the global override cannot touch,
-  // so the setting used to do nothing at all to the dock's largest animation.
-  // What goes is the decoration — neighbours rippling outward, tiles lifting
-  // off the bar. What stays is a small scale on the tile under the pointer,
-  // because that is not ornament: it is how you know what you are about to
-  // click, and removing it would make the dock harder to use, not calmer.
+  // Reduced motion keeps only a small scale on the tile under the pointer:
+  // that tells you what you are about to click; the ripple is decoration.
   const calm = reduceMotion();
   const maxScale = calm ? Math.min(1.12, Math.max(1, S.cfg.zoom || 1.25)) : Math.max(1, S.cfg.zoom || 1.25);
   const spread = calm ? base * 0.6 : base * 2.0;
@@ -93,26 +127,30 @@ export function magnify(clientX, clientY) {
   const liftAxis = vertical ? "X" : "Y";
   const liftSign = (vertical ? S.cfg.edge === "left" : S.cfg.edge === "top") ? 1 : -1;
   const dr = S.magDockRect;
-  const pointer = vertical ? clientY - dr.top : clientX - dr.left;
+  const pointer = vertical ? magPointer.y - dr.top : magPointer.x - dr.left;
   let best = null;
   let bestInf = 0;
+  let settled = true;
   for (const item of magCache) {
     const delta = item.center - pointer;
-    const influence = item.noMag ? 0 : Math.max(0, 1 - (Math.abs(delta) / spread) ** 2);
-    const scale = item.noMag ? 1 : 1 + (maxScale - 1) * influence;
-    // Lift toward the screen interior (translate BEFORE scale so it stays a
-    // constant px amount). Neighbours also push along the bar — the wave.
-    // Rail-origin scale does most of the "lift"; keep translate modest.
-    const lift = calm ? 0 : Math.round(influence * 5);
-    const liftTf = lift ? `translate${liftAxis}(${liftSign * lift}px) ` : "";
-    const push = item.noMag || calm ? 0 : Math.sign(delta || 1) * influence * base * 0.22;
-    const pushTf = push ? `translate${mainAxis}(${push.toFixed(1)}px) ` : "";
-    item.el.style.zIndex = influence > 0.02 ? String(Math.round(10 + influence * 90)) : "";
-    item.el.style.transform = `${pushTf}${liftTf}scale(${scale.toFixed(3)})`;
-    if (!item.noMag && influence > bestInf) {
-      bestInf = influence;
-      best = item.el;
+    const influence = !magPointerActive || item.noMag ? 0 : Math.max(0, 1 - (Math.abs(delta) / spread) ** 2);
+    const target = {
+      scale: item.noMag ? 1 : 1 + (maxScale - 1) * influence,
+      lift: calm ? 0 : influence * 5,
+      push: item.noMag || calm ? 0 : Math.sign(delta || 1) * influence * base * 0.22,
+    };
+    const cur = item.cur || (item.cur = { scale: 1, lift: 0, push: 0 });
+    for (const key of ["scale", "lift", "push"]) {
+      cur[key] += (target[key] - cur[key]) * k;
+      if (Math.abs(target[key] - cur[key]) > (key === "scale" ? 0.002 : 0.2)) settled = false;
+      else cur[key] = target[key];
     }
+    const shown = (cur.scale - 1) / Math.max(0.001, maxScale - 1);
+    const liftTf = cur.lift >= 0.5 ? `translate${liftAxis}(${(liftSign * cur.lift).toFixed(1)}px) ` : "";
+    const pushTf = Math.abs(cur.push) >= 0.05 ? `translate${mainAxis}(${cur.push.toFixed(1)}px) ` : "";
+    item.el.style.zIndex = shown > 0.02 ? String(Math.round(10 + shown * 90)) : "";
+    item.el.style.transform = cur.scale === 1 && !liftTf && !pushTf ? "" : `${pushTf}${liftTf}scale(${cur.scale.toFixed(3)})`;
+    if (!item.noMag && influence > bestInf) { bestInf = influence; best = item.el; }
   }
   const focus = best && bestInf > 0.45 ? best : null;
   if (focus !== magFocus) {
@@ -121,8 +159,9 @@ export function magnify(clientX, clientY) {
     magFocus = focus;
   }
   // Hit-rects must track the wave — style mutations are ignored while mag-live,
-  // so schedule from this rAF instead of waiting for the MutationObserver.
+  // so schedule from this frame instead of waiting for the MutationObserver.
   scheduleMagHitRects();
+  return settled;
 }
 
 let magHitTimer = 0;

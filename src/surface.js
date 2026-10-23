@@ -66,10 +66,11 @@ export function surfaceAlpha(cfg) {
   const style = effectiveSurface(cfg);
   if (style === "solid") return 1;
   if (style === "taskbar") return 0.82;
-  // Glass stays a frost. Even at full strength it is clearly thinner than
-  // the taskbar, so the two cannot be mistaken for each other.
+  // Glass is Windows 11 acrylic: a tint dense enough that text stays legible
+  // over any wallpaper (the system flyouts sit around 0.6-0.8), and at the
+  // default strength still thinner than the taskbar style.
   const strength = Math.max(0, Math.min(100, Number(cfg?.materialStrength ?? 60))) / 100;
-  return Math.round((0.22 + strength * 0.28) * 100) / 100;
+  return Math.round((0.42 + strength * 0.4) * 100) / 100;
 }
 
 /** Menus and flyouts carry text, so they never get thinner than this. */

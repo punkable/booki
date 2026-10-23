@@ -19,8 +19,9 @@ const HEX = /^#[0-9a-f]{6}$/i;
 // The Windows 11 taskbar's own fills in dark and light mode.
 export const TASKBAR_DARK = "#202020";
 export const TASKBAR_LIGHT = "#eeeeee";
-// A light veil, not another dark gray. At the glass alpha it reads as frost.
-const GLASS_AUTO = { dark: "#f2f2f2", light: "#ffffff" };
+// Windows 11 acrylic tints, one per theme: the light flyout fill and the
+// dark one. Over the native blur they read as the system's own material.
+const GLASS_AUTO = { dark: "#2c2c2c", light: "#fcfcfc" };
 
 export function colorSource(cfg) {
   return COLOR_SOURCES.includes(cfg?.colorSource) ? cfg.colorSource : "custom";

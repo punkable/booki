@@ -453,6 +453,11 @@ body.edge-left .tile.drop-gap-after, body.edge-right .tile.drop-gap-after { marg
   opacity: 0;
   transform: translateY(6px) scale(0.97);
 }
+/* Windows 11 menus slide in from the side they open toward, no scaling. */
+.menu.measuring { transform: translateY(8px); }
+body.edge-top .menu.measuring { transform: translateY(-8px); }
+body.edge-left .menu.measuring { transform: translateX(-8px); }
+body.edge-right .menu.measuring { transform: translateX(8px); }
 @media (prefers-reduced-motion: reduce) {
   .menu, .trash-pop, .coach, .undo-toast { transition: none; }
 }

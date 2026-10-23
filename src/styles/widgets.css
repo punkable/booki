@@ -690,3 +690,6 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .productivity-panel .focus-option .win-switch:checked::after { transform: translateX(20px); background: var(--accent-contrast, #fff); }
 .productivity-panel .focus-option .win-switch:checked:hover::after { transform: translateX(18px); }
 .productivity-panel .focus-option .win-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Expandable cards keep the primary ink for their names, like the others. */
+details.reading-card > summary { color: var(--ink); }
+details.reading-card > summary .reading-card-names strong { color: var(--ink); }
