@@ -115,16 +115,18 @@ body.look-clear { --surf-stroke: color-mix(in srgb, #fff 26%, transparent); }
   --ctrl-stroke: color-mix(in srgb, var(--ink) 18%, transparent);
   --bg: var(--glass-tint, var(--surface-tint));
   --layer-strong: var(--glass-tint, var(--surface-tint));
+  --focus-ring: var(--ink);
+  --danger-text: light-dark(#c42b1c, #ff99a4);
   color: var(--ink);
 }
 :root[data-high-contrast] :is(.menu, .stack, .productivity-panel, .note-editor, .trash-pop) {
   --ink: CanvasText; --ink-2: CanvasText; --ink-3: CanvasText;
-  --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText;
+  --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText; --danger-text: CanvasText;
 }
 @media (forced-colors: active) {
   :is(.menu, .stack, .productivity-panel, .note-editor, .trash-pop) {
     --ink: CanvasText; --ink-2: CanvasText; --ink-3: CanvasText;
-    --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText;
+    --bg: Canvas; --layer-strong: Canvas; --ctrl-fill: Canvas; --ctrl-stroke: ButtonText; --danger-text: CanvasText;
   }
 }
 .dock, .notch-pill {

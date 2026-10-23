@@ -105,6 +105,7 @@ for (const [theme, tint, expected] of [['dark', '#f3f3f3', 'rgb(27, 27, 27)'], [
     await page.locator('[data-id=g]').click();
     const view = page.locator('.group-toolbar select');
     assert.equal(await view.evaluate(el => getComputedStyle(el).color), expected);
+    assert.equal(await view.evaluate(el => getComputedStyle(el).getPropertyValue('--focus-ring').trim()), expected === 'rgb(27, 27, 27)' ? '#1b1b1b' : '#f2f2f2');
     const option = await view.locator('option').first().evaluate(el => ({ ink: getComputedStyle(el).color, fill: getComputedStyle(el).backgroundColor }));
     assert.equal(option.ink, expected); assert.notEqual(option.ink, option.fill);
     assert.notEqual(option.fill, 'rgba(0, 0, 0, 0)');
