@@ -681,3 +681,12 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .productivity-head { justify-content: flex-start; gap: 4px; }
 .productivity-head > :first-child { margin-right: auto; }
 .productivity-head .widget-settings-action { margin-left: 0; }
+/* Windows 11 toggle switch for on/off options inside dock panels. */
+.productivity-panel .focus-option { display: flex; min-height: 0; margin: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 2px; font-size: 0.8125rem; cursor: pointer; }
+.productivity-panel .focus-option .win-switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 40px; height: 20px; margin: 0; border: 1px solid var(--ctrl-strong-stroke, var(--ink-2)); border-radius: 999px; background: transparent; cursor: pointer; transition: background var(--dur-1, .12s) ease; }
+.productivity-panel .focus-option .win-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-2); transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), width 0.12s ease; }
+.productivity-panel .focus-option .win-switch:hover::after { width: 14px; height: 14px; top: 2px; }
+.productivity-panel .focus-option .win-switch:checked { background: var(--accent); border-color: var(--accent); }
+.productivity-panel .focus-option .win-switch:checked::after { transform: translateX(20px); background: var(--accent-contrast, #fff); }
+.productivity-panel .focus-option .win-switch:checked:hover::after { transform: translateX(18px); }
+.productivity-panel .focus-option .win-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

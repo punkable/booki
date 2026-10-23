@@ -126,9 +126,10 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       const options = document.createElement("div"); options.className = "focus-options";
       for (const [key, label, on] of [["dnd", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "focus.tuck", !!st.tuckDuringFocus]]) {
         const row = document.createElement("label"); row.className = `focus-option focus-option-${key}`;
-        const box = document.createElement("input"); box.type = "checkbox"; box.checked = on;
+        // On/off settings are toggle switches in Windows, text first.
+        const box = document.createElement("input"); box.type = "checkbox"; box.checked = on; box.setAttribute("role", "switch"); box.className = "win-switch";
         box.addEventListener("change", () => update({ [key]: box.checked }));
-        row.append(box, text("span", "", t(label))); options.appendChild(row);
+        row.append(text("span", "", t(label)), box); options.appendChild(row);
       }
       body.appendChild(options);
     },

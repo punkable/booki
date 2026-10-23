@@ -158,7 +158,7 @@ export function buildSystemPanel(item, { close }) {
     const battery = section(t("w.battery"));
     live(battery, statsReading, 2500, (stats) => {
       if (!(stats?.battery >= 0)) { battery.append(text("p", t("plugins.noData"))); return; }
-      cards(battery, [{ name: t(stats.charging ? "dev.charging" : "w.battery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
+      cards(battery, [{ name: t(stats.charging ? "dev.charging" : "panelFlow.onBattery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
     });
   }
   if (item.widget === "ai") {
