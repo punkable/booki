@@ -693,3 +693,21 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 /* Expandable cards keep the primary ink for their names, like the others. */
 details.reading-card > summary { color: var(--ink); }
 details.reading-card > summary .reading-card-names strong { color: var(--ink); }
+/* An expanded reading card stacks its parts full width: the name row stays
+   on top instead of collapsing into a zero-width grid column. */
+details.reading-card > * { grid-column: 1 / -1; min-width: 0; }
+details.reading-card .system-widget-readings { font-size: 0.8125rem; gap: 4px 16px; }
+details.reading-card .system-widget-readings dt { color: var(--ink-2); }
+/* An expanded reading card stacks its parts full width: the name row stays
+   on top instead of collapsing into a zero-width grid column. */
+details.reading-card > * { grid-column: 1 / -1; min-width: 0; }
+details.reading-card .system-widget-readings { font-size: 0.8125rem; gap: 4px 16px; }
+details.reading-card .system-widget-readings dt { color: var(--ink-2); }
+/* A card's own action: a quiet icon button beside its value. */
+.reading-card-action { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-left: 4px; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.reading-card-action svg { width: 15px; height: 15px; }
+.reading-card-action:hover { color: var(--ink); background: var(--hover); }
+.reading-card-action:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.reading-card-action.has-error { color: var(--danger, #c42b1c); }
+.panel-stamp[title] { cursor: help; }
+.focus-icon-button[role="switch"][aria-checked="true"] { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }

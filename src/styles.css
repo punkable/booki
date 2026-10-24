@@ -2109,27 +2109,10 @@ body.edge-right .stack.open { transform: none; }
   border-radius: var(--r-control);
   padding: 6px 8px;
 }
-.clip-foot { margin-top: 4px; }
-.clip-clear {
-  width: 100%;
-  padding: 7px;
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--ink-2);
-  cursor: pointer;
-  background: transparent;
-  border: 1px dashed var(--stroke);
-  border-radius: var(--r-control);
-  transition: background var(--dur-2) ease, color var(--dur-2) ease;
-}
-.clip-clear:hover { color: var(--danger-text); border-color: color-mix(in srgb, var(--danger) 45%, var(--stroke)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.clip-meta {
-  margin-top: 6px;
-  text-align: center;
-  font-size: 0.6875rem;
-  color: var(--ink-2);
-}
+.clip-foot { flex: none; }
+/* The count reads as a quiet pill beside the search field. */
+.clip-meta { min-width: 28px; padding: 3px 8px; text-align: center; font-size: 0.6875rem; font-weight: 600; color: var(--ink-2); background: var(--ctrl-fill); border-radius: 999px; font-variant-numeric: tabular-nums; }
+.clip-clear-action.is-armed { color: #fff; background: var(--danger, #c42b1c); }
 
 @media (max-width: 420px) {
   .stack {

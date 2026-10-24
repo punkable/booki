@@ -200,8 +200,9 @@ function release951() {
 
 export function currentRelease() {
   return { version: "0.96.0", date: "2026-10-23", headline: t("release96.headline"), sections: [
-    { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release96.open"), t("release96.settings"), t("release96.preferences"), t("release96.ai"), t("release96.panels")] },
-    { icon: "download", title: t("release95.collectorTitle"), notes: [t("release96.plugins"), t("release96.notices")] },
+    { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release96.settings"), t("release96.open"), t("release96.preferences"), t("release96.panels"), t("release96.ai")] },
+    { icon: "palette", title: t("release96.lookTitle"), notes: [t("release96.glass"), t("release96.motion"), t("release96.colors")] },
+    { icon: "download", title: t("plugins.title"), notes: [t("release96.updates"), t("release96.plugins"), t("release96.notices")] },
     { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release96.windows")] },
   ] };
 }

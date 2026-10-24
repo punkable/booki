@@ -122,16 +122,16 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       const controls = document.createElement("div"); controls.className = "focus-stepper-controls"; controls.append(less, input, more);
       stepper.append(label, controls); body.appendChild(stepper);
       if (item.widget !== "focus") return;
-      // Quiet-time options: Windows' Do not disturb (on by default) and a tucked dock.
-      const options = document.createElement("div"); options.className = "focus-options";
-      for (const [key, label, on] of [["dnd", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "focus.tuck", !!st.tuckDuringFocus]]) {
-        const row = document.createElement("label"); row.className = `focus-option focus-option-${key}`;
-        // On/off settings are toggle switches in Windows, text first.
-        const box = document.createElement("input"); box.type = "checkbox"; box.checked = on; box.setAttribute("role", "switch"); box.className = "win-switch";
-        box.addEventListener("change", () => update({ [key]: box.checked }));
-        row.append(text("span", "", t(label)), box); options.appendChild(row);
+      // Quiet-time options sit beside Start as two toggle icons (Do not disturb,
+      // keep the dock tucked away), named on hover; on reads as the accent fill.
+      for (const [key, glyph, label, on] of [["dnd", "moon", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "eye-off", "focus.tuck", !!st.tuckDuringFocus]]) {
+        const option = document.createElement("button"); option.type = "button";
+        option.className = `stack-close focus-icon-button focus-option-${key}`; option.setAttribute("role", "switch");
+        option.setAttribute("aria-checked", String(on)); option.title = t(label); option.setAttribute("aria-label", t(label));
+        option.innerHTML = icon(glyph);
+        option.addEventListener("click", () => update({ [key]: !on }));
+        row.appendChild(option);
       }
-      body.appendChild(options);
     },
     tasks(body, st) {
       const list = Array.isArray(st.tasks) ? st.tasks : [];

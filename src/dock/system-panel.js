@@ -83,11 +83,6 @@ export function buildSystemPanel(item, { close }) {
     return b;
   };
   const section = (title) => { const el = document.createElement("section"); el.className = "productivity-section"; if (title !== t(`w.${item.widget}`)) el.append(text("strong", title)); body.append(el); return el; };
-  const list = (container, rows) => {
-    const dl = document.createElement("dl"); dl.className = "system-widget-readings";
-    for (const [label, value] of rows) dl.append(text("dt", label), text("dd", value));
-    container.append(dl);
-  };
   const reads = new WeakMap();
   const load = async (container, action, paint) => {
     const request = Symbol(); reads.set(container, request);
@@ -102,7 +97,7 @@ export function buildSystemPanel(item, { close }) {
       if (disposed) return;
       const open = new Set([...container.querySelectorAll("details.reading-card[open]")].map((card) => card.dataset.readingKey));
       const focused = container.contains(document.activeElement) ? document.activeElement.closest("details.reading-card")?.dataset.readingKey : null;
-      container.querySelectorAll(":scope > .reading-cards, :scope > .system-widget-readings, :scope > p, :scope > .productivity-button").forEach((el) => el.remove());
+      container.querySelectorAll(":scope > .reading-cards, :scope > p, :scope > .productivity-button").forEach((el) => el.remove());
       paint(data);
       container.querySelectorAll("details.reading-card").forEach((card) => {
         card.open = open.has(card.dataset.readingKey);
@@ -124,6 +119,13 @@ export function buildSystemPanel(item, { close }) {
       top.append(names);
       if (row.error) top.append(text("span", row.error, "reading-card-note"));
       if (row.value) top.append(text("span", row.value, "reading-card-value"));
+      // A card's own action is an icon beside its value, named on hover.
+      if (row.action) {
+        const act = document.createElement("button"); act.type = "button"; act.className = "reading-card-action";
+        act.innerHTML = icon(row.action.glyph); act.title = row.action.label; act.setAttribute("aria-label", `${row.action.label}: ${row.name}`);
+        act.addEventListener("click", async () => { act.disabled = true; try { if (await row.action.run()) act.remove(); } catch (_) { act.classList.add("has-error"); } finally { act.disabled = false; } });
+        top.append(act);
+      }
       card.append(top);
       for (const bar of row.bars || []) {
         const line = document.createElement("div"); line.className = "reading-bar";
@@ -135,7 +137,7 @@ export function buildSystemPanel(item, { close }) {
         if (bar.tone) fill.dataset.tone = bar.tone;
         track.append(fill); line.append(track); card.append(line);
       }
-      if (row.details) { list(card, row.details); card.append(text("small", t("refine.deviceNote"), "device-reading-note")); }
+      if (row.meta) card.append(text("small", row.meta, "reading-card-meta"));
       grid.append(card);
     }
     container.append(grid);
@@ -217,9 +219,10 @@ export function buildSystemPanel(item, { close }) {
         for (const session of sessions) volumeRow(sessionList, session.name, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted));
       });
     };
-    button(apps, t("plugins.refresh"), refresh);
+    headAction("refresh", t("plugins.refresh"), refresh);
     refresh();
   }
+  const sourceName = (source) => ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[source] || source || t("panelFlow.deviceReady");
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
     headAction("bluetooth", t("dev.bluetoothSettings"), () => api.launch("ms-settings:bluetooth", []));
@@ -234,23 +237,19 @@ export function buildSystemPanel(item, { close }) {
       const own = item.style?.device;
       const shown = own ? [matchDevice(values, own, item.style?.deviceKind)].filter(Boolean) : values;
       if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
-      cards(devices, shown.map((d) => ({
-        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : t("panelFlow.deviceReady"), tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
-        value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
-        details: [[t("refine.source"), ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[d.source] || d.source || t("plugins.noData")], [t("refine.readAt"), deviceReading.checkedAt ? new Date(deviceReading.checkedAt).toLocaleTimeString(curLang(), { hour: "2-digit", minute: "2-digit" }) : "—"]],
-      })));
-      const deviceStamp = stamp(deviceReading); if (deviceStamp) devices.append(deviceStamp);
-      // Each device can have its own card on the dock, beside this one.
-      if (own) return;
       const pinnedDevices = new Set(allWidgetPins("devices").map((p) => p.style?.device).filter(Boolean));
-      devices.querySelectorAll(".reading-card").forEach((card, i) => {
-        if (pinnedDevices.has(shown[i].name)) return;
-        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
-        button(row, t("dev.ownCard"), async () => {
-          if (!(await addWidget("devices", { style: { device: shown[i].name, deviceKind: shown[i].kind }, after: item.id }))) throw new Error(t("status.saveError"));
-          row.remove();
-        });
-      });
+      cards(devices, shown.map((d) => ({
+        // One line under the name: what needs attention, else where it reads from.
+        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : sourceName(d.source), tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
+        value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
+        // Each device can have its own card on the dock, beside this one.
+        action: own || pinnedDevices.has(d.name) ? null : { glyph: "plus", label: t("dev.ownCard"), run: async () => {
+          if (!(await addWidget("devices", { style: { device: d.name, deviceKind: d.kind }, after: item.id }))) throw new Error(t("status.saveError"));
+          return true;
+        } },
+      })));
+      // One honest note for the whole list, on the timestamp, not per card.
+      const deviceStamp = stamp(deviceReading); if (deviceStamp) { deviceStamp.title = t("refine.deviceNote"); devices.append(deviceStamp); }
     });
   }
   if (item.widget === "system") {

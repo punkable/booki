@@ -39,8 +39,8 @@ test("starting and pausing from the panel switches Do not disturb on and off", a
   const cfg = makeConfig({ pinned: [focus({ minutes: 25 })] });
   const { page, errors } = await openPage(browser, port, "index.html", { cfg, viewport: { width: 1200, height: 600 }, initScript: mockDnd(false) });
   await page.locator('#dock > [data-widget="focus"]').click();
-  assert.equal(await page.locator(".focus-option-dnd input").isChecked(), false, "off until chosen");
-  await page.locator(".focus-option-dnd input").check();
+  assert.equal(await page.locator(".focus-option-dnd").getAttribute("aria-checked"), "false", "off until chosen");
+  await page.locator(".focus-option-dnd").click();
   await page.locator(".focus-primary").click();
   await waitForAsyncCondition(page, () => window.__dndCalls.length >= 1);
   await page.locator(".focus-primary").click();

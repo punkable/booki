@@ -89,13 +89,17 @@ Requiere Windows 10 u 11. El instalador aún no tiene firma Authenticode, así q
 <!-- booki:news:start -->
 ## Novedades de 0.96.0
 
-Widgets que abren su contenido, ajustes por pasos y avisos que respetan el dock.
+Vidrio acrílico de Windows 11 para cada tema, una nueva galería de widgets, movimiento fluido a cualquier frecuencia y actualizaciones de complementos.
 
-- Un clic abre el contenido o los controles de los 15 widgets, también dentro de grupos. El clic derecho y el engranaje abren los ajustes de esa copia.
-- Contenido, Apariencia y Conexiones opcionales en pestañas, con Anterior/Siguiente y selector de copias. El inspector conserva su posición al desplazar el catálogo.
+- Nueva página de Widgets: arriba los de tu dock, una galería con categorías y «Añadir» en un clic, y los ajustes en un panel lateral con vista previa en vivo.
+- Un clic abre el contenido de cualquier widget, también dentro de grupos; el clic derecho o su engranaje abre los ajustes de esa copia.
 - Configura reloj, calendario, ciudad y unidades, dispositivo, proveedor de IA, rotación, métricas, duración de enfoque y rueda de volumen. Sistema y Batería actualizan sus detalles mientras están abiertos.
-- Claude, Codex, Cursor y OpenCode tienen un estado visible de detección. Se amplían las rutas locales, personalizadas y de archivo sin leer credenciales; la cuota desconocida se explica y se puede volver a consultar.
-- Cabeceras y controles más compactos, búsqueda y vista de grupos integradas, ayuda del portapapeles bajo demanda y listas con desplazamiento interno.
+- Los paneles de widgets comparten una cabecera con acciones en íconos (actualizar, Bluetooth), tarjetas con barras, interruptores de Windows y detalles más claros de Multimedia, Sistema e IA.
+- Claude, Codex, Cursor y OpenCode: se muestran los que hay en tu PC y los que no, en una línea. El uso sigue saliendo solo de registros locales, nunca de credenciales.
+- El vidrio ahora es el acrílico de Windows 11, con su propia versión clara y oscura.
+- La ampliación del dock sigue al puntero con un movimiento suave basado en el tiempo real: igual de rápida a 60, 144 o 240 Hz y sin rebote. Los menús se deslizan como en Windows 11.
+- Selectores de color con muestras al estilo Windows 11 y un campo para el color hexadecimal exacto.
+- Booki revisa cada pocas horas si tus complementos tienen actualización y te la ofrece; tus widgets conservan sus ajustes.
 - Cada complemento ofrece el widget correcto y configura el existente, incluso dentro de grupos, sin duplicar el Recolector. La instalación espera a que la aceptación se guarde.
 - Avisos y actualización comparten una posición fuera del dock y de sus iconos ampliados. Se mide el contenido completo, incluidos botones; el aviso de actualización se puede cerrar. Una acción antigua no oculta un aviso nuevo.
 - Los cambios del origen del área de trabajo de Windows vuelven a colocar el dock aunque su tamaño no cambie. Los ajustes relevantes enlazan con sonido, energía y fecha de Windows.

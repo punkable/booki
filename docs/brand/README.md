@@ -246,7 +246,7 @@ Interaction preferences that are part of the identity:
 - White backgrounds, near-black `#1d1d1f` headlines, neutral `#6e6e73` supporting copy, warm tones from the capybara used sparingly.
 - Show the real interface in its light theme with sample data. Browser renders do not prove native Windows behaviour.
 - Soft shadows, gentle camera movement, fades to white. One clear idea per scene.
-- Finished media lives in `docs/presentation/`; production steps in `tools/presentation/README.md`. Historical native captures stay in `docs/screenshots/`; reference renders of each finish in `docs/quality/reference/`.
+- Finished media lives in `docs/presentation/`; production steps in `tools/presentation/README.md`. Reference renders of each finish can be generated with `npm run capture:reference` (into `test-results/reference/`, not committed).
 
 ## 12. Before shipping UI
 

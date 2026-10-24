@@ -81,13 +81,17 @@
 <!-- booki:news:start -->
 ## What's new in 0.96.0
 
-Widgets open their content, settings advance in steps, and notices respect the dock.
+Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates.
 
-- One click opens the content or controls of all 15 widgets, including grouped widgets. Right-click and the gear open settings for that instance.
-- Content, Appearance and optional Connections tabs offer Previous/Next and an instance selector. The inspector stays reachable while scrolling the catalog.
+- New Widgets page: your dock's widgets on top, a gallery with categories and one-click Add, and settings in a side sheet with a live preview.
+- One click opens any widget's content, also inside groups; right-click or its gear opens that copy's settings.
 - Configure time, calendar, city and units, device, AI provider, rotation, metrics, focus duration and volume wheel. System and Battery details refresh while open.
-- Claude, Codex, Cursor and OpenCode have visible discovery status. Local, custom and archive paths are expanded without reading credentials; missing allowance is explained and can be checked again.
-- More compact headers and controls, integrated group search/view tools, clipboard help on demand and internally scrolling lists.
+- Widget panels share one header with icon actions (refresh, Bluetooth), meter cards, Windows toggle switches and clearer Media, System and AI details.
+- Claude, Codex, Cursor and OpenCode: the ones on your PC are shown, the missing ones in one line. Usage still comes only from local logs, never credentials.
+- Glass is now Windows 11 acrylic, with its own light and dark version.
+- The dock's magnification follows the pointer with smooth, time-based motion: equally quick at 60, 144 or 240 Hz, without overshoot. Menus slide in like Windows 11.
+- Colour pickers with Windows 11 swatches and an exact hex field.
+- Booki checks every few hours whether your plugins have an update and offers it; your widgets keep their settings.
 - Each plugin offers the correct widget and configures existing copies, even inside groups, without duplicating Collector. Installation waits for saved acceptance.
 - Notices and updates share a lane outside the dock and enlarged icons. Complete content, including buttons, is measured; the update notice can be dismissed. An older action cannot hide a newer notice.
 - Windows work-area origin changes reposition the dock even when its size is unchanged. Relevant settings link to Windows sound, power and date settings.

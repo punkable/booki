@@ -37,3 +37,4 @@ CLAUDE.local.md
 .claude/
 docs/HANDOFF.md
 docs/quality/booki-local-audit-*.md
+/.claude/worktrees/

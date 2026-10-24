@@ -45,7 +45,21 @@ export async function toggleClipboardStack(tileEl, widgetId = tileEl?.dataset.id
   settings.addEventListener("click", () => dockApi.openWidgetSettings(widgetId).catch(() => showErrorToast(t("overhaul.failed"))));
   const help = document.createElement("button"); help.type = "button"; help.className = "stack-close";
   help.innerHTML = icon("info"); help.setAttribute("aria-label", t("clip.howTitle")); help.setAttribute("aria-expanded", "false"); help.setAttribute("aria-controls", "clipboard-guide");
-  head.append(help, settings, close);
+  // Clearing is a header action like the others; a second click within a
+  // few seconds confirms it, so one stray click cannot wipe the history.
+  const clear = document.createElement("button"); clear.type = "button"; clear.className = "stack-close clip-clear-action";
+  clear.innerHTML = icon("trash"); clear.title = t("clip.clear"); clear.setAttribute("aria-label", t("clip.clear"));
+  let armed = 0;
+  clear.addEventListener("click", () => {
+    if (!armed) {
+      clear.classList.add("is-armed"); clear.title = t("clip.clearConfirm"); clear.setAttribute("aria-label", t("clip.clearConfirm"));
+      armed = setTimeout(() => { armed = 0; clear.classList.remove("is-armed"); clear.title = t("clip.clear"); clear.setAttribute("aria-label", t("clip.clear")); }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = 0; clear.classList.remove("is-armed"); clear.title = t("clip.clear"); clear.setAttribute("aria-label", t("clip.clear"));
+    clipAction(async () => { await dockApi.clipboardClear(); refreshClipboard(); await renderClipboardList(grid, foot); });
+  });
+  head.append(clear, help, settings, close);
   stackEl.appendChild(head);
 
   const guide = document.createElement("div");
@@ -81,9 +95,10 @@ export async function toggleClipboardStack(tileEl, widgetId = tileEl?.dataset.id
   grid.className = "stack-grid clip-list";
   stackEl.appendChild(grid);
 
+  // The count sits beside the search instead of a footer row of its own.
   const foot = document.createElement("div");
   foot.className = "clip-foot";
-  stackEl.appendChild(foot);
+  tools.appendChild(foot);
 
   S.stackOpen = true;
   document.body.classList.add("stack-open");
@@ -186,18 +201,9 @@ async function renderClipboardList(grid, foot) {
     grid.appendChild(row);
   });
 
-  const clear = document.createElement("button");
-  clear.className = "clip-clear";
-  clear.textContent = t("clip.clear");
-  clear.addEventListener("click", () => clipAction(async () => {
-    await dockApi.clipboardClear();
-    refreshClipboard();
-    await renderClipboardList(grid, foot);
-  }));
-  foot.appendChild(clear);
   const meta = document.createElement("div");
   meta.className = "clip-meta";
-  meta.textContent = t("clip.countHint").replace("{n}", rawCount);
+  meta.textContent = String(rawCount); meta.title = t("clip.countHint").replace("{n}", rawCount);
   foot.appendChild(meta);
   if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
 }
