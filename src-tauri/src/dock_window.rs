@@ -62,9 +62,75 @@ pub(crate) fn list_monitors(window: WebviewWindow) -> Vec<MonitorInfo> {
         .unwrap_or_default()
 }
 
+/// `monitor: -2` means "follow the pointer": the dock lives on the display
+/// the pointer settled on last, chosen by `start_monitor_follow`.
+pub(crate) const FOLLOW_POINTER: i32 = -2;
+static FOLLOWED: Mutex<String> = Mutex::new(String::new());
+
+fn monitor_name_at_cursor(window: &WebviewWindow) -> Option<String> {
+    let point = window.cursor_position().ok()?;
+    window.available_monitors().ok()?.into_iter().find_map(|m| {
+        let (p, z) = (m.position(), m.size());
+        let inside = point.x >= p.x as f64
+            && point.y >= p.y as f64
+            && point.x < p.x as f64 + z.width as f64
+            && point.y < p.y as f64 + z.height as f64;
+        inside.then(|| m.name().cloned().unwrap_or_default())
+    })
+}
+
+/// With "follow the pointer", move the dock once the pointer has rested on
+/// another display for a moment, so crossing a screen on the way somewhere
+/// does not drag the dock along.
+pub(crate) fn start_monitor_follow(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut candidate = String::new();
+        let mut since = std::time::Instant::now();
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(350));
+            let cfg = config::load();
+            if cfg.monitor != FOLLOW_POINTER {
+                continue;
+            }
+            let Some(dock) = app.get_webview_window("dock") else {
+                continue;
+            };
+            let Some(name) = monitor_name_at_cursor(&dock) else {
+                continue;
+            };
+            if *FOLLOWED.lock().unwrap() == name {
+                candidate.clear();
+                continue;
+            }
+            if candidate != name {
+                candidate = name;
+                since = std::time::Instant::now();
+                continue;
+            }
+            if since.elapsed() < std::time::Duration::from_millis(900) {
+                continue;
+            }
+            *FOLLOWED.lock().unwrap() = candidate.clone();
+            let _ = position_dock(&dock, &cfg.edge);
+            let _ = app.emit("booki://dock-monitor-changed", candidate.clone());
+        }
+    });
+}
+
 /// Prefer the stable display name. Keep the preference while disconnected.
 pub(crate) fn pick_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
     let cfg = config::load();
+    if cfg.monitor == FOLLOW_POINTER {
+        let followed = FOLLOWED.lock().unwrap().clone();
+        if let Ok(mons) = window.available_monitors() {
+            if let Some(m) = mons
+                .iter()
+                .find(|m| m.name().is_some_and(|n| *n == followed))
+            {
+                return Some(m.clone());
+            }
+        }
+    }
     if let Ok(mons) = window.available_monitors() {
         if !cfg.monitor_name.is_empty() {
             if let Some(m) = mons

@@ -150,6 +150,28 @@ pub struct Status {
     /// "booki" for this edition's copy, "shared" for the normal Booki's copy
     /// (Booki Dev only), "system" for one already on the PC.
     pub source: Option<&'static str>,
+    /// Booki's own copy (or a companion's) is older than the pinned release
+    /// this Booki ships. Installing again replaces it atomically.
+    pub outdated: bool,
+    /// The pinned release this Booki would install.
+    pub latest: String,
+}
+
+/// The VERSION file Booki wrote beside its own copy, if any.
+fn own_version(plugin: &Plugin) -> Option<String> {
+    let (path, kind) = located(plugin)?;
+    if kind != "booki" {
+        return None;
+    }
+    std::fs::read_to_string(path.parent()?.join("VERSION"))
+        .ok()
+        .map(|v| v.trim().to_string())
+}
+
+/// Only Booki's own copies can be outdated: a system or shared copy belongs
+/// to someone else and is left alone.
+fn is_outdated(plugin: &Plugin) -> bool {
+    own_version(plugin).is_some_and(|v| v != plugin.tag)
 }
 
 pub fn status(plugin: &Plugin) -> Status {
@@ -181,10 +203,19 @@ pub fn status(plugin: &Plugin) -> Status {
     } else {
         "system"
     });
+    let outdated = !plugin.external
+        && installed
+        && (is_outdated(plugin)
+            || plugin
+                .companions
+                .iter()
+                .any(|id| find(id).is_some_and(is_outdated)));
     Status {
         installed,
         version,
         source,
+        outdated,
+        latest: plugin.tag.clone(),
     }
 }
 
@@ -252,7 +283,7 @@ pub fn install(plugin: &Plugin) -> Result<String, String> {
     let version = install_one(plugin)?;
     for id in &plugin.companions {
         let companion = find(id).ok_or("unknown companion")?;
-        if executable(companion).is_none() {
+        if executable(companion).is_none() || is_outdated(companion) {
             install_one(companion)?;
         }
     }
@@ -305,7 +336,9 @@ fn commit_install(target: &std::path::Path, staging: &std::path::Path) -> Result
     }
     let had_previous = target.exists();
     if had_previous {
-        std::fs::rename(target, &backup).map_err(|e| e.to_string())?;
+        // Windows refuses to move a running program: say so instead of a raw
+        // OS error. Nothing has changed yet, so the old copy keeps working.
+        std::fs::rename(target, &backup).map_err(|_| "plugin in use".to_string())?;
     }
     if let Err(error) = std::fs::rename(staging, target) {
         if had_previous {

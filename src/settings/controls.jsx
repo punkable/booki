@@ -9,7 +9,7 @@ import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
 import { COLOR_SOURCES, SURFACE_COLORS, colorSource } from "../system-look.js";
-import { Icon, Select } from "./ui.jsx";
+import { Icon } from "./ui.jsx";
 
 export const LANG_OPTIONS = [
   { value: "system", key: "lang.system" },
@@ -36,8 +36,25 @@ function Swatches({ value, presets, onChange, label, caption, lead, children }) 
       </label>
       {children}
     </div>
-    {caption && <p className="swatch-caption">{caption}</p>}
+    <div className="swatch-foot">
+      <HexField value={current} onChange={onChange} />
+      {caption && <p className="swatch-caption">{caption}</p>}
+    </div>
   </div>;
+}
+
+/** Type or paste an exact colour. Applies once it is a valid #rrggbb. */
+function HexField({ value, onChange }) {
+  const valid = (v) => /^#?[0-9a-f]{6}$/i.test(v);
+  const [text, setText] = useState(valid(value) ? value.toUpperCase() : "");
+  useEffect(() => { if (valid(value)) setText(value.toUpperCase()); }, [value]);
+  const commit = (v) => { const hex = `#${v.replace(/^#/, "").toLowerCase()}`; if (valid(v) && hex !== value) onChange(hex); };
+  return <label className="hex-field" data-invalid={text && !valid(text) || undefined}>
+    <span className="hex-chip" style={{ "--sw": valid(text) ? `#${text.replace(/^#/, "")}` : "transparent" }} aria-hidden="true" />
+    <input type="text" spellCheck={false} maxLength={7} aria-label={t("ap.hex")} placeholder="#RRGGBB" value={text}
+      onChange={(e) => { setText(e.target.value); commit(e.target.value); }}
+      onBlur={() => { if (!valid(text) && valid(value)) setText(value.toUpperCase()); }} />
+  </label>;
 }
 
 /** Name of the picked colour: its palette name and Pantone reference, or
@@ -46,7 +63,8 @@ function paletteCaption(value) {
   const entry = paletteEntry(value);
   if (entry?.code) return `${entry.name} · PANTONE ${entry.code} · ${t("palette.year").replace("{year}", entry.year)}`;
   if (entry) return t("palette.brand");
-  return /^#[0-9a-f]{6}$/i.test(value || "") ? `${t("ap.custom")} · ${value.toUpperCase()}` : "";
+  // A custom colour is already spelled out in the hex field beside it.
+  return "";
 }
 
 /** The suggested palette first; a custom colour stays available. `sources`
@@ -122,6 +140,9 @@ const slotLabel = (slot) => t(`be.notch${slot[0].toUpperCase()}${slot.slice(1)}`
  *  dock should go. The twelve spots are one radio group (arrow keys walk
  *  them); the chosen one holds the dock, a hovered one previews it. With
  *  several screens, a menu above says which screen the picture is. */
+export const positionEdges = ["bottom", "top", "left", "right"];
+export const positionSlots = SLOTS;
+export { slotLabel };
 export function PositionPicker({ cfg, set, afterPlacement, monitors = [] }) {
   const edge = EDGES.includes(cfg.edge) ? cfg.edge : "bottom";
   const slot = SLOTS.includes(cfg.notchPosition) ? cfg.notchPosition : "center";
@@ -140,26 +161,25 @@ export function PositionPicker({ cfg, set, afterPlacement, monitors = [] }) {
     pick(next);
     requestAnimationFrame(() => event.currentTarget?.querySelector?.(`[data-spot="${next.e}-${next.s}"]`)?.focus());
   };
-  const screenName = (m) => `${t("be.monitor")} ${m.index + 1} · ${m.w}×${m.h}${m.primary ? ` · ${t("mon.primary")}` : ""}`;
+  // A small picture of the screen beside what it shows; the precise
+  // controls are ordinary setting rows under it (see the Dock page).
+  // A miniature desktop the width of the section: click a spot and a small
+  // dock glides there; the current place reads as a chip on the screen.
+  const vertical = edge === "left" || edge === "right";
   return <div className="position-picker">
-    {monitors.length > 1 && <div className="position-screen">
-      <Select label={t("be.monitor")} value={String(chosen)}
-        options={[{ value: "-1", label: t("mon.auto") }, ...monitors.map((m) => ({ value: String(m.index), label: screenName(m) }))]}
-        onChange={(v) => { const n = Number(v); set({ monitor: n, monitorName: n < 0 ? "" : monitors.find((m) => m.index === n)?.name || "" }, afterPlacement); }} />
-    </div>}
-    <div className="monitor-art">
-      <div className="screen-map" style={{ aspectRatio: String(ratio) }} role="radiogroup" aria-label={t("be.position")} onKeyDown={walk}>
-        {spots.map((p) => {
-          const on = p.e === edge && p.s === slot;
-          return <button key={`${p.e}-${p.s}`} data-spot={`${p.e}-${p.s}`} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
-            className={`screen-spot at-${p.e} slot-${p.s}`} aria-label={name(p)} title={name(p)} onClick={() => pick(p)}>
-            <span className="screen-dock" />
-          </button>;
-        })}
-      </div>
-      <span className="monitor-stand" aria-hidden="true" />
+    <div className="screen-map" style={{ aspectRatio: String(Math.max(ratio, 2.6)) }} role="radiogroup" aria-label={t("be.position")} onKeyDown={walk}>
+      <span className="screen-window w1" aria-hidden="true" /><span className="screen-window w2" aria-hidden="true" />
+      {spots.map((p) => {
+        const on = p.e === edge && p.s === slot;
+        return <button key={`${p.e}-${p.s}`} data-spot={`${p.e}-${p.s}`} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1}
+          className={`screen-spot at-${p.e} slot-${p.s}`} aria-label={name(p)} title={name(p)} onClick={() => pick(p)}>
+          <span className="screen-dock" />
+        </button>;
+      })}
+      <span className={`screen-live-dock live-${edge} live-${slot}${vertical ? " vertical" : ""}`} aria-hidden="true"><i /><i /><i /><i /><i /></span>
+      <span className="screen-chip" aria-live="polite">{name({ e: edge, s: slot })}</span>
+      <span className="screen-hint">{t("be.positionHint")}</span>
     </div>
-    <p className="screen-caption" aria-live="polite">{name({ e: edge, s: slot })}</p>
   </div>;
 }
 

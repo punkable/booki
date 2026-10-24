@@ -500,7 +500,6 @@
 .catalog-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .catalog-name { font-weight: 600; }
 .catalog-desc { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
-.catalog-pinned { color: var(--accent); }
 .catalog-preview { display: flex; align-items: center; justify-content: center; min-height: 64px; padding: 10px; overflow: hidden; background: var(--subtle-pressed); border-radius: 6px; }
 .inspector, .workspace-inspector { position: sticky; top: 0; display: flex; flex-direction: column; min-width: 0; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); outline: none; }
 .inspector > * + *, .workspace-inspector > * + * { border-top: 1px solid var(--divider); }
@@ -1034,11 +1033,194 @@
 .catalog-text { display: grid; gap: 2px; min-width: 0; }
 .catalog-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .catalog-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.catalog-pinned { display: grid; place-items: center; flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-contrast, #fff); }
-.catalog-pinned svg { width: 10px; height: 10px; }
 
 /* While the configuration loads: a WinUI ProgressRing, never an empty window. */
 .settings-loading { display: flex; align-items: center; gap: 12px; color: var(--ink-2); }
 .settings-spinner { width: 20px; height: 20px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: settings-spin 0.8s linear infinite; }
 @keyframes settings-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .settings-spinner { animation-duration: 2.4s; } }
+
+/* A widget's functional settings and appearance are separate, keyboard-reachable steps. */
+.widget-settings-panel { min-width: 0; }
+.widget-location form { display: flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+.widget-location label { display: grid; flex: 1; min-width: 140px; gap: 6px; }
+.widget-location-results { list-style: none; padding: 0; display: grid; gap: 6px; }
+.widget-location-results button { text-align: start; white-space: normal; }
+.widget-action { margin-block: 10px; }
+.widget-content-fields textarea { width: 100%; resize: vertical; min-height: 130px; }
+@media (forced-colors: active) { .widget-settings-tabs [aria-selected="true"] { border-color: Highlight; outline: 1px solid Highlight; } }
+.widget-settings-workspace { padding: 0 0 8px; }
+.widget-settings-panel { padding: 4px 16px 0; }
+@container page (min-width: 900px) { .page-widgets .split:not(:has(> .inspector[data-empty="true"])) { grid-template-columns: minmax(0, 1fr) 380px; } }
+
+@container page (min-width: 721px) {
+  .page-widgets .inspector { max-height: calc(100dvh - 48px); overflow-y: auto; scrollbar-width: thin; }
+}
+/* Segmented choices never cut off: in narrow panes they wrap to a second row. */
+.ui-seg { max-width: 100%; flex-wrap: wrap; }
+.ui-seg-item { flex: 1 1 auto; justify-content: center; }
+.inline-details > summary { cursor: pointer; color: var(--ink-2); font-size: 0.8125rem; padding: 4px 0; }
+.inline-details > summary:hover { color: var(--ink); }
+
+/* ── Widgets: on your dock, then a gallery to explore, then a settings sheet ── */
+.widgets-on-dock { margin-bottom: 24px; }
+.widgets-on-dock h2, .widgets-explore-head h2 { margin: 0 0 10px; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 600; }
+.widgets-on-dock h2 .count { margin-left: 6px; padding: 1px 7px; color: var(--ink-2); font-size: 12px; font-weight: 600; background: var(--subtle-pressed); border-radius: 999px; }
+.widgets-on-dock ul { display: flex; gap: 8px; margin: 0; padding: 2px 2px 8px; list-style: none; overflow-x: auto; scrollbar-width: thin; }
+.widgets-on-dock-item { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 148px; padding: 8px; color: var(--ink); font: inherit; text-align: left; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); cursor: pointer; transition: background var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease); }
+.widgets-on-dock-item:hover { background: var(--card-hover); }
+.widgets-on-dock-item:active { transform: scale(0.98); }
+.widgets-on-dock-item[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
+.widgets-on-dock-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.on-dock-preview { display: grid; place-items: center; height: 56px; overflow: hidden; border-radius: 6px; background: linear-gradient(135deg, color-mix(in srgb, var(--widget-accent) 22%, var(--subtle-pressed)), var(--subtle-pressed)); }
+.on-dock-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.on-dock-name .catalog-icon { width: 20px; height: 20px; border-radius: 4px; }
+.on-dock-name .catalog-icon svg { width: 13px; height: 13px; }
+.on-dock-group { display: flex; align-items: center; gap: 4px; margin-top: -4px; color: var(--ink-2); font-size: 11px; }
+.on-dock-group svg { width: 12px; height: 12px; }
+
+.page-widgets .widgets-split:has(> .inspector[data-empty="true"]), .widgets-split:has(> .inspector[data-empty="true"]) { grid-template-columns: minmax(0, 1fr); }
+.widgets-split > .inspector[data-empty="true"] { display: none; }
+.widgets-split { grid-template-columns: minmax(0, 1fr) 340px; }
+.widgets-explore { min-width: 0; }
+.widgets-explore-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.widgets-explore-head h2 { margin: 0; }
+.widgets-explore-head .search-field { width: min(280px, 100%); }
+
+/* A Windows pivot: icon + label, the current one underlined in the accent. */
+.widget-pivot { display: flex; gap: 2px; margin-bottom: 14px; overflow-x: auto; border-bottom: 1px solid var(--divider); scrollbar-width: none; }
+.pivot-item { position: relative; display: inline-flex; align-items: center; gap: 7px; flex: none; padding: 8px 12px 10px; color: var(--ink-2); font: inherit; font-size: 13px; background: transparent; border: 0; border-radius: 6px 6px 0 0; cursor: pointer; }
+.pivot-item svg { width: 15px; height: 15px; }
+.pivot-item:hover { color: var(--ink); background: var(--subtle-pressed); }
+.pivot-item[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.pivot-item[aria-pressed="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 3px; border-radius: 3px; background: var(--accent); }
+.pivot-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+.catalog-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.catalog-card { gap: 0; padding: 0; overflow: hidden; cursor: default; }
+.catalog-card:hover { background: var(--card); }
+.catalog-card[data-selected] { box-shadow: inset 0 0 0 2px var(--accent); }
+.catalog-open { display: flex; flex-direction: column; gap: 12px; padding: 10px 10px 4px; color: inherit; font: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
+.catalog-open:hover .catalog-preview { filter: brightness(1.03); }
+.catalog-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: var(--r-card); }
+/* The preview sits on a little wallpaper so it reads as "on the dock". */
+.catalog-preview, .inspector-preview { position: relative; min-height: 84px; border-radius: 8px; background:
+  radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--widget-accent) 38%, transparent), transparent 60%),
+  radial-gradient(120% 90% at 100% 100%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 60%),
+  var(--subtle-pressed); }
+.catalog-stage { display: inline-flex; padding: 6px; border-radius: 14px; background: color-mix(in srgb, var(--card) 62%, transparent); box-shadow: 0 1px 0 var(--card-stroke), 0 6px 16px rgba(0, 0, 0, 0.08); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.catalog-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.catalog-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 10px 10px; }
+.catalog-foot .catalog-action { margin-left: auto; }
+.catalog-action svg { width: 14px; height: 14px; }
+
+/* The settings sheet: header, live preview, pivot tabs, content, actions. */
+.widget-sheet { box-shadow: var(--card-shadow); }
+.widget-sheet .inspector-dismiss { position: absolute; top: 8px; right: 8px; margin: 0; border-top: 0; }
+.widget-sheet .inspector-dismiss + * { border-top: 0; }
+.widget-sheet .inspector-head { padding-right: 52px; }
+.widget-sheet .inspector-preview { display: flex; justify-content: center; align-items: center; margin: 0 16px; border-top: 0; min-height: 96px; }
+.widget-settings-tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--divider); }
+.widget-settings-tabs [role="tab"] { position: relative; padding: 10px 10px 12px; color: var(--ink-2); font: inherit; font-size: 13px; background: transparent; border: 0; cursor: pointer; }
+.widget-settings-tabs [role="tab"]:hover { color: var(--ink); }
+.widget-settings-tabs [role="tab"][aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.widget-settings-tabs [role="tab"][aria-selected="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 3px; border-radius: 3px; background: var(--accent); }
+.widget-settings-tabs [role="tab"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: 4px; }
+.button-danger-subtle { color: var(--danger-text, #c42b1c); }
+.button-danger-subtle:hover { background: color-mix(in srgb, var(--danger, #c42b1c) 10%, transparent); }
+.inspector-actions { justify-content: space-between; }
+@media (prefers-reduced-motion: reduce) { .widgets-on-dock-item { transition: none; } }
+.widget-sheet .ui-seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); width: 100%; }
+.catalog-foot { padding: 4px 10px 10px; min-height: 0; }
+.catalog-foot .catalog-action { flex: 1; justify-content: center; margin: 0; }
+.catalog-preview { display: flex; align-items: center; justify-content: center; }
+.widget-sheet .ui-seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); width: 100%; }
+.catalog-name { display: flex; align-items: center; gap: 6px; }
+.catalog-badge { display: inline-flex; align-items: center; gap: 2px; height: 18px; min-width: 18px; padding: 0 4px; justify-content: center; color: var(--accent-contrast, #1b1b1b); font-size: 11px; background: var(--accent); border-radius: 999px; }
+.catalog-badge svg { width: 11px; height: 11px; }
+.catalog-badge b { font-weight: 700; }
+.widget-sheet .ui-seg:has(> :nth-child(5)) { grid-template-columns: repeat(2, 1fr); }
+/* Plugin cards: an icon tile, name and licence, then what it feeds. */
+.plugin-head { display: flex; align-items: center; gap: 12px; }
+.plugin-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; color: var(--widget-accent); background: color-mix(in srgb, var(--widget-accent) 15%, transparent); border-radius: 10px; }
+.plugin-icon svg, .plugin-icon .ui-icon { width: 20px; height: 20px; }
+.plugin-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.plugin-title .plugin-name { margin: 0; }
+.plugin-card { gap: 10px; padding: 16px; }
+.plugin-terms-title { display: flex; gap: 10px; align-items: flex-start; margin: 0; color: var(--ink-2); font-size: 0.8125rem; line-height: 1.45; }
+.plugin-terms-title .ui-icon, .plugin-terms-title svg, .plugin-terms-done svg { flex: none; width: 16px; height: 16px; color: var(--accent); margin-top: 1px; }
+.plugin-terms-done { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; color: var(--ink-2); font-size: 0.8125rem; }
+.collector-settings > summary { cursor: pointer; padding: 8px 0; color: var(--ink-2); font-size: 0.8125rem; }
+.plugin-terms .plugin-desc { font-size: 0.8125rem; color: var(--ink-2); margin: 0 0 0 26px; }
+.plugin-terms .terms-check { margin-left: 26px; }
+/* Windows 11: a disabled accent button turns neutral grey, not a washed-out accent. */
+.button-accent:disabled { opacity: 1; color: var(--ink-3); background: var(--subtle-pressed); border-color: transparent; }
+.plugin-badge-update { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }
+
+/* Colour pickers, Windows 11 style: rounded-square swatches, a check on the
+   chosen one, a custom well and an exact hex field. */
+.swatches { gap: 6px; }
+.swatch { width: 32px; height: 32px; border-radius: 6px; transition: transform var(--dur-1, .12s) var(--ease, ease), box-shadow var(--dur-1, .12s) var(--ease, ease); }
+.swatch:hover { transform: scale(1.06); }
+.swatch:active { transform: scale(0.96); }
+.swatch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.swatch[aria-pressed="true"], .swatch[data-active] { box-shadow: 0 0 0 2px var(--card, var(--page-bg)), 0 0 0 4px var(--ink); }
+.swatch[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; background: #fff; filter: drop-shadow(0 0 1px rgba(0,0,0,.6));
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / contain no-repeat; }
+.swatch-custom { border-radius: 6px; }
+.swatch-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.hex-field { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 6px; background: var(--field, var(--ctrl-fill)); border: 1px solid var(--control-stroke); border-bottom-color: var(--ctrl-strong-stroke, var(--control-stroke)); border-radius: var(--r-control); }
+.hex-field:focus-within { border-bottom: 2px solid var(--accent); }
+.hex-field[data-invalid] { border-bottom-color: var(--danger, #c42b1c); }
+.hex-chip { width: 18px; height: 18px; border-radius: 4px; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); }
+.hex-field input { width: 76px; padding: 0; color: var(--ink); font: inherit; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; text-transform: uppercase; background: transparent; border: 0; outline: none; }
+@media (prefers-reduced-motion: reduce) { .swatch { transition: none; } .swatch:hover, .swatch:active { transform: none; } }
+/* Add menu: a WinUI MenuFlyout under the Add button. */
+.add-menu { position: relative; }
+.add-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 220px; padding: 4px 0; background: var(--layer-strong, var(--card)); border: 1px solid var(--card-stroke); border-radius: 8px; box-shadow: var(--shadow-flyout, 0 8px 16px rgba(0,0,0,.14)); animation: add-menu-in var(--dur-4, .25s) var(--ease, ease) both; }
+.add-menu-list [role="menuitem"] { display: flex; align-items: center; gap: 12px; width: calc(100% - 8px); margin: 2px 4px; min-height: 32px; padding: 0 11px; color: var(--ink); font: inherit; text-align: left; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.add-menu-list [role="menuitem"]:hover, .add-menu-list [role="menuitem"]:focus-visible { background: var(--subtle-pressed); outline: none; }
+.add-menu-list [role="menuitem"]:disabled { color: var(--ink-3); cursor: default; background: none; }
+.add-menu-list svg { width: 16px; height: 16px; color: var(--ink-2); }
+@keyframes add-menu-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .add-menu-list { animation: none; } }
+/* Position: a small screen beside its caption instead of a tall monitor. */
+.position-picker { grid-template-columns: minmax(0, 200px) minmax(0, 1fr); align-items: center; justify-items: stretch; gap: 20px; padding: 4px 0 8px; }
+.position-picker .monitor-art { width: 100%; }
+.position-side { display: grid; gap: 6px; align-content: center; }
+.position-side .screen-caption { margin: 0; font-weight: 600; text-align: left; }
+.position-hint { margin: 0 0 6px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); }
+@container page (max-width: 560px) { .position-picker { grid-template-columns: 1fr; justify-items: center; } }
+.position-label { margin-top: 6px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); font-weight: 600; }
+.position-side .ui-seg { justify-self: start; }
+.position-side .screen-caption { font-size: calc(15px * var(--os-text-scale, 1)); }
+
+/* ── Position: a full-width miniature desktop with a dock that glides ── */
+.position-picker { display: block; padding: 4px 0 8px; }
+.position-picker .screen-map { position: relative; width: 100%; max-height: 230px; min-height: 170px; overflow: hidden; border-radius: 10px; border: 1px solid var(--card-stroke);
+  background: radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 60%), radial-gradient(90% 120% at 100% 100%, #7f9cff66, transparent 60%), color-mix(in srgb, var(--ink) 6%, var(--card)); }
+.screen-window { position: absolute; border-radius: 6px; background: color-mix(in srgb, var(--card) 80%, transparent); border: 1px solid var(--card-stroke); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.screen-window.w1 { left: 22%; top: 22%; width: 34%; height: 46%; }
+.screen-window.w2 { left: 48%; top: 32%; width: 28%; height: 40%; }
+.position-picker .screen-dock { opacity: 0; }
+.position-picker .screen-spot:hover .screen-dock, .position-picker .screen-spot:focus-visible .screen-dock { opacity: 1; background: color-mix(in srgb, var(--ink) 30%, transparent); }
+.position-picker .screen-spot[aria-checked="true"] .screen-dock { opacity: 0; }
+.screen-live-dock { position: absolute; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; border-radius: 9px; pointer-events: none;
+  background: color-mix(in srgb, var(--card) 82%, transparent); border: 1px solid var(--card-stroke); box-shadow: 0 4px 14px rgba(0,0,0,.14);
+  transition: left .35s var(--ease), top .35s var(--ease), right .35s var(--ease), bottom .35s var(--ease), transform .35s var(--ease); }
+.screen-live-dock i { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); opacity: .85; }
+.screen-live-dock i:nth-child(2) { background: #4f9cf9; } .screen-live-dock i:nth-child(3) { background: #f0506e; } .screen-live-dock i:nth-child(4) { background: #30a46c; } .screen-live-dock i:nth-child(5) { background: #8e6ad8; }
+.screen-live-dock.vertical { flex-direction: column; padding: 8px 5px; }
+.screen-live-dock.live-bottom { bottom: 8px; top: auto; } .screen-live-dock.live-top { top: 8px; bottom: auto; }
+.screen-live-dock.live-left { left: 8px; right: auto; } .screen-live-dock.live-right { right: 8px; left: auto; }
+.screen-live-dock:is(.live-bottom, .live-top).live-start { left: 8%; transform: none; }
+.screen-live-dock:is(.live-bottom, .live-top).live-center { left: 50%; transform: translateX(-50%); }
+.screen-live-dock:is(.live-bottom, .live-top).live-end { left: 92%; transform: translateX(-100%); }
+.screen-live-dock:is(.live-left, .live-right).live-start { top: 14%; transform: none; }
+.screen-live-dock:is(.live-left, .live-right).live-center { top: 50%; transform: translateY(-50%); }
+.screen-live-dock:is(.live-left, .live-right).live-end { top: 86%; transform: translateY(-100%); }
+.screen-chip { position: absolute; left: 12px; top: 10px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--card) 88%, transparent); border: 1px solid var(--card-stroke); border-radius: 999px; pointer-events: none; }
+.screen-hint { position: absolute; right: 12px; top: 12px; font-size: 11px; color: var(--ink-2); pointer-events: none; }
+.position-picker .screen-chip { transition: opacity .2s; }
+@media (prefers-reduced-motion: reduce) { .screen-live-dock { transition: none; } }

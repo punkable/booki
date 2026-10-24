@@ -52,7 +52,7 @@ Estos términos explican qué es Booki, qué hace y qué no, y quién responde d
 
 Booki es software libre y de código abierto bajo la licencia MIT. Cualquiera puede leer, auditar, modificar y redistribuir su código según esa licencia. Se ofrece **«tal cual», sin garantía de ningún tipo**. Los autores y colaboradores no responden de reclamaciones, daños o pérdidas derivados de su uso, según indica la licencia.
 
-Booki no tiene cuentas, ni telemetría, ni servidores propios. Consulta [Privacidad](README.es.md#privacidad).
+Booki no tiene cuentas, ni telemetría, ni servidores propios. Consulta [Privacidad](README.md#privacy-and-your-data).
 
 ## 2. Los complementos son herramientas de terceros que tú decides instalar
 

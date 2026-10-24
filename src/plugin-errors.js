@@ -5,6 +5,7 @@ import { t } from "./i18n.js";
 const KNOWN = [
   [/operation is in progress|download is already running/i, "perr.busy"],
   [/install the plugin first/i, "perr.notInstalled"],
+  [/plugin in use/i, "perr.inUse"],
   [/checksum|pinned, verified download|unexpected download address|expected program/i, "perr.verify"],
   [/could not reach|download failed|download interrupted/i, "perr.network"],
   [/too large/i, "perr.tooLarge"],

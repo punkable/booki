@@ -1785,6 +1785,7 @@ pub fn run() {
         })
         .setup(|app| {
             log::info!("Booki backend started");
+            dock_window::start_monitor_follow(app.handle().clone());
             {
                 let handle = app.handle().clone();
                 agent_activity::start(

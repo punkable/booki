@@ -2,7 +2,9 @@ import { t, curLang } from "../i18n.js";
 import { calendarMonth, calendarWeekStart, toggleTimer, timerSeconds, formatTimer, tasksSummary } from "./productivity.js";
 import { dock as dockApi } from "../api.js";
 import { icon } from "../icons.js";
+import { WIDGET_GLYPHS } from "../widgets-meta.js";
 import { weatherKind, formatDegrees, formatHour, formatWeekday } from "./weather-codes.js";
+import { clockParts } from "./widget-view.js";
 
 // One forecast per city for ten minutes, however often the panel is reopened.
 const forecastCache = new Map();
@@ -23,7 +25,10 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", t(`w.${item.widget}`));
   const head = document.createElement("div"); head.className = "productivity-head";
-  const title = document.createElement("strong"); title.textContent = t(`w.${item.widget}`); head.appendChild(title);
+  // Same title row as the system panels: the widget's glyph, then its name.
+  const title = document.createElement("div"); title.className = "widget-panel-title";
+  const titleGlyph = document.createElement("span"); titleGlyph.className = "widget-panel-icon"; titleGlyph.innerHTML = icon(WIDGET_GLYPHS[item.widget] || "sparkles");
+  const name = document.createElement("strong"); name.textContent = t(`w.${item.widget}`); title.append(titleGlyph, name); head.appendChild(title);
   const button = (label, fn, container = panel) => {
     const b = document.createElement("button"); b.type = "button"; b.textContent = label;
     b.className = "productivity-button"; b.addEventListener("click", fn); container.appendChild(b); return b;
@@ -55,7 +60,7 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     });
     return queue;
   };
-  const SECTIONS = { timer: ["timer"], tasks: ["tasks"], focus: ["timer", "tasks"], calendar: ["calendar"], clock: ["calendar"], weather: ["weather"] };
+  const SECTIONS = { timer: ["timer"], tasks: ["tasks"], focus: ["timer", "tasks"], calendar: ["calendar"], clock: ["clock", "calendar"], weather: ["weather"] };
   function draw() {
     if (disposed) return;
     clearInterval(timer);
@@ -68,6 +73,16 @@ export function buildProductivityPanel(item, { save, weatherSearch, weatherForec
     }
   }
   const DRAW = {
+    clock(body, st) {
+      const time = document.createElement("time"); const date = document.createElement("p");
+      body.append(time, date);
+      const paint = () => {
+        const now = new Date(); const value = clockParts(now, curLang(), st);
+        if (time.textContent !== value.time) { time.textContent = value.time; time.dateTime = now.toISOString(); }
+        if (date.textContent !== value.date) date.textContent = value.date;
+      };
+      paint(); timer = setInterval(() => { if (disposed) clearInterval(timer); else paint(); }, 1000);
+    },
     timer(body, st) {
       // Countdown inside a ring that empties as the block runs.
       const total = Math.min(180, Math.max(1, Number(st.minutes) || 25)) * 60;
@@ -107,15 +122,16 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       const controls = document.createElement("div"); controls.className = "focus-stepper-controls"; controls.append(less, input, more);
       stepper.append(label, controls); body.appendChild(stepper);
       if (item.widget !== "focus") return;
-      // Quiet-time options: Windows' Do not disturb (on by default) and a tucked dock.
-      const options = document.createElement("div"); options.className = "focus-options";
-      for (const [key, label, on] of [["dnd", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "focus.tuck", !!st.tuckDuringFocus]]) {
-        const row = document.createElement("label"); row.className = `focus-option focus-option-${key}`;
-        const box = document.createElement("input"); box.type = "checkbox"; box.checked = on;
-        box.addEventListener("change", () => update({ [key]: box.checked }));
-        row.append(box, text("span", "", t(label))); options.appendChild(row);
+      // Quiet-time options sit beside Start as two toggle icons (Do not disturb,
+      // keep the dock tucked away), named on hover; on reads as the accent fill.
+      for (const [key, glyph, label, on] of [["dnd", "moon", "focus.dnd", st.dnd === true], ["tuckDuringFocus", "eye-off", "focus.tuck", !!st.tuckDuringFocus]]) {
+        const option = document.createElement("button"); option.type = "button";
+        option.className = `stack-close focus-icon-button focus-option-${key}`; option.setAttribute("role", "switch");
+        option.setAttribute("aria-checked", String(on)); option.title = t(label); option.setAttribute("aria-label", t(label));
+        option.innerHTML = icon(glyph);
+        option.addEventListener("click", () => update({ [key]: !on }));
+        row.appendChild(option);
       }
-      body.appendChild(options);
     },
     tasks(body, st) {
       const list = Array.isArray(st.tasks) ? st.tasks : [];
@@ -151,18 +167,18 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
         });
       }); body.appendChild(form);
     },
-    calendar(body) {
+    calendar(body, st) {
       const now = new Date();
       const date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
       const nav = document.createElement("div"); nav.className = "focus-month"; body.appendChild(nav);
-      const label = text("strong", "focus-month-title", date.toLocaleDateString(curLang(), { month: "long", year: "numeric" })); label.setAttribute("aria-live", "polite"); nav.appendChild(label);
+      const label = text("strong", "focus-month-title", ((s) => s.charAt(0).toLocaleUpperCase(curLang()) + s.slice(1))(date.toLocaleDateString(curLang(), { month: "long", year: "numeric" }))); label.setAttribute("aria-live", "polite"); nav.appendChild(label);
       if (monthOffset !== 0) { const today = document.createElement("button"); today.type = "button"; today.className = "focus-today"; today.textContent = t("focus.today"); today.addEventListener("click", () => { monthOffset = 0; draw(); }); nav.appendChild(today); }
       for (const [name, step, key] of [["chevron-left", -1, "premium.previousMonth"], ["chevron-right", 1, "premium.nextMonth"]]) {
         const go = document.createElement("button"); go.type = "button"; go.className = "stack-close"; go.innerHTML = icon(name); go.title = t(key); go.setAttribute("aria-label", t(key));
         go.addEventListener("click", () => { monthOffset += step; draw(); }); nav.appendChild(go);
       }
       const grid = document.createElement("div"); grid.className = "focus-calendar";
-      const weekStart = calendarWeekStart(navigator.language || curLang());
+      const weekStart = [0, 1].includes(st.weekStart) ? st.weekStart : calendarWeekStart(navigator.language || curLang());
       for (let i = 0; i < 7; i++) { const cell = document.createElement("strong"); cell.textContent = new Date(2024, 0, 7 + weekStart + i).toLocaleDateString(curLang(), { weekday: "narrow" }); grid.appendChild(cell); }
       for (const day of calendarMonth(date, weekStart)) { const cell = document.createElement("span"); cell.textContent = day ? String(day) : ""; if (monthOffset === 0 && day === now.getDate()) { cell.className = "today"; cell.setAttribute("aria-label", `${t("focus.today")}, ${day}`); cell.setAttribute("aria-current", "date"); } grid.appendChild(cell); } body.appendChild(grid);
     },
@@ -175,6 +191,12 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
         empty.append(art, text("strong", "", t("focus.noCity")), text("span", "", t("weather.emptyHint")));
         body.appendChild(empty);
       }
+      // A configured widget opens its forecast, with location editing on demand.
+      let location = body;
+      if (hasCity) {
+        location = document.createElement("details"); location.className = "weather-location-settings";
+        const summary = document.createElement("summary"); summary.textContent = t("widgetFlow.changeCity"); location.append(summary); body.append(location);
+      }
       // City search: one field, Enter or the button searches, results are rows.
       const form = document.createElement("form"); form.className = "weather-search"; form.setAttribute("role", "search");
       const lens = document.createElement("span"); lens.className = "weather-search-icon"; lens.setAttribute("aria-hidden", "true"); lens.innerHTML = icon("search");
@@ -182,8 +204,8 @@ if (panel.querySelector("input:focus")) panel.addEventListener("focusout", () =>
       input.setAttribute("aria-label", t("focus.city")); input.maxLength = 100; input.autocomplete = "off"; input.spellcheck = false;
       const submit = document.createElement("button"); submit.type = "submit"; submit.className = "weather-search-go";
       submit.innerHTML = icon("chevron-right"); submit.title = t("focus.search"); submit.setAttribute("aria-label", t("focus.search"));
-      form.append(lens, input, submit); body.appendChild(form);
-      const results = document.createElement("ul"); results.className = "weather-results"; results.setAttribute("aria-live", "polite"); body.appendChild(results);
+      form.append(lens, input, submit); location.appendChild(form);
+      const results = document.createElement("ul"); results.className = "weather-results"; results.setAttribute("aria-live", "polite"); location.appendChild(results);
       const status = (message) => { results.replaceChildren(); if (message) results.appendChild(text("li", "weather-results-note", message)); };
       form.addEventListener("submit", async (event) => {
         event.preventDefault();

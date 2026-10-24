@@ -14,6 +14,7 @@ import {
   onOcclusion,
   onDesktop,
   onReveal,
+  onDockMonitorChanged,
   onNotchMenu,
   onSoftReveal,
   onFullscreen,
@@ -51,7 +52,7 @@ import {
   edgeAutoScroll,
   stopEdgeScroll,
 } from "./dock/magnify.js";
-import { reframe, checkScreenChange } from "./dock/frame.js";
+import { reframe, checkScreenChange, forceReframe } from "./dock/frame.js";
 import {
   queueVolumeSet,
   adjustVolumeFromWheel,
@@ -97,6 +98,7 @@ import { openMenu, openBackgroundMenu, openFileMenu, openPanelItemMenu, openGrou
 import { checkChangelog, maybeOnboard } from "./dock/onboarding.js";
 import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.js";
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
+import { startPluginUpdateChecks } from "./dock/plugin-updates.js";
 import "./dock/agent-notices.js";
 
 
@@ -211,7 +213,7 @@ dockEl.addEventListener("dblclick", (e) => {
     dockApi.openSettings(); // double-click the empty bar → Settings
     return;
   }
-  if (tile.classList.contains("widget")) dockApi.openWidgetSettings(tile.dataset.id);
+  // Widgets are used from their tile; configuration is an explicit context action.
 });
 
 // Middle-click works like the taskbar: an app opens a new instance and a
@@ -284,7 +286,8 @@ dockEl.addEventListener(
       // Read the settled value (dataset.v), not the tween's mid-animation text.
       const vEl = w.querySelector(".w-ring-num");
       const cur = Number(vEl.dataset.v) || parseInt(vEl.textContent, 10) || 0;
-      const next = Math.max(0, Math.min(100, cur + (e.deltaY > 0 ? -3 : 3)));
+      const step = Math.max(1, Math.min(10, Number(item.style?.volumeStep) || 3));
+      const next = Math.max(0, Math.min(100, cur + ((e.deltaY || e.deltaX) > 0 ? -step : step)));
       queueVolumeSet(next);
       return;
     }
@@ -300,8 +303,6 @@ dockEl.addEventListener(
   { passive: false }
 );
 
-let magnifyRaf = 0;
-
 dockEl.addEventListener("pointermove", (e) => {
   // Always keep the freshest pointer position; coalesce to one magnify per frame
   // so it runs exactly at the display's refresh (crisp at 60/120/144Hz alike).
@@ -310,11 +311,16 @@ dockEl.addEventListener("pointermove", (e) => {
   if (captureHeld()) return;
   if (S.edgeMove) return; // moving the whole dock to another edge — no magnify
   if (document.body.classList.contains("dock-overflow")) { edgeAutoScroll(); return; }
-  if (magnifyRaf) return;
-  magnifyRaf = requestAnimationFrame(() => {
-    magnifyRaf = 0;
-    magnify(magPointer.x, magPointer.y);
-  });
+  // magnify() only records the target; its own frame loop paints at the
+  // display's refresh and reads the freshest pointer position.
+  magnify(magPointer.x, magPointer.y);
+});
+// High-rate mice report positions between frames. pointerrawupdate delivers
+// them without waiting for the frame's coalesced pointermove, so the wave
+// uses where the pointer is now, not where it was a few milliseconds ago.
+if ("onpointerrawupdate" in window) dockEl.addEventListener("pointerrawupdate", (e) => {
+  magPointer.x = e.clientX;
+  magPointer.y = e.clientY;
 });
 dockEl.addEventListener("pointerleave", () => {
   stopEdgeScroll();
@@ -621,7 +627,7 @@ const dockTooltip = createDockTooltip(dockEl, {
   dismiss: dismissAfterCaptureCheck,
   preserve: captureHeld,
   edge: () => S.cfg.edge,
-  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
+  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel, .note-editor") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
     const pin = findPinnedById(el.dataset.id);
     if (!pin) return null;
@@ -664,6 +670,9 @@ window.addEventListener("pointerdown", (e) => {
 
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.
 setInterval(checkUpdates, 4 * 3600 * 1000);
+startPluginUpdateChecks();
+// Following the pointer to another display: recompute size and anchor there.
+onDockMonitorChanged(() => requestAnimationFrame(forceReframe));
 
 // Easter egg: Konami party.
 const KONAMI = [

@@ -1,5 +1,6 @@
 //! Opt-in AI usage for the AI widget, computed only from the usage logs that
-//! Claude Code and the Codex CLI already write on this PC.
+//! Claude Code and the Codex CLI already write on this PC. Cursor and
+//! OpenCode expose presence through folder metadata only, without quota.
 //!
 //! Privacy contract: this module never reads, uses, stores or sends any
 //! sign-in, token or credential, and makes no network request. It only opens
@@ -53,7 +54,9 @@ pub struct UsageBlock {
 pub struct ProviderUsage {
     pub id: &'static str,
     pub name: &'static str,
-    /// Plan windows with real percentages (Codex only).
+    /// Local tool data exists; false means discovery found no source on this PC.
+    pub detected: bool,
+    /// Plan windows with real percentages when published in Codex logs.
     pub windows: Vec<UsageWindow>,
     /// The active 5-hour block (Claude), None when idle for 5 hours.
     pub block: Option<UsageBlock>,
@@ -63,32 +66,109 @@ pub struct ProviderUsage {
     pub last_activity: i64,
 }
 
-/// Every AI tool found on this PC (its config folder exists), with whatever
-/// usage its local logs show. Tools that are not installed are left out.
+/// The four supported providers, with explicit source discovery. An absent
+/// source is represented instead of silently removing the provider.
 pub fn usage() -> Vec<ProviderUsage> {
-    let now = now_secs();
-    let mut out = Vec::new();
-    let claude: Vec<PathBuf> = claude_dirs().into_iter().filter(|d| d.is_dir()).collect();
-    if !claude.is_empty() {
-        let roots: Vec<PathBuf> = claude.iter().map(|d| d.join("projects")).collect();
-        let mut entries = Vec::new();
-        read_logs(&roots, now, |line| {
-            if let Some(e) = parse_claude_line(line) {
-                entries.push(e);
-            }
-        });
-        out.push(claude_usage(entries, now));
+    usage_from_roots(
+        &claude_dirs(),
+        &codex_homes(),
+        &cursor_data_dirs(),
+        &opencode_data_dirs(),
+        now_secs(),
+    )
+}
+
+fn usage_from_roots(
+    claude: &[PathBuf],
+    codex: &[PathBuf],
+    cursor: &[PathBuf],
+    opencode: &[PathBuf],
+    now: i64,
+) -> Vec<ProviderUsage> {
+    let mut entries = Vec::new();
+    let roots: Vec<_> = claude.iter().map(|d| d.join("projects")).collect();
+    read_logs(&roots, now, |line| {
+        if let Some(entry) = parse_claude_line(line) {
+            entries.push(entry);
+        }
+    });
+    let mut claude_usage = claude_usage(entries, now);
+    claude_usage.detected = claude.iter().any(|path| path.is_dir());
+    let mut events = Vec::new();
+    let roots: Vec<_> = codex
+        .iter()
+        .flat_map(|dir| [dir.join("sessions"), dir.join("archived_sessions")])
+        .collect();
+    read_logs_from(&roots, now, |path, line| {
+        if let Some(mut event) = parse_codex_line(line) {
+            event.session = path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            events.push(event);
+        }
+    });
+    let mut codex_usage = codex_usage(events, now);
+    codex_usage.detected = codex.iter().any(|path| path.is_dir());
+    // Cursor/OpenCode discovery uses directory metadata only. Their account
+    // databases and credentials are never opened for a subscription allowance.
+    vec![
+        claude_usage,
+        codex_usage,
+        discovered("cursor", "Cursor", cursor),
+        discovered("opencode", "OpenCode", opencode),
+    ]
+}
+
+fn discovered(id: &'static str, name: &'static str, roots: &[PathBuf]) -> ProviderUsage {
+    ProviderUsage {
+        id,
+        name,
+        detected: roots.iter().any(|path| path.is_dir()),
+        windows: Vec::new(),
+        block: None,
+        week_tokens: 0,
+        last_activity: 0,
     }
-    if let Some(home) = codex_home().filter(|d| d.is_dir()) {
-        let mut events = Vec::new();
-        read_logs(&[home.join("sessions")], now, |line| {
-            if let Some(e) = parse_codex_line(line) {
-                events.push(e);
-            }
-        });
-        out.push(codex_usage(events, now));
+}
+
+fn unique_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = HashSet::new();
+    paths
+        .into_iter()
+        .filter(|path| seen.insert(path.clone()))
+        .collect()
+}
+
+pub(crate) fn cursor_data_dirs() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join(".cursor"));
     }
-    out
+    if let Some(config) = dirs::config_dir() {
+        paths.push(config.join("Cursor"));
+    }
+    if let Some(data) = dirs::data_local_dir() {
+        paths.push(data.join("Cursor"));
+    }
+    unique_paths(paths)
+}
+
+pub(crate) fn opencode_data_dirs() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(data) = std::env::var_os("XDG_DATA_HOME").filter(|value| !value.is_empty()) {
+        paths.push(PathBuf::from(data).join("opencode"));
+    }
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join(".local").join("share").join("opencode"));
+    }
+    if let Some(data) = dirs::data_local_dir() {
+        paths.push(data.join("opencode"));
+    }
+    if let Some(config) = dirs::config_dir() {
+        paths.push(config.join("opencode"));
+    }
+    unique_paths(paths)
 }
 
 fn now_secs() -> i64 {
@@ -104,6 +184,10 @@ fn now_secs() -> i64 {
 /// under `roots` modified in the last 7 days, newest first, until the byte
 /// budget runs out. Files are opened read-only and streamed.
 fn read_logs(roots: &[PathBuf], now: i64, mut each: impl FnMut(&[u8])) {
+    read_logs_from(roots, now, |_, line| each(line));
+}
+
+fn read_logs_from(roots: &[PathBuf], now: i64, mut each: impl FnMut(&Path, &[u8])) {
     let mut files = Vec::new();
     for root in roots {
         collect_jsonl(root, now - WEEK, 0, &mut files);
@@ -125,7 +209,7 @@ fn read_logs(roots: &[PathBuf], now: i64, mut each: impl FnMut(&[u8])) {
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
                     budget = budget.saturating_sub(n as u64);
-                    each(&line);
+                    each(&path, &line);
                 }
             }
         }
@@ -171,22 +255,23 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 /// $CLAUDE_CONFIG_DIR (comma-separated list allowed), else ~/.claude and
 /// ~/.config/claude.
 pub(crate) fn claude_dirs() -> Vec<PathBuf> {
-    if let Some(list) = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|d| !d.is_empty()) {
-        let list = list.to_string_lossy().into_owned();
-        let dirs: Vec<PathBuf> = list
-            .split(',')
-            .map(str::trim)
-            .filter(|d| !d.is_empty())
-            .map(PathBuf::from)
-            .collect();
-        if !dirs.is_empty() {
-            return dirs;
-        }
+    let mut paths = Vec::new();
+    if let Some(list) = std::env::var_os("CLAUDE_CONFIG_DIR") {
+        paths.extend(
+            list.to_string_lossy()
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from),
+        );
     }
-    let Some(home) = dirs::home_dir() else {
-        return Vec::new();
-    };
-    vec![home.join(".claude"), home.join(".config").join("claude")]
+    if let Some(home) = dirs::home_dir() {
+        paths.extend([home.join(".claude"), home.join(".config").join("claude")]);
+    }
+    if let Some(config) = std::env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty()) {
+        paths.push(PathBuf::from(config).join("claude"));
+    }
+    unique_paths(paths)
 }
 
 /// Only the fields needed for usage; everything else in the line (message
@@ -294,6 +379,7 @@ fn claude_usage(entries: Vec<ClaudeEntry>, now: i64) -> ProviderUsage {
     ProviderUsage {
         id: "claude",
         name: "Claude",
+        detected: true,
         windows: Vec::new(),
         block: current_block(&entries, now),
         week_tokens: entries.iter().map(|e| e.tokens).sum(),
@@ -303,12 +389,16 @@ fn claude_usage(entries: Vec<ClaudeEntry>, now: i64) -> ProviderUsage {
 
 // ───────────────────────────── Codex CLI ─────────────────────────────
 
-/// $CODEX_HOME, else ~/.codex.
-pub(crate) fn codex_home() -> Option<PathBuf> {
-    std::env::var_os("CODEX_HOME")
-        .filter(|d| !d.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| dirs::home_dir().map(|h| h.join(".codex")))
+/// Custom and default Codex homes, so a stale override cannot hide local sessions.
+pub(crate) fn codex_homes() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(home) = std::env::var_os("CODEX_HOME").filter(|value| !value.is_empty()) {
+        paths.push(PathBuf::from(home));
+    }
+    if let Some(home) = dirs::home_dir() {
+        paths.push(home.join(".codex"));
+    }
+    unique_paths(paths)
 }
 
 /// `{"timestamp": "…", "type": "event_msg", "payload": {"type":
@@ -342,6 +432,7 @@ struct CodexTokens {
 
 #[derive(Debug, Clone, PartialEq)]
 struct CodexEvent {
+    session: String,
     at: i64,
     /// Tokens of this turn.
     tokens: u64,
@@ -373,6 +464,7 @@ fn parse_codex_line(line: &[u8]) -> Option<CodexEvent> {
         .map(|r| parse_rate_limits(r, at))
         .unwrap_or_default();
     Some(CodexEvent {
+        session: String::new(),
         at,
         tokens,
         total,
@@ -397,7 +489,10 @@ fn window_label(minutes: i64, primary: bool) -> String {
 ///
 /// `at` is the event time, which relative reset times count from.
 fn parse_rate_limits(r: &Value, at: i64) -> Vec<UsageWindow> {
-    let num = |v: Option<&Value>| v.and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()));
+    let num = |v: Option<&Value>| {
+        v.and_then(|v| v.as_f64().or_else(|| v.as_str()?.parse().ok()))
+            .filter(|n| n.is_finite())
+    };
     ["primary", "secondary"]
         .iter()
         .filter_map(|key| {
@@ -429,7 +524,7 @@ fn codex_usage(mut events: Vec<CodexEvent>, now: i64) -> ProviderUsage {
     let mut seen = HashSet::new();
     let week_tokens = events
         .iter()
-        .filter(|e| e.tokens > 0 && seen.insert((e.total, e.tokens)))
+        .filter(|e| e.tokens > 0 && seen.insert((e.session.as_str(), e.total, e.tokens)))
         .map(|e| e.tokens)
         .sum();
     // The latest snapshot of the plan's windows; a window whose reset time
@@ -459,6 +554,7 @@ fn codex_usage(mut events: Vec<CodexEvent>, now: i64) -> ProviderUsage {
     ProviderUsage {
         id: "codex",
         name: "Codex",
+        detected: true,
         windows,
         block: None,
         week_tokens,
@@ -634,5 +730,81 @@ mod tests {
         });
         std::fs::remove_dir_all(&dir).ok();
         assert_eq!(n, 1);
+    }
+    #[test]
+    fn all_providers_explain_missing_local_sources() {
+        let providers = usage_from_roots(&[], &[], &[], &[], t(T0));
+        assert_eq!(
+            providers
+                .iter()
+                .map(|provider| provider.id)
+                .collect::<Vec<_>>(),
+            vec!["claude", "codex", "cursor", "opencode"]
+        );
+        assert!(providers.iter().all(|provider| !provider.detected
+            && provider.windows.is_empty()
+            && provider.week_tokens == 0));
+    }
+
+    #[test]
+    fn provider_discovery_uses_all_homes_archives_and_metadata_only_for_other_tools() {
+        let root = std::env::temp_dir().join(format!("booki-ai-discovery-{}", std::process::id()));
+        let claude = root.join("claude");
+        let codex = root.join("codex");
+        let cursor = root.join("cursor");
+        let opencode = root.join("opencode");
+        for path in [
+            claude.join("projects"),
+            codex.join("archived_sessions"),
+            cursor.clone(),
+            opencode.clone(),
+        ] {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        std::fs::write(
+            claude.join("projects/session.jsonl"),
+            claude_line(T0, "fixture", "request", 100, 50),
+        )
+        .unwrap();
+        let event = format!(
+            r#"{{"timestamp":"{T0}","payload":{{"type":"token_count","info":null,"rate_limits":{{"primary":{{"used_percent":25,"window_minutes":300}}}}}}}}"#
+        );
+        std::fs::write(codex.join("archived_sessions/session.jsonl"), &event).unwrap();
+        // These fixture files must never become usage sources for these providers.
+        std::fs::write(cursor.join("auth.json"), &event).unwrap();
+        std::fs::write(opencode.join("opencode.db"), &event).unwrap();
+        let providers = usage_from_roots(
+            &[root.join("missing-custom"), claude],
+            &[root.join("missing-codex"), codex],
+            &[cursor],
+            &[opencode],
+            t(T0),
+        );
+        assert!(providers.iter().all(|provider| provider.detected));
+        assert_eq!(providers[0].week_tokens, 165);
+        assert_eq!(providers[1].windows[0].percent, 25.0);
+        assert!(providers[2..]
+            .iter()
+            .all(|provider| provider.windows.is_empty() && provider.week_tokens == 0));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn identical_counters_in_different_codex_sessions_are_not_deduplicated() {
+        let line = format!(
+            r#"{{"timestamp":"{T0}","payload":{{"type":"token_count","info":{{"last_token_usage":{{"total_tokens":5}},"total_token_usage":{{"total_tokens":5}}}}}}}}"#
+        );
+        let mut first = parse_codex_line(line.as_bytes()).unwrap();
+        first.session = "first.jsonl".into();
+        let mut second = first.clone();
+        second.session = "second.jsonl".into();
+        assert_eq!(
+            codex_usage(vec![first.clone(), first, second], t(T0)).week_tokens,
+            10
+        );
+        assert!(parse_rate_limits(
+            &serde_json::json!({"primary":{"used_percent":"NaN"}}),
+            t(T0)
+        )
+        .is_empty());
     }
 }

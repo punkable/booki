@@ -13,7 +13,8 @@ import { placeBesideBar } from "./placement.js";
 import { setPreviewSubText } from "./widget-view.js";
 import { S } from "./state.js";
 import { findPinnedById, widgetLabel, findWidgetPin } from "./helpers.js";
-import { dockEl } from "./dom.js";
+import { dockEl, liveDockRect } from "./dom.js";
+import { notesOf, activeNote, noteTitle, draftKey, withNoteText, withNewNote, withoutNote } from "../notes-model.js";
 import { scheduleHitReport } from "./hit-regions.js";
 import { reframe, applyFrame } from "./frame.js";
 import { eachWidget, tickProductivity, cacheWidgetEls, syncPolls } from "./live-widgets.js";
@@ -46,6 +47,17 @@ export function insideWidgetPanel(target) {
   const panel = S.productivityPanel;
   return !!panel && (panel.contains(target) || !!panel._opener?.contains?.(target));
 }
+/** One route for using a widget, from the bar, a group or the widget hub. */
+export function openWidget(item, tile = dockEl) {
+  if (["clock", "calendar", "weather", "focus"].includes(item.widget)) return openProductivity(item, tile);
+  if (item.widget === "notes") return editNote(item);
+  if (item.widget === "clipboard") {
+    closeProductivityPanel();
+    if (S.stackItemId) closeStack();
+    return toggleClipboardStack(tile, item.id);
+  }
+  return openSystemPanel(item, tile);
+}
 export function openProductivity(item, tile) {
   if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
@@ -77,29 +89,40 @@ export function openSystemPanel(item, tile) {
 export function openWidgetHub() {
   closeProductivityPanel();
   const item = { id: "__widgets", widget: "hub" };
-  const open = (pin) => {
-    if (["focus", "clock", "calendar", "weather"].includes(pin.widget)) openProductivity(pin, dockEl);
-    else if (pin.widget === "notes") editNote(pin);
-    else if (pin.widget === "clipboard") { closeProductivityPanel(); toggleClipboardStack(dockEl); }
-    else openSystemPanel(pin, dockEl);
-  };
+  const open = (pin) => openWidget(pin, dockEl);
   mountWidgetPanel(item, dockEl, buildWidgetHub(S.cfg.pinned, { open, close: closeProductivityPanel, settings: () => dockApi.openSettingsTab("widgets") }));
+}
+function placeWidgetPanel(panel, tile) {
+  const bar = liveDockRect(), anchor = tile.getBoundingClientRect(), edge = S.cfg.edge || "bottom", gap = 10, pad = 8;
+  const vertical = edge === "left" || edge === "right";
+  const height = vertical ? innerHeight - pad * 2 : edge === "top" ? innerHeight - bar.bottom - gap - pad : bar.top - gap - pad;
+  const width = !vertical ? innerWidth - pad * 2 : edge === "left" ? innerWidth - bar.right - gap - pad : bar.left - gap - pad;
+  panel.style.maxHeight = `${Math.max(1, height)}px`; panel.style.maxWidth = `${Math.max(1, width)}px`;
+  const pos = placeBesideBar({ bar, box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge, viewport: { width: innerWidth, height: innerHeight }, along: vertical ? anchor.top + anchor.height / 2 : anchor.left + anchor.width / 2, inside: bar, gap, pad });
+  panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
 }
 function mountWidgetPanel(item, tile, panel) {
   // One flyout at a time: a widget panel replaces an open folder or menu.
   closeStack(); closeMenu();
-  panel._opener = tile; panel._itemId = item.id;
+  panel._opener = tile; panel._itemId = item.id; panel.tabIndex = -1;
+  if (item.id !== "__widgets") {
+    const settings = document.createElement("button"); settings.type = "button"; settings.className = "stack-close widget-settings-action";
+    settings.innerHTML = icon("settings");
+    const label = t("widgetFlow.configureNamed").replace("{name}", () => widgetLabel(item.widget));
+    settings.title = label; settings.setAttribute("aria-label", label);
+    settings.addEventListener("click", () => dockApi.openWidgetSettings(item.id));
+    const head = panel.querySelector(".productivity-head"); head?.insertBefore(settings, head.lastElementChild);
+  }
   panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; cacheWidgetEls(); syncPolls(); applyFrame();
   const place = () => {
     if (!panel.isConnected) return;
-    const pos = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
-    panel.style.left = `${pos.left}px`; panel.style.top = `${pos.top}px`; scheduleHitReport();
+    placeWidgetPanel(panel, tile);
   };
   const dispose = panel.dispose;
   const observer = new ResizeObserver(() => { if (!panel.isConnected) { observer.disconnect(); return; } applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { dispose?.(); observer.disconnect(); };
-  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); panel.querySelector(item.widget === "weather" ? "input" : "button")?.focus(); });
+  requestAnimationFrame(() => { place(); panel.classList.add("is-open"); const search = item.widget === "weather" ? panel.querySelector("input") : null; if (search?.offsetParent) search.focus(); else panel.focus({ preventScroll: true }); });
 }
 
 // Notes use a serialized autosave and keep their draft visible on failure.
@@ -118,47 +141,67 @@ export async function editNote(item) {
   if (!(await closeNoteEditor())) return;
   closeProductivityPanel(); closeStack(); closeMenu();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`) || dockEl;
+  const styleNow = () => findWidgetPin(item.id)?.style || item.style || {};
+  let current = activeNote(styleNow());
   const panel = document.createElement("section");
   panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
+  // Header: glyph and title, then New note and Close, like the other panels.
   const head = document.createElement("div"); head.className = "productivity-head";
-  const title = document.createElement("strong"); title.textContent = t("w.notes");
+  const titleBox = document.createElement("div"); titleBox.className = "widget-panel-title";
+  const glyph = document.createElement("span"); glyph.className = "widget-panel-icon"; glyph.innerHTML = icon("note");
+  const title = document.createElement("strong"); title.textContent = t("w.notes"); titleBox.append(glyph, title);
+  const add = document.createElement("button"); add.type = "button"; add.className = "stack-close"; add.innerHTML = icon("plus");
+  add.title = t("notes.new"); add.setAttribute("aria-label", t("notes.new"));
   const close = document.createElement("button"); close.type = "button"; close.className = "stack-close"; close.innerHTML = icon("x"); close.title = t("stack.close"); close.setAttribute("aria-label", t("stack.close"));
-  close.addEventListener("click", closeNoteEditor); head.append(title, close);
+  close.addEventListener("click", closeNoteEditor); head.append(titleBox, add, close);
+  // Every note as a chip with its first line; only shown with two or more.
+  const strip = document.createElement("div"); strip.className = "note-strip"; strip.setAttribute("role", "tablist"); strip.setAttribute("aria-label", t("w.notes"));
   const ta = document.createElement("textarea"); ta.className = "note-input";
-  ta.value = item.style?.note || ""; ta.placeholder = t("w.notesEmpty"); ta.setAttribute("aria-label", t("w.notes")); ta.maxLength = 20000;
+  ta.value = current.text; ta.placeholder = t("w.notesEmpty"); ta.setAttribute("aria-label", t("w.notes")); ta.maxLength = 20000;
   const footer = document.createElement("div"); footer.className = "note-save-state";
   const status = document.createElement("span"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.textContent = t("status.saved");
   const retry = document.createElement("button"); retry.type = "button"; retry.className = "productivity-button"; retry.textContent = t("focus.retry"); retry.hidden = true;
+  const remove = document.createElement("button"); remove.type = "button"; remove.className = "stack-close note-delete"; remove.innerHTML = icon("trash");
+  remove.title = t("notes.delete"); remove.setAttribute("aria-label", t("notes.delete"));
   let recoveryPending = true;
   let retryLoad = null;
-  // Each save writes the whole config, so it waits for a ~1 s pause in typing
-  // (the last argument). Closing the editor flushes whatever is still pending.
-  const saver = createDraftSaver(async (text) => {
-    // Journal first: a failed configuration write still leaves a recoverable
-    // encrypted local copy. Clear only the matching text after durable save.
-    await dockApi.writeNoteDraft(item.id, text);
-    const current = findWidgetPin(item.id);
-    // The note's widget is gone: the text is safe in the draft; let it close.
-    if (!current || current.widget !== "notes") return true;
-    current.style = { ...(current.style || {}), note: text };
-    if (!(await persist({}, { showError: false }))) return false;
+  const paintTile = () => {
+    const style = styleNow(), list = notesOf(style);
+    const first = noteTitle(activeNote(style).text);
     eachWidget("notes", (el) => {
       if (el.dataset.id !== item.id) return;
+      const text = list.length > 1 ? `${first || t("w.notesEmpty")} · ${t("notes.count").replace("{n}", () => list.length)}` : first;
       setPreviewSubText(el, text || t("w.notesEmpty"), !text);
       setTileLabel(el, widgetLabel("notes"));
     });
-    await dockApi.clearNoteDraft(item.id, text);
+  };
+  // Each save writes the whole config, so it waits for a ~1 s pause in typing
+  // (the last argument). Closing or switching notes flushes what is pending.
+  const saver = createDraftSaver(async (text) => {
+    const noteId = current.id;
+    // Journal first: a failed configuration write still leaves a recoverable
+    // encrypted local copy. Clear only the matching text after durable save.
+    await dockApi.writeNoteDraft(draftKey(item.id, noteId), text);
+    const pin = findWidgetPin(item.id);
+    // The note's widget is gone: the text is safe in the draft; let it close.
+    if (!pin || pin.widget !== "notes") return true;
+    pin.style = withNoteText(pin.style || {}, noteId, text);
+    if (!(await persist({}, { showError: false }))) return false;
+    paintTile(); drawStrip();
+    await dockApi.clearNoteDraft(draftKey(item.id, noteId), text);
     return true;
   }, (state) => { status.textContent = t(state === "error" ? "status.saveError" : `status.${state}`); retry.hidden = state !== "error"; }, 1000);
   panel.flush = () => recoveryPending ? Promise.resolve(true) : saver.flush(); panel.dispose = saver.cancelTimer;
-  retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } }); footer.append(status, retry); panel.append(head, ta, footer);
+  retry.addEventListener("click", () => { if (retryLoad) retryLoad(); else { ta.focus(); saver.flush(); } });
+  footer.append(status, retry, remove); panel.append(head, strip, ta, footer);
   ta.disabled = true;
   const loadRecovery = async () => {
     retry.hidden = true; status.textContent = t("overhaul.loading");
+    const key = draftKey(item.id, current.id), forNote = current.id;
     try {
-      const recovered = await dockApi.readNoteDraft(item.id);
-      if (noteEditor !== panel) return;
+      const recovered = await dockApi.readNoteDraft(key);
+      if (noteEditor !== panel || current.id !== forNote) return;
       if (recovered != null && recovered !== ta.value) {
         const recovery = document.createElement("div"); recovery.className = "note-recovery";
         recovery.setAttribute("role", "status");
@@ -170,13 +213,13 @@ export async function editNote(item) {
         restore.addEventListener("click", () => { ta.value = recovered; resume(); saver.change(recovered); });
         discard.addEventListener("click", async () => {
           restore.disabled = discard.disabled = true;
-          try { await dockApi.clearNoteDraft(item.id, recovered); if (noteEditor === panel) resume(); }
+          try { await dockApi.clearNoteDraft(key, recovered); if (noteEditor === panel) resume(); }
           catch { status.textContent = t("status.saveError"); restore.disabled = discard.disabled = false; }
         });
         recovery.append(restore, discard); panel.insertBefore(recovery, ta);
         status.textContent = t("notes.recoveryFound"); retryLoad = null; restore.focus();
       } else {
-        if (recovered != null) await dockApi.clearNoteDraft(item.id, recovered);
+        if (recovered != null) await dockApi.clearNoteDraft(key, recovered);
         if (noteEditor !== panel) return;
         recoveryPending = false; retryLoad = null; ta.disabled = false; status.textContent = t("status.saved"); ta.focus();
       }
@@ -185,10 +228,61 @@ export async function editNote(item) {
       status.textContent = t("status.saveError"); retry.hidden = false; retryLoad = loadRecovery;
     }
   };
-  ta.addEventListener("input", () => saver.change(ta.value));
+  // Show another note in this same panel: save what is pending first.
+  const open = async (noteId) => {
+    if (noteId === current.id && !ta.disabled) { ta.focus(); return; }
+    if (!recoveryPending && !(await saver.flush())) return;
+    panel.querySelector(".note-recovery")?.remove();
+    current = notesOf(styleNow()).find((note) => note.id === noteId) || activeNote(styleNow());
+    ta.value = current.text; recoveryPending = true; ta.disabled = true;
+    drawStrip(); loadRecovery();
+  };
+  const commitStyle = async (style) => {
+    const pin = findWidgetPin(item.id);
+    if (!pin) return false;
+    pin.style = style;
+    if (!(await persist({}, { showError: false }))) { status.textContent = t("status.saveError"); return false; }
+    paintTile();
+    return true;
+  };
+  function drawStrip() {
+    const list = notesOf(styleNow());
+    strip.hidden = list.length < 2;
+    strip.replaceChildren(...list.map((note) => {
+      const chip = document.createElement("button"); chip.type = "button"; chip.className = "note-chip"; chip.setAttribute("role", "tab");
+      chip.setAttribute("aria-selected", String(note.id === current.id)); chip.tabIndex = note.id === current.id ? 0 : -1;
+      chip.textContent = (note.id === current.id ? noteTitle(ta.value) : noteTitle(note.text)) || t("notes.untitled");
+      chip.addEventListener("click", () => open(note.id));
+      return chip;
+    }));
+  }
+  add.addEventListener("click", async () => {
+    if (!recoveryPending && !(await saver.flush())) return;
+    const id = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    if (await commitStyle(withNewNote(styleNow(), id))) open(id);
+  });
+  // Deleting asks for a second click within three seconds.
+  let armed = 0;
+  remove.addEventListener("click", async () => {
+    if (!armed) {
+      remove.classList.add("is-armed"); remove.title = t("notes.deleteConfirm"); remove.setAttribute("aria-label", t("notes.deleteConfirm"));
+      armed = setTimeout(() => { armed = 0; remove.classList.remove("is-armed"); remove.title = t("notes.delete"); remove.setAttribute("aria-label", t("notes.delete")); }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = 0; remove.classList.remove("is-armed");
+    saver.cancelTimer();
+    const gone = current.id;
+    const style = withoutNote(styleNow(), gone);
+    if (!(await commitStyle(style))) return;
+    await dockApi.clearNoteDraft(draftKey(item.id, gone), ta.value).catch(() => {});
+    current = { id: "" };
+    open(style.activeNote);
+  });
+  ta.addEventListener("input", () => { saver.change(ta.value); const chip = strip.querySelector('[aria-selected="true"]'); if (chip) chip.textContent = noteTitle(ta.value) || t("notes.untitled"); });
   panel.addEventListener("keydown", async (event) => {
     event.stopPropagation();
     if (event.key === "Escape" || ((event.ctrlKey || event.metaKey) && event.key === "Enter")) { event.preventDefault(); await closeNoteEditor(); }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") { event.preventDefault(); add.click(); }
   });
   panel.addEventListener("focusout", (event) => {
     if (event.relatedTarget && panel.contains(event.relatedTarget)) return;
@@ -196,11 +290,11 @@ export async function editNote(item) {
     requestAnimationFrame(() => { if (noteEditor === panel && !panel.contains(document.activeElement)) closeNoteEditor(); });
   });
   document.body.appendChild(panel); noteEditor = panel; S.pinnedReveal = true; applyFrame();
+  drawStrip();
   loadRecovery();
   const place = () => {
     if (!panel.isConnected) return;
-    const { left, top } = placeBesideBar({ bar: tile.getBoundingClientRect(), box: { width: panel.offsetWidth, height: panel.offsetHeight }, edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, inside: dockEl.getBoundingClientRect() });
-    panel.style.left = `${left}px`; panel.style.top = `${top}px`; scheduleHitReport();
+    placeWidgetPanel(panel, tile);
   };
   const observer = new ResizeObserver(() => { applyFrame(); requestAnimationFrame(place); }); observer.observe(panel);
   panel.dispose = () => { saver.cancelTimer(); observer.disconnect(); };

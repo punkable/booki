@@ -35,7 +35,6 @@ export async function notify(title, detail = "", { critical = false, actions = [
 }
 
 /** Notices held so far (for tests and the Focus card). */
-export const heldNotices = () => held.slice();
 
 function flushHeld() {
   if (quiet() || !held.length) return;

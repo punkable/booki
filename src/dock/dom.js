@@ -25,3 +25,12 @@ export const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 export const stackEl = document.getElementById("stack");
+
+/** Painted bar bounds include magnified tiles, not just their layout slots. */
+export function liveDockRect() {
+  const rects = [dockEl, ...dockEl.querySelectorAll('.tile')].map((el) => el.getBoundingClientRect()).filter((r) => r.width && r.height);
+  if (!rects.length) return dockEl.getBoundingClientRect();
+  const left = Math.min(...rects.map((r) => r.left)), top = Math.min(...rects.map((r) => r.top));
+  const right = Math.max(...rects.map((r) => r.right)), bottom = Math.max(...rects.map((r) => r.bottom));
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}

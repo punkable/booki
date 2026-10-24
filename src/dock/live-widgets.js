@@ -10,7 +10,7 @@ import { singleFlight } from "./async-cache.js";
 import { paintDownloads } from "./collector.js";
 import { notify, quiet } from "./notices.js";
 import { pollDnd, dndActive, onFocusDndChange } from "./focus-dnd.js";
-import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
+import { deviceReading, aiReading, statsReading, tokenText, updatesReading, shownUpdates, batteryTone, usageTone, TONE_COLORS, shortDeviceName, matchDevice } from "./readings.js";
 import { formatDegrees } from "./weather-codes.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
@@ -42,10 +42,6 @@ export function wireLiveWidgets(fns) { Object.assign(deps, fns); }
 let widgetEls = {};
 export function cacheWidgetEls() {
   widgetEls = {};
-  // The widget elements are about to be replaced, so any "already painted this
-  // minute" shortcut is stale — a fresh clock card would otherwise sit on its
-  // placeholder until the minute rolled over.
-  lastClockKey = "";
   // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
@@ -67,14 +63,18 @@ export function eachWidget(type, fn) {
 // same two strings with Intl and write them straight back into the DOM. Keep
 // the 1s cadence (it is what makes the rollover feel immediate) and skip the
 // work when the displayed minute has not changed.
-let lastClockKey = "";
 export function tickClocks() {
   if (S.hiddenState) return; // don't update a tucked-away dock
-  const { key, time, date } = clockParts(new Date(), curLang());
+  const now = new Date();
   tickProductivity();
-  if (key === lastClockKey) return;
-  lastClockKey = key;
-  eachWidget("clock", (el) => setText(el, date, time));
+  eachWidget("clock", (el) => {
+    const style = findWidgetPin(el.dataset.id)?.style || {};
+    const { key, time, date } = clockParts(now, curLang(), style);
+    if (el.dataset.clockKey === key) return;
+    el.dataset.clockKey = key;
+    el.classList.toggle("clock-no-date", style.showDate === false);
+    setText(el, date, time);
+  });
 }
 
 const weatherCache = new Map();
@@ -132,7 +132,7 @@ export function tickProductivity() {
 const pollStats = singleFlight(async () => {
   let s;
   try {
-    s = await dockApi.systemStats();
+    s = await statsReading.refresh();
   } catch (_) {
     return;
   }
@@ -207,7 +207,7 @@ function paintDevices(list) {
       setTileLabel(el, own ? `${own} · ${t("dev.disconnected")}` : t("w.devicesNone"));
       return;
     }
-    const shown = own ? mine[0] : mine[deviceTurn % mine.length];
+    const shown = own ? mine[0] : mine[(style?.rotate === false ? 0 : deviceTurn) % mine.length];
     // Charging shows the bolt in the ring and says so under the name.
     if (shown.charging) setCornerGlyph(el, "zap", "device-charging");
     else setCornerGlyph(el, KIND_ICON[shown.kind] || "battery", `device-${shown.kind || "other"}`);
@@ -253,6 +253,7 @@ const resetsText = (seconds) => { const r = resetClock(seconds); return r ? ` ·
 const tokensText = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
 /** Every hint line for one provider. */
 function aiHintLines(p) {
+  if (p.detected === false) return [`${p.name} · ${t("panelFlow.notDetected")}`];
   const week = `${p.name} · ${t("w.aiWeekTokens").replace("{n}", () => tokensText(p.week_tokens))}`;
   if ((p.windows || []).length) {
     return p.windows.map((w) => `${p.name} ${windowName(w.label)} · ${Math.round(w.percent)}%${resetsText(w.resets_at)}`);
@@ -277,22 +278,24 @@ onAgentActivity(({ provider, state }) => {
   aiTurn = 0;
   if (aiReading.last) paintAi(aiReading.last);
 });
-const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
+const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode" };
 function paintAi(providers) {
-  const urgent = providers.filter((p) => ["waiting", "error"].includes(aiStages.get(p.id)));
-  const working = providers.filter((p) => aiStages.get(p.id) === "working");
-  const shown = urgent.length ? urgent : working.length ? working : providers;
   eachWidget("ai", (el) => {
-    setWidgetAvailable(el, shown.length > 0);
-    const hint = providers.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
+    const style = findWidgetPin(el.dataset.id)?.style || {};
+    const available = style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false);
+    const urgent = available.filter((provider) => ["waiting", "error"].includes(aiStages.get(provider.id)));
+    const working = available.filter((provider) => aiStages.get(provider.id) === "working");
+    const shown = urgent.length ? urgent : working.length ? working : available;
+    setWidgetAvailable(el, shown.some((provider) => provider.detected !== false));
+    const hint = available.flatMap(aiHintLines).concat(t("w.aiLocal")).join("\n");
     if (!shown.length) {
       resetGlyph(el, "ai");
       setText(el, t("w.ai"), "—");
-      setTileLabel(el, !providers.length ? t("w.aiNone") : hint);
+      setTileLabel(el, !available.length ? t("w.aiNone") : hint);
       return;
     }
-    const current = shown[aiTurn % shown.length];
-    el.style.setProperty("--ai-brand", current.id === "claude" ? "#d97757" : "#10a37f");
+    const current = shown[(style.rotate === false ? 0 : aiTurn) % shown.length];
+    el.style.setProperty("--ai-brand", ({ claude: "#d97757", cursor: "#c6ccd8", opencode: "#b3a1ff" })[current.id] || "#10a37f");
     setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
     setTileLabel(el, hint);
     let tone = "good";
@@ -304,10 +307,10 @@ function paintAi(providers) {
       // Local Claude logs have token counts, not the subscription allowance.
       // An elapsed-time ring must never masquerade as remaining quota.
       const recorded = current.block?.tokens || current.week_tokens || 0;
-      setText(el, `${current.name} · ${t("refine.estimate")}`, recorded > 0 ? `~${tokenText(recorded)}` : "?");
+      setText(el, recorded > 0 ? `${current.name} · ${t("refine.estimate")}` : current.name, recorded > 0 ? `~${tokenText(recorded).replace(/\s+/g, "")}` : "?");
     }
     el.dataset.tone = tone;
-    el.classList.toggle("needs-attention", providers.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
+    el.classList.toggle("needs-attention", available.some((p) => (p.windows || []).some((w) => w.percent >= 95)));
     if (el.dataset.autoAccent) el.style.setProperty("--w-accent", TONE_COLORS[tone]);
   });
 }
@@ -453,7 +456,7 @@ const pollMedia = singleFlight(async () => {
   });
 });
 
-// System volume — scroll changes it, click toggles mute.
+// System volume — the wheel changes it; the tile opens the mixer.
 let lastVolumePct = NaN;
 let volumeWheelTimer = null;
 let volumeInfoPending = false;

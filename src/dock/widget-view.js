@@ -20,8 +20,6 @@ import { reduceMotion } from "./motion.js";
 
 export const RING_R = 15.5; // SVG viewBox 0 0 36 36
 export const RING_C = 2 * Math.PI * RING_R;
-export const BATTERY_LOW = "#e5484d";
-
 /** Transport glyphs for the media card — filled, rounded, Fluent-like SVGs. */
 export const MEDIA_SVG = {
   prev: '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M3.2 2.8c0-.44.36-.8.8-.8s.8.36.8.8v4.1l7-4.63c.8-.53 1.87.04 1.87 1v9.46c0 .96-1.07 1.53-1.87 1L4.8 9.1v4.1c0 .44-.36.8-.8.8s-.8-.36-.8-.8V2.8Z"/></svg>',
@@ -68,13 +66,19 @@ const CLOCK_LOCALE = { es: "es-ES", en: "en-US", pt: "pt-BR", fr: "fr-FR", de: "
    does. The poll loop still ticks every second (that is what makes the
    rollover feel immediate) but skips the two Intl formats and the DOM writes
    while the displayed minute is unchanged — 59 of every 60 ticks. */
-export function clockParts(now, lang) {
+const clockCache = new Map();
+export function clockParts(now, lang, style = {}) {
   const loc = CLOCK_LOCALE[lang] || "en-US";
-  return {
-    key: `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}`,
-    time: now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" }),
-    date: now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" }),
+  const key = `${lang}|${now.getFullYear()}-${now.getMonth()}-${now.getDate()}|${now.getHours()}:${now.getMinutes()}|${style.showSeconds ? now.getSeconds() : ""}|${style.hourCycle || "system"}|${style.showDate !== false}`;
+  if (clockCache.has(key)) return clockCache.get(key);
+  const result = {
+    key,
+    time: now.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", ...(style.showSeconds ? { second: "2-digit" } : {}), ...(["12", "24"].includes(style.hourCycle) ? { hour12: style.hourCycle === "12" } : {}) }),
+    date: style.showDate === false ? "" : now.toLocaleDateString(loc, { weekday: "short", day: "numeric", month: "short" }),
   };
+  clockCache.set(key, result);
+  if (clockCache.size > 32) clockCache.delete(clockCache.keys().next().value);
+  return result;
 }
 
 // ── markup ────────────────────────────────────────────────────────────────

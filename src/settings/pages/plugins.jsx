@@ -3,9 +3,12 @@ import { CollectorSettings } from "../collector-settings.jsx";
 import { pluginError } from "../../plugin-errors.js";
 import React, { useEffect, useState } from "react";
 import PLUGINS from "../../plugin-catalog.json";
-import { WIDGET_META, widgetDisplayName } from "../../widgets-meta.js";
+import { widgetDisplayName, WIDGET_META, WIDGET_GLYPHS } from "../../widgets-meta.js";
+
+const PLUGIN_GLYPHS = { headsetcontrol: "headphones", "yt-dlp": "download", openrgb: "lightbulb", librehardwaremonitor: "thermometer", winget: "refresh" };
 import { dock as dockApi, pickRgbProfile } from "../../api.js";
 import { t } from "../../i18n.js";
+import { PLUGIN_WIDGETS, pinnedWidgetInstances } from "../../widget-integrations.js";
 import { Icon, PageHeader } from "../ui.jsx";
 
 /** An optional open-source tool Booki can download into its own folder. It
@@ -14,16 +17,14 @@ import { Icon, PageHeader } from "../ui.jsx";
 /** The dock widget a plugin brings, if any (yt-dlp → Downloads). */
 export const TERMS_URL = "https://github.com/punkable/booki/blob/main/TERMS.md";
 
-const widgetFor = (id) => Object.keys(WIDGET_META).find((w) => WIDGET_META[w].plugin === id);
-const pinnedWidget = (pins, widget) => (pins || []).some((p) => p.widget === widget || (p.children || []).some((c) => c.widget === widget));
 
-function PluginCard({ id, name, repo, source, external, license, open, cfg, set, companions }) {
-  const [state, setState] = useState({ installed: false, version: null, source: null });
+function PluginCard({ id, name, repo, source, external, license, open, cfg, set, companions, beforeInstall }) {
+  const [state, setState] = useState({ installed: false, version: null, source: null, outdated: false, latest: null });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const termsOk = (cfg?.pluginTerms || 0) >= 1;
   const refresh = () => dockApi.pluginStatus(id)
-    .then((status) => setState({ installed: !!status?.installed, version: status?.version || null, source: status?.source || null }))
+    .then((status) => setState({ installed: !!status?.installed, version: status?.version || null, source: status?.source || null, outdated: !!status?.outdated, latest: status?.latest || null }))
     .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { refresh(); }, [id]);
@@ -34,29 +35,39 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
   };
   return <article className="card plugin-card" data-setting-label={name}>
     <header className="plugin-head">
-      <h3 className="plugin-name">{name}</h3>
-      {state.installed && <span className="plugin-badge"><Icon name="check" />{t(state.source === "system" || state.source === "shared" ? "plugins.onPc" : "plugins.active")}</span>}
+      <span className="plugin-icon" style={{ "--widget-accent": WIDGET_META[(PLUGIN_WIDGETS[id] || [])[0]]?.accent || "var(--accent)" }}><Icon name={PLUGIN_GLYPHS[id] || "sparkles"} /></span>
+      <span className="plugin-title"><h3 className="plugin-name">{name}</h3>
+        <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span></span>
+      {state.installed && (state.outdated
+        ? <span className="plugin-badge plugin-badge-update"><Icon name="download" />{t("plugins.outdated")}</span>
+        : <span className="plugin-badge"><Icon name="check" />{t(state.source === "system" || state.source === "shared" ? "plugins.onPc" : "plugins.active")}</span>)}
     </header>
-    <span className="plugin-meta">{license} · {t("plugins.by").replace("{repo}", () => repo)}{state.installed && state.version ? ` · ${state.version}` : ""}</span>
     <p className="plugin-desc">{t(`plugins.${id}.desc`)}</p>
     {companions?.length > 0 && <p className="plugin-desc plugin-fine">{t("plugins.includes").replace("{list}", () => companions.map((c) => { const p = PLUGINS.find((x) => x.id === c); return p ? `${p.name} (${p.license})` : c; }).join(", "))}</p>}
     {external && <p className="plugin-desc plugin-fine">{t("plugins.winget.managed")}</p>}
     {state.source === "system" && <p className="plugin-desc plugin-fine">{t("plugins.onPcHint")}</p>}
     {state.source === "shared" && <p className="plugin-desc plugin-fine">{t("plugins.sharedHint")}</p>}
     {id === "librehardwaremonitor" && <p className="plugin-warning" role="note">{t("plugins.sensorWarning")}</p>}
-    <p className="plugin-feeds"><Icon name="sparkles" />{t(`plugins.${id}.feeds`)}</p>
+    <p className="plugin-feeds"><Icon name={WIDGET_GLYPHS[(PLUGIN_WIDGETS[id] || [])[0]] || "sparkles"} />{t(`plugins.${id}.feeds`)}</p>
     {error && <p className="plugin-desc plugin-action-error" role="alert">{error}</p>}
-    {id === "yt-dlp" && <details className="collector-settings"><summary>{t("refine.collectorSettings")}</summary><CollectorSettings cfg={cfg} set={set} /></details>}
+    {id === "yt-dlp" && state.installed && <details className="collector-settings"><summary>{t("refine.collectorSettings")}</summary><CollectorSettings cfg={cfg} set={set} /></details>}
     <div className="plugin-actions">
       {state.installed && ["openrgb", "librehardwaremonitor"].includes(id) && <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginOpen(id))}>{t(id === "librehardwaremonitor" ? "plugins.openAdmin" : "system.open")}</button>}
       {state.installed && id === "openrgb" && <button type="button" className="button" disabled={busy} onClick={() => run(async () => { const path = await pickRgbProfile(); if (path) await dockApi.pluginOpen(id, path); })}>{t("plugins.profile")}</button>}
+      {state.installed && state.outdated && <button type="button" className="button button-accent" disabled={busy || !termsOk}
+        onClick={() => run(() => dockApi.pluginInstall(id))}><Icon name="download" />{busy ? t("plugins.installing") : t("plugins.update").replace("{v}", () => state.latest || "")}</button>}
       {external ? <button type="button" className="button" onClick={() => open("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1")}>{t("plugins.appInstaller")}</button> : state.source === "system" || state.source === "shared" ? null : state.installed
         ? <button type="button" className="button" disabled={busy} onClick={() => run(() => dockApi.pluginUninstall(id))}>{t("plugins.remove")}</button>
         : <button type="button" className="button button-accent" disabled={busy || !termsOk} title={termsOk ? undefined : t("plugins.acceptTerms")}
-            onClick={() => run(() => dockApi.pluginInstall(id))}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
-      {state.installed && widgetFor(id) && cfg && !pinnedWidget(cfg.pinned, widgetFor(id)) && <button type="button" className="button button-accent"
-        onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget: widgetFor(id), name: widgetDisplayName(widgetFor(id), t), path: "", args: [], style: {} }] })}>
-        <Icon name="plus" />{t("dl.addWidget")}</button>}
+            onClick={() => run(async () => { if (beforeInstall && !(await beforeInstall())) throw new Error(t("status.saveError")); await dockApi.pluginInstall(id); })}>{busy ? t("plugins.installing") : t("plugins.install")}</button>}
+      {state.installed && cfg && (PLUGIN_WIDGETS[id] || []).map((widget) => {
+        const instance = pinnedWidgetInstances(cfg.pinned, widget)[0];
+        return instance ? <button key={widget} type="button" className="button" onClick={() => dockApi.openWidgetSettings(instance.id)}>
+          <Icon name="settings" />{t("widgetFlow.configureNamed").replace("{name}", () => widgetDisplayName(widget, t))}
+        </button> : <button key={widget} type="button" className="button button-accent" onClick={() => set({ pinned: [...(cfg.pinned || []), { id: crypto.randomUUID(), kind: "widget", widget, name: widgetDisplayName(widget, t), path: "", args: [], style: {} }] })}>
+          <Icon name="plus" />{t("widgetFlow.addNamed").replace("{name}", () => widgetDisplayName(widget, t))}
+        </button>;
+      })}
       <button type="button" className="link plugin-source" onClick={() => open(source || `https://github.com/${repo}`)}>{t("plugins.source")}<Icon name="external" /></button>
     </div>
   </article>;
@@ -66,20 +77,22 @@ function PluginCard({ id, name, repo, source, external, license, open, cfg, set,
  *  the one acceptance that unlocks every Install button. */
 function PluginTerms({ cfg, set, open }) {
   const accepted = (cfg?.pluginTerms || 0) >= 1;
+  // Once accepted, the legal block folds into one confirming line.
+  if (accepted) return <p className="plugin-terms-done"><label className="terms-check"><input type="checkbox" checked disabled readOnly />{t("plugins.acceptTerms")}</label> <button type="button" className="link" onClick={() => open(TERMS_URL)}>{t("plugins.termsLink")}</button></p>;
   return <div className="card plugin-terms">
-    <p className="plugin-desc">{t("plugins.howItWorks")}</p>
+    <p className="plugin-terms-title"><Icon name="shield" />{t("plugins.howItWorks")}</p>
     <p className="plugin-desc">{t("plugins.terms")} <button type="button" className="link" onClick={() => open(TERMS_URL)}>{t("plugins.termsLink")}</button></p>
     <label className="terms-check"><input type="checkbox" checked={accepted} disabled={accepted}
       onChange={(e) => { if (e.target.checked) set({ pluginTerms: 1 }, { flush: true }); }} />{t("plugins.acceptTerms")}</label>
   </div>;
 }
 
-export function PluginsPage({ cfg, set }) {
+export function PluginsPage({ cfg, set, beforeInstall }) {
   return <>
     <PageHeader title={t("plugins.title")}>{t("plugins.hint")}</PageHeader>
     <PluginTerms cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />
     <div className="plugin-grid">
-      {PLUGINS.filter((plugin) => !plugin.companion).map((plugin) => <PluginCard key={plugin.id} {...plugin} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />)}
+      {PLUGINS.filter((plugin) => !plugin.companion).map((plugin) => <PluginCard key={plugin.id} {...plugin} beforeInstall={beforeInstall} cfg={cfg} set={set} open={(url) => dockApi.launch(url)} />)}
     </div>
   </>;
 }

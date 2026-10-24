@@ -307,13 +307,13 @@ test('creating a Settings group commits its members together and cancel preserve
   const cfg = makeConfig({ pinned: pins });
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.getByRole('menuitem', { name: 'Group', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'New group', exact: true });
   await dialog.getByRole('checkbox', { name: 'Editor', exact: true }).check();
   assert.equal(await dialog.getByRole('button', { name: 'Create group (1)' }).isDisabled(), true);
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   assert.deepEqual((await page.evaluate(() => window.__TAURI__.core.invoke('get_config'))).pinned, pins);
-  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.getByRole('menuitem', { name: 'Group', exact: true }).click();
   await dialog.getByRole('checkbox', { name: 'Editor', exact: true }).check();
   await dialog.getByRole('checkbox', { name: 'Browser', exact: true }).check();
   await dialog.getByRole('button', { name: 'Create group (2)' }).click();

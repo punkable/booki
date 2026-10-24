@@ -1,20 +1,14 @@
 {
-  "version": "0.95.1",
+  "version": "0.96.0",
   "edition": "official",
-  "source": "4db45850c8dea0c484c286c36ae4bfae6208fab6a1f44e7ed563ca46bcbbaaff",
+  "source": "ab7c00b237b9d5ac360e95e5f41b4436c43369b576e3564b4fac89ee4a7ae640",
   "kind": "composed browser frontend with offline placeholder app icons and example data; native blur not verified",
   "files": {
-    "docs/presentation/hero-en.jpg": "7448aa71e363a934543d1fbd761bb61e57689eb9e3ef3ac4cdc9cf90cfcdd336",
-    "docs/presentation/island-en.jpg": "4538f6c04ee0651c2c42055d7f457e63f51bb4b77a3dbeb3f51ac79fab322a71",
-    "docs/presentation/groups-en.jpg": "0f93fb2115c47efadb1422dbee374e0a7f67a7830c40addd0c956692079687fc",
-    "docs/presentation/widgets-en.jpg": "72e88bb76db7b14919a7b1c09050ca444a1e5dcd00b065c551aafbfb8332f72e",
-    "docs/presentation/settings-en.jpg": "3d51b8b2ede67e44fae6d5ce87e286512343d87a2b80cedfe412fb1561fe79a0",
-    "docs/presentation/dark-en.jpg": "f956fc03cbff6c39127418c656fcb1db7073d6292032041edc9e2507dbc631a0",
-    "docs/presentation/hero-es.jpg": "34b2aae03b5daa81b5df7d0fcde02acb243eb2d7ba957cca472fa5e6f4a0a7de",
-    "docs/presentation/island-es.jpg": "f787323953503e92f227fec7fac7120a25b2c611add4de1ca3c060579750522a",
-    "docs/presentation/groups-es.jpg": "38d5af3256ad3095caa76ec33236a1722418308059c8d523e8a624a40f012429",
-    "docs/presentation/widgets-es.jpg": "1dc5f1e4d408ed553d63d6ff4890b2e1eef8e017d603613a6ba688c42eb9fd75",
-    "docs/presentation/settings-es.jpg": "eb0fa063119e425f5dd07f6263373878667201c7e2f2709d608accb7c7257f8d",
-    "docs/presentation/dark-es.jpg": "81e664ecaf83f95ad36465db9dabe728e58182582664bb548c6725c9ccca108f"
+    "docs/presentation/hero-en.jpg": "1a34bef00bf7918efdd869f6d056ea0cbe638a9378bf8c80da8e8ae7a736738c",
+    "docs/presentation/island-en.jpg": "78156ff2e1dccd2cebdee361cdaef0effc4019818706cc5f8446042154046fbc",
+    "docs/presentation/groups-en.jpg": "cef3d99096f2aa1b3c7f88f244cb56972df48179b69d1f60fc7bcee2711e7af3",
+    "docs/presentation/widgets-en.jpg": "6333ab84c55a2712f38151c2078b149cda271e5598ebf1764347931a85694a1b",
+    "docs/presentation/settings-en.jpg": "8d261d9c4b3822f213443b92d99bcac46f859eb22a24a79c47a3c80b779f8279",
+    "docs/presentation/dark-en.jpg": "be93ce6c37a4fc115bc3c1d4b7a7151e88c73d1c564fb6a814f8c9585548a5fd"
   }
 }

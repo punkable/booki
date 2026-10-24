@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" font-family="Segoe UI, Inter, system-ui, sans-serif">
+  <title>The parts of Booki</title>
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6c7a1"/><stop offset=".55" stop-color="#efe9f2"/><stop offset="1" stop-color="#a9c1ff"/></linearGradient>
+  </defs>
+  <rect width="960" height="360" rx="20" fill="url(#wall)"/>
+
+  <!-- notch -->
+  <rect x="420" y="18" width="120" height="30" rx="15" fill="#1f1d1c"/>
+  <circle cx="440" cy="33" r="6" fill="#d97757"/><rect x="456" y="29" width="60" height="8" rx="4" fill="#5c5753"/>
+  <path d="M540 33 H 610" stroke="#3a3532" stroke-width="1.5"/>
+  <text x="618" y="30" font-size="14" font-weight="700" fill="#1b1b1b">Notch</text>
+  <text x="618" y="48" font-size="12" fill="#3a3532">Focus timer, music, battery and AI agents at a glance</text>
+
+  <!-- flyout -->
+  <rect x="110" y="96" width="240" height="140" rx="12" fill="#ffffff" fill-opacity=".86" stroke="#ffffff"/>
+  <rect x="126" y="112" width="24" height="24" rx="6" fill="#eef3fb"/><text x="160" y="129" font-size="13" font-weight="700" fill="#1b1b1b">Devices</text>
+  <rect x="126" y="148" width="208" height="30" rx="7" fill="#f2f2f4"/><text x="138" y="168" font-size="12" fill="#1b1b1b">Mouse</text><text x="306" y="168" font-size="12" font-weight="700" fill="#1b1b1b">78%</text>
+  <rect x="126" y="186" width="208" height="30" rx="7" fill="#f2f2f4"/><text x="138" y="206" font-size="12" fill="#1b1b1b">Keyboard</text><text x="306" y="206" font-size="12" font-weight="700" fill="#c42b1c">18%</text>
+  <text x="372" y="140" font-size="14" font-weight="700" fill="#1b1b1b">Widget panel</text>
+  <text x="372" y="158" font-size="12" fill="#3a3532">One click on a widget opens its details.</text>
+  <text x="372" y="174" font-size="12" fill="#3a3532">Right-click or the gear: its settings.</text>
+
+  <!-- dock -->
+  <rect x="60" y="262" width="840" height="64" rx="18" fill="#ffffff" fill-opacity=".72" stroke="#ffffff"/>
+  <g>
+    <rect x="80" y="274" width="40" height="40" rx="10" fill="#4f9cf9"/>
+    <rect x="130" y="274" width="40" height="40" rx="10" fill="#f0506e"/>
+    <rect x="180" y="270" width="48" height="48" rx="12" fill="#ffb02e"/>
+    <rect x="238" y="274" width="40" height="40" rx="10" fill="#6b5cf6"/>
+    <rect x="300" y="274" width="40" height="40" rx="10" fill="#6b69d6"/>
+    <rect x="306" y="280" width="12" height="12" rx="3" fill="#fff" fill-opacity=".8"/><rect x="322" y="280" width="12" height="12" rx="3" fill="#fff" fill-opacity=".8"/>
+    <rect x="306" y="296" width="12" height="12" rx="3" fill="#fff" fill-opacity=".8"/><rect x="322" y="296" width="12" height="12" rx="3" fill="#fff" fill-opacity=".8"/>
+    <rect x="370" y="274" width="120" height="40" rx="10" fill="#f6f6f8"/><text x="382" y="294" font-size="15" font-weight="700" fill="#1b1b1b">09:41</text><text x="382" y="308" font-size="10" fill="#5d5652">Wed, Oct 21</text>
+    <rect x="500" y="274" width="40" height="40" rx="10" fill="#f6f6f8"/><circle cx="520" cy="294" r="13" fill="none" stroke="#30a46c" stroke-width="4"/>
+    <rect x="550" y="274" width="90" height="40" rx="10" fill="#f6f6f8"/><circle cx="572" cy="294" r="11" fill="none" stroke="#0078d4" stroke-width="4"/><circle cx="614" cy="294" r="11" fill="none" stroke="#8e6ad8" stroke-width="4"/>
+    <rect x="650" y="274" width="120" height="40" rx="10" fill="#f6f6f8"/><text x="662" y="294" font-size="15" font-weight="700" fill="#1b1b1b">18:00</text><text x="662" y="308" font-size="10" fill="#5d5652">Focus</text>
+  </g>
+  <path d="M204 262 V 240" stroke="#3a3532" stroke-width="1.5"/>
+  <text x="80" y="254" font-size="12" fill="#1b1b1b"><tspan font-weight="700">Apps</tspan> magnify under the pointer</text>
+  <path d="M320 326 V 342" stroke="#3a3532" stroke-width="1.5"/>
+  <text x="250" y="355" font-size="12" fill="#1b1b1b"><tspan font-weight="700">Groups</tspan> with colour and icon</text>
+  <path d="M570 326 V 342" stroke="#3a3532" stroke-width="1.5"/>
+  <text x="470" y="355" font-size="12" fill="#1b1b1b"><tspan font-weight="700">Live widgets</tspan> right on the bar</text>
+  <text x="790" y="290" font-size="12" font-weight="700" fill="#1b1b1b">Any edge</text>
+  <text x="790" y="306" font-size="12" fill="#3a3532">Glass, taskbar or solid</text>
+</svg>

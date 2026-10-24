@@ -4,9 +4,9 @@ import { sharedReading } from "./async-cache.js";
 
 export const deviceReading = sharedReading(() => api.deviceBatteries());
 export const aiReading = sharedReading(() => api.aiUsage());
+export const statsReading = sharedReading(() => api.systemStats());
 /** A provider has something current to show: plan windows (Codex) or an
  *  active 5-hour block (Claude). See ai_usage.rs. */
-export const aiActive = (p) => (p?.windows || []).length > 0 || !!p?.block;
 /** Token counts in a compact form: 820, 12 K, 1.2 M, 3.4 B. */
 export function tokenText(n) {
   n = Math.max(0, Number(n) || 0);
@@ -33,14 +33,6 @@ export function shownUpdates(list, ignored = []) {
   if (!Array.isArray(list)) return list;
   const skip = new Set(Array.isArray(ignored) ? ignored : []);
   return list.filter((u) => !skip.has(`${u.id}@${u.available}`));
-}
-
-/** Bytes as KB/MB/GB/TB. */
-export function sizeText(n) {
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  let i = 0; n = Number(n) || 0;
-  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-  return `${n.toFixed(i && n < 10 ? 1 : 0)} ${units[i]}`;
 }
 
 // Brand words that say nothing on a small card: "SteelSeries Arctis Nova 7"

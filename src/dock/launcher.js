@@ -38,14 +38,19 @@ export function launcherResults({ pinned = [], installed = [], frequent = [], wi
     add({ kind: "pin", name: item.name || baseTitle(item.path), path: item.path, args: item.args || [], folder: item.kind === "folder" }, 4);
   }
   frequent.forEach((app, i) => add({ kind: "app", name: app.name, path: app.path, args: app.args || [] }, 3 - Math.min(2, i / 4)));
+  // Open windows lead, typed or not: like Start, the first thing offered is
+  // what you were just using.
+  // Without a query, an app already listed (pinned or frequent) is not
+  // repeated as a window: its row switches to that window anyway.
+  for (const w of windows) {
+    if (!w.exe || !w.title) continue;
+    if (!q && out.has(pathKey(w.exe))) continue;
+    add({ kind: "window", name: w.title, path: w.exe, args: [], hwnd: w.hwnd }, 5);
+  }
   if (q) {
     for (const action of actions) add({ ...action, kind: "action" }, 2);
     for (const group of installed) for (const item of group.items || []) {
       if (!item.is_dir) add({ kind: "app", name: item.name, path: item.path, args: item.args || [] }, 0);
-    }
-    for (const w of windows) {
-      if (!w.exe || !w.title) continue;
-      add({ kind: "window", name: w.title, path: w.exe, args: [], hwnd: w.hwnd }, 5);
     }
   }
   // An app that is already open carries its first window, so opening it can
@@ -131,7 +136,7 @@ export function buildLauncher(root, deps) {
   });
 
   function markActive() {
-    [...body.children].forEach((row, i) => {
+    [...body.querySelectorAll(".launcher-row")].forEach((row, i) => {
       row.classList.toggle("active", i === active);
       row.setAttribute("aria-selected", String(i === active));
       if (i === active) { row.scrollIntoView({ block: "nearest" }); search.setAttribute("aria-activedescendant", row.id); }
@@ -149,7 +154,18 @@ export function buildLauncher(root, deps) {
       body.appendChild(note);
       search.removeAttribute("aria-activedescendant");
     }
-    results.forEach((entry, i) => body.appendChild(row(entry, i)));
+    // Without a query the list is grouped like Start: open now, pinned, most used.
+    const sections = !search.value.trim();
+    let section = "";
+    results.forEach((entry, i) => {
+      const kind = entry.kind === "window" ? "launcher.sectionOpen" : entry.kind === "pin" ? "launcher.sectionPinned" : entry.kind === "app" ? "launcher.sectionFrequent" : "";
+      if (sections && kind && kind !== section) {
+        section = kind;
+        const head = el("div", "launcher-section"); head.textContent = t(kind); head.setAttribute("role", "presentation");
+        body.appendChild(head);
+      }
+      body.appendChild(row(entry, i));
+    });
     markActive();
     deps.relayout();
   }

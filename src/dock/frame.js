@@ -146,7 +146,12 @@ export function applyFrame() {
 let lastScreenSig = "";
 function screenSig() {
   const s = window.screen || {};
-  return [s.width, s.height, s.availWidth, s.availHeight, window.devicePixelRatio || 1].join("x");
+  return [s.width, s.height, s.availWidth, s.availHeight, s.availLeft ?? 0, s.availTop ?? 0, window.devicePixelRatio || 1].join("x");
+}
+/** Reframe for a new display even when its metrics match the old one. */
+export function forceReframe() {
+  lastScreenSig = "";
+  checkScreenChange();
 }
 export function checkScreenChange() {
   if (!S.cfg) return; // a resize before boot finished → nothing to reframe yet

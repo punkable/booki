@@ -174,8 +174,9 @@ export function applyAll() {
   dropOverlay.querySelector("#drop-pill").textContent = t("dock.dropPin");
   const pill = document.getElementById("update-pill");
   if (pill) {
-    pill.textContent = t("dock.update");
-    pill.title = t("dock.updateTip");
+    pill.querySelector("[data-update-label]").textContent = pill.dataset.version ? t("toast.updateBody").replace("{version}", () => pill.dataset.version) : t("dock.update");
+    pill.querySelector("[data-update-open]").title = t("dock.updateTip");
+    pill.querySelector("[data-update-dismiss]").setAttribute("aria-label", t("stack.close"));
   }
   dockEl.setAttribute("aria-label", t("a11y.dock"));
   applyTheme(S.cfg);

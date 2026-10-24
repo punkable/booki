@@ -52,6 +52,11 @@ jobs:
         if: matrix.arch == 'x64'
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --target ${{ matrix.target }}
       - run: npm ci
+      - name: Remove stale bundle outputs from the build cache
+        shell: pwsh
+        run: |
+          $bundlePath = Join-Path $PWD "src-tauri/target/${{ matrix.target }}/release/bundle"
+          if (Test-Path $bundlePath) { Remove-Item -LiteralPath $bundlePath -Recurse -Force }
       # PRs (including forks) must build without production signing secrets.
       - name: Package without updater signatures
         shell: bash

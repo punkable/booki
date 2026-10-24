@@ -1,121 +1,83 @@
-/* Widgets: the catalog of ten, and an inspector for the one you pick. */
-import { CollectorSettings } from "../collector-settings.jsx";
-import React, { useEffect, useRef, useState } from "react";
-import { dock as dockApi } from "../../api.js";
+/* Widget catalog and per-instance settings, separated into accessible steps. */
+import React, { useRef, useState } from "react";
 import { t } from "../../i18n.js";
 import { icon } from "../../icons.js";
-import { WIDGET_ORDER, WIDGET_META, WIDGET_GLYPHS, SYSTEM_METRICS, systemMetrics, metricLabel, widgetDisplayName } from "../../widgets-meta.js";
+import { WIDGET_ORDER, WIDGET_META, WIDGET_GLYPHS, widgetDisplayName } from "../../widgets-meta.js";
+import { WidgetContent, WidgetConnections } from "../widget-content.jsx";
+import { pluginsForWidget, pinnedWidgetInstances } from "../../widget-integrations.js";
 import { findPin, updatePin, removePin } from "../../pins.js";
 import { widgetRefs } from "../pin-model.js";
 import { Inspector } from "../inspector.jsx";
 import { WidgetPreview } from "../dock-preview.jsx";
 import { AccentPicker } from "../controls.jsx";
-import { CollapsibleSection, Icon, PageHeader, Row, SegmentedControl, Slider, Toggle } from "../ui.jsx";
+import { Icon, PageHeader, Row, SegmentedControl } from "../ui.jsx";
 
 const name = (widget) => widgetDisplayName(widget, t);
-const CATEGORIES = [["all", "design.allWidgets"], ["time", "widgets.time"], ["system", "overhaul.system"], ["media", "w.media"], ["tools", "design.utilityWidgets"]];
+const CATEGORIES = [["all", "design.allWidgets", "grid"], ["time", "widgets.time", "clock"], ["system", "overhaul.system", "cpu"], ["media", "w.media", "music"], ["tools", "design.utilityWidgets", "sliders"]];
+const glyph = (widget) => ({ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") });
 
-/** Clipboard history policy. Lives with the clipboard widget. */
-function ClipboardPolicy({ cfg, set }) {
-  const [storageFailed, setStorageFailed] = useState(false);
-  useEffect(() => {
-    let active = true;
-    const refresh = () => dockApi.clipboardStorageFailed().then((failed) => { if (active) setStorageFailed(!!failed); }).catch(() => {});
-    refresh();
-    window.addEventListener("focus", refresh);
-    return () => { active = false; window.removeEventListener("focus", refresh); };
-  }, [cfg.clipboardPersist]);
-  return <>
-    {storageFailed && <p className="notice notice-error" role="alert">{t("clip.storageFailed")}</p>}
-    <Toggle label={t("clip.memory")} hint={t("clip.memoryHint")} checked={!!cfg.clipboardPersist} onChange={(v) => set({ clipboardPersist: v })} />
-    <Toggle label={t("clip.sensitive")} hint={t("clip.sensitiveHint")} checked={cfg.clipboardSensitiveGuard !== false} onChange={(v) => set({ clipboardSensitiveGuard: v })} />
-    <Toggle label={t("clip.compact")} hint={t("clip.compactHint")} checked={!!cfg.clipboardCompact} onChange={(v) => set({ clipboardCompact: v })} />
-    <Row label={t("clip.retention")} hint={t("clip.retentionHint")} stack>
-      <Slider value={cfg.clipboardRetentionDays ?? 7} min={1} max={90} step={1} fmt={(v) => t("clip.days").replace("{n}", v)} onChange={(v) => set({ clipboardRetentionDays: v })} />
-    </Row>
-    <Row label={t("clip.limit")} hint={t("clip.limitHint")} stack>
-      <Slider value={cfg.clipboardHistoryLimit ?? 60} min={10} max={200} step={10} fmt={(v) => t("clip.items").replace("{n}", v)} onChange={(v) => set({ clipboardHistoryLimit: v })} />
-    </Row>
-    <Row label={t("clip.clear")}><button type="button" className="button" onClick={() => dockApi.clipboardClear()}>{t("clip.clear")}</button></Row>
-  </>;
-}
-
-/** What one widget shows and how it looks. */
+/** Settings of one widget copy: a pivot of tabs, the live preview always in view. */
 function WidgetFields({ item, cfg, set, onChange }) {
+  const [step, setStep] = useState(0);
   const style = item.style || {};
   const patch = (next) => onChange({ ...style, ...next });
-  const metrics = systemMetrics(style);
-  const toggleMetric = (metric) => {
-    const next = metrics.includes(metric) ? metrics.filter((m) => m !== metric) : [...metrics, metric];
-    if (next.length) patch({ metrics: SYSTEM_METRICS.filter((m) => next.includes(m)) });
-  };
-  return <>
-    <div className="inspector-preview"><WidgetPreview widget={item.widget} style={style} size={52} /></div>
-    {item.widget === "system" && <Row label={t("widgets.metrics")} hint={t("widgets.metricsHint")} stack>
-      <div className="chips" role="group" aria-label={t("widgets.metrics")}>
-        {SYSTEM_METRICS.map((metric) => <button key={metric} type="button" className="chip" aria-pressed={metrics.includes(metric)}
-          disabled={metrics.length === 1 && metrics.includes(metric)} onClick={() => toggleMetric(metric)}>{metricLabel(metric, t)}</button>)}
-      </div>
-    </Row>}
-    {item.widget === "collector" && <CollectorSettings cfg={cfg} set={set} />}
-    {item.widget === "notes" && <Row label={t("w.note")} stack>
-      <input className="text-field" type="text" value={style.note || ""} placeholder={t("w.notesEmpty")} onChange={(e) => patch({ note: e.target.value })} />
-    </Row>}
-    {item.widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(v) => patch({ scrollVolume: v })} />}
-    {["media", "battery", "devices"].includes(item.widget) && <Toggle label={t("overhaul.relevant")} hint={t("overhaul.relevantHint")} checked={!!style.hideWhenUnavailable} onChange={(v) => patch({ hideWhenUnavailable: v })} />}
-    {item.widget === "ai" && <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p>}
-    {item.widget === "devices" && <p className="inline-note"><Icon name="info" />{t("widget.devicesNote")}</p>}
-    {["focus", "calendar", "weather", "clock"].includes(item.widget) && <p className="inline-note"><Icon name="info" />{t("widgets.openFromDock")}</p>}
-    <Row label={t("w.variant")}>
-      <SegmentedControl value={["glass", "solid", "minimal"].includes(style.variant) ? style.variant : "glass"} onChange={(v) => patch({ variant: v })}
-        options={[{ value: "glass", label: t("w.v.glass") }, { value: "solid", label: t("w.v.solid") }, { value: "minimal", label: t("w.v.minimal") }]} />
-    </Row>
-    {item.widget !== "system" && <Row label={t("overhaul.widgetSize")}>
-      <SegmentedControl value={String(style.span || "auto")} onChange={(v) => patch({ span: v === "auto" ? null : Number(v) })}
-        options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: t(`w.span${n}`) }))]} />
-    </Row>}
-    <Row label={t("w.color")} stack><AccentPicker sources value={style.color || WIDGET_META[item.widget]?.accent || cfg.accent} onChange={(v) => patch({ color: v })} /></Row>
-    {item.widget === "focus" && <CollapsibleSection title={t("focus.quietTitle")}>
-      <Toggle label={t("focus.dnd")} hint={t("focus.dndHint")} checked={style.dnd === true} onChange={(v) => patch({ dnd: v })} />
-      <Toggle label={t("focus.tuck")} hint={t("focus.tuckHint")} checked={!!style.tuckDuringFocus} onChange={(v) => patch({ tuckDuringFocus: v })} />
-    </CollapsibleSection>}
-    {item.widget === "clipboard" && <CollapsibleSection title={t("clip.privacyTitle")}><ClipboardPolicy cfg={cfg} set={set} /></CollapsibleSection>}
-  </>;
-}
-
-function CatalogCard({ widget, pinned, selected, style, onInspect }) {
-  const meta = WIDGET_META[widget];
-  return <button type="button" className="card catalog-card" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} title={pinned ? t("widget.pinned") : undefined}
-    style={{ "--widget-accent": meta.accent }} onClick={onInspect}>
-    <span className="catalog-preview" aria-hidden="true"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span>
-    <span className="catalog-head">
-      <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
-      <span className="catalog-text">
-        <span className="catalog-name"><span className="catalog-title">{name(widget)}</span>
-          {pinned && <span className="catalog-pinned" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon("check") }} />}</span>
-        <span className="catalog-desc">{t(meta.desc)}</span>
-      </span>
-    </span>
-  </button>;
-}
-
-/** With nothing selected, the inspector lists the widgets already on the
-   dock, so their settings are one click away. */
-function InDock({ cfg, onInspect }) {
-  const onDock = WIDGET_ORDER.filter((widget) => widgetRefs(cfg.pinned, widget).length > 0);
-  return <div className="widgets-in-dock">
-    <h2>{t("apps.inDock")}</h2>
-    {onDock.length ? <ul>
-      {onDock.map((widget) => <li key={widget}>
-        <button type="button" className="widgets-in-dock-item" style={{ "--widget-accent": WIDGET_META[widget].accent }} onClick={(event) => onInspect(widget, event.currentTarget)}>
-          <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[widget] || "sparkles") }} />
-          <span>{name(widget)}</span>
-          <Icon name="chevron-right" />
-        </button>
-      </li>)}
-    </ul> : null}
-    <p className="empty">{t("widgets.pick")}</p>
+  const steps = ["content", "appearance", ...(pluginsForWidget(item.widget).length ? ["connections"] : [])];
+  const active = steps[step];
+  const base = `widget-step-${item.id}`;
+  const selectStep = (index, focus = false) => { setStep(index); if (focus) document.getElementById(`${base}-${steps[index]}`)?.focus(); };
+  return <div className="widget-settings-workspace">
+    <div role="tablist" aria-label={t("widgetFlow.steps")} className="widget-settings-tabs" onKeyDown={(event) => {
+      if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      selectStep(event.key === "Home" ? 0 : event.key === "End" ? steps.length - 1 : (step + (event.key === "ArrowRight" ? 1 : steps.length - 1)) % steps.length, true);
+    }}>{steps.map((name, index) => <button type="button" role="tab" key={name} id={`${base}-${name}`} aria-controls={`${base}-panel`} aria-selected={step === index} tabIndex={step === index ? 0 : -1} onClick={() => selectStep(index)}>{t(`widgetFlow.${name}`)}</button>)}</div>
+    <section id={`${base}-panel`} role="tabpanel" aria-labelledby={`${base}-${active}`} tabIndex={0} className="widget-settings-panel">
+      {active === "content" && <WidgetContent item={item} cfg={cfg} set={set} patch={patch} />}
+      {active === "connections" && <WidgetConnections widget={item.widget} />}
+      {active === "appearance" && <>
+        <Row label={t("w.variant")}><SegmentedControl value={["glass", "solid", "minimal"].includes(style.variant) ? style.variant : "glass"} onChange={(variant) => patch({ variant })} options={[{ value: "glass", label: t("w.v.glass") }, { value: "solid", label: t("w.v.solid") }, { value: "minimal", label: t("w.v.minimal") }]} /></Row>
+        {item.widget !== "system" && <Row label={t("overhaul.widgetSize")} stack><SegmentedControl value={String(style.span || "auto")} onChange={(value) => patch({ span: value === "auto" ? null : Number(value) })} options={[{ value: "auto", label: t("overhaul.automatic") }, ...[1, 2, 3].map((n) => ({ value: String(n), label: t(`w.span${n}`) }))]} /></Row>}
+        <Row label={t("w.color")} stack><AccentPicker sources value={style.color || WIDGET_META[item.widget]?.accent || cfg.accent} onChange={(color) => patch({ color })} /></Row>
+      </>}
+    </section>
   </div>;
+}
+
+/** A gallery card: what it looks like, what it does, and one clear action. */
+function CatalogCard({ widget, count, selected, style, onInspect, onAdd }) {
+  const meta = WIDGET_META[widget];
+  const pinned = count > 0;
+  return <article className="card catalog-card" data-selected={selected || undefined} style={{ "--widget-accent": meta.accent }}>
+    <button type="button" className="catalog-open" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} onClick={onInspect}>
+      <span className="catalog-preview" aria-hidden="true"><span className="catalog-stage"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span></span>
+      <span className="catalog-head">
+        <span className="catalog-icon" dangerouslySetInnerHTML={glyph(widget)} />
+        <span className="catalog-text"><span className="catalog-name"><span className="catalog-title">{name(widget)}</span>{pinned && <span className="catalog-badge" title={count > 1 ? t("gallery.count").replace("{n}", () => count) : t("gallery.onDock")} dangerouslySetInnerHTML={{ __html: icon("check") + (count > 1 ? `<b>${count}</b>` : "") }} />}</span>
+          <span className="catalog-desc">{t(meta.desc)}</span></span>
+      </span>
+    </button>
+    <footer className="catalog-foot">
+      {pinned
+        ? <button type="button" className="button catalog-action" onClick={onInspect}><Icon name="settings" />{t("gallery.configure")}</button>
+        : <button type="button" className="button button-accent catalog-action" aria-label={t("widgetFlow.addNamed").replace("{name}", () => name(widget))} onClick={onAdd}><Icon name="plus" />{t("widget.add")}</button>}
+    </footer>
+  </article>;
+}
+
+/** The widgets on the dock, as they look there, one click from their settings. */
+function OnDock({ cfg, selectedId, onPick }) {
+  const pins = WIDGET_ORDER.flatMap((widget) => pinnedWidgetInstances(cfg.pinned, widget));
+  return <section className="widgets-on-dock" aria-labelledby="widgets-on-dock-title">
+    <h2 id="widgets-on-dock-title">{t("gallery.onDock")} <span className="count">{pins.length}</span></h2>
+    {pins.length ? <ul>{pins.map((pin) => <li key={pin.id}>
+      <button type="button" className="widgets-on-dock-item" aria-pressed={selectedId === pin.id} style={{ "--widget-accent": WIDGET_META[pin.widget]?.accent }}
+        aria-label={t("widgetFlow.configureNamed").replace("{name}", () => pin.style?.device || name(pin.widget))} onClick={(event) => onPick(pin.id, event.currentTarget)}>
+        <span className="on-dock-preview" aria-hidden="true"><WidgetPreview widget={pin.widget} style={pin.style} size={32} /></span>
+        <span className="on-dock-name"><span className="catalog-icon" dangerouslySetInnerHTML={glyph(pin.widget)} />{pin.style?.device || name(pin.widget)}</span>
+        {pin.group && <span className="on-dock-group"><Icon name="folder" />{pin.group}</span>}
+      </button>
+    </li>)}</ul> : <p className="empty">{t("gallery.emptyDock")}</p>}
+  </section>;
 }
 
 export function WidgetsPage({ cfg, set, focusedPin }) {
@@ -126,14 +88,17 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const origin = useRef(null);
   const saved = findPin(cfg.pinned, selectedId);
   const selected = saved?.kind === "widget" ? saved : draft;
+  const fresh = (widget) => ({ id: crypto.randomUUID(), kind: "widget", widget, name: name(widget), path: "", args: [], style: {} });
   const inspect = (widget) => {
     origin.current = document.activeElement;
-    // A widget pinned twice: each click on its card reaches the next copy.
     const refs = widgetRefs(cfg.pinned, widget);
-    const ref = refs.find((r) => r.id !== selectedId) || refs[0];
+    const ref = refs.find((r) => r.id === selectedId) || refs[0];
     selectId(ref?.id || null);
-    setDraft(ref ? null : { id: crypto.randomUUID(), kind: "widget", widget, name: name(widget), path: "", args: [], style: {} });
+    setDraft(ref ? null : fresh(widget));
   };
+  const pick = (id, from) => { origin.current = from; setDraft(null); selectId(id); };
+  // One click adds it; its settings open beside the gallery to fine-tune.
+  const add = (widget) => { const pin = fresh(widget); set({ pinned: [...cfg.pinned, pin] }); setDraft(null); selectId(pin.id); };
   const change = (style) => {
     if (saved) set({ pinned: updatePin(cfg.pinned, saved.id, { style }) });
     else setDraft((item) => ({ ...item, style }));
@@ -142,36 +107,43 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const words = fold(query).trim().split(/\s+/).filter(Boolean);
   const widgets = WIDGET_ORDER.filter((widget) => (category === "all" || WIDGET_META[widget].category === category)
     && words.every((word) => fold(`${name(widget)} ${t(WIDGET_META[widget].desc)}`).includes(word)));
+  const instances = selected ? pinnedWidgetInstances(cfg.pinned, selected.widget) : [];
   return <>
     <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
-    <div className="toolbar">
-      <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} /></label>
-      <div className="chips" role="group" aria-label={t("tab.widgets")}>
-        {CATEGORIES.map(([value, key]) => <button key={value} type="button" className="chip" aria-pressed={category === value} onClick={() => setCategory(value)}>{t(key)}</button>)}
-      </div>
-    </div>
-    <div className="split">
-      <div className="catalog-grid">
-        {widgets.map((widget) => {
-          const refs = widgetRefs(cfg.pinned, widget);
-          return <CatalogCard key={widget} widget={widget} pinned={refs.length > 0} selected={selected?.widget === widget}
-            style={findPin(cfg.pinned, refs[0]?.id)?.style} onInspect={() => inspect(widget)} />;
-        })}
-        {!widgets.length && <p className="empty" role="status">{t("add.none")}</p>}
-      </div>
-      <Inspector className="inspector" selectionKey={selected?.id} origin={origin} onBack={() => { selectId(null); setDraft(null); }}>
-        {selected ? <>
+    <OnDock cfg={cfg} selectedId={saved?.id} onPick={pick} />
+    <div className="split widgets-split">
+      <section className="widgets-explore" aria-labelledby="widgets-explore-title">
+        <div className="widgets-explore-head">
+          <h2 id="widgets-explore-title">{t("gallery.explore")}</h2>
+          <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} /></label>
+        </div>
+        <div className="widget-pivot" role="group" aria-label={t("tab.widgets")}>
+          {CATEGORIES.map(([value, key, glyphName]) => <button key={value} type="button" className="pivot-item" aria-pressed={category === value} onClick={() => setCategory(value)}><Icon name={glyphName} />{t(key)}</button>)}
+        </div>
+        <div className="catalog-grid">
+          {widgets.map((widget) => {
+            const refs = widgetRefs(cfg.pinned, widget);
+            return <CatalogCard key={widget} widget={widget} count={refs.length} selected={selected?.widget === widget}
+              style={findPin(cfg.pinned, refs[0]?.id)?.style} onInspect={() => inspect(widget)} onAdd={() => add(widget)} />;
+          })}
+          {!widgets.length && <p className="empty" role="status">{t("add.none")}</p>}
+        </div>
+      </section>
+      <Inspector className="inspector widget-sheet" dismissible selectionKey={selected?.id} origin={origin} onBack={() => { selectId(null); setDraft(null); }}>
+        {selected && <>
           <header className="inspector-head" style={{ "--widget-accent": WIDGET_META[selected.widget]?.accent }}>
-            <span className="catalog-icon" dangerouslySetInnerHTML={{ __html: icon(WIDGET_GLYPHS[selected.widget] || "sparkles") }} />
-            <div><h2>{name(selected.widget)}</h2><p>{t(WIDGET_META[selected.widget]?.desc || "widget.defaultDesc")}</p></div>
+            <span className="catalog-icon" dangerouslySetInnerHTML={glyph(selected.widget)} />
+            <div><h2>{name(selected.widget)}</h2><p>{saved ? (saved.group ? `${t("gallery.inGroup").replace("{group}", () => saved.group)}` : t("gallery.onDock")) : t(WIDGET_META[selected.widget]?.desc || "widget.defaultDesc")}</p></div>
           </header>
-          <WidgetFields item={selected} cfg={cfg} set={set} onChange={change} />
+          <div className="inspector-preview"><span className="catalog-stage"><WidgetPreview widget={selected.widget} style={selected.style || {}} size={52} /></span></div>
+          {saved && instances.length > 1 && <Row label={t("widgetFlow.instance")}><select className="text-field" aria-label={t("widgetFlow.instance")} value={saved.id} onChange={(event) => selectId(event.target.value)}>{instances.map((pin, index) => <option key={pin.id} value={pin.id}>{pin.style?.device || pin.name || name(pin.widget)} · {pin.group || t("tab.dock")} · {index + 1}</option>)}</select></Row>}
+          <WidgetFields key={`${selected.id}:${selected.widget}`} item={selected} cfg={cfg} set={set} onChange={change} />
           <div className="inspector-actions">
             {saved
-              ? <button type="button" className="button" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); if (origin.current?.isConnected) origin.current.focus(); }}>{t("apps.remove")}</button>
-              : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}>{t("widget.add")}</button>}
+              ? <button type="button" className="button button-danger-subtle" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); if (origin.current?.isConnected) origin.current.focus(); }}><Icon name="trash" />{t("apps.remove")}</button>
+              : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}><Icon name="plus" />{t("widget.add")}</button>}
           </div>
-        </> : <InDock cfg={cfg} onInspect={inspect} />}
+        </>}
       </Inspector>
     </div>
   </>;

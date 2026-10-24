@@ -456,7 +456,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 
 /* Calendar: month and arrows on one line, round days, today in the accent. */
 .focus-month { display: flex; align-items: center; gap: 2px; margin-bottom: 8px; }
-.focus-month-title { flex: 1; font-size: 14px; text-transform: capitalize; }
+.focus-month-title { flex: 1; font-size: 14px; }
 .focus-today { padding: 5px 10px; border: 0; border-radius: var(--r-control); font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); cursor: pointer; }
 .focus-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
 .focus-calendar > * { display: grid; place-items: center; height: 32px; font-size: 12px; }
@@ -486,7 +486,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .reading-card-value { margin-left: auto; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value { color: #ff8b8f; }
 .reading-bar-track { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
-.reading-bar-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transition: width var(--dur-4) var(--ease-out); }
+.reading-bar-track i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--accent, #60cdff); transform-origin: left center; transition: transform var(--dur-4) var(--ease-out); }
 .reading-bar-track i[data-tone="good"], .reading-bar-track i[data-tone="charging"] { background: #30a46c; }
 .reading-bar-track i[data-tone="fair"] { background: #f5a524; }
 .reading-bar-track i[data-tone="low"], .reading-bar-track i[data-tone="critical"] { background: #e5484d; }
@@ -619,8 +619,109 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .reading-card > summary::-webkit-details-marker { display: none; }
 .reading-card[open] > summary { margin-bottom: 10px; }
 .device-reading-note { display: block; color: var(--ink-2); line-height: 1.5; }
+.ai-missing, .ai-quota-note { display: block; margin: 8px 2px 0; color: var(--ink-2); font-size: 12px; line-height: 1.45; }
+.ai-quota-note { margin: 8px 2px 0; }
 
 .collector-job-progress { display: block; width: 100%; height: 4px; margin: 0 0 10px; accent-color: var(--accent); border: 0; border-radius: 4px; overflow: hidden; }
 .collector-job-progress[hidden] { display: none; }
 .collector-job-progress::-webkit-progress-bar { background: var(--track); }
 .collector-job-progress::-webkit-progress-value { background: var(--accent); }
+.tile.widget[data-widget="clock"].clock-no-date .w-label { display: none; }
+.productivity-clock { text-align: center; padding: 12px; }
+.productivity-clock time { font-size: 30px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.productivity-clock p { margin: 5px 0; }
+.widget-provider-details > summary, .weather-location-settings > summary { padding: 10px 0; cursor: pointer; }
+
+/* Detail surfaces use a quiet shared header and scroll only their contents. */
+.system-widget-panel { display: flex; flex-direction: column; overflow: hidden; }
+.system-widget-panel .productivity-head { flex: none; gap: 6px; margin-bottom: 0; padding-bottom: 10px; }
+.widget-panel-title { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+.widget-panel-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.widget-panel-icon svg { width: 16px; height: 16px; }
+.system-widget-sections { min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-top: 12px; }
+.system-widget-panel .stack-close { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }
+.system-widget-panel .plugin-panel-actions { gap: 7px; padding-top: 8px; }
+.reading-card-top { flex-wrap: wrap; }
+.reading-card-names { flex-basis: 100px; }
+.reading-card-note { white-space: normal; overflow-wrap: anywhere; }
+.widget-diagnostics { margin-top: 12px; border-top: 1px solid var(--stroke); padding-top: 10px; color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.widget-diagnostics summary { cursor: pointer; font-weight: 600; }
+.system-widget-panel { width: min(380px, calc(100vw - 24px)); }
+.reading-card > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); margin-inline: 3px; opacity: .7; }
+.reading-card[open] > summary::after { transform: rotate(225deg); }
+.reading-card[data-tone="low"] .reading-card-value, .reading-card[data-tone="critical"] .reading-card-value,
+.reading-card[data-tone="low"] .reading-card-names small, .reading-card[data-tone="critical"] .reading-card-names small { color: var(--danger-text); }
+
+/* One type scale inside widget details: 13px body, 14px section titles. */
+.system-widget-panel .productivity-section > strong { font-size: 0.875rem; }
+.system-widget-panel .productivity-section p,
+.system-widget-panel details > summary,
+.system-widget-panel details > p { font-size: 0.8125rem; line-height: 1.45; }
+.system-widget-panel .productivity-section p { color: var(--ink-2); }
+.system-widget-panel details > summary { cursor: pointer; color: var(--ink-2); }
+.system-widget-panel .volume-row label, .system-widget-panel .volume-row span { font-size: 0.8125rem; }
+/* The settings gear sits with the close button, never mid-header. */
+.productivity-head .widget-settings-action { margin-left: auto; }
+.productivity-head .widget-settings-action + * { margin-left: 4px; }
+.media-now { display: grid; gap: 2px; min-width: 0; padding: 4px 2px 10px; }
+.media-now strong { font-size: 0.9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-now small { color: var(--ink-2); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-transport { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.media-transport .productivity-button { width: 40px; height: 40px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.media-transport .media-play { width: 48px; height: 48px; background: var(--accent, #d9a066); color: #1b1b1b; border-color: transparent; }
+.panel-head-action.is-busy svg { animation: settings-spin 0.9s linear infinite; }
+.panel-head-action.has-error { color: var(--danger, #c42b1c); }
+.productivity-head .panel-head-action { margin-left: 4px; }
+.panel-stamp { margin: 6px 2px 0 !important; font-size: 0.75rem !important; color: var(--ink-3, var(--ink-2)) !important; text-align: right; }
+.sensor-offer > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; list-style: none; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.sensor-offer > summary::-webkit-details-marker { display: none; }
+.sensor-offer > summary svg { width: 16px; height: 16px; flex: none; }
+.sensor-offer > summary:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+@keyframes settings-spin { to { transform: rotate(360deg); } }
+.productivity-head { justify-content: flex-start; gap: 4px; }
+.productivity-head > :first-child { margin-right: auto; }
+.productivity-head .widget-settings-action { margin-left: 0; }
+/* Windows 11 toggle switch for on/off options inside dock panels. */
+.productivity-panel .focus-option { display: flex; min-height: 0; margin: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 2px; font-size: 0.8125rem; cursor: pointer; }
+.productivity-panel .focus-option .win-switch { appearance: none; -webkit-appearance: none; flex: none; position: relative; width: 40px; height: 20px; margin: 0; border: 1px solid var(--ctrl-strong-stroke, var(--ink-2)); border-radius: 999px; background: transparent; cursor: pointer; transition: background var(--dur-1, .12s) ease; }
+.productivity-panel .focus-option .win-switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-2); transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), width 0.12s ease; }
+.productivity-panel .focus-option .win-switch:hover::after { width: 14px; height: 14px; top: 2px; }
+.productivity-panel .focus-option .win-switch:checked { background: var(--accent); border-color: var(--accent); }
+.productivity-panel .focus-option .win-switch:checked::after { transform: translateX(20px); background: var(--accent-contrast, #fff); }
+.productivity-panel .focus-option .win-switch:checked:hover::after { transform: translateX(18px); }
+.productivity-panel .focus-option .win-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Expandable cards keep the primary ink for their names, like the others. */
+details.reading-card > summary { color: var(--ink); }
+details.reading-card > summary .reading-card-names strong { color: var(--ink); }
+/* An expanded reading card stacks its parts full width: the name row stays
+   on top instead of collapsing into a zero-width grid column. */
+details.reading-card > * { grid-column: 1 / -1; min-width: 0; }
+details.reading-card .system-widget-readings { font-size: 0.8125rem; gap: 4px 16px; }
+details.reading-card .system-widget-readings dt { color: var(--ink-2); }
+/* An expanded reading card stacks its parts full width: the name row stays
+   on top instead of collapsing into a zero-width grid column. */
+details.reading-card > * { grid-column: 1 / -1; min-width: 0; }
+details.reading-card .system-widget-readings { font-size: 0.8125rem; gap: 4px 16px; }
+details.reading-card .system-widget-readings dt { color: var(--ink-2); }
+/* A card's own action: a quiet icon button beside its value. */
+.reading-card-action { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-left: 4px; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: 6px; cursor: pointer; }
+.reading-card-action svg { width: 15px; height: 15px; }
+.reading-card-action:hover { color: var(--ink); background: var(--hover); }
+.reading-card-action:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.reading-card-action.has-error { color: var(--danger, #c42b1c); }
+.panel-stamp[title] { cursor: help; }
+.focus-icon-button[role="switch"][aria-checked="true"] { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }
+/* Notes: chips for each note under the header, the text without a box, and
+   a quiet footer with the save state and Delete. */
+.note-strip { display: flex; gap: 6px; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.note-strip[hidden] { display: none; }
+.note-chip { flex: none; max-width: 140px; padding: 4px 10px; overflow: hidden; color: var(--ink-2); font: inherit; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-radius: 999px; cursor: pointer; }
+.note-chip:hover { color: var(--ink); }
+.note-chip[aria-selected="true"] { color: var(--accent-contrast, #1b1b1b); background: var(--accent); border-color: transparent; font-weight: 600; }
+.note-editor .note-input { border-color: transparent; background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.note-editor .note-input:focus { background: var(--ctrl-fill); }
+.note-save-state { display: flex; align-items: center; gap: 8px; }
+.note-save-state [role="status"] { flex: 1; color: var(--ink-2); font-size: 12px; }
+.note-delete.is-armed { color: #fff; background: var(--danger, #c42b1c); }
+.note-editor.note-workspace .note-input { border: 1px solid transparent; border-radius: 8px; resize: none; }
+.note-editor.note-workspace .note-input:focus { border-color: transparent; border-bottom-color: var(--accent); outline: none; }

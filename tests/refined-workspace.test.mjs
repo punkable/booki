@@ -52,13 +52,13 @@ test("Collector queues multiple links, waits for native cancellation and exposes
   assert.deepEqual(errors, []); await page.close();
 });
 
-test("Collector default format is saved from its gear panel and used for automatic media jobs", async () => {
+test("Collector default format is saved from its inline preferences and used for automatic media jobs", async () => {
   const { page, errors } = await openPage(browser, port, "index.html", {
     cfg: makeConfig({ pinned: [widget("collector")] }),
     initScript: `window.__jobs=[]; const old=window.__TAURI__.core.invoke; window.__TAURI__.core.invoke=(cmd,args)=>cmd==='plugin_download' ? (window.__jobs.push(args),Promise.resolve('C:/Downloads/audio.m4a')) : old(cmd,args);`,
   });
   await page.locator('#dock > [data-id="collector"]').click();
-  await page.getByRole("button", { name: "Collector settings", exact: true }).click();
+  await page.locator(".collector-settings > summary").click();
   await page.getByRole("combobox", { name: "Format for video pages", exact: true }).selectOption("audio");
   await page.getByRole("combobox", { name: "Video quality", exact: true }).selectOption("1080");
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).collectorFormat === "audio");

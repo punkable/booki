@@ -4,12 +4,14 @@ import { dock as api, pickRgbProfile } from "../api.js";
 import { t, curLang } from "../i18n.js";
 import { icon } from "../icons.js";
 import PLUGINS from "../plugin-catalog.json";
+import { systemMetrics, metricLabel, WIDGET_GLYPHS } from "../widgets-meta.js";
+import { fmtRate } from "./widget-view.js";
 import { pluginError } from "../plugin-errors.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { buildCollectorPanel } from "./collector-panel.js";
-import { deviceReading, aiReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
+import { deviceReading, aiReading, statsReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, refreshDevices, paintLighting } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
@@ -25,8 +27,26 @@ export function buildSystemPanel(item, { close }) {
   const head = document.createElement("div"); head.className = "productivity-head";
   const done = document.createElement("button"); done.type = "button"; done.className = "stack-close";
   done.innerHTML = icon("x"); done.setAttribute("aria-label", t("stack.close")); done.addEventListener("click", close);
-  head.append(text("strong", t(`w.${item.widget}`)), done); panel.append(head);
+  const heading = document.createElement("div"); heading.className = "widget-panel-title";
+  const headingIcon = text("span", "", "widget-panel-icon"); headingIcon.innerHTML = icon(WIDGET_GLYPHS[item.widget] || "sparkles");
+  heading.append(headingIcon, text("strong", t(`w.${item.widget}`))); head.append(heading, done); panel.append(head);
   const body = document.createElement("div"); body.className = "system-widget-sections"; panel.append(body);
+  // Panel-wide actions live in the header as icons, beside settings and close.
+  const headAction = (glyph, label, action) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "stack-close panel-head-action";
+    b.innerHTML = icon(glyph); b.title = label; b.setAttribute("aria-label", label);
+    b.addEventListener("click", async () => {
+      b.disabled = true; b.classList.add("is-busy");
+      try { await action(); } catch (_) { b.classList.add("has-error"); setTimeout(() => b.classList.remove("has-error"), 1600); }
+      finally { if (!disposed) { b.disabled = false; b.classList.remove("is-busy"); } }
+    });
+    head.insertBefore(b, done); return b;
+  };
+  const stamp = (reading) => {
+    const at = reading.checkedAt; if (!at) return null;
+    const time = new Date(at).toLocaleTimeString(curLang(), { hour: "2-digit", minute: "2-digit" });
+    return text("p", t("panelFlow.checkedAgo").replace("{time}", () => time), "panel-stamp");
+  };
   const button = (container, label, action) => {
     const b = text("button", label, "productivity-button"); b.type = "button";
     b.addEventListener("click", async () => {
@@ -63,11 +83,6 @@ export function buildSystemPanel(item, { close }) {
     return b;
   };
   const section = (title) => { const el = document.createElement("section"); el.className = "productivity-section"; if (title !== t(`w.${item.widget}`)) el.append(text("strong", title)); body.append(el); return el; };
-  const list = (container, rows) => {
-    const dl = document.createElement("dl"); dl.className = "system-widget-readings";
-    for (const [label, value] of rows) dl.append(text("dt", label), text("dd", value));
-    container.append(dl);
-  };
   const reads = new WeakMap();
   const load = async (container, action, paint) => {
     const request = Symbol(); reads.set(container, request);
@@ -104,6 +119,13 @@ export function buildSystemPanel(item, { close }) {
       top.append(names);
       if (row.error) top.append(text("span", row.error, "reading-card-note"));
       if (row.value) top.append(text("span", row.value, "reading-card-value"));
+      // A card's own action is an icon beside its value, named on hover.
+      if (row.action) {
+        const act = document.createElement("button"); act.type = "button"; act.className = "reading-card-action";
+        act.innerHTML = icon(row.action.glyph); act.title = row.action.label; act.setAttribute("aria-label", `${row.action.label}: ${row.name}`);
+        act.addEventListener("click", async () => { act.disabled = true; try { if (await row.action.run()) act.remove(); } catch (_) { act.classList.add("has-error"); } finally { act.disabled = false; } });
+        top.append(act);
+      }
       card.append(top);
       for (const bar of row.bars || []) {
         const line = document.createElement("div"); line.className = "reading-bar";
@@ -111,64 +133,76 @@ export function buildSystemPanel(item, { close }) {
         const track = document.createElement("div"); track.className = "reading-bar-track";
         track.setAttribute("role", "meter"); track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", "100");
         track.setAttribute("aria-valuenow", String(Math.round(bar.percent))); track.setAttribute("aria-label", `${row.name} ${bar.label || t("w.battery")}`);
-        const fill = document.createElement("i"); fill.style.width = `${Math.max(0, Math.min(100, bar.percent))}%`;
+        const fill = document.createElement("i"); fill.style.transform = `scaleX(${Math.max(0, Math.min(100, bar.percent)) / 100})`;
         if (bar.tone) fill.dataset.tone = bar.tone;
         track.append(fill); line.append(track); card.append(line);
       }
-      if (row.details) { list(card, row.details); card.append(text("small", t("refine.deviceNote"), "device-reading-note")); }
+      if (row.meta) card.append(text("small", row.meta, "reading-card-meta"));
       grid.append(card);
     }
     container.append(grid);
   };
   if (item.widget === "media") {
     const transport = section(t("w.media"));
-    load(transport, api.mediaInfo, (media) => { transport.append(text("p", media?.title ? (media.artist ? `${media.title} · ${media.artist}` : media.title) : t("plugins.noData"))); });
+    // Now playing first, then one centered transport row.
+    const now = document.createElement("div"); now.className = "media-now"; transport.append(now);
+    load(now, api.mediaInfo, (media) => {
+      if (!media?.title) { now.append(text("p", t("w.mediaIdle"))); return; }
+      now.append(text("strong", media.title)); if (media.artist) now.append(text("small", media.artist));
+    });
+    const controls = document.createElement("div"); controls.className = "media-transport"; transport.append(controls);
     for (const [glyph, action] of [["chevron-left", api.mediaPrev], ["play", api.mediaToggle], ["chevron-right", api.mediaNext]]) {
-      const control = button(transport, "", action); control.innerHTML = icon(glyph); control.setAttribute("aria-label", t(`w.${glyph === "play" ? "playPause" : glyph === "chevron-left" ? "prev" : "next"}`));
+      const control = button(controls, "", action); control.innerHTML = icon(glyph); control.setAttribute("aria-label", t(`w.${glyph === "play" ? "playPause" : glyph === "chevron-left" ? "prev" : "next"}`));
+      if (glyph === "play") control.classList.add("media-play");
     }
   }
   if (item.widget === "battery") {
     const battery = section(t("w.battery"));
-    load(battery, api.systemStats, (stats) => {
+    live(battery, statsReading, 2500, (stats) => {
       if (!(stats?.battery >= 0)) { battery.append(text("p", t("plugins.noData"))); return; }
-      cards(battery, [{ name: t(stats.charging ? "dev.charging" : "w.battery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
+      cards(battery, [{ name: t(stats.charging ? "dev.charging" : "panelFlow.onBattery"), glyph: "battery", value: `${stats.battery}%`, bars: [{ label: "", percent: stats.battery, tone: batteryTone(stats.battery, !!stats.charging) }] }]);
     });
   }
   if (item.widget === "ai") {
     const ai = section(t("w.ai"));
-    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai" };
+    const icons = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode" };
     const windowName = (label) => (label === "week" ? t("w.aiWeek") : label);
     const clock = (s) => (s > 0 ? new Date(s * 1000).toLocaleString(curLang(), { weekday: "short", hour: "numeric", minute: "2-digit" }) : "");
     const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
     const tokens = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
     live(ai, aiReading, 60000, (providers) => {
-      const all = Array.isArray(providers) ? providers : [];
+      const all = (Array.isArray(providers) ? providers : []).filter((provider) => !item.style?.provider || provider.id === item.style.provider);
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
-      cards(ai, all.map((p) => {
+      // Providers with no local data share one quiet line instead of a card each.
+      const found = all.filter((p) => p.detected !== false), missing = all.filter((p) => p.detected === false);
+      const notFound = () => { if (missing.length) ai.append(text("p", t("panelFlow.notFound").replace("{names}", () => missing.map((p) => p.name).join(", ")), "ai-missing")); };
+      if (!found.length) { notFound(); return; }
+      const recorded = found.filter((p) => !(p.windows || []).length && (p.block || p.week_tokens > 0));
+      cards(ai, found.map((p) => {
         const windows = p.windows || [];
         const sub = t("w.aiWeekTokens").replace("{n}", () => tokens(p.week_tokens));
         if (windows.length) {
           return {
-            name: p.name, glyph: icons[p.id] || "sparkles", sub,
+            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: `${Math.round(100 - Math.max(...windows.map((window) => window.percent)))}% ${t("w.aiRemaining")}`,
             tone: usageTone(Math.max(0, ...windows.map((w) => w.percent))),
-            bars: windows.map((w) => ({ label: withReset(windowName(w.label), w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
+            bars: windows.map((w) => ({ label: withReset(`${windowName(w.label)} · ${t("panelFlow.used")}`, w.resets_at), percent: w.percent, tone: usageTone(w.percent) })),
           };
         }
-        if (p.block) {
-          // Local logs hold no plan limit: the bar is time elapsed in the
-          // 5-hour block, the value is the tokens spent in it.
-          return {
-            name: p.name, glyph: icons[p.id] || "sparkles", sub, value: tokens(p.block.tokens),
-            bars: [{ label: withReset(t("w.aiBlockElapsed").replace("{n}", () => Math.round(p.block.elapsed_percent)), p.block.resets_at), percent: p.block.elapsed_percent, tone: "good" }],
-          };
-        }
-        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: p.week_tokens > 0 ? sub : "", error: t("w.aiIdle"), bars: [] };
+        // Local consumption never masquerades as a subscription allowance.
+        if (p.block) return { name: p.name, glyph: icons[p.id] || "sparkles", sub: withReset(sub, p.block.resets_at), value: `~${tokens(p.block.tokens)}`, bars: [] };
+        if (p.week_tokens > 0) return { name: p.name, glyph: icons[p.id] || "sparkles", sub, bars: [] };
+        return { name: p.name, glyph: icons[p.id] || "sparkles", sub: t("panelFlow.presenceOnly"), bars: [] };
       }));
-      const ids = new Set(all.map((p) => p.id));
-      if (!ids.has("claude")) ai.append(text("p", t("w.aiNoClaude")));
-      if (!ids.has("codex") && !ids.has("chatgpt")) ai.append(text("p", t("w.aiNoCodex")));
-      ai.append(text("p", t("w.aiLocal")));
+      // Said once, under the cards it applies to.
+      if (recorded.length) ai.append(text("p", t("w.aiQuotaUnknown"), "ai-quota-note"));
+      notFound();
+
     });
+  }
+  if (item.widget === "ai") {
+    headAction("refresh", t("plugins.refresh"), () => aiReading.refresh());
+    const guide = document.createElement("details"); guide.className = "widget-diagnostics";
+    guide.append(text("summary", t("panelFlow.aiDetection")), text("p", t("panelFlow.aiSources")), text("p", t("w.aiLocal"))); body.append(guide);
   }
   if (item.widget === "volume") {
     const master = section(t("w.volume"));
@@ -185,51 +219,57 @@ export function buildSystemPanel(item, { close }) {
         for (const session of sessions) volumeRow(sessionList, session.name, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted));
       });
     };
-    button(apps, t("plugins.refresh"), refresh);
+    headAction("refresh", t("plugins.refresh"), refresh);
     refresh();
   }
+  const sourceName = (source) => ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[source] || source || t("panelFlow.deviceReady");
   if (item.widget === "devices") {
     const devices = section(t("w.devices"));
-    const actions = document.createElement("div"); actions.className = "plugin-panel-actions";
-    body.append(actions);
-    button(actions, t("plugins.refresh"), refreshDevices);
-    button(actions, t("dev.bluetoothSettings"), () => api.launch("ms-settings:bluetooth", []));
+    headAction("bluetooth", t("dev.bluetoothSettings"), () => api.launch("ms-settings:bluetooth", []));
+    headAction("refresh", t("plugins.refresh"), refreshDevices);
     live(devices, deviceReading, 30000, (values) => {
-      if (!Array.isArray(values) || !values.length) { devices.append(text("p", t("w.devicesNone"))); return; }
+      if (!Array.isArray(values) || !values.length) {
+        // Nothing found: the one useful next step is pairing, so offer it here.
+        devices.append(text("p", t("w.devicesNone")));
+        button(devices, t("dev.bluetoothSettings"), () => api.launch("ms-settings:bluetooth", []));
+        return;
+      }
       const own = item.style?.device;
       const shown = own ? [matchDevice(values, own, item.style?.deviceKind)].filter(Boolean) : values;
       if (!shown.length) { devices.append(text("p", t("w.devicesNone"))); return; }
-      cards(devices, shown.map((d) => ({
-        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : "", tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
-        value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
-        details: [[t("refine.source"), ({ bluetooth: "Bluetooth", headsetcontrol: "HeadsetControl", logitech: "Logitech HID++", hidpp: "Logitech HID++", xinput: "Xbox" })[d.source] || d.source || t("plugins.noData")], [t("refine.readAt"), deviceReading.checkedAt ? new Date(deviceReading.checkedAt).toLocaleTimeString(curLang(), { hour: "2-digit", minute: "2-digit" }) : "—"]],
-      })));
-      // Each device can have its own card on the dock, beside this one.
-      if (own) return;
       const pinnedDevices = new Set(allWidgetPins("devices").map((p) => p.style?.device).filter(Boolean));
-      devices.querySelectorAll(".reading-card").forEach((card, i) => {
-        if (pinnedDevices.has(shown[i].name)) return;
-        const row = document.createElement("div"); row.className = "plugin-panel-actions"; card.append(row);
-        button(row, t("dev.ownCard"), async () => {
-          if (!(await addWidget("devices", { style: { device: shown[i].name, deviceKind: shown[i].kind }, after: item.id }))) throw new Error(t("status.saveError"));
-          row.remove();
-        });
-      });
+      cards(devices, shown.map((d) => ({
+        // One line under the name: what needs attention, else where it reads from.
+        name: d.name, sub: d.charging ? t("dev.charging") : d.level <= 20 ? t("dev.low") : sourceName(d.source), tone: batteryTone(d.level, d.charging), glyph: { headset: "headphones", mouse: "mouse", keyboard: "device-keyboard", gamepad: "gamepad" }[d.kind] || "battery",
+        value: `${d.level}%`, bars: [{ label: "", percent: d.level, tone: batteryTone(d.level, d.charging) }],
+        // Each device can have its own card on the dock, beside this one.
+        action: own || pinnedDevices.has(d.name) ? null : { glyph: "plus", label: t("dev.ownCard"), run: async () => {
+          if (!(await addWidget("devices", { style: { device: d.name, deviceKind: d.kind }, after: item.id }))) throw new Error(t("status.saveError"));
+          return true;
+        } },
+      })));
+      // One honest note for the whole list, on the timestamp, not per card.
+      const deviceStamp = stamp(deviceReading); if (deviceStamp) { deviceStamp.title = t("refine.deviceNote"); devices.append(deviceStamp); }
     });
   }
   if (item.widget === "system") {
     const native = section(t("w.system"));
-    load(native, api.systemStats, (stats) => {
+    live(native, statsReading, 2500, (stats) => {
       if (!stats) { native.append(text("p", t("plugins.noData"))); return; }
-      list(native, [["CPU", `${Math.round(stats.cpu || 0)}%`], ["RAM", `${Math.round(stats.mem || 0)}%`]]);
+      const values = { cpu: stats.cpu, ram: stats.mem, disk: stats.disk };
+      // Same cards as the other panels: a meter per load, the rates as text.
+      const glyphs = { cpu: "cpu", ram: "memory", disk: "disk", net: "download" };
+      cards(native, systemMetrics(item.style).map((metric) => metric === "net"
+        ? { name: metricLabel(metric, t), glyph: glyphs.net, value: `↓ ${fmtRate(stats.net_down_kbps || 0)} · ↑ ${fmtRate(stats.net_up_kbps || 0)}`, bars: [] }
+        : { name: metricLabel(metric, t), glyph: glyphs[metric], value: `${Math.round(values[metric] || 0)}%`, tone: usageTone(values[metric] || 0), bars: [{ label: "", percent: values[metric] || 0, tone: usageTone(values[metric] || 0) }] }));
     });
+  }
+  if (["system", "battery"].includes(item.widget)) {
+    const timer = setInterval(() => { if (!disposed && !document.hidden) statsReading.fresh(2000).catch(() => {}); }, 5000);
+    unsubscribe.push(() => clearInterval(timer));
   }
   if (item.widget === "collector") {
     buildCollectorPanel(item, { box: section(t("w.collector")), button, installButton, isDisposed: () => disposed, onDispose: (off) => unsubscribe.push(off) });
-    const gear = document.createElement("button"); gear.type = "button"; gear.className = "stack-close";
-    gear.innerHTML = icon("settings"); gear.title = t("refine.collectorSettings"); gear.setAttribute("aria-label", t("refine.collectorSettings"));
-    gear.addEventListener("click", () => { const preferences = body.querySelector(".collector-settings"); preferences.open = !preferences.open; preferences.scrollIntoView({ block: "nearest" }); });
-    head.insertBefore(gear, done);
   }
   // A widget whose plugin is missing offers it in one line, terms included.
   const needsPlugin = (id, container, onReady) => api.pluginStatus(id).then((state) => {
@@ -255,7 +295,11 @@ export function buildSystemPanel(item, { close }) {
       if (running) return;
       const list = shownUpdates(raw, S.cfg?.ignoredUpdates);
       box.querySelectorAll(":scope > *:not(strong)").forEach((el) => el.remove());
-      if (!Array.isArray(list)) { box.append(text("p", t("perr.appInstaller"))); return; }
+      if (!Array.isArray(list)) {
+        box.append(text("p", t("perr.appInstaller")));
+        button(box, t("plugins.appInstaller"), () => api.launch("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", []));
+        return;
+      }
       if (!list.length) { box.append(text("p", t("up.none"), "update-empty")); return; }
       const bar = document.createElement("div"); bar.className = "update-bar";
       const count = text("span", t("up.some").replace("{n}", () => list.length), "update-count");
@@ -342,10 +386,11 @@ export function buildSystemPanel(item, { close }) {
   // Devices: support for USB headsets is a one-line offer while it is off,
   // and invisible once it is on. No plugin name, no description.
   if (item.widget === "devices") {
-    const offer = document.createElement("div"); offer.className = "device-offer";
+    const offer = document.createElement("details"); offer.className = "device-offer sensor-offer";
     api.pluginStatus("headsetcontrol").then((status) => {
       if (disposed || status?.installed) return;
-      offer.append(text("span", t("dev.missingHeadset")));
+      const summary = document.createElement("summary"); summary.innerHTML = icon("headphones"); summary.append(text("span", t("dev.missingHeadset")));
+      offer.append(summary);
       installButton(offer, t("dev.enable"), "headsetcontrol", () => { offer.remove(); deviceReading.refresh().catch(() => {}); });
       body.append(offer);
     }).catch(() => {});
@@ -353,6 +398,11 @@ export function buildSystemPanel(item, { close }) {
   for (const id of ids.filter((id) => id !== "headsetcontrol")) {
     const plugin = PLUGINS.find((p) => p.id === id);
     const box = section(plugin.name);
+    // Says what it adds instead of a vague "Connections": a sensor offer that
+    // opens into its explanation and install button.
+    const details = document.createElement("details"); details.className = "widget-provider-details sensor-offer";
+    const summary = document.createElement("summary"); summary.innerHTML = icon("thermometer"); summary.append(text("span", t("panelFlow.sensors")));
+    details.append(summary, box); body.append(details);
     box.append(text("p", t(`plugins.${id}.desc`)));
     if (id === "librehardwaremonitor") box.append(text("p", t("plugins.sensorWarning"), "plugin-warning"));
     const controls = document.createElement("div"); controls.className = "plugin-panel-actions"; box.append(controls);
@@ -361,6 +411,8 @@ export function buildSystemPanel(item, { close }) {
       const status = await api.pluginStatus(id);
       if (disposed) return;
       controls.replaceChildren();
+      // Once installed it is a normal part of the panel, not a hidden offer.
+      if (status?.installed) { details.open = true; summary.hidden = true; }
       if (!status?.installed) {
         if (plugin.external) button(controls, t("plugins.appInstaller"), () => api.launch("ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1", []));
         else installButton(controls, t("plugins.installForWidget"), id, show);

@@ -1,10 +1,10 @@
 /* The toast beside the bar: undo a removal, or report a failure. */
 
 import { t } from "../i18n.js";
-import { placeBesideBar } from "./placement.js";
+import { placeDockNotices } from "./notice-layout.js";
 import { S } from "./state.js";
 import { baseName } from "./helpers.js";
-import { dockEl, undoToast, esc } from "./dom.js";
+import { undoToast, esc } from "./dom.js";
 import { reframe } from "./frame.js";
 import { render } from "./render.js";
 
@@ -15,24 +15,19 @@ export function wireUndoToast(fns) { Object.assign(deps, fns); }
 
 let undoRemoval = null;
 let undoRemovalTimer = null;
+let toastGeneration = 0;
 
 export function hideUndoToast() {
+  toastGeneration++;
   clearTimeout(undoRemovalTimer);
   undoRemovalTimer = null;
   undoRemoval = null;
   undoToast?.classList.add("hidden");
+  placeDockNotices();
   if (undoToast) undoToast.innerHTML = "";
 }
 
-export function placeUndoToast() {
-  if (!S.cfg || !undoToast || undoToast.classList.contains("hidden")) return;
-  const { left, top } = placeBesideBar({
-    bar: dockEl.getBoundingClientRect(),
-    box: { width: undoToast.offsetWidth, height: undoToast.offsetHeight },
-    edge: S.cfg.edge, viewport: { width: innerWidth, height: innerHeight }, gap: 12,
-  });
-  undoToast.style.left = `${left}px`; undoToast.style.top = `${top}px`;
-}
+export const placeUndoToast = placeDockNotices;
 
 export function showUndoToast(item, index) {
   if (!undoToast) return;
@@ -73,17 +68,18 @@ async function undoLastRemoval() {
 export function showNoticeToast(title, detail = "", actions = []) {
   if (!undoToast) return;
   hideUndoToast();
+  const generation = toastGeneration;
   undoToast.innerHTML = `<span class="notice-copy"><strong>${esc(title)}</strong>${detail ? `<small>${esc(detail)}</small>` : ""}</span>`;
   undoToast.classList.remove("hidden");
-  placeUndoToast();
   for (const action of actions) {
     const button = document.createElement("button"); button.type = "button"; button.textContent = action.label;
     button.addEventListener("click", async () => {
       button.disabled = true;
-      try { await action.run(); hideUndoToast(); }
-      catch (_) { showErrorToast(t("overhaul.failed")); }
+      try { await action.run(); if (generation === toastGeneration) hideUndoToast(); }
+      catch (_) { if (generation === toastGeneration) showErrorToast(t("overhaul.failed")); }
     });
     undoToast.append(button);
   }
+  placeUndoToast();
   undoRemovalTimer = setTimeout(hideUndoToast, actions.length ? 10000 : 4000);
 }

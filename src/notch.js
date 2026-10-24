@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onUsageReady } from "./api.js";
+import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
@@ -395,7 +395,6 @@ let activityExpiry = null;
 const VOLUME_FLASH_MS = 2000;
 const CHARGE_FLASH_MS = 2500;
 let chargeFlash = null;
-let usageFlash = null; // { provider, name, until } after a plan window resets
 const FOCUS_DONE_MS = 60000;
 const ringEl = document.getElementById("nl-ring");
 const lText = document.getElementById("nl-text");
@@ -487,12 +486,6 @@ onAgentActivity((payload) => applyAgent(payload));
 setInterval(() => {
   if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
 }, 8000);
-onUsageReady(({ provider, name } = {}) => {
-  if (!provider || videoForeground || scene === "game") return;
-  usageFlash = { provider, name, until: Date.now() + 5000 };
-  if (canPeek) nudgePresence();
-  paintActivity();
-});
 if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
 
 function currentActivity(now = Date.now()) {
@@ -507,7 +500,6 @@ function currentActivity(now = Date.now()) {
   const agent = agentsOn ? agentActivity(now) : null;
   if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
   if (agent?.state === "error") return { kind: "agent-error", provider: agent.provider, since: agent.since };
-  if (usageFlash && usageFlash.until > now) return { kind: "usage", provider: usageFlash.provider, name: usageFlash.name, until: usageFlash.until };
   const done = agentsOn ? nextAgentDone(now) : null;
   if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
   if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
@@ -551,7 +543,7 @@ function paintActivity() {
     lastActivityKind = kind;
   }
   document.body.classList.toggle("live", !!activity);
-  for (const name of ["timer", "done", "volume", "media", "battery", "charging", "agent", "agent-waiting", "agent-done", "agent-error", "usage"]) document.body.classList.toggle(`act-${name}`, kind === name);
+  for (const name of ["timer", "done", "volume", "media", "battery", "charging", "agent", "agent-waiting", "agent-done", "agent-error"]) document.body.classList.toggle(`act-${name}`, kind === name);
   if (kind === "timer") {
     lText.textContent = mmss(activity.left);
     ringEl.style.strokeDashoffset = String(100 - activity.progress * 100);
@@ -562,8 +554,8 @@ function paintActivity() {
     lText.textContent = t("notch.focusDone");
   } else if (kind === "battery" || kind === "charging") {
     lText.textContent = `${activity.level}%`;
-  } else if (kind === "usage" || kind.startsWith("agent")) {
-    const state = kind === "usage" ? "ready" : kind === "agent" ? "working" : kind.slice(6);
+  } else if (kind.startsWith("agent")) {
+    const state = kind === "agent" ? "working" : kind.slice(6);
     const name = AGENT_NAMES[activity.provider] || activity.name || activity.provider;
     const phrase = state === "ready"
       ? t("notch.usageReady").replace("{agent}", () => name)

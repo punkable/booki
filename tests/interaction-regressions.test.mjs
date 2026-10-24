@@ -52,12 +52,13 @@ test('widget targets select the exact nested copy, including a repeated request 
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: pins }), initScript: `
     const old=window.__TAURI__.core.invoke; window.target='widget:two';
     window.__TAURI__.core.invoke=(cmd,args)=>cmd==='take_pending_tab'?Promise.resolve(window.target):old(cmd,args);` });
-  await page.locator('.inspector input[type=text]').waitFor();
-  assert.equal(await page.locator('.inspector input[type=text]').inputValue(), 'Second');
-  await page.locator('.catalog-card').filter({ hasText: 'Quick note editable' }).click();
-  assert.equal(await page.locator('.inspector input[type=text]').inputValue(), 'First');
+  const copy = page.getByRole('combobox', { name: 'Widget being configured', exact: true });
+  await copy.waitFor();
+  assert.equal(await copy.inputValue(), 'two');
+  await copy.selectOption('one');
+  assert.equal(await copy.inputValue(), 'one');
   await signal(page, 'booki://show-tab', null);
-  await waitForAsyncCondition(page, () => document.querySelector('.inspector input[type=text]')?.value === 'Second');
+  await waitForAsyncCondition(page, () => document.querySelector('.inspector select')?.value === 'two');
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -144,6 +145,7 @@ test('a capture keeps the magnified tile and tooltip after pointer leave and rel
   const tile = page.locator('#dock > [data-id=a]');
   await tile.hover();
   await page.locator('#booki-dock-tooltip.show').waitFor();
+  await page.waitForTimeout(400); // the wave eases in; read it once it rests
   const transform = await tile.evaluate(el => el.style.transform);
   assert.ok(transform, 'hover has magnified the tile');
   await signal(page, 'booki://capture-session', true);
@@ -155,6 +157,7 @@ test('a capture keeps the magnified tile and tooltip after pointer leave and rel
   await page.evaluate(() => { window.capturing=false; });
   await signal(page, 'booki://capture-session', false);
   await waitForAsyncCondition(page, () => !document.querySelector('#booki-dock-tooltip.show'));
-  assert.equal(await tile.evaluate(el => el.style.transform), '');
+  // Released, the wave springs back to rest instead of snapping.
+  await waitForAsyncCondition(page, () => document.querySelector('#dock > [data-id=a]').style.transform === '');
   assert.deepEqual(errors, []); await page.close();
 });

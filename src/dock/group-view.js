@@ -1,3 +1,4 @@
+import { icon } from "../icons.js";
 import { widgetDisplayName } from "../widgets-meta.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
@@ -89,7 +90,13 @@ export function enhanceGroupView(stack, grid, item) {
     const at = Math.max(0, Math.min(GROUP_VIEWS.length - 1, GROUP_VIEWS.indexOf(view) + (wheel < 0 ? 1 : -1)));
     changed(GROUP_VIEWS[at]); wheel = 0;
   }, { passive: false });
-  toolbar.append(search, select); stack.insertBefore(toolbar, grid);
+  const searchField = document.createElement("label"); searchField.className = "group-search-field";
+  const searchIcon = document.createElement("span"); searchIcon.innerHTML = icon("search"); searchIcon.setAttribute("aria-hidden", "true");
+  searchField.append(searchIcon, search);
+  const viewField = document.createElement("label"); viewField.className = "group-view-field";
+  const viewIcon = document.createElement("span"); viewIcon.innerHTML = icon("grid"); viewIcon.setAttribute("aria-hidden", "true");
+  viewField.append(viewIcon, select);
+  toolbar.append(searchField, viewField); stack.insertBefore(toolbar, grid);
   return () => {
     sessions.delete(item.id); sessions.set(item.id, { query: search.value, scroll: grid.scrollTop });
     while (sessions.size > 50) sessions.delete(sessions.keys().next().value);

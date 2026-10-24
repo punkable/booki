@@ -9,8 +9,8 @@ import { resolveSurfaceStyle, translucent } from "../../surface.js";
 import { colorSource, surfaceColor } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
-import { AccentPicker, ColorSourcePicker, PositionPicker, ScenarioPicker, SurfaceColorPicker } from "../controls.jsx";
-import { CollapsibleSection, PageHeader, Row, SegmentedControl, SettingsSection, Slider, Toggle } from "../ui.jsx";
+import { AccentPicker, ColorSourcePicker, PositionPicker, ScenarioPicker, SurfaceColorPicker, positionEdges, positionSlots, slotLabel } from "../controls.jsx";
+import { CollapsibleSection, PageHeader, Row, SegmentedControl, Select, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
 
@@ -46,6 +46,22 @@ export function DockPage({ cfg, set }) {
 
     <SettingsSection icon="app" title={t("be.position")}>
       <div className="row-block"><PositionPicker cfg={cfg} set={set} afterPlacement={afterPlacement} monitors={monitors} /></div>
+      <Row label={t("be.edgeLabel")}>
+        <SegmentedControl value={cfg.edge || "bottom"} onChange={(v) => set({ edge: v }, afterPlacement)}
+          options={positionEdges.map((value) => ({ value, label: t(`edge.${value}`) }))} />
+      </Row>
+      <Row label={t("be.alignLabel")}>
+        <SegmentedControl value={cfg.notchPosition || "center"} onChange={(v) => set({ notchPosition: v }, afterPlacement)}
+          options={positionSlots.map((value) => ({ value, label: slotLabel(value) }))} />
+      </Row>
+      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
+        <Slider value={cfg.edgeGap ?? 12} min={0} max={72} step={2} fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)} onChange={(v) => set({ edgeGap: v }, afterPlacement)} />
+      </Row>
+      {monitors.length > 1 && <Row label={t("be.monitor")} hint={cfg.monitor === -2 ? t("mon.followHint") : undefined}>
+        <Select label={t("be.monitor")} value={String(cfg.monitor ?? -1)}
+          options={[{ value: "-1", label: t("mon.auto") }, { value: "-2", label: t("mon.follow") }, ...monitors.map((m) => ({ value: String(m.index), label: `${t("be.monitor")} ${m.index + 1} · ${m.w}×${m.h}${m.primary ? ` · ${t("mon.primary")}` : ""}` }))]}
+          onChange={(v) => { const n = Number(v); set({ monitor: n, monitorName: n < 0 ? "" : monitors.find((m) => m.index === n)?.name || "" }, afterPlacement); }} />
+      </Row>}
     </SettingsSection>
 
     <SettingsSection icon="palette" title={t("tab.appearance")}>
@@ -82,9 +98,6 @@ export function DockPage({ cfg, set }) {
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}
       <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
-      <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
-        <Slider value={cfg.edgeGap ?? 12} min={0} max={72} step={2} fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)} onChange={(v) => set({ edgeGap: v }, afterPlacement)} />
-      </Row>
       {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
       </Row>}

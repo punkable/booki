@@ -1,6 +1,6 @@
 /* Reference screenshots of every finish and every Settings page, in light and
    dark, from the built frontend with the tests' fake bridge. Compare a new
-   build against docs/quality/reference/ by eye before a release.
+   build against test-results/reference/ by eye before a release.
 
    Browser renders cannot show native blur or Mica (those come from Windows),
    so the glass and Mica captures show the page-side fallback, not the final
@@ -68,7 +68,7 @@ try {
     failOn(`settings-${theme}`, errors);
     await page.close();
   }
-  console.log(`Wrote ${written.length} reference screenshots to docs/quality/reference/.`);
+  console.log(`Wrote ${written.length} reference screenshots to test-results/reference/.`);
 } finally {
   await browser.close();
   srv.close();

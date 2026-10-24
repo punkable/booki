@@ -12,9 +12,9 @@ if (readFileSync(join(root, "dist/settings.html"), "utf8").includes("Booki Dev")
 const preview = process.argv.includes("--preview");
 execFileSync(process.execPath, [join(root, "tools/presentation/stills.mjs")], {
   cwd: root, stdio: "inherit",
-  env: { ...process.env, BOOKI_STILLS_LANGUAGE: "en,es", BOOKI_STILLS_PREVIEW: preview ? "1" : "0" },
+  env: { ...process.env, BOOKI_STILLS_LANGUAGE: "en", BOOKI_STILLS_PREVIEW: preview ? "1" : "0" },
 });
-const files = Object.fromEntries(["en", "es"].flatMap((language) =>
+const files = Object.fromEntries(["en"].flatMap((language) =>
   ["hero", "island", "groups", "widgets", "settings", "dark"].map((name) => {
     const path = `docs/presentation/${name}-${language}.jpg`;
     return [path, hash(path)];
