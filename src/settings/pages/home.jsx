@@ -120,7 +120,7 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
     <SetupCard cfg={cfg} set={set} apps={counts.apps} navigate={navigate} />
 
     <section className="card home-hero" aria-label={t("overhaul.preview")}>
-      <DockPreview cfg={cfg} large stage onSelect={counts.apps + counts.widgets + counts.groups > 0 ? onSelect : undefined} />
+      <DockPreview cfg={cfg} large stage actual onSelect={counts.apps + counts.widgets + counts.groups > 0 ? onSelect : undefined} />
       <div className="home-hero-bar">
         {/* Label then count, so "1" never needs a plural in five languages. */}
         <div className="home-stats">

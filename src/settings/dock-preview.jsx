@@ -86,7 +86,7 @@ export function PreviewPin({ item, size = 40, gap = 6 }) {
 }
 /* The preview always shows the whole dock: it scales down to fit its column
    instead of scrolling, so the bar never grows an inner scrollbar. */
-function useFitScale(maxHeight) {
+function useFitScale(maxHeight, actual = false) {
   const frame = useRef(null);
   const bar = useRef(null);
   const [fit, setFit] = useState({ scale: 1, height: 0 });
@@ -96,7 +96,7 @@ function useFitScale(maxHeight) {
     const measure = () => {
       const width = inner.offsetWidth, height = inner.offsetHeight;
       if (!width || !height) return;
-      const scale = Math.min(1, outer.clientWidth / width, maxHeight / height);
+      const scale = actual ? 1 : Math.min(1, outer.clientWidth / width, maxHeight / height);
       setFit((prev) => Math.abs(prev.scale - scale) < 0.005 && prev.height === Math.ceil(height * scale) ? prev : { scale, height: Math.ceil(height * scale) });
     };
     measure();
@@ -105,7 +105,7 @@ function useFitScale(maxHeight) {
     observer.observe(outer);
     observer.observe(inner);
     return () => observer.disconnect();
-  }, [maxHeight]);
+  }, [maxHeight, actual]);
   return { frame, bar, fit };
 }
 /** The config as the dock paints it (Windows' taskbar colour, the wallpaper,
@@ -115,7 +115,8 @@ function usePaintedLook(cfg) {
   useEffect(() => onLookChange(() => setVersion((v) => v + 1)), []);
   return paintedLook(cfg);
 }
-export function DockPreview({ cfg: saved, large = false, stage = false, onSelect, onDragPin, onDropPin, onDragOver }) {
+/** `actual`: drawn at real size, scrolling sideways when it does not fit. */
+export function DockPreview({ cfg: saved, large = false, stage = false, actual = false, onSelect, onDragPin, onDropPin, onDragOver }) {
   const cfg = usePaintedLook(saved);
   const gap = cfg.spacing ?? 6;
   const vertical = cfg.edge === "left" || cfg.edge === "right";
@@ -123,10 +124,10 @@ export function DockPreview({ cfg: saved, large = false, stage = false, onSelect
   const surface = translucent(cfg) ? "glass" : "solid";
   const fill = glassFillColor(cfg);
   const items = cfg.pinned || [];
-  const { frame, bar, fit } = useFitScale(vertical ? 300 : 140);
+  const { frame, bar, fit } = useFitScale(vertical ? 300 : 140, actual && !vertical);
   // `stage` sets the dock on a small desktop scene, on its own edge.
   return <div className={"live-preview-scene" + (large ? " large" : "") + (stage ? ` stage at-${cfg.edge || "bottom"}` : "")}>
-    <div ref={frame} className="live-preview-fit" style={{ height: fit.height || undefined }}>
+    <div ref={frame} className={"live-preview-fit" + (actual && !vertical ? " actual" : "")} style={{ height: (!actual && fit.height) || undefined }}>
     <div ref={bar} className={"live-preview-bar" + (vertical ? " vertical" : "")} data-surface={surface} data-ink={surfaceForeground(cfg) ? (surfaceForeground(cfg) === "#1b1b1b" ? "dark" : "light") : undefined} style={{ "--gap": `${gap}px`, "--ink": surfaceForeground(cfg) || undefined, color: surfaceForeground(cfg) || undefined, gap, borderRadius: dockRadius(cfg),
       transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,
       background: `color-mix(in srgb, ${fill} ${Math.round((transparencyReduced(cfg) ? 1 : surfaceAlpha(cfg)) * 100)}%, transparent)` }}>

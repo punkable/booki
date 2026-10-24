@@ -431,6 +431,10 @@
 
 /* ── Home ───────────────────────────────────────────────────────────────── */
 .home-hero { margin-bottom: 28px; overflow: hidden; }
+/* Home shows the bar at its real size: shrunk to fit, a full dock was too
+   small to read. A long one scrolls sideways (safe centring keeps its start). */
+.live-preview-fit.actual { justify-content: safe center !important; overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; scrollbar-width: thin; }
+.home-hero .live-preview-scene.stage { min-height: 150px; padding: 44px 16px 18px; }
 .home-hero-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
 .home-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
 .home-usage { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin: 16px 0; }
