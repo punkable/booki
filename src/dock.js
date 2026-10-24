@@ -102,6 +102,8 @@ import { startPluginUpdateChecks } from "./dock/plugin-updates.js";
 import "./dock/agent-notices.js";
 import { enableFluentSelects } from "./fluent-select.js";
 enableFluentSelects();
+import { watchLongTasks } from "./long-tasks.js";
+watchLongTasks("dock");
 
 
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,

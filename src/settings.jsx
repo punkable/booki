@@ -22,6 +22,8 @@ import { PluginsPage } from "./settings/pages/plugins.jsx";
 import { SystemPage } from "./settings/pages/system.jsx";
 import { enableFluentSelects } from "./fluent-select.js";
 enableFluentSelects();
+import { watchLongTasks } from "./long-tasks.js";
+watchLongTasks("settings");
 
 // [id, label, glyph, tile colour]
 const PAGES = [
