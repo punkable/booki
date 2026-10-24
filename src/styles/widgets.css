@@ -509,7 +509,17 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 /* Rotating cards (Devices, AI): the ring glyph turns into the device kind or
    provider logo and eases in as the card moves to the next one. */
 .w-ring-ico.w-glyph-swap { animation: w-glyph-in 0.25s cubic-bezier(0.1, 0.9, 0.2, 1); }
-@keyframes w-glyph-in { from { opacity: 0; transform: scale(0.8); } }
+/* Keeps the centring translate: animating `transform` alone threw the
+   glyph sideways for the length of the swap. */
+@keyframes w-glyph-in { from { opacity: 0; transform: translateX(-50%) scale(0.6); } }
+/* AI: the provider logo is what tells the turns apart, so it is larger and in
+   the provider's colour, and the reading slides in with it. */
+.tile.widget[data-widget="ai"] .w-ring-ico { top: 14%; color: var(--ai-brand, var(--w-accent)); }
+.tile.widget[data-widget="ai"] .w-ring-ico svg { width: calc(var(--size) * 0.26); height: calc(var(--size) * 0.26); stroke-width: 2; }
+.tile.widget[data-widget="ai"].w-turn :is(.w-ring-num, .w-label, .w-value) { animation: w-turn-in 0.35s cubic-bezier(0.1, 0.9, 0.2, 1); }
+.tile.widget[data-widget="ai"][data-variant="solid"] .w-ring-ico { color: #fff; }
+@keyframes w-turn-in { from { opacity: 0; transform: translateY(5px); } }
+@media (prefers-reduced-motion: reduce) { .tile.widget[data-widget="ai"].w-turn :is(.w-ring-num, .w-label, .w-value) { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .w-ring-ico.w-glyph-swap { animation: none; } }
 
 .system-widget-panel { width: min(400px, calc(100vw - 24px)); }

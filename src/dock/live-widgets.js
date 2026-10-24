@@ -295,6 +295,10 @@ function paintAi(providers) {
       return;
     }
     const current = shown[(style.rotate === false ? 0 : aiTurn) % shown.length];
+    if (el.dataset.aiCurrent && el.dataset.aiCurrent !== current.id) {
+      el.classList.remove("w-turn"); void el.offsetWidth; el.classList.add("w-turn");
+    }
+    el.dataset.aiCurrent = current.id;
     el.style.setProperty("--ai-brand", ({ claude: "#d97757", cursor: "#c6ccd8", opencode: "#b3a1ff" })[current.id] || "#10a37f");
     setCornerGlyph(el, PROVIDER_ICON[current.id] || "sparkles", `ai-${current.id}`);
     setTileLabel(el, hint);
