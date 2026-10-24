@@ -525,44 +525,70 @@ body[data-ink="light"] .rename-pop-input {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
-/* ─────────────────── First-run coach bubbles ─────────────────── */
+/* ─────────────── First-run tips: WinUI TeachingTip ─────────────── */
 .coach {
-  position: fixed; /* placed beside the bar by placePop() in dock.js */
+  position: fixed; /* placed beside the bar by placePop() */
   z-index: 70;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Intrinsic width: the coach must NOT be measured against the (possibly tiny)
-     dock window, or the window never grows enough and the text shatters. Still
-     capped to the viewport so narrow screens never overflow horizontally. */
-  width: min(430px, calc(100vw - 16px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+  /* Intrinsic width, capped to the viewport: never measured against the
+     (possibly tiny) dock window, or the text shatters. */
+  width: min(360px, calc(100vw - 16px));
   box-sizing: border-box;
-  padding: 10px 14px;
-  border-radius: var(--r-pill);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 14px 40px 12px 14px;
+  border-radius: var(--r-overlay, 8px);
+  background: var(--panel-fill, var(--layer-strong));
+  border: 1px solid var(--stroke-flyout, var(--stroke-light));
+  box-shadow: var(--shadow-flyout);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   backdrop-filter: blur(24px) saturate(160%);
   color: var(--ink);
-  font: 500 12.5px var(--font);
+  font: 400 13px/1.45 var(--font);
   transition: opacity var(--dur-4) var(--ease), transform var(--dur-4) var(--ease);
 }
-
-.coach-emoji { font-size: 18px; flex: 0 0 auto; }
-.coach-text { min-width: 0; }
-.coach-dots { flex: 0 0 auto; font-size: 9px; color: var(--accent); letter-spacing: 2px; }
+/* The tail points at the bar, from the side that faces it. */
+.coach::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border: inherit;
+  border-width: 0 1px 1px 0;
+  translate: -50% 0;
+  rotate: 45deg;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.edge-top .coach::after { top: -7px; bottom: auto; rotate: 225deg; }
+body.edge-left .coach::after { left: -7px; top: 50%; bottom: auto; translate: 0 -50%; rotate: 135deg; }
+body.edge-right .coach::after { left: auto; right: -7px; top: 50%; bottom: auto; translate: 0 -50%; rotate: -45deg; }
+.coach-emoji { font-size: 18px; line-height: 1; }
+.coach-text { min-width: 0; padding-top: 2px; }
+.coach-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-right: -26px; }
+.coach-dots { display: flex; gap: 6px; }
+.coach-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--strong-stroke, var(--ink-3)); transition: width var(--dur-2) var(--ease), background var(--dur-2) var(--ease); }
+.coach-dots i.on { width: 16px; border-radius: 3px; background: var(--accent); }
 .coach-btn {
-  flex: 0 0 auto;
-  border: 0;
+  min-width: 96px;
+  border: 1px solid transparent;
   background: var(--accent);
   color: var(--accent-contrast, #fff);
-  font: 600 12px var(--font);
-  padding: 6px 13px;
-  border-radius: 999px;
+  font: 600 13px var(--font);
+  padding: 5px 12px;
+  border-radius: var(--r-control, 4px);
   cursor: pointer;
 }
-.coach-btn:active { transform: scale(0.96); }
+.coach-btn:hover { background: color-mix(in srgb, var(--accent) 90%, var(--ink)); }
+.coach-btn:active { opacity: 0.85; }
+.coach-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: var(--r-control, 4px); cursor: pointer; }
+.coach-close:hover { background: var(--hover); color: var(--ink); }
+.coach-close svg { width: 14px; height: 14px; }
+.coach :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* Symmetric exit: popovers leave along the path they entered. Added as .closing by dismissPop() in dock.js just before removal. */
 .trash-pop.closing, .coach.closing {
@@ -2888,3 +2914,6 @@ body.surface-glass.native-material #ctx-menu:not(.hidden) { opacity: 1; }
 body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .note-editor, .trash-pop, .undo-toast, .coach).mat-wait {
   background-color: var(--glass-tint, var(--surface-tint)) !important;
 }
+/* Windows' blur covers rectangles only: a translucent tail outside it would
+   show the desktop unblurred, so on native glass the tip goes without. */
+body.surface-glass.native-material .coach::after { display: none; }
