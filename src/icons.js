@@ -59,6 +59,10 @@ export const iconSparkles = () =>
   S(`<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9Z"/>`);
 export const iconStar = () =>
   S(`<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2 7.5 14 3 9.6l6.2-.9Z"/>`);
+export const iconPin = () =>
+  S(`<path d="M12 17v5"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.7l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z"/>`);
+export const iconPinOff = () =>
+  S(`<path d="M12 17v5"/><path d="M15 9.3V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.9"/><path d="m2 2 20 20"/><path d="M9 9v1.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h11"/>`);
 export const iconShield = () =>
   S(`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9.5 12.5 11 14l3.5-4"/>`);
 export const iconEye = () =>
@@ -161,6 +165,8 @@ const iconMap = {
   globe: iconGlobe,
   file: iconFile,
   star: iconStar,
+  pin: iconPin,
+  "pin-off": iconPinOff,
   shield: iconShield,
   eye: iconEye,
   "eye-off": iconEyeOff,

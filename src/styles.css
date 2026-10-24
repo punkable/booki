@@ -2064,54 +2064,57 @@ body.edge-right .stack.open { transform: none; }
   gap: 4px;
 }
 .clip-row {
+  /* Win+V card: up to three lines of the copied text, then when it was
+     copied; the actions float in the corner on hover or focus. */
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 104px 8px 10px;
-  border-radius: var(--r-control);
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--ctrl-fill, var(--layer));
+  border: 1px solid var(--stroke-light, transparent);
+  border-radius: var(--r-card, 8px);
   cursor: pointer;
-  transition: background var(--dur-2) ease;
+  transition: background var(--dur-2) ease, border-color var(--dur-2) ease;
   animation: stack-cell-in var(--dur-4) var(--ease) backwards;
   animation-delay: calc(var(--i, 0) * 30ms);
 }
 @media (prefers-reduced-motion: reduce) { .clip-row { animation: none; } }
 .clip-row:hover { background: var(--hover); }
-.clip-row.copied { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.clip-row.favorite::before,
-.clip-row.private::after {
-  content: "";
-  flex: 0 0 auto;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.clip-row.private::after { background: #6aa7ff; }
+.clip-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.clip-row.copied { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.clip-section { padding: 6px 2px 0; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
+.clip-section:first-child { padding-top: 0; }
 .clip-text {
-  flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
+.clip-info { display: flex; align-items: center; gap: 6px; min-height: 14px; font-size: 0.6875rem; color: var(--ink-2); }
+.clip-badge { display: inline-grid; place-items: center; color: var(--ink-2); }
+.clip-badge svg { width: 11px; height: 11px; }
 .clip-acts {
   position: absolute;
-  top: 50%;
+  top: 6px;
   right: 6px;
-  transform: translateY(-50%);
   display: none;
   gap: 3px;
 }
 .clip-row:hover .clip-acts,
 .clip-row:focus-within .clip-acts,
 .clip-row.editing .clip-acts { display: flex; }
-.clip-list.compact { gap: 2px; }
-.clip-list.compact .clip-row { padding-top: 5px; padding-bottom: 5px; }
-.clip-list.compact .clip-text { font-size: 0.75rem; }
-.clip-row.editing { position: static; padding: 6px 0; align-items: flex-start; cursor: default; background: transparent; }
+.clip-list.compact { gap: 4px; }
+.clip-list.compact .clip-row { padding-top: 7px; padding-bottom: 7px; }
+.clip-list.compact .clip-text { -webkit-line-clamp: 1; line-clamp: 1; }
+.clip-row.editing { flex-direction: row; align-items: flex-start; cursor: default; }
 .clip-row.editing .clip-acts { position: static; transform: none; margin-left: 6px; margin-top: 2px; }
 .clip-act {
   width: 28px; height: 28px; display: grid; place-items: center; padding: 0;
@@ -2147,24 +2150,6 @@ body.edge-right .stack.open { transform: none; }
   }
   .stack-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
   .clip-guide { font-size: 0.6875rem; }
-  .clip-row {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    padding: 8px 10px;
-  }
-  .clip-acts {
-    position: static;
-    display: flex;
-    transform: none;
-    margin-left: auto;
-  }
-  .clip-text {
-    flex-basis: 100%;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
 }
 
 /* A grouped widget shown live inside the flyout: full-width read-out card. */
