@@ -18,6 +18,17 @@ let inFlight = false;
 let desired = null;
 let tint = "#2c2c2cb8";
 let enabled = true;
+// Signature Windows last confirmed, and who waits to hear it.
+let appliedSig = "";
+const settledListeners = new Set();
+function settled() {
+  for (const listener of settledListeners) listener();
+}
+/** Called whenever Windows has applied the blur for the latest report. */
+export function onMaterialSettled(listener) {
+  settledListeners.add(listener);
+  return () => settledListeners.delete(listener);
+}
 
 /** Four CSS corner radii, in window CSS pixels, or null when native blur
  * cannot follow the surface faithfully. The CSS fill is always retained. */
@@ -128,6 +139,10 @@ function pumpMaterial() {
       // flash in and out between frames.
       if (!enabled || (!ok && list.length)) document.body.classList.remove("native-material");
       else if (list.length) document.body.classList.add("native-material");
+      if (ok && list.length) {
+        appliedSig = sig;
+        settled();
+      }
       if (!ok && list.length) {
         lastSig = "";
         retryAfter = Date.now() + 5000;
@@ -152,6 +167,7 @@ export function reportMaterial(shapes) {
   const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, physicalMaterialShapes(list, devicePixelRatio)]);
   if (desired?.sig !== sig) desired = { list, sig, revision: ++generation, color: tint };
   else if (desired.revision !== generation) desired = { ...desired, revision: generation, color: tint };
+  if (list.length && sig === appliedSig && !inFlight) settled();
   pumpMaterial();
 }
 

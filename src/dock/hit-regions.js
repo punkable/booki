@@ -3,7 +3,7 @@
 
 import { dock as dockApi } from "../api.js";
 import { rectFromElement, pointInRect, hitSignature } from "./geometry.js";
-import { reportMaterial, shapeOf } from "../material.js";
+import { onMaterialSettled, reportMaterial, shapeOf } from "../material.js";
 import { S } from "./state.js";
 import { baseSize } from "./helpers.js";
 import { dockEl, stackEl } from "./dom.js";
@@ -90,12 +90,29 @@ export function reportDockMaterial() {
     reportMaterial([]);
     return;
   }
-  reportMaterial([
-    shapeOf(dockEl),
-    S.stackOpen ? shapeOf(stackEl) : null,
-    ...[...document.querySelectorAll(MATERIAL_PANELS)].map((el) => shapeOf(el)),
-  ]);
+  const panels = [...document.querySelectorAll(MATERIAL_PANELS)];
+  if (S.stackOpen) panels.unshift(stackEl);
+  const shapes = panels.map((el) => shapeOf(el));
+  // A panel shows a solid fill until Windows has put the blur behind it:
+  // translucent without blur is the see-through flash glass must never have.
+  waiting.clear();
+  panels.forEach((el, i) => {
+    if (!el.classList.contains("mat-ready")) el.classList.add("mat-wait");
+    if (shapes[i]) waiting.add(el);
+  });
+  for (const el of document.querySelectorAll(".mat-ready, .mat-wait")) {
+    if (!panels.includes(el)) el.classList.remove("mat-ready", "mat-wait");
+  }
+  reportMaterial([shapeOf(dockEl), ...shapes]);
 }
+const waiting = new Set();
+onMaterialSettled(() => {
+  for (const el of waiting) {
+    el.classList.remove("mat-wait");
+    el.classList.add("mat-ready");
+  }
+  waiting.clear();
+});
 
 export function reportHitRects() {
   reportDockMaterial();

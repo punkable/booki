@@ -2877,3 +2877,14 @@ body:has(.productivity-panel, .note-editor) #booki-dock-tooltip { opacity: 0 !im
 .nc-agent[hidden] { display: none; }
 .nc-agent svg { width: 16px; height: 16px; display: block; }
 .nc-bar[data-tone="media"] i { background: var(--ink-2); }
+/* Glass flyouts open like WinUI 3's: they slide in at full opacity, since
+   Windows' blur cannot fade with the page, and wear the theme's solid fill
+   until the blur is confirmed behind them (.mat-wait). Never see-through. */
+body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .note-editor, .trash-pop, .undo-toast, .coach) {
+  transition-property: transform, visibility !important;
+}
+body.surface-glass.native-material .stack.open,
+body.surface-glass.native-material #ctx-menu:not(.hidden) { opacity: 1; }
+body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .note-editor, .trash-pop, .undo-toast, .coach).mat-wait {
+  background-color: var(--glass-tint, var(--surface-tint)) !important;
+}
