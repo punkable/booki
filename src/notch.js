@@ -373,6 +373,14 @@ const cSub = document.getElementById("nc-sub");
 const cPlay = document.getElementById("nc-play");
 const cBar = document.getElementById("nc-bar");
 /** A thin bar under the text: time left, battery or volume level (0..1); null hides it. */
+/** How far the track is, from the last reading plus the time since. */
+function mediaProgress(now = Date.now()) {
+  const duration = Number(media?.duration_ms);
+  if (!duration || media.position_ms == null) return null;
+  const position = Number(media.position_ms) + (media.playing ? now - (media.fetchedAt || now) : 0);
+  return Math.min(1, position / duration);
+}
+
 function cardBar(fraction, tone = "") {
   cBar.hidden = fraction == null;
   if (fraction == null) return;
@@ -430,11 +438,14 @@ const AGENT_ICONS = {
   gemini: "ai-gemini", windsurf: "ai-windsurf", goose: "ai-goose", cline: "ai-cline", continue: "ai-continue",
 };
 const AGENT_DONE_MS = 5000;
+// Several live states take turns at this pace; one waiting on you stays put.
+const AGENT_ROTATE_MS = 6000;
 let agentsOn = true;
 const agents = new Map(); // provider -> { state: "working" | "waiting", since }
 let agentDone = null; // { provider, since, until }
 const agentDoneQueue = [];
 const lAgent = document.getElementById("nl-agent");
+const cAgent = document.getElementById("nc-agent");
 const lState = document.getElementById("nl-state");
 
 function clearAgents() {
@@ -487,13 +498,13 @@ function agentActivity(now = Date.now()) {
   const all = [...agents].map(([provider, activity]) => ({ provider, ...activity }));
   const urgent = all.filter((row) => ["waiting", "error"].includes(row.state));
   const eligible = urgent.length ? urgent : all;
-  return eligible.length ? eligible[Math.floor(now / 8000) % eligible.length] : null;
+  return eligible.length ? eligible[Math.floor(now / AGENT_ROTATE_MS) % eligible.length] : null;
 }
 
 onAgentActivity((payload) => applyAgent(payload));
 setInterval(() => {
   if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
-}, 8000);
+}, AGENT_ROTATE_MS);
 if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
 
 function currentActivity(now = Date.now()) {
@@ -516,7 +527,7 @@ function currentActivity(now = Date.now()) {
   if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
-    if (agent && !cardOpen && Math.floor(now / 8000) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
+    if (agent && !cardOpen && Math.floor(now / AGENT_ROTATE_MS) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
@@ -644,6 +655,15 @@ function paintMedia() {
 function paintCard() {
   const activity = currentActivity();
   cardBar(null);
+  const provider = activity?.kind.startsWith("agent") ? activity.provider : "";
+  cAgent.hidden = !provider;
+  if (provider) {
+    const mark = AGENT_ICONS[provider] || "sparkles";
+    if (cAgent.dataset.icon !== mark) {
+      cAgent.innerHTML = icon(mark);
+      cAgent.dataset.icon = mark;
+    }
+  }
   if (activity?.kind === "timer") {
     cTitle.textContent = mmss(activity.left);
     cSub.textContent = t("w.focus");
@@ -671,7 +691,8 @@ function paintCard() {
     const state = activity.kind === "agent" ? "working" : activity.kind.slice(6);
     cTitle.textContent = agentLabel(state, activity.provider);
     const withMedia = activity.kind === "agent" && hasRecentMedia();
-    cSub.textContent = withMedia ? media.title || media.artist : agentElapsed(activity.since);
+    // Working shows how long the turn has run; the other states, when they began.
+    cSub.textContent = withMedia ? media.title || media.artist : state === "working" ? agentDuration(activity.since) : agentElapsed(activity.since);
     cPlay.hidden = !withMedia;
     if (withMedia) {
       cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
@@ -692,6 +713,7 @@ function paintCard() {
   if (hasRecentMedia()) {
     cTitle.textContent = media.title || media.artist;
     cSub.textContent = media.title ? media.artist : "";
+    cardBar(mediaProgress(), "media");
     cPlay.hidden = false;
     cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
     cPlay.setAttribute("aria-label", t("w.playPause"));
@@ -706,6 +728,17 @@ function paintCard() {
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
   }
+}
+
+/** "3 min" / "1 h 5 min": how long a turn has been running. */
+function agentDuration(since, now = Date.now()) {
+  const minutes = Math.max(0, Math.floor((now - Number(since || now)) / 60000));
+  const unit = (value, name) => {
+    try { return new Intl.NumberFormat(curLang(), { style: "unit", unit: name, unitDisplay: "short" }).format(value); } catch (_) { return `${value}`; }
+  };
+  if (minutes < 1) return `< ${unit(1, "minute")}`;
+  if (minutes < 60) return unit(minutes, "minute");
+  return `${unit(Math.floor(minutes / 60), "hour")} ${minutes % 60 ? unit(minutes % 60, "minute") : ""}`.trim();
 }
 
 /** "hace 2 min" / "2 min ago", in the notch's language. */
@@ -731,6 +764,7 @@ const pollMedia = singleFlight(async () => {
   }
   try {
     media = await invoke("media_info");
+    if (media) media.fetchedAt = Date.now();
   } catch (_) {
     media = null;
   }
@@ -783,7 +817,8 @@ function openCard() {
   clearInterval(cardWatch);
   cardWatch = setInterval(() => {
     if (cardOpen && !pill.matches(":hover") && !pill.contains(document.activeElement)) closeCard();
-  }, 1200);
+    else if (cardOpen && media?.playing && !cBar.hidden && cBar.dataset.tone === "media") paintCard();
+  }, 1000);
   cardOpen = true;
   document.body.classList.add("card");
   followMorph();

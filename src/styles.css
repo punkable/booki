@@ -2873,3 +2873,7 @@ body:has(.productivity-panel, .note-editor) #booki-dock-tooltip { opacity: 0 !im
 .nc-bar[data-tone="charging"] i { background: #30a46c; }
 .nc-bar[data-tone="low"] i { background: #e5484d; }
 @media (prefers-reduced-motion: reduce) { .nc-bar i { transition: none; } }
+.nc-agent { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--agent-tint, var(--ink)); background: color-mix(in srgb, var(--agent-tint, var(--ink)) 16%, transparent); }
+.nc-agent[hidden] { display: none; }
+.nc-agent svg { width: 16px; height: 16px; display: block; }
+.nc-bar[data-tone="media"] i { background: var(--ink-2); }

@@ -102,6 +102,8 @@ pub struct MediaSnapshot {
     pub artist: String,
     pub playing: bool,
     pub thumb: Option<String>,
+    pub position_ms: Option<u64>,
+    pub duration_ms: Option<u64>,
 }
 
 pub fn media_now_playing() -> Option<MediaSnapshot> {
