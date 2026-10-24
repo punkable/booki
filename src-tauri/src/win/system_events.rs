@@ -33,9 +33,10 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 /// resume or display signal: the old queue carried the kinds themselves and
 /// dropped whatever arrived while its 32 slots were full.
 static QUEUE: OnceLock<SyncSender<()>> = OnceLock::new();
-const KINDS: [&str; 16] = [
+const KINDS: [&str; 17] = [
     "ready",
     "windows",
+    "foreground",
     "clipboard",
     "preferences",
     "display",
@@ -55,6 +56,8 @@ static PENDING: [AtomicBool; KINDS.len()] = [const { AtomicBool::new(false) }; K
 pub static MEDIA: AtomicBool = AtomicBool::new(false);
 pub static VOLUME: AtomicBool = AtomicBool::new(false);
 pub static WINDOWS: AtomicBool = AtomicBool::new(false);
+/// The foreground window, or its title, changed (a new app, or a browser tab).
+pub static FOREGROUND: AtomicBool = AtomicBool::new(false);
 pub static CLIPBOARD: AtomicBool = AtomicBool::new(false);
 pub static CATALOG: AtomicBool = AtomicBool::new(false);
 /// The last window outside Booki that came to the foreground (the hook skips
@@ -301,6 +304,16 @@ unsafe extern "system" fn window_event(
         LAST_FOREGROUND.store(hwnd.0 as isize, Ordering::Relaxed);
         // A window that asked for attention got it.
         answered(hwnd.0 as isize);
+        signal("foreground");
+    }
+    // A tab switch inside the active browser only renames its window.
+    if event == EVENT_OBJECT_NAMECHANGE
+        && object == 0
+        && child == 0
+        && hwnd.0 as isize == LAST_FOREGROUND.load(Ordering::Relaxed)
+    {
+        signal("foreground");
+        return;
     }
     if event == EVENT_SYSTEM_FOREGROUND
         || (object == 0
@@ -414,8 +427,21 @@ fn watch_windows() {
             0,
             flags,
         );
+        let names = SetWinEventHook(
+            EVENT_OBJECT_NAMECHANGE,
+            EVENT_OBJECT_NAMECHANGE,
+            None,
+            Some(window_event),
+            0,
+            0,
+            flags,
+        );
         WINDOWS.store(
             !foreground.0.is_null() && !objects.0.is_null(),
+            Ordering::Relaxed,
+        );
+        FOREGROUND.store(
+            !foreground.0.is_null() && !names.0.is_null(),
             Ordering::Relaxed,
         );
         signal("ready");
@@ -435,9 +461,11 @@ fn watch_windows() {
         }
         CLIPBOARD.store(false, Ordering::Relaxed);
         WINDOWS.store(false, Ordering::Relaxed);
+        FOREGROUND.store(false, Ordering::Relaxed);
         signal("ready");
         let _ = UnhookWinEvent(foreground);
         let _ = UnhookWinEvent(objects);
+        let _ = UnhookWinEvent(names);
     });
 }
 fn watch_catalog() {

@@ -104,7 +104,54 @@ fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let level = reply[4];
     let charging = unified_charging(&reply[4..]);
     log_status_change(slot, &reply[4..8]);
-    (1..=100).contains(&level).then_some((level, charging))
+    if !(1..=100).contains(&level) {
+        return None;
+    }
+    // The percent has been seen to drop to 15 right after unplugging while
+    // the level flags (and Logi Options+) still said the battery was good.
+    // When the two disagree, the percent is not shown: the caller falls back
+    // to the last agreeing reading or to the legacy battery feature.
+    if !level_agrees(level, reply[5]) {
+        log::info!(
+            "logitech slot {slot} percent {level} disagrees with level flags {:#04x}",
+            reply[5]
+        );
+        return last_agreeing(slot)
+            .map(|l| (l, charging))
+            .or_else(|| battery_status(device, slot).map(|(l, legacy)| (l, charging || legacy)));
+    }
+    remember_agreeing(slot, level);
+    Some((level, charging))
+}
+
+/// Does a 0x1004 percent fit its level flags (1 critical, 2 low, 4 good,
+/// 8 full)? Firmware without flags (0) is taken at its word.
+pub fn level_agrees(percent: u8, flags: u8) -> bool {
+    if flags & 0x0c != 0 && percent <= 20 {
+        return false; // "good" or "full", yet nearly empty
+    }
+    if flags & 0x03 != 0 && flags & 0x0c == 0 && percent >= 60 {
+        return false; // "critical" or "low", yet more than half full
+    }
+    true
+}
+
+static AGREEING: std::sync::Mutex<Vec<(u8, u8)>> = std::sync::Mutex::new(Vec::new());
+
+fn remember_agreeing(slot: u8, level: u8) {
+    if let Ok(mut seen) = AGREEING.lock() {
+        seen.retain(|(s, _)| *s != slot);
+        seen.push((slot, level));
+    }
+}
+
+fn last_agreeing(slot: u8) -> Option<u8> {
+    AGREEING
+        .lock()
+        .ok()?
+        .iter()
+        .find(|(s, _)| *s == slot)
+        .map(|(_, l)| *l)
 }
 
 /// Write the raw 0x1004 status to Booki's log when it changes, so a device
@@ -229,6 +276,16 @@ fn classify(report: &[u8], feature: u8, function_sw: u8) -> Reply {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_percent_that_contradicts_the_level_flags_is_not_trusted() {
+        assert!(!level_agrees(15, 0x04)); // good, yet 15 %
+        assert!(!level_agrees(10, 0x08)); // full, yet 10 %
+        assert!(!level_agrees(85, 0x02)); // low, yet 85 %
+        assert!(level_agrees(15, 0x02));
+        assert!(level_agrees(90, 0x04));
+        assert!(level_agrees(15, 0x00)); // no flags: trust the percent
+    }
 
     #[test]
     fn replies_are_matched_by_feature_and_software_id() {

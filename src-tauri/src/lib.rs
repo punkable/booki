@@ -1243,11 +1243,11 @@ fn system_events_support() -> serde_json::Value {
     #[cfg(windows)]
     {
         use win::system_events;
-        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "foreground": system_events::FOREGROUND.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false, "clipboard": false })
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "foreground": false, "catalog": false, "clipboard": false })
     }
 }
 
@@ -1819,7 +1819,7 @@ pub fn run() {
                         reposition_surfaces(&handle);
                     }
                     if kind == "resume" {
-                        for source in ["media", "volume", "windows"] {
+                        for source in ["media", "volume", "windows", "foreground"] {
                             let _ = handle.emit(&format!("booki://{source}-changed"), ());
                         }
                     }

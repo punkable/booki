@@ -302,8 +302,14 @@ function paintScene() {
   paintPresence();
 }
 
+// Windows reports app switches and title changes (a browser tab turning into
+// a video); the slow timer only recovers from a missed event.
+let foregroundTimer = null;
+let nativeSupport = {};
 async function pollForeground() {
+  clearTimeout(foregroundTimer);
   if (!inTauri) return;
+  foregroundTimer = setTimeout(pollForeground, recoveryInterval(nativeSupport, "foreground", 3000));
   try {
     place = String(await invoke("foreground_place") || "desk");
     codeForeground = place === "code";
@@ -315,7 +321,6 @@ async function pollForeground() {
   }
   paintScene();
 }
-setInterval(pollForeground, 3000);
 pollForeground();
 
 /** Show the tab for a moment because something changed worth a glance. */
@@ -751,7 +756,6 @@ function agentElapsed(since, now = Date.now()) {
   return rtf.format(-Math.floor(seconds / 3600), "hour");
 }
 
-let nativeSupport = {};
 
 // Media is polled only while it can be shown, and slower when nothing plays:
 // the WinRT session query is cheap but not free.
@@ -794,7 +798,7 @@ const readVolume = singleFlight(async () => {
   paintActivity();
 });
 
-observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
+observeSystem(dockApi, { foreground: pollForeground, media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 520) { // --dur-spring
