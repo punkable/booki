@@ -89,14 +89,17 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const saved = findPin(cfg.pinned, selectedId);
   const selected = saved?.kind === "widget" ? saved : draft;
   const fresh = (widget) => ({ id: crypto.randomUUID(), kind: "widget", widget, name: name(widget), path: "", args: [], style: {} });
+  const deselect = () => { selectId(null); setDraft(null); };
   const inspect = (widget) => {
+    // Clicking the widget already open closes its settings again.
+    if (selected?.widget === widget) { deselect(); return; }
     origin.current = document.activeElement;
     const refs = widgetRefs(cfg.pinned, widget);
     const ref = refs.find((r) => r.id === selectedId) || refs[0];
     selectId(ref?.id || null);
     setDraft(ref ? null : fresh(widget));
   };
-  const pick = (id, from) => { origin.current = from; setDraft(null); selectId(id); };
+  const pick = (id, from) => { if (selectedId === id && saved) { deselect(); return; } origin.current = from; setDraft(null); selectId(id); };
   // One click adds it; its settings open beside the gallery to fine-tune.
   const add = (widget) => { const pin = fresh(widget); set({ pinned: [...cfg.pinned, pin] }); setDraft(null); selectId(pin.id); };
   const change = (style) => {

@@ -138,13 +138,15 @@ async function closeNoteEditor() {
   return true;
 }
 export async function editNote(item) {
-  if (!(await closeNoteEditor())) return;
+  // A second click on the same Notes widget closes its editor, like a panel.
+  const reopen = !(noteEditor && noteEditor._itemId === item.id);
+  if (!(await closeNoteEditor()) || !reopen) return;
   closeProductivityPanel(); closeStack(); closeMenu();
   const tile = dockEl.querySelector(`.tile[data-id="${item.id}"]`) || dockEl;
   const styleNow = () => findWidgetPin(item.id)?.style || item.style || {};
   let current = activeNote(styleNow());
   const panel = document.createElement("section");
-  panel.className = "note-editor note-workspace"; panel.tabIndex = -1;
+  panel.className = "note-editor note-workspace"; panel.tabIndex = -1; panel._itemId = item.id;
   panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", t("w.notes"));
   // Header: glyph and title, then New note and Close, like the other panels.
   const head = document.createElement("div"); head.className = "productivity-head";

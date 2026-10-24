@@ -725,3 +725,24 @@ details.reading-card .system-widget-readings dt { color: var(--ink-2); }
 .note-delete.is-armed { color: #fff; background: var(--danger, #c42b1c); }
 .note-editor.note-workspace .note-input { border: 1px solid transparent; border-radius: 8px; resize: none; }
 .note-editor.note-workspace .note-input:focus { border-color: transparent; border-bottom-color: var(--accent); outline: none; }
+
+/* WinUI 3 ComboBox drop-down (src/fluent-select.js), dock and Settings. */
+.fluent-select-pop { position: fixed; z-index: 1000; padding: 4px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  color: var(--ink); background: var(--panel-fill, var(--layer-strong, #fbfbfb)); -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid var(--stroke-flyout, rgba(0,0,0,.1)); border-radius: 8px; box-shadow: var(--shadow-flyout, 0 8px 16px rgba(0,0,0,.14));
+  font: inherit; font-size: 14px; animation: fluent-select-in .2s cubic-bezier(0,0,0,1) both; transform-origin: top center; }
+.fluent-select-pop.opens-up { transform-origin: bottom center; }
+.fluent-select-pop.is-closing { animation: fluent-select-out .12s cubic-bezier(1,0,1,1) both; pointer-events: none; }
+.fluent-select-option { position: relative; display: flex; align-items: center; min-height: 32px; padding: 0 12px 0 14px; border-radius: 4px; cursor: default; white-space: nowrap; outline: none; }
+.fluent-select-option:hover, .fluent-select-option:focus { background: var(--hover, rgba(0,0,0,.04)); }
+.fluent-select-option:active { background: var(--pressed, rgba(0,0,0,.03)); color: var(--ink-2); }
+.fluent-select-option[aria-selected="true"] { background: var(--hover, rgba(0,0,0,.04)); }
+.fluent-select-option[aria-selected="true"]::before { content: ""; position: absolute; left: 3px; top: 50%; width: 3px; height: 16px; margin-top: -8px; border-radius: 2px; background: var(--accent); }
+.fluent-select-option[aria-disabled="true"] { color: var(--ink-3, #999); }
+.fluent-select-option:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring, var(--accent)); }
+@keyframes fluent-select-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes fluent-select-out { to { opacity: 0; } }
+.fluent-select-pop.opens-up { animation-name: fluent-select-in-up; }
+@keyframes fluent-select-in-up { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .fluent-select-pop, .fluent-select-pop.is-closing { animation: none; } }
+@media (forced-colors: active) { .fluent-select-option[aria-selected="true"]::before { background: Highlight; } }

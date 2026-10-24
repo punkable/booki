@@ -20,6 +20,8 @@ import { WidgetsPage } from "./settings/pages/widgets.jsx";
 import { AppsPage } from "./settings/pages/apps.jsx";
 import { PluginsPage } from "./settings/pages/plugins.jsx";
 import { SystemPage } from "./settings/pages/system.jsx";
+import { enableFluentSelects } from "./fluent-select.js";
+enableFluentSelects();
 
 // [id, label, glyph, tile colour]
 const PAGES = [
