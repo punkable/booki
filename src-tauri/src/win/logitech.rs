@@ -6,9 +6,20 @@ use super::devices::DeviceBattery;
 use hidapi::{HidApi, HidDevice};
 
 const LOGITECH: u16 = 0x046d;
-/// The vendor collection that carries HID++ long reports.
+/// The vendor collection that carries HID++ long reports: 0xff00/0x0002 on
+/// receivers and USB, 0xff43/0x0202 on devices paired over Bluetooth LE
+/// (MX Keys, MX Master…), where Windows itself only reports a percent and
+/// never whether the device is charging.
 const HIDPP_USAGE_PAGE: u16 = 0xff00;
 const HIDPP_LONG_USAGE: u16 = 0x0002;
+const HIDPP_BLE_USAGE_PAGE: u16 = 0xff43;
+const HIDPP_BLE_USAGE: u16 = 0x0202;
+
+/// True for a HID collection that speaks HID++ long reports.
+pub fn is_hidpp_collection(usage_page: u16, usage: u16) -> bool {
+    (usage_page == HIDPP_USAGE_PAGE && usage == HIDPP_LONG_USAGE)
+        || (usage_page == HIDPP_BLE_USAGE_PAGE && usage == HIDPP_BLE_USAGE)
+}
 const LONG: u8 = 0x11;
 const SHORT: u8 = 0x10;
 /// Booki's software id (low nibble of the function byte).
@@ -28,10 +39,7 @@ pub fn batteries() -> Vec<DeviceBattery> {
     };
     let mut out = Vec::new();
     for info in api.device_list() {
-        if info.vendor_id() != LOGITECH
-            || info.usage_page() != HIDPP_USAGE_PAGE
-            || info.usage() != HIDPP_LONG_USAGE
-        {
+        if info.vendor_id() != LOGITECH || !is_hidpp_collection(info.usage_page(), info.usage()) {
             continue;
         }
         let Ok(device) = info.open_device(&api) else {
@@ -85,7 +93,9 @@ fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
 pub fn unified_charging(params: &[u8]) -> bool {
     let status = params.get(2).copied().unwrap_or(0);
     let external = params.get(3).copied().unwrap_or(0);
-    matches!(status, 1..=3) || external == 1
+    // Firmware differs on what it puts in "external power": some send 1 for
+    // the cable, others a bit set or 2. Any non-zero value means plugged in.
+    matches!(status, 1..=3) || external != 0
 }
 
 fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
@@ -93,7 +103,21 @@ fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let reply = request(device, slot, index, 1, &[])?;
     let level = reply[4];
     let charging = unified_charging(&reply[4..]);
+    log_status_change(slot, &reply[4..8]);
     (1..=100).contains(&level).then_some((level, charging))
+}
+
+/// Write the raw 0x1004 status to Booki's log when it changes, so a device
+/// whose charging is not recognised can be diagnosed from a log file.
+fn log_status_change(slot: u8, params: &[u8]) {
+    static LAST: std::sync::Mutex<Vec<(u8, Vec<u8>)>> = std::sync::Mutex::new(Vec::new());
+    let Ok(mut last) = LAST.lock() else { return };
+    if last.iter().any(|(s, p)| *s == slot && p == params) {
+        return;
+    }
+    last.retain(|(s, _)| *s != slot);
+    last.push((slot, params.to_vec()));
+    log::info!("logitech slot {slot} unified battery status {params:02x?}");
 }
 
 /// Feature 0x1000, GetBatteryLevelStatus: level in percent, the next level,
@@ -223,6 +247,13 @@ mod tests {
     }
 
     #[test]
+    fn receiver_usb_and_bluetooth_hidpp_collections_are_read() {
+        assert!(is_hidpp_collection(0xff00, 0x0002));
+        assert!(is_hidpp_collection(0xff43, 0x0202));
+        assert!(!is_hidpp_collection(0xff00, 0x0001));
+        assert!(!is_hidpp_collection(0x0001, 0x0006));
+    }
+    #[test]
     fn mx_keys_on_the_charger_is_charging_and_a_plain_battery_is_not() {
         // percent, level "good", status still discharging, external power on.
         assert!(unified_charging(&[78, 4, 0, 1]));
@@ -233,5 +264,7 @@ mod tests {
         assert!(!unified_charging(&[10, 1, 4, 0]));
         // A level flag is not external power.
         assert!(!unified_charging(&[50, 0x10, 0, 0]));
+        // Firmware that reports the cable as 2 or a bit flag is still plugged in.
+        assert!(unified_charging(&[64, 4, 0, 2]));
     }
 }
