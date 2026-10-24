@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release96(), release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -198,11 +198,20 @@ function release951() {
   ] };
 }
 
-export function currentRelease() {
+function release96() {
   return { version: "0.96.0", date: "2026-10-23", headline: t("release96.headline"), sections: [
     { icon: "grid", title: t("release95.widgetsTitle"), notes: [t("release96.settings"), t("release96.open"), t("release96.notes"), t("release96.preferences"), t("release96.panels"), t("release96.ai")] },
     { icon: "palette", title: t("release96.lookTitle"), notes: [t("release96.glass"), t("release96.motion"), t("release96.colors")] },
     { icon: "download", title: t("plugins.title"), notes: [t("release96.updates"), t("release96.plugins"), t("release96.notices")] },
     { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release96.launcher"), t("release96.position"), t("release96.addMenu"), t("release96.windows")] },
+  ] };
+}
+
+export function currentRelease() {
+  return { version: "0.97.0", date: "2026-10-24", headline: t("release97.headline"), sections: [
+    { icon: "sparkles", title: t("release97.agentsTitle"), notes: [t("release97.claudeUsage"), t("release97.hooks"), t("release97.notchCard")] },
+    { icon: "palette", title: t("release97.lookTitle"), notes: [t("release97.glass"), t("release97.controls")] },
+    { icon: "grid", title: t("release97.everydayTitle"), notes: [t("release97.clipboard"), t("release97.folders"), t("release97.devices")] },
+    { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release97.efficiency")] },
   ] };
 }
