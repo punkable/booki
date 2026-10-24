@@ -721,6 +721,12 @@ export async function onNotchMenu(cb) {
   return T.event.listen("booki://notch-menu", () => cb());
 }
 
+/** The dock followed the pointer to another display. */
+export async function onDockMonitorChanged(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://dock-monitor-changed", () => cb());
+}
+
 /** Listen for the "reveal the dock" signal (fired when the notch is clicked). */
 export async function onReveal(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};

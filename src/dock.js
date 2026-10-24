@@ -14,6 +14,7 @@ import {
   onOcclusion,
   onDesktop,
   onReveal,
+  onDockMonitorChanged,
   onNotchMenu,
   onSoftReveal,
   onFullscreen,
@@ -51,7 +52,7 @@ import {
   edgeAutoScroll,
   stopEdgeScroll,
 } from "./dock/magnify.js";
-import { reframe, checkScreenChange } from "./dock/frame.js";
+import { reframe, checkScreenChange, forceReframe } from "./dock/frame.js";
 import {
   queueVolumeSet,
   adjustVolumeFromWheel,
@@ -670,6 +671,8 @@ window.addEventListener("pointerdown", (e) => {
 // Long sessions deserve the pill too — re-check every 4 h, not just at boot.
 setInterval(checkUpdates, 4 * 3600 * 1000);
 startPluginUpdateChecks();
+// Following the pointer to another display: recompute size and anchor there.
+onDockMonitorChanged(() => requestAnimationFrame(forceReframe));
 
 // Easter egg: Konami party.
 const KONAMI = [

@@ -57,9 +57,9 @@ export function DockPage({ cfg, set }) {
       <Row label={t("be.edgeGap")} hint={t("be.edgeGapHint")}>
         <Slider value={cfg.edgeGap ?? 12} min={0} max={72} step={2} fmt={(v) => (v === 0 ? t("be.edgeGapFlush") : `${v}px`)} onChange={(v) => set({ edgeGap: v }, afterPlacement)} />
       </Row>
-      {monitors.length > 1 && <Row label={t("be.monitor")}>
+      {monitors.length > 1 && <Row label={t("be.monitor")} hint={cfg.monitor === -2 ? t("mon.followHint") : undefined}>
         <Select label={t("be.monitor")} value={String(cfg.monitor ?? -1)}
-          options={[{ value: "-1", label: t("mon.auto") }, ...monitors.map((m) => ({ value: String(m.index), label: `${t("be.monitor")} ${m.index + 1} · ${m.w}×${m.h}${m.primary ? ` · ${t("mon.primary")}` : ""}` }))]}
+          options={[{ value: "-1", label: t("mon.auto") }, { value: "-2", label: t("mon.follow") }, ...monitors.map((m) => ({ value: String(m.index), label: `${t("be.monitor")} ${m.index + 1} · ${m.w}×${m.h}${m.primary ? ` · ${t("mon.primary")}` : ""}` }))]}
           onChange={(v) => { const n = Number(v); set({ monitor: n, monitorName: n < 0 ? "" : monitors.find((m) => m.index === n)?.name || "" }, afterPlacement); }} />
       </Row>}
     </SettingsSection>
