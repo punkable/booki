@@ -6,9 +6,20 @@ use super::devices::DeviceBattery;
 use hidapi::{HidApi, HidDevice};
 
 const LOGITECH: u16 = 0x046d;
-/// The vendor collection that carries HID++ long reports.
+/// The vendor collection that carries HID++ long reports: 0xff00/0x0002 on
+/// receivers and USB, 0xff43/0x0202 on devices paired over Bluetooth LE
+/// (MX Keys, MX Master…), where Windows itself only reports a percent and
+/// never whether the device is charging.
 const HIDPP_USAGE_PAGE: u16 = 0xff00;
 const HIDPP_LONG_USAGE: u16 = 0x0002;
+const HIDPP_BLE_USAGE_PAGE: u16 = 0xff43;
+const HIDPP_BLE_USAGE: u16 = 0x0202;
+
+/// True for a HID collection that speaks HID++ long reports.
+pub fn is_hidpp_collection(usage_page: u16, usage: u16) -> bool {
+    (usage_page == HIDPP_USAGE_PAGE && usage == HIDPP_LONG_USAGE)
+        || (usage_page == HIDPP_BLE_USAGE_PAGE && usage == HIDPP_BLE_USAGE)
+}
 const LONG: u8 = 0x11;
 const SHORT: u8 = 0x10;
 /// Booki's software id (low nibble of the function byte).
@@ -28,10 +39,7 @@ pub fn batteries() -> Vec<DeviceBattery> {
     };
     let mut out = Vec::new();
     for info in api.device_list() {
-        if info.vendor_id() != LOGITECH
-            || info.usage_page() != HIDPP_USAGE_PAGE
-            || info.usage() != HIDPP_LONG_USAGE
-        {
+        if info.vendor_id() != LOGITECH || !is_hidpp_collection(info.usage_page(), info.usage()) {
             continue;
         }
         let Ok(device) = info.open_device(&api) else {
@@ -85,7 +93,9 @@ fn read_device(device: &HidDevice, slot: u8) -> Option<DeviceBattery> {
 pub fn unified_charging(params: &[u8]) -> bool {
     let status = params.get(2).copied().unwrap_or(0);
     let external = params.get(3).copied().unwrap_or(0);
-    matches!(status, 1..=3) || external == 1
+    // Firmware differs on what it puts in "external power": some send 1 for
+    // the cable, others a bit set or 2. Any non-zero value means plugged in.
+    matches!(status, 1..=3) || external != 0
 }
 
 fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
@@ -93,7 +103,68 @@ fn unified_battery(device: &HidDevice, slot: u8) -> Option<(u8, bool)> {
     let reply = request(device, slot, index, 1, &[])?;
     let level = reply[4];
     let charging = unified_charging(&reply[4..]);
-    (1..=100).contains(&level).then_some((level, charging))
+    log_status_change(slot, &reply[4..8]);
+    if !(1..=100).contains(&level) {
+        return None;
+    }
+    // The percent has been seen to drop to 15 right after unplugging while
+    // the level flags (and Logi Options+) still said the battery was good.
+    // When the two disagree, the percent is not shown: the caller falls back
+    // to the last agreeing reading or to the legacy battery feature.
+    if !level_agrees(level, reply[5]) {
+        log::info!(
+            "logitech slot {slot} percent {level} disagrees with level flags {:#04x}",
+            reply[5]
+        );
+        return last_agreeing(slot)
+            .map(|l| (l, charging))
+            .or_else(|| battery_status(device, slot).map(|(l, legacy)| (l, charging || legacy)));
+    }
+    remember_agreeing(slot, level);
+    Some((level, charging))
+}
+
+/// Does a 0x1004 percent fit its level flags (1 critical, 2 low, 4 good,
+/// 8 full)? Firmware without flags (0) is taken at its word.
+pub fn level_agrees(percent: u8, flags: u8) -> bool {
+    if flags & 0x0c != 0 && percent <= 20 {
+        return false; // "good" or "full", yet nearly empty
+    }
+    if flags & 0x03 != 0 && flags & 0x0c == 0 && percent >= 60 {
+        return false; // "critical" or "low", yet more than half full
+    }
+    true
+}
+
+static AGREEING: std::sync::Mutex<Vec<(u8, u8)>> = std::sync::Mutex::new(Vec::new());
+
+fn remember_agreeing(slot: u8, level: u8) {
+    if let Ok(mut seen) = AGREEING.lock() {
+        seen.retain(|(s, _)| *s != slot);
+        seen.push((slot, level));
+    }
+}
+
+fn last_agreeing(slot: u8) -> Option<u8> {
+    AGREEING
+        .lock()
+        .ok()?
+        .iter()
+        .find(|(s, _)| *s == slot)
+        .map(|(_, l)| *l)
+}
+
+/// Write the raw 0x1004 status to Booki's log when it changes, so a device
+/// whose charging is not recognised can be diagnosed from a log file.
+fn log_status_change(slot: u8, params: &[u8]) {
+    static LAST: std::sync::Mutex<Vec<(u8, Vec<u8>)>> = std::sync::Mutex::new(Vec::new());
+    let Ok(mut last) = LAST.lock() else { return };
+    if last.iter().any(|(s, p)| *s == slot && p == params) {
+        return;
+    }
+    last.retain(|(s, _)| *s != slot);
+    last.push((slot, params.to_vec()));
+    log::info!("logitech slot {slot} unified battery status {params:02x?}");
 }
 
 /// Feature 0x1000, GetBatteryLevelStatus: level in percent, the next level,
@@ -207,6 +278,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_percent_that_contradicts_the_level_flags_is_not_trusted() {
+        assert!(!level_agrees(15, 0x04)); // good, yet 15 %
+        assert!(!level_agrees(10, 0x08)); // full, yet 10 %
+        assert!(!level_agrees(85, 0x02)); // low, yet 85 %
+        assert!(level_agrees(15, 0x02));
+        assert!(level_agrees(90, 0x04));
+        assert!(level_agrees(15, 0x00)); // no flags: trust the percent
+    }
+
+    #[test]
     fn replies_are_matched_by_feature_and_software_id() {
         let mut answer = [0u8; 20];
         answer[..5].copy_from_slice(&[LONG, 1, 0x08, 0x1b, 64]);
@@ -223,6 +304,13 @@ mod tests {
     }
 
     #[test]
+    fn receiver_usb_and_bluetooth_hidpp_collections_are_read() {
+        assert!(is_hidpp_collection(0xff00, 0x0002));
+        assert!(is_hidpp_collection(0xff43, 0x0202));
+        assert!(!is_hidpp_collection(0xff00, 0x0001));
+        assert!(!is_hidpp_collection(0x0001, 0x0006));
+    }
+    #[test]
     fn mx_keys_on_the_charger_is_charging_and_a_plain_battery_is_not() {
         // percent, level "good", status still discharging, external power on.
         assert!(unified_charging(&[78, 4, 0, 1]));
@@ -233,5 +321,7 @@ mod tests {
         assert!(!unified_charging(&[10, 1, 4, 0]));
         // A level flag is not external power.
         assert!(!unified_charging(&[50, 0x10, 0, 0]));
+        // Firmware that reports the cable as 2 or a bit flag is still plugged in.
+        assert!(unified_charging(&[64, 4, 0, 2]));
     }
 }

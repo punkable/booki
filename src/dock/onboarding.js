@@ -3,6 +3,7 @@
 import { dock as dockApi } from "../api.js";
 import { emo } from "../emoji.js";
 import { t } from "../i18n.js";
+import { icon } from "../icons.js";
 import { S } from "./state.js";
 import { reframe } from "./frame.js";
 import { setHidden, scheduleHide } from "./autohide.js";
@@ -73,11 +74,19 @@ export async function maybeOnboard() {
   pop.addEventListener("keydown", (e) => { if (e.key === "Escape" && btn) { i = steps.length - 1; btn.click(); } });
   const showStep = () => {
     const last = i === steps.length - 1;
+    // WinUI TeachingTip: content, then a footer with progress and the action,
+    // a close button in the corner and a tail pointing at the bar.
     pop.innerHTML =
       `<span class="coach-emoji">${steps[i].emoji}</span>` +
       `<span class="coach-text">${steps[i].text}</span>` +
-      `<span class="coach-dots" aria-hidden="true">${steps.map((_, k) => (k === i ? "●" : "○")).join(" ")}</span>`;
+      `<span class="coach-foot"><span class="coach-dots" aria-hidden="true">${steps.map((_, k) => `<i${k === i ? ' class="on"' : ""}></i>`).join("")}</span></span>`;
     pop.setAttribute("aria-label", `${i + 1} / ${steps.length}`);
+    const close = document.createElement("button");
+    close.className = "coach-close";
+    close.setAttribute("aria-label", t("ob.done"));
+    close.innerHTML = icon("x");
+    close.addEventListener("click", () => { i = steps.length - 1; btn.click(); });
+    pop.appendChild(close);
     btn = document.createElement("button");
     btn.className = "coach-btn";
     btn.textContent = last ? t("ob.done") : t("ob.next");
@@ -99,7 +108,7 @@ export async function maybeOnboard() {
         checkChangelog();
       }
     });
-    pop.appendChild(btn);
+    pop.querySelector(".coach-foot").appendChild(btn);
     btn.focus();
   };
   showStep();

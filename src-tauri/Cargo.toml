@@ -1,6 +1,6 @@
 [package]
 name = "booki-dock"
-version = "0.96.0"
+version = "0.97.0"
 description = "Booki — a modern, lightweight dock for Windows"
 authors = ["Booki"]
 edition = "2021"
@@ -30,8 +30,11 @@ tauri-plugin-single-instance = "2"
 # Native drag-out: drag a file from the folder flyout into Explorer/other apps.
 tauri-plugin-drag = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# preserve_order: Claude Code's settings.json keeps its key order when Booki edits it.
+serde_json = { version = "1", features = ["preserve_order"] }
 dirs = "7"
+# Folder-change notices for the agent logs (ReadDirectoryChangesW on Windows).
+notify = "8"
 base64 = "0.23"
 log = "0.4"
 # System metrics for the dock widgets (CPU / memory / network). Cross-platform.

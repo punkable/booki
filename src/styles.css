@@ -525,44 +525,70 @@ body[data-ink="light"] .rename-pop-input {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
-/* ─────────────────── First-run coach bubbles ─────────────────── */
+/* ─────────────── First-run tips: WinUI TeachingTip ─────────────── */
 .coach {
-  position: fixed; /* placed beside the bar by placePop() in dock.js */
+  position: fixed; /* placed beside the bar by placePop() */
   z-index: 70;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Intrinsic width: the coach must NOT be measured against the (possibly tiny)
-     dock window, or the window never grows enough and the text shatters. Still
-     capped to the viewport so narrow screens never overflow horizontally. */
-  width: min(430px, calc(100vw - 16px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+  /* Intrinsic width, capped to the viewport: never measured against the
+     (possibly tiny) dock window, or the text shatters. */
+  width: min(360px, calc(100vw - 16px));
   box-sizing: border-box;
-  padding: 10px 14px;
-  border-radius: var(--r-pill);
-  background: var(--layer-strong);
-  border: 1px solid var(--stroke-light);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 14px 40px 12px 14px;
+  border-radius: var(--r-overlay, 8px);
+  background: var(--panel-fill, var(--layer-strong));
+  border: 1px solid var(--stroke-flyout, var(--stroke-light));
+  box-shadow: var(--shadow-flyout);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   backdrop-filter: blur(24px) saturate(160%);
   color: var(--ink);
-  font: 500 12.5px var(--font);
+  font: 400 13px/1.45 var(--font);
   transition: opacity var(--dur-4) var(--ease), transform var(--dur-4) var(--ease);
 }
-
-.coach-emoji { font-size: 18px; flex: 0 0 auto; }
-.coach-text { min-width: 0; }
-.coach-dots { flex: 0 0 auto; font-size: 9px; color: var(--accent); letter-spacing: 2px; }
+/* The tail points at the bar, from the side that faces it. */
+.coach::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border: inherit;
+  border-width: 0 1px 1px 0;
+  translate: -50% 0;
+  rotate: 45deg;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.edge-top .coach::after { top: -7px; bottom: auto; rotate: 225deg; }
+body.edge-left .coach::after { left: -7px; top: 50%; bottom: auto; translate: 0 -50%; rotate: 135deg; }
+body.edge-right .coach::after { left: auto; right: -7px; top: 50%; bottom: auto; translate: 0 -50%; rotate: -45deg; }
+.coach-emoji { font-size: 18px; line-height: 1; }
+.coach-text { min-width: 0; padding-top: 2px; }
+.coach-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-right: -26px; }
+.coach-dots { display: flex; gap: 6px; }
+.coach-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--strong-stroke, var(--ink-3)); transition: width var(--dur-2) var(--ease), background var(--dur-2) var(--ease); }
+.coach-dots i.on { width: 16px; border-radius: 3px; background: var(--accent); }
 .coach-btn {
-  flex: 0 0 auto;
-  border: 0;
+  min-width: 96px;
+  border: 1px solid transparent;
   background: var(--accent);
   color: var(--accent-contrast, #fff);
-  font: 600 12px var(--font);
-  padding: 6px 13px;
-  border-radius: 999px;
+  font: 600 13px var(--font);
+  padding: 5px 12px;
+  border-radius: var(--r-control, 4px);
   cursor: pointer;
 }
-.coach-btn:active { transform: scale(0.96); }
+.coach-btn:hover { background: color-mix(in srgb, var(--accent) 90%, var(--ink)); }
+.coach-btn:active { opacity: 0.85; }
+.coach-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: var(--r-control, 4px); cursor: pointer; }
+.coach-close:hover { background: var(--hover); color: var(--ink); }
+.coach-close svg { width: 14px; height: 14px; }
+.coach :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* Symmetric exit: popovers leave along the path they entered. Added as .closing by dismissPop() in dock.js just before removal. */
 .trash-pop.closing, .coach.closing {
@@ -1578,6 +1604,7 @@ body.edge-right .stack.open { transform: none; }
 .stack-head-icon svg { width: 15px; height: 15px; }
 .stack-head-icon img.emo { width: 15px; height: 15px; }
 .stack-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; line-height: 20px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-breadcrumbs[hidden] { display: none; }
 .stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
 .stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: var(--r-control); font: inherit; font-size: 0.75rem; color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
@@ -2038,54 +2065,57 @@ body.edge-right .stack.open { transform: none; }
   gap: 4px;
 }
 .clip-row {
+  /* Win+V card: up to three lines of the copied text, then when it was
+     copied; the actions float in the corner on hover or focus. */
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 104px 8px 10px;
-  border-radius: var(--r-control);
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--ctrl-fill, var(--layer));
+  border: 1px solid var(--stroke-light, transparent);
+  border-radius: var(--r-card, 8px);
   cursor: pointer;
-  transition: background var(--dur-2) ease;
+  transition: background var(--dur-2) ease, border-color var(--dur-2) ease;
   animation: stack-cell-in var(--dur-4) var(--ease) backwards;
   animation-delay: calc(var(--i, 0) * 30ms);
 }
 @media (prefers-reduced-motion: reduce) { .clip-row { animation: none; } }
 .clip-row:hover { background: var(--hover); }
-.clip-row.copied { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.clip-row.favorite::before,
-.clip-row.private::after {
-  content: "";
-  flex: 0 0 auto;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-.clip-row.private::after { background: #6aa7ff; }
+.clip-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.clip-row.copied { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
+.clip-section { padding: 6px 2px 0; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
+.clip-section:first-child { padding-top: 0; }
 .clip-text {
-  flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
+.clip-info { display: flex; align-items: center; gap: 6px; min-height: 14px; font-size: 0.6875rem; color: var(--ink-2); }
+.clip-badge { display: inline-grid; place-items: center; color: var(--ink-2); }
+.clip-badge svg { width: 11px; height: 11px; }
 .clip-acts {
   position: absolute;
-  top: 50%;
+  top: 6px;
   right: 6px;
-  transform: translateY(-50%);
   display: none;
   gap: 3px;
 }
 .clip-row:hover .clip-acts,
 .clip-row:focus-within .clip-acts,
 .clip-row.editing .clip-acts { display: flex; }
-.clip-list.compact { gap: 2px; }
-.clip-list.compact .clip-row { padding-top: 5px; padding-bottom: 5px; }
-.clip-list.compact .clip-text { font-size: 0.75rem; }
-.clip-row.editing { position: static; padding: 6px 0; align-items: flex-start; cursor: default; background: transparent; }
+.clip-list.compact { gap: 4px; }
+.clip-list.compact .clip-row { padding-top: 7px; padding-bottom: 7px; }
+.clip-list.compact .clip-text { -webkit-line-clamp: 1; line-clamp: 1; }
+.clip-row.editing { flex-direction: row; align-items: flex-start; cursor: default; }
 .clip-row.editing .clip-acts { position: static; transform: none; margin-left: 6px; margin-top: 2px; }
 .clip-act {
   width: 28px; height: 28px; display: grid; place-items: center; padding: 0;
@@ -2121,24 +2151,6 @@ body.edge-right .stack.open { transform: none; }
   }
   .stack-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
   .clip-guide { font-size: 0.6875rem; }
-  .clip-row {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    padding: 8px 10px;
-  }
-  .clip-acts {
-    position: static;
-    display: flex;
-    transform: none;
-    margin-left: auto;
-  }
-  .clip-text {
-    flex-basis: 100%;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
 }
 
 /* A grouped widget shown live inside the flyout: full-width read-out card. */
@@ -2164,7 +2176,7 @@ body.edge-right .stack.open { transform: none; }
   /* WinUI ToolTip: 9,6,9,8 padding, Caption 12/16, ControlCornerRadius,
      SurfaceStrokeColorFlyout and the tooltip shadow. */
   padding: 6px 9px 8px; font-size: 0.75rem; line-height: 16px;
-  color: var(--ink); background: var(--layer-strong);
+  color: var(--ink); background: var(--glass-tint, var(--surface-tint));
   border: 1px solid var(--stroke-flyout); border-radius: var(--r-control);
   box-shadow: var(--shadow-tooltip);
   pointer-events: none; opacity: 0;
@@ -2475,8 +2487,7 @@ body.native-material .dock-tip {
   backdrop-filter: none;
 }
 
-.stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.stack-pager .stack-more:disabled { opacity: .4; cursor: default; }
+.stack-sentinel { grid-column: 1 / -1; height: 1px; }
 
 /* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
@@ -2866,3 +2877,34 @@ body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-wo
 body:has(.productivity-panel, .note-editor) #booki-dock-tooltip { opacity: 0 !important; visibility: hidden; }
 .launcher-section { padding: 10px 10px 4px; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
 .launcher-section:first-child { padding-top: 2px; }
+/* Notch card: a thin level bar under the text (focus, battery, volume). */
+.nc-bar { display: block; width: 100%; min-width: 90px; height: 3px; margin-top: 5px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.nc-bar[hidden] { display: none; }
+.nc-bar i { display: block; height: 100%; transform-origin: left center; border-radius: inherit; background: var(--accent); transition: transform .4s var(--ease); }
+.nc-bar[data-tone="charging"] i { background: #30a46c; }
+.nc-bar[data-tone="low"] i { background: #e5484d; }
+@media (prefers-reduced-motion: reduce) { .nc-bar i { transition: none; } }
+.nc-agent { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--agent-tint, var(--ink)); background: color-mix(in srgb, var(--agent-tint, var(--ink)) 16%, transparent); }
+.nc-agent[hidden] { display: none; }
+.nc-agent svg { width: 16px; height: 16px; display: block; }
+.nc-bar[data-tone="media"] i { background: var(--ink-2); }
+/* Glass flyouts open like WinUI 3's: they slide in at full opacity, since
+   Windows' blur cannot fade with the page, and wear the theme's solid fill
+   until the blur is confirmed behind them (.mat-wait). Never see-through. */
+body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .note-editor, .trash-pop, .undo-toast, .coach) {
+  transition-property: transform, visibility !important;
+}
+body.surface-glass.native-material .stack.open,
+body.surface-glass.native-material #ctx-menu:not(.hidden) { opacity: 1; }
+body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .note-editor, .trash-pop, .undo-toast, .coach).mat-wait {
+  background-color: var(--glass-tint, var(--surface-tint)) !important;
+}
+/* Windows' blur covers rectangles only: a translucent tail outside it would
+   show the desktop unblurred, so on native glass the tip goes without. */
+body.surface-glass.native-material .coach::after { display: none; }
+/* The notch card wears the solid fill until Windows' blur is behind it, and
+   while it waits for the blur to leave before shrinking (notch.js). */
+body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { background-color: var(--glass-tint, var(--surface-tint)) !important; }
+/* An open group or folder covers the labels above the bar; through its
+   translucent fill they read as ghost text over the grid. */
+body.stack-open .tile > .label { opacity: 0; transition: none; }

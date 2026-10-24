@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" font-family="Segoe UI, Inter, system-ui, sans-serif">
-  <title>How Booki reads AI usage: local logs only</title>
+  <title>How Booki reads AI usage: local data only</title>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbf4ee"/><stop offset="1" stop-color="#eef1fb"/></linearGradient>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z" fill="#8a7f78"/></marker>
   </defs>
   <rect width="960" height="400" rx="20" fill="url(#bg)"/>
   <text x="40" y="52" font-size="22" font-weight="700" fill="#1b1b1b">AI usage stays on your PC</text>
-  <text x="40" y="78" font-size="14" fill="#5d5652">Booki only reads the usage logs your AI tools already write. No accounts, no tokens, no network.</text>
+  <text x="40" y="78" font-size="14" fill="#5d5652">Booki only reads what your AI tools already write on this PC. No accounts, no tokens, no network.</text>
 
   <!-- Local logs -->
   <g transform="translate(40 110)">
     <rect width="300" height="230" rx="14" fill="#fff" stroke="#e4dcd5"/>
     <text x="20" y="34" font-size="15" font-weight="700" fill="#1b1b1b">Your PC</text>
     <g font-size="13" fill="#3a3532">
-      <rect x="20" y="52" width="260" height="36" rx="8" fill="#f6efe9"/><text x="34" y="75">Claude Code · local session logs</text>
+      <rect x="20" y="52" width="260" height="36" rx="8" fill="#f6efe9"/><text x="34" y="75">Claude Code · logs, status line*</text>
       <rect x="20" y="96" width="260" height="36" rx="8" fill="#f6efe9"/><text x="34" y="119">Codex · local session logs</text>
-      <rect x="20" y="140" width="260" height="36" rx="8" fill="#f6efe9"/><text x="34" y="163">Cursor · OpenCode · folder presence</text>
+      <rect x="20" y="140" width="260" height="36" rx="8" fill="#f6efe9"/><text x="34" y="163">Agent hooks* · event kind only</text>
     </g>
-    <text x="20" y="208" font-size="12" fill="#7a716b">Read-only. Message text is never kept.</text>
+    <text x="20" y="208" font-size="12" fill="#7a716b">* Opt-in. Message text is never kept.</text>
   </g>
 
   <path d="M350 225 H 420" stroke="#8a7f78" stroke-width="2" fill="none" marker-end="url(#arrow)"/>

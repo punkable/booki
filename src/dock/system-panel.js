@@ -86,7 +86,9 @@ export function buildSystemPanel(item, { close }) {
   const reads = new WeakMap();
   const load = async (container, action, paint) => {
     const request = Symbol(); reads.set(container, request);
-    const loading = text("p", t("overhaul.loading")); container.append(loading);
+    // A skeleton of two cards shimmers while it loads; the text is for screen readers.
+    const loading = text("p", t("overhaul.loading"), "skeleton-cards"); loading.setAttribute("role", "status");
+    loading.insertAdjacentHTML("beforeend", '<i aria-hidden="true"></i><i aria-hidden="true"></i>'); container.append(loading);
     try { const data = await action(); if (!disposed && reads.get(container) === request) { loading.remove(); paint(data); } }
     catch (error) { if (!disposed && reads.get(container) === request) { loading.textContent = pluginError(error); loading.setAttribute("role", "alert"); button(container, t("focus.retry"), () => { loading.remove(); return load(container, action, paint); }); } }
   };

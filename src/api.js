@@ -570,6 +570,13 @@ export const dock = {
     invoke("sync_context_menu", { enabled, labelPin, labelGroup }),
   hideDock: (edge) => invoke("hide_dock", { edge }),
   revealDock: () => invoke("reveal_dock"),
+  /** Booki's opt-in Claude Code status line and agent hooks:
+   *  { statusline, agents: [{ id, available, hooks }] }. */
+  agentBridgeStatus: () => invoke("agent_bridge_status"),
+  agentStatuslineSet: (on) => invoke("agent_statusline_set", { on }),
+  agentHooksSet: (agent, on) => invoke("agent_hooks_set", { agent, on }),
+  /** The reveal is painted over the notch: let the notch go. */
+  notchHandoff: () => invoke("notch_handoff"),
   notchToast: (title, detail = "") => invoke("notch_toast", { title, detail }),
   notchToastDismiss: () => invoke("notch_toast_dismiss"),
   hideAll: () => invoke("hide_all"),

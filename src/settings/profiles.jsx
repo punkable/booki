@@ -7,7 +7,7 @@ import { SnapshotReview } from "./snapshot-review.jsx";
 import { t } from "../i18n.js";
 import { icon } from "../icons.js";
 import { countContent } from "../dock/layout-model.js";
-import { Button, PageHeader, CollapsibleSection } from "./ui.jsx";
+import { Button, InfoBar, PageHeader, CollapsibleSection } from "./ui.jsx";
 
 // Saved profiles include general preferences; preview before replacing the live configuration.
 function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
@@ -66,7 +66,7 @@ function ProfilesCard({ cfg, onApply, beforeSnapshot }) {
         }}>{t(overwrite === name.trim() && name.trim() ? "integral.overwriteProfile" : "prof.save")}</button>
       </div>
     </div>
-    {error && <div className="profile-error" role="alert"><span>{error}</span><button className="button" disabled={busy} onClick={() => action(refresh)}>{t("apps.refresh")}</button></div>}
+    {error && <InfoBar severity="error" className="profile-error" action={<button className="button" disabled={busy} onClick={() => action(refresh)}>{t("apps.refresh")}</button>}>{error}</InfoBar>}
     <div className="profile-list" aria-label={t("prof.title")}>
       {!profiles.length && <p className="profile-empty">{t("design.profileEmpty")}</p>}
       {/* A chosen profile opens in place of the list, rather than unfolding

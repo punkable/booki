@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_x64-setup.exe"><b>Download for Windows v0.96.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.96.0.md">What's new v0.96.0</a>
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_x64-setup.exe"><b>Download for Windows v0.97.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.97.0.md">What's new v0.97.0</a>
 </p>
 <!-- booki:download:end -->
 
@@ -87,35 +87,28 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and never sign-ins, tokens, credential files or the network" /></p>
+<p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and, if you opt in, Claude Code's status line and agent hook events; never sign-ins, tokens, credential files or the network" /></p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.96.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v0.97.0, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.96.0
+## What's new in 0.97.0
 
-Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates.
+Booki now understands your AI agents better: Claude's real plan usage and exact states for Claude Code, Codex, Gemini CLI and Cursor, plus flicker-free glass and Windows 11 controls.
 
-- New Widgets page: your dock's widgets on top, a gallery with categories and one-click Add, and settings in a side sheet with a live preview.
-- One click opens any widget's content, also inside groups; right-click or its gear opens that copy's settings.
-- Notes holds several notes: add one with + or Ctrl+N and switch between them from their tabs; each keeps its own recoverable draft.
-- Configure time, calendar, city and units, device, AI provider, rotation, metrics, focus duration and volume wheel. System and Battery details refresh while open.
-- Widget panels share one header with icon actions (refresh, Bluetooth), meter cards, Windows toggle switches and clearer Media, System and AI details.
-- Claude, Codex, Cursor and OpenCode: the ones on your PC are shown, the missing ones in one line. Usage still comes only from local logs, never credentials.
-- Glass is now Windows 11 acrylic, with its own light and dark version.
-- The dock's magnification follows the pointer with smooth, time-based motion: equally quick at 60, 144 or 240 Hz, without overshoot. Menus slide in like Windows 11.
-- Colour pickers with Windows 11 swatches and an exact hex field.
-- Booki checks every few hours whether your plugins have an update and offers it; your widgets keep their settings.
-- Each plugin offers the correct widget and configures existing copies, even inside groups, without duplicating Collector. Installation waits for saved acceptance.
-- Notices and updates share a lane outside the dock and enlarged icons. Complete content, including buttons, is measured; the update notice can be dismissed. An older action cannot hide a newer notice.
-- The launcher opens like Start: open windows, what is on your dock and what you use most, before you type.
-- Position shows a miniature desktop where the dock glides to the chosen spot, plus an option to follow the pointer across monitors.
-- Apps & folders: Group, Separator, Settings and Recycle Bin in a single '+ Add' menu.
-- Windows work-area origin changes reposition the dock even when its size is unchanged. Relevant settings link to Windows sound, power and date settings.
+- Optional: the AI widget shows Claude's real 5-hour and 7-day percentages, which Claude Code hands to its status line. Your own status line keeps showing.
+- Optional: through Claude Code, Codex, Gemini CLI and Cursor hooks the notch knows at once whether an agent is working, waiting for your permission or done. Only the event kind is kept; no credentials, no network.
+- The notch card shows song progress, focus and battery with a thin bar, plus the working agent's logo and turn time. States take turns on their own and anything urgent stays put.
+- Menus, groups and the notch card no longer show the desktop for a moment when they open on glass; the notch hands over to the dock without both showing.
+- Switches, sliders, notices and tips behave like Windows 11: the switch can be dragged, the slider shows its value and notices use InfoBar.
+- Clipboard history looks like Win+V: pinned items first, a three-line preview and when it was copied.
+- Folders scroll like Explorer and load more as you reach the end; Home shows the dock at real size.
+- Logitech keyboards charging by cable while on Bolt show as charging, and a percentage that contradicts the keyboard's own level is no longer shown.
+- The notch and agent detection react to Windows notices instead of checking every few seconds, and dependencies with security fixes were updated.
 
-[Full release notes](docs/releases/v0.96.0.md)
+[Full release notes](docs/releases/v0.97.0.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -131,9 +124,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [0.96.0](docs/releases/v0.96.0.md) | Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates. |
 | [0.95.1](docs/releases/v0.95.1.md) | Clearer settings, consistent click activation and fixes for saving, captures and notices. |
 | [0.95.0](docs/releases/v0.95.0.md) | A smoother Booki: clearer groups, a quieter notch and a fuller Collector. |
-| [0.94.0](docs/releases/v0.94.0.md) | More flexible groups, clearer widgets and a refreshed README. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->
@@ -164,6 +157,7 @@ Collector supports video, audio, files and galleries: paste one link per line to
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
 - Network requests are limited to update checks/downloads and website favicons, plus features you explicitly enable: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source). The AI usage widget makes no network requests.
 - The AI usage widget only reads, read-only, the local session logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions` and `archived_sessions`, or `CODEX_HOME`). For Cursor and OpenCode it only checks that their folders exist. Booki never reads, uses, stores or sends sign-ins, tokens or credential files, keeps no message content and makes no network request for it. Claude's logs hold no plan limits, so the widget shows tokens used; Codex's logs include its plan percentages; a missing allowance is shown as unknown, never estimated.
+- Optional, off by default: **Real Claude plan usage** lets Claude Code pass its 5-hour and 7-day percentages to Booki through its status line (your own status line keeps running), and **Exact agent states** adds a Booki hook to Claude Code, Codex, Gemini CLI or Cursor so the notch knows when an agent is working, waiting for permission or done. Booki only writes those percentages and event kinds to `%LOCALAPPDATA%\Booki\agents`, backs up each agent's config once and removes only its own entries when you turn it off. No credentials, no network.
 - Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
 - Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. Booki tells you when a newer pinned version is available, and updating keeps your widgets as they are. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.

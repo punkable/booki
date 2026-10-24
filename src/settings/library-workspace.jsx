@@ -200,7 +200,8 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     return drop(event, mode === 'after' ? { beforeId: after?.id } : { beforeId: item.id });
   };
   const stripItems = openGroup ? openGroup.children || [] : cfg.pinned.filter((item) => item.kind !== 'widget');
-  const inspect = (item) => { inspectorOrigin.current = document.activeElement; inspectCandidate(null); selectId(item.id); };
+  // A second click on the selected item deselects it and closes its inspector.
+  const inspect = (item) => { if (selectedId === item.id) { selectId(null); return; } inspectorOrigin.current = document.activeElement; inspectCandidate(null); selectId(item.id); };
   const browse = async (folder) => {
     try {
       const path = await (folder ? pickFolder() : pickAppFile());
@@ -275,7 +276,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     {error && <p role="alert">{error}</p>}
     <div className="library-workspace">
       <div className="library-catalog">
-        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }}
+        <AppLibrary cfg={cfg} set={set} listInstalled={listInstalled} browseFile={() => browse(false)} browseFolder={() => browse(true)} addCandidates={add} onIdentities={setIdentities} onInspect={(app) => { if (candidate?.path === app.path) { inspectCandidate(null); return; } inspectorOrigin.current = document.activeElement; inspectCandidate(app); selectId(null); }}
           destination={<label className="library-destination"><span>{t('library.addingTo')}</span><select value={destination} onChange={(event) => setTargetGroup(event.target.value)}><option value="">{t('workspace.pinned')}</option>{groups.map((item) => <option key={item.id} value={item.id}>{item.name || t('group.new')}</option>)}</select></label>}
           webPanel={<div className="web-add"><input type="url" aria-label={t('apps.webPlaceholder')} placeholder={t('apps.webPlaceholder')} value={webUrl} onChange={(event) => setWebUrl(event.target.value)} /><input aria-label={t('apps.webName')} placeholder={t('apps.webName')} value={webName} maxLength={100} onChange={event=>setWebName(event.target.value)} /><button className="button button-accent" disabled={webBusy || !webUrl.trim()} onClick={async () => {
       if (webBusy) return;

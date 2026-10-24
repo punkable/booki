@@ -115,6 +115,8 @@ export async function openStack(tileEl, item) {
       else button.addEventListener("click", () => navigateFolder?.(folderNavigation.goTo(index), false));
       breadcrumbs.appendChild(button);
     });
+    // At the folder that was opened the trail is just the title again.
+    breadcrumbs.hidden = trail.length < 2;
     breadcrumbs.lastElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
   };
   const seq = ++stackSeq;
@@ -398,11 +400,12 @@ export async function openStack(tileEl, item) {
       c.innerHTML = `<span class="stack-glyph skel"></span><span class="stack-name skel"></span>`;
       grid.appendChild(c);
     }
-    let page = 0;
+    let shown = [];
+    let more = false;
     let request = 0;
     const pageSize = 24;
     let queryTimer = null;
-    const toolbar = document.createElement("div"); toolbar.className = "stack-folder-tools";
+    const toolbar = document.createElement("div"); toolbar.className = "stack-folder-tools group-toolbar";
     const search = document.createElement("input"); search.type = "search"; search.maxLength = 256;
     search.className = "stack-folder-search"; search.placeholder = t("integral.searchFolder"); search.setAttribute("aria-label", t("integral.searchFolder"));
     const order = document.createElement("select"); order.className = "stack-folder-sort"; order.setAttribute("aria-label", t("integral.sortFolder"));
@@ -410,55 +413,48 @@ export async function openStack(tileEl, item) {
       const option = document.createElement("option"); option.value = value; option.textContent = t(key); order.appendChild(option);
     }
     const refresh = document.createElement("button"); refresh.className = "stack-close"; refresh.innerHTML = icon("refresh"); refresh.setAttribute("aria-label",t("apps.refresh")); refresh.title = t("apps.refresh");
-    toolbar.append(search,order,refresh); stackEl.appendChild(toolbar);
+    // Same fields as a group's toolbar: a search box with its glyph, a sort list.
+    const searchField = document.createElement("label"); searchField.className = "group-search-field";
+    const searchIcon = document.createElement("span"); searchIcon.innerHTML = icon("search"); searchIcon.setAttribute("aria-hidden", "true");
+    searchField.append(searchIcon, search);
+    const orderField = document.createElement("label"); orderField.className = "group-view-field";
+    const orderIcon = document.createElement("span"); orderIcon.innerHTML = icon("list"); orderIcon.setAttribute("aria-hidden", "true");
+    orderField.append(orderIcon, order);
+    toolbar.append(searchField,orderField,refresh); stackEl.appendChild(toolbar);
     const shortcut = event => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); event.stopPropagation(); search.focus(); search.select(); }
     };
     stackEl.addEventListener("keydown",shortcut);
-    stackDispose = () => { clearTimeout(queryTimer); request++; stackEl.removeEventListener("keydown",shortcut); };
-    const pager = document.createElement("div");
-    pager.className = "stack-pager";
-    const loadPage = async (nextPage) => {
+    stackDispose = () => { clearTimeout(queryTimer); request++; nearEnd?.disconnect(); stackEl.removeEventListener("keydown",shortcut); };
+    // Like Explorer, the list scrolls and the next batch loads as its end
+    // comes into view; there are no pages to step through.
+    const sentinel = document.createElement("div");
+    sentinel.className = "stack-sentinel";
+    sentinel.setAttribute("aria-hidden", "true");
+    const nearEnd = typeof IntersectionObserver === "function"
+      ? new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting) && more && grid.getAttribute("aria-busy") !== "true") loadPage(shown.length); }, { root: stackEl, rootMargin: "120px" })
+      : null;
+    const loadPage = async (offset) => {
       if (seq !== stackSeq || !S.stackOpen) return;
       const current = ++request;
       grid.setAttribute("aria-busy","true");
-      const previousFocus = pager.contains(document.activeElement) ? document.activeElement?.dataset.pageAction : null;
-      const buttonStates = [...pager.querySelectorAll("button")].map((b) => [b, b.dataset.logicalDisabled === "true"]);
-      buttonStates.forEach(([b]) => { b.disabled = true; });
       try {
-        const rows = await dockApi.listDir(folderNavigation.current.path, nextPage * pageSize, pageSize + 1, search.value.trim(), order.value);
+        const rows = await dockApi.listDir(folderNavigation.current.path, offset, pageSize + 1, search.value.trim(), order.value);
         if (seq !== stackSeq || !S.stackOpen || current !== request) return;
-        page = nextPage;
-        fillGrid((rows || []).slice(0, pageSize));
-        if (!rows?.length && search.value.trim()) grid.querySelector(".stack-empty").textContent = t("integral.noFolderMatches");
-        pager.replaceChildren();
-        const button = (key, next, disabled) => {
-          const b = document.createElement("button");
-          b.className = "stack-more";
-          b.textContent = t(key);
-          b.disabled = disabled; b.dataset.logicalDisabled = String(disabled); b.dataset.pageAction = key;
-          b.addEventListener("click", () => loadPage(next));
-          pager.appendChild(b);
-        };
-        button("stack.previous", page - 1, page === 0);
-        const label = document.createElement("span");
-        label.textContent = t("stack.page").replace("{n}", String(page + 1));
-        label.setAttribute("aria-live", "polite");
-        pager.appendChild(label);
-        button("stack.next", page + 1, !rows || rows.length <= pageSize);
-        grid.appendChild(pager);
-        if (previousFocus) {
-          const target = [...pager.querySelectorAll("button")].find(button => button.dataset.pageAction === previousFocus && !button.disabled) || pager.querySelector("button:not(:disabled)");
-          target?.focus({preventScroll:true});
-        }
-        grid.parentElement.scrollTop = 0;
+        const batch = (rows || []).slice(0, pageSize);
+        more = !!rows && rows.length > pageSize;
+        const scroll = stackEl.scrollTop;
+        shown = offset === 0 ? batch : shown.concat(batch);
+        fillGrid(shown);
+        if (!shown.length && search.value.trim()) grid.querySelector(".stack-empty").textContent = t("integral.noFolderMatches");
+        if (more) { grid.appendChild(sentinel); nearEnd?.observe(sentinel); }
+        else nearEnd?.unobserve(sentinel);
+        stackEl.scrollTop = offset === 0 ? 0 : scroll;
         applyFrame();
         if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
       } catch (_) {
         if (seq !== stackSeq || !S.stackOpen || current !== request) return;
-        buttonStates.forEach(([b, disabled]) => { b.disabled = disabled; });
-        const retainPage = pager.isConnected;
-        if (!retainPage) grid.replaceChildren();
+        if (offset === 0) grid.replaceChildren();
         grid.querySelector('.stack-load-error')?.remove();
         const failure = document.createElement("div");
         failure.className = "stack-load-error";
@@ -469,9 +465,9 @@ export async function openStack(tileEl, item) {
         const retry = document.createElement("button");
         retry.className = "stack-more";
         retry.textContent = t("apps.refresh");
-        retry.addEventListener("click", () => loadPage(nextPage));
+        retry.addEventListener("click", () => loadPage(offset));
         failure.append(message, retry);
-        grid.prepend(failure);
+        if (offset === 0) grid.prepend(failure); else grid.append(failure);
         applyFrame();
       } finally {
         if (current === request && seq === stackSeq && S.stackOpen) grid.setAttribute("aria-busy","false");

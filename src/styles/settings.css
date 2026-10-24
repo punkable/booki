@@ -258,9 +258,18 @@
 .ui-switch.on { background: var(--accent); border-color: var(--accent); }
 .ui-switch.on .ui-switch-knob { background: var(--accent-contrast); transform: translateX(20px); }
 .ui-switch.on:hover .ui-switch-knob { transform: translateX(18px); }
+/* Pressed: the knob stretches toward the side it would go (WinUI). */
+.ui-switch:active .ui-switch-knob { width: 17px; }
+.ui-switch.on:active .ui-switch-knob { transform: translateX(15px); }
+.ui-switch.dragging .ui-switch-knob { width: 17px; transform: translateX(var(--knob-x)); transition: width var(--dur-2) var(--ease); }
 
 /* Slider, Windows 11: thin track, accent fill, ringed thumb */
 .ui-slider { display: flex; align-items: center; gap: 12px; }
+.ui-slider-track { position: relative; display: flex; }
+/* Value bubble over the thumb while dragging (WinUI Slider ToolTip). The
+   10 px thumb radius keeps it centred on the thumb at both ends. */
+.ui-slider-tip { position: absolute; bottom: calc(100% + 6px); left: calc(10px + (100% - 20px) * var(--p, 0)); translate: -50% 4px; padding: 4px 8px; font-size: calc(12px * var(--os-text-scale, 1)); color: var(--ink); white-space: nowrap; background: var(--layer-strong); border: 1px solid var(--stroke-flyout, var(--control-stroke)); border-radius: var(--r-control, 4px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.14); opacity: 0; pointer-events: none; transition: opacity var(--dur-1) var(--ease), translate var(--dur-1) var(--ease); }
+.ui-slider.active .ui-slider-tip { opacity: 1; translate: -50% 0; }
 .ui-slider input { width: 200px; height: 20px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
 .ui-slider input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pct), var(--strong-stroke) var(--pct)); }
 /* WinUI Slider thumb: a 20px solid disc with a 12px accent core that grows to
@@ -324,7 +333,7 @@
     radial-gradient(circle at 88% 80%, #ff4f7b 0 8%, transparent 20%),
     repeating-linear-gradient(100deg, #2f6b33 0 3px, #4f9a44 3px 6px, #23552a 6px 9px); }
 .finish-sample-bar { display: flex; align-items: center; gap: 4px; padding: 5px 7px; color: var(--sample-ink, var(--ink)); background: var(--sample-fill); border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: var(--r-card); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.14); }
-.finish-sample-bar.is-glass { -webkit-backdrop-filter: blur(10px) saturate(125%); backdrop-filter: blur(10px) saturate(125%); }
+
 .finish-clear .finish-sample-bar { border-color: rgba(255, 255, 255, 0.4); }
 .finish-sample-bar b { font: 650 11px/1 var(--font, inherit); letter-spacing: -0.01em; padding-right: 2px; }
 .finish-sample-bar i { width: 14px; height: 14px; border-radius: 4px; background: #3b82f6; }
@@ -384,6 +393,9 @@
 .empty { margin: 0; padding: 16px; color: var(--ink-2); }
 
 /* ── Dock preview ───────────────────────────────────────────────────────── */
+/* No backdrop-filter in previews: they scroll with the page, and in the
+   transparent Mica window every scrolled frame re-blurred them. Over the
+   preview's own gradient the blur was barely visible anyway. */
 .live-preview-scene { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 14px; }
 .live-preview-fit { position: relative; display: flex; justify-content: center; align-items: flex-start; width: 100%; min-width: 0; overflow: hidden; }
 .live-preview-bar { flex: none; display: flex; align-items: center; width: max-content; padding: 8px; color: var(--ink); border: 1px solid var(--control-stroke); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12); transform-origin: top center; }
@@ -391,7 +403,7 @@
 .live-preview-bar.vertical .tile.widget { width: var(--size) !important; }
 .live-preview-bar.vertical .w-card { justify-content: center; padding: 4px; }
 .live-preview-bar.vertical :is(.w-label, .w-pv-main, .w-pv-badge) { display: none; }
-.live-preview-bar[data-surface="glass"] { backdrop-filter: blur(20px) saturate(150%); }
+
 .live-preview-app { display: grid; place-items: center; flex: none; color: var(--ink); background: color-mix(in srgb, var(--accent) 16%, var(--control)); border-radius: 24%; }
 .live-preview-app svg { width: 55%; height: 55%; }
 .live-preview-app img { width: 100%; height: 100%; object-fit: contain; }
@@ -427,10 +439,14 @@
 .live-preview-scene.stage.at-left .live-preview-fit { justify-content: flex-start; }
 .live-preview-scene.stage.at-right .live-preview-fit { justify-content: flex-end; }
 .live-preview-scene.stage .live-preview-bar { border-color: rgba(255, 255, 255, 0.16); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35); }
-.live-preview-scene.stage .live-preview-caption { position: absolute; top: 12px; left: 16px; padding: 3px 10px; color: rgba(255, 255, 255, 0.85); font-size: calc(11.5px * var(--os-text-scale, 1)); background: rgba(0, 0, 0, 0.28); border-radius: 999px; backdrop-filter: blur(8px); }
+.live-preview-scene.stage .live-preview-caption { position: absolute; top: 12px; left: 16px; padding: 3px 10px; color: rgba(255, 255, 255, 0.85); font-size: calc(11.5px * var(--os-text-scale, 1)); background: rgba(0, 0, 0, 0.42); border-radius: 999px; }
 
 /* ── Home ───────────────────────────────────────────────────────────────── */
 .home-hero { margin-bottom: 28px; overflow: hidden; }
+/* Home shows the bar at its real size: shrunk to fit, a full dock was too
+   small to read. A long one scrolls sideways (safe centring keeps its start). */
+.live-preview-fit.actual { justify-content: safe center !important; overflow-x: auto; overflow-y: hidden; padding-bottom: 6px; scrollbar-width: thin; }
+.home-hero .live-preview-scene.stage { min-height: 150px; padding: 44px 16px 18px; }
 .home-hero-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; }
 .home-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
 .home-usage { display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin: 16px 0; }
@@ -572,6 +588,7 @@
   .ui-row:not(.ui-toggle-row) > .ui-row-control { flex: 1 1 100%; justify-content: flex-start; }
   .ui-slider input { width: 100%; flex: 1; }
   .ui-slider { width: 100%; }
+  .ui-slider-track { flex: 1; }
 }
 @media (max-width: 760px) {
   .settings-body { --sidebar-w: 64px; }
@@ -759,17 +776,14 @@
 .profile-manage summary { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); cursor: pointer; }
 .profile-manage-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .profile-manage-controls .text-field { flex: 1 1 160px; width: auto; }
-.profile-empty, .profile-error { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
-.profile-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger-text); }
+.profile-empty { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
 .prof-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; border-top: 1px solid var(--divider); }
 .profile-backup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; margin-top: 10px; padding: 12px 18px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .profile-backup h2 { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 400; line-height: calc(20px * var(--os-text-scale, 1)); }
 .profile-backup p { margin: 2px 0 0; color: var(--ink-2); font-size: calc(12.5px * var(--os-text-scale, 1)); line-height: calc(17px * var(--os-text-scale, 1)); }
 
 /* ── Notices and recovery ───────────────────────────────────────────────── */
-.recovery-notice, .settings-recovery { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 16px; background: color-mix(in srgb, #fce100 14%, var(--card)); border: 1px solid color-mix(in srgb, #fce100 40%, transparent); border-radius: var(--r-card); }
-.recovery-notice h2, .settings-recovery h2 { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 600; }
-.recovery-notice p, .settings-recovery p { margin: 0; }
+.recovery-notice, .settings-recovery { margin: 0 0 16px; }
 .settings-recovery > .button { align-self: flex-start; }
 .settings-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -1108,7 +1122,7 @@
   radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--widget-accent) 38%, transparent), transparent 60%),
   radial-gradient(120% 90% at 100% 100%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 60%),
   var(--subtle-pressed); }
-.catalog-stage { display: inline-flex; padding: 6px; border-radius: 14px; background: color-mix(in srgb, var(--card) 62%, transparent); box-shadow: 0 1px 0 var(--card-stroke), 0 6px 16px rgba(0, 0, 0, 0.08); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.catalog-stage { display: inline-flex; padding: 6px; border-radius: 14px; background: color-mix(in srgb, var(--card) 62%, transparent); box-shadow: 0 1px 0 var(--card-stroke), 0 6px 16px rgba(0, 0, 0, 0.08); }
 .catalog-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .catalog-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 6px 10px 10px; }
 .catalog-foot .catalog-action { margin-left: auto; }
@@ -1224,3 +1238,32 @@
 .screen-hint { position: absolute; right: 12px; top: 12px; font-size: 11px; color: var(--ink-2); pointer-events: none; }
 .position-picker .screen-chip { transition: opacity .2s; }
 @media (prefers-reduced-motion: reduce) { .screen-live-dock { transition: none; } }
+
+/* Scrolling Settings stays light: no blur on repeated cards (the window's
+   Mica already blurs), and cards off screen are not laid out or painted. */
+.catalog-card, .plugin-card, .widgets-on-dock-item { content-visibility: auto; contain-intrinsic-size: auto 240px; }
+.live-preview-scene.stage .live-preview-caption { backdrop-filter: none; background: rgba(0, 0, 0, 0.42); }
+/* WinUI page entrance: the new section rises 28px into place and fades in. */
+.page-enter { animation: page-enter .3s cubic-bezier(0, 0, 0, 1) both; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(28px); } }
+@media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }
+
+/* ── InfoBar (WinUI) ── tinted strip, filled severity badge, message, action. */
+.info-bar { --ib-bg: var(--card); --ib-badge: var(--accent); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 0; padding: 10px 12px 10px 14px; color: var(--ink); background: var(--ib-bg); border: 1px solid var(--card-stroke); border-radius: var(--r-control, 4px); font-size: calc(13px * var(--os-text-scale, 1)); line-height: 1.4; }
+.info-bar-success { --ib-bg: #dff6dd; --ib-badge: #0f7b0f; }
+.info-bar-warning { --ib-bg: #fff4ce; --ib-badge: #9d5d00; }
+.info-bar-error { --ib-bg: #fde7e9; --ib-badge: #c42b1c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .info-bar-success { --ib-bg: #393d1b; --ib-badge: #6ccb5f; } :root:not([data-theme="light"]) .info-bar-warning { --ib-bg: #433519; --ib-badge: #fce100; } :root:not([data-theme="light"]) .info-bar-error { --ib-bg: #442726; --ib-badge: #ff99a4; } }
+:root[data-theme="dark"] .info-bar-success { --ib-bg: #393d1b; --ib-badge: #6ccb5f; }
+:root[data-theme="dark"] .info-bar-warning { --ib-bg: #433519; --ib-badge: #fce100; }
+:root[data-theme="dark"] .info-bar-error { --ib-bg: #442726; --ib-badge: #ff99a4; }
+.info-bar-badge { flex: none; display: grid; place-items: center; width: 16px; height: 16px; color: var(--ib-bg); background: var(--ib-badge); border-radius: 50%; }
+.info-bar-badge svg { width: 11px; height: 11px; stroke-width: 3; }
+.info-bar-body { flex: 1 1 220px; min-width: 0; display: flex; flex-wrap: wrap; gap: 0 8px; }
+.info-bar-title { font-weight: 600; }
+.info-bar-action { display: flex; gap: 8px; }
+.info-bar-close { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px -4px 0; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: var(--r-control, 4px); cursor: pointer; }
+.info-bar-close:hover { background: var(--hover); }
+.info-bar-close svg { width: 14px; height: 14px; }
+:root[data-high-contrast] .info-bar { background: Canvas; border-color: CanvasText; }
+:root[data-high-contrast] .info-bar-badge { color: Canvas; background: CanvasText; }

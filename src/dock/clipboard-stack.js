@@ -2,7 +2,7 @@
 
 import { dock as dockApi, logMessage } from "../api.js";
 import { icon } from "../icons.js";
-import { t } from "../i18n.js";
+import { t, curLang } from "../i18n.js";
 import { S } from "./state.js";
 import { stackEl } from "./dom.js";
 import { applyFrame } from "./frame.js";
@@ -143,7 +143,19 @@ async function renderClipboardList(grid, foot) {
     if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
     return;
   }
-  items.forEach((entry, i) => {
+  // Win+V: pinned entries first under their own heading, then the rest.
+  const pinned = items.filter((entry) => entry.favorite);
+  const recent = items.filter((entry) => !entry.favorite);
+  const heading = (key) => {
+    const h = document.createElement("div");
+    h.className = "clip-section";
+    h.textContent = t(key);
+    grid.appendChild(h);
+  };
+  const ordered = [...pinned, ...recent];
+  ordered.forEach((entry, i) => {
+    if (pinned.length && i === 0) heading("clip.pinnedSection");
+    if (pinned.length && i === pinned.length && recent.length) heading("clip.recentSection");
     const row = document.createElement("div");
     row.className = "clip-row" + (entry.favorite ? " favorite" : "") + (entry.private ? " private" : "");
     row.tabIndex = 0;
@@ -151,8 +163,19 @@ async function renderClipboardList(grid, foot) {
     const text = document.createElement("div");
     text.className = "clip-text";
     text.textContent = entry.text;
-    text.title = entry.text;
     row.appendChild(text);
+    const info = document.createElement("div");
+    info.className = "clip-info";
+    info.append(clipAgo(entry.ts));
+    if (entry.private) {
+      const badge = document.createElement("span");
+      badge.className = "clip-badge";
+      badge.innerHTML = icon("lock");
+      badge.title = t("clip.privateBadge");
+      badge.setAttribute("aria-label", t("clip.privateBadge"));
+      info.append(badge);
+    }
+    row.appendChild(info);
 
     const acts = document.createElement("div");
     acts.className = "clip-acts";
@@ -169,7 +192,7 @@ async function renderClipboardList(grid, foot) {
       b.addEventListener("keydown", (ev) => ev.stopPropagation());
       acts.appendChild(b);
     };
-    act("star", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), () => clipAction(async () => {
+    act(entry.favorite ? "pin-off" : "pin", entry.favorite ? t("clip.unfavorite") : t("clip.favorite"), () => clipAction(async () => {
       await dockApi.clipboardFavorite(entry.id, !entry.favorite);
       await renderClipboardList(grid, foot);
     }));
@@ -206,6 +229,18 @@ async function renderClipboardList(grid, foot) {
   meta.textContent = String(rawCount); meta.title = t("clip.countHint").replace("{n}", rawCount);
   foot.appendChild(meta);
   if (S.pendingReplace) requestAnimationFrame(S.pendingReplace);
+}
+
+/** "5 min ago", in the dock's language; empty for an unknown time. */
+function clipAgo(ts) {
+  const seconds = Math.round((Date.now() - Number(ts || 0)) / 1000);
+  if (!ts || seconds < 0) return "";
+  let rtf;
+  try { rtf = new Intl.RelativeTimeFormat(curLang(), { numeric: "auto", style: "short" }); } catch (_) { return ""; }
+  if (seconds < 60) return rtf.format(0, "second");
+  if (seconds < 3600) return rtf.format(-Math.floor(seconds / 60), "minute");
+  if (seconds < 86400) return rtf.format(-Math.floor(seconds / 3600), "hour");
+  return rtf.format(-Math.floor(seconds / 86400), "day");
 }
 
 // A clipboard command that fails (history locked, IPC error) says so in the

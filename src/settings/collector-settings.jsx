@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { pickFolder } from "../api.js";
 import { t } from "../i18n.js";
 import { COLLECTOR_QUALITIES, collectorPreferences } from "../collector-preferences.js";
-import { Row, SegmentedControl, Select } from "./ui.jsx";
+import { InfoBar, Row, SegmentedControl, Select } from "./ui.jsx";
 
 export function CollectorSettings({ cfg, set }) {
   const preferences = collectorPreferences(cfg);
@@ -14,7 +14,7 @@ export function CollectorSettings({ cfg, set }) {
     finally { setBusy(false); }
   };
   return <div className="collector-preferences">
-    {error && <p className="notice-error" role="alert">{error}</p>}
+    {error && <InfoBar severity="error">{error}</InfoBar>}
     <Row label={t("refine.saveFolder")} hint={cfg.collectorDirectory || t("refine.systemDownloads")}>
       <button type="button" className="button" disabled={busy} onClick={chooseFolder}>{t("m.addFolder")}</button>
       {cfg.collectorDirectory && <button type="button" className="button" onClick={() => set({ collectorDirectory: "" })}>{t("refine.systemDownloads")}</button>}

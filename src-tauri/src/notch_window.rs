@@ -298,12 +298,7 @@ pub(crate) fn notch_reveal(app: AppHandle) {
         let _ = dock.set_ignore_cursor_events(false);
         lift_dock_window(&dock);
     }
-    // Hide the notch only once the dock is up: the other order left a
-    // frame with neither on screen, a blink right where the dock grows
-    // out of the notch.
-    if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
-    }
+    crate::dock_window::schedule_notch_handoff(&app);
     let _ = app.emit("booki://reveal", ());
 }
 

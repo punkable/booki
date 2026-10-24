@@ -143,7 +143,13 @@ export function setHidden(v) {
     dockApi.revealDock();
     applyFrame();
     setTimeout(() => {
-      if (!S.hiddenState) document.body.classList.remove("tucked");
+      if (S.hiddenState) return;
+      document.body.classList.remove("tucked");
+      // Two frames: the first of the reveal is then on screen over the
+      // notch, and the notch can leave without a moment showing both.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!S.hiddenState) dockApi.notchHandoff?.().catch(() => {});
+      }));
     }, 40);
     revealTimer = setTimeout(() => {
       document.body.classList.remove("revealing");

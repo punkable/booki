@@ -100,6 +100,12 @@ import { updateEdgePreview, enterEdgeMove, endEdgeMove } from "./dock/edge-move.
 import { placeUpdatePill, checkUpdates } from "./dock/updates.js";
 import { startPluginUpdateChecks } from "./dock/plugin-updates.js";
 import "./dock/agent-notices.js";
+import { enableFluentSelects } from "./fluent-select.js";
+enableFluentSelects();
+import { enableFluentTooltips } from "./fluent-tooltip.js";
+enableFluentTooltips();
+import { watchLongTasks } from "./long-tasks.js";
+watchLongTasks("dock");
 
 
 // Kill native HTML5 drag inside the dock window. Icon tiles are <img> elements,

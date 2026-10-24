@@ -6,14 +6,14 @@ import { pluginsForWidget } from "../widget-integrations.js";
 import PLUGINS from "../plugin-catalog.json";
 import { CollectorSettings } from "./collector-settings.jsx";
 import { notesOf } from "../notes-model.js";
-import { Row, Select, Slider, Toggle, Icon } from "./ui.jsx";
+import { InfoBar, Row, Select, Slider, Toggle, Icon } from "./ui.jsx";
 
 function Action({ children, run }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(false);
   return <div className="widget-action"><button type="button" className="button" disabled={busy} onClick={async () => {
     setBusy(true); setError(false);
     try { await run(); } catch { setError(true); } finally { setBusy(false); }
-  }}>{children}</button>{error && <p role="alert" className="notice-error">{t("overhaul.failed")}</p>}</div>;
+  }}>{children}</button>{error && <InfoBar severity="error">{t("overhaul.failed")}</InfoBar>}</div>;
 }
 
 function WeatherLocation({ style, patch }) {
@@ -35,7 +35,7 @@ function WeatherLocation({ style, patch }) {
     <form onSubmit={search}><label>{t("widgetFlow.city")}<input className="text-field" value={query} maxLength={160} onChange={(event) => { request.current++; setQuery(event.target.value); setState("idle"); setResults([]); }} /></label>
       <button type="submit" className="button" disabled={state === "loading" || !query.trim()}>{t("widgetFlow.search")}</button></form>
     {state === "loading" && <p role="status">{t("overhaul.loading")}</p>}
-    {state === "error" && <p role="alert">{t("focus.weatherError")}</p>}
+    {state === "error" && <InfoBar severity="error">{t("focus.weatherError")}</InfoBar>}
     {state === "done" && !results.length && <p role="status">{t("add.none")}</p>}
     <ul className="widget-location-results">{results.map((city, i) => <li key={`${city.latitude},${city.longitude},${i}`}><button type="button" className="button" onClick={() => {
       patch({ city: city.name, latitude: city.latitude, longitude: city.longitude }); setResults([]); setState("idle");
@@ -90,6 +90,7 @@ export function WidgetContent({ item, cfg, set, patch }) {
       {!style.provider && <Toggle label={t("widgetFlow.rotate")} checked={style.rotate !== false} onChange={(rotate) => patch({ rotate })} />}
       <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p><details className="inline-details"><summary>{t("panelFlow.aiDetection")}</summary><p className="inline-note">{t("panelFlow.aiSources")}</p></details>
       <Toggle label={t("be.notchAgents")} hint={t("widgetFlow.sharedNotch")} checked={cfg.notchAgents !== false} onChange={(notchAgents) => set({ notchAgents })} />
+      <AgentBridge />
     </>}
     {widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(scrollVolume) => patch({ scrollVolume })} />}
     {widget === "volume" && <Row label={t("widgetFlow.volumeStep")} stack><Slider value={style.volumeStep || 3} min={1} max={10} step={1} fmt={(value) => `${value}%`} onChange={(volumeStep) => patch({ volumeStep })} /></Row>}
@@ -109,6 +110,33 @@ export function WidgetContent({ item, cfg, set, patch }) {
   </div>;
 }
 /** Clipboard history policy. Lives with the clipboard widget. */
+/** Opt-in: Claude Code reports its real plan usage through its status line,
+ *  and each agent its exact state through its hooks. Local only; nothing is
+ *  read from any account and nothing goes over the network. */
+const AGENT_NAMES = { claude: "Claude Code", codex: "Codex", gemini: "Gemini CLI", cursor: "Cursor" };
+function AgentBridge() {
+  const [status, setStatus] = useState(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { dockApi.agentBridgeStatus?.().then(setStatus).catch(() => setStatus(null)); }, []);
+  const agents = (status?.agents || []).filter((agent) => agent.available);
+  if (!agents.length) return null;
+  const run = async (action) => {
+    if (busy) return;
+    setBusy(true); setError("");
+    try { setStatus(await action()); }
+    catch (e) { setError(String(e?.message || e || t("overhaul.failed"))); }
+    finally { setBusy(false); }
+  };
+  const claude = agents.some((agent) => agent.id === "claude");
+  return <>
+    {claude && <Toggle label={t("claude.realUsage")} hint={t("claude.realUsageHint")} checked={status.statusline} onChange={(on) => run(() => dockApi.agentStatuslineSet(on))} />}
+    <p className="inline-note">{t("claude.exactStatesHint")}</p>
+    {agents.map((agent) => <Toggle key={agent.id} label={t("agents.exactStates").replace("{agent}", () => AGENT_NAMES[agent.id] || agent.id)} hint={agent.id === "codex" ? t("agents.codexTrust") : undefined} checked={agent.hooks} onChange={(on) => run(() => dockApi.agentHooksSet(agent.id, on))} />)}
+    {error && <InfoBar severity="error">{error}</InfoBar>}
+  </>;
+}
+
 export function ClipboardPolicy({ cfg, set }) {
   const [storageFailed, setStorageFailed] = useState(false);
   useEffect(() => {
@@ -119,7 +147,7 @@ export function ClipboardPolicy({ cfg, set }) {
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [cfg.clipboardPersist]);
   return <>
-    {storageFailed && <p className="notice notice-error" role="alert">{t("clip.storageFailed")}</p>}
+    {storageFailed && <InfoBar severity="error">{t("clip.storageFailed")}</InfoBar>}
     <Toggle label={t("clip.memory")} hint={t("clip.memoryHint")} checked={!!cfg.clipboardPersist} onChange={(v) => set({ clipboardPersist: v })} />
     <Toggle label={t("clip.sensitive")} hint={t("clip.sensitiveHint")} checked={cfg.clipboardSensitiveGuard !== false} onChange={(v) => set({ clipboardSensitiveGuard: v })} />
     <Toggle label={t("clip.compact")} hint={t("clip.compactHint")} checked={!!cfg.clipboardCompact} onChange={(v) => set({ clipboardCompact: v })} />

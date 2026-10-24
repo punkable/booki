@@ -3,7 +3,7 @@
 
 import { dock as dockApi } from "../api.js";
 import { rectFromElement, pointInRect, hitSignature } from "./geometry.js";
-import { reportMaterial, shapeOf } from "../material.js";
+import { onMaterialSettled, reportMaterial, shapeOf } from "../material.js";
 import { S } from "./state.js";
 import { baseSize } from "./helpers.js";
 import { dockEl, stackEl } from "./dom.js";
@@ -71,11 +71,13 @@ export function pointInLiveHitArea(x, y) {
   return rects.some((rect) => pointInRect(x, y, rect));
 }
 // Real blur behind the bar and whatever panel is open over the desktop.
+// The tooltip is not one: like Windows 11's it is a solid chip that fades,
+// and a blur that cannot fade with it showed the desktop for a moment.
 // Every floating surface belongs here: one left out only gets the CSS blur,
 // which sees the page and not the desktop, and reads as a flat second sheet.
 export const MATERIAL_PANELS = [
   "#ctx-menu:not(.hidden)", ".trash-pop", ".coach", ".update-pill:not(.hidden)",
-  ".stack-drag-clone", ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".dock-tip.show", ".drop-hint.show",
+  ".stack-drag-clone", ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".drop-hint.show",
 ].join(", ");
 // A surface reports its shape only once it is fully shown (shapeOf skips a
 // fading one), so report again whenever one finishes appearing or leaving.
@@ -90,12 +92,30 @@ export function reportDockMaterial() {
     reportMaterial([]);
     return;
   }
-  reportMaterial([
-    shapeOf(dockEl),
-    S.stackOpen ? shapeOf(stackEl) : null,
-    ...[...document.querySelectorAll(MATERIAL_PANELS)].map((el) => shapeOf(el)),
-  ]);
+  const panels = [...document.querySelectorAll(MATERIAL_PANELS)];
+  if (S.stackOpen) panels.unshift(stackEl);
+  const shapes = panels.map((el) => shapeOf(el));
+  // A panel shows a solid fill until Windows has put the blur behind it:
+  // translucent without blur is the see-through flash glass must never have.
+  waiting.clear();
+  panels.forEach((el, i) => {
+    if (!el.classList.contains("mat-ready")) el.classList.add("mat-wait");
+    if (shapes[i]) waiting.add(el);
+  });
+  for (const el of document.querySelectorAll(".mat-ready, .mat-wait")) {
+    if (!panels.includes(el)) el.classList.remove("mat-ready", "mat-wait");
+  }
+  reportMaterial([shapeOf(dockEl), ...shapes]);
 }
+const waiting = new Set();
+onMaterialSettled((shapes) => {
+  if (!shapes) return;
+  for (const el of waiting) {
+    el.classList.remove("mat-wait");
+    el.classList.add("mat-ready");
+  }
+  waiting.clear();
+});
 
 export function reportHitRects() {
   reportDockMaterial();

@@ -19,17 +19,21 @@ test('native material never extends past the rounded CSS outline', () => {
   assert.equal(containedShape([0, 0, 4, 4, 40, 40, 40, 40]), null);
 });
 
-test('settings dock previews scale to fit instead of scrolling', async () => {
+test('settings dock previews fit their column; Home shows the bar at real size', async () => {
   assertBuilt();
   const { srv, port } = await serveDist();
   const browser = await launchBrowser();
   try {
     for (const edge of ['bottom', 'left']) {
       const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ edge, pinned: everyKindPinned() }), viewport: { width: 900, height: 700 } });
+      // Home draws a horizontal bar 1:1 and lets it scroll sideways.
+      const actual = await page.evaluate(() => [...document.querySelectorAll('.live-preview-fit.actual')].map((frame) => getComputedStyle(frame.querySelector('.live-preview-bar')).transform));
+      assert.ok(actual.every((t) => t === 'none'), `${edge}: Home preview is not scaled`);
+      if (edge === 'left') assert.equal(actual.length, 0, 'a vertical bar still fits');
       const scrollers = await page.evaluate(() => [...document.querySelectorAll('.live-preview-scene, .live-preview-scene *')]
-        .filter((el) => { const s = getComputedStyle(el); return /(auto|scroll)/.test(s.overflowX + s.overflowY); }).map((el) => el.className));
+        .filter((el) => !el.matches('.live-preview-fit.actual')).filter((el) => { const s = getComputedStyle(el); return /(auto|scroll)/.test(s.overflowX + s.overflowY); }).map((el) => el.className));
       assert.deepEqual(scrollers, [], `${edge}: preview must not scroll`);
-      const fits = await page.evaluate(() => [...document.querySelectorAll('.live-preview-fit')].every((frame) => {
+      const fits = await page.evaluate(() => [...document.querySelectorAll('.live-preview-fit:not(.actual)')].every((frame) => {
         const bar = frame.querySelector('.live-preview-bar').getBoundingClientRect();
         const box = frame.getBoundingClientRect();
         return bar.left >= box.left - 1 && bar.right <= box.right + 1;

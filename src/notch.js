@@ -23,7 +23,7 @@ import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
-import { reportMaterial, shapeOf, applyMaterial, followFrames } from "./material.js";
+import { reportMaterial, shapeOf, applyMaterial, followFrames, onMaterialSettled } from "./material.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -106,7 +106,7 @@ function reportNotchHitRects() {
   // third of the height or more, which split the pill into a blurred and a
   // flat band. Those shapes get the CSS fill alone; the card is big enough
   // for the real blur.
-  const blurred = toasting || document.body.classList.contains("card");
+  const blurred = toasting || (document.body.classList.contains("card") && !document.body.classList.contains("card-leaving"));
   reportMaterial(document.visibilityState === "hidden" || away || !blurred ? [] : [shapeOf(toasting ? toastEl : pill)]);
   // During drag or toast, keep the whole notch window interactive so gestures
   // and the message aren't yanked out from under the cursor.
@@ -302,8 +302,14 @@ function paintScene() {
   paintPresence();
 }
 
+// Windows reports app switches and title changes (a browser tab turning into
+// a video); the slow timer only recovers from a missed event.
+let foregroundTimer = null;
+let nativeSupport = {};
 async function pollForeground() {
+  clearTimeout(foregroundTimer);
   if (!inTauri) return;
+  foregroundTimer = setTimeout(pollForeground, recoveryInterval(nativeSupport, "foreground", 3000));
   try {
     place = String(await invoke("foreground_place") || "desk");
     codeForeground = place === "code";
@@ -315,7 +321,6 @@ async function pollForeground() {
   }
   paintScene();
 }
-setInterval(pollForeground, 3000);
 pollForeground();
 
 /** Show the tab for a moment because something changed worth a glance. */
@@ -371,6 +376,22 @@ const cArt = document.getElementById("nc-art-img");
 const cTitle = document.getElementById("nc-title");
 const cSub = document.getElementById("nc-sub");
 const cPlay = document.getElementById("nc-play");
+const cBar = document.getElementById("nc-bar");
+/** A thin bar under the text: time left, battery or volume level (0..1); null hides it. */
+/** How far the track is, from the last reading plus the time since. */
+function mediaProgress(now = Date.now()) {
+  const duration = Number(media?.duration_ms);
+  if (!duration || media.position_ms == null) return null;
+  const position = Number(media.position_ms) + (media.playing ? now - (media.fetchedAt || now) : 0);
+  return Math.min(1, position / duration);
+}
+
+function cardBar(fraction, tone = "") {
+  cBar.hidden = fraction == null;
+  if (fraction == null) return;
+  cBar.dataset.tone = tone;
+  cBar.firstElementChild.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
+}
 let media = null; // { title, artist, playing, thumb } or null
 let mediaPeekUntil = 0;
 let mediaKey = "";
@@ -422,11 +443,14 @@ const AGENT_ICONS = {
   gemini: "ai-gemini", windsurf: "ai-windsurf", goose: "ai-goose", cline: "ai-cline", continue: "ai-continue",
 };
 const AGENT_DONE_MS = 5000;
+// Several live states take turns at this pace; one waiting on you stays put.
+const AGENT_ROTATE_MS = 6000;
 let agentsOn = true;
 const agents = new Map(); // provider -> { state: "working" | "waiting", since }
 let agentDone = null; // { provider, since, until }
 const agentDoneQueue = [];
 const lAgent = document.getElementById("nl-agent");
+const cAgent = document.getElementById("nc-agent");
 const lState = document.getElementById("nl-state");
 
 function clearAgents() {
@@ -479,13 +503,13 @@ function agentActivity(now = Date.now()) {
   const all = [...agents].map(([provider, activity]) => ({ provider, ...activity }));
   const urgent = all.filter((row) => ["waiting", "error"].includes(row.state));
   const eligible = urgent.length ? urgent : all;
-  return eligible.length ? eligible[Math.floor(now / 8000) % eligible.length] : null;
+  return eligible.length ? eligible[Math.floor(now / AGENT_ROTATE_MS) % eligible.length] : null;
 }
 
 onAgentActivity((payload) => applyAgent(payload));
 setInterval(() => {
   if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
-}, 8000);
+}, AGENT_ROTATE_MS);
 if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
 
 function currentActivity(now = Date.now()) {
@@ -508,7 +532,7 @@ function currentActivity(now = Date.now()) {
   if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
   const timer = focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
-    if (agent && !cardOpen && Math.floor(now / 8000) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
+    if (agent && !cardOpen && Math.floor(now / AGENT_ROTATE_MS) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
@@ -635,9 +659,20 @@ function paintMedia() {
 
 function paintCard() {
   const activity = currentActivity();
+  cardBar(null);
+  const provider = activity?.kind.startsWith("agent") ? activity.provider : "";
+  cAgent.hidden = !provider;
+  if (provider) {
+    const mark = AGENT_ICONS[provider] || "sparkles";
+    if (cAgent.dataset.icon !== mark) {
+      cAgent.innerHTML = icon(mark);
+      cAgent.dataset.icon = mark;
+    }
+  }
   if (activity?.kind === "timer") {
     cTitle.textContent = mmss(activity.left);
     cSub.textContent = t("w.focus");
+    cardBar(activity.progress, "focus");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -645,6 +680,7 @@ function paintCard() {
   if (activity?.kind === "volume") {
     cTitle.textContent = activity.muted ? t("notch.muted") : `${activity.level}%`;
     cSub.textContent = t("w.volume");
+    cardBar(activity.muted ? 0 : activity.level / 100, "volume");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -660,7 +696,8 @@ function paintCard() {
     const state = activity.kind === "agent" ? "working" : activity.kind.slice(6);
     cTitle.textContent = agentLabel(state, activity.provider);
     const withMedia = activity.kind === "agent" && hasRecentMedia();
-    cSub.textContent = withMedia ? media.title || media.artist : agentElapsed(activity.since);
+    // Working shows how long the turn has run; the other states, when they began.
+    cSub.textContent = withMedia ? media.title || media.artist : state === "working" ? agentDuration(activity.since) : agentElapsed(activity.since);
     cPlay.hidden = !withMedia;
     if (withMedia) {
       cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
@@ -673,6 +710,7 @@ function paintCard() {
   if (activity?.kind === "battery" || activity?.kind === "charging") {
     cTitle.textContent = `${activity.level}%`;
     cSub.textContent = t(activity.kind === "charging" ? "notch.charging" : "notch.batteryLow");
+    cardBar(activity.level / 100, activity.kind === "charging" ? "charging" : "low");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -680,6 +718,7 @@ function paintCard() {
   if (hasRecentMedia()) {
     cTitle.textContent = media.title || media.artist;
     cSub.textContent = media.title ? media.artist : "";
+    cardBar(mediaProgress(), "media");
     cPlay.hidden = false;
     cPlay.innerHTML = media.playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
     cPlay.setAttribute("aria-label", t("w.playPause"));
@@ -696,6 +735,17 @@ function paintCard() {
   }
 }
 
+/** "3 min" / "1 h 5 min": how long a turn has been running. */
+function agentDuration(since, now = Date.now()) {
+  const minutes = Math.max(0, Math.floor((now - Number(since || now)) / 60000));
+  const unit = (value, name) => {
+    try { return new Intl.NumberFormat(curLang(), { style: "unit", unit: name, unitDisplay: "short" }).format(value); } catch (_) { return `${value}`; }
+  };
+  if (minutes < 1) return `< ${unit(1, "minute")}`;
+  if (minutes < 60) return unit(minutes, "minute");
+  return `${unit(Math.floor(minutes / 60), "hour")} ${minutes % 60 ? unit(minutes % 60, "minute") : ""}`.trim();
+}
+
 /** "hace 2 min" / "2 min ago", in the notch's language. */
 function agentElapsed(since, now = Date.now()) {
   const seconds = Math.max(0, Math.round((now - Number(since || now)) / 1000));
@@ -706,7 +756,6 @@ function agentElapsed(since, now = Date.now()) {
   return rtf.format(-Math.floor(seconds / 3600), "hour");
 }
 
-let nativeSupport = {};
 
 // Media is polled only while it can be shown, and slower when nothing plays:
 // the WinRT session query is cheap but not free.
@@ -719,6 +768,7 @@ const pollMedia = singleFlight(async () => {
   }
   try {
     media = await invoke("media_info");
+    if (media) media.fetchedAt = Date.now();
   } catch (_) {
     media = null;
   }
@@ -748,7 +798,7 @@ const readVolume = singleFlight(async () => {
   paintActivity();
 });
 
-observeSystem(dockApi, { media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
+observeSystem(dockApi, { foreground: pollForeground, media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 520) { // --dur-spring
@@ -771,7 +821,11 @@ function openCard() {
   clearInterval(cardWatch);
   cardWatch = setInterval(() => {
     if (cardOpen && !pill.matches(":hover") && !pill.contains(document.activeElement)) closeCard();
-  }, 1200);
+    else if (cardOpen && media?.playing && !cBar.hidden && cBar.dataset.tone === "media") paintCard();
+  }, 1000);
+  pill.classList.add("mat-wait");
+  clearTimeout(leaveFallback);
+  document.body.classList.remove("card-leaving");
   cardOpen = true;
   document.body.classList.add("card");
   followMorph();
@@ -781,10 +835,36 @@ function closeCard() {
   clearInterval(cardWatch);
   if (!cardOpen) return;
   cardOpen = false;
-  document.body.classList.remove("card");
+  // Windows takes the blur away a beat after we ask. Shrinking first left a
+  // blurred sheet the size of the card behind the tab: hold the card, solid,
+  // until the blur is gone, then shrink.
+  if (document.body.classList.contains("native-material") && document.body.classList.contains("surface-glass")) {
+    pill.classList.add("mat-wait");
+    document.body.classList.add("card-leaving");
+    clearTimeout(leaveFallback);
+    leaveFallback = setTimeout(finishClose, 250);
+    reportNotchHitRects();
+    return;
+  }
+  finishClose();
+}
+let leaveFallback = null;
+function finishClose() {
+  clearTimeout(leaveFallback);
+  if (cardOpen) return;
+  document.body.classList.remove("card", "card-leaving");
   followMorph();
   paintPresence();
 }
+// The card is solid until the blur is confirmed behind it and its morph has
+// settled; a translucent card without blur showed the desktop for a moment.
+onMaterialSettled((shapes) => {
+  if (document.body.classList.contains("card-leaving")) {
+    if (!shapes) finishClose();
+    return;
+  }
+  if (shapes && !pill.getAnimations().some((a) => a.playState === "running")) pill.classList.remove("mat-wait");
+});
 
 // Intent delay in, a short grace out: brushing past the edge does nothing,
 // and leaving by a pixel does not snap it shut.

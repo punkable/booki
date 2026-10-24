@@ -1884,6 +1884,10 @@ pub struct MediaSnapshot {
     pub playing: bool,
     /// Album art as a data URI, when the source exposes one.
     pub thumb: Option<String>,
+    /// Playback position and track length in milliseconds, when the source
+    /// publishes a timeline (many browsers and some players do not).
+    pub position_ms: Option<u64>,
+    pub duration_ms: Option<u64>,
 }
 
 // Each query owns only its initialization reference; borrowed apartments remain intact.
@@ -1911,6 +1915,40 @@ fn media_session() -> Option<windows::Media::Control::GlobalSystemMediaTransport
         .join()
         .ok()?;
     mgr.GetCurrentSession().ok()
+}
+
+/// Position and length of the current track. The source reports its position
+/// only now and then, so a playing track is advanced by the time elapsed
+/// since that report.
+fn media_timeline(
+    session: &windows::Media::Control::GlobalSystemMediaTransportControlsSession,
+    playing: bool,
+) -> (Option<u64>, Option<u64>) {
+    let Ok(tl) = session.GetTimelineProperties() else {
+        return (None, None);
+    };
+    let ticks = |d: windows::Foundation::TimeSpan| (d.Duration.max(0) / 10_000) as u64;
+    let start = tl.StartTime().map(ticks).unwrap_or(0);
+    let end = tl.EndTime().map(ticks).unwrap_or(0);
+    let duration = end.saturating_sub(start);
+    if duration < 1_000 {
+        return (None, None);
+    }
+    let mut position = tl.Position().map(ticks).unwrap_or(0).saturating_sub(start);
+    if playing {
+        // DateTime counts 100 ns ticks since 1601-01-01.
+        const UNIX_TO_1601: i64 = 116_444_736_000_000_000;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as i64 / 100 + UNIX_TO_1601)
+            .unwrap_or(0);
+        if let Ok(updated) = tl.LastUpdatedTime() {
+            if updated.UniversalTime > 0 && now > updated.UniversalTime {
+                position += ((now - updated.UniversalTime) / 10_000) as u64;
+            }
+        }
+    }
+    (Some(position.min(duration)), Some(duration))
 }
 
 pub fn media_now_playing() -> Option<MediaSnapshot> {
@@ -1956,11 +1994,14 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
             base64::engine::general_purpose::STANDARD.encode(bytes)
         ))
     })();
+    let (position_ms, duration_ms) = media_timeline(&session, playing);
     Some(MediaSnapshot {
         title,
         artist,
         playing,
         thumb,
+        position_ms,
+        duration_ms,
     })
 }
 

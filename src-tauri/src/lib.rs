@@ -4,6 +4,7 @@
 //! persistence, app launching and (on Windows) native window management.
 
 mod agent_activity;
+mod agent_bridge;
 mod ai_usage;
 mod app_catalog;
 mod apps;
@@ -1243,11 +1244,11 @@ fn system_events_support() -> serde_json::Value {
     #[cfg(windows)]
     {
         use win::system_events;
-        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
+        serde_json::json!({ "media": system_events::MEDIA.load(Ordering::Relaxed), "volume": system_events::VOLUME.load(Ordering::Relaxed), "windows": system_events::WINDOWS.load(Ordering::Relaxed), "foreground": system_events::FOREGROUND.load(Ordering::Relaxed), "catalog": system_events::CATALOG.load(Ordering::Relaxed), "clipboard": system_events::CLIPBOARD.load(Ordering::Relaxed) })
     }
     #[cfg(not(windows))]
     {
-        serde_json::json!({ "media": false, "volume": false, "windows": false, "catalog": false, "clipboard": false })
+        serde_json::json!({ "media": false, "volume": false, "windows": false, "foreground": false, "catalog": false, "clipboard": false })
     }
 }
 
@@ -1516,6 +1517,31 @@ fn install_panic_hook() {
     }));
 }
 
+/// Agent status lines and hooks, answered without starting the app.
+pub fn agent_cli() -> bool {
+    agent_bridge::run_cli()
+}
+
+/// Booki's Claude Code status line and each agent's hooks (opt-in).
+#[tauri::command]
+fn agent_bridge_status() -> agent_bridge::BridgeStatus {
+    agent_bridge::status()
+}
+
+#[tauri::command]
+async fn agent_statusline_set(on: bool) -> Result<agent_bridge::BridgeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || agent_bridge::set_statusline(on))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn agent_hooks_set(agent: String, on: bool) -> Result<agent_bridge::BridgeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || agent_bridge::set_hooks(&agent, on))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
@@ -1667,6 +1693,10 @@ pub fn run() {
             known_folders,
             hide_dock,
             reveal_dock,
+            agent_bridge_status,
+            agent_statusline_set,
+            agent_hooks_set,
+            dock_window::notch_handoff,
             notch_reveal,
             notch_reveal_for_menu,
             notch_screen_busy,
@@ -1819,7 +1849,7 @@ pub fn run() {
                         reposition_surfaces(&handle);
                     }
                     if kind == "resume" {
-                        for source in ["media", "volume", "windows"] {
+                        for source in ["media", "volume", "windows", "foreground"] {
                             let _ = handle.emit(&format!("booki://{source}-changed"), ());
                         }
                     }

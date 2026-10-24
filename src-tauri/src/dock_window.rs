@@ -366,12 +366,7 @@ pub(crate) fn reveal_dock(app: AppHandle) {
         let _ = dock.set_always_on_top(cfg.always_on_top);
         let _ = dock.show();
     }
-    // Hide the notch only once the dock is up: the other order left a
-    // frame with neither on screen, a blink right where the dock grows
-    // out of the notch.
-    if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
-    }
+    schedule_notch_handoff(&app);
     let _ = app.emit("booki://soft-reveal", ());
 }
 
@@ -390,6 +385,39 @@ pub(crate) fn lift_dock_window(dock: &tauri::WebviewWindow) {
     let _ = dock.set_focus();
 }
 
+/// The notch leaves once the dock has painted its first frame of the reveal
+/// (the dock calls `notch_handoff`). Hiding it as soon as the dock window was
+/// shown left both on screen for a moment, since the dock paints a few frames
+/// later; hiding it first left neither. A fallback hides it regardless.
+static HANDOFF: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+pub(crate) fn schedule_notch_handoff(app: &AppHandle) {
+    let generation = HANDOFF.fetch_add(1, Ordering::SeqCst) + 1;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        if HANDOFF.load(Ordering::SeqCst) == generation {
+            if let Some(notch) = app.get_webview_window("notch") {
+                let _ = notch.hide();
+            }
+        }
+    });
+}
+
+/// The dock has drawn its reveal over the notch: the notch can go now.
+#[tauri::command]
+pub(crate) fn notch_handoff(app: AppHandle) {
+    HANDOFF.fetch_add(1, Ordering::SeqCst);
+    let dock_up = app
+        .get_webview_window("dock")
+        .and_then(|d| d.is_visible().ok())
+        .unwrap_or(false);
+    if dock_up {
+        if let Some(notch) = app.get_webview_window("notch") {
+            let _ = notch.hide();
+        }
+    }
+}
+
 /// Bring the already-running Booki's dock to the front (used when a second
 /// instance is launched). Shows + focuses the dock window, hides the notch
 /// (unless notch_always_visible is on), and tells the frontend to un-hide and
@@ -401,12 +429,7 @@ pub(crate) fn reveal_running_dock(app: &AppHandle) {
         let _ = dock.set_ignore_cursor_events(false);
         lift_dock_window(&dock);
     }
-    // Hide the notch only once the dock is up: the other order left a
-    // frame with neither on screen, a blink right where the dock grows
-    // out of the notch.
-    if let Some(notch) = app.get_webview_window("notch") {
-        let _ = notch.hide();
-    }
+    schedule_notch_handoff(app);
     let _ = app.emit("booki://reveal", ());
 }
 
