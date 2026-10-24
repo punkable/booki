@@ -6,14 +6,14 @@ import { pluginsForWidget } from "../widget-integrations.js";
 import PLUGINS from "../plugin-catalog.json";
 import { CollectorSettings } from "./collector-settings.jsx";
 import { notesOf } from "../notes-model.js";
-import { Row, Select, Slider, Toggle, Icon } from "./ui.jsx";
+import { InfoBar, Row, Select, Slider, Toggle, Icon } from "./ui.jsx";
 
 function Action({ children, run }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(false);
   return <div className="widget-action"><button type="button" className="button" disabled={busy} onClick={async () => {
     setBusy(true); setError(false);
     try { await run(); } catch { setError(true); } finally { setBusy(false); }
-  }}>{children}</button>{error && <p role="alert" className="notice-error">{t("overhaul.failed")}</p>}</div>;
+  }}>{children}</button>{error && <InfoBar severity="error">{t("overhaul.failed")}</InfoBar>}</div>;
 }
 
 function WeatherLocation({ style, patch }) {
@@ -35,7 +35,7 @@ function WeatherLocation({ style, patch }) {
     <form onSubmit={search}><label>{t("widgetFlow.city")}<input className="text-field" value={query} maxLength={160} onChange={(event) => { request.current++; setQuery(event.target.value); setState("idle"); setResults([]); }} /></label>
       <button type="submit" className="button" disabled={state === "loading" || !query.trim()}>{t("widgetFlow.search")}</button></form>
     {state === "loading" && <p role="status">{t("overhaul.loading")}</p>}
-    {state === "error" && <p role="alert">{t("focus.weatherError")}</p>}
+    {state === "error" && <InfoBar severity="error">{t("focus.weatherError")}</InfoBar>}
     {state === "done" && !results.length && <p role="status">{t("add.none")}</p>}
     <ul className="widget-location-results">{results.map((city, i) => <li key={`${city.latitude},${city.longitude},${i}`}><button type="button" className="button" onClick={() => {
       patch({ city: city.name, latitude: city.latitude, longitude: city.longitude }); setResults([]); setState("idle");
@@ -119,7 +119,7 @@ export function ClipboardPolicy({ cfg, set }) {
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [cfg.clipboardPersist]);
   return <>
-    {storageFailed && <p className="notice notice-error" role="alert">{t("clip.storageFailed")}</p>}
+    {storageFailed && <InfoBar severity="error">{t("clip.storageFailed")}</InfoBar>}
     <Toggle label={t("clip.memory")} hint={t("clip.memoryHint")} checked={!!cfg.clipboardPersist} onChange={(v) => set({ clipboardPersist: v })} />
     <Toggle label={t("clip.sensitive")} hint={t("clip.sensitiveHint")} checked={cfg.clipboardSensitiveGuard !== false} onChange={(v) => set({ clipboardSensitiveGuard: v })} />
     <Toggle label={t("clip.compact")} hint={t("clip.compactHint")} checked={!!cfg.clipboardCompact} onChange={(v) => set({ clipboardCompact: v })} />

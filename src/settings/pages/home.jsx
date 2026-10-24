@@ -9,7 +9,7 @@ import { activeFinish } from "../../surface.js";
 import { resolveNotchMode } from "../../notch-mode.js";
 import { currentRelease } from "../../release-notes.js";
 import { DockPreview } from "../dock-preview.jsx";
-import { Icon, PageHeader } from "../ui.jsx";
+import { Icon, InfoBar, PageHeader } from "../ui.jsx";
 
 const NOTCH_LABELS = { attached: "be.notchModeAttached", floating: "be.notchModeFloating", smart: "be.notchModeSmart" };
 
@@ -72,7 +72,7 @@ function SetupCard({ cfg, set, apps, navigate }) {
         <Icon name={autostart ? "check" : "power"} className="setup-icon" />
         <span className="setup-text"><strong>{t("be.autostart")}</strong><span>{autostart ? t("setup.startDone") : t("setup.startHint")}</span></span>
         {!autostart && <span className="setup-actions"><button type="button" className="button button-accent" disabled={busy} onClick={toggleStart}>{t("setup.startOn")}</button></span>}
-        {startFailed && <p className="notice-error" role="alert">{t("plugins.failed")}</p>}
+        {startFailed && <InfoBar severity="error">{t("plugins.failed")}</InfoBar>}
       </li>
     </ol>
   </section>;

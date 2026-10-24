@@ -773,17 +773,14 @@
 .profile-manage summary { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); cursor: pointer; }
 .profile-manage-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .profile-manage-controls .text-field { flex: 1 1 160px; width: auto; }
-.profile-empty, .profile-error { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
-.profile-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--danger-text); }
+.profile-empty { margin: 0; padding: 14px 18px; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
 .prof-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 16px; border-top: 1px solid var(--divider); }
 .profile-backup { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; margin-top: 10px; padding: 12px 18px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); box-shadow: var(--card-shadow); }
 .profile-backup h2 { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 400; line-height: calc(20px * var(--os-text-scale, 1)); }
 .profile-backup p { margin: 2px 0 0; color: var(--ink-2); font-size: calc(12.5px * var(--os-text-scale, 1)); line-height: calc(17px * var(--os-text-scale, 1)); }
 
 /* ── Notices and recovery ───────────────────────────────────────────────── */
-.recovery-notice, .settings-recovery { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 16px; background: color-mix(in srgb, #fce100 14%, var(--card)); border: 1px solid color-mix(in srgb, #fce100 40%, transparent); border-radius: var(--r-card); }
-.recovery-notice h2, .settings-recovery h2 { margin: 0; font-size: calc(14px * var(--os-text-scale, 1)); font-weight: 600; }
-.recovery-notice p, .settings-recovery p { margin: 0; }
+.recovery-notice, .settings-recovery { margin: 0 0 16px; }
 .settings-recovery > .button { align-self: flex-start; }
 .settings-recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -1247,3 +1244,23 @@
 .page-enter { animation: page-enter .3s cubic-bezier(0, 0, 0, 1) both; }
 @keyframes page-enter { from { opacity: 0; transform: translateY(28px); } }
 @media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }
+
+/* ── InfoBar (WinUI) ── tinted strip, filled severity badge, message, action. */
+.info-bar { --ib-bg: var(--card); --ib-badge: var(--accent); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 0; padding: 10px 12px 10px 14px; color: var(--ink); background: var(--ib-bg); border: 1px solid var(--card-stroke); border-radius: var(--r-control, 4px); font-size: calc(13px * var(--os-text-scale, 1)); line-height: 1.4; }
+.info-bar-success { --ib-bg: #dff6dd; --ib-badge: #0f7b0f; }
+.info-bar-warning { --ib-bg: #fff4ce; --ib-badge: #9d5d00; }
+.info-bar-error { --ib-bg: #fde7e9; --ib-badge: #c42b1c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .info-bar-success { --ib-bg: #393d1b; --ib-badge: #6ccb5f; } :root:not([data-theme="light"]) .info-bar-warning { --ib-bg: #433519; --ib-badge: #fce100; } :root:not([data-theme="light"]) .info-bar-error { --ib-bg: #442726; --ib-badge: #ff99a4; } }
+:root[data-theme="dark"] .info-bar-success { --ib-bg: #393d1b; --ib-badge: #6ccb5f; }
+:root[data-theme="dark"] .info-bar-warning { --ib-bg: #433519; --ib-badge: #fce100; }
+:root[data-theme="dark"] .info-bar-error { --ib-bg: #442726; --ib-badge: #ff99a4; }
+.info-bar-badge { flex: none; display: grid; place-items: center; width: 16px; height: 16px; color: var(--ib-bg); background: var(--ib-badge); border-radius: 50%; }
+.info-bar-badge svg { width: 11px; height: 11px; stroke-width: 3; }
+.info-bar-body { flex: 1 1 220px; min-width: 0; display: flex; flex-wrap: wrap; gap: 0 8px; }
+.info-bar-title { font-weight: 600; }
+.info-bar-action { display: flex; gap: 8px; }
+.info-bar-close { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px -4px 0; padding: 0; color: var(--ink-2); background: transparent; border: 0; border-radius: var(--r-control, 4px); cursor: pointer; }
+.info-bar-close:hover { background: var(--hover); }
+.info-bar-close svg { width: 14px; height: 14px; }
+:root[data-high-contrast] .info-bar { background: Canvas; border-color: CanvasText; }
+:root[data-high-contrast] .info-bar-badge { color: Canvas; background: CanvasText; }

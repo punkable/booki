@@ -16,6 +16,24 @@ export function Icon({ name, className = "" }) {
   return <span className={"ui-icon " + className} aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(name) }} />;
 }
 
+/** WinUI InfoBar: a tinted strip with a severity badge, a message, an
+ *  optional action and an optional close button. severity: "info" |
+ *  "success" | "warning" | "error". Errors are announced as alerts. */
+export function InfoBar({ severity = "info", title, children, action, onClose, closeLabel = "Close", className = "" }) {
+  const badge = { info: "info", success: "check", warning: "alert", error: "x" }[severity] || "info";
+  return (
+    <div className={`info-bar info-bar-${severity} ${className}`.trim()} role={severity === "error" || severity === "warning" ? "alert" : "status"}>
+      <span className="info-bar-badge" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(badge) }} />
+      <div className="info-bar-body">
+        {title ? <strong className="info-bar-title">{title}</strong> : null}
+        {children ? <span className="info-bar-message">{children}</span> : null}
+      </div>
+      {action ? <div className="info-bar-action">{action}</div> : null}
+      {onClose ? <button type="button" className="info-bar-close" aria-label={closeLabel} onClick={onClose} dangerouslySetInnerHTML={{ __html: icon("x") }} /> : null}
+    </div>
+  );
+}
+
 // ── Page structure ─────────────────────────────────────────────────────────
 
 /** Page title, optional one-line description and a right-side slot. */

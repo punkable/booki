@@ -12,6 +12,7 @@ import { useSettingsStore } from "./settings/store.js";
 import { findSettings, SEARCH_PARENT } from "./settings/search.js";
 import { NativeBackdrop } from "./settings/native-backdrop.jsx";
 import { RecoveryNotice } from "./settings/recovery-notice.jsx";
+import { InfoBar } from "./settings/ui.jsx";
 import { SettingsBoundary } from "./settings/error-boundary.jsx";
 import { ChangelogModal } from "./settings/changelog.jsx";
 import { HomePage } from "./settings/pages/home.jsx";
@@ -199,14 +200,14 @@ function App() {
         <p className={"save-status is-" + saveState} role="status" aria-live="polite">
           {configConflict ? "" : saveState === "saving" ? t("status.saving") : saveState === "saved" ? t("status.saved") : saveState === "error" ? t("status.saveError") : ""}
         </p>
-        {configConflict && <div className="notice notice-error conflict-error" role="alert"><span>{t("workspace.conflict")}</span>
+        {configConflict && <InfoBar severity="warning" className="conflict-error" action={<>
           <button type="button" className="button" onClick={() => store.resolveConfigConflict(true)}>{t("workspace.keepMine")}</button>
-          <button type="button" className="button" onClick={() => store.resolveConfigConflict(false)}>{t("workspace.useOther")}</button></div>}
-        {closeError === "failed" && <div className="notice notice-error close-error" role="alert"><span>{t("workspace.closeFailed")}</span>
-          <button type="button" className="button" onClick={() => store.close()}>{t("focus.retry")}</button></div>}
-        {closeError === "unsaved" && <div className="notice notice-error close-error" role="alert"><span>{t("workspace.closeUnsaved")}</span>
+          <button type="button" className="button" onClick={() => store.resolveConfigConflict(false)}>{t("workspace.useOther")}</button></>}>{t("workspace.conflict")}</InfoBar>}
+        {closeError === "failed" && <InfoBar severity="error" className="close-error" action={
+          <button type="button" className="button" onClick={() => store.close()}>{t("focus.retry")}</button>}>{t("workspace.closeFailed")}</InfoBar>}
+        {closeError === "unsaved" && <InfoBar severity="warning" className="close-error" action={<>
           <button type="button" className="button" onClick={() => store.close()}>{t("focus.retry")}</button>
-          <button type="button" className="button" onClick={() => store.close({ discard: true })}>{t("workspace.closeDiscard")}</button></div>}
+          <button type="button" className="button" onClick={() => store.close({ discard: true })}>{t("workspace.closeDiscard")}</button></>}>{t("workspace.closeUnsaved")}</InfoBar>}
         <NativeBackdrop cfg={cfg} />
         <RecoveryNotice revision={cfg.revision} onProfiles={() => navigate("system")} onStartFresh={store.startFresh} />
         <div key={page} className="page-enter">
