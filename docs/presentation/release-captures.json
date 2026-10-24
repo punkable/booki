@@ -1,14 +1,14 @@
 {
-  "version": "0.97.0",
+  "version": "0.98.0",
   "edition": "official",
-  "source": "eb43ebc80b0da5be6bbc1cd82958c1a82984b428c4e070a3c39da14c4fc7b1a5",
+  "source": "ab6a2b2042c64e9b402a12c6df3493839b91bccfdd2db150c7427a78d658d2b0",
   "kind": "composed browser frontend with offline placeholder app icons and example data; native blur not verified",
   "files": {
-    "docs/presentation/hero-en.jpg": "295aa670f6e73bb284bd1938b00ad2da3f10ae24d9240462a86bb32b871c8f11",
-    "docs/presentation/island-en.jpg": "f6011b08c22eccb3c49713d5594992fc1f86bade357e0558e18172e7cb76611f",
-    "docs/presentation/groups-en.jpg": "09835f8f73429f21a3c3dad0d394085cd2f75ff54e6bfafce17729907616aef7",
-    "docs/presentation/widgets-en.jpg": "777628633a04f84ab768bd24d9f4d5807bd5856da90665fb9de57099845eb9d6",
-    "docs/presentation/settings-en.jpg": "19cf97d32eb04b3904b209c2d3afc71b1a216c9c90a19c2b7d0965fb3f0dc5f9",
-    "docs/presentation/dark-en.jpg": "539cac58f167409e9f064295939ceaf1e19185b20e68cea4ee7f4413325542c2"
+    "docs/presentation/hero-en.jpg": "57e5e029193a948270d48e50009d95a9e3c7a161836f40c1d4a5c42a1b74a421",
+    "docs/presentation/island-en.jpg": "6acf8f1827b98db26951d03b48dfdf974aeb0961f9a6082e105ce2691240b97b",
+    "docs/presentation/groups-en.jpg": "b733fd3717c7e9008afae5e9a3c8036ba53f93b3d2d69d1cc987e8d2eced318a",
+    "docs/presentation/widgets-en.jpg": "60e32e0efa09954b4243da18c899d69032d58c9280c490b86e1c45ace2296105",
+    "docs/presentation/settings-en.jpg": "3946b719aade318ccabe3d63e2818d9d221481c2e89f3fdc648c7f1a20297ee2",
+    "docs/presentation/dark-en.jpg": "78d65f2280ab7fd53e86dde0c4444e3be74852f708b2ce29b3ff5175605f360b"
   }
 }
