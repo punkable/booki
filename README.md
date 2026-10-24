@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_x64-setup.exe"><b>Download for Windows v0.97.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.97.0/Booki_0.97.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.97.0.md">What's new v0.97.0</a>
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.1/Booki_0.97.1_x64-setup.exe"><b>Download for Windows v0.97.1 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.1/Booki_0.97.1_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v0.97.1/Booki_0.97.1_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v0.97.1.md">What's new v0.97.1</a>
 </p>
 <!-- booki:download:end -->
 
@@ -90,25 +90,18 @@
 <p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and, if you opt in, Claude Code's status line and agent hook events; never sign-ins, tokens, credential files or the network" /></p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.97.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v0.97.1, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.97.0
+## What's new in 0.97.1
 
-Booki now understands your AI agents better: Claude's real plan usage and exact states for Claude Code, Codex, Gemini CLI and Cursor, plus flicker-free glass and Windows 11 controls.
+Fixes the expanded dock blocking clicks on the lower half of the screen.
 
-- Optional: the AI widget shows Claude's real 5-hour and 7-day percentages, which Claude Code hands to its status line. Your own status line keeps showing.
-- Optional: through Claude Code, Codex, Gemini CLI and Cursor hooks the notch knows at once whether an agent is working, waiting for your permission or done. Only the event kind is kept; no credentials, no network.
-- The notch card shows song progress, focus and battery with a thin bar, plus the working agent's logo and turn time. States take turns on their own and anything urgent stays put.
-- Menus, groups and the notch card no longer show the desktop for a moment when they open on glass; the notch hands over to the dock without both showing.
-- Switches, sliders, notices and tips behave like Windows 11: the switch can be dragged, the slider shows its value and notices use InfoBar.
-- Clipboard history looks like Win+V: pinned items first, a three-line preview and when it was copied.
-- Folders scroll like Explorer and load more as you reach the end; Home shows the dock at real size.
-- Logitech keyboards charging by cable while on Bolt show as charging, and a percentage that contradicts the keyboard's own level is no longer shown.
-- The notch and agent detection react to Windows notices instead of checking every few seconds, and dependencies with security fixes were updated.
+- After it was shown again, the dock's whole transparent window kept capturing clicks, so programs on the lower half of the screen could not be moved or used until the pointer crossed the bar.
+- Under Real Claude plan usage, Booki says whether Claude Code calls it and sends your plan usage, so you can tell why it does not show.
 
-[Full release notes](docs/releases/v0.97.0.md)
+[Full release notes](docs/releases/v0.97.1.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -124,9 +117,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [0.97.0](docs/releases/v0.97.0.md) | Booki now understands your AI agents better: Claude's real plan usage and exact states for Claude Code, Codex, Gemini CLI and Cursor, plus flicker-free glass and Windows 11 controls. |
 | [0.96.0](docs/releases/v0.96.0.md) | Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates. |
 | [0.95.1](docs/releases/v0.95.1.md) | Clearer settings, consistent click activation and fixes for saving, captures and notices. |
-| [0.95.0](docs/releases/v0.95.0.md) | A smoother Booki: clearer groups, a quieter notch and a fuller Collector. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->
