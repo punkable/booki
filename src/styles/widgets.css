@@ -711,3 +711,17 @@ details.reading-card .system-widget-readings dt { color: var(--ink-2); }
 .reading-card-action.has-error { color: var(--danger, #c42b1c); }
 .panel-stamp[title] { cursor: help; }
 .focus-icon-button[role="switch"][aria-checked="true"] { color: var(--accent-contrast, #1b1b1b); background: var(--accent); }
+/* Notes: chips for each note under the header, the text without a box, and
+   a quiet footer with the save state and Delete. */
+.note-strip { display: flex; gap: 6px; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.note-strip[hidden] { display: none; }
+.note-chip { flex: none; max-width: 140px; padding: 4px 10px; overflow: hidden; color: var(--ink-2); font: inherit; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-radius: 999px; cursor: pointer; }
+.note-chip:hover { color: var(--ink); }
+.note-chip[aria-selected="true"] { color: var(--accent-contrast, #1b1b1b); background: var(--accent); border-color: transparent; font-weight: 600; }
+.note-editor .note-input { border-color: transparent; background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.note-editor .note-input:focus { background: var(--ctrl-fill); }
+.note-save-state { display: flex; align-items: center; gap: 8px; }
+.note-save-state [role="status"] { flex: 1; color: var(--ink-2); font-size: 12px; }
+.note-delete.is-armed { color: #fff; background: var(--danger, #c42b1c); }
+.note-editor.note-workspace .note-input { border: 1px solid transparent; border-radius: 8px; resize: none; }
+.note-editor.note-workspace .note-input:focus { border-color: transparent; border-bottom-color: var(--accent); outline: none; }

@@ -52,12 +52,13 @@ test('widget targets select the exact nested copy, including a repeated request 
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: pins }), initScript: `
     const old=window.__TAURI__.core.invoke; window.target='widget:two';
     window.__TAURI__.core.invoke=(cmd,args)=>cmd==='take_pending_tab'?Promise.resolve(window.target):old(cmd,args);` });
-  await page.locator('.inspector textarea').waitFor();
-  assert.equal(await page.locator('.inspector textarea').inputValue(), 'Second');
-  await page.getByRole('combobox', { name: 'Widget being configured', exact: true }).selectOption('one');
-  assert.equal(await page.locator('.inspector textarea').inputValue(), 'First');
+  const copy = page.getByRole('combobox', { name: 'Widget being configured', exact: true });
+  await copy.waitFor();
+  assert.equal(await copy.inputValue(), 'two');
+  await copy.selectOption('one');
+  assert.equal(await copy.inputValue(), 'one');
   await signal(page, 'booki://show-tab', null);
-  await waitForAsyncCondition(page, () => document.querySelector('.inspector textarea')?.value === 'Second');
+  await waitForAsyncCondition(page, () => document.querySelector('.inspector select')?.value === 'two');
   assert.deepEqual(errors, []); await page.close();
 });
 

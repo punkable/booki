@@ -5,6 +5,7 @@ import { SYSTEM_METRICS, systemMetrics, metricLabel } from "../widgets-meta.js";
 import { pluginsForWidget } from "../widget-integrations.js";
 import PLUGINS from "../plugin-catalog.json";
 import { CollectorSettings } from "./collector-settings.jsx";
+import { notesOf } from "../notes-model.js";
 import { Row, Select, Slider, Toggle, Icon } from "./ui.jsx";
 
 function Action({ children, run }) {
@@ -92,7 +93,7 @@ export function WidgetContent({ item, cfg, set, patch }) {
     </>}
     {widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(scrollVolume) => patch({ scrollVolume })} />}
     {widget === "volume" && <Row label={t("widgetFlow.volumeStep")} stack><Slider value={style.volumeStep || 3} min={1} max={10} step={1} fmt={(value) => `${value}%`} onChange={(volumeStep) => patch({ volumeStep })} /></Row>}
-    {widget === "notes" && <Row label={t("w.note")} stack><textarea className="text-field" aria-label={t("w.note")} rows={6} maxLength={20000} value={style.note || ""} placeholder={t("w.notesEmpty")} onChange={(event) => patch({ note: event.target.value })} /></Row>}
+    {widget === "notes" && <p className="inline-note">{t("notes.where").replace("{n}", () => notesOf(style).length)}</p>}
     {widget === "focus" && <>
       <Row label={t("widgetFlow.duration")} hint={style.endsAt ? t("widgetFlow.runningDuration") : undefined} stack><Slider value={Number(style.minutes) || 25} min={1} max={180} step={1} fmt={(value) => `${value} min`} onChange={(minutes) => patch(style.endsAt ? { minutes } : { minutes, remaining: null })} /></Row>
       <Toggle label={t("focus.dnd")} hint={t("focus.dndHint")} checked={style.dnd === true} onChange={(dnd) => patch({ dnd })} />

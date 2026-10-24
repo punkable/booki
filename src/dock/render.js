@@ -1,4 +1,5 @@
 /* Building the bar: one tile per pin, swapped in as a single DOM update. */
+import { notesOf, activeNote, noteTitle } from "../notes-model.js";
 
 import { dock as dockApi } from "../api.js";
 import { imageSrc } from "../image-src.js";
@@ -424,7 +425,9 @@ export function widgetTile(item, { inFlyout = false } = {}) {
   if (["clock", "focus", "calendar", "weather"].includes(type)) tickClocks();
   if (type === "notes") {
     el.querySelector(".w-pv-title").textContent = t("w.notes");
-    setPreviewSubText(el, st.note || t("w.notesEmpty"), !st.note);
+    const list = notesOf(st), first = noteTitle(activeNote(st).text);
+    const sub = list.length > 1 ? `${first || t("w.notesEmpty")} · ${t("notes.count").replace("{n}", () => list.length)}` : first;
+    setPreviewSubText(el, sub || t("w.notesEmpty"), !sub);
     setTileLabel(el, widgetLabel("notes"));
   }
   if (type === "clipboard") {
