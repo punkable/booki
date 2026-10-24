@@ -35,6 +35,7 @@ test("adding apps displays local usage in order and reaches installed apps beyon
     };
   });
   await page.getByRole("button", { name: "Apps & folders", exact: true }).click();
+  await page.getByRole("button", { name: "Add apps", exact: true }).click();
   await page.locator(".app-library-card").first().waitFor();
   assert.deepEqual((await page.locator(".app-library-card > span:nth-child(2)").allTextContents()).slice(0, 2), ["Zed", "Atom"]);
   await page.getByRole("button", { name: "Add app: Zed", exact: true }).click();

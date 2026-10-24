@@ -33,7 +33,7 @@ test('Library keeps pin labels visible in short windows and Escape returns to th
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
   // The dock's own items live in one labelled Add menu, readable without hovering.
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'New', exact: true }).click();
   for (const name of ['Group', 'Add Settings icon', 'Separator', 'Recycle Bin']) {
     const item = page.getByRole('menuitem', { name, exact: true });
     assert.ok((await item.innerText()).trim().length > 0);
@@ -47,9 +47,13 @@ test('Library keeps pin labels visible in short windows and Escape returns to th
   });
   assert.ok(visibleLabel, 'the pin name is inside the scroll strip');
   await pin.click();
-  await page.locator('.library-inspector').press('Escape');
-  assert.equal(await pin.evaluate((button) => button === document.activeElement), true);
-  assert.equal(await page.locator('.library-inspector').isVisible(), false);
+  // The item's page opens; Escape goes back and returns focus to the pin.
+  await page.locator('.library-inspector').waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true }).waitFor();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true }).evaluate((button) => button === document.activeElement), true);
+  assert.equal(await page.locator('.library-inspector').count(), 0);
   assert.deepEqual(errors, []);
   await page.close();
 });

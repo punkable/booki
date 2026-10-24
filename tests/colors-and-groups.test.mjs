@@ -117,7 +117,8 @@ test("choosing 'Like Windows' hides the palette and paints the Windows accent", 
   const palette = page.getByRole("group", { name: "Accent color" });
   await palette.waitFor();
   assert.equal(await page.getByText("Mocha Mousse · PANTONE 17-1230").count(), 1, "the picked colour is named");
-  await page.getByRole("radio", { name: "Like Windows" }).click();
+  // The source is a drop-down, as in Windows Settings > Colors.
+  await page.getByRole("combobox", { name: "Accent color", exact: true }).selectOption("windows");
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).colorSource === "windows");
   assert.equal(await palette.count(), 0);
   await waitForAsyncCondition(page, () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() === "#0078d4");

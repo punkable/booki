@@ -14,7 +14,11 @@ const settings = async (cfg, initScript = '', viewport = { width: 1150, height: 
   await opened.page.getByRole('navigation').getByRole('button', { name: 'Widgets', exact: true }).click();
   return opened;
 };
-const inspect = async (page, name) => page.locator('.catalog-card').filter({ hasText: name }).first().click();
+// A widget opens as its own page; go back to the gallery first if one is open.
+const inspect = async (page, name) => {
+  if (await page.locator('.ui-breadcrumb-parent').count()) await page.locator('.ui-breadcrumb-parent').click();
+  await page.locator('.catalog-card').filter({ hasText: name }).first().click();
+};
 
 for (const grouped of [false, true]) test(`all 15 ${grouped ? 'grouped' : 'dock'} widgets open usable content without entering Settings`, async () => {
   for (const type of WIDGET_ORDER) {

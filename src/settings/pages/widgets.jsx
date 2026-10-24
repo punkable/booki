@@ -7,10 +7,9 @@ import { WidgetContent, WidgetConnections } from "../widget-content.jsx";
 import { pluginsForWidget, pinnedWidgetInstances } from "../../widget-integrations.js";
 import { findPin, updatePin, removePin } from "../../pins.js";
 import { widgetRefs } from "../pin-model.js";
-import { Inspector } from "../inspector.jsx";
 import { WidgetPreview } from "../dock-preview.jsx";
 import { AccentPicker } from "../controls.jsx";
-import { Icon, PageHeader, Row, SegmentedControl } from "../ui.jsx";
+import { BreadcrumbHeader, Icon, PageHeader, Row, SegmentedControl } from "../ui.jsx";
 
 const name = (widget) => widgetDisplayName(widget, t);
 const CATEGORIES = [["all", "design.allWidgets", "grid"], ["time", "widgets.time", "clock"], ["system", "overhaul.system", "cpu"], ["media", "w.media", "music"], ["tools", "design.utilityWidgets", "sliders"]];
@@ -47,7 +46,7 @@ function WidgetFields({ item, cfg, set, onChange }) {
 function CatalogCard({ widget, count, selected, style, onInspect, onAdd }) {
   const meta = WIDGET_META[widget];
   const pinned = count > 0;
-  return <article className="card catalog-card" data-selected={selected || undefined} style={{ "--widget-accent": meta.accent }}>
+  return <article className="card catalog-card" data-widget={widget} data-selected={selected || undefined} style={{ "--widget-accent": meta.accent }}>
     <button type="button" className="catalog-open" aria-pressed={selected} aria-label={`${name(widget)}${pinned ? `, ${t("widget.pinned")}` : ""}`} onClick={onInspect}>
       <span className="catalog-preview" aria-hidden="true"><span className="catalog-stage"><WidgetPreview widget={widget} style={style} size={widget === "system" ? 30 : 40} /></span></span>
       <span className="catalog-head">
@@ -70,7 +69,7 @@ function OnDock({ cfg, selectedId, onPick }) {
   return <section className="widgets-on-dock" aria-labelledby="widgets-on-dock-title">
     <h2 id="widgets-on-dock-title">{t("gallery.onDock")} <span className="count">{pins.length}</span></h2>
     {pins.length ? <ul>{pins.map((pin) => <li key={pin.id}>
-      <button type="button" className="widgets-on-dock-item" aria-pressed={selectedId === pin.id} style={{ "--widget-accent": WIDGET_META[pin.widget]?.accent }}
+      <button type="button" data-pin-id={pin.id} className="widgets-on-dock-item" aria-pressed={selectedId === pin.id} style={{ "--widget-accent": WIDGET_META[pin.widget]?.accent }}
         aria-label={t("widgetFlow.configureNamed").replace("{name}", () => pin.style?.device || name(pin.widget))} onClick={(event) => onPick(pin.id, event.currentTarget)}>
         <span className="on-dock-preview" aria-hidden="true"><WidgetPreview widget={pin.widget} style={pin.style} size={32} /></span>
         <span className="on-dock-name"><span className="catalog-icon" dangerouslySetInnerHTML={glyph(pin.widget)} />{pin.style?.device || name(pin.widget)}</span>
@@ -111,10 +110,38 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const widgets = WIDGET_ORDER.filter((widget) => (category === "all" || WIDGET_META[widget].category === category)
     && words.every((word) => fold(`${name(widget)} ${t(WIDGET_META[widget].desc)}`).includes(word)));
   const instances = selected ? pinnedWidgetInstances(cfg.pinned, selected.widget) : [];
+  // Windows Settings: a chosen widget opens as its own page, full width,
+  // with "Widgets › name" to go back. Nothing is squeezed into a side column.
+  // The gallery is drawn anew on return, so focus finds the widget again.
+  const back = () => {
+    const id = saved?.id, widget = selected?.widget;
+    selectId(null); setDraft(null);
+    requestAnimationFrame(() => (document.querySelector(`.widgets-on-dock-item[data-pin-id="${CSS.escape(id || '')}"]`)
+      || document.querySelector(`.catalog-card[data-widget="${CSS.escape(widget || '')}"] .catalog-open`))?.focus());
+  };
+  if (selected) return <>
+    <BreadcrumbHeader parent={t("tab.widgets")} title={saved?.style?.device || name(selected.widget)} onBack={back} />
+    <div className="inspector widget-sheet widget-page" style={{ "--widget-accent": WIDGET_META[selected.widget]?.accent }}>
+      <header className="widget-page-hero">
+        <span className="widget-page-stage"><span className="catalog-stage"><WidgetPreview widget={selected.widget} style={selected.style || {}} size={56} /></span></span>
+        <div className="widget-page-text">
+          <h2><span className="catalog-icon" dangerouslySetInnerHTML={glyph(selected.widget)} />{name(selected.widget)}</h2>
+          <p>{saved ? (saved.group ? t("gallery.inGroup").replace("{group}", () => saved.group) : t("gallery.onDock")) : t(WIDGET_META[selected.widget]?.desc || "widget.defaultDesc")}</p>
+          {saved && instances.length > 1 && <label className="widget-page-instance"><span>{t("widgetFlow.instance")}</span><select className="text-field" aria-label={t("widgetFlow.instance")} value={saved.id} onChange={(event) => selectId(event.target.value)}>{instances.map((pin, index) => <option key={pin.id} value={pin.id}>{pin.style?.device || pin.name || name(pin.widget)} · {pin.group || t("tab.dock")} · {index + 1}</option>)}</select></label>}
+        </div>
+        <div className="widget-page-actions">
+          {saved
+            ? <button type="button" className="button button-danger-subtle" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); back(); }}><Icon name="trash" />{t("apps.remove")}</button>
+            : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}><Icon name="plus" />{t("widget.add")}</button>}
+        </div>
+      </header>
+      <WidgetFields key={`${selected.id}:${selected.widget}`} item={selected} cfg={cfg} set={set} onChange={change} />
+    </div>
+  </>;
   return <>
     <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
     <OnDock cfg={cfg} selectedId={saved?.id} onPick={pick} />
-    <div className="split widgets-split">
+    <div className="widgets-split">
       <section className="widgets-explore" aria-labelledby="widgets-explore-title">
         <div className="widgets-explore-head">
           <h2 id="widgets-explore-title">{t("gallery.explore")}</h2>
@@ -132,22 +159,6 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
           {!widgets.length && <p className="empty" role="status">{t("add.none")}</p>}
         </div>
       </section>
-      <Inspector className="inspector widget-sheet" dismissible selectionKey={selected?.id} origin={origin} onBack={() => { selectId(null); setDraft(null); }}>
-        {selected && <>
-          <header className="inspector-head" style={{ "--widget-accent": WIDGET_META[selected.widget]?.accent }}>
-            <span className="catalog-icon" dangerouslySetInnerHTML={glyph(selected.widget)} />
-            <div><h2>{name(selected.widget)}</h2><p>{saved ? (saved.group ? `${t("gallery.inGroup").replace("{group}", () => saved.group)}` : t("gallery.onDock")) : t(WIDGET_META[selected.widget]?.desc || "widget.defaultDesc")}</p></div>
-          </header>
-          <div className="inspector-preview"><span className="catalog-stage"><WidgetPreview widget={selected.widget} style={selected.style || {}} size={52} /></span></div>
-          {saved && instances.length > 1 && <Row label={t("widgetFlow.instance")}><select className="text-field" aria-label={t("widgetFlow.instance")} value={saved.id} onChange={(event) => selectId(event.target.value)}>{instances.map((pin, index) => <option key={pin.id} value={pin.id}>{pin.style?.device || pin.name || name(pin.widget)} · {pin.group || t("tab.dock")} · {index + 1}</option>)}</select></Row>}
-          <WidgetFields key={`${selected.id}:${selected.widget}`} item={selected} cfg={cfg} set={set} onChange={change} />
-          <div className="inspector-actions">
-            {saved
-              ? <button type="button" className="button button-danger-subtle" onClick={() => { set({ pinned: removePin(cfg.pinned, saved.id) }); selectId(null); if (origin.current?.isConnected) origin.current.focus(); }}><Icon name="trash" />{t("apps.remove")}</button>
-              : <button type="button" className="button button-accent" onClick={() => { set({ pinned: [...cfg.pinned, draft] }); selectId(draft.id); setDraft(null); }}><Icon name="plus" />{t("widget.add")}</button>}
-          </div>
-        </>}
-      </Inspector>
     </div>
   </>;
 }

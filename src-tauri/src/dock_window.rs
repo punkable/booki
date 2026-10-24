@@ -363,6 +363,7 @@ pub(crate) fn reveal_dock(app: AppHandle) {
         // the user is working in. A direct notch click uses notch_reveal below.
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
+        crate::CURSOR_RESYNC.store(true, Ordering::Release);
         let _ = dock.set_always_on_top(cfg.always_on_top);
         let _ = dock.show();
     }
@@ -427,6 +428,7 @@ pub(crate) fn reveal_running_dock(app: &AppHandle) {
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
+        crate::CURSOR_RESYNC.store(true, Ordering::Release);
         lift_dock_window(&dock);
     }
     schedule_notch_handoff(app);

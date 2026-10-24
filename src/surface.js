@@ -16,15 +16,22 @@
 export const SURFACE_STYLES = ["taskbar", "glass", "solid"];
 
 /** Preset fill colours. Labels live in i18n (`tint.<id>`). */
+// Booki's own fills: quiet darks, then quiet lights, each holding up as
+// glass and as solid. Deep Mocha Mousse and Cloud Dancer come from the
+// suggested palette.
 export const SURFACE_TINT_PRESETS = [
   ["black", "#000000"],
   ["graphite", "#1c1c1c"],
   ["slate", "#2d2d30"],
-  ["night", "#0b1a2a"],
-  ["white", "#f3f3f3"],
-  // Deep Mocha Mousse and Cloud Dancer, from the suggested palette.
   ["mocha", "#2b211c"],
+  ["night", "#0b1a2a"],
+  ["forest", "#13201a"],
+  ["plum", "#221a2b"],
+  ["white", "#f3f3f3"],
   ["cloud", "#f0eee9"],
+  ["sand", "#efe6da"],
+  ["mist", "#e6edf2"],
+  ["blush", "#f3e8e6"],
 ];
 
 const LEGACY_SURFACES = { acrylic: "glass", tinted: "glass", liquid: "glass", island: "glass", clear: "glass", windows: "solid", mica: "solid" };

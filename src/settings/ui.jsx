@@ -49,6 +49,23 @@ export function PageHeader({ title, children, meta }) {
   );
 }
 
+/** A subpage title, as in Windows 11 Settings: "Widgets › AI usage", where
+ *  the parent is a link back. Escape anywhere on the page goes back too. */
+export function BreadcrumbHeader({ parent, title, onBack }) {
+  useEffect(() => {
+    const key = (event) => { if (event.key === "Escape" && !event.defaultPrevented && !document.querySelector(".modal-scrim, .fluent-select-pop")) { event.preventDefault(); onBack(); } };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [onBack]);
+  return <header className="ui-page-head ui-breadcrumb">
+    <h1>
+      <button type="button" className="ui-breadcrumb-parent" onClick={onBack}>{parent}</button>
+      <Icon name="chevron-right" className="ui-breadcrumb-sep" />
+      <span aria-current="page">{title}</span>
+    </h1>
+  </header>;
+}
+
 /** A titled group of rows. `icon` draws the page-coloured section glyph,
  *  `desc` a line under the title, `hint` a footer under the group. */
 export function SettingsSection({ title, icon: glyph, desc, hint, children, className = "" }) {

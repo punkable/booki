@@ -127,6 +127,13 @@ static HIT_RECTS: HitRegions = Mutex::new((Vec::new(), true));
 /// transparent padding would block clicks on apps behind it.
 #[allow(clippy::type_complexity)]
 static NOTCH_HIT_RECTS: HitRegions = Mutex::new((Vec::new(), false));
+/// Set when something made a window interactive behind the cursor watcher's
+/// back (a reveal). The watcher caches what it last applied, so without this
+/// it never made the window click-through again: the dock's tall transparent
+/// window then swallowed clicks over half the screen until the pointer
+/// crossed the bar.
+pub(crate) static CURSOR_RESYNC: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 static DOCK_HOME_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 
@@ -2263,6 +2270,11 @@ pub fn run() {
                                 win::material::sync();
                                 // Shortest interval any target asks for this tick.
                                 let mut next_ms = 180u64;
+                                if CURSOR_RESYNC.swap(false, Ordering::AcqRel) {
+                                    for t in targets.iter_mut() {
+                                        t.last = None;
+                                    }
+                                }
                                 for t in targets.iter_mut() {
                                     let (rects, all) = match t.rects.lock() {
                                         Ok(g) => g.clone(),

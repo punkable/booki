@@ -1267,3 +1267,107 @@
 .info-bar-close svg { width: 14px; height: 14px; }
 :root[data-high-contrast] .info-bar { background: Canvas; border-color: CanvasText; }
 :root[data-high-contrast] .info-bar-badge { color: Canvas; background: CanvasText; }
+
+/* Colour settings, as in Windows 11 Settings > Personalization > Colors:
+   one card per colour with a preview, what it is now and a drop-down for
+   its source; choosing by hand unfolds a swatch grid under a divider. */
+.color-setting { box-sizing: border-box; width: 100%; overflow: hidden; background: var(--ctrl-fill, var(--card)); border: 1px solid var(--card-stroke, var(--control-stroke)); border-radius: var(--r-card, 8px); }
+.color-setting-head { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; }
+.color-setting-preview { flex: none; width: 32px; height: 32px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent); transition: background var(--dur-2, .2s) var(--ease, ease); }
+.color-setting-name { flex: 1; min-width: 0; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
+.color-setting-head .ui-select { flex: none; min-width: 168px; }
+.color-setting-body { display: grid; gap: 14px; padding: 14px 12px 14px 56px; border-top: 1px solid var(--divider, var(--card-stroke)); animation: color-unfold var(--dur-3, .25s) var(--ease-out, ease-out); }
+@keyframes color-unfold { from { opacity: 0; transform: translateY(-4px); } }
+.color-group { display: grid; gap: 8px; }
+.color-group-title { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); font-weight: 600; }
+.color-setting .swatches { gap: 6px; }
+.color-setting .swatch { width: 36px; height: 36px; }
+.color-setting .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ctrl-fill, var(--card)), 0 0 0 4px var(--accent); }
+/* Light fills get a dark check so it stays visible. */
+.color-setting .swatch[aria-pressed="true"]::after { background: #fff; }
+.color-group:last-child .swatch[aria-pressed="true"]::after { background: #1b1b1b; filter: none; }
+@media (prefers-reduced-motion: reduce) { .color-setting-body { animation: none; } }
+@container page (max-width: 560px) { .color-setting-body { padding-left: 12px; } .color-setting-head { flex-wrap: wrap; } .color-setting-head .ui-select { width: 100%; } }
+
+/* ── Apps & folders, WinUI 3 layout ─────────────────────────────────────
+   A CommandBar on top, the dock's grid on the left and its details on the
+   right as setting cards; adding apps happens in a ContentDialog. */
+.library-commandbar { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; margin: -4px 0 12px; }
+.library-commandbar .add-menu-list { right: auto; left: 0; }
+.library-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: 12px; }
+.library-workspace:has(> .library-inspector[data-empty="true"]) { grid-template-columns: minmax(0, 1fr) 300px; }
+.library-workspace .library-dock-editor { margin: 0; }
+.library-pin-strip { max-height: min(420px, 55vh); }
+.library-inspector, .library-inspector[data-empty="true"] { display: flex; top: 0; gap: 0; padding: 0; }
+.library-inspector > :not(.inspector-back):not(.inspector-dismiss):not(.library-inspector-title) { margin: 0; }
+.library-detail-head { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--divider); }
+.library-detail-head > :first-child { flex: none; width: 48px; height: 48px; }
+.library-detail-title { flex: 1; min-width: 0; }
+.library-detail-title h2 { margin: 0; overflow: hidden; font-size: calc(16px * var(--os-text-scale, 1)); line-height: calc(22px * var(--os-text-scale, 1)); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.library-detail-title p { margin: 2px 0 0; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); }
+.library-detail-head .add-menu-list { right: 0; left: auto; }
+.library-detail-cards { display: grid; gap: 4px; padding: 12px; }
+.library-card { display: grid; gap: 8px; padding: 12px 14px; background: var(--ctrl-fill, var(--subtle-pressed)); border: 1px solid var(--card-stroke); border-radius: var(--r-card, 8px); }
+.library-card-row { grid-template-columns: 1fr auto; align-items: center; }
+.library-card-title, .library-field > span { color: var(--ink); font-size: calc(13px * var(--os-text-scale, 1)); font-weight: 600; }
+.library-card-hint { margin: 0; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: 1.4; }
+.library-card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.library-card-actions .button { flex: 1 1 auto; justify-content: center; }
+.library-card .group-look { margin: 0; }
+.library-path { margin: 0; color: var(--ink-2); font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: calc(11.5px * var(--os-text-scale, 1)); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.library-card-warning { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--danger-text, #c42b1c); font-size: calc(12px * var(--os-text-scale, 1)); }
+.library-card-warning svg { width: 14px; height: 14px; }
+.library-inspector .library-field { display: grid; gap: 8px; }
+.library-inspector .library-field input { height: 32px; padding: 0 10px; color: var(--ink); font: inherit; font-size: calc(14px * var(--os-text-scale, 1)); background: var(--field); border: 1px solid var(--control-stroke); border-bottom-color: var(--ctrl-strong-stroke, var(--control-stroke)); border-radius: var(--r-control); outline: none; }
+.library-inspector .library-field input:focus { border-bottom: 2px solid var(--accent); }
+.library-detail-empty { display: grid; justify-items: center; gap: 8px; padding: 32px 24px; color: var(--ink-2); text-align: center; }
+.library-detail-empty > svg { width: 32px; height: 32px; color: var(--accent); }
+.library-detail-empty strong { color: var(--ink); font-size: calc(14px * var(--os-text-scale, 1)); }
+.library-detail-empty p { margin: 0; font-size: calc(12px * var(--os-text-scale, 1)); line-height: 1.5; }
+.add-menu-list .menu-danger { color: var(--danger-text, #c42b1c); }
+.add-menu-icon .icon-button { width: 32px; height: 32px; }
+/* The Add apps dialog is wide: the catalog is a grid. */
+.library-add-dialog { width: min(960px, 100%); height: min(760px, 100%); max-height: min(760px, 100%); }
+.library-add-dialog .modal-body { padding: 20px 24px 16px; }
+.library-add-dialog .library-header { margin-bottom: 4px; }
+.app-library-card.chosen { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }
+@container page (max-width: 640px) {
+  .library-workspace, .library-workspace:has(> .library-inspector[data-empty="true"]) { grid-template-columns: minmax(0, 1fr); }
+  .library-inspector[data-empty="true"] { display: none; }
+}
+
+/* ── Subpages, as in Windows 11 Settings ────────────────────────────────
+   "Parent › Item" is the page title; the parent is a link back. */
+.ui-breadcrumb h1 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.ui-breadcrumb-parent { padding: 0 4px; margin: 0 -4px; color: var(--ink-2); font: inherit; background: none; border: 0; border-radius: var(--r-control); cursor: pointer; }
+.ui-breadcrumb-parent:hover { color: var(--ink); background: var(--subtle-hover); }
+.ui-breadcrumb-parent:focus-visible { outline: 2px solid var(--focus-ring); }
+.ui-breadcrumb-sep { width: 18px; height: 18px; color: var(--ink-3, var(--ink-2)); }
+.ui-breadcrumb [aria-current] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-enter:has(> .ui-breadcrumb) { animation-name: subpage-in; }
+@keyframes subpage-in { from { opacity: 0; transform: translateX(24px); } }
+
+/* Widgets: gallery full width; a widget's own page with its preview on top. */
+.widgets-split { display: block; }
+.widget-page { position: static; display: flex; flex-direction: column; overflow: hidden; }
+.widget-page-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 20px; padding: 20px; background: linear-gradient(135deg, color-mix(in srgb, var(--widget-accent, var(--accent)) 16%, var(--card)), var(--card)); border-bottom: 1px solid var(--divider); }
+.widget-page-stage { flex: none; display: grid; place-items: center; width: 120px; height: 96px; background: var(--subtle-pressed); border-radius: var(--r-card); }
+.widget-page-text { flex: 1 1 220px; min-width: 0; display: grid; gap: 4px; }
+.widget-page-text h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: calc(20px * var(--os-text-scale, 1)); line-height: 1.3; font-weight: 600; }
+.widget-page-text p { margin: 0; color: var(--ink-2); font-size: calc(13px * var(--os-text-scale, 1)); }
+.widget-page-instance { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); }
+.widget-page-actions { display: flex; gap: 8px; margin-left: auto; }
+.widget-page .widget-settings-workspace { padding: 0 8px 12px; }
+.widget-page .widget-settings-tabs { padding: 0 12px; }
+@media (prefers-reduced-motion: reduce) { .page-enter:has(> .ui-breadcrumb) { animation: none; } }
+/* Your dock's widgets wrap instead of scrolling sideways. */
+.widgets-on-dock ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); overflow: visible; }
+.widgets-on-dock-item { width: 100%; }
+.widget-page-stage { width: auto; min-width: 120px; padding: 12px 16px; }
+
+/* Apps & folders item page: the group's contents (when it is one), then
+   its settings as cards, full width. */
+.library-page { position: static; display: block; margin-top: 16px; background: var(--card); border: 1px solid var(--card-stroke); border-radius: var(--r-card); outline: none; }
+.library-page .library-detail-cards { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; padding: 16px; }
+.library-page .library-field { grid-column: 1 / -1; }
+.ui-breadcrumb + .library-dock-editor, .ui-breadcrumb ~ [role="alert"] + .library-dock-editor { margin-bottom: 0; }

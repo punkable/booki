@@ -75,7 +75,11 @@ export function AppLibrary({ cfg, set, listInstalled, browseFile, browseFolder, 
     setSelected({}); setMessage(t('add.added'));
   };
   const cards = (candidates, suggestions = false) => <div className="app-library-grid">{candidates.map((c) => <div className="app-library-choice" key={appKey(c, data.identities)}>
-    <button type="button" aria-label={`${t("next.inspector")}: ${c.name}`} className={'app-library-card' + (c.pinned ? ' pinned' : '')} onClick={() => onInspect?.(c)} title={c.path}
+    <button type="button" aria-label={`${onInspect ? t("next.inspector") : t("premium.selectApp")}: ${c.name}`} aria-pressed={onInspect ? undefined : !!selected[appKey(c, data.identities)]}
+      className={'app-library-card' + (c.pinned ? ' pinned' : '') + (selected[appKey(c, data.identities)] ? ' chosen' : '')} title={c.path}
+      // Without an inspector (the Add apps dialog), a click picks the app for
+      // "Add selected"; its + adds it straight away.
+      onClick={() => { if (onInspect) onInspect(c); else if (!c.pinned) setSelected((prev) => ({ ...prev, [appKey(c, data.identities)]: prev[appKey(c, data.identities)] ? null : c })); }}
       draggable={!c.pinned} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData(PIN_DRAG_TYPE, JSON.stringify({ id: crypto.randomUUID(), kind: 'app', name: c.name, path: c.path, args: c.args || [] })); }}>
       <AppIcon path={c.path} name={c.name} revision={iconRevision} /><span>{c.name}</span>
     </button>
