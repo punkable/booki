@@ -7,6 +7,7 @@ mod agent_activity;
 mod ai_usage;
 mod app_catalog;
 mod apps;
+mod claude_bridge;
 mod clipboard;
 mod clipboard_storage;
 mod config;
@@ -1517,6 +1518,28 @@ fn install_panic_hook() {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Claude Code's status line and hooks, answered without starting the app.
+pub fn claude_cli() -> bool {
+    claude_bridge::run_cli()
+}
+
+/// Whether Booki's Claude Code status line and hooks are installed.
+#[tauri::command]
+fn claude_bridge_status() -> claude_bridge::BridgeStatus {
+    claude_bridge::status()
+}
+
+/// Turn Booki's Claude Code status line and hooks on or off (opt-in).
+#[tauri::command]
+async fn claude_bridge_set(
+    statusline: bool,
+    hooks: bool,
+) -> Result<claude_bridge::BridgeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || claude_bridge::set(statusline, hooks))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub fn run() {
     install_panic_hook();
     if std::env::args().any(|arg| arg == "--autostart") {
@@ -1667,6 +1690,8 @@ pub fn run() {
             known_folders,
             hide_dock,
             reveal_dock,
+            claude_bridge_status,
+            claude_bridge_set,
             dock_window::notch_handoff,
             notch_reveal,
             notch_reveal_for_menu,

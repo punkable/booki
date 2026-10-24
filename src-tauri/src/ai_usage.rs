@@ -380,7 +380,8 @@ fn claude_usage(entries: Vec<ClaudeEntry>, now: i64) -> ProviderUsage {
         id: "claude",
         name: "Claude",
         detected: true,
-        windows: Vec::new(),
+        // Real plan percentages, when the opt-in status line has reported them.
+        windows: crate::claude_bridge::plan_windows(now),
         block: current_block(&entries, now),
         week_tokens: entries.iter().map(|e| e.tokens).sum(),
         last_activity: entries.last().map_or(0, |e| e.at),

@@ -30,7 +30,8 @@ tauri-plugin-single-instance = "2"
 # Native drag-out: drag a file from the folder flyout into Explorer/other apps.
 tauri-plugin-drag = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# preserve_order: Claude Code's settings.json keeps its key order when Booki edits it.
+serde_json = { version = "1", features = ["preserve_order"] }
 dirs = "7"
 # Folder-change notices for the agent logs (ReadDirectoryChangesW on Windows).
 notify = "8"

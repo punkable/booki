@@ -444,6 +444,8 @@ impl Watch {
             Provider::Claude => crate::ai_usage::claude_dirs()
                 .into_iter()
                 .map(|d| d.join("projects"))
+                // Booki's hook records: a write there wakes the watcher.
+                .chain(crate::claude_bridge::dir())
                 .collect(),
             Provider::Codex => crate::ai_usage::codex_homes()
                 .into_iter()
@@ -672,6 +674,17 @@ impl Watch {
     /// The new state when it changed, to be announced.
     fn change(&mut self, now: i64) -> Option<Activity> {
         let mut state = self.machine.state(now);
+        // Claude's own hooks, when installed, say exactly what it is doing.
+        if self.provider == Provider::Claude {
+            if let Some(hooked) = crate::claude_bridge::hook_state(now) {
+                state = match hooked {
+                    "working" => State::Working,
+                    "waiting" => State::Waiting,
+                    "done" => State::Done,
+                    _ => State::Idle,
+                };
+            }
+        }
         // "Done" only follows real work we saw.
         if state == State::Done
             && !matches!(self.reported, State::Working | State::Waiting | State::Done)
