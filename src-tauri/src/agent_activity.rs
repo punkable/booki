@@ -47,6 +47,9 @@ use std::sync::Mutex;
 
 pub const EVENT: &str = "booki://agent-activity";
 const POLL_MS: u64 = 1500;
+/// With every tool idle the loop waits for a folder-change notice; this is
+/// only the fallback for a missed one (or a root that cannot be watched).
+const IDLE_MS: u64 = 15_000;
 /// Re-find the newest session file every this many polls.
 const DISCOVER_EVERY: u32 = 3;
 /// Pending tool call + silence for this long = waiting (heuristic).
@@ -917,14 +920,46 @@ pub fn start(
             Watch::new(Provider::Continue),
         ];
         let mut tick: u32 = 0;
+        // Windows tells us when something under a log folder changes, so an
+        // idle Booki reads nothing until a tool writes. Paths only: the
+        // notice carries no file content, and roots never name credentials.
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
+        let mut watcher =
+            notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+                if event.is_ok() {
+                    let _ = tx.send(());
+                }
+            })
+            .ok();
+        let mut watched: HashSet<PathBuf> = HashSet::new();
+        let mut woke = false;
         loop {
             let now = now_ms();
             let on = enabled();
+            if on && tick % DISCOVER_EVERY == 0 {
+                if let Some(w) = watcher.as_mut() {
+                    use notify::Watcher;
+                    for root in watches.iter().flat_map(Watch::roots) {
+                        if watched.contains(&root) || !root.exists() {
+                            continue;
+                        }
+                        let mode = if root.is_dir() {
+                            notify::RecursiveMode::Recursive
+                        } else {
+                            notify::RecursiveMode::NonRecursive
+                        };
+                        if w.watch(&root, mode).is_ok() {
+                            watched.insert(root);
+                        }
+                    }
+                }
+            }
             for watch in watches.iter_mut() {
                 let change = if on {
                     let heavy = watch.provider.size_only()
                         && !matches!(watch.provider, Provider::Cursor | Provider::OpenCode);
-                    let due = tick % DISCOVER_EVERY == 0
+                    // A notice may be a new session file: look for it now.
+                    let due = (woke || tick % DISCOVER_EVERY == 0)
                         && (!heavy || !watch.has_file() || tick % (DISCOVER_EVERY * 4) == 0);
                     if due {
                         watch.discover(now);
@@ -946,7 +981,24 @@ pub fn start(
                     .collect();
             }
             tick = tick.wrapping_add(1);
-            std::thread::sleep(std::time::Duration::from_millis(POLL_MS));
+            // Busy tools need the clock (silence turns working into waiting or
+            // done); idle ones only a notice. Without a watcher, keep polling.
+            let busy = watches.iter().any(|w| w.reported != State::Idle);
+            if busy || watcher.is_none() || watched.is_empty() {
+                std::thread::sleep(std::time::Duration::from_millis(POLL_MS));
+                woke = false;
+            } else {
+                woke = rx
+                    .recv_timeout(std::time::Duration::from_millis(IDLE_MS))
+                    .is_ok();
+                // An app that writes all the time (Cursor's own state) still
+                // costs at most one pass per poll interval.
+                if woke {
+                    std::thread::sleep(std::time::Duration::from_millis(POLL_MS));
+                }
+            }
+            // A burst of writes is one wake-up.
+            while rx.try_recv().is_ok() {}
         }
     });
 }
