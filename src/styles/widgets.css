@@ -746,3 +746,15 @@ details.reading-card .system-widget-readings dt { color: var(--ink-2); }
 @keyframes fluent-select-in-up { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .fluent-select-pop, .fluent-select-pop.is-closing { animation: none; } }
 @media (forced-colors: active) { .fluent-select-option[aria-selected="true"]::before { background: Highlight; } }
+
+/* WinUI ToolTip (src/fluent-tooltip.js). */
+.fluent-tip { position: fixed; z-index: 2000; max-width: 320px; padding: 5px 9px 7px; color: var(--ink); background: var(--layer-strong, #fbfbfb);
+  border: 1px solid var(--stroke-flyout, rgba(0,0,0,.1)); border-radius: 4px; box-shadow: var(--shadow-tooltip, 0 4px 8px rgba(0,0,0,.14));
+  font: 400 12px/16px var(--font, "Segoe UI Variable Text", "Segoe UI", sans-serif); pointer-events: none; opacity: 0; transform: translateY(2px);
+  transition: opacity .083s linear, transform .167s cubic-bezier(0,0,0,1); overflow-wrap: anywhere; }
+.fluent-tip[data-side="above"] { transform: translateY(-2px); }
+.fluent-tip.show { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .fluent-tip { transition: none; } }
+@media (forced-colors: active) { .fluent-tip { border-color: CanvasText; } }
+/* No tooltip while a drop-down list is open: the list is the focus. */
+body:has(.fluent-select-pop:not(.is-closing)) .fluent-tip { display: none; }

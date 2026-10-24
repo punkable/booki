@@ -102,6 +102,8 @@ import { startPluginUpdateChecks } from "./dock/plugin-updates.js";
 import "./dock/agent-notices.js";
 import { enableFluentSelects } from "./fluent-select.js";
 enableFluentSelects();
+import { enableFluentTooltips } from "./fluent-tooltip.js";
+enableFluentTooltips();
 import { watchLongTasks } from "./long-tasks.js";
 watchLongTasks("dock");
 
