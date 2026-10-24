@@ -1229,3 +1229,7 @@
    Mica already blurs), and cards off screen are not laid out or painted. */
 .catalog-card, .plugin-card, .widgets-on-dock-item { content-visibility: auto; contain-intrinsic-size: auto 240px; }
 .live-preview-scene.stage .live-preview-caption { backdrop-filter: none; background: rgba(0, 0, 0, 0.42); }
+/* WinUI page entrance: the new section rises 28px into place and fades in. */
+.page-enter { animation: page-enter .3s cubic-bezier(0, 0, 0, 1) both; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(28px); } }
+@media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }

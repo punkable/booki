@@ -758,3 +758,10 @@ details.reading-card .system-widget-readings dt { color: var(--ink-2); }
 @media (forced-colors: active) { .fluent-tip { border-color: CanvasText; } }
 /* No tooltip while a drop-down list is open: the list is the focus. */
 body:has(.fluent-select-pop:not(.is-closing)) .fluent-tip { display: none; }
+/* Loading skeletons: card silhouettes with a soft shimmer (WinUI shimmer). */
+.skeleton-cards { display: grid; gap: 8px; margin: 0; font-size: 0 !important; color: transparent !important; }
+.skeleton-cards:not(:has(i)) { font-size: 0.8125rem !important; color: var(--ink-2) !important; }
+.skeleton-cards i { display: block; height: 54px; border-radius: 8px; background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 5%, transparent) 0%, color-mix(in srgb, var(--ink) 10%, transparent) 50%, color-mix(in srgb, var(--ink) 5%, transparent) 100%) 0 0 / 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.skeleton-cards i + i { opacity: .7; }
+@keyframes skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-cards i { animation: none; } }

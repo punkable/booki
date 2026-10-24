@@ -209,6 +209,7 @@ function App() {
           <button type="button" className="button" onClick={() => store.close({ discard: true })}>{t("workspace.closeDiscard")}</button></div>}
         <NativeBackdrop cfg={cfg} />
         <RecoveryNotice revision={cfg.revision} onProfiles={() => navigate("system")} onStartFresh={store.startFresh} />
+        <div key={page} className="page-enter">
         <SettingsBoundary key={page} onHome={() => navigate("home")}>
           {page === "home" && <HomePage cfg={cfg} set={set} navigate={navigate} reveal={(tab, key) => { navigate(tab); setSearchTarget({ key, tab, label: t(key) }); }} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
           {page === "dock" && <DockPage {...pageProps} />}
@@ -217,6 +218,7 @@ function App() {
           {page === "plugins" && <PluginsPage cfg={cfg} set={set} beforeInstall={store.settled} />}
           {page === "system" && <SystemPage {...pageProps} version={version} store={store} onWhatsNew={() => setShowChangelog(true)} />}
         </SettingsBoundary>
+        </div>
       </div>
     </main>
     {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
