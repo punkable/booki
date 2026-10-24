@@ -90,7 +90,7 @@ export function WidgetContent({ item, cfg, set, patch }) {
       {!style.provider && <Toggle label={t("widgetFlow.rotate")} checked={style.rotate !== false} onChange={(rotate) => patch({ rotate })} />}
       <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p><details className="inline-details"><summary>{t("panelFlow.aiDetection")}</summary><p className="inline-note">{t("panelFlow.aiSources")}</p></details>
       <Toggle label={t("be.notchAgents")} hint={t("widgetFlow.sharedNotch")} checked={cfg.notchAgents !== false} onChange={(notchAgents) => set({ notchAgents })} />
-      <ClaudeBridge />
+      <AgentBridge />
     </>}
     {widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(scrollVolume) => patch({ scrollVolume })} />}
     {widget === "volume" && <Row label={t("widgetFlow.volumeStep")} stack><Slider value={style.volumeStep || 3} min={1} max={10} step={1} fmt={(value) => `${value}%`} onChange={(volumeStep) => patch({ volumeStep })} /></Row>}
@@ -110,24 +110,29 @@ export function WidgetContent({ item, cfg, set, patch }) {
   </div>;
 }
 /** Clipboard history policy. Lives with the clipboard widget. */
-/** Opt-in: Claude Code reports its real plan usage and exact states to Booki
- *  through its status line and hooks. Local only; nothing is read from the
- *  account and nothing goes over the network. */
-function ClaudeBridge() {
+/** Opt-in: Claude Code reports its real plan usage through its status line,
+ *  and each agent its exact state through its hooks. Local only; nothing is
+ *  read from any account and nothing goes over the network. */
+const AGENT_NAMES = { claude: "Claude Code", codex: "Codex", gemini: "Gemini CLI", cursor: "Cursor" };
+function AgentBridge() {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { dockApi.claudeBridgeStatus?.().then(setStatus).catch(() => setStatus(null)); }, []);
-  if (!status?.available) return null;
-  const change = async (next) => {
+  useEffect(() => { dockApi.agentBridgeStatus?.().then(setStatus).catch(() => setStatus(null)); }, []);
+  const agents = (status?.agents || []).filter((agent) => agent.available);
+  if (!agents.length) return null;
+  const run = async (action) => {
+    if (busy) return;
     setBusy(true); setError("");
-    try { setStatus(await dockApi.claudeBridgeSet(next.statusline, next.hooks)); }
+    try { setStatus(await action()); }
     catch (e) { setError(String(e?.message || e || t("overhaul.failed"))); }
     finally { setBusy(false); }
   };
+  const claude = agents.some((agent) => agent.id === "claude");
   return <>
-    <Toggle label={t("claude.realUsage")} hint={t("claude.realUsageHint")} checked={status.statusline} onChange={(statusline) => !busy && change({ ...status, statusline })} />
-    <Toggle label={t("claude.exactStates")} hint={t("claude.exactStatesHint")} checked={status.hooks} onChange={(hooks) => !busy && change({ ...status, hooks })} />
+    {claude && <Toggle label={t("claude.realUsage")} hint={t("claude.realUsageHint")} checked={status.statusline} onChange={(on) => run(() => dockApi.agentStatuslineSet(on))} />}
+    <p className="inline-note">{t("claude.exactStatesHint")}</p>
+    {agents.map((agent) => <Toggle key={agent.id} label={t("agents.exactStates").replace("{agent}", () => AGENT_NAMES[agent.id] || agent.id)} hint={agent.id === "codex" ? t("agents.codexTrust") : undefined} checked={agent.hooks} onChange={(on) => run(() => dockApi.agentHooksSet(agent.id, on))} />)}
     {error && <InfoBar severity="error">{error}</InfoBar>}
   </>;
 }

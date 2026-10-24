@@ -4,10 +4,10 @@
 //! persistence, app launching and (on Windows) native window management.
 
 mod agent_activity;
+mod agent_bridge;
 mod ai_usage;
 mod app_catalog;
 mod apps;
-mod claude_bridge;
 mod clipboard;
 mod clipboard_storage;
 mod config;
@@ -1517,29 +1517,32 @@ fn install_panic_hook() {
     }));
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-/// Claude Code's status line and hooks, answered without starting the app.
-pub fn claude_cli() -> bool {
-    claude_bridge::run_cli()
+/// Agent status lines and hooks, answered without starting the app.
+pub fn agent_cli() -> bool {
+    agent_bridge::run_cli()
 }
 
-/// Whether Booki's Claude Code status line and hooks are installed.
+/// Booki's Claude Code status line and each agent's hooks (opt-in).
 #[tauri::command]
-fn claude_bridge_status() -> claude_bridge::BridgeStatus {
-    claude_bridge::status()
+fn agent_bridge_status() -> agent_bridge::BridgeStatus {
+    agent_bridge::status()
 }
 
-/// Turn Booki's Claude Code status line and hooks on or off (opt-in).
 #[tauri::command]
-async fn claude_bridge_set(
-    statusline: bool,
-    hooks: bool,
-) -> Result<claude_bridge::BridgeStatus, String> {
-    tauri::async_runtime::spawn_blocking(move || claude_bridge::set(statusline, hooks))
+async fn agent_statusline_set(on: bool) -> Result<agent_bridge::BridgeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || agent_bridge::set_statusline(on))
         .await
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn agent_hooks_set(agent: String, on: bool) -> Result<agent_bridge::BridgeStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || agent_bridge::set_hooks(&agent, on))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
     if std::env::args().any(|arg| arg == "--autostart") {
@@ -1690,8 +1693,9 @@ pub fn run() {
             known_folders,
             hide_dock,
             reveal_dock,
-            claude_bridge_status,
-            claude_bridge_set,
+            agent_bridge_status,
+            agent_statusline_set,
+            agent_hooks_set,
             dock_window::notch_handoff,
             notch_reveal,
             notch_reveal_for_menu,
