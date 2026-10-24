@@ -8,7 +8,7 @@
  * Button keeps the small Fluent-style API (appearance, size, icon) that the
  * profile and update panels were written against.
  */
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { icon } from "../icons.js";
 
 /** Inline line icon from src/icons.js. */
@@ -80,16 +80,51 @@ export function Row({ label, hint, children, stack = false }) {
 
 // ── Controls ───────────────────────────────────────────────────────────────
 
-/** The on/off switch itself. */
+/** The on/off switch itself. Like WinUI's ToggleSwitch, the knob stretches
+ *  while pressed and can be dragged to the other side. */
 function Switch({ checked, onChange, label }) {
+  const drag = useRef(null);
+  const [offset, setOffset] = useState(null);
+  const TRAVEL = 15; // px a stretched (17 px) knob can travel inside the track
+  const down = (event) => {
+    if (event.button !== 0) return;
+    drag.current = { x: event.clientX, moved: false };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const move = (event) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = event.clientX - d.x;
+    if (Math.abs(dx) > 3) d.moved = true;
+    if (d.moved) setOffset(Math.max(0, Math.min(TRAVEL, (checked ? TRAVEL : 0) + dx)));
+  };
+  const up = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.moved) {
+      const on = (offset ?? 0) > TRAVEL / 2;
+      // The click that follows a drag must not toggle it a second time.
+      drag.current = { swallow: true };
+      if (on !== !!checked) onChange(on);
+    }
+    setOffset(null);
+  };
   return (
     <button
       type="button"
       role="switch"
       aria-checked={!!checked}
       aria-label={label}
-      className={"ui-switch" + (checked ? " on" : "")}
-      onClick={() => onChange(!checked)}
+      className={"ui-switch" + (checked ? " on" : "") + (offset != null ? " dragging" : "")}
+      style={offset != null ? { "--knob-x": `${offset}px` } : undefined}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={() => { drag.current = null; setOffset(null); }}
+      onClick={(event) => {
+        if (drag.current?.swallow) { drag.current = null; event.stopPropagation(); return; }
+        onChange(!checked);
+      }}
     >
       <span className="ui-switch-knob" />
     </button>
@@ -116,8 +151,19 @@ export function Slider({ value, min, max, step, onChange, fmt }) {
   const label = useContext(RowLabel);
   const v = Number(value ?? min);
   const pct = ((v - min) / Math.max(1e-9, max - min)) * 100;
+  const [active, setActive] = useState(false);
+  // WinUI shows the value above the thumb while it is being dragged.
+  useEffect(() => {
+    if (!active) return;
+    const end = () => setActive(false);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    return () => { window.removeEventListener("pointerup", end); window.removeEventListener("pointercancel", end); };
+  }, [active]);
   return (
-    <div className="ui-slider">
+    <div className={"ui-slider" + (active ? " active" : "")} style={{ "--p": pct / 100 }} onPointerDown={() => setActive(true)}>
+      <span className="ui-slider-track">
+      <span className="ui-slider-tip" aria-hidden="true">{fmt ? fmt(v) : v}</span>
       <input
         type="range"
         aria-label={label}
@@ -128,6 +174,7 @@ export function Slider({ value, min, max, step, onChange, fmt }) {
         style={{ "--pct": `${pct}%` }}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+      </span>
       <span className="ui-slider-value">{fmt ? fmt(v) : v}</span>
     </div>
   );

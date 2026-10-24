@@ -258,9 +258,18 @@
 .ui-switch.on { background: var(--accent); border-color: var(--accent); }
 .ui-switch.on .ui-switch-knob { background: var(--accent-contrast); transform: translateX(20px); }
 .ui-switch.on:hover .ui-switch-knob { transform: translateX(18px); }
+/* Pressed: the knob stretches toward the side it would go (WinUI). */
+.ui-switch:active .ui-switch-knob { width: 17px; }
+.ui-switch.on:active .ui-switch-knob { transform: translateX(15px); }
+.ui-switch.dragging .ui-switch-knob { width: 17px; transform: translateX(var(--knob-x)); transition: width var(--dur-2) var(--ease); }
 
 /* Slider, Windows 11: thin track, accent fill, ringed thumb */
 .ui-slider { display: flex; align-items: center; gap: 12px; }
+.ui-slider-track { position: relative; display: flex; }
+/* Value bubble over the thumb while dragging (WinUI Slider ToolTip). The
+   10 px thumb radius keeps it centred on the thumb at both ends. */
+.ui-slider-tip { position: absolute; bottom: calc(100% + 6px); left: calc(10px + (100% - 20px) * var(--p, 0)); translate: -50% 4px; padding: 4px 8px; font-size: calc(12px * var(--os-text-scale, 1)); color: var(--ink); white-space: nowrap; background: var(--layer-strong); border: 1px solid var(--stroke-flyout, var(--control-stroke)); border-radius: var(--r-control, 4px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.14); opacity: 0; pointer-events: none; transition: opacity var(--dur-1) var(--ease), translate var(--dur-1) var(--ease); }
+.ui-slider.active .ui-slider-tip { opacity: 1; translate: -50% 0; }
 .ui-slider input { width: 200px; height: 20px; margin: 0; appearance: none; background: transparent; cursor: pointer; }
 .ui-slider input::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pct), var(--strong-stroke) var(--pct)); }
 /* WinUI Slider thumb: a 20px solid disc with a 12px accent core that grows to
@@ -576,6 +585,7 @@
   .ui-row:not(.ui-toggle-row) > .ui-row-control { flex: 1 1 100%; justify-content: flex-start; }
   .ui-slider input { width: 100%; flex: 1; }
   .ui-slider { width: 100%; }
+  .ui-slider-track { flex: 1; }
 }
 @media (max-width: 760px) {
   .settings-body { --sidebar-w: 64px; }
