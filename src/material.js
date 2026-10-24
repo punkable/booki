@@ -21,10 +21,11 @@ let enabled = true;
 // Signature Windows last confirmed, and who waits to hear it.
 let appliedSig = "";
 const settledListeners = new Set();
-function settled() {
-  for (const listener of settledListeners) listener();
+function settled(shapes) {
+  for (const listener of settledListeners) listener(shapes);
 }
-/** Called whenever Windows has applied the blur for the latest report. */
+/** Called whenever Windows has applied the latest report: with the number of
+ *  blurred shapes, 0 once the blur is gone. */
 export function onMaterialSettled(listener) {
   settledListeners.add(listener);
   return () => settledListeners.delete(listener);
@@ -139,9 +140,9 @@ function pumpMaterial() {
       // flash in and out between frames.
       if (!enabled || (!ok && list.length)) document.body.classList.remove("native-material");
       else if (list.length) document.body.classList.add("native-material");
-      if (ok && list.length) {
+      if (ok || !list.length) {
         appliedSig = sig;
-        settled();
+        settled(list.length);
       }
       if (!ok && list.length) {
         lastSig = "";
@@ -167,7 +168,7 @@ export function reportMaterial(shapes) {
   const sig = tint + JSON.stringify([devicePixelRatio, screenX, screenY, physicalMaterialShapes(list, devicePixelRatio)]);
   if (desired?.sig !== sig) desired = { list, sig, revision: ++generation, color: tint };
   else if (desired.revision !== generation) desired = { ...desired, revision: generation, color: tint };
-  if (list.length && sig === appliedSig && !inFlight) settled();
+  if (sig === appliedSig && !inFlight) settled(list.length);
   pumpMaterial();
 }
 

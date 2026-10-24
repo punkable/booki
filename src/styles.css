@@ -2917,3 +2917,6 @@ body.surface-glass.native-material :is(.stack, #ctx-menu, .productivity-panel, .
 /* Windows' blur covers rectangles only: a translucent tail outside it would
    show the desktop unblurred, so on native glass the tip goes without. */
 body.surface-glass.native-material .coach::after { display: none; }
+/* The notch card wears the solid fill until Windows' blur is behind it, and
+   while it waits for the blur to leave before shrinking (notch.js). */
+body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { background-color: var(--glass-tint, var(--surface-tint)) !important; }

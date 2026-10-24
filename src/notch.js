@@ -23,7 +23,7 @@ import { resolveNotchMode } from "./notch-mode.js";
 import { availW, availH, rectFromElement, hitSignature } from "./dock/geometry.js";
 import { reduceMotion } from "./dock/motion.js";
 import { clockParts, MEDIA_SVG } from "./dock/widget-view.js";
-import { reportMaterial, shapeOf, applyMaterial, followFrames } from "./material.js";
+import { reportMaterial, shapeOf, applyMaterial, followFrames, onMaterialSettled } from "./material.js";
 
 const root = document.documentElement;
 const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TAURI__.window) || null;
@@ -106,7 +106,7 @@ function reportNotchHitRects() {
   // third of the height or more, which split the pill into a blurred and a
   // flat band. Those shapes get the CSS fill alone; the card is big enough
   // for the real blur.
-  const blurred = toasting || document.body.classList.contains("card");
+  const blurred = toasting || (document.body.classList.contains("card") && !document.body.classList.contains("card-leaving"));
   reportMaterial(document.visibilityState === "hidden" || away || !blurred ? [] : [shapeOf(toasting ? toastEl : pill)]);
   // During drag or toast, keep the whole notch window interactive so gestures
   // and the message aren't yanked out from under the cursor.
@@ -823,6 +823,9 @@ function openCard() {
     if (cardOpen && !pill.matches(":hover") && !pill.contains(document.activeElement)) closeCard();
     else if (cardOpen && media?.playing && !cBar.hidden && cBar.dataset.tone === "media") paintCard();
   }, 1000);
+  pill.classList.add("mat-wait");
+  clearTimeout(leaveFallback);
+  document.body.classList.remove("card-leaving");
   cardOpen = true;
   document.body.classList.add("card");
   followMorph();
@@ -832,10 +835,36 @@ function closeCard() {
   clearInterval(cardWatch);
   if (!cardOpen) return;
   cardOpen = false;
-  document.body.classList.remove("card");
+  // Windows takes the blur away a beat after we ask. Shrinking first left a
+  // blurred sheet the size of the card behind the tab: hold the card, solid,
+  // until the blur is gone, then shrink.
+  if (document.body.classList.contains("native-material") && document.body.classList.contains("surface-glass")) {
+    pill.classList.add("mat-wait");
+    document.body.classList.add("card-leaving");
+    clearTimeout(leaveFallback);
+    leaveFallback = setTimeout(finishClose, 250);
+    reportNotchHitRects();
+    return;
+  }
+  finishClose();
+}
+let leaveFallback = null;
+function finishClose() {
+  clearTimeout(leaveFallback);
+  if (cardOpen) return;
+  document.body.classList.remove("card", "card-leaving");
   followMorph();
   paintPresence();
 }
+// The card is solid until the blur is confirmed behind it and its morph has
+// settled; a translucent card without blur showed the desktop for a moment.
+onMaterialSettled((shapes) => {
+  if (document.body.classList.contains("card-leaving")) {
+    if (!shapes) finishClose();
+    return;
+  }
+  if (shapes && !pill.getAnimations().some((a) => a.playState === "running")) pill.classList.remove("mat-wait");
+});
 
 // Intent delay in, a short grace out: brushing past the edge does nothing,
 // and leaving by a pixel does not snap it shut.

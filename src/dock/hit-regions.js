@@ -106,7 +106,8 @@ export function reportDockMaterial() {
   reportMaterial([shapeOf(dockEl), ...shapes]);
 }
 const waiting = new Set();
-onMaterialSettled(() => {
+onMaterialSettled((shapes) => {
+  if (!shapes) return;
   for (const el of waiting) {
     el.classList.remove("mat-wait");
     el.classList.add("mat-ready");
