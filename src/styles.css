@@ -2866,3 +2866,10 @@ body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-wo
 body:has(.productivity-panel, .note-editor) #booki-dock-tooltip { opacity: 0 !important; visibility: hidden; }
 .launcher-section { padding: 10px 10px 4px; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
 .launcher-section:first-child { padding-top: 2px; }
+/* Notch card: a thin level bar under the text (focus, battery, volume). */
+.nc-bar { display: block; width: 100%; min-width: 90px; height: 3px; margin-top: 5px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.nc-bar[hidden] { display: none; }
+.nc-bar i { display: block; height: 100%; transform-origin: left center; border-radius: inherit; background: var(--accent); transition: transform .4s var(--ease); }
+.nc-bar[data-tone="charging"] i { background: #30a46c; }
+.nc-bar[data-tone="low"] i { background: #e5484d; }
+@media (prefers-reduced-motion: reduce) { .nc-bar i { transition: none; } }

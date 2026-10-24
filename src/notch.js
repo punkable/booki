@@ -371,6 +371,14 @@ const cArt = document.getElementById("nc-art-img");
 const cTitle = document.getElementById("nc-title");
 const cSub = document.getElementById("nc-sub");
 const cPlay = document.getElementById("nc-play");
+const cBar = document.getElementById("nc-bar");
+/** A thin bar under the text: time left, battery or volume level (0..1); null hides it. */
+function cardBar(fraction, tone = "") {
+  cBar.hidden = fraction == null;
+  if (fraction == null) return;
+  cBar.dataset.tone = tone;
+  cBar.firstElementChild.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
+}
 let media = null; // { title, artist, playing, thumb } or null
 let mediaPeekUntil = 0;
 let mediaKey = "";
@@ -635,9 +643,11 @@ function paintMedia() {
 
 function paintCard() {
   const activity = currentActivity();
+  cardBar(null);
   if (activity?.kind === "timer") {
     cTitle.textContent = mmss(activity.left);
     cSub.textContent = t("w.focus");
+    cardBar(activity.progress, "focus");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -645,6 +655,7 @@ function paintCard() {
   if (activity?.kind === "volume") {
     cTitle.textContent = activity.muted ? t("notch.muted") : `${activity.level}%`;
     cSub.textContent = t("w.volume");
+    cardBar(activity.muted ? 0 : activity.level / 100, "volume");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;
@@ -673,6 +684,7 @@ function paintCard() {
   if (activity?.kind === "battery" || activity?.kind === "charging") {
     cTitle.textContent = `${activity.level}%`;
     cSub.textContent = t(activity.kind === "charging" ? "notch.charging" : "notch.batteryLow");
+    cardBar(activity.level / 100, activity.kind === "charging" ? "charging" : "low");
     cPlay.hidden = true;
     document.body.classList.add("card-clock");
     return;

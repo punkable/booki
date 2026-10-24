@@ -765,3 +765,6 @@ body:has(.fluent-select-pop:not(.is-closing)) .fluent-tip { display: none; }
 .skeleton-cards i + i { opacity: .7; }
 @keyframes skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton-cards i { animation: none; } }
+/* Solid cards are filled with the status colour: their text and glyph stay
+   white while charging instead of turning the same green as the fill. */
+.tile.widget[data-variant="solid"].charging .w-ring-num, .tile.widget[data-variant="solid"].charging .w-ring-ico { color: #fff; }
