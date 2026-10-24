@@ -17,9 +17,12 @@ const installed = [{ items: [
 ] }];
 const windows = [{ hwnd: 42, title: "Inbox - Firefox", exe: "C:/Apps/firefox.exe" }];
 
-test("an empty query lists pins (inside groups too) and frequent apps, not windows", () => {
+test("an empty query lists open windows, pins (inside groups too) and frequent apps without repeating an app", () => {
   const names = launcherResults({ pinned, installed, windows, frequent: [{ name: "Code", path: "C:/Apps/code.exe" }] }, "").map((r) => r.name);
+  // Firefox is pinned, so its open window is reached through the pin, not listed twice.
   assert.deepEqual(new Set(names), new Set(["Firefox", "Slack", "Projects", "Code"]));
+  const other = launcherResults({ pinned, installed, windows: [{ hwnd: 7, title: "Report.pdf - Viewer", exe: "C:/Apps/viewer.exe" }] }, "");
+  assert.equal(other[0].name, "Report.pdf - Viewer", "an open app that is not pinned leads the list");
 });
 
 test("an app that is already open carries its window, so Enter can switch to it", () => {

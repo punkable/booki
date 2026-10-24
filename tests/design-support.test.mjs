@@ -32,11 +32,13 @@ test('Library keeps pin labels visible in short windows and Escape returns to th
     viewport: { width: 768, height: 540 }, cfg: makeConfig({ theme: 'light', pinned: [app] }),
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  for (const name of ['Add Settings icon', 'Separator', 'Recycle Bin']) {
-    // Labelled actions stay readable without hovering over their icons.
-    const button = page.getByRole('button', { name, exact: true });
-    assert.ok((await button.innerText()).trim().length > 0);
+  // The dock's own items live in one labelled Add menu, readable without hovering.
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  for (const name of ['Group', 'Add Settings icon', 'Separator', 'Recycle Bin']) {
+    const item = page.getByRole('menuitem', { name, exact: true });
+    assert.ok((await item.innerText()).trim().length > 0);
   }
+  await page.keyboard.press('Escape');
   const pin = page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true });
   const visibleLabel = await page.locator('.library-pin-name').evaluate((label) => {
     const text = label.getBoundingClientRect();

@@ -626,7 +626,7 @@ const dockTooltip = createDockTooltip(dockEl, {
   dismiss: dismissAfterCaptureCheck,
   preserve: captureHeld,
   edge: () => S.cfg.edge,
-  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel") || !ctxMenu.classList.contains("hidden"),
+  blocked: () => S.editMode || !!S.dragging || S.hiddenState || S.stackOpen || !!document.querySelector(".productivity-panel, .note-editor") || !ctxMenu.classList.contains("hidden"),
   describe: (el) => {
     const pin = findPinnedById(el.dataset.id);
     if (!pin) return null;

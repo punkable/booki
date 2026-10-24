@@ -1176,3 +1176,12 @@
 .hex-chip { width: 18px; height: 18px; border-radius: 4px; background: var(--sw); border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent); }
 .hex-field input { width: 76px; padding: 0; color: var(--ink); font: inherit; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; text-transform: uppercase; background: transparent; border: 0; outline: none; }
 @media (prefers-reduced-motion: reduce) { .swatch { transition: none; } .swatch:hover, .swatch:active { transform: none; } }
+/* Add menu: a WinUI MenuFlyout under the Add button. */
+.add-menu { position: relative; }
+.add-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 220px; padding: 4px 0; background: var(--layer-strong, var(--card)); border: 1px solid var(--card-stroke); border-radius: 8px; box-shadow: var(--shadow-flyout, 0 8px 16px rgba(0,0,0,.14)); animation: add-menu-in var(--dur-4, .25s) var(--ease, ease) both; }
+.add-menu-list [role="menuitem"] { display: flex; align-items: center; gap: 12px; width: calc(100% - 8px); margin: 2px 4px; min-height: 32px; padding: 0 11px; color: var(--ink); font: inherit; text-align: left; background: transparent; border: 0; border-radius: 4px; cursor: pointer; }
+.add-menu-list [role="menuitem"]:hover, .add-menu-list [role="menuitem"]:focus-visible { background: var(--subtle-pressed); outline: none; }
+.add-menu-list [role="menuitem"]:disabled { color: var(--ink-3); cursor: default; background: none; }
+.add-menu-list svg { width: 16px; height: 16px; color: var(--ink-2); }
+@keyframes add-menu-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .add-menu-list { animation: none; } }

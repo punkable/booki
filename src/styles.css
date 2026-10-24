@@ -2862,3 +2862,7 @@ body.surface-glass.native-material :is(.productivity-panel, .note-editor.note-wo
 .group-search-field:hover, .group-view-field:hover { background: var(--ctrl-fill-hover, var(--ctrl-fill)); }
 .group-search-field:focus-within, .group-view-field:focus-within { outline: none; border-bottom: 2px solid var(--accent); }
 .group-toolbar .group-view-field select { appearance: none; -webkit-appearance: none; padding-right: 18px; background: no-repeat right 2px center / 12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+/* A tooltip shown before a panel opened never sits on top of that panel. */
+body:has(.productivity-panel, .note-editor) #booki-dock-tooltip { opacity: 0 !important; visibility: hidden; }
+.launcher-section { padding: 10px 10px 4px; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
+.launcher-section:first-child { padding-top: 2px; }

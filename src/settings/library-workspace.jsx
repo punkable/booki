@@ -229,10 +229,12 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
         <div className="library-dock-actions">
           {undo && undo.after === pinsKey(cfg.pinned) && <button className="button" onClick={() => { set({ pinned: undo.before }); setUndo(null); }}><Icon name="undo" />{t('act.undo')}</button>}
           {!openGroup && <>
-            <button className="button button-accent" onClick={() => createGroup(true)}><Icon name="folder-plus" />{t('apps.newFolderShort')}</button>
-            <button className="button" onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }])}><Icon name="minus" />{t('m.separator')}</button>
-            <button className="button" disabled={hasSettings(cfg.pinned)} onClick={() => commit([...latest.current.pinned, settingsPin()])}><Icon name="settings" />{t('next.addSettings')}</button>
-            <button className="button" disabled={cfg.pinned.some(item => item.kind === 'trash')} onClick={() => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }])}><Icon name="trash" />{t('apps.addTrash')}</button>
+            <AddMenu items={[
+              { icon: 'folder-plus', label: t('apps.newFolderShort'), run: () => createGroup(true) },
+              { icon: 'minus', label: t('m.separator'), run: () => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'separator', name: '', path: '', args: [] }]) },
+              { icon: 'settings', label: t('next.addSettings'), disabled: hasSettings(cfg.pinned), run: () => commit([...latest.current.pinned, settingsPin()]) },
+              { icon: 'trash', label: t('apps.addTrash'), disabled: cfg.pinned.some(item => item.kind === 'trash'), run: () => commit([...latest.current.pinned, { id: crypto.randomUUID(), kind: 'trash', name: t('trash.name'), path: '', args: [] }]) },
+            ]} />
           </>}
         </div>
       </div>
@@ -317,4 +319,31 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     {pickingIcon && IconPicker && <IconPicker item={pickingIcon} onClose={() => pickIcon(null)} onPick={(value) => { commit(updatePin(latest.current.pinned, pickingIcon.id, { icon: value })); pickIcon(null); }} />}
     {creatingGroup && <GroupCreator pinned={cfg.pinned} initialIds={chosenIds} onClose={() => createGroup(false)} onCreate={(next) => { commit(next); createGroup(false); chooseIds([]); }} />}
   </>;
+}
+
+/** One "Add" button for the dock's own items: group, separator, Settings and
+ *  Recycle Bin, as a WinUI-style menu instead of four buttons in a row. */
+function AddMenu({ items }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return undefined;
+    const away = (event) => { if (!ref.current?.contains(event.target)) setOpen(false); };
+    const key = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); ref.current?.querySelector('button')?.focus(); } };
+    document.addEventListener('pointerdown', away); document.addEventListener('keydown', key, true);
+    requestAnimationFrame(() => ref.current?.querySelector('[role="menuitem"]:not(:disabled)')?.focus());
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key, true); };
+  }, [open]);
+  return <div className="add-menu" ref={ref}>
+    <button type="button" className="button button-accent" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="plus" />{t('widget.add')}<Icon name="chevron-down" /></button>
+    {open && <div className="add-menu-list" role="menu" onKeyDown={(event) => {
+      if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+      event.preventDefault();
+      const list = [...event.currentTarget.querySelectorAll('[role="menuitem"]:not(:disabled)')];
+      const at = list.indexOf(document.activeElement);
+      list[(at + (event.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length]?.focus();
+    }}>
+      {items.map((item) => <button key={item.label} type="button" role="menuitem" disabled={item.disabled} onClick={() => { setOpen(false); item.run(); }}><Icon name={item.icon} />{item.label}</button>)}
+    </div>}
+  </div>;
 }
