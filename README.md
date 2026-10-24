@@ -100,6 +100,7 @@ Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at 
 
 - New Widgets page: your dock's widgets on top, a gallery with categories and one-click Add, and settings in a side sheet with a live preview.
 - One click opens any widget's content, also inside groups; right-click or its gear opens that copy's settings.
+- Notes holds several notes: add one with + or Ctrl+N and switch between them from their tabs; each keeps its own recoverable draft.
 - Configure time, calendar, city and units, device, AI provider, rotation, metrics, focus duration and volume wheel. System and Battery details refresh while open.
 - Widget panels share one header with icon actions (refresh, Bluetooth), meter cards, Windows toggle switches and clearer Media, System and AI details.
 - Claude, Codex, Cursor and OpenCode: the ones on your PC are shown, the missing ones in one line. Usage still comes only from local logs, never credentials.
@@ -109,6 +110,9 @@ Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at 
 - Booki checks every few hours whether your plugins have an update and offers it; your widgets keep their settings.
 - Each plugin offers the correct widget and configures existing copies, even inside groups, without duplicating Collector. Installation waits for saved acceptance.
 - Notices and updates share a lane outside the dock and enlarged icons. Complete content, including buttons, is measured; the update notice can be dismissed. An older action cannot hide a newer notice.
+- The launcher opens like Start: open windows, what is on your dock and what you use most, before you type.
+- Position shows a miniature desktop where the dock glides to the chosen spot, plus an option to follow the pointer across monitors.
+- Apps & folders: Group, Separator, Settings and Recycle Bin in a single '+ Add' menu.
 - Windows work-area origin changes reposition the dock even when its size is unchanged. Relevant settings link to Windows sound, power and date settings.
 
 [Full release notes](docs/releases/v0.96.0.md)
