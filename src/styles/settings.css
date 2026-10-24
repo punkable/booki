@@ -1267,3 +1267,24 @@
 .info-bar-close svg { width: 14px; height: 14px; }
 :root[data-high-contrast] .info-bar { background: Canvas; border-color: CanvasText; }
 :root[data-high-contrast] .info-bar-badge { color: Canvas; background: CanvasText; }
+
+/* Colour settings, as in Windows 11 Settings > Personalization > Colors:
+   one card per colour with a preview, what it is now and a drop-down for
+   its source; choosing by hand unfolds a swatch grid under a divider. */
+.color-setting { box-sizing: border-box; width: 100%; overflow: hidden; background: var(--ctrl-fill, var(--card)); border: 1px solid var(--card-stroke, var(--control-stroke)); border-radius: var(--r-card, 8px); }
+.color-setting-head { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px; }
+.color-setting-preview { flex: none; width: 32px; height: 32px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent); transition: background var(--dur-2, .2s) var(--ease, ease); }
+.color-setting-name { flex: 1; min-width: 0; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); line-height: calc(16px * var(--os-text-scale, 1)); }
+.color-setting-head .ui-select { flex: none; min-width: 168px; }
+.color-setting-body { display: grid; gap: 14px; padding: 14px 12px 14px 56px; border-top: 1px solid var(--divider, var(--card-stroke)); animation: color-unfold var(--dur-3, .25s) var(--ease-out, ease-out); }
+@keyframes color-unfold { from { opacity: 0; transform: translateY(-4px); } }
+.color-group { display: grid; gap: 8px; }
+.color-group-title { color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); font-weight: 600; }
+.color-setting .swatches { gap: 6px; }
+.color-setting .swatch { width: 36px; height: 36px; }
+.color-setting .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ctrl-fill, var(--card)), 0 0 0 4px var(--accent); }
+/* Light fills get a dark check so it stays visible. */
+.color-setting .swatch[aria-pressed="true"]::after { background: #fff; }
+.color-group:last-child .swatch[aria-pressed="true"]::after { background: #1b1b1b; filter: none; }
+@media (prefers-reduced-motion: reduce) { .color-setting-body { animation: none; } }
+@container page (max-width: 560px) { .color-setting-body { padding-left: 12px; } .color-setting-head { flex-wrap: wrap; } .color-setting-head .ui-select { width: 100%; } }

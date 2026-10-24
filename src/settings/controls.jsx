@@ -8,8 +8,8 @@ import { icon } from "../icons.js";
 import { SURFACE_TINT_PRESETS } from "../surface.js";
 import { LAYOUT_SCENARIOS } from "../dock/layout-model.js";
 import { ACCENT_PALETTE, paletteEntry } from "../palette.js";
-import { COLOR_SOURCES, SURFACE_COLORS, colorSource } from "../system-look.js";
-import { Icon } from "./ui.jsx";
+import { COLOR_SOURCES, colorSource } from "../system-look.js";
+import { Icon, Select } from "./ui.jsx";
 
 export const LANG_OPTIONS = [
   { value: "system", key: "lang.system" },
@@ -82,7 +82,23 @@ export function AccentPicker({ value, onChange, sources = false }) {
   </Swatches>;
 }
 
-/** Where the accent comes from. Each choice shows the colour it would use. */
+/** One colour setting laid out like Windows 11 Settings > Personalization >
+ *  Colors: a preview of the colour in use and what it is, a drop-down for
+ *  where it comes from, and, when chosen by hand, a grid of swatches that
+ *  unfolds below. */
+function ColorSetting({ label, preview, name, mode, modes, onMode, children }) {
+  return <div className="color-setting" data-open={!!children || undefined}>
+    <div className="color-setting-head">
+      <span className="color-setting-preview" style={{ "--sw": preview }} aria-hidden="true" />
+      <span className="color-setting-name">{name}</span>
+      <Select label={label} value={mode} onChange={onMode} options={modes} />
+    </div>
+    {children && <div className="color-setting-body">{children}</div>}
+  </div>;
+}
+
+/** Where the accent comes from: Windows, the wallpaper, or Booki's palette
+ *  (which keeps a custom colour well for exact brand colours). */
 export function ColorSourcePicker({ cfg, set, children }) {
   const source = colorSource(cfg);
   const [windows, setWindows] = useState("");
@@ -95,27 +111,43 @@ export function ColorSourcePicker({ cfg, set, children }) {
   }, []);
   const custom = /^#[0-9a-f]{6}$/i.test(cfg?.accent || "") ? cfg.accent : "#dfaa75";
   const swatch = { windows: windows || "var(--accent)", wallpaper: wall || "#8a8a8a", custom };
-  return <div className="accent-sources">
-    <div className="accent-source-row" role="radiogroup" aria-label={t("look.source")}>
-      {COLOR_SOURCES.map((value) => <button key={value} type="button" role="radio" className="accent-source" aria-checked={source === value} onClick={() => set({ colorSource: value })}>
-        <span className="accent-swatch" style={{ "--sw": swatch[value] }} aria-hidden="true" />
-        <span className="accent-source-name">{t(`look.${value}`)}</span>
-      </button>)}
-    </div>
-    {source !== "custom" && <p className="swatch-caption">{t(`look.${source}Now`)}</p>}
+  const name = source === "custom" ? (paletteEntry(custom)?.name || custom.toUpperCase()) : t(`look.${source}Now`);
+  return <ColorSetting label={t("look.source")} preview={swatch[source]} name={name} mode={source}
+    modes={COLOR_SOURCES.map((value) => ({ value, label: t(`look.${value}`) }))} onMode={(value) => set({ colorSource: value })}>
     {source === "custom" ? children : null}
-  </div>;
+  </ColorSetting>;
 }
 
-/** The dock's fill: the style's own, the wallpaper's, the accent's, or a
- * colour picked by hand. */
+/** The dock's fill: automatic, from the wallpaper, or one of Booki's own
+ *  fills. No free colour here: each fill holds up as glass and as solid. */
 export function SurfaceColorPicker({ value, onChange }) {
   const current = String(value || "auto").toLowerCase();
   const picked = /^#[0-9a-f]{6}$/.test(current) ? current : "";
-  return <Swatches value={picked} label={t("surface.color")} presets={SURFACE_TINT_PRESETS.map(([id, hex]) => [t(`tint.${id}`), hex])} onChange={onChange}
-    lead={SURFACE_COLORS.map((choice) => <button key={choice} type="button" className="chip" aria-pressed={current === choice} onClick={() => onChange(choice)}>
-      {choice === "wallpaper" && <Icon name="image" />}{t(`surface.${choice}`)}
-    </button>)} />;
+  const mode = picked ? "custom" : current === "wallpaper" ? "wallpaper" : "auto";
+  const [wall, setWall] = useState("");
+  useEffect(() => {
+    let live = true;
+    dockApi.wallpaperAccent().then((hex) => { if (live && hex) setWall(hex); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const fallback = SURFACE_TINT_PRESETS[1][1];
+  const preset = SURFACE_TINT_PRESETS.find(([, hex]) => hex === picked);
+  const preview = { auto: "var(--surface-tint, #2c2c2c)", wallpaper: wall || "#8a8a8a", custom: picked || fallback }[mode];
+  const name = mode === "custom" ? (preset ? t(`tint.${preset[0]}`) : picked.toUpperCase()) : t(mode === "wallpaper" ? "surface.wallpaperNow" : "surface.autoNow");
+  // Split by how light the fill is, not by position in the list.
+  const light = ([, hex]) => parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16) > 384;
+  const group = (title, list) => <div className="color-group">
+    <span className="color-group-title">{title}</span>
+    <div className="swatches" role="radiogroup" aria-label={title}>
+      {list.map(([id, hex]) => <button key={hex} type="button" role="radio" className="swatch" style={{ "--sw": hex }}
+        aria-label={t(`tint.${id}`)} title={t(`tint.${id}`)} aria-checked={picked === hex} aria-pressed={picked === hex} onClick={() => onChange(hex)} />)}
+    </div>
+  </div>;
+  return <ColorSetting label={t("surface.color")} preview={preview} name={name} mode={mode}
+    modes={[{ value: "auto", label: t("surface.auto") }, { value: "wallpaper", label: t("surface.wallpaper") }, { value: "custom", label: t("look.custom") }]}
+    onMode={(next) => onChange(next === "custom" ? picked || fallback : next)}>
+    {mode === "custom" ? <>{group(t("surface.darkFills"), SURFACE_TINT_PRESETS.filter((p) => !light(p)))}{group(t("surface.lightFills"), SURFACE_TINT_PRESETS.filter(light))}</> : null}
+  </ColorSetting>;
 }
 
 /** The three ways the dock can behave; each is a small patch. */

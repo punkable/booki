@@ -14,7 +14,9 @@ import { hexToRgb, rgbToHex } from "./util-color.js";
 import { resolveSurfaceStyle } from "./surface.js";
 
 export const COLOR_SOURCES = ["windows", "wallpaper", "custom"];
-export const SURFACE_COLORS = ["auto", "wallpaper", "accent"];
+// "accent" is no longer offered: a dock filled with the accent read as loud.
+// A saved "accent" falls back to auto.
+export const SURFACE_COLORS = ["auto", "wallpaper"];
 const HEX = /^#[0-9a-f]{6}$/i;
 // The Windows 11 taskbar's own fills in dark and light mode.
 export const TASKBAR_DARK = "#202020";
@@ -94,7 +96,6 @@ export function resolveLook(cfg, { platform = null, wallpaper = "", systemDark =
     const fill = surfaceColor(cfg);
     if (HEX.test(fill)) glassTint = fill;
     else if (fill === "wallpaper" && wall) glassTint = dark ? mixHex(wall, "#202020", 0.72) : mixHex(wall, "#ffffff", 0.72);
-    else if (fill === "accent" && HEX.test(accent || "")) glassTint = dark ? mixHex(accent, "#202020", 0.72) : mixHex(accent, "#ffffff", 0.7);
     else if (style === "glass") glassTint = GLASS_AUTO[tone];
   }
   return { ...cfg, accent, theme, surfaceStyle: style, glassTint };
