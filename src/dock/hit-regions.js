@@ -71,11 +71,13 @@ export function pointInLiveHitArea(x, y) {
   return rects.some((rect) => pointInRect(x, y, rect));
 }
 // Real blur behind the bar and whatever panel is open over the desktop.
+// The tooltip is not one: like Windows 11's it is a solid chip that fades,
+// and a blur that cannot fade with it showed the desktop for a moment.
 // Every floating surface belongs here: one left out only gets the CSS blur,
 // which sees the page and not the desktop, and reads as a flat second sheet.
 export const MATERIAL_PANELS = [
   "#ctx-menu:not(.hidden)", ".trash-pop", ".coach", ".update-pill:not(.hidden)",
-  ".stack-drag-clone", ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".dock-tip.show", ".drop-hint.show",
+  ".stack-drag-clone", ".productivity-panel.is-open", ".note-editor.is-open", ".undo-toast:not(.hidden)", ".drop-hint.show",
 ].join(", ");
 // A surface reports its shape only once it is fully shown (shapeOf skips a
 // fading one), so report again whenever one finishes appearing or leaving.

@@ -1604,6 +1604,7 @@ body.edge-right .stack.open { transform: none; }
 .stack-head-icon svg { width: 15px; height: 15px; }
 .stack-head-icon img.emo { width: 15px; height: 15px; }
 .stack-title { flex: 1; min-width: 0; font-size: 0.875rem; font-weight: 600; line-height: 20px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack-breadcrumbs[hidden] { display: none; }
 .stack-breadcrumbs { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: thin; }
 .stack-breadcrumbs button { flex: 0 0 auto; max-width: 180px; min-height: 30px; padding: 5px 8px; border: 0; border-radius: var(--r-control); font: inherit; font-size: 0.75rem; color: var(--ink-2); background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .stack-breadcrumbs button:hover, .stack-breadcrumbs button[aria-current] { color: var(--ink); background: var(--hover); }
@@ -2175,7 +2176,7 @@ body.edge-right .stack.open { transform: none; }
   /* WinUI ToolTip: 9,6,9,8 padding, Caption 12/16, ControlCornerRadius,
      SurfaceStrokeColorFlyout and the tooltip shadow. */
   padding: 6px 9px 8px; font-size: 0.75rem; line-height: 16px;
-  color: var(--ink); background: var(--layer-strong);
+  color: var(--ink); background: var(--glass-tint, var(--surface-tint));
   border: 1px solid var(--stroke-flyout); border-radius: var(--r-control);
   box-shadow: var(--shadow-tooltip);
   pointer-events: none; opacity: 0;
@@ -2486,8 +2487,7 @@ body.native-material .dock-tip {
   backdrop-filter: none;
 }
 
-.stack-pager { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.stack-pager .stack-more:disabled { opacity: .4; cursor: default; }
+.stack-sentinel { grid-column: 1 / -1; height: 1px; }
 
 /* CSS owns the single fill and outline; native windows supply only blur. */
 body.notch-body .notch-pill { box-shadow: none; }
@@ -2905,3 +2905,6 @@ body.surface-glass.native-material .coach::after { display: none; }
 /* The notch card wears the solid fill until Windows' blur is behind it, and
    while it waits for the blur to leave before shrinking (notch.js). */
 body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { background-color: var(--glass-tint, var(--surface-tint)) !important; }
+/* An open group or folder covers the labels above the bar; through its
+   translucent fill they read as ghost text over the grid. */
+body.stack-open .tile > .label { opacity: 0; transition: none; }

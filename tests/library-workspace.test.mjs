@@ -76,7 +76,8 @@ test('a failed folder page preserves the visible entries and offers retry', asyn
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [{ id:'folder',name:'Files',kind:'folder',path:'C:/Files' }] }) });
   await page.evaluate(() => { const old=window.__TAURI__.core.invoke;window.__failNext=true;window.__TAURI__.core.invoke=(c,a)=>{ if(c==='list_dir'){if(a.offset>0 && window.__failNext){window.__failNext=false;return Promise.reject(new Error('unavailable'));}return Promise.resolve(Array.from({length:25},(_,i)=>({name:`File ${a.offset+i}`,path:`C:/Files/${a.offset+i}.txt`,is_dir:false})));}return old(c,a);}; });
   await page.locator('.tile[data-id="folder"]').click();
-  await page.locator('.stack-pager').getByRole('button', { name:'Next', exact:true }).click();
+  await page.locator('.stack-item').filter({hasText:'File 23'}).waitFor();
+  await page.locator('#stack').evaluate(el=>{el.scrollTop=el.scrollHeight;});
   await page.locator('.stack-load-error').getByRole('alert').waitFor();
   assert.equal(await page.locator('.stack-item').filter({hasText:'File 0'}).count(),1);
   await page.locator('.stack-load-error').getByRole('button').click();
@@ -231,7 +232,7 @@ test('optional Settings pin opens once per pointer or keyboard activation and us
   assert.deepEqual(errors, []); await page.close();
 });
 
-test('folder search covers every page, sorting resets pagination and Escape clears the query', async () => {
+test('folder search covers every entry, sorting starts from the top and Escape clears the query', async () => {
   const {page,errors}=await openPage(browser,port,'index.html',{cfg:makeConfig({pinned:[{id:'folder',name:'Files',kind:'folder',path:'C:/Files'}]}),initScript:`
     const old=window.__TAURI__.core.invoke; window.__folderCalls=[];
     window.__TAURI__.core.invoke=(command,args)=>{
@@ -256,9 +257,8 @@ test('folder search covers every page, sorting resets pagination and Escape clea
   await page.getByRole('combobox',{name:'Sort folder',exact:true}).selectOption('name-desc');
   await page.locator('.stack-item').filter({hasText:'File 099.txt'}).waitFor();
   assert.equal(await page.locator('.stack-item').first().textContent().then(text=>text.includes('File 099.txt')),true);
-  await page.locator('.stack-pager').getByRole('button',{name:'Next',exact:true}).click();
+  await page.locator('#stack').evaluate(el=>{el.scrollTop=el.scrollHeight;});
   await page.locator('.stack-item').filter({hasText:'File 075.txt'}).waitFor();
-  assert.equal(await page.locator('.stack-pager').getByRole('button',{name:'Next',exact:true}).evaluate(el=>el===document.activeElement),true);
   await search.fill('does-not-exist');
   await page.getByText('No files match your search.',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>window.__folderCalls.at(-1).offset),0);

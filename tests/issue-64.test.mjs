@@ -50,7 +50,7 @@ test("shortcut launches as a shortcut and transfer failure leaves the pin intact
   await page.close();
 });
 
-test("folder paging reaches later entries without changing sort or losing the previous page", async () => {
+test("a folder loads later entries as it scrolls, keeping the ones already shown", async () => {
   const folder = { id: "folder", kind: "folder", name: "Files", path: "C:/Files" };
   const { page, errors } = await openPage(browser, port, "index.html", { cfg: makeConfig({ pinned: [folder] }) });
   await page.evaluate(() => {
@@ -59,19 +59,16 @@ test("folder paging reaches later entries without changing sort or losing the pr
     window.__TAURI__.core.invoke = (cmd, args) => cmd === "list_dir" ? Promise.resolve(rows.slice(args.offset, args.offset + args.limit)) : old(cmd, args);
   });
   await page.locator('.tile[data-id="folder"]').click();
-  await page.getByRole("button", { name: "Next", exact: true }).waitFor();
+  await page.locator(".stack-item").filter({ hasText: "File 23.txt" }).waitFor();
   assert.equal(await page.locator(".stack-item").count(), 24);
-  assert.equal(await page.getByRole("button", { name: "Previous", exact: true }).isDisabled(), true);
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByText("Page 2", { exact: true }).waitFor();
-  assert.equal(await page.locator(".stack-name").first().textContent(), "File 24.txt");
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByText("Page 3", { exact: true }).waitFor();
-  assert.equal(await page.locator(".stack-item").count(), 12);
-  assert.equal(await page.getByRole("button", { name: "Next", exact: true }).isDisabled(), true);
-  await page.getByRole("button", { name: "Previous", exact: true }).click();
-  await page.getByText("Page 2", { exact: true }).waitFor();
-  assert.equal(await page.locator(".stack-name").first().textContent(), "File 24.txt");
+  const scrollEnd = () => page.locator("#stack").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await scrollEnd();
+  await page.locator(".stack-item").filter({ hasText: "File 47.txt" }).waitFor();
+  await scrollEnd();
+  await page.locator(".stack-item").filter({ hasText: "File 59.txt" }).waitFor();
+  assert.equal(await page.locator(".stack-item").count(), 60);
+  assert.equal(await page.locator(".stack-name").first().textContent(), "File 00.txt");
+  assert.equal(await page.locator(".stack-sentinel").count(), 0, "nothing left to load");
   assert.deepEqual(errors, []);
   await page.close();
 });
