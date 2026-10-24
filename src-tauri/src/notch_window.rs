@@ -231,6 +231,7 @@ fn show_toast_frame(
         }
         let _ = notch.show();
         let _ = notch.set_ignore_cursor_events(false);
+        crate::CURSOR_RESYNC.store(true, Ordering::Release);
         let _ = app.emit(
             "booki://notch-toast",
             serde_json::json!({
@@ -296,6 +297,7 @@ pub(crate) fn notch_reveal(app: AppHandle) {
     if let Some(dock) = app.get_webview_window("dock") {
         let _ = position_dock(&dock, &cfg.edge);
         let _ = dock.set_ignore_cursor_events(false);
+        crate::CURSOR_RESYNC.store(true, Ordering::Release);
         lift_dock_window(&dock);
     }
     crate::dock_window::schedule_notch_handoff(&app);
