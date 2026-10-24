@@ -131,6 +131,9 @@ function AgentBridge() {
   const claude = agents.some((agent) => agent.id === "claude");
   return <>
     {claude && <Toggle label={t("claude.realUsage")} hint={t("claude.realUsageHint")} checked={status.statusline} onChange={(on) => run(() => dockApi.agentStatuslineSet(on))} />}
+    {claude && status.statusline && <p className="inline-note" role="status">{!status.statusline_seen ? t("claude.notSeen")
+      : status.statusline_limits ? t("claude.seenLimits").replace("{time}", () => new Date(status.statusline_seen * 1000).toLocaleTimeString())
+      : t("claude.seenNoLimits")}</p>}
     <p className="inline-note">{t("claude.exactStatesHint")}</p>
     {agents.map((agent) => <Toggle key={agent.id} label={t("agents.exactStates").replace("{agent}", () => AGENT_NAMES[agent.id] || agent.id)} hint={agent.id === "codex" ? t("agents.codexTrust") : undefined} checked={agent.hooks} onChange={(on) => run(() => dockApi.agentHooksSet(agent.id, on))} />)}
     {error && <InfoBar severity="error">{error}</InfoBar>}

@@ -199,10 +199,18 @@ pub fn limits_from_status(input: &Value) -> Option<Value> {
 
 fn statusline() {
     let input = stdin_text();
-    if let Ok(doc) = serde_json::from_str::<Value>(&input) {
-        if let (Some(limits), Some(dir)) = (limits_from_status(&doc), dir()) {
-            let _ = write_atomic(&dir.join("limits.json"), &limits);
+    let doc = serde_json::from_str::<Value>(&input).ok();
+    let limits = doc.as_ref().and_then(limits_from_status);
+    if let Some(dir) = dir() {
+        if let Some(limits) = &limits {
+            let _ = write_atomic(&dir.join("limits.json"), limits);
         }
+        // For Settings to say whether Claude Code reaches Booki at all and
+        // whether it sends the plan usage (only Pro/Max, after a reply).
+        let _ = write_atomic(
+            &dir.join("statusline-seen.json"),
+            &json!({ "at": now_secs(), "parsed": doc.is_some(), "limits": limits.is_some() }),
+        );
     }
     // The user's own status line keeps showing, fed the same document.
     let wrapped = dir()
@@ -557,6 +565,10 @@ pub struct AgentStatus {
 pub struct BridgeStatus {
     /// Booki's Claude Code status line is installed.
     pub statusline: bool,
+    /// When Claude Code last ran Booki as its status line (Unix seconds).
+    pub statusline_seen: Option<i64>,
+    /// Whether that call carried the plan usage.
+    pub statusline_limits: bool,
     pub agents: Vec<AgentStatus>,
 }
 
@@ -566,7 +578,17 @@ pub fn status() -> BridgeStatus {
             .and_then(|p| read_json(&p))
             .unwrap_or_else(|| json!({}))
     };
+    let seen = dir().and_then(|d| read_json(&d.join("statusline-seen.json")));
     BridgeStatus {
+        statusline_seen: seen
+            .as_ref()
+            .and_then(|v| v.get("at"))
+            .and_then(Value::as_i64),
+        statusline_limits: seen
+            .as_ref()
+            .and_then(|v| v.get("limits"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         statusline: statusline_present(&doc(Agent::Claude)),
         agents: AGENTS
             .into_iter()
