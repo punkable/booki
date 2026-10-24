@@ -1667,6 +1667,7 @@ pub fn run() {
             known_folders,
             hide_dock,
             reveal_dock,
+            dock_window::notch_handoff,
             notch_reveal,
             notch_reveal_for_menu,
             notch_screen_busy,
