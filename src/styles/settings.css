@@ -1185,3 +1185,42 @@
 .add-menu-list svg { width: 16px; height: 16px; color: var(--ink-2); }
 @keyframes add-menu-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .add-menu-list { animation: none; } }
+/* Position: a small screen beside its caption instead of a tall monitor. */
+.position-picker { grid-template-columns: minmax(0, 200px) minmax(0, 1fr); align-items: center; justify-items: stretch; gap: 20px; padding: 4px 0 8px; }
+.position-picker .monitor-art { width: 100%; }
+.position-side { display: grid; gap: 6px; align-content: center; }
+.position-side .screen-caption { margin: 0; font-weight: 600; text-align: left; }
+.position-hint { margin: 0 0 6px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); }
+@container page (max-width: 560px) { .position-picker { grid-template-columns: 1fr; justify-items: center; } }
+.position-label { margin-top: 6px; color: var(--ink-2); font-size: calc(12px * var(--os-text-scale, 1)); font-weight: 600; }
+.position-side .ui-seg { justify-self: start; }
+.position-side .screen-caption { font-size: calc(15px * var(--os-text-scale, 1)); }
+
+/* ── Position: a full-width miniature desktop with a dock that glides ── */
+.position-picker { display: block; padding: 4px 0 8px; }
+.position-picker .screen-map { position: relative; width: 100%; max-height: 230px; min-height: 170px; overflow: hidden; border-radius: 10px; border: 1px solid var(--card-stroke);
+  background: radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 60%), radial-gradient(90% 120% at 100% 100%, #7f9cff66, transparent 60%), color-mix(in srgb, var(--ink) 6%, var(--card)); }
+.screen-window { position: absolute; border-radius: 6px; background: color-mix(in srgb, var(--card) 80%, transparent); border: 1px solid var(--card-stroke); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+.screen-window.w1 { left: 22%; top: 22%; width: 34%; height: 46%; }
+.screen-window.w2 { left: 48%; top: 32%; width: 28%; height: 40%; }
+.position-picker .screen-dock { opacity: 0; }
+.position-picker .screen-spot:hover .screen-dock, .position-picker .screen-spot:focus-visible .screen-dock { opacity: 1; background: color-mix(in srgb, var(--ink) 30%, transparent); }
+.position-picker .screen-spot[aria-checked="true"] .screen-dock { opacity: 0; }
+.screen-live-dock { position: absolute; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 5px 8px; border-radius: 9px; pointer-events: none;
+  background: color-mix(in srgb, var(--card) 82%, transparent); border: 1px solid var(--card-stroke); box-shadow: 0 4px 14px rgba(0,0,0,.14);
+  transition: left .35s var(--ease), top .35s var(--ease), right .35s var(--ease), bottom .35s var(--ease), transform .35s var(--ease); }
+.screen-live-dock i { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); opacity: .85; }
+.screen-live-dock i:nth-child(2) { background: #4f9cf9; } .screen-live-dock i:nth-child(3) { background: #f0506e; } .screen-live-dock i:nth-child(4) { background: #30a46c; } .screen-live-dock i:nth-child(5) { background: #8e6ad8; }
+.screen-live-dock.vertical { flex-direction: column; padding: 8px 5px; }
+.screen-live-dock.live-bottom { bottom: 8px; top: auto; } .screen-live-dock.live-top { top: 8px; bottom: auto; }
+.screen-live-dock.live-left { left: 8px; right: auto; } .screen-live-dock.live-right { right: 8px; left: auto; }
+.screen-live-dock:is(.live-bottom, .live-top).live-start { left: 8%; transform: none; }
+.screen-live-dock:is(.live-bottom, .live-top).live-center { left: 50%; transform: translateX(-50%); }
+.screen-live-dock:is(.live-bottom, .live-top).live-end { left: 92%; transform: translateX(-100%); }
+.screen-live-dock:is(.live-left, .live-right).live-start { top: 14%; transform: none; }
+.screen-live-dock:is(.live-left, .live-right).live-center { top: 50%; transform: translateY(-50%); }
+.screen-live-dock:is(.live-left, .live-right).live-end { top: 86%; transform: translateY(-100%); }
+.screen-chip { position: absolute; left: 12px; top: 10px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--card) 88%, transparent); border: 1px solid var(--card-stroke); border-radius: 999px; pointer-events: none; }
+.screen-hint { position: absolute; right: 12px; top: 12px; font-size: 11px; color: var(--ink-2); pointer-events: none; }
+.position-picker .screen-chip { transition: opacity .2s; }
+@media (prefers-reduced-motion: reduce) { .screen-live-dock { transition: none; } }
