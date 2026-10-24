@@ -5,21 +5,18 @@ const { srv, port } = await serveDist();
 const browser = await launchBrowser();
 test.after(async () => { await browser.close(); srv.close(); });
 
-test('a narrow library inspector reveals its controls and returns focus to the selected app', async () => {
-  const { page, errors } = await openPage(browser, port, 'settings.html', { viewport: { width: 520, height: 680 } });
-  await page.evaluate(() => { const invoke = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c,a) => c === 'list_installed_apps' ? Promise.resolve([{items:Array.from({length:36},(_,i)=>({name:`Editor ${String(i).padStart(2,'0')}`,path:`C:/editor${i}.exe`}))}]) : invoke(c,a); });
+test('a narrow window opens a dock item as its own page and back returns focus to it', async () => {
+  const { page, errors } = await openPage(browser, port, 'settings.html', { viewport: { width: 520, height: 680 }, cfg: makeConfig({ pinned: [{ id:'e', kind:'app', name:'Editor', path:'C:/editor.exe', args:[] }] }) });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  const card = page.getByRole('button', { name:'Item details: Editor 35',exact:true });
-  await card.click();
-  const inspector = page.locator('.library-inspector');
-  await inspector.waitFor({state:'visible'});
-  assert.equal(await inspector.evaluate(e=>e===document.activeElement),true);
-  const rect = await inspector.boundingBox(); assert.ok(rect.y >= 0 && rect.y < 600);
-  await inspector.getByRole('button', {name:'Close',exact:true}).click();
-  assert.equal(await card.evaluate(e=>e===document.activeElement),true);
-  await page.setViewportSize({width:1280,height:850}); await card.click();
-  assert.equal(await inspector.getByRole('button', {name:'Close',exact:true}).isVisible(),true);
-  assert.deepEqual(errors,[]); await page.close();
+  const pin = page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true });
+  await pin.click();
+  const details = page.locator('.library-inspector');
+  await details.getByRole('textbox', { name: 'Rename', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
+  await page.locator('.ui-breadcrumb-parent').click();
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.library-pin').getByRole('button', { name: 'Editor', exact: true }).evaluate(e=>e===document.activeElement),true);
+  assert.deepEqual(errors, []); await page.close();
 });
 
 test('failed explicit recovery never acknowledges damaged data or hides the recovery notice', async () => {

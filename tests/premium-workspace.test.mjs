@@ -17,6 +17,7 @@ async function mockApps(page, fail = false) {
 test('bulk selection retains apps across searches and adds them together', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
   await mockApps(page); await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Select app: Alpha', exact: true }).check();
   await page.locator('.app-library-tools input').fill('Beta');
   await page.getByRole('checkbox', { name: 'Select app: Beta', exact: true }).check();
@@ -29,6 +30,7 @@ test('bulk selection retains apps across searches and adds them together', async
 test('partial discovery failure reports the problem while retaining usable recommendations', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
   await mockApps(page, true); await page.getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'Some app sources' }).waitFor();
   assert.equal(await page.locator('.app-library-card').filter({ hasText: 'Zed' }).count(), 1);
   await page.getByRole('button', { name: 'Hide suggestion: Zed', exact: true }).click();
@@ -47,6 +49,7 @@ test('finish presets preserve pins and the library fits a narrow Settings window
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
   assert.deepEqual(saved.pinned, cfg.pinned); assert.equal(saved.surfaceStyle, 'solid');
   await mockApps(page); await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
   await page.locator('.app-library-card').first().waitFor();
   assert.equal(await page.evaluate(() => document.body.scrollWidth <= innerWidth), true);
   assert.deepEqual(errors, []); await page.close();

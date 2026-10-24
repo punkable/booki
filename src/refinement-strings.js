@@ -73,7 +73,7 @@ const rows = {
   "library.more": ["Más opciones", "More options", "Mais opções", "Plus d’options", "Weitere Optionen"],
   "library.appearance": ["Apariencia", "Appearance", "Aparência", "Apparence", "Darstellung"],
   "library.contents": ["Contenido", "Contents", "Conteúdo", "Contenu", "Inhalt"],
-  "library.contentsHint": ["Ábrelo para ordenar sus apps arrastrándolas, o saca una con su botón.", "Open it to reorder its apps by dragging, or take one out with its button.", "Abra-o para ordenar as apps arrastando, ou retire uma com o seu botão.", "Ouvrez-le pour réordonner ses apps en les glissant, ou sortez-en une avec son bouton.", "Öffne sie, um Apps per Ziehen zu ordnen, oder nimm eine mit ihrer Taste heraus."],
+  "library.contentsHint": ["Arriba están sus apps: arrástralas para ordenarlas o sácalas con su botón.", "Its apps are above: drag them to reorder, or take one out with its button.", "As apps estão acima: arraste-as para ordenar, ou retire uma com o seu botão.", "Ses apps sont au-dessus : glissez-les pour les réordonner, ou sortez-en une avec son bouton.", "Die Apps stehen oben: zum Ordnen ziehen oder mit der Taste herausnehmen."],
   "library.openGroup": ["Abrir grupo", "Open group", "Abrir grupo", "Ouvrir le groupe", "Gruppe öffnen"],
   "library.addHere": ["Añadir apps aquí", "Add apps here", "Adicionar apps aqui", "Ajouter des apps ici", "Apps hier hinzufügen"],
   "library.icon": ["Icono", "Icon", "Ícone", "Icône", "Symbol"],

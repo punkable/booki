@@ -10,9 +10,12 @@ test('selecting a catalog app does not pin it; explicit add and undo preserve co
   const { page, errors } = await openPage(browser, port, 'settings.html', { viewport: { width: 520, height: 680 } });
   await page.evaluate(() => { const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (c,a) => c === 'list_installed_apps' ? Promise.resolve([{items:[{ name:'Editor',path:'C:/editor.exe' }]}]) : old(c,a); });
   await page.getByRole('navigation').getByRole('button', { name: 'Apps & folders', exact: true }).click();
-  await page.getByRole('button', { name: 'Item details: Editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
+  // In the Add apps dialog a click selects the app; only + or "Add selected" pins.
+  await page.getByRole('button', { name: 'Select app: Editor', exact: true }).click();
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
   await page.getByRole('button', { name: 'Add app: Editor', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.waitForTimeout(250);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
@@ -119,7 +122,7 @@ test('dragging in the dock editor makes groups, files apps into them and takes t
   // the strip takes it out of the group.
   await groupPin.locator('button').first().click();
   await page.locator('.library-pin-strip.in-group').waitFor();
-  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-catalog'), { targetPosition: { x: 200, y: 200 } });
+  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-page'), { targetPosition: { x: 200, y: 60 } });
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 2);
   rows = await pinned();
   assert.deepEqual(rows.map((p) => p.id).slice(1), ['gamma']);
@@ -279,24 +282,25 @@ test('an inaccessible folder offers retry instead of claiming it is empty', asyn
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('library keeps one compact editable dock and gives an unselected catalog the available width', async () => {
+test('library keeps one compact editable dock, and an item opens as its own page', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
   const editor=page.getByRole('region',{name:'In your dock',exact:true});
   await editor.getByRole('button',{name:'Editor',exact:true}).waitFor();
   const geometry=await page.evaluate(()=>{
-    const editor=document.querySelector('.library-dock-editor'),catalog=document.querySelector('.library-catalog'),workspace=document.querySelector('.library-workspace');
-    return {height:editor.getBoundingClientRect().height,catalogWidth:catalog.getBoundingClientRect().width,workspaceWidth:workspace.getBoundingClientRect().width,previewCount:editor.querySelectorAll('.live-preview-scene').length};
+    const editor=document.querySelector('.library-dock-editor');
+    return {height:editor.getBoundingClientRect().height,previewCount:editor.querySelectorAll('.live-preview-scene').length,catalog:document.querySelectorAll('.app-library-section').length};
   });
   assert.ok(geometry.height<=180,`The persistent editor occupies ${geometry.height}px`);
-  assert.ok(geometry.catalogWidth>=geometry.workspaceWidth*.95,'No width reserved for an empty inspector');
   assert.equal(geometry.previewCount,0,'The editable dock must not be duplicated by a second preview');
+  assert.equal(geometry.catalog,0,'The catalog waits behind Add apps');
   await editor.getByRole('button',{name:'Editor',exact:true}).click();
   await page.locator('.library-inspector').getByRole('textbox',{name:'Rename',exact:true}).waitFor();
+  assert.equal(await page.locator('.ui-breadcrumb [aria-current="page"]').innerText(),'Editor');
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('widget filtering preserves a customized draft and keeps the inspector in view while the page scrolls', async () => {
+test('widget filtering narrows the gallery and a widget opens as its own page', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
   const search=page.getByRole('searchbox',{name:'Search widgets',exact:true});
@@ -305,36 +309,24 @@ test('widget filtering preserves a customized draft and keeps the inspector in v
   await page.locator('.catalog-card',{hasText:'Focus'}).first().click();
   await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
   await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).click();
-  await search.fill('not-a-widget');
-  await page.getByRole('status').filter({hasText:'No results'}).waitFor();
-  assert.equal(await page.locator('.inspector').getByRole('radio',{name:'Solid',exact:true}).getAttribute('aria-checked'),'true');
-  await search.fill('');
-  await page.locator('.settings-main').evaluate(element=>element.scrollTop=element.scrollHeight);
-  const inspector=await page.locator('.inspector').boundingBox();
-  assert.ok(inspector.y>=0 && inspector.y<850,'The inspector stays reachable while the catalog scrolls');
   await page.locator('.inspector').getByRole('button',{name:'Add',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='focus' && item.style.variant==='solid');});
+  await page.locator('.ui-breadcrumb-parent').click();
+  await page.locator('.catalog-grid').waitFor();
   assert.deepEqual(errors,[]);await page.close();
 });
 
-test('the dock editor scrolls away while browsing a populated library, without covering the selection', async () => {
+test('Add apps opens a dialog over the page and Escape closes it', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[app]}),viewport:{width:1280,height:720},initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:Array.from({length:70},(_,i)=>({name:'App '+i,path:'C:/Apps/app'+i+'.exe'}))}]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
-  await page.locator('.app-library-card').first().waitFor();
-  const main=page.locator('.settings-main');
-  await main.evaluate(element=>element.scrollTop=element.scrollHeight);
-  assert.ok(await main.evaluate(element=>element.scrollTop>0),'The catalog is long enough to scroll');
-  const editor=await page.locator('.library-dock-editor').boundingBox();
-  assert.ok(editor.y+editor.height<=0,'The full editor leaves the viewport while browsing the catalog');
-  const overlap=(a,b)=>a.x<b.x+b.width && b.x<a.x+a.width && a.y<b.y+b.height && b.y<a.y+a.height;
-  await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
-  await page.getByRole('button',{name:'Item details: App 69',exact:true}).click();
-  const inspector=await page.locator('.library-candidate-inspector').boundingBox();
-  const tools=await page.locator('.app-library-tools').boundingBox();
-  const pinned=await page.locator('.library-dock-editor').boundingBox();
-  assert.ok(!overlap(inspector,tools),'The selected app and search tools must not overlap');
-  assert.ok(!overlap(inspector,pinned),'The dock editor must not cover the selected app');
-  assert.ok(inspector.y>=0 && inspector.y+40<=720,'Selection is visible');
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
+  const dialog=page.getByRole('dialog',{name:'Add to your dock',exact:true});
+  await dialog.locator('.app-library-card').first().waitFor();
+  await dialog.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('App 69');
+  await dialog.getByRole('button',{name:'Add app: App 69',exact:true}).click();
+  await waitForAsyncCondition(page, async()=>(await window.__TAURI__.core.invoke('get_config')).pinned.some(item=>item.name==='App 69'));
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('dialog').count(),0);
   assert.deepEqual(errors,[]);await page.close();
 });
 
@@ -360,15 +352,16 @@ test('a delayed config reply cannot replace the newer dock or replay its appeara
 test('native icon refresh retries extraction while utilities remain searchable in a folded section', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{initScript:`const old=window.__TAURI__.core.invoke;window.iconReady=false;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='list_installed_apps'?Promise.resolve([{items:[{name:'Editor',path:'C:/editor.exe'},{name:'Browser',path:'C:/browser.exe'},{name:'PowerShell',path:'C:/Windows/powershell.exe'}]}]):cmd==='app_icon'?Promise.resolve(window.iconReady?'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" fill="blue"/></svg>':null):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
-  await page.getByRole('button',{name:'Item details: Editor',exact:true}).waitFor();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
+  await page.getByRole('button',{name:'Select app: Editor',exact:true}).waitFor();
   const tools=page.locator('.app-library-utilities');
   assert.equal(await tools.getAttribute('open'),null);
-  assert.equal(await page.getByRole('button',{name:'Item details: PowerShell',exact:true}).isVisible(),false);
+  assert.equal(await page.getByRole('button',{name:'Select app: PowerShell',exact:true}).isVisible(),false);
   await page.evaluate(()=>window.iconReady=true);
   await page.getByRole('button',{name:'Refresh list',exact:true}).click();
-  await page.getByRole('button',{name:'Item details: Editor',exact:true}).locator('img').waitFor();
+  await page.getByRole('button',{name:'Select app: Editor',exact:true}).locator('img').waitFor();
   await page.getByRole('searchbox',{name:'Search apps…',exact:true}).fill('powershell');
-  await page.getByRole('button',{name:'Item details: PowerShell',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Select app: PowerShell',exact:true}).waitFor();
   await page.getByRole('button',{name:'Add app: PowerShell',exact:true}).click();
   await waitForAsyncCondition(page, async()=>(await window.__TAURI__.core.invoke('get_config')).pinned.some(item=>item.name==='PowerShell'));
   assert.deepEqual(errors,[]);await page.close();
@@ -386,9 +379,11 @@ test('dock position exposes labelled edges and alignment even when auto-hide is 
 test('Windows known folders use the selected group and participate in undo', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{cfg:makeConfig({pinned:[{id:'group',kind:'group',name:'Work',children:[]}]}),initScript:`const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='known_folders'?Promise.resolve([['documents','C:/Users/Owner/Documents']]):old(cmd,args);`});
   await page.getByRole('navigation').getByRole('button',{name:'Apps & folders',exact:true}).click();
+  await page.getByRole('button', { name: 'Add apps', exact: true }).click();
   await page.locator('.library-destination select').selectOption('group');
   await page.getByRole('tab',{name:'Folders',exact:true}).click();
   await page.getByRole('button',{name:'Documents',exact:true}).click();
+  await page.keyboard.press('Escape');
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1&&cfg.pinned[0].id==='group'&&cfg.pinned[0].name==='Work'&&cfg.pinned[0].children?.[0]?.kind==='folder'&&cfg.pinned[0].children[0].path==='C:/Users/Owner/Documents';});
   await page.getByRole('button',{name:'Undo',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.length===1 && cfg.pinned[0].id==='group' && (cfg.pinned[0].children || []).length===0;});
