@@ -305,7 +305,7 @@ async function render(html, file) {
 }
 
 try {
-  const locales = (process.env.BOOKI_STILLS_LANGUAGE || 'en,es').split(',');
+  const locales = (process.env.BOOKI_STILLS_LANGUAGE || 'en').split(',');
   for (const locale of locales) {
     if (!COPY[locale]) throw new Error('BOOKI_STILLS_LANGUAGE must list en and/or es.');
     const dockLight = await shootDock(locale, 'light'), dockDark = await shootDock(locale, 'dark');

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { validateCaptures } from "../scripts/release-docs.mjs";
 
 test("publication rejects old versions, stale UI, Dev captures and missing/replaced images", () => {
-  const files = Object.fromEntries(["en", "es"].flatMap((lang) => ["hero", "island", "groups", "widgets", "settings", "dark"].map((name) => [`docs/presentation/${name}-${lang}.jpg`, "digest"])));
+  const files = Object.fromEntries(["en"].flatMap((lang) => ["hero", "island", "groups", "widgets", "settings", "dark"].map((name) => [`docs/presentation/${name}-${lang}.jpg`, "digest"])));
   const manifest = { version: "1.2.3", source: "current UI", edition: "official", files };
   const expected = { version: "1.2.3", source: "current UI", hash: () => "digest" };
   assert.doesNotThrow(() => validateCaptures(manifest, expected));

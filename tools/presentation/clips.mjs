@@ -76,8 +76,6 @@ await record('widgets', 'index.html', { theme: 'dark', surfaceStyle: 'glass', au
   await pause(page, 300);
   await tile.click();
   await pause(page, 1600);
-  await page.locator('details.reading-card summary').nth(1).click().catch(() => {});
-  await pause(page, 1600);
   await page.keyboard.press('Escape');
   await pause(page, 700);
 });

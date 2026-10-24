@@ -36,7 +36,7 @@ const regions = (language, { preview = false } = {}) => {
   return {
     history: `## ${es ? "Actualizaciones recientes" : "Recent updates"}\n\n| ${es ? "Versión" : "Version"} | ${es ? "Qué cambió" : "What changed"} |\n|---|---|\n${history}\n\n[${es ? "Todas las versiones publicadas" : "All published releases"}](https://github.com/punkable/booki/releases)`,
     news: `## ${es ? "Novedades de" : "What's new in"} ${version}\n\n${release.headline}\n\n${release.sections.flatMap((section) => section.notes.map((note) => `- ${note}`)).join("\n")}\n\n[${es ? "Notas completas" : "Full release notes"}](docs/releases/v${version}.md)`,
-    download: `<p align="center">\n  <a href="${base}_x64-setup.exe"><b>${es ? "Descargar para Windows" : "Download for Windows"} v${version} (x64)</b></a> ·\n  <a href="${base}_arm64-setup.exe">ARM64</a> ·\n  <a href="${base}_x64_en-US.msi">MSI x64</a> ·\n  <a href="docs/releases/v${version}.md">${es ? "Novedades" : "What's new"} v${version}</a> ·\n  <a href="${es ? "README.md" : "README.es.md"}">${es ? "English" : "Español"}</a>\n</p>`,
+    download: `<p align="center">\n  <a href="${base}_x64-setup.exe"><b>${es ? "Descargar para Windows" : "Download for Windows"} v${version} (x64)</b></a> ·\n  <a href="${base}_arm64-setup.exe">ARM64</a> ·\n  <a href="${base}_x64_en-US.msi">MSI x64</a> ·\n  <a href="docs/releases/v${version}.md">${es ? "Novedades" : "What's new"} v${version}</a>\n</p>`,
     media: preview
       ? `<p align="center"><sub>${es ? `Vista previa de esta rama, basada en v${version}, con iconos y datos de ejemplo. Incluye cambios aún no publicados; las descargas corresponden a la versión estable. El vidrio nativo requiere comprobación en Windows.` : `Branch preview based on v${version}, with example icons and data. Includes unpublished changes; downloads point to the stable release. Native glass still requires a Windows check.`}</sub></p>`
       : `<p align="center"><sub>${es ? `Capturas del frontend del código fuente v${version}, con datos de ejemplo. El desenfoque nativo de Windows requiere comprobación en la app.` : `Source frontend captures for v${version}, with example data. Native Windows blur requires an in-app check.`}</sub></p>`,
@@ -48,7 +48,7 @@ const captions = {
   es: { hero: "Dock de Booki con apps de ejemplo, grupo, reloj, sistema, temporizador y Recolector", island: "Claude Code, Cursor y Codex con estados de trabajo, espera y finalización en el notch compacto de Booki", groups: "Grupo de Booki con búsqueda, densidad seleccionable e iconos de apps de ejemplo", widgets: "Panel de widgets en vivo y cola de sesión del Recolector de Booki", settings: "Inicio actual de Ajustes de Booki con dock de ejemplo", dark: "Ajustes actuales del Dock de Booki en modo oscuro" },
 };
 export function syncReadmes(options = {}) {
-  for (const language of ["en", "es"]) {
+  for (const language of ["en"]) {
     const path = join(root, language === "es" ? "README.es.md" : "README.md");
     let text = readFileSync(path, "utf8");
     for (const [name, body] of Object.entries(regions(language, options))) {
@@ -66,7 +66,7 @@ export function syncReadmes(options = {}) {
 export function checkReleaseDocs() {
   const notes = `docs/releases/v${version}.md`;
   if (!existsSync(join(root, notes)) || !readFileSync(join(root, notes), "utf8").startsWith(`# Booki ${version}`)) throw new Error(`Missing versioned release notes: ${notes}`);
-  for (const language of ["en", "es"]) {
+  for (const language of ["en"]) {
     const path = language === "es" ? "README.es.md" : "README.md";
     const text = readFileSync(join(root, path), "utf8");
     for (const [name, body] of Object.entries(regions(language))) {
@@ -83,7 +83,7 @@ export function checkReleaseDocs() {
 }
 export function validateCaptures(manifest, expected) {
   if (manifest.version !== expected.version || manifest.source !== expected.source || manifest.edition !== "official") throw new Error("Screenshots do not match this version/source/edition; run npm run release:prepare");
-  for (const language of ["en", "es"]) for (const name of ["hero", "island", "groups", "widgets", "settings", "dark"]) {
+  for (const language of ["en"]) for (const name of ["hero", "island", "groups", "widgets", "settings", "dark"]) {
     const path = `docs/presentation/${name}-${language}.jpg`;
     if (!manifest.files?.[path] || manifest.files[path] !== expected.hash(path)) throw new Error(`Unverified screenshot: ${path}`);
   }

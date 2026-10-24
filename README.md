@@ -13,8 +13,7 @@
   <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_x64-setup.exe"><b>Download for Windows v0.96.0 (x64)</b></a> ·
   <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_arm64-setup.exe">ARM64</a> ·
   <a href="https://github.com/punkable/booki/releases/download/v0.96.0/Booki_0.96.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.96.0.md">What's new v0.96.0</a> ·
-  <a href="README.es.md">Español</a>
+  <a href="docs/releases/v0.96.0.md">What's new v0.96.0</a>
 </p>
 <!-- booki:download:end -->
 
@@ -31,40 +30,54 @@
 <tr>
 <td align="center" width="25%"><b>⚡ Light</b><br/><sub>Native Rust core. Widgets pause when the dock hides.</sub></td>
 <td align="center" width="25%"><b>🔒 Private</b><br/><sub>No accounts, no telemetry, no cloud.</sub></td>
-<td align="center" width="25%"><b>🎨 Yours</b><br/><sub>Taskbar, glass or solid. Any edge. Five languages.</sub></td>
+<td align="center" width="25%"><b>🪟 Native</b><br/><sub>Windows 11 acrylic, light and dark. Any edge.</sub></td>
 <td align="center" width="25%"><b>🧡 Open</b><br/><sub>MIT licensed. Built in the open.</sub></td>
 </tr>
 </table>
 
+<p align="center"><img src="docs/presentation/diagram-anatomy.svg" width="960" alt="The parts of Booki: the notch at the top, a widget panel, and the dock with apps, groups and live widgets" /></p>
+
 ---
+
+<h2 align="center">Smooth at any refresh rate.</h2>
+
+<p align="center">Icons grow under your pointer with time-based motion: just as quick at 60, 144 or 240 Hz, only smoother on faster screens, with no overshoot.<br/>Pick glass (Windows 11 acrylic, light or dark), the taskbar's own look, or solid.</p>
+
+<p align="center"><img src="docs/presentation/clip-magnify.webp" width="900" alt="The pointer moves along the Booki dock and the icons grow and settle under it" /></p>
+
+<h2 align="center">Widgets that open with one click.</h2>
+
+<p align="center">Clock, calendar, weather, system, battery, devices, AI usage, media, volume, notes, clipboard, focus, Collector, updates and lighting.<br/>One click opens a widget's details; right-click or its gear opens its settings.</p>
+
+<p align="center"><img src="docs/presentation/clip-widgets.webp" width="900" alt="Clicking the Devices widget opens a panel with the battery of a mouse, a keyboard and headphones" /></p>
+
+<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki live widget panel and Collector session queue" /></p>
+
+<h2 align="center">A gallery to make them yours.</h2>
+
+<p align="center">The widgets on your dock sit at the top. Below, explore by category and add one in a click.<br/>Its settings open beside the gallery with a live preview: content, look and colour.</p>
+
+<p align="center"><img src="docs/presentation/clip-gallery.webp" width="900" alt="In Booki's Widgets settings, Weather is added from the gallery and its colour is changed in the side sheet" /></p>
+
+<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Current Booki Settings home with example dock" /></p>
 
 <h2 align="center">The notch that tells you things.</h2>
 
-<p align="center">A quiet dot at the top of your screen that opens into a capsule for your focus timer, the song that's playing or a low battery.<br/>Hover it for a card with more. Prefer something simpler? Choose an attached tab or a floating pill.</p>
+<p align="center">A quiet capsule at the top of your screen for your focus timer, the song that's playing, a low battery,<br/>or your AI coding agents: working, waiting for you, done.</p>
+
+<p align="center"><img src="docs/presentation/clip-notch.webp" width="760" alt="The Booki notch shows Claude working, then waiting, then Codex working, then Claude done" /></p>
 
 <p align="center"><img src="docs/presentation/island-en.jpg" width="1000" alt="Claude Code, Cursor and Codex with working, waiting and finished states in the compact Booki notch" /></p>
 
 <h2 align="center">Groups that look like yours.</h2>
 
-<p align="center">Pin apps, folders, files and websites, then gather them into groups.<br/>Give each group a colour from a curated palette and an icon from the library — it shows in the dock and in Settings.</p>
+<p align="center">Pin apps, folders, files and websites, then gather them into groups with a colour and an icon.<br/>Search inside a group and switch between list and icon sizes with Ctrl + wheel.</p>
 
 <p align="center"><img src="docs/presentation/groups-en.jpg" width="1000" alt="Booki group flyout with search, selectable density and example app icons" /></p>
 
-<h2 align="center">Live, at a glance.</h2>
-
-<p align="center">Clock, calendar, weather, system (CPU, memory, disk, network), battery, media, volume, notes, clipboard and focus (timer + tasks).<br/>Compact tiles that sit right on the bar.<br/>A focus block turns on Windows Do not disturb (and turns it back off when it ends), holds Booki's own notices and can keep the dock tucked away.</p>
-
-<p align="center"><img src="docs/presentation/widgets-en.jpg" width="1000" alt="Booki live widget panel and Collector session queue" /></p>
-
-<h2 align="center">Settings you actually enjoy.</h2>
-
-<p align="center">Six clear sections — Home, Dock, Widgets, Apps, Plugins and System — with a live preview of your dock and everything at a glance.</p>
-
-<p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Current Booki Settings home with example dock" /></p>
-
 <h2 align="center">At home in the dark.</h2>
 
-<p align="center">Follows your Windows theme and accent. Match the taskbar, blur what's behind with glass, or stay solid.<br/>When a game or video goes fullscreen, Booki steps aside.</p>
+<p align="center">Follows your Windows theme and accent. When a game or video goes fullscreen, Booki steps aside.</p>
 
 <p align="center"><img src="docs/presentation/dark-en.jpg" width="1000" alt="Current Booki Dock settings in dark mode" /></p>
 
@@ -73,6 +86,8 @@
 <h2 align="center">Private by design.</h2>
 
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
+
+<p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and never sign-ins, tokens, credential files or the network" /></p>
 
 <!-- booki:media:start -->
 <p align="center"><sub>Source frontend captures for v0.96.0, with example data. Native Windows blur requires an in-app check.</sub></p>
@@ -128,11 +143,11 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 | Drag a pin out | Unpin, or return a shortcut to the desktop |
 | Right-click the dock | Add items, choose a profile or open Settings |
 | Middle-click a pin | Reveal its location in Explorer |
-| Double-click a widget | Open its configuration; utility widgets open their own panel |
+| Click a widget | Open its details or controls |
+| Right-click a widget, or its gear | Open the settings of that copy |
 | Right-click a group → Customize | Edit name, icon and color; expand a picker only when needed, then Apply or Cancel |
 | `Ctrl` + wheel inside a group | Switch between list and icon sizes |
 | Drag from a group | See the shortcut and destination; `Escape` cancels |
-| Widget panel / Audio controls | Available from the menu and action search |
 | `Alt` + `1…9` | Launch the corresponding pin; the modifier is configurable |
 | Push the cursor to the edge | Reveal a hidden dock when edge/hover behavior is enabled |
 | Wheel over Media, if enabled | Change system volume |
@@ -144,9 +159,9 @@ Collector supports video, audio, files and galleries: paste one link per line to
 
 - No telemetry, accounts or cloud synchronization. Configuration lives at `%APPDATA%\Booki\config.json`, with a safety backup.
 - Network requests are limited to update checks/downloads and website favicons, plus features you explicitly enable: Open-Meteo weather after choosing a city (never your device location), plugin downloads from their official release pages (each checked against a SHA-256 checksum pinned in Booki's source). The AI usage widget makes no network requests.
-- The AI usage widget only reads the local usage logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions`), read-only, when the widget or local usage notices are enabled. Booki never reads, uses, stores or sends your Claude or ChatGPT credentials, keeps no message content, and makes no network request for it. Claude's local logs hold no plan limits, so the widget shows tokens in the current 5-hour block and this week; Codex's logs include its plan percentages.
+- The AI usage widget only reads, read-only, the local session logs of Claude Code (`~/.claude/projects`) and Codex (`~/.codex/sessions` and `archived_sessions`, or `CODEX_HOME`). For Cursor and OpenCode it only checks that their folders exist. Booki never reads, uses, stores or sends sign-ins, tokens or credential files, keeps no message content and makes no network request for it. Claude's logs hold no plan limits, so the widget shows tokens used; Codex's logs include its plan percentages; a missing allowance is shown as unknown, never estimated.
 - Device batteries come from Windows itself, from Logitech receivers over USB, and, if you installed it, from HeadsetControl running on your PC. Nothing leaves your computer.
-- Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
+- Plugins live in `%LOCALAPPDATA%\Booki\plugins`; removing one in Settings deletes its folder. Booki tells you when a newer pinned version is available, and updating keeps your widgets as they are. They are independent third-party tools under their own licenses, installed only when you choose to; you are responsible for using them lawfully. See the [terms of use](TERMS.md).
 - App recommendations read Windows' local usage record and local successful Booki launches (`app-usage.json`). Usage is not uploaded.
 - Clipboard history is local. Restart persistence is off by default; when enabled, it is protected for your Windows user and can expire.
 - Compatible captures hide the dock by default. Enable **Visible in captures** in Settings when recording it.
@@ -179,7 +194,7 @@ npm run tauri:build  # Windows packages
 
 UI changes follow the [visual identity and design system](docs/brand/README.md).
 
-The images and film are rebuilt from the real frontend by [tools/presentation](tools/presentation/README.md); finished media live in `docs/presentation/`. Older native Windows captures and PNG brand exports are kept in `docs/`.
+README images and clips are recorded from the real frontend with sample data by [tools/presentation](tools/presentation/README.md) (`stills.mjs`, `clips.mjs`); finished media live in `docs/presentation/`.
 
 To audit the current public release without running its installers:
 
@@ -196,7 +211,3 @@ Releases are built from version tags through [release.yml](.github/workflows/rel
 [MIT](LICENSE) · [Terms of use and plugin notice](TERMS.md). Booki by [Punkable](https://github.com/punkable) · [@0xPunki](https://x.com/0xPunki).
 
 Emoji artwork: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) © Microsoft, MIT. AI provider logos: [LobeHub Icons](https://github.com/lobehub/lobe-icons) (MIT); the marks belong to their owners. Device glyphs: [Lucide](https://lucide.dev/) (ISC). Optional city weather: [Open-Meteo](https://open-meteo.com/). The presentation uses the official Booki logo, [Inter](tools/presentation/fonts/OFL.txt) under the SIL Open Font License, and no third-party music. See the [visual identity guidelines](docs/brand/README.md).
-
-### Quality and design
-
-See the [CoolDock research and design decisions](docs/research/cooldock.md) and [premium workspace implementation, measurements and verification limits](docs/quality/premium-workspace.md).
