@@ -427,6 +427,7 @@ const pollMedia = singleFlight(async () => {
   eachWidget("media", (el) => {
     // Inside an app widget, only that app's own session shows.
     const m = el.dataset.appId ? (ownsMedia(findWidgetPin(el.dataset.appId) || {}, now?.source) ? now : null) : now;
+    if (el.dataset.appId) el.classList.toggle("aw-idle", !m);
     const art = el.querySelector(".w-art");
     const ico = el.querySelector(".w-ico");
     const toggle = el.querySelector(".w-ctl-toggle");

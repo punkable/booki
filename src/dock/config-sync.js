@@ -16,7 +16,7 @@ import { emitConfigChanged } from "./helpers.js";
 import { dockEl, dockKeys, dropOverlay, undoToast, esc } from "./dom.js";
 import { fitDock, reframe, SHADOW_PAD, applyFrame } from "./frame.js";
 import { startPolls } from "./live-widgets.js";
-import { hideMode, setupAutoHide } from "./autohide.js";
+import { hideMode, setupAutoHide, onForegroundApp } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { render } from "./render.js";
 import { hideUndoToast, placeUndoToast } from "./undo-toast.js";
@@ -124,6 +124,8 @@ export async function reloadConfig({ afterSaves = true } = {}) {
     prev.notchMode !== S.cfg.notchMode ||
     prev.notchPosition !== S.cfg.notchPosition;
   if (hideChanged) setupAutoHide();
+  // The per-app exception list changed: re-check the app in front now.
+  if (JSON.stringify(prev?.hideForApps || []) !== JSON.stringify(S.cfg.hideForApps || [])) onForegroundApp();
   if (edgeSwapped) {
     // Briefly SHOW the dock in its new spot so the user actually sees it move —
     // otherwise smart-hide (the settings window occludes the dock area) tucks it

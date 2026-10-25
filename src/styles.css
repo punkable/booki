@@ -2974,3 +2974,4 @@ body.stack-open .dock-tip { opacity: 0 !important; visibility: hidden; }
 .stack-item.stack-widget > .tile.widget.in-flyout { --size: 64px !important; height: var(--size); }
 .stack-item.stack-widget-small > .tile.widget.in-flyout { --size: 72px !important; }
 .stack-item.stack-widget-small { padding: 6px 4px 8px; }
+.tile.app-wide .aw-media.aw-idle .w-controls { display: none; }
