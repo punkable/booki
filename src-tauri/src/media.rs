@@ -10,6 +10,7 @@ pub(crate) struct MediaInfo {
     pub(crate) thumb: Option<String>,
     pub(crate) position_ms: Option<u64>,
     pub(crate) duration_ms: Option<u64>,
+    pub(crate) source: String,
 }
 
 /// What the system media session is playing (async: WinRT calls block briefly).
@@ -23,6 +24,7 @@ pub(crate) async fn media_info() -> Option<MediaInfo> {
             thumb: m.thumb,
             position_ms: m.position_ms,
             duration_ms: m.duration_ms,
+            source: m.source,
         })
     })
     .await

@@ -5,6 +5,7 @@ import { dock as dockApi } from "../api.js";
 import { imageSrc } from "../image-src.js";
 import { setTileLabel } from "./tooltip.js";
 import { widgetWidth } from "./layout-model.js";
+import { decorateAppWidget, isAppWidget } from "./app-widgets.js";
 import { icon } from "../icons.js";
 import { isotype } from "../brand-mark.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "../icon-library.js";
@@ -133,7 +134,7 @@ function appTile(item) {
   el.appendChild(badge);
 
   const addGlyph = () => {
-    if (el.querySelector(".glyph, img")) return;
+    if (el.querySelector(":scope > .glyph, :scope > img")) return;
     const look = pinFallback(item);
     const glyph = document.createElement("span");
     glyph.className = "glyph fallback";
@@ -182,6 +183,8 @@ function appTile(item) {
     deps.removeItem(item.id);
   });
   el.appendChild(rm);
+
+  if (isAppWidget(item)) decorateAppWidget(el, item, { mediaTile: (w) => widgetTile(w, { inFlyout: true }) });
 
   el.addEventListener("contextmenu", (e) => deps.openMenu(e, item));
   el.addEventListener("pointerdown", (e) => deps.onPointerDown(e, el, item));

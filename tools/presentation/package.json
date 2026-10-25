@@ -2,12 +2,19 @@
   "name": "booki-presentation",
   "private": true,
   "type": "module",
-  "scripts": { "capture": "node capture.mjs", "render": "node render.mjs", "stills": "node stills.mjs" },
+  "scripts": {
+    "capture": "node capture.mjs",
+    "render": "node render.mjs",
+    "stills": "node stills.mjs"
+  },
   "dependencies": {
     "@remotion/bundler": "4.0.532",
     "@remotion/renderer": "4.0.532",
-    "remotion": "4.0.532",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "remotion": "4.0.532"
+  },
+  "devDependencies": {
+    "simple-icons": "16.35.0"
   }
 }

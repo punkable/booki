@@ -104,6 +104,8 @@ pub struct MediaSnapshot {
     pub thumb: Option<String>,
     pub position_ms: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// App that owns the session (AppUserModelID, lowercased), to match a pinned app.
+    pub source: String,
 }
 
 pub fn media_now_playing() -> Option<MediaSnapshot> {

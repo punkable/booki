@@ -30,6 +30,7 @@ import {
 import { S } from "./state.js";
 import { dockKeys } from "./dom.js";
 import { widgetLabel, findWidgetPin } from "./helpers.js";
+import { ownsMedia } from "./app-widgets.js";
 import { fitDock, reframe } from "./frame.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -422,8 +423,10 @@ function setMediaToggle(toggle, playing) {
   toggle.innerHTML = playing ? MEDIA_SVG.pause : MEDIA_SVG.play;
 }
 const pollMedia = singleFlight(async () => {
-  const m = await dockApi.mediaInfo().catch(() => null);
+  const now = await dockApi.mediaInfo().catch(() => null);
   eachWidget("media", (el) => {
+    // Inside an app widget, only that app's own session shows.
+    const m = el.dataset.appId ? (ownsMedia(findWidgetPin(el.dataset.appId) || {}, now?.source) ? now : null) : now;
     const art = el.querySelector(".w-art");
     const ico = el.querySelector(".w-ico");
     const toggle = el.querySelector(".w-ctl-toggle");

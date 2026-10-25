@@ -1901,6 +1901,8 @@ pub struct MediaSnapshot {
     /// publishes a timeline (many browsers and some players do not).
     pub position_ms: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// App that owns the session (AppUserModelID, lowercased), to match a pinned app.
+    pub source: String,
 }
 
 // Each query owns only its initialization reference; borrowed apartments remain intact.
@@ -2008,6 +2010,10 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         ))
     })();
     let (position_ms, duration_ms) = media_timeline(&session, playing);
+    let source = session
+        .SourceAppUserModelId()
+        .map(|s| s.to_string().to_lowercase())
+        .unwrap_or_default();
     Some(MediaSnapshot {
         title,
         artist,
@@ -2015,6 +2021,7 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         thumb,
         position_ms,
         duration_ms,
+        source,
     })
 }
 

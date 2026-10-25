@@ -128,20 +128,22 @@
 }
 .w-ring-ico {
   position: absolute;
-  top: 19%;
+  /* Anchored to the centre, not the top: on a wide card the ring is
+     narrower than the box and a top offset landed on the stroke. */
+  bottom: calc(50% + var(--size) * 0.07);
   left: 50%;
   transform: translateX(-50%);
   display: grid;
   place-items: center;
   color: var(--w-accent);
 }
-.w-ring-ico svg { position: static; width: calc(var(--size) * 0.18); height: calc(var(--size) * 0.18); transform: none; stroke-width: 2.2; }
-.w-ring-ico img.emo { width: calc(var(--size) * 0.18) !important; height: calc(var(--size) * 0.18) !important; }
+.w-ring-ico svg { position: static; width: calc(var(--size) * 0.15); height: calc(var(--size) * 0.15); transform: none; stroke-width: 2.2; }
+.w-ring-ico img.emo { width: calc(var(--size) * 0.15) !important; height: calc(var(--size) * 0.15) !important; }
 .w-ring-num {
   position: relative;
-  margin-top: calc(var(--size) * 0.12);
+  margin-top: calc(var(--size) * 0.13);
   font-family: var(--font-display);
-  font-size: calc(var(--size) * 0.25);
+  font-size: calc(var(--size) * 0.23);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;

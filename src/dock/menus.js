@@ -11,6 +11,7 @@ import { reframe } from "./frame.js";
 import { addMenuHead, placeMenu, closeMenu, resetMenu, addMenuSection, openMenuSection } from "./menu-core.js";
 import { render, refreshGroupTile } from "./render.js";
 import { windowsFor } from "./running-windows.js";
+import { appWidgetKind } from "./app-widgets.js";
 import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
 import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
@@ -94,6 +95,13 @@ export function openMenu(e, item) {
   if (item.kind === "app" || item.kind === "folder") addMenuSection(ctxMenu, "pencil", t("refine.customize"), () => openMenuSection(e, menuPinTitle(item), () => openMenu(e, item), ({ add }) => {
     add("pencil", `${t("apps.rename")}…`, () => promptRename(item));
     add("image", t("m.changeIcon"), () => changeIcon(item));
+    if (appWidgetKind(item)) {
+      const wide = item.style?.appWidget === "wide";
+      add(wide ? "app" : "grid", t(wide ? "aw.showIcon" : "aw.showWide"), async () => {
+        item.style = { ...(item.style || {}), appWidget: wide ? "" : "wide" };
+        if (await persist()) { await render(); reframe(); }
+      });
+    }
     if (item.icon) add("undo", t("m.removeIcon"), () => clearIcon(item));
   }));
   if (item.kind !== "separator") addMenuSection(ctxMenu, "grid", t("refine.organize"), () => openMenuSection(e, t("refine.organize"), () => openMenu(e, item), ({ add }) => {

@@ -24,7 +24,9 @@ import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
 
 // Widgets whose read-out needs the whole row of a widget hub.
-const WIDE_HUB_WIDGETS = new Set(["system", "media", "clipboard", "notes", "collector"]);
+const WIDE_HUB_WIDGETS = new Set(["system", "media", "clipboard", "notes"]);
+// A single ring reads fine in one column; two would leave it floating in space.
+const SMALL_HUB_WIDGETS = new Set(["battery", "volume", "updates", "collector", "devices", "ai"]);
 import { closeProductivityPanel, openSystemPanel, openWidgetHub, openWidget } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
@@ -263,7 +265,7 @@ export async function openStack(tileEl, item) {
         const wCell = document.createElement("div");
         const tile = widgetTile(it, { inFlyout: true });
         const wide = WIDE_HUB_WIDGETS.has(tile.dataset.widget);
-        wCell.className = "stack-item stack-widget " + (wide ? "stack-widget-wide" : "stack-widget-half");
+        wCell.className = "stack-item stack-widget " + (wide ? "stack-widget-wide" : SMALL_HUB_WIDGETS.has(tile.dataset.widget) ? "stack-widget-small" : "stack-widget-half");
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
         wCell.appendChild(tile);
         const name = document.createElement("span");

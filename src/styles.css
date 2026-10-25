@@ -2156,21 +2156,23 @@ body.edge-right .stack.open { transform: none; }
 /* A group holding widgets works like the Windows Widgets board: a four-column
    grid where widgets are cards two columns wide (or the whole row for wide
    read-outs) and apps take one column below them. */
-.group-stack .stack-grid.widget-hub-grid, .stack-grid.widget-hub-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.group-stack .stack-grid.widget-hub-grid, .stack-grid.widget-hub-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: row dense; }
 .group-stack .stack-grid.widget-hub-grid[data-view="list"] .stack-item:not(.stack-widget) { grid-column: 1 / -1; }
 .stack-item.stack-widget {
   grid-column: span 2;
   flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px;
-  min-height: 112px; padding: 8px 10px 12px; cursor: pointer;
+  padding: 6px 8px 8px; gap: 4px; cursor: pointer;
   background: var(--layer, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--stroke-card, rgba(255, 255, 255, 0.08));
   border-radius: var(--r-card, 8px);
 }
 .stack-item.stack-widget-wide { grid-column: 1 / -1; }
+.stack-item.stack-widget-small { grid-column: span 1; }
+.stack-item.stack-widget-small .stack-widget-name { text-align: center; }
 .stack-item.stack-widget:hover { background: var(--layer-hover, rgba(255, 255, 255, 0.08)); transform: none; }
 .stack-widget .tile.widget.in-flyout {
   position: relative; margin: 0; width: 100%; transform: none !important;
-  display: flex; align-items: center; justify-content: center; flex: 1;
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
 }
 .stack-item.stack-widget > .tile.widget.in-flyout { width: 100% !important; max-width: 100%; height: var(--size); }
 .stack-widget .tile.widget.in-flyout .w-card { width: 100%; }
@@ -2921,7 +2923,7 @@ body.surface-glass.native-material .coach::after { display: none; }
 body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { background-color: var(--glass-tint, var(--surface-tint)) !important; }
 /* An open group or folder covers the labels above the bar; through its
    translucent fill they read as ghost text over the grid. */
-body.stack-open .tile > .label { opacity: 0; transition: none; }
+body.stack-open .tile > .label { opacity: 0 !important; transition: none; }
 
 /* A widget inside a group tile: its glyph on a tint of its own colour. */
 .tile.group .group-mini.mini-widget { background: color-mix(in srgb, var(--mini-accent) 22%, transparent); color: var(--mini-accent); }
@@ -2929,3 +2931,41 @@ body.stack-open .tile > .label { opacity: 0; transition: none; }
 /* A card never lets its read-out spill into the next one. */
 .stack-widget .tile.widget.in-flyout, .stack-widget .tile.widget.in-flyout .w-card { min-width: 0; overflow: hidden; }
 .stack-widget .tile.widget.in-flyout :is(.w-label, .w-value, .w-sub) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* App widget: a pinned app as a wide live card — its icon, then a read-out
+   and small buttons, like the dock's own widgets. */
+.tile.app-wide {
+  width: calc(var(--size) * 4 + var(--gap, 6px) * 3);
+  justify-content: flex-start; gap: calc(var(--size) * 0.14);
+  padding: 0 calc(var(--size) * 0.12) 0 calc(var(--size) * 0.06);
+  border-radius: var(--tile-r, 12px);
+  background: var(--w-bg, color-mix(in srgb, var(--ink, #fff) 7%, transparent));
+}
+.tile.app-wide > img, .tile.app-wide > .glyph { flex: 0 0 auto; width: calc(var(--size) * 0.78); height: calc(var(--size) * 0.78); }
+.tile.app-wide .aw-body { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 6px; }
+.tile.app-wide .aw-text { flex: 1; min-width: 0; display: grid; text-align: left; line-height: 1.15; }
+.tile.app-wide .aw-title { font-size: calc(var(--size) * 0.25); font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.app-wide .aw-sub { font-size: calc(var(--size) * 0.2); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.app-wide .aw-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+.tile.app-wide .aw-btn { width: calc(var(--size) * 0.46); height: calc(var(--size) * 0.46); display: grid; place-items: center; border-radius: 50%; color: var(--ink-2); cursor: pointer; }
+.tile.app-wide .aw-btn:hover { background: color-mix(in srgb, var(--ink, #fff) 12%, transparent); color: var(--ink); }
+.tile.app-wide .aw-btn svg { width: 55%; height: 55%; }
+.tile.app-wide .aw-media { position: static; flex: 1; min-width: 0; width: auto !important; height: 100%; margin: 0; background: transparent; box-shadow: none; transform: none !important; }
+.tile.app-wide .aw-media .w-card { width: 100%; background: transparent !important; box-shadow: none !important; border: 0 !important; padding-left: 0; }
+.tile.app-wide .aw-media :is(.w-ico, .w-art) { display: none !important; }
+.tile.app-wide .aw-media .label, .tile.app-wide .aw-media .rm { display: none; }
+body:is(.edge-left, .edge-right) .tile.app-wide { width: var(--size); padding: 0; background: transparent; justify-content: center; }
+body:is(.edge-left, .edge-right) .tile.app-wide .aw-body { display: none; }
+.tile.app-wide > img, .tile.app-wide > .glyph { order: -1; }
+.tile.app-wide > .badge { left: calc(var(--size) * 0.5); right: auto; }
+/* Inside a hub card the card is the surface: the read-out drops its own
+   fill and border so there is one rounded edge, not two. */
+.stack-item.stack-widget > .tile.widget.in-flyout .w-card { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+body.stack-open .dock-tip { opacity: 0 !important; visibility: hidden; }
+
+/* Tiles that already are a surface (widgets, groups) react on that surface:
+   no second hover plate and ring around it, which read as a double border. */
+.tile:is(.widget, .group):hover, .tile:is(.widget, .group):active { background: transparent; box-shadow: none; }
+.tile.group:hover .group-grid { filter: brightness(1.15); }
+[data-theme="light"] .tile.group:hover .group-grid { filter: brightness(0.96); }
+.tile.app-wide:hover { box-shadow: none; background: color-mix(in srgb, var(--ink, #fff) 11%, transparent); }

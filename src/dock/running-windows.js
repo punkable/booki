@@ -10,6 +10,7 @@ import { dockEl, stackEl } from "./dom.js";
 import { checkScreenChange } from "./frame.js";
 import { pollSlowdown } from "./live-widgets.js";
 import { refreshTrashState } from "./render.js";
+import { paintAppWidget } from "./app-widgets.js";
 
 // ─────────────────── Running-app indicators ───────────────────
 
@@ -77,6 +78,7 @@ export function startRunningPoll() {
         const app = S.cfg.pinned.find((a) => a.id === t.dataset.id);
         if (!app || app.kind === "separator" || app.kind === "trash" || app.kind === "action") return;
         const matches = matchWins(app);
+        if (t.dataset.appWidget) paintAppWidget(t, app, matches);
         const badge = t.querySelector(".badge");
         if (matches.length) {
           t.dataset.running = "true";
