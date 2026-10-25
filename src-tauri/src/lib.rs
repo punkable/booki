@@ -685,11 +685,11 @@ fn foreground_exe() -> String {
     win::foreground_exe()
 }
 
-/// video, creative, code, game, or desk. One look, so the notch does not
-/// ask four times.
+/// video, creative, code, game, or desk, for the asking window's monitor.
+/// One look, so the notch does not ask four times.
 #[tauri::command]
-fn foreground_place() -> &'static str {
-    win::foreground_place()
+fn foreground_place(window: tauri::WebviewWindow) -> &'static str {
+    win::foreground_place(window.hwnd().map(|h| h.0 as isize).unwrap_or(0))
 }
 
 /// Plan usage of the AI services signed in on this PC, for the AI widget.

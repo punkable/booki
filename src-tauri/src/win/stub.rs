@@ -201,7 +201,7 @@ pub fn foreground_exe() -> String {
     String::new()
 }
 
-pub fn foreground_place() -> &'static str {
+pub fn foreground_place(_notch: isize) -> &'static str {
     "desk"
 }
 
