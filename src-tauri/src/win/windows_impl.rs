@@ -2202,6 +2202,67 @@ pub fn volume_set_state(pct: u32, muted: bool) -> Result<(), String> {
     }
 }
 
+/// A program's FileDescription from its version resource ("Helium",
+/// "Discord"), the name Task Manager shows. None when it has none.
+fn file_description(path: &str) -> Option<String> {
+    use windows::Win32::Storage::FileSystem::{
+        GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
+    };
+    if path.is_empty() {
+        return None;
+    }
+    let wpath = wide(path);
+    unsafe {
+        let size = GetFileVersionInfoSizeW(PCWSTR(wpath.as_ptr()), None);
+        if size == 0 || size > 4 * 1024 * 1024 {
+            return None;
+        }
+        let mut data = vec![0u8; size as usize];
+        GetFileVersionInfoW(
+            PCWSTR(wpath.as_ptr()),
+            Some(0),
+            size,
+            data.as_mut_ptr().cast(),
+        )
+        .ok()?;
+        // The first language/code page the file declares.
+        let mut ptr = std::ptr::null_mut();
+        let mut len = 0u32;
+        let query = wide("\\VarFileInfo\\Translation");
+        if !VerQueryValueW(
+            data.as_ptr().cast(),
+            PCWSTR(query.as_ptr()),
+            &mut ptr,
+            &mut len,
+        )
+        .as_bool()
+            || len < 4
+        {
+            return None;
+        }
+        let pair = std::slice::from_raw_parts(ptr as *const u16, 2);
+        let key = wide(&format!(
+            "\\StringFileInfo\\{:04x}{:04x}\\FileDescription",
+            pair[0], pair[1]
+        ));
+        if !VerQueryValueW(
+            data.as_ptr().cast(),
+            PCWSTR(key.as_ptr()),
+            &mut ptr,
+            &mut len,
+        )
+        .as_bool()
+            || len == 0
+        {
+            return None;
+        }
+        let text = std::slice::from_raw_parts(ptr as *const u16, len as usize);
+        let end = text.iter().position(|&c| c == 0).unwrap_or(text.len());
+        let name = String::from_utf16_lossy(&text[..end]).trim().to_string();
+        (!name.is_empty()).then_some(name)
+    }
+}
+
 /// Core Audio sessions on the default output. The instance identifier (not
 /// just the PID) distinguishes multiple sessions owned by the same app.
 pub fn app_volumes() -> Result<Vec<super::AppVolume>, String> {
@@ -2230,12 +2291,28 @@ pub fn app_volumes() -> Result<Vec<super::AppVolume>, String> {
             if key.is_empty() {
                 continue;
             }
-            let name = process_image_path(pid)
-                .and_then(|path| {
+            let path = process_image_path(pid).unwrap_or_default();
+            // The name people know: the session's own, else the program's
+            // description (what Task Manager shows), else its file name. Many
+            // Chromium browsers ship as chrome.exe, so the file name alone
+            // called Helium or Brave "chrome".
+            let session_name = control
+                .GetDisplayName()
+                .ok()
+                .map(|n| {
+                    let text = n.to_string().unwrap_or_default();
+                    windows::Win32::System::Com::CoTaskMemFree(Some(n.0.cast()));
+                    text
+                })
+                .filter(|n| !n.is_empty() && !n.starts_with('@'));
+            let name = session_name
+                .or_else(|| file_description(&path))
+                .or_else(|| {
                     std::path::Path::new(&path)
                         .file_stem()
                         .map(|n| n.to_string_lossy().into_owned())
                 })
+                .filter(|n| !n.is_empty())
                 .unwrap_or_else(|| {
                     if pid == 0 {
                         "Windows".into()
@@ -2246,6 +2323,7 @@ pub fn app_volumes() -> Result<Vec<super::AppVolume>, String> {
             result.push(super::AppVolume {
                 id: key,
                 name,
+                path,
                 percent: (volume.GetMasterVolume().unwrap_or(0.0) * 100.0).round() as u32,
                 muted: volume.GetMute().map(|v| v.as_bool()).unwrap_or(false),
             });

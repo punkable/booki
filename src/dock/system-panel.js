@@ -210,7 +210,7 @@ export function buildSystemPanel(item, { close }) {
     const master = section(t("w.volume"));
     load(master, api.volumeInfo, (value) => {
       if (!Array.isArray(value)) { master.append(text("p", t("plugins.noData"))); return; }
-      volumeRow(master, t("w.volume"), value[0], value[1], (percent, muted) => api.masterVolumeSet(percent, muted));
+      volumeRow(master, t("w.volume"), value[0], value[1], (percent, muted) => api.masterVolumeSet(percent, muted), "");
     });
     const apps = section(t("plugins.audioApps"));
     const sessionList = document.createElement("div"); apps.append(sessionList);
@@ -218,7 +218,15 @@ export function buildSystemPanel(item, { close }) {
       sessionList.replaceChildren();
       return load(sessionList, api.appVolumes, (sessions) => {
         if (!Array.isArray(sessions) || !sessions.length) { sessionList.append(text("p", t("plugins.noSessions"))); return; }
-        for (const session of sessions) volumeRow(sessionList, session.name, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted));
+        // An app can own several sessions (Discord's voice and its sounds):
+        // number them so two rows with one name are not a mystery.
+        const counts = {}; for (const s of sessions) counts[s.name] = (counts[s.name] || 0) + 1;
+        const seen = {};
+        for (const session of sessions) {
+          seen[session.name] = (seen[session.name] || 0) + 1;
+          const label = counts[session.name] > 1 ? `${session.name} ${seen[session.name]}` : session.name;
+          volumeRow(sessionList, label, session.percent, session.muted, (percent, muted) => api.appVolumeSet(session.id, percent, muted), session.path ?? null);
+        }
       });
     };
     headAction("refresh", t("plugins.refresh"), refresh);
@@ -490,8 +498,13 @@ export function buildSystemPanel(item, { close }) {
     };
     show().catch((error) => { if (!disposed) { state.textContent = pluginError(error); button(controls, t("focus.retry"), show); } });
   }
-  function volumeRow(container, name, percent, muted, save) {
+  function volumeRow(container, name, percent, muted, save, path) {
     const row = document.createElement("div"); row.className = "app-volume-row";
+    // Like the Windows mixer: the app's own icon; the speaker for the master
+    // volume and for Windows' system sounds.
+    const art = document.createElement("span"); art.className = "app-volume-icon"; art.setAttribute("aria-hidden", "true");
+    art.innerHTML = icon(path === "" ? "volume" : "app");
+    if (path) api.appIcon(path).then((src) => { if (src && !disposed) { const img = document.createElement("img"); img.alt = ""; img.src = src; art.replaceChildren(img); } }).catch(() => {});
     const input = document.createElement("input"); input.type = "range"; input.min = "0"; input.max = "100"; input.value = String(percent); input.setAttribute("aria-label", name);
     const value = text("output", `${percent}%`); input.addEventListener("input", () => { value.textContent = `${input.value}%`; });
     // Commit on release/keyboard change. Serialize volume and mute writes so
@@ -512,7 +525,7 @@ export function buildSystemPanel(item, { close }) {
     input.addEventListener("change", commit); mute.addEventListener("change", commit);
     const sync = () => input.style.setProperty("--pct", `${input.value}%`);
     input.addEventListener("input", sync); sync();
-    row.append(text("span", name), input, value, mute); container.append(row);
+    row.append(art, text("span", name, "app-volume-name"), input, value, mute); container.append(row);
   }
   return panel;
 }
