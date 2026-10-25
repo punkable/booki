@@ -369,6 +369,19 @@ pub struct Config {
     /// from their local session logs (agent_activity.rs).
     #[serde(default = "default_true")]
     pub notch_agents: bool,
+    /// What the notch shows live: {media, timer, battery, volume} → bool.
+    #[serde(default)]
+    pub notch_live: serde_json::Map<String, serde_json::Value>,
+    /// Music in the notch: "brief" (a few seconds per track) or "playing"
+    /// (the whole time something plays).
+    #[serde(default = "default_notch_music")]
+    pub notch_music: String,
+    /// Milliseconds the pointer rests on the notch before it opens (hover).
+    #[serde(default = "default_reveal_delay")]
+    pub reveal_delay: u32,
+    /// Executables the dock always steps aside for while they are in front.
+    #[serde(default)]
+    pub hide_for_apps: Vec<String>,
     /// Compact density: tighter padding/gaps for small screens.
     #[serde(default)]
     pub compact: bool,
@@ -437,6 +450,14 @@ fn default_notch_trigger() -> String {
     "click".into()
 }
 
+fn default_notch_music() -> String {
+    "brief".into()
+}
+
+fn default_reveal_delay() -> u32 {
+    300
+}
+
 fn default_notch_visibility() -> String {
     "auto".into()
 }
@@ -502,6 +523,10 @@ impl Default for Config {
             notch_trigger: default_notch_trigger(),
             notch_visibility: default_notch_visibility(),
             notch_agents: true,
+            notch_live: serde_json::Map::new(),
+            notch_music: default_notch_music(),
+            reveal_delay: default_reveal_delay(),
+            hide_for_apps: Vec::new(),
             compact: false,
             position_hotkeys: true,
             hotkey_modifier: default_hotkey_modifier(),
@@ -1181,5 +1206,21 @@ mod migration_tests {
         assert_eq!(cfg.surface_style, "glass");
         assert_eq!(cfg.surface_color, "auto");
         assert!(cfg.surface_tint.is_empty());
+    }
+
+    #[test]
+    fn notch_and_exception_preferences_survive_a_round_trip() {
+        let value = serde_json::json!({
+            "notchLive": { "media": false },
+            "notchMusic": "playing",
+            "revealDelay": 600,
+            "hideForApps": ["obs64.exe"],
+        });
+        let cfg: Config = serde_json::from_value(value).unwrap();
+        let back = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(back["notchLive"]["media"], false);
+        assert_eq!(back["notchMusic"], "playing");
+        assert_eq!(back["revealDelay"], 600);
+        assert_eq!(back["hideForApps"][0], "obs64.exe");
     }
 }

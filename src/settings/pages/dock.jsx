@@ -57,6 +57,10 @@ export function DockPage({ cfg, set }) {
         <div className="live-toggles">
           {["media", "timer", "battery", "volume"].map((key) => <Toggle key={key} label={t(`beh.live${key[0].toUpperCase()}${key.slice(1)}`)}
             checked={(cfg.notchLive || {})[key] !== false} onChange={(v) => set({ notchLive: { ...(cfg.notchLive || {}), [key]: v } })} />)}
+          {(cfg.notchLive || {}).media !== false && <Row label={t("notch.music")} hint={t(cfg.notchMusic === "playing" ? "notch.musicPlayingHint" : "notch.musicBriefHint")}>
+            <SegmentedControl value={cfg.notchMusic === "playing" ? "playing" : "brief"} onChange={(v) => set({ notchMusic: v })}
+              options={[{ value: "brief", label: t("notch.musicBrief") }, { value: "playing", label: t("notch.musicPlaying") }]} />
+          </Row>}
           <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
         </div>
       </Row>}

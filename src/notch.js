@@ -76,6 +76,7 @@ async function applyLook() {
     focusTimers = focusTimersOf(cfg.pinned || []);
     agentsOn = cfg.notchAgents !== false;
     liveOn = { media: true, timer: true, battery: true, volume: true, ...(cfg.notchLive || {}) };
+    musicWhilePlaying = cfg.notchMusic === "playing";
     if (!agentsOn) clearAgents();
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
@@ -402,6 +403,7 @@ function cardBar(fraction, tone = "") {
 }
 let media = null; // { title, artist, playing, thumb } or null
 let mediaPeekUntil = 0;
+let musicWhilePlaying = false; // Settings: music stays in the notch while it plays
 let mediaKey = "";
 let mediaSeenAt = 0;
 const PAUSED_MEDIA_MS = 60000;
@@ -548,7 +550,7 @@ function idleActivity(now) {
   if (liveOn.battery && chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
   // Music gets a brief introduction, including while an editor is focused.
   // Afterwards it remains available on hover without occupying the capsule.
-  if (liveOn.media && media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
+  if (liveOn.media && media?.playing && (musicWhilePlaying || mediaPeekUntil > now)) return { kind: "media", until: musicWhilePlaying ? now + MEDIA_PEEK_MS : mediaPeekUntil };
   const timer = liveOn.timer && focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
     if (agent && !cardOpen && Math.floor(now / AGENT_ROTATE_MS) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
