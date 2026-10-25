@@ -25,16 +25,19 @@ pub(crate) struct WifiStatus {
 }
 
 /// The value after the first `:` of a `netsh` line ("    SSID   : Home").
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows commands
 fn value(line: &str) -> Option<&str> {
     line.split_once(':').map(|(_, v)| v.trim())
 }
 
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows commands
 fn percent(text: &str) -> Option<u8> {
     text.trim().strip_suffix('%')?.trim().parse().ok()
 }
 
 /// Parse `netsh wlan show interfaces`. Labels are localized except "SSID",
 /// "BSSID" and the "%" of the signal, so only those are relied on.
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows commands
 pub(crate) fn parse_interfaces(text: &str) -> WifiStatus {
     let mut status = WifiStatus::default();
     for line in text.lines() {
@@ -54,6 +57,7 @@ pub(crate) fn parse_interfaces(text: &str) -> WifiStatus {
 
 /// Parse `netsh wlan show networks mode=bssid`: "SSID 1 : name" starts a
 /// network, the first "NN%" after it is its signal. Strongest first, one per name.
+#[cfg_attr(not(windows), allow(dead_code))] // read by the Windows commands
 pub(crate) fn parse_networks(text: &str) -> Vec<WifiNetwork> {
     let mut out: Vec<WifiNetwork> = Vec::new();
     let mut current: Option<WifiNetwork> = None;
