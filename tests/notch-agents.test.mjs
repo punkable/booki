@@ -72,7 +72,9 @@ test("Cursor shows its logo and status in a compact capsule with a complete acce
     await page.mouse.move(0, 0);
     for (const state of ["working", "waiting", "error", "done"]) {
       await event(page, "booki://agent-activity", { provider: "cursor", state, since: Date.now() });
-      await page.waitForTimeout(450);
+      // Wait for the size morph to settle; a headless page can run its
+      // transitions late, so a fixed delay measured the pill mid-change.
+      await page.waitForFunction(() => { const r = document.getElementById("notch-pill").getBoundingClientRect(); return r.width >= 56 && r.width <= 72 && r.height > 12; }, null, { timeout: 4000 }).catch(() => {});
       const measured = await page.evaluate(() => {
         const pill = document.getElementById("notch-pill").getBoundingClientRect();
         const label = document.getElementById("nl-text");
