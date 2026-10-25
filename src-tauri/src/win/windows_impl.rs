@@ -949,18 +949,25 @@ pub fn foreground_exe() -> String {
     path.rsplit(['\\', '/']).next().unwrap_or("").to_lowercase()
 }
 
-pub fn foreground_place() -> &'static str {
+/// `notch` is the asking window: a video or a game on another monitor does
+/// not own its screen, so there it counts as the desk.
+pub fn foreground_place(notch: isize) -> &'static str {
     let hwnd = unsafe { GetForegroundWindow() };
     if hwnd.0.is_null() {
         return "desk";
     }
+    let elsewhere = notch != 0
+        && unsafe {
+            MonitorFromWindow(HWND(notch as *mut _), MONITOR_DEFAULTTONEAREST)
+                != MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+        };
     let mut pid = 0u32;
     unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
     let path = unsafe { process_image_path(pid) }.unwrap_or_default();
     let exe = path.rsplit(['\\', '/']).next().unwrap_or("");
     let title = window_title(hwnd).to_lowercase();
     if looks_like_video(&title, exe) {
-        return "video";
+        return if elsewhere { "desk" } else { "video" };
     }
     if looks_like_creative(&title, exe) {
         return "creative";
@@ -968,7 +975,7 @@ pub fn foreground_place() -> &'static str {
     if looks_like_code(exe) {
         return "code";
     }
-    if looks_like_game(exe) {
+    if looks_like_game(exe) && !elsewhere {
         return "game";
     }
     "desk"

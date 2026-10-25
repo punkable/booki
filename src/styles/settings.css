@@ -1237,6 +1237,9 @@
 .screen-chip { position: absolute; left: 12px; top: 10px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--card) 88%, transparent); border: 1px solid var(--card-stroke); border-radius: 999px; pointer-events: none; }
 .screen-hint { position: absolute; right: 12px; top: 12px; font-size: 11px; color: var(--ink-2); pointer-events: none; }
 .position-picker .screen-chip { transition: opacity .2s; }
+.screen-hint { transition: opacity .2s; }
+/* Previewing a top spot puts the dock where the labels sit: they step aside. */
+.screen-map:has(.screen-spot.at-top:is(:hover, :focus-visible)) :is(.screen-chip, .screen-hint) { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .screen-live-dock { transition: none; } }
 
 /* Scrolling Settings stays light: no blur on repeated cards (the window's
@@ -1453,3 +1456,4 @@
 .group-hero-actions { flex: none; display: flex; align-items: center; gap: 8px; }
 .group-hero-look { position: absolute; z-index: 20; top: calc(100% - 8px); left: 16px; min-width: 280px; padding: 12px; display: grid; gap: 10px; border-radius: 8px; background: var(--card); border: 1px solid var(--divider); box-shadow: 0 8px 24px rgb(0 0 0 / .22); }
 @media (max-width: 560px) { .group-hero { flex-wrap: wrap; } .group-hero-actions { width: 100%; justify-content: flex-end; } }
+.preset-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }

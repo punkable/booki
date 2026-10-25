@@ -8,7 +8,7 @@ import { notify } from "./notices.js";
 
 export const AGENT_NAMES = {
   claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode",
-  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue",
+  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue", "claude-app": "Claude",
 };
 
 const last = new Map();

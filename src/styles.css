@@ -993,7 +993,7 @@ body.notch-body.act-agent-waiting .nl-state { color: #e8a317; }
 .nl-dots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes nl-dots { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 @keyframes nl-agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-body.notch-body.agent-claude { --agent-tint: #D97757; }
+body.notch-body:is(.agent-claude, .agent-claude-app) { --agent-tint: #D97757; }
 body.notch-body.agent-codex { --agent-tint: #10a37f; }
 body.notch-body.agent-cursor { --agent-tint: #7c6aef; }
 body.notch-body.agent-opencode { --agent-tint: #3dbeb3; }
@@ -1639,7 +1639,7 @@ body.edge-right .stack.open { transform: none; }
   position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; display: flex;
   opacity: 0; pointer-events: none;
   align-items: center; justify-content: center; line-height: 1; color: var(--ink-2);
-  background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
+  background: var(--layer-strong);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
   border-radius: var(--r-control); cursor: pointer;
   box-shadow: var(--shadow-tooltip);
@@ -1737,7 +1737,7 @@ body.edge-right .stack.open { transform: none; }
 .stack-act {
   width: 24px; height: 24px; display: grid; place-items: center; padding: 0;
   color: var(--ink-2); cursor: pointer;
-  background: color-mix(in srgb, var(--layer-strong) 92%, transparent);
+  background: var(--layer-strong);
   border: 1px solid color-mix(in srgb, var(--stroke) 70%, transparent);
   border-radius: var(--r-control);
   box-shadow: var(--shadow-tooltip);
@@ -2066,7 +2066,8 @@ body.edge-right .stack.open { transform: none; }
 }
 .clip-row {
   /* Win+V card: up to three lines of the copied text, then when it was
-     copied; the actions float in the corner on hover or focus. */
+     copied; the actions sit on that last line on hover or focus, where
+     there is no text under them to show through. */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -2099,13 +2100,13 @@ body.edge-right .stack.open { transform: none; }
   -webkit-line-clamp: 3;
   line-clamp: 3;
 }
-.clip-info { display: flex; align-items: center; gap: 6px; min-height: 14px; font-size: 0.6875rem; color: var(--ink-2); }
+.clip-info { display: flex; align-items: center; gap: 6px; min-height: 28px; font-size: 0.6875rem; color: var(--ink-2); }
 .clip-badge { display: inline-grid; place-items: center; color: var(--ink-2); }
 .clip-badge svg { width: 11px; height: 11px; }
 .clip-acts {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  bottom: 8px;
+  right: 8px;
   display: none;
   gap: 3px;
 }

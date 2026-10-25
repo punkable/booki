@@ -90,7 +90,6 @@ export function WidgetContent({ item, cfg, set, patch }) {
       {!style.provider && <Toggle label={t("widgetFlow.rotate")} checked={style.rotate !== false} onChange={(rotate) => patch({ rotate })} />}
       <Toggle label={t("ai.quotaOnly")} hint={t("ai.quotaOnlyHint")} checked={!!style.quotaOnly} onChange={(quotaOnly) => patch({ quotaOnly })} />
       <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p><details className="inline-details"><summary>{t("panelFlow.aiDetection")}</summary><p className="inline-note">{t("panelFlow.aiSources")}</p></details>
-      <Toggle label={t("be.notchAgents")} hint={t("widgetFlow.sharedNotch")} checked={cfg.notchAgents !== false} onChange={(notchAgents) => set({ notchAgents })} />
       <AgentBridge />
     </>}
     {widget === "media" && <Toggle label={t("w.mediaScrollVolume")} hint={t("w.mediaScrollVolumeHint")} checked={!!style.scrollVolume} onChange={(scrollVolume) => patch({ scrollVolume })} />}

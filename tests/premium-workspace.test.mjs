@@ -56,11 +56,11 @@ test('finish presets preserve pins and the library fits a narrow Settings window
 });
 test('search focuses the requested control instead of leaving focus in the search box', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
-  const search = page.getByRole('combobox'); await search.fill('Reduce transparency');
-  await page.getByRole('option').filter({ hasText: 'Reduce transparency' }).click();
-  await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).waitFor();
+  const search = page.getByRole('combobox'); await search.fill('Show names on hover');
+  await page.getByRole('option').filter({ hasText: 'Show names on hover' }).click();
+  await page.getByRole('switch', { name: 'Show names on hover', exact: true }).waitFor();
   await page.waitForTimeout(150);
-  assert.equal(await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).evaluate((el) => el === document.activeElement), true);
+  assert.equal(await page.getByRole('switch', { name: 'Show names on hover', exact: true }).evaluate((el) => el === document.activeElement), true);
   assert.deepEqual(errors, []); await page.close();
 });
 test('failed profile save keeps the name and explains the failure for retry', async () => {

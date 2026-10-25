@@ -8,11 +8,9 @@ test.after(async () => { await browser.close(); srv.close(); });
 const group = { id: 'g', kind: 'group', name: 'Work', children: [{ id: 'a', kind: 'app', name: 'Editor', path: 'C:/editor.exe' }] };
 const signal = (page, name, payload) => page.evaluate(([name, payload]) => { for (const cb of window.__listeners[name] || []) cb({ payload }); }, [name, payload]);
 
-test('style presets start folded and explain each explicit application without changing the notch', async () => {
+test('style presets are shortcuts beside the style and never change the notch', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ notchMode: 'attached', notchTrigger: 'click' }) });
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
-  assert.equal(await page.getByRole('button', { name: 'Apply Compact', exact: true }).isVisible(), false);
-  await page.getByRole('button', { name: /Style presets/ }).click();
   await page.getByRole('button', { name: 'Apply Compact', exact: true }).click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).spacing === 4);
   const cfg = await page.evaluate(() => window.__TAURI__.core.invoke('get_config'));
@@ -24,16 +22,16 @@ test('a conflict does not block unrelated edits and disappears when the remote v
   const { page, errors } = await openPage(browser, port, 'settings.html', { initScript: `
     const old=window.__TAURI__.core.invoke; window.once=false;
     window.__TAURI__.core.invoke=async(cmd,args)=>{
-      if(cmd==='save_config' && args.patch?.reduceTransparency !== undefined && !window.once){
+      if(cmd==='save_config' && args.patch?.showLabels !== undefined && !window.once){
         window.once=true;
-        const current={...await old('get_config'),reduceTransparency:false,revision:2};
-        throw 'BOOKI_CONFIG_CONFLICT:'+JSON.stringify({keys:['reduceTransparency'],current});
+        const current={...await old('get_config'),showLabels:true,revision:2};
+        throw 'BOOKI_CONFIG_CONFLICT:'+JSON.stringify({keys:['showLabels'],current});
       }
       return old(cmd,args);
     };` });
-  await page.getByRole('combobox').fill('Reduce transparency');
-  await page.getByRole('option').filter({ hasText: 'Reduce transparency' }).click();
-  await page.getByRole('switch', { name: 'Reduce transparency', exact: true }).click();
+  await page.getByRole('combobox').fill('Show names on hover');
+  await page.getByRole('option').filter({ hasText: 'Show names on hover' }).click();
+  await page.getByRole('switch', { name: 'Show names on hover', exact: true }).click();
   await page.locator('.conflict-error').waitFor();
   await page.getByRole('navigation').getByRole('button', { name: 'Dock', exact: true }).click();
   await page.getByRole('radio', { name: 'Dark', exact: true }).click();
@@ -41,7 +39,7 @@ test('a conflict does not block unrelated edits and disappears when the remote v
   await page.getByRole('radio', { name: 'Light', exact: true }).click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).theme === 'light');
   assert.equal(await page.locator('.conflict-error').isVisible(), true);
-  await page.evaluate(async () => { await window.__TAURI__.core.invoke('save_config',{patch:{reduceTransparency:true,revision:3}}); });
+  await page.evaluate(async () => { await window.__TAURI__.core.invoke('save_config',{patch:{showLabels:false,revision:3}}); });
   await signal(page, 'booki://config-changed', null);
   await waitForAsyncCondition(page, () => !document.querySelector('.conflict-error'));
   assert.deepEqual(errors, []); await page.close();
