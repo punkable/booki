@@ -1419,3 +1419,22 @@
 .live-toggles { display: grid; width: 100%; }
 .live-toggles .ui-toggle-row { padding-left: 0; padding-right: 0; }
 .dock-scene[data-notch="dot"] .scene-notch { bottom: 7%; width: 7%; aspect-ratio: 1; height: auto; border-radius: 50%; }
+
+/* Widgets › On your dock: compact, aligned rows of cards (preview beside the
+   name), like the app library; the gallery lives in the Add widget dialog. */
+.widgets-commands { display: flex; gap: 8px; margin: 0 0 16px; }
+.widgets-on-dock ul { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(208px, 1fr)); gap: 6px; padding: 0; overflow: visible; }
+.widgets-on-dock-item { width: 100%; height: 64px; box-sizing: border-box; display: grid; grid-template-columns: 72px minmax(0, 1fr); grid-template-rows: auto auto; align-content: center; column-gap: 10px; row-gap: 2px; padding: 6px; }
+.widgets-on-dock-item .on-dock-preview { grid-row: 1 / 3; height: 52px; }
+.widgets-on-dock-item .on-dock-name { align-self: end; }
+.widgets-on-dock-item .on-dock-group { margin-top: 0; align-self: start; }
+.widgets-on-dock-item .on-dock-name:only-of-type, .widgets-on-dock-item:not(:has(.on-dock-group)) .on-dock-name { grid-row: 1 / 3; align-self: center; }
+.widgets-empty { display: grid; justify-items: start; gap: 8px; }
+.widget-add-dialog { width: min(980px, 100%); height: min(780px, 100%); max-height: min(780px, 100%); }
+.widget-add-dialog .modal-body { padding: 20px 24px 16px; overflow: auto; }
+.widget-add-dialog .widgets-explore-head { position: sticky; top: -20px; z-index: 1; padding-top: 4px; background: var(--layer-strong, var(--bg)); }
+/* Like a WinUI ContentDialog: an opaque surface, so a scrolled gallery or the
+   page behind never shows through its header. */
+.widget-add-dialog, .library-add-dialog { background: var(--card); }
+.widget-add-dialog .widgets-explore-head, .widget-add-dialog .widget-pivot { background: var(--card); }
+.widget-add-dialog .widget-pivot { position: sticky; top: 34px; z-index: 1; }

@@ -1,5 +1,6 @@
 /* Widget catalog and per-instance settings, separated into accessible steps. */
 import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { t } from "../../i18n.js";
 import { icon } from "../../icons.js";
 import { WIDGET_ORDER, WIDGET_META, WIDGET_GLYPHS, widgetDisplayName } from "../../widgets-meta.js";
@@ -9,7 +10,7 @@ import { findPin, updatePin, removePin } from "../../pins.js";
 import { widgetRefs } from "../pin-model.js";
 import { WidgetPreview } from "../dock-preview.jsx";
 import { AccentPicker } from "../controls.jsx";
-import { BreadcrumbHeader, Icon, PageHeader, Row, SegmentedControl } from "../ui.jsx";
+import { BreadcrumbHeader, Icon, PageHeader, Row, SegmentedControl, useModalControls } from "../ui.jsx";
 
 const name = (widget) => widgetDisplayName(widget, t);
 const CATEGORIES = [["all", "design.allWidgets", "grid"], ["time", "widgets.time", "clock"], ["system", "overhaul.system", "cpu"], ["media", "w.media", "music"], ["tools", "design.utilityWidgets", "sliders"]];
@@ -63,8 +64,19 @@ function CatalogCard({ widget, count, selected, style, onInspect, onAdd }) {
   </article>;
 }
 
+/** The gallery as a dialog, like "Add apps": search, categories and cards. */
+function AddWidgetDialog({ onClose, children }) {
+  useModalControls(onClose);
+  return createPortal(<div className="modal-scrim" onClick={onClose}>
+    <div className="modal widget-add-dialog" role="dialog" aria-modal="true" aria-label={t("gallery.explore")} onClick={(event) => event.stopPropagation()}>
+      <div className="modal-body">{children}</div>
+      <footer className="modal-foot"><button type="button" className="button" onClick={onClose}>{t("stack.close")}</button></footer>
+    </div>
+  </div>, document.body);
+}
+
 /** The widgets on the dock, as they look there, one click from their settings. */
-function OnDock({ cfg, selectedId, onPick }) {
+function OnDock({ cfg, selectedId, onPick, onAdd }) {
   const pins = WIDGET_ORDER.flatMap((widget) => pinnedWidgetInstances(cfg.pinned, widget));
   return <section className="widgets-on-dock" aria-labelledby="widgets-on-dock-title">
     <h2 id="widgets-on-dock-title">{t("gallery.onDock")} <span className="count">{pins.length}</span></h2>
@@ -75,12 +87,13 @@ function OnDock({ cfg, selectedId, onPick }) {
         <span className="on-dock-name"><span className="catalog-icon" dangerouslySetInnerHTML={glyph(pin.widget)} />{pin.style?.device || name(pin.widget)}</span>
         {pin.group && <span className="on-dock-group"><Icon name="folder" />{pin.group}</span>}
       </button>
-    </li>)}</ul> : <p className="empty">{t("gallery.emptyDock")}</p>}
+    </li>)}</ul> : <div className="empty widgets-empty"><p>{t("gallery.emptyDock")}</p><button type="button" className="button" onClick={onAdd}><Icon name="plus" />{t("gallery.addWidget")}</button></div>}
   </section>;
 }
 
-export function WidgetsPage({ cfg, set, focusedPin }) {
+export function WidgetsPage({ cfg, set, focusedPin, startAdding = false }) {
   const [selectedId, selectId] = useState(focusedPin || null);
+  const [adding, setAdding] = useState(startAdding && !focusedPin);
   const [draft, setDraft] = useState(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
@@ -92,6 +105,7 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   const inspect = (widget) => {
     // Clicking the widget already open closes its settings again.
     if (selected?.widget === widget) { deselect(); return; }
+    setAdding(false);
     origin.current = document.activeElement;
     const refs = widgetRefs(cfg.pinned, widget);
     const ref = refs.find((r) => r.id === selectedId) || refs[0];
@@ -100,7 +114,7 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   };
   const pick = (id, from) => { if (selectedId === id && saved) { deselect(); return; } origin.current = from; setDraft(null); selectId(id); };
   // One click adds it; its settings open beside the gallery to fine-tune.
-  const add = (widget) => { const pin = fresh(widget); set({ pinned: [...cfg.pinned, pin] }); setDraft(null); selectId(pin.id); };
+  const add = (widget) => { const pin = fresh(widget); set({ pinned: [...cfg.pinned, pin] }); setAdding(false); setDraft(null); selectId(pin.id); };
   const change = (style) => {
     if (saved) set({ pinned: updatePin(cfg.pinned, saved.id, { style }) });
     else setDraft((item) => ({ ...item, style }));
@@ -140,12 +154,15 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
   </>;
   return <>
     <PageHeader title={t("tab.widgets")}>{t("apps.widgetsHint")}</PageHeader>
-    <OnDock cfg={cfg} selectedId={saved?.id} onPick={pick} />
-    <div className="widgets-split">
+    <div className="command-bar widgets-commands">
+      <button type="button" className="button button-accent" onClick={() => setAdding(true)}><Icon name="plus" />{t("gallery.addWidget")}</button>
+    </div>
+    <OnDock cfg={cfg} selectedId={saved?.id} onPick={pick} onAdd={() => setAdding(true)} />
+    {adding && <AddWidgetDialog onClose={() => setAdding(false)}>
       <section className="widgets-explore" aria-labelledby="widgets-explore-title">
         <div className="widgets-explore-head">
           <h2 id="widgets-explore-title">{t("gallery.explore")}</h2>
-          <label className="search-field"><Icon name="search" /><input type="search" aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); setQuery(""); } }} /></label>
+          <label className="search-field"><Icon name="search" /><input type="search" autoFocus aria-label={t("design.widgetsSearch")} placeholder={t("design.widgetsSearch")} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); e.stopPropagation(); setQuery(""); } }} /></label>
         </div>
         <div className="widget-pivot" role="group" aria-label={t("tab.widgets")}>
           {CATEGORIES.map(([value, key, glyphName]) => <button key={value} type="button" className="pivot-item" aria-pressed={category === value} onClick={() => setCategory(value)}><Icon name={glyphName} />{t(key)}</button>)}
@@ -159,6 +176,6 @@ export function WidgetsPage({ cfg, set, focusedPin }) {
           {!widgets.length && <p className="empty" role="status">{t("add.none")}</p>}
         </div>
       </section>
-    </div>
+    </AddWidgetDialog>}
   </>;
 }

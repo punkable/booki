@@ -118,13 +118,17 @@ function App() {
   const [searchTarget, setSearchTarget] = useState(null);
   const [focusedPin, setFocusedPin] = useState(null);
   const [targetVisit, setTargetVisit] = useState(0);
+  const [startAdding, setStartAdding] = useState(false);
   const [page, setPageRaw] = useState(() => {
     try { return pageOf(localStorage.getItem("booki.lastTab")) || "home"; } catch (_) { return "home"; }
   });
   const navigate = (id) => {
     const widgetId = id?.startsWith("widget:") ? decodeURIComponent(id.slice(7)) : null;
-    const next = widgetId ? "widgets" : pageOf(id) || "home";
+    // "widgets:add" opens Widgets with its Add widget dialog already open.
+    const adding = id === "widgets:add";
+    const next = widgetId || adding ? "widgets" : pageOf(id) || "home";
     setFocusedPin(widgetId);
+    setStartAdding(adding);
     setTargetVisit((visit) => visit + 1);
     // A search result already revealed belongs to that visit; without this,
     // coming back to its page would scroll and focus it again.
@@ -215,7 +219,7 @@ function App() {
         <SettingsBoundary key={page} onHome={() => navigate("home")}>
           {page === "home" && <HomePage cfg={cfg} set={set} navigate={navigate} reveal={(tab, key) => { navigate(tab); setSearchTarget({ key, tab, label: t(key) }); }} onSelect={select} onWhatsNew={() => setShowChangelog(true)} />}
           {page === "dock" && <DockPage {...pageProps} />}
-          {page === "widgets" && <WidgetsPage key={targetVisit} {...pageProps} />}
+          {page === "widgets" && <WidgetsPage key={targetVisit} {...pageProps} startAdding={startAdding} />}
           {page === "apps" && <AppsPage {...pageProps} />}
           {page === "plugins" && <PluginsPage cfg={cfg} set={set} beforeInstall={store.settled} />}
           {page === "system" && <SystemPage {...pageProps} store={store} />}

@@ -17,6 +17,7 @@ const settings = async (cfg, initScript = '', viewport = { width: 1150, height: 
 // A widget opens as its own page; go back to the gallery first if one is open.
 const inspect = async (page, name) => {
   if (await page.locator('.ui-breadcrumb-parent').count()) await page.locator('.ui-breadcrumb-parent').click();
+  if (!(await page.locator('.widget-add-dialog').count())) await page.getByRole('button', { name: 'Add widget' }).first().click();
   await page.locator('.catalog-card').filter({ hasText: name }).first().click();
 };
 

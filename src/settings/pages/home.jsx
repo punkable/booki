@@ -129,7 +129,7 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
           <span>{t("overhaul.groups")} <strong>{counts.groups}</strong></span>
         </div>
         <div className="home-actions">
-          <button type="button" className="button" onClick={() => navigate("widgets")}><Icon name="zap" />{t("overhaul.addWidget")}</button>
+          <button type="button" className="button" onClick={() => navigate("widgets:add")}><Icon name="zap" />{t("overhaul.addWidget")}</button>
           <button type="button" className="button button-accent" onClick={() => navigate("apps")}><Icon name="plus" />{t("premium.addApps")}</button>
         </div>
       </div>
