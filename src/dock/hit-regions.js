@@ -56,7 +56,7 @@ const PANEL_HIT_PAD = 4;
 // Open panels that must stay clickable. Tooltips are not listed: they never
 // take input, and counting them blocked clicks on whatever sat under them.
 const HIT_PANELS =
-  ".productivity-panel, .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
+  ".productivity-panel, .group-view-list:not([hidden]), .edit-toolbar, .trash-pop, .coach, .note-editor, .undo-toast:not(.hidden), #ctx-menu:not(.hidden), .update-pill:not(.hidden)";
 
 export function pointInLiveHitArea(x, y) {
   if (S.edgeMove || S.dragging || S.draggingFile) return true;

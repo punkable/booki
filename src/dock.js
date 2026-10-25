@@ -669,7 +669,7 @@ function clippedText(el, name) {
 // its items act on the open flyout, so pressing it never counts as outside.
 window.addEventListener("pointerdown", (e) => {
   if (closestSel(e.target, "#ctx-menu")) return;
-  if (S.stackOpen && !closestSel(e.target, "#stack") && !closestSel(e.target, ".tile")) closeStack();
+  if (S.stackOpen && !closestSel(e.target, "#stack, .group-view-list") && !closestSel(e.target, ".tile")) closeStack();
   if (S.productivityPanel && !insideWidgetPanel(e.target)) closeProductivityPanel();
   if (S.trashPop && !S.trashPop.contains(e.target)) { closeTrashPop(); S.pinnedReveal = false; scheduleHide(); }
 });

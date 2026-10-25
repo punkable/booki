@@ -41,8 +41,28 @@ test('grouped System details show selected metrics, refresh while open and relea
   for(let i=0;i<6&&!(await page.evaluate(()=>document.querySelector('.reading-cards')?.textContent.includes('71%')));i++){await page.clock.fastForward(5500);await page.waitForTimeout(100);}
   await waitForAsyncCondition(page,()=>document.querySelector('.reading-cards')?.textContent.includes('71%'));
   assert.equal(await page.locator('.reading-cards').count(),1);
+  // Closing the panel goes back to the group it was opened from; closing the group then stops the reads.
+  await page.keyboard.press('Escape');await page.clock.fastForward(1000);
   await page.keyboard.press('Escape');await page.clock.fastForward(1000);
   const reads=await page.evaluate(()=>window.reads);await page.clock.fastForward(6000);
   assert.equal(await page.evaluate(()=>window.reads),reads);
+  assert.deepEqual(errors,[]);await page.close();
+});
+
+test('closing a widget opened from a group goes back to that group; clicking away does not',async()=>{
+  const cfg=makeConfig({pinned:[{id:'g',kind:'group',name:'Tools',children:[{id:'v',kind:'widget',widget:'volume'},{id:'c',kind:'widget',widget:'clock'}]}]});
+  const {page,errors}=await openPage(browser,port,'index.html',{cfg});
+  for(const id of ['v','c']){
+    await page.locator('#dock > [data-id=g]').click();await page.locator('#stack.open').waitFor();
+    await page.locator(`#stack [data-child-id=${id}]`).click();await page.locator('.productivity-panel.is-open').waitFor();
+    assert.equal(await page.locator('#stack.open').count(),0);
+    await page.keyboard.press('Escape');
+    await page.locator('#stack.open').waitFor();
+    await page.keyboard.press('Escape');await page.waitForTimeout(300);
+  }
+  await page.locator('#dock > [data-id=g]').click();await page.locator('#stack.open').waitFor();
+  await page.locator('#stack [data-child-id=v]').click();await page.locator('.productivity-panel.is-open').waitFor();
+  await page.mouse.click(4,4);await page.waitForTimeout(500);
+  assert.equal(await page.locator('#stack.open').count(),0);
   assert.deepEqual(errors,[]);await page.close();
 });

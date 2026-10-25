@@ -3,6 +3,7 @@ import { widgetDisplayName } from "../widgets-meta.js";
 import { t } from "../i18n.js";
 import { S } from "./state.js";
 import { persist } from "./config-sync.js";
+import { scheduleHitReport } from "./hit-regions.js";
 
 const sessions = new Map();
 export const GROUP_VIEWS = ["list", "small", "medium", "large"];
@@ -17,12 +18,69 @@ export function enhanceGroupView(stack, grid, item) {
   const previous = sessions.get(item.id);
   search.value = previous?.query || "";
   search.placeholder = t("refine.searchGroup"); search.setAttribute("aria-label", t("refine.searchGroup"));
-  const select = document.createElement("select"); select.setAttribute("aria-label", t("refine.groupView")); select.title = t("refine.viewHint");
-  GROUP_VIEWS.forEach((value) => select.append(new Option(t(`refine.${value}`), value)));
+  // A Fluent drop-down drawn inside the group, not a native <select>: Windows
+  // draws a native list outside the dock window, at its own width, and
+  // picking from it took focus away and closed the group being edited.
+  const select = document.createElement("button"); select.type = "button"; select.className = "group-view-button";
+  select.setAttribute("aria-haspopup", "listbox"); select.setAttribute("aria-expanded", "false");
+  select.setAttribute("aria-label", t("refine.groupView")); select.title = t("refine.viewHint");
+  const selectText = document.createElement("span"); selectText.className = "group-view-value";
+  const chevron = document.createElement("span"); chevron.className = "group-view-chevron"; chevron.innerHTML = icon("chevron-down"); chevron.setAttribute("aria-hidden", "true");
+  select.append(selectText, chevron);
+  const list = document.createElement("div"); list.className = "group-view-list"; list.setAttribute("role", "listbox"); list.hidden = true;
+  list.setAttribute("aria-label", t("refine.groupView"));
+  const options = GROUP_VIEWS.map((value) => {
+    const option = document.createElement("div"); option.className = "group-view-option"; option.setAttribute("role", "option"); option.tabIndex = -1;
+    option.dataset.value = value; option.textContent = t(`refine.${value}`);
+    option.addEventListener("click", (event) => { event.stopPropagation(); changed(value); closeList(true); });
+    list.append(option); return option;
+  });
+  const away = (event) => { if (!viewField.contains(event.target) && !list.contains(event.target)) closeList(false); };
+  const openList = () => {
+    // Lives on the page while open, so a short group can't clip it; placed
+    // under its field and exactly as wide.
+    const r = viewField.getBoundingClientRect();
+    document.body.append(list);
+    // Keep the group's own ink and surfaces (a tinted glass adjusts them).
+    const look = getComputedStyle(viewField);
+    for (const name of ["--ink", "--ink-2", "--layer-strong", "--stroke-flyout", "--hover", "--focus-ring", "--accent", "--bg"]) {
+      const value = look.getPropertyValue(name); if (value) list.style.setProperty(name, value);
+    }
+    list.style.color = look.color;
+    list.style.left = `${r.left}px`; list.style.width = `${r.width}px`;
+    list.hidden = false;
+    const below = r.bottom + 4, height = list.offsetHeight;
+    list.style.top = `${below + height <= innerHeight - 8 ? below : Math.max(8, r.top - 4 - height)}px`;
+    select.setAttribute("aria-expanded", "true"); scheduleHitReport();
+    (options.find((o) => o.dataset.value === view) || options[0]).focus();
+    document.addEventListener("pointerdown", away, true);
+  };
+  function closeList(refocus) {
+    if (list.hidden) return;
+    list.hidden = true; select.setAttribute("aria-expanded", "false");
+    viewField.append(list); scheduleHitReport();
+    document.removeEventListener("pointerdown", away, true);
+    if (refocus) select.focus();
+  }
+  select.addEventListener("click", (event) => { event.stopPropagation(); list.hidden ? openList() : closeList(true); });
+  select.addEventListener("keydown", (event) => { if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) { event.preventDefault(); event.stopPropagation(); openList(); } });
+  list.addEventListener("keydown", (event) => {
+    const at = options.indexOf(document.activeElement);
+    const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+    if (step) { event.preventDefault(); options[(at + step + options.length) % options.length].focus(); }
+    else if (event.key === "Home" || event.key === "End") { event.preventDefault(); options[event.key === "Home" ? 0 : options.length - 1].focus(); }
+    else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (at >= 0) { changed(options[at].dataset.value); closeList(true); } }
+    else if (event.key === "Escape" || event.key === "Tab") { event.preventDefault(); closeList(true); }
+    else return;
+    event.stopPropagation(); // Escape closes the list, not the group
+  });
   let view = GROUP_VIEWS.includes(item.style?.groupView) ? item.style.groupView : "medium";
   let savedView = view;
   let timer;
-  const setView = (next) => { view = next; grid.dataset.view = next; select.value = next; };
+  const setView = (next) => {
+    view = next; grid.dataset.view = next; selectText.textContent = t(`refine.${next}`);
+    for (const o of options) o.setAttribute("aria-selected", String(o.dataset.value === next));
+  };
   const save = async () => {
     if (view === savedView) return;
     const live = S.cfg.pinned.find((pin) => pin.id === item.id);
@@ -33,7 +91,7 @@ export function enhanceGroupView(stack, grid, item) {
     else if (view === next) setView(savedView);
   };
   const changed = (next) => { setView(next); clearTimeout(timer); timer = setTimeout(save, 350); };
-  select.addEventListener("change", () => changed(select.value)); setView(view);
+  setView(view);
   const empty = document.createElement("p"); empty.className = "stack-empty group-no-matches"; empty.textContent = t("refine.noMatches"); empty.hidden = true;
   grid.append(empty);
   const applySearch = () => {
@@ -93,13 +151,13 @@ export function enhanceGroupView(stack, grid, item) {
   const searchField = document.createElement("label"); searchField.className = "group-search-field";
   const searchIcon = document.createElement("span"); searchIcon.innerHTML = icon("search"); searchIcon.setAttribute("aria-hidden", "true");
   searchField.append(searchIcon, search);
-  const viewField = document.createElement("label"); viewField.className = "group-view-field";
+  const viewField = document.createElement("div"); viewField.className = "group-view-field";
   const viewIcon = document.createElement("span"); viewIcon.innerHTML = icon("grid"); viewIcon.setAttribute("aria-hidden", "true");
-  viewField.append(viewIcon, select);
+  viewField.append(viewIcon, select, list);
   toolbar.append(searchField, viewField); stack.insertBefore(toolbar, grid);
   return () => {
     sessions.delete(item.id); sessions.set(item.id, { query: search.value, scroll: grid.scrollTop });
     while (sessions.size > 50) sessions.delete(sessions.keys().next().value);
-    clearTimeout(timer); stack.removeEventListener("keydown", keydown); void save();
+    clearTimeout(timer); closeList(false); stack.removeEventListener("keydown", keydown); void save();
   };
 }
