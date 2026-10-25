@@ -27,7 +27,7 @@ const sample = `(() => { const old = window.__TAURI__.core.invoke;
     return old(cmd, args);
   }; })();`;
 // The drawn pointer follows the real mouse; recorded video has none.
-const pointer = `(() => { addEventListener('DOMContentLoaded', () => { const c = document.createElement('div'); c.id = 'fake-cursor'; c.innerHTML = ${JSON.stringify(CURSOR)};
+const pointer = `(() => { addEventListener('DOMContentLoaded', () => { const c = document.createElement('div'); c.id = 'fake-cursor'; c.innerHTML = atob("${Buffer.from(CURSOR).toString("base64")}");
   c.style.cssText = 'position:fixed;left:-40px;top:-40px;z-index:2147483647;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))'; document.documentElement.append(c);
   addEventListener('pointermove', (e) => { c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px'; }, true); }); })();`;
 const init = bridgePatch(icons) + studioPatch(fontPath, { clock: '2026-10-21T09:41:00Z' }) + sample + pointer;
