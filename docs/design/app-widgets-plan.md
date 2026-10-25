@@ -19,10 +19,10 @@ Agreed with the owner; to start once the 1.0 audit and stability work is done.
 - **Browser:** count and list of open windows with their active tab, switch
   between them, new / private window. Real tab lists would need an extension;
   not planned.
-- **Calendar / Outlook:** day and next event through the Windows calendar
+- **Calendar / Outlook:** postponed: reading events needs package identity (Store or a signed sparse package). Until then the card shows the date. Originally: day and next event through the Windows calendar
   permission, asked when the widget is turned on; without it, only the date.
   The standalone Calendar widget merges into this.
-- **Badges:** optional notification access (UserNotificationListener) to
+- **Badges:** postponed for the same reason (package identity). Originally: optional notification access (UserNotificationListener) to
   count notifications per app. Never read or store their text.
 
 ## System widgets (one widget each)

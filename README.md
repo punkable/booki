@@ -4,9 +4,9 @@
 
 <h1 align="center">Booki</h1>
 
-<h3 align="center">Your desktop, calmer.</h3>
+<h3 align="center">Your dock, finally alive.</h3>
 
-<p align="center">A beautiful dock for Windows 11 — apps, folders and live widgets in one calm bar.<br/>Free, private and open source.</p>
+<p align="center">A beautiful dock for Windows 11. Your apps, groups and live widgets in one calm bar:<br/>the song that's playing, your open windows and your day, right where your apps are.<br/>Free, private and open source.</p>
 
 <!-- booki:download:start -->
 <p align="center">
@@ -24,7 +24,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock with example apps, a group, clock, system readings, focus timer and Collector" /></p>
+<p align="center"><img src="docs/presentation/hero-real-en.jpg" width="1000" alt="Booki on a Windows desktop: the dock with a browser and music player shown as live cards and an open group with clock, battery, focus and system widgets" /></p>
 
 <table align="center">
 <tr>
@@ -39,9 +39,23 @@
 
 ---
 
+<h2 align="center">Groups that work like a widget board.</h2>
+
+<p align="center">Put widgets and apps in the same group and it opens like the Windows Widgets board:<br/>live cards in three sizes, apps beside them, in whatever order you drag them.</p>
+
+<p align="center"><img src="docs/presentation/desk-hub.jpg" width="1000" alt="An open Booki group over a browser window: clock, battery, focus timer and system cards next to Notion, Obsidian and GitHub Desktop" /></p>
+
+<h2 align="center">Apps that show what they're doing.</h2>
+
+<p align="center">Turn a pinned app into a live card: your music player shows the song and its controls,<br/>your browser how many windows are open with a button for a new or private one.</p>
+
+<p align="center"><img src="docs/presentation/desk-dark.jpg" width="1000" alt="A dark Booki dock over a code editor: browser card with two windows, music card playing, clock, system and focus widgets" /></p>
+
 <h2 align="center">Smooth at any refresh rate.</h2>
 
 <p align="center">Icons grow under your pointer with time-based motion: just as quick at 60, 144 or 240 Hz, only smoother on faster screens, with no overshoot.<br/>Pick glass (Windows 11 acrylic, light or dark), the taskbar's own look, or solid.</p>
+
+<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock with example apps, a group, clock, system readings, focus timer and Collector" /></p>
 
 <p align="center"><img src="docs/presentation/clip-magnify.webp" width="900" alt="The pointer moves along the Booki dock and the icons grow and settle under it" /></p>
 
@@ -188,7 +202,7 @@ npm run tauri:build  # Windows packages
 
 UI changes follow the [visual identity and design system](docs/brand/README.md).
 
-README images and clips are recorded from the real frontend with sample data by [tools/presentation](tools/presentation/README.md) (`stills.mjs`, `clips.mjs`); finished media live in `docs/presentation/`.
+README images and clips are recorded from the real frontend with sample data by [tools/presentation](tools/presentation/README.md) (`stills.mjs`, `clips.mjs`, `desktop.mjs`); finished media live in `docs/presentation/`. Desktop wallpapers are photos from [Unsplash](https://unsplash.com) (Unsplash License); app marks come from [Simple Icons](https://simpleicons.org) and belong to their owners. They illustrate apps Booki can pin and do not imply endorsement.
 
 To audit the current public release without running its installers:
 

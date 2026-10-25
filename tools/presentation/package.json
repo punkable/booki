@@ -5,7 +5,8 @@
   "scripts": {
     "capture": "node capture.mjs",
     "render": "node render.mjs",
-    "stills": "node stills.mjs"
+    "stills": "node stills.mjs",
+    "desktop": "node desktop.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "4.0.532",

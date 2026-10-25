@@ -142,6 +142,56 @@ try {
     wall: 'peaks', theme: 'dark', pinned: [app('code'), app('chrome', { appWidget: 'wide' }), app('spotify', { appWidget: 'wide' }), app('claude'), app('discord'), sep('s1'), widget('clock'), widget('system', { metrics: ['cpu', 'ram'] }), widget('focus', { minutes: 25, endsAt: NOW + 18 * 60 * 1000 })], cursor: { x: 1060, y: 1040 },
     windows: editorWindow({ left: 300, top: 110, width: 1320, height: 560 }),
   });
+  const font = readFileSync(fontPath).toString('base64');
+  const mark = `data:image/svg+xml;base64,${readFileSync(resolve(here, '../../assets/brand/svg/isotype.svg')).toString('base64')}`;
+  const shot = (name) => `data:image/jpeg;base64,${readFileSync(resolve(out, name)).toString('base64')}`;
+  const COPY = {
+    en: { kicker: 'FREE · OPEN SOURCE · WINDOWS 11', title: ['Your dock,', 'finally alive.'], body: 'Apps, groups and live widgets in one calm bar. Music, windows and your day at a glance, right where your apps are.', chips: ['Live widgets', 'App cards', 'Dynamic notch', 'No account'], cta: 'Download free on GitHub' },
+    es: { kicker: 'GRATIS · CÓDIGO ABIERTO · WINDOWS 11', title: ['Tu dock,', 'por fin vivo.'], body: 'Apps, grupos y widgets en vivo en una barra tranquila. Tu música, tus ventanas y tu día de un vistazo, justo donde están tus apps.', chips: ['Widgets en vivo', 'Apps como tarjetas', 'Notch dinámico', 'Sin cuenta'], cta: 'Descárgalo gratis en GitHub' },
+  };
+  const laptop = (img, width) => `<div style="width:${width}px">
+      <div style="padding:${width * 0.018}px;border-radius:${width * 0.03}px ${width * 0.03}px 6px 6px;background:linear-gradient(#2b2b30,#141417);box-shadow:0 50px 100px rgba(60,40,20,.35),inset 0 0 0 2px #3a3a40">
+        <img src="${img}" style="display:block;width:100%;border-radius:6px"></div>
+      <div style="height:${width * 0.022}px;margin:0 -${width * 0.06}px;border-radius:0 0 ${width * 0.04}px ${width * 0.04}px;background:linear-gradient(#d9d9de,#a9a9b0);box-shadow:0 20px 40px rgba(60,40,20,.25)"></div></div>`;
+  const pageHtml = (w, h, inner) => `<!doctype html><html><head><meta charset="utf-8"><style>
+    @font-face { font-family: Inter; src: url(data:font/ttf;base64,${font}) format('truetype'); font-weight: 100 900; }
+    html, body { margin: 0; width: ${w}px; height: ${h}px; overflow: hidden; }
+    body { font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; color: #17161a; background:
+      radial-gradient(900px 700px at 0% 0%, rgba(255,196,140,.75), transparent 70%), radial-gradient(900px 700px at 100% 10%, rgba(190,210,255,.85), transparent 70%), #f5f0ea; }
+    .kick { font-size: 15px; letter-spacing: .22em; color: #8b6a4c; font-weight: 600; }
+    h1 { margin: 18px 0 0; font-weight: 780; letter-spacing: -.035em; line-height: .98; }
+    h1 span:last-child { color: #c98a4d; display: block; }
+    p { color: #57524e; line-height: 1.45; }
+    .chip { display: inline-block; padding: 10px 18px; margin: 0 10px 10px 0; border-radius: 40px; background: #ffffffa8; border: 1px solid #fff; font-size: 17px; color: #4c4744; }
+    .cta { display: inline-block; padding: 16px 26px; border-radius: 12px; background: #17161a; color: #fff; font-weight: 650; font-size: 19px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 750; font-size: 26px; letter-spacing: -.04em; }
+  </style></head><body>${inner}</body></html>`;
+  const head = (c, size) => `<div class="brand"><img src="${mark}" width="40" height="40">booki</div>
+      <div class="kick" style="margin-top:40px">${c.kicker}</div>
+      <h1 style="font-size:${size}px"><span>${c.title[0]}</span><span>${c.title[1]}</span></h1>`;
+  async function compose(file, w, h, html) {
+    const page = await browser.newPage({ viewport: { width: w, height: h } });
+    page.on('pageerror', (e) => problems.push(`${file}: ${e}`));
+    await page.setContent(html, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: file, type: 'jpeg', quality: 90 });
+    await page.close();
+  }
+  for (const [lang, c] of Object.entries(COPY)) {
+    await compose(resolve(out, `hero-real-${lang}.jpg`), 1920, 1080, pageHtml(1920, 1080, `
+      <div style="position:absolute;left:110px;top:150px;width:640px">${head(c, 104)}
+        <p style="font-size:24px;margin:28px 0 30px">${c.body}</p>
+        <div>${c.chips.map((x) => `<span class="chip">${x}</span>`).join('')}</div>
+        <div style="margin-top:26px"><span class="cta">${c.cta}</span></div></div>
+      <div style="position:absolute;left:830px;top:230px">${laptop(shot('desk-hub.jpg'), 960)}</div>`));
+    await compose(resolve(out, `social-square-${lang}.jpg`), 1080, 1080, pageHtml(1080, 1080, `
+      <div style="position:absolute;left:80px;top:70px;right:80px">${head(c, 92)}</div>
+      <div style="position:absolute;left:80px;top:470px">${laptop(shot('desk-hub.jpg'), 920)}</div>`));
+    await compose(resolve(out, `social-story-${lang}.jpg`), 1080, 1350, pageHtml(1080, 1350, `
+      <div style="position:absolute;left:80px;top:80px;right:80px">${head(c, 100)}<p style="font-size:28px;margin-top:26px">${c.body}</p></div>
+      <div style="position:absolute;left:110px;top:600px">${laptop(shot('desk-dark.jpg'), 860)}</div>
+      <div style="position:absolute;left:80px;bottom:70px"><span class="cta">${c.cta}</span></div>`));
+  }
   console.log('Rendered desktop captures');
 } finally { await browser.close(); srv.close(); }
 if (problems.length) { console.error(problems.join('\n')); process.exitCode = 1; }
