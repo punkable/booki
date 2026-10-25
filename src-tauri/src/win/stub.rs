@@ -193,6 +193,10 @@ pub fn foreground_is_video() -> bool {
     false
 }
 
+pub fn bluetooth_radio(_set: Option<bool>) -> Option<bool> {
+    None
+}
+
 pub fn foreground_exe() -> String {
     String::new()
 }

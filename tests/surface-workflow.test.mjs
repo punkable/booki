@@ -284,7 +284,7 @@ test('the dock app panel retries failed sources and supports keyboard tabs', asy
   await tabs.getByRole('tab', { name: 'Apps', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await tabs.getByRole('tab', { name: 'Widgets', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('.add-wcell').count(), 15);
+  assert.equal(await page.locator('.add-wcell').count(), 18);
   await page.locator('.add-head').getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await page.locator('#stack.open').count(), 0);
   assert.deepEqual(errors, []);

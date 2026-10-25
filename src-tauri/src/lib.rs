@@ -13,6 +13,7 @@ mod clipboard_storage;
 mod config;
 mod config_document;
 mod config_transaction;
+mod connectivity;
 mod directory;
 mod dnd;
 mod dock_window;
@@ -1667,6 +1668,10 @@ pub fn run() {
             foreground_is_video,
             foreground_place,
             foreground_exe,
+            connectivity::wifi_status,
+            connectivity::wifi_networks,
+            connectivity::bluetooth_state,
+            connectivity::bluetooth_set,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,

@@ -104,6 +104,10 @@ export function WidgetContent({ item, cfg, set, patch }) {
     {widget === "collector" && <><p className="inline-note">{t("widgetFlow.sharedSettings")}</p><CollectorSettings cfg={cfg} set={set} /></>}
     {widget === "updates" && <><p>{t("widget.updatesDesc")}</p><Row label={t("widgetFlow.ignoredUpdates")} hint={String((cfg.ignoredUpdates || []).length)}><button type="button" className="button" disabled={!cfg.ignoredUpdates?.length} onClick={() => set({ ignoredUpdates: [] })}>{t("widgetFlow.restoreUpdates")}</button></Row></>}
     {widget === "lighting" && <><p>{t("widget.lightingDesc")}</p><Action run={() => dockApi.pluginOpen("openrgb")}>{t("widgetFlow.manageLighting")}</Action></>}
+    {["wifi", "bluetooth", "winsettings"].includes(widget) && <p>{t(`widget.${widget}Desc`)}</p>}
+    {widget === "wifi" && openWindows("ms-settings:network-wifi")}
+    {widget === "bluetooth" && openWindows("ms-settings:bluetooth")}
+    {widget === "winsettings" && openWindows("ms-settings:")}
     {widget === "battery" && openWindows("ms-settings:batterysaver")}
     {["volume", "media"].includes(widget) && openWindows("ms-settings:sound")}
     {widget === "calendar" && openWindows("ms-settings:dateandtime")}

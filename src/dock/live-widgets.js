@@ -228,8 +228,20 @@ function paintDevices(list) {
 const pollDevices = singleFlight(async () => {
   let list = [];
   try { list = (await deviceReading.refresh()) || []; } catch (_) { list = []; }
-  paintDevices(list); syncRotation(); warnLowDevices(list);
+  paintDevices(list); syncRotation(); warnLowDevices(list); announceDeviceChanges(list);
 });
+
+// "Headphones connected · 100%" / "Headphones disconnected", like a phone.
+// The first reading only sets the baseline; nothing is announced at start.
+let knownDevices = null;
+function announceDeviceChanges(list) {
+  const now = new Map(list.map((d) => [d.name, d]));
+  if (knownDevices) {
+    for (const [name, d] of now) if (!knownDevices.has(name)) notify(t("dev.connectedNotice").replace("{name}", () => shortDeviceName(name)), Number.isFinite(d.level) ? `${d.level}%` : "");
+    for (const name of knownDevices) if (!now.has(name)) notify(t("dev.disconnectedNotice").replace("{name}", () => shortDeviceName(name)), "");
+  }
+  knownDevices = new Set(now.keys());
+}
 
 // One notice per device when it crosses 10%, not again until it recovers.
 const warnedDevices = new Set();
@@ -554,9 +566,38 @@ function anyPinnedWidget(predicate, items = S.cfg?.pinned || []) {
 // widgets can repaint without throwing away every timer and its cadence.
 let pollKey = "";
 let pollsActive = false;
+// Wi-Fi and Bluetooth: one read every 15 s while either widget is on screen.
+let connTimer = null;
+const pollConnectivity = singleFlight(async () => {
+  if (widgetPresent("wifi")) {
+    const w = await dockApi.wifiStatus().catch(() => null);
+    eachWidget("wifi", (el) => {
+      const value = !w?.adapter ? t("conn.noAdapter") : w.connected ? w.ssid : t("conn.offline");
+      setText(el, t("w.wifi"), value);
+      el.classList.toggle("off", !w?.connected);
+      setTileLabel(el, w?.connected ? `${t("w.wifi")} · ${w.ssid} · ${w.signal}%` : `${t("w.wifi")} · ${value}`);
+    });
+  }
+  if (widgetPresent("bluetooth")) {
+    const on = await dockApi.bluetoothState().catch(() => null);
+    eachWidget("bluetooth", (el) => {
+      const value = on == null ? t("conn.noAdapter") : on ? t("conn.on") : t("conn.off");
+      setText(el, t("w.bluetooth"), value);
+      el.classList.toggle("off", on !== true);
+      setTileLabel(el, `${t("w.bluetooth")} · ${value}`);
+    });
+  }
+});
+export function refreshConnectivity() { pollConnectivity(); }
+function paintSettingsWidget() {
+  eachWidget("winsettings", (el) => { setText(el, t("w.winsettings"), t("conn.open")); setTileLabel(el, t("widget.winsettingsDesc")); });
+}
+
 export function stopPolls() {
   clearInterval(widgetPollTimer);
   widgetPollTimer = null;
+  clearInterval(connTimer);
+  connTimer = null;
   // The device/AI rotation sleeps with the polls too.
   clearInterval(rotationTimer);
   rotationTimer = 0;
@@ -597,6 +638,8 @@ function pollKinds() {
     collector: widgetPresent("collector"),
     updates: widgetPresent("updates"),
     lighting: widgetPresent("lighting"),
+    conn: widgetPresent(["wifi", "bluetooth"]),
+    winsettings: widgetPresent("winsettings"),
   };
 }
 // First paint so freshly built cards aren't blank until the next tick.
@@ -612,6 +655,8 @@ function paintPolls(k) {
   if (k.collector) paintDownloads();
   if (k.updates) pollUpdates();
   if (k.lighting) paintLighting();
+  if (k.conn) pollConnectivity();
+  if (k.winsettings) paintSettingsWidget();
 }
 /* Called after the bar or a flyout was rebuilt. Restarts the timers only when
    the set of live widget kinds changed; otherwise it just repaints the new
@@ -631,6 +676,9 @@ export function startPolls() {
   if (S.hiddenState || S.displayOff) return; // tucked away or screen off → stay idle
   deps.startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const k = pollKinds();
+  clearInterval(connTimer); connTimer = null;
+  if (k.conn) { pollConnectivity(); connTimer = setInterval(pollConnectivity, 15000); }
+  if (k.winsettings) paintSettingsWidget();
   pollKey = JSON.stringify(k);
   pollsActive = true;
   const { clock: hasClock, local: hasLocal, stats: hasStats, media: hasMedia, volume: hasVolume, clipboard: hasClipboard, devices: hasDevices, ai: hasAi } = k;

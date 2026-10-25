@@ -2025,6 +2025,23 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
     })
 }
 
+/// The Bluetooth radio's state (Some(true) = on), switching it first when
+/// `set` asks to. None when the PC has no Bluetooth radio.
+pub fn bluetooth_radio(set: Option<bool>) -> Option<bool> {
+    use windows::Devices::Radios::{Radio, RadioKind, RadioState};
+    let _runtime = MediaRuntime::new();
+    let radios = Radio::GetRadiosAsync().ok()?.join().ok()?;
+    let radio = radios
+        .into_iter()
+        .find(|r| r.Kind().is_ok_and(|k| k == RadioKind::Bluetooth))?;
+    if let Some(on) = set {
+        let _ = Radio::RequestAccessAsync().and_then(|op| op.join());
+        let state = if on { RadioState::On } else { RadioState::Off };
+        let _ = radio.SetStateAsync(state).and_then(|op| op.join());
+    }
+    radio.State().ok().map(|s| s == RadioState::On)
+}
+
 /// Toggle play/pause on the current system media session.
 pub fn media_toggle() -> bool {
     let _runtime = MediaRuntime::new();

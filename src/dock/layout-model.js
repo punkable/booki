@@ -9,7 +9,7 @@ export function widgetSpan(widget, style = {}) {
   const requested = Number(style?.span);
   if ([1, 2, 3].includes(requested)) return requested;
   if (["media", "notes", "clipboard"].includes(type)) return 3;
-  return ["clock", "focus", "calendar", "weather"].includes(type) ? 2 : 1;
+  return ["clock", "focus", "calendar", "weather", "wifi", "bluetooth", "winsettings"].includes(type) ? 2 : 1;
 }
 export function widgetWidth(type, size, gap, style = {}) {
   const span = widgetSpan(type, style);

@@ -60,7 +60,7 @@ test('settings advance by accessible steps and retain functional choices separat
   assert.deepEqual(errors, []); await page.close();
 });
 
-test('all 15 widgets have a content step and a separate appearance step', async () => {
+test('all 18 widgets have a content step and a separate appearance step', async () => {
   for (const type of WIDGET_ORDER) {
     const { page, errors } = await openPage(browser, port, 'settings.html', { cfg: makeConfig({ pinned: [widget(type)] }), initScript: `const old=window.__TAURI__.core.invoke;window.__TAURI__.core.invoke=(cmd,args)=>cmd==='take_pending_tab'?Promise.resolve('widget:${type}'):old(cmd,args);` });
     await page.getByRole('tab', { name: 'Content', exact: true }).waitFor();

@@ -618,6 +618,22 @@ body:is(.edge-left, .edge-right) .dock .tile.widget:has(.w-ring):is([data-span="
 .collector-folder { overflow-wrap: anywhere; color: var(--ink-2); font-size: 12px; }
 .download-form textarea, .collector-field select { box-sizing: border-box; width: 100%; font: inherit; color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-bottom-color: var(--ctrl-stroke-bottom); border-radius: var(--r-control); padding: 8px 10px; }
 .download-form textarea { resize: vertical; min-height: 72px; max-height: 160px; }
+
+/* Wi-Fi, Bluetooth and Windows Settings panels. */
+.tile.widget.off .w-value { opacity: .6; }
+.conn-current { margin: 0; font-weight: 600; }
+.conn-list { display: grid; gap: 2px; margin: 4px 0 8px; }
+.conn-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r-control); }
+.conn-row:hover { background: var(--hover); }
+.conn-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: var(--accent); }
+.conn-glyph svg { width: 100%; height: 100%; }
+.conn-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-level { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: 12px; }
+.conn-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; font-weight: 600; }
+.conn-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.conn-shortcut { display: grid; justify-items: center; gap: 6px; padding: 12px 6px; font: inherit; font-size: 12px; color: var(--ink); background: var(--ctrl-fill, transparent); border: 1px solid var(--ctrl-stroke, var(--stroke)); border-radius: var(--r-card, 8px); cursor: pointer; text-align: center; }
+.conn-shortcut:hover { background: var(--hover); }
+.conn-shortcut svg { width: 20px; height: 20px; color: var(--accent); }
 .collector-queue-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 18px 0 8px; }
 .collector-jobs { display: grid; gap: 8px; }
 .collector-job { padding: 10px; border: 1px solid var(--stroke); border-radius: var(--r-card); background: var(--ctrl-fill); }
@@ -780,3 +796,15 @@ body:has(.fluent-select-pop:not(.is-closing)) .fluent-tip { display: none; }
 /* Solid cards are filled with the status colour: their text and glyph stay
    white while charging instead of turning the same green as the fill. */
 .tile.widget[data-variant="solid"].charging .w-ring-num, .tile.widget[data-variant="solid"].charging .w-ring-ico { color: #fff; }
+.conn-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+/* A Windows 11 toggle switch: track with a knob that slides and grows. */
+.productivity-panel input.conn-toggle { appearance: none; position: relative; flex: none; width: 40px; height: 20px; margin: 0; border-radius: 10px; border: 1px solid var(--ink-2); background: transparent; cursor: pointer; transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.productivity-panel input.conn-toggle::after { content: ""; position: absolute; top: 3px; left: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-2); transition: left var(--dur-2) var(--ease), width var(--dur-1) var(--ease), background var(--dur-1) var(--ease); }
+.productivity-panel input.conn-toggle:hover::after { width: 14px; height: 14px; top: 2px; }
+.productivity-panel input.conn-toggle:checked { background: var(--accent); border-color: var(--accent); }
+.productivity-panel input.conn-toggle:checked::after { left: 22px; background: var(--on-accent, #fff); }
+.productivity-panel input.conn-toggle:checked:hover::after { left: 20px; }
+.productivity-panel input.conn-toggle:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
+.productivity-panel input.conn-toggle:disabled { opacity: .5; cursor: default; }
+.productivity-panel input.conn-toggle:checked { background-image: none; }
+.productivity-panel input.conn-toggle:checked::after { content: ""; width: 12px; height: 12px; border: 0; transform: none; margin: 0; }
