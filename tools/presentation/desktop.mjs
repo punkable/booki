@@ -1,6 +1,6 @@
 /* Realistic desktop captures for the README and social posts: the real built
-   dock (dist/) running over a photo wallpaper, with mock app windows behind
-   it, so the images read like someone's actual desktop.
+   dock (dist/) running over a photo wallpaper. Nothing else is drawn: no
+   imitation app windows, only Booki's own surfaces with sample data.
 
    - Wallpapers are Unsplash photos (Unsplash License), downloaded at capture
      time into the ignored public/stills/ folder; only the composed images
@@ -11,7 +11,7 @@
 
    Run `npm run build` at the repository root first, then
    `node tools/presentation/desktop.mjs`. Writes docs/presentation/desk-*.jpg. */
-/* global document */
+/* global document, window */
 import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -33,62 +33,44 @@ const COVER = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w
 const patch = `(() => { const old = window.__TAURI__.core.invoke;
   window.__TAURI__.core.invoke = (cmd, args = {}) => {
     if (cmd === 'media_info') return Promise.resolve({ title: 'Golden Hour', artist: 'Sample Artist', playing: true, thumb: ${JSON.stringify(COVER)}, position_ms: 74000, duration_ms: 212000, source: 'spotify.exe' });
-    if (cmd === 'list_windows') return Promise.resolve([{ hwnd: 1, title: 'Booki — a calmer dock for Windows', exe: ${JSON.stringify(pathOf('chrome'))} }, { hwnd: 2, title: 'Design review', exe: ${JSON.stringify(pathOf('chrome'))} }, { hwnd: 3, title: 'Spotify', exe: ${JSON.stringify(pathOf('spotify'))} }, { hwnd: 4, title: 'booki — VSCodium', exe: ${JSON.stringify(pathOf('code'))} }]);
-    if (cmd === 'device_batteries') return Promise.resolve([{ name: 'Headphones', level: 72 }, { name: 'Keyboard', level: 90 }]);
+    if (cmd === 'list_windows') return Promise.resolve([{ hwnd: 1, title: 'punkable/booki · GitHub', exe: ${JSON.stringify(pathOf('chrome'))} }, { hwnd: 2, title: 'Design review', exe: ${JSON.stringify(pathOf('chrome'))} }, { hwnd: 3, title: 'Spotify', exe: ${JSON.stringify(pathOf('spotify'))} }, { hwnd: 4, title: 'booki — VSCodium', exe: ${JSON.stringify(pathOf('code'))} }]);
+    if (cmd === 'ai_usage') return Promise.resolve([{ id: 'claude', name: 'Claude', detected: true, windows: [{ label: '5h', percent: 38, resets_at: ${NOW / 1000} + 7200 }], week_tokens: 2400000 }]);
+    if (cmd === 'device_batteries') return Promise.resolve([{ name: 'MX Master 3S', kind: 'mouse', level: 78, source: 'logitech' }, { name: 'WH-1000XM5', kind: 'headset', level: 64, charging: true, source: 'bluetooth' }]);
     return old(cmd, args);
   }; })();`;
 const initScript = bridgePatch(icons) + studioPatch(fontPath, { clock: CLOCK, frozen: true }) + patch;
-
-/* ── Mock app windows (behind the dock) ─────────────────────────────────── */
-const caption = (dark) => `<div style="display:flex;gap:0;margin-left:auto">${['M4 8h8', 'M4 4h8v8H4z', 'M4 4l8 8M12 4l-8 8'].map((d) => `<svg width="46" height="32" viewBox="-15 -8 46 32"><path d="${d}" fill="none" stroke="${dark ? '#ddd' : '#333'}" stroke-width="1"/></svg>`).join('')}</div>`;
-function browserWindow({ left, top, width, height, dark }) {
-  const bg = dark ? '#202124' : '#ffffff', chrome = dark ? '#2b2c30' : '#e9ecf1', ink = dark ? '#e8eaed' : '#202124', soft = dark ? '#3a3b40' : '#eef0f3';
-  return `<div class="win" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:${bg}">
-    <div style="display:flex;align-items:end;height:40px;background:${chrome};padding:0 8px">
-      <div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:10px 10px 0 0;background:${bg};color:${ink};font-size:13px;width:230px"><img src="${icons[pathOf('chrome')]}" width="16">Booki — a calmer dock</div>
-      <div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;color:${ink};opacity:.7;font-size:13px;width:180px">Design review</div>${caption(dark)}</div>
-    <div style="height:44px;display:flex;align-items:center;padding:0 16px;gap:14px;border-bottom:1px solid ${soft}"><div style="flex:1;height:30px;border-radius:15px;background:${soft};color:${ink};opacity:.75;font-size:13px;display:flex;align-items:center;padding:0 16px">github.com/punkable/booki</div></div>
-    <div style="padding:46px 70px;color:${ink}">
-      <div style="font-size:44px;font-weight:760;letter-spacing:-.03em">Your desktop, calmer.</div>
-      <div style="margin-top:14px;font-size:18px;opacity:.7;max-width:560px;line-height:1.5">A beautiful dock for Windows 11 — apps, folders and live widgets in one calm bar.</div>
-      <div style="display:flex;gap:12px;margin-top:28px"><span style="padding:12px 20px;border-radius:8px;background:#dfaa75;color:#2b1d10;font-weight:650;font-size:15px">Download for Windows</span><span style="padding:12px 20px;border-radius:8px;border:1px solid ${soft};font-size:15px">View on GitHub</span></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px">${[0, 1, 2].map(() => `<div style="height:120px;border-radius:12px;background:${soft}"></div>`).join('')}</div>
-    </div></div>`;
-}
-function editorWindow({ left, top, width, height }) {
-  const lines = [
-    ['#c586c0', 'import', '#9cdcfe', ' { widgetTile }', '#c586c0', ' from', '#ce9178', ' "./render.js";'],
-    ['#6a9955', '// A group with widgets works as a widget hub.'],
-    ['#569cd6', 'const', '#4fc1ff', ' hasWidgets', '#d4d4d4', ' = isGroup && items.', '#dcdcaa', 'some', '#d4d4d4', '((it) => it.kind === ', '#ce9178', '"widget"', '#d4d4d4', ');'],
-    ['#d4d4d4', 'grid.classList.', '#dcdcaa', 'toggle', '#d4d4d4', '(', '#ce9178', '"widget-hub-grid"', '#d4d4d4', ', hasWidgets);'],
-    [], ['#c586c0', 'for', '#d4d4d4', ' (', '#569cd6', 'const', '#9cdcfe', ' it', '#c586c0', ' of', '#9cdcfe', ' items', '#d4d4d4', ') {'],
-    ['#d4d4d4', '  ', '#569cd6', 'const', '#4fc1ff', ' tile', '#d4d4d4', ' = ', '#dcdcaa', 'widgetTile', '#d4d4d4', '(it, { inFlyout: ', '#569cd6', 'true', '#d4d4d4', ' });'],
-    ['#d4d4d4', '  cell.', '#dcdcaa', 'appendChild', '#d4d4d4', '(tile);'], ['#d4d4d4', '}'],
-  ];
-  const code = lines.map((l, i) => `<div><span style="display:inline-block;width:46px;color:#6e7681">${i + 12}</span>${l.reduce((s, v, j) => (j % 2 ? s + `<span style="color:${l[j - 1]}">${v.replace(/</g, '&lt;')}</span>` : s), '')}</div>`).join('');
-  return `<div class="win" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:#1e1e1e;color:#d4d4d4">
-    <div style="display:flex;align-items:center;height:36px;background:#181818;padding-left:14px;font-size:13px;gap:10px"><img src="${icons[pathOf('code')]}" width="16">stack.js — booki — VSCodium${caption(true)}</div>
-    <div style="display:flex;height:calc(100% - 36px)"><div style="width:220px;background:#181818;padding:14px;font-size:13px;line-height:2;color:#bbb">BOOKI<br>&nbsp;▸ src-tauri<br>&nbsp;▾ src<br>&nbsp;&nbsp;&nbsp;▾ dock<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;render.js<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#fff;background:#37373d;padding:2px 6px">stack.js</span><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;notch.js</div>
-    <div style="flex:1;padding:18px 10px;font:14px/1.75 'Cascadia Code',Consolas,monospace;white-space:pre">${code}</div></div></div>`;
-}
 
 const { srv, port } = await serveDist();
 const browser = await launchBrowser();
 const camera = { newPage: (o) => browser.newPage({ ...o, deviceScaleFactor: SCALE, timezoneId: 'UTC' }) };
 const problems = [];
 
-async function desktop(file, { wall, theme, pinned, windows, open, cursor, extra = {} }) {
+/** The notch capsule showing an agent, as a transparent PNG data URI. */
+async function notchShot(provider, state) {
+  const cfg = makeConfig({ captureVisible: true, theme: 'dark', language: 'en', autoHideMode: 'smart', notchMode: 'floating', notchVisibility: 'always', pinned: [] });
+  const { page } = await openPage(camera, port, 'notch.html', { cfg, viewport: { width: 360, height: 100 }, initScript: initScript + `{ const old = window.__TAURI__.core.invoke; window.__TAURI__.core.invoke = (cmd, args) => cmd === 'media_info' ? Promise.resolve(null) : old(cmd, args); }` });
+  await page.addStyleTag({ content: '#notch-pill { translate: 0 -20px; }' });
+  await page.evaluate(({ provider, state }) => { for (const cb of window.__listeners['booki://agent-activity'] || []) cb({ payload: { provider, state, since: Date.now() } }); }, { provider, state });
+  await page.waitForTimeout(900);
+  const b = await page.locator('#notch-pill').boundingBox();
+  const png = await page.screenshot({ omitBackground: true, clip: { x: b.x - 8, y: b.y - 8, width: b.width + 16, height: b.height + 16 } });
+  await page.close();
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+
+async function desktop(file, { wall, theme, pinned, open, panel, notch, cursor, extra = {} }) {
   const cfg = makeConfig({ captureVisible: true, theme, surfaceStyle: 'glass', language: 'en', autoHideMode: 'off', magnification: false, iconSize: 52, pinned, pluginTerms: 1, ...extra });
   const { page, errors } = await openPage(camera, port, 'index.html', { cfg, viewport: { width: 1920, height: 1080 }, initScript });
   await page.evaluate(() => document.fonts.ready);
   const wallUri = await wallpaper(wall);
   await page.addStyleTag({ content: `html { background: url(${wallUri}) center / cover !important; } body { background: transparent !important; }
-    .win { position: fixed; z-index: 0; border-radius: 9px; overflow: hidden; box-shadow: 0 26px 70px rgba(0,0,0,.42), 0 0 0 1px rgba(255,255,255,.08); font-family: BookiStudio, sans-serif; }
     #fake-cursor { position: fixed; z-index: 2147483647; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
     #dock, #stack, .tile { z-index: 10; }` });
-  await page.evaluate((html) => { const host = document.createElement('div'); host.innerHTML = html; document.body.prepend(...host.children); }, windows);
   await page.mouse.move(1, 1); await page.waitForTimeout(1500);
   if (open) { await page.locator(`#dock > [data-id="${open}"]`).click(); await page.locator('#stack.open').waitFor(); await page.mouse.move(1, 1); await page.waitForTimeout(700); }
+  if (panel) { await page.locator(`#dock > [data-id="${panel}"]`).click(); await page.locator('.system-widget-panel.is-open').waitFor(); await page.mouse.move(1, 1); await page.waitForTimeout(900); }
+  // The notch is its own window on Windows; its capture sits at the top edge.
+  if (notch) await page.evaluate(({ src, width }) => { const n = document.createElement('img'); n.src = src; n.style.cssText = `position:fixed;top:14px;left:calc(50% - ${width / 2}px);width:${width}px;z-index:20`; document.body.append(n); }, notch);
   if (cursor) await page.evaluate(({ svg, x, y }) => { const c = document.createElement('div'); c.id = 'fake-cursor'; c.innerHTML = svg; c.style.left = `${x}px`; c.style.top = `${y}px`; document.body.append(c); }, { svg: CURSOR, ...cursor });
   await page.waitForTimeout(300);
   await page.screenshot({ path: file, type: 'jpeg', quality: 88 });
@@ -97,15 +79,14 @@ async function desktop(file, { wall, theme, pinned, windows, open, cursor, extra
 }
 
 try {
-  const hub = { id: 'grp-day', kind: 'group', name: 'My day', children: [widget('clock'), widget('battery'), widget('focus', { minutes: 25, endsAt: NOW + 18 * 60 * 1000 }), widget('system', { metrics: ['cpu', 'ram'] }), app('notion'), app('obsidian'), app('github')] };
-  const dockLight = [app('chrome', { appWidget: 'wide' }), app('spotify', { appWidget: 'wide' }), app('discord'), app('figma'), app('code'), sep('s1'), hub, sep('s2'), widget('weather', { city: 'Lisboa', latitude: 38.72, longitude: -9.14 }), widget('devices')];
+  const hub = { id: 'grp-day', kind: 'group', name: 'My day', children: [widget('clock'), widget('battery'), widget('devices'), widget('system', { metrics: ['cpu', 'ram'] }), widget('focus', { minutes: 25, endsAt: NOW + 18 * 60 * 1000 }), widget('weather', { city: 'Lisboa', latitude: 38.72, longitude: -9.14 })] };
+  const dockLight = [app('chrome', { appWidget: 'wide' }), app('spotify', { appWidget: 'wide' }), app('discord'), app('figma'), app('code'), sep('s1'), hub, sep('s2'), widget('clock'), widget('ai')];
   await desktop(resolve(out, 'desk-hub.jpg'), {
     wall: 'valley', theme: 'light', pinned: dockLight, open: 'grp-day', cursor: { x: 1160, y: 1000 },
-    windows: browserWindow({ left: 150, top: 70, width: 1080, height: 700, dark: false }),
   });
   await desktop(resolve(out, 'desk-dark.jpg'), {
     wall: 'peaks', theme: 'dark', pinned: [app('code'), app('chrome', { appWidget: 'wide' }), app('spotify', { appWidget: 'wide' }), app('claude'), app('discord'), sep('s1'), widget('clock'), widget('system', { metrics: ['cpu', 'ram'] }), widget('focus', { minutes: 25, endsAt: NOW + 18 * 60 * 1000 })], cursor: { x: 1060, y: 1040 },
-    windows: editorWindow({ left: 300, top: 110, width: 1320, height: 560 }),
+    notch: { src: await notchShot('claude', 'working'), width: 150 },
   });
   const font = readFileSync(fontPath).toString('base64');
   const mark = `data:image/svg+xml;base64,${readFileSync(resolve(here, '../../assets/brand/svg/isotype.svg')).toString('base64')}`;
