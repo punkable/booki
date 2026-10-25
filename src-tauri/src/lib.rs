@@ -689,7 +689,14 @@ fn foreground_exe() -> String {
 /// One look, so the notch does not ask four times.
 #[tauri::command]
 fn foreground_place(window: tauri::WebviewWindow) -> &'static str {
-    win::foreground_place(window.hwnd().map(|h| h.0 as isize).unwrap_or(0))
+    #[cfg(windows)]
+    let caller = window.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+    #[cfg(not(windows))]
+    let caller = {
+        let _ = window;
+        0
+    };
+    win::foreground_place(caller)
 }
 
 /// Plan usage of the AI services signed in on this PC, for the AI widget.
