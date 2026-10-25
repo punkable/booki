@@ -106,6 +106,14 @@ export function DockPage({ cfg, set }) {
           options={["system", "light", "dark", "auto"].map((value) => ({ value, label: t(`theme.${value}`) }))} />
       </Row>
       <Row label={t("finish.title")} stack><FinishPicker cfg={cfg} set={(patch) => set(patch, afterSurface)} /></Row>
+      {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
+        <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
+      </Row>}
+      {/* Presets are shortcuts to a whole look, beside the style they set. */}
+      <Row label={t("refine.presets")} hint={t("refine.presetsHint")}>
+        <div className="preset-buttons">{DOCK_PRESETS.map((preset) => <button key={preset.id} type="button" className="button" title={t(`refine.${preset.id}Hint`)}
+          aria-label={`${t("refine.applyPreset")} ${t(`refine.${preset.id}`)}`} onClick={() => set(preset.patch, afterSurface)}>{t(`refine.${preset.id}`)}</button>)}</div>
+      </Row>
       {style === "taskbar"
         ? <div className="row-block"><p className="swatch-caption look-now"><span className="look-now-dot" aria-hidden="true" />{t("surface.taskbarNote")}</p></div>
         : <Row label={t("surface.color")} hint={t("surface.colorHint")} stack><SurfaceColorPicker value={surfaceColor(cfg)} onChange={(v) => set({ surfaceColor: v, surfaceTint: "" }, afterSurface)} /></Row>}
@@ -120,20 +128,14 @@ export function DockPage({ cfg, set }) {
       <Row label={t("ap.iconSize")}><Slider value={cfg.iconSize ?? 48} min={28} max={80} step={4} fmt={(v) => `${v}px`} onChange={(v) => set({ iconSize: v })} /></Row>
     </SettingsSection>
 
-    <CollapsibleSection title={t("refine.presets")} hint={t("refine.presetsHint")}>
-      {DOCK_PRESETS.map((preset) => <Row key={preset.id} label={t(`refine.${preset.id}`)} hint={t(`refine.${preset.id}Hint`)}>
-        <button type="button" className="button" aria-label={`${t("refine.applyPreset")} ${t(`refine.${preset.id}`)}`} onClick={() => set(preset.patch, afterSurface)}>{t("refine.applyPreset")}</button>
-      </Row>)}
-    </CollapsibleSection>
-
     <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
-      {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
-        <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
-      </Row>}
-      <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />
+      {/* Retired switches: Solid covers less transparency, spacing covers
+          compact, and the native material is automatic. They stay only for
+          someone who changed them, so it can be undone. */}
+      {!!cfg.reduceTransparency && <Toggle label={t("overhaul.reduceTransparency")} hint={t("overhaul.reduceTransparencyHint")} checked={!!cfg.reduceTransparency} onChange={(v) => set({ reduceTransparency: v }, afterSurface)} />}
       <Row label={t("ap.spacing")}><Slider value={cfg.spacing ?? 6} min={0} max={20} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ spacing: v })} /></Row>
       <Row label={t("ap.radius")} hint={t("ap.radiusHint")}><Slider value={cfg.cornerRadius ?? 12} min={0} max={24} step={1} fmt={(v) => `${v}px`} onChange={(v) => set({ cornerRadius: v })} /></Row>
-      <Toggle label={t("ap.compact")} hint={t("ap.compactHint")} checked={!!cfg.compact} onChange={(v) => set({ compact: v })} />
+      {!!cfg.compact && <Toggle label={t("ap.compact")} hint={t("ap.compactHint")} checked={!!cfg.compact} onChange={(v) => set({ compact: v })} />}
       <Toggle label={t("be.magnify")} checked={cfg.magnification !== false} onChange={(v) => set({ magnification: v })} />
       {cfg.magnification !== false && <>
         <Row label={t("be.zoom")} hint={t("be.zoomHint")}>
@@ -154,13 +156,11 @@ export function DockPage({ cfg, set }) {
       <Toggle label={t("be.alwaysOnTop")} hint={t("be.alwaysOnTopHint")} checked={cfg.alwaysOnTop !== false}
         onChange={(v) => { set({ alwaysOnTop: v }); dockApi.setAlwaysOnTop(v); }} />
       <Toggle label={t("be.taskbarFollow")} hint={t("be.taskbarFollowHint")} checked={cfg.taskbarFollow !== false} onChange={(v) => set({ taskbarFollow: v })} />
-      {cfg.taskbarFollow !== false && <>
-        <Row label={t("be.taskbarSettle")} hint={t("be.taskbarSettleHint")}>
-          <Slider value={cfg.taskbarSettleMs ?? 1000} min={0} max={3000} step={100} fmt={(v) => (v === 0 ? t("be.taskbarSettleOff") : seconds(v))} onChange={(v) => set({ taskbarSettleMs: v })} />
-        </Row>
-        <Toggle label={t("be.taskbarHoldHover")} hint={t("be.taskbarHoldHoverHint")} checked={cfg.taskbarHoldWhileHover !== false} onChange={(v) => set({ taskbarHoldWhileHover: v })} />
-      </>}
-      {seeThrough && <Toggle label={t("ap.nativeMaterial")} hint={t("ap.nativeMaterialHint")}
+      {cfg.taskbarFollow !== false && (cfg.taskbarSettleMs ?? 1000) !== 1000 && <Row label={t("be.taskbarSettle")} hint={t("be.taskbarSettleHint")}>
+        <Slider value={cfg.taskbarSettleMs ?? 1000} min={0} max={3000} step={100} fmt={(v) => (v === 0 ? t("be.taskbarSettleOff") : seconds(v))} onChange={(v) => set({ taskbarSettleMs: v })} />
+      </Row>}
+      {cfg.taskbarFollow !== false && cfg.taskbarHoldWhileHover === false && <Toggle label={t("be.taskbarHoldHover")} hint={t("be.taskbarHoldHoverHint")} checked={false} onChange={(v) => set({ taskbarHoldWhileHover: v })} />}
+      {seeThrough && cfg.nativeMaterial === false && <Toggle label={t("ap.nativeMaterial")} hint={t("ap.nativeMaterialHint")}
         checked={cfg.nativeMaterial !== false} onChange={(v) => set({ nativeMaterial: v }, afterSurface)} />}
     </CollapsibleSection>
   </>;

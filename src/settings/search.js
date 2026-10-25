@@ -10,12 +10,13 @@ import { t } from "../i18n.js";
 // result can scroll to it.
 const SEARCH_INDEX = [
   ["dock.behavior", "dock"], ["be.reveal", "dock"], ["be.notchMode", "dock"], ["be.notchPresence", "dock"], ["be.hideDelay", "dock"], ["be.hideInFullscreen", "dock"],
+  ["notch.section", "dock"], ["beh.live", "dock"], ["notch.music", "dock"], ["be.notchAgents", "dock"], ["refine.presets", "dock"],
   ["be.position", "dock"], ["be.monitor", "dock"], ["be.edgeGap", "dock"],
-  ["tab.appearance", "dock"], ["ap.theme", "dock"], ["look.source", "dock"], ["dock.intensity", "dock"], ["finish.title", "dock"], ["surface.color", "dock"], ["overhaul.reduceTransparency", "dock"],
-  ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"], ["ap.compact", "dock"],
+  ["tab.appearance", "dock"], ["ap.theme", "dock"], ["look.source", "dock"], ["dock.intensity", "dock"], ["finish.title", "dock"], ["surface.color", "dock"],
+  ["gp.size", "dock"], ["ap.iconSize", "dock"], ["ap.spacing", "dock"], ["ap.radius", "dock"],
   ["dock.more", "dock"], ["be.magnify", "dock"], ["be.zoom", "dock"], ["be.anim", "dock"], ["overhaul.overflow", "dock"],
   ["be.showLabels", "dock"], ["be.showIndicators", "dock"], ["be.focusRunning", "dock"], ["be.alwaysOnTop", "dock"],
-  ["be.taskbarFollow", "dock"], ["be.taskbarSettle", "dock"], ["be.taskbarHoldHover", "dock"], ["ap.nativeMaterial", "dock"],
+  ["be.taskbarFollow", "dock"],
   ["plugins.title", "plugins"], ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
   ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.launcher", "system"], ["autoProf.title", "system"], ["sc.positions", "system"],
   ["ab.updates", "system"], ["tab.profiles", "system"], ["gen.captureVisible", "system"], ["gen.ctxMenu", "system"],
@@ -26,11 +27,10 @@ const SEARCH_INDEX = [
 // magnification, a picked colour…). When the row is hidden, the result goes
 // to the section or switch that controls it instead of doing nothing.
 export const SEARCH_PARENT = {
-  "be.reveal": "dock.behavior", "be.notchMode": "dock.behavior", "be.notchPresence": "dock.behavior", "be.hideDelay": "dock.behavior",
+  "be.reveal": "notch.section", "be.notchMode": "notch.section", "be.notchPresence": "notch.section", "beh.live": "notch.section", "notch.music": "beh.live", "be.notchAgents": "notch.section", "be.hideDelay": "dock.behavior",
   "be.monitor": "be.position", "ap.accent": "look.source",
-  "dock.intensity": "tab.appearance", "surface.color": "tab.appearance", "ap.nativeMaterial": "tab.appearance",
+  "dock.intensity": "tab.appearance", "surface.color": "tab.appearance",
   "be.zoom": "be.magnify", "be.anim": "be.magnify",
-  "be.taskbarSettle": "be.taskbarFollow", "be.taskbarHoldHover": "be.taskbarFollow",
 };
 
 const PAGE_LABELS = { plugins: "plugins.title", home: "overhaul.home", dock: "tab.dock", widgets: "tab.widgets", apps: "overhaul.appsFolders", system: "overhaul.system" };
@@ -48,8 +48,6 @@ const SEARCH_ALIASES = {
   "dock.behavior": "ocultar esconder auto hide hidden smart inteligente comportamiento behavior siempre visible",
   "be.hideInFullscreen": "pantalla completa fullscreen juego pelicula movie presentation ocultar",
   "be.taskbarFollow": "taskbar barra tareas autohide ocultar windhawk seguir follow",
-  "be.taskbarSettle": "retraso delay settle bajar notch taskbar barra",
-  "be.taskbarHoldHover": "mantener hold hover cursor notch dock taskbar",
   "be.notchMode": "notch forma shape pildora pill pestana tab punto dot circulo circle pegado flotante attached floating isla island smart inteligente",
   "be.notchPresence": "notch punto isla ocultar esconder maximizada navegador trabajar molesta auto hide dot",
   "be.position": "posicion position borde edge arriba abajo izquierda derecha",

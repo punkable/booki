@@ -1456,3 +1456,4 @@
 .group-hero-actions { flex: none; display: flex; align-items: center; gap: 8px; }
 .group-hero-look { position: absolute; z-index: 20; top: calc(100% - 8px); left: 16px; min-width: 280px; padding: 12px; display: grid; gap: 10px; border-radius: 8px; background: var(--card); border: 1px solid var(--divider); box-shadow: 0 8px 24px rgb(0 0 0 / .22); }
 @media (max-width: 560px) { .group-hero { flex-wrap: wrap; } .group-hero-actions { width: 100%; justify-content: flex-end; } }
+.preset-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
