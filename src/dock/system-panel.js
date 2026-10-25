@@ -173,7 +173,11 @@ export function buildSystemPanel(item, { close }) {
     const withReset = (label, s) => { const r = clock(s); return r ? `${label} · ${t("w.aiResets").replace("{time}", () => r)}` : label; };
     const tokens = (n) => t("w.aiTokens").replace("{n}", () => tokenText(n));
     live(ai, aiReading, 60000, (providers) => {
-      const all = (Array.isArray(providers) ? providers : []).filter((provider) => !item.style?.provider || provider.id === item.style.provider);
+      const quotaOnly = !!item.style?.quotaOnly;
+      const listed = (Array.isArray(providers) ? providers : []).filter((provider) => !item.style?.provider || provider.id === item.style.provider);
+      const all = quotaOnly ? listed.filter((provider) => (provider.windows || []).length > 0) : listed;
+      const hidden = quotaOnly ? listed.filter((provider) => provider.detected !== false && !(provider.windows || []).length) : [];
+      if (hidden.length) ai.append(text("p", t("ai.hiddenNoQuota").replace("{names}", () => hidden.map((p) => p.name).join(", ")), "ai-missing"));
       if (!all.length) { ai.append(text("p", t("w.aiNone"))); return; }
       // Providers with no local data share one quiet line instead of a card each.
       const found = all.filter((p) => p.detected !== false), missing = all.filter((p) => p.detected === false);

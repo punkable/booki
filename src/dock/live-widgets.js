@@ -296,7 +296,10 @@ const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-op
 function paintAi(providers) {
   eachWidget("ai", (el) => {
     const style = findWidgetPin(el.dataset.id)?.style || {};
-    const available = style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false);
+    const quota = (provider) => !style.quotaOnly || (provider.windows || []).length > 0;
+    // "Only with quota" hides the rest without removing them: one that starts
+    // reporting its plan appears again by itself.
+    const available = (style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false)).filter(quota);
     const urgent = available.filter((provider) => ["waiting", "error"].includes(aiStages.get(provider.id)));
     const working = available.filter((provider) => aiStages.get(provider.id) === "working");
     const shown = urgent.length ? urgent : working.length ? working : available;

@@ -88,6 +88,7 @@ export function WidgetContent({ item, cfg, set, patch }) {
     {widget === "ai" && <>
       <Row label={t("widgetFlow.provider")}><Select label={t("widgetFlow.provider")} value={style.provider || "auto"} onChange={(value) => patch({ provider: value === "auto" ? null : value })} options={[{ value: "auto", label: t("widgetFlow.allProviders") }, ...["claude", "codex", "cursor", "opencode"].map((value) => ({ value, label: { claude: "Claude", codex: "Codex", chatgpt: "ChatGPT", cursor: "Cursor", opencode: "OpenCode" }[value] }))]} /></Row>
       {!style.provider && <Toggle label={t("widgetFlow.rotate")} checked={style.rotate !== false} onChange={(rotate) => patch({ rotate })} />}
+      <Toggle label={t("ai.quotaOnly")} hint={t("ai.quotaOnlyHint")} checked={!!style.quotaOnly} onChange={(quotaOnly) => patch({ quotaOnly })} />
       <p className="inline-note"><Icon name="lock" />{t("widget.aiPrivacy")}</p><details className="inline-details"><summary>{t("panelFlow.aiDetection")}</summary><p className="inline-note">{t("panelFlow.aiSources")}</p></details>
       <Toggle label={t("be.notchAgents")} hint={t("widgetFlow.sharedNotch")} checked={cfg.notchAgents !== false} onChange={(notchAgents) => set({ notchAgents })} />
       <AgentBridge />
