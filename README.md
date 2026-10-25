@@ -24,7 +24,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center"><img src="docs/presentation/hero-real-en.jpg" width="1000" alt="Booki on a Windows desktop: the dock with a browser and music player shown as live cards and an open group with clock, battery, focus and system widgets" /></p>
+<p align="center"><img src="docs/presentation/hero-real-en.jpg" width="1000" alt="Booki on a Windows desktop: the dock with a browser and music player shown as live cards and an open group with clock, battery, devices, system, focus and weather widgets" /></p>
 
 <table align="center">
 <tr>
@@ -35,7 +35,7 @@
 </tr>
 </table>
 
-<p align="center"><img src="docs/presentation/diagram-anatomy.svg" width="960" alt="The parts of Booki: the notch at the top, a widget panel, and the dock with apps, groups and live widgets" /></p>
+<p align="center"><img src="docs/presentation/anatomy-en.jpg" width="1000" alt="The parts of Booki, labelled on the actual interface: the notch showing Claude working, the Devices widget panel, and the dock with apps, groups and live widgets" /></p>
 
 ---
 
@@ -43,13 +43,13 @@
 
 <p align="center">Put widgets and apps in the same group and it opens like the Windows Widgets board:<br/>live cards in three sizes, apps beside them, in whatever order you drag them.</p>
 
-<p align="center"><img src="docs/presentation/desk-hub.jpg" width="1000" alt="An open Booki group over a browser window: clock, battery, focus timer and system cards next to Notion, Obsidian and GitHub Desktop" /></p>
+<p align="center"><img src="docs/presentation/desk-hub.jpg" width="1000" alt="An open Booki group on a photo desktop: clock, battery, devices, system, focus and weather cards" /></p>
 
 <h2 align="center">Apps that show what they're doing.</h2>
 
 <p align="center">Turn a pinned app into a live card: your music player shows the song and its controls,<br/>your browser how many windows are open with a button for a new or private one.</p>
 
-<p align="center"><img src="docs/presentation/desk-dark.jpg" width="1000" alt="A dark Booki dock over a code editor: browser card with two windows, music card playing, clock, system and focus widgets" /></p>
+<p align="center"><img src="docs/presentation/desk-dark.jpg" width="1000" alt="A dark Booki dock on a mountain wallpaper with the notch showing Claude working: browser card with two windows, music card playing, clock, system and focus widgets" /></p>
 
 <h2 align="center">Smooth at any refresh rate.</h2>
 
@@ -69,9 +69,9 @@
 
 <h2 align="center">A gallery to make them yours.</h2>
 
-<p align="center">The widgets on your dock sit at the top. Below, explore by category and add one in a click.<br/>Its settings open beside the gallery with a live preview: content, look and colour.</p>
+<p align="center">Your widgets sit on top as compact cards. <b>Add widget</b> opens the gallery: search, browse by category, add one in a click.<br/>Then tune it with a live preview: content, look and colour.</p>
 
-<p align="center"><img src="docs/presentation/clip-gallery.webp" width="900" alt="In Booki's Widgets settings, Weather is added from the gallery and its colour is changed in the side sheet" /></p>
+<p align="center"><img src="docs/presentation/clip-gallery.webp" width="900" alt="In Booki's Widgets settings, Add widget opens the gallery, Weather is added and its colour is changed with a live preview" /></p>
 
 <p align="center"><img src="docs/presentation/settings-en.jpg" width="1000" alt="Current Booki Settings home with example dock" /></p>
 
@@ -101,7 +101,7 @@
 
 <p align="center">No accounts. No telemetry. No cloud sync. Your tasks, notes and usage stay on your PC.<br/>Weather asks only for the city you choose — never your location.</p>
 
-<p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and, if you opt in, Claude Code's status line and agent hook events; never sign-ins, tokens, credential files or the network" /></p>
+<p align="center"><img src="docs/presentation/privacy-en.jpg" width="1000" alt="AI usage stays on your PC: Booki reads only local session logs, Claude Code's status line if you opt in, agent event kinds and file sizes; never sign-ins, tokens, credential files, the network or made-up quotas. The actual AI usage panel sits in the middle." /></p>
 
 <!-- booki:media:start -->
 <p align="center"><sub>Source frontend captures for v1.0.2, with example data. Native Windows blur requires an in-app check.</sub></p>

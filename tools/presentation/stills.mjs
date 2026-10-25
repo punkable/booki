@@ -13,7 +13,9 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { serveDist, launchBrowser, openPage, makeConfig } from '../../tests/harness.mjs';
-import { iconUri, bridgePatch, studioPatch } from './fixtures.mjs';
+import { bridgePatch, studioPatch } from './fixtures.mjs';
+import { icon as glyph } from '../../src/icons.js';
+import { APPS as KIT_APPS, pathOf as kitPath, icons as kitIcons } from './desk-kit.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const shots = resolve(here, 'public/stills'); mkdirSync(shots, { recursive: true });
@@ -29,31 +31,28 @@ const FOCUS = { minutes: 25, endsAt: NOW + 18 * 60 * 1000 }; // 18:00 left, ever
 const SCALE = 3; // capture at 2x so the composited UI stays crisp
 const WINDOW = { width: 1180, height: 760 }; // Settings window, shown at 1120 wide
 
-/* Sample apps: generic glyph icons from fixtures.mjs under short names. */
-const APPS = {
-  files: 'Files', browser: 'Browser', mail: 'Mail', music: 'Music', photos: 'Photos', editor: 'Code',
-  chat: 'Chat', terminal: 'Terminal', notes: 'Notes', calendar: 'Calendar', videos: 'Videos', camera: 'Camera',
-};
-const pathOf = (key) => `C:/Examples/${APPS[key]}.exe`;
-const icons = Object.fromEntries(Object.keys(APPS).map((key) => [pathOf(key), iconUri(key)]));
+/* Sample apps: brand marks on squircles (desk-kit.mjs, Simple Icons). */
+const APPS = Object.fromEntries(Object.entries(KIT_APPS).map(([key, [name]]) => [key, name]));
+const pathOf = kitPath;
+const icons = kitIcons;
 const app = (key) => ({ id: `app-${key}`, kind: 'app', name: APPS[key], path: pathOf(key) });
 const separator = (id) => ({ id, kind: 'separator' });
 const group = (id, name, color, glyph, keys) => ({ id, kind: 'group', name, style: { color, glyph }, children: keys.map(app) });
 const widget = (name, style) => ({ id: `w-${name}`, kind: 'widget', widget: name, ...(style ? { style } : {}) });
 // The installed-apps list the Apps page offers ("All apps").
-const LIBRARY = ['browser', 'chat', 'editor', 'files', 'mail', 'music', 'photos', 'terminal'];
+const LIBRARY = ['chrome', 'discord', 'code', 'figma', 'notion', 'spotify', 'obsidian', 'github'];
 
 const PINNED = [
-  ...['files', 'browser', 'mail', 'music', 'photos', 'editor'].map(app),
+  ...['chrome', 'spotify', 'discord', 'figma', 'notion', 'code'].map(app),
   separator('sep-apps'),
-  group('grp-work', 'Work', '#6b69d6', 'zap', ['terminal', 'chat', 'notes', 'calendar']),
-  group('grp-play', 'Play', '#f7630c', 'gamepad', ['videos', 'camera', 'music']),
+  group('grp-work', 'Work', '#6b69d6', 'zap', ['obsidian', 'github', 'claude', 'telegram']),
+  group('grp-play', 'Play', '#f7630c', 'gamepad', ['steam', 'vlc', 'blender']),
   separator('sep-widgets'),
   widget('clock'),
   widget('weather', { city: 'Lisboa', latitude: 38.72, longitude: -9.14 }),
   widget('system', { metrics: ['cpu', 'ram'] }),
   widget('focus', FOCUS),
-  widget('collector'),
+  widget('ai'),
   widget('devices'),
 ];
 
@@ -63,7 +62,8 @@ const stillsPatch = `(() => { const old = window.__TAURI__.core.invoke;
   window.__TAURI__.core.invoke = (cmd, args = {}) => {
     if (cmd === 'media_info') return Promise.resolve({ title: 'Sunset', artist: 'Sample Artist', album: 'Example', playing: true });
     if (cmd === 'running_windows' || cmd === 'list_windows') return Promise.resolve([]);
-    if (cmd === 'device_batteries') return Promise.resolve([{ name: 'Headphones', level: 72 }, { name: 'Keyboard', level: 90 }]);
+    if (cmd === 'device_batteries') return Promise.resolve([{ name: 'MX Master 3S', kind: 'mouse', level: 78, source: 'logitech' }, { name: 'MX Keys Mini', kind: 'keyboard', level: 18, source: 'logitech' }, { name: 'WH-1000XM5', kind: 'headset', level: 64, charging: true, source: 'bluetooth' }]);
+    if (cmd === 'ai_usage') return Promise.resolve([{ id: 'claude', name: 'Claude', detected: true, windows: [{ label: '5h', percent: 38, resets_at: ${NOW / 1000} + 7200 }, { label: 'week', percent: 61, resets_at: ${NOW / 1000} + 300000 }], week_tokens: 2400000 }, { id: 'codex', name: 'Codex', detected: true, windows: [{ label: '5h', percent: 22, resets_at: ${NOW / 1000} + 9000 }], week_tokens: 640000 }]);
     if (cmd === 'list_installed_apps') return Promise.resolve([{ name: 'Examples', items: library }]);
     if (cmd === 'frequent_apps') return Promise.resolve(library.slice(0, 4).map((item, i) => ({ ...item, runs: 40 - i * 8, focus_ms: (40 - i * 8) * 20000 })));
     return old(cmd, args);
@@ -94,10 +94,15 @@ async function shootDock(locale, theme) {
   await page.addStyleTag({ content: 'body.dock-body { padding-bottom: 70px !important; }' });
   await page.mouse.move(0, 0); await page.waitForTimeout(900);
   const box = await page.locator('#dock').boundingBox();
+  // Where the apps, groups and widgets sit, relative to the bar (anatomy).
+  const parts = await page.evaluate((dock) => {
+    const span = (sel) => { const r = [...document.querySelectorAll(sel)].map((el) => el.getBoundingClientRect()); if (!r.length) return null; const l = Math.min(...r.map((x) => x.left)), rr = Math.max(...r.map((x) => x.right)); return { x: l - dock.x, width: rr - l }; };
+    return { apps: span('#dock > .tile[data-id]:not(.group):not(.widget):not(.separator)'), groups: span('#dock > .tile.group'), widgets: span('#dock > .tile.widget') };
+  }, box);
   const file = resolve(shots, `dock-${theme}-${locale}.png`);
   await page.screenshot({ path: file, omitBackground: true, clip: pad(box, 40) });
   await finish(opened, `dock ${theme} ${locale}`);
-  return { file, width: box.width, height: box.height, pad: 40 };
+  return { file, width: box.width, height: box.height, pad: 40, parts };
 }
 
 async function shootNotch(locale, theme, provider = "claude", state = "working") {
@@ -149,7 +154,7 @@ async function shootSettings(locale, theme, pageName) {
 }
 
 async function shootGroup(locale) {
-  const opened = await open('index.html', config(locale, 'light', { autoHideMode: 'off', magnification: false, pinned: [app('files'), app('browser'), group('grp-work', 'Work', '#6b69d6', 'zap', ['terminal', 'chat', 'notes', 'calendar', 'editor', 'mail', 'photos', 'videos']), widget('clock'), widget('system', { metrics: ['cpu', 'ram'] })] }), { width: 1600, height: 700 });
+  const opened = await open('index.html', config(locale, 'light', { autoHideMode: 'off', magnification: false, pinned: [app('chrome'), app('spotify'), group('grp-work', 'Work', '#6b69d6', 'zap', ['code', 'github', 'figma', 'notion', 'obsidian', 'claude', 'discord', 'telegram']), widget('clock'), widget('system', { metrics: ['cpu', 'ram'] })] }), { width: 1600, height: 700 });
   const { page } = opened;
   await page.locator('#dock > [data-id="grp-work"]').click();
   await page.locator('#stack.open').waitFor();
@@ -162,31 +167,16 @@ async function shootGroup(locale) {
   return { file, width: box.width, height: box.height, pad: 20 };
 }
 
-async function shootUtility(locale, kind) {
-  const opened = await open('index.html', config(locale, 'dark', { autoHideMode: 'off', pinned: ['clock', 'devices', 'volume', 'ai', 'focus', 'collector'].map((type) => widget(type, type === 'focus' ? FOCUS : {})) }), { width: 1200, height: 820 }, `{
-    window.__captureJobs = [];
-    const old = window.__TAURI__.core.invoke;
-    window.__TAURI__.core.invoke = (cmd, args) => cmd === 'plugin_status' ? Promise.resolve({ installed: true, version: 'sample' }) : cmd === 'plugin_download' ? new Promise((resolve) => window.__captureJobs.push({ args, resolve })) : old(cmd, args);
-  }`);
+/** A widget's real detail panel, opened by clicking it on the dock. */
+async function shootPanel(locale, type, theme = 'dark') {
+  const opened = await open('index.html', config(locale, theme, { surfaceStyle: 'glass', autoHideMode: 'off', pinned: ['clock', 'devices', 'ai', 'volume'].map((name) => widget(name)) }), { width: 1200, height: 900 });
   const { page } = opened;
-  let selector;
-  if (kind === 'hub') {
-    await page.locator('#dock').dispatchEvent('contextmenu', { clientX: 600, clientY: 650 });
-    await page.getByRole('menuitem', { name: locale === 'es' ? 'Panel de widgets' : 'Widget panel', exact: true }).click();
-    selector = '.widget-hub.is-open';
-  } else {
-    await page.locator('#dock > [data-id="w-collector"]').click();
-    await page.getByRole('textbox', { name: locale === 'es' ? 'Pega un enlace' : 'Paste a link' }).fill('https://example.com/tutorial\nhttps://example.com/guide.pdf');
-    await page.getByRole('button', { name: locale === 'es' ? 'Añadir a la cola' : 'Add to queue', exact: true }).click();
-    await page.waitForFunction(() => window.__captureJobs.length > 0);
-    await page.evaluate(() => { for (const cb of window.__listeners['plugin-download'] || []) cb({ payload: { id: window.__captureJobs[0].args.jobId, state: 'progress', percent: 64, title: 'Design tutorial' } }); });
-    selector = '.system-widget-panel.is-open';
-    await page.locator('.system-widget-sections').evaluate((el) => { el.scrollTop = 0; });
-  }
-  await page.locator(selector).waitFor(); await page.mouse.move(1, 1); await page.waitForTimeout(300);
-  const box = await page.locator(selector).boundingBox(), file = resolve(shots, `${kind}-${locale}.png`);
+  await page.locator(`#dock > [data-id="w-${type}"]`).click();
+  const selector = '.system-widget-panel.is-open';
+  await page.locator(selector).waitFor(); await page.mouse.move(1, 1); await page.waitForTimeout(900);
+  const box = await page.locator(selector).boundingBox(), file = resolve(shots, `panel-${type}-${theme}-${locale}.png`);
   await page.locator(selector).screenshot({ path: file, omitBackground: true });
-  await finish(opened, `${kind} ${locale}`);
+  await finish(opened, `${type} panel ${locale}`);
   return { file, width: box.width, height: box.height, pad: 0 };
 }
 
@@ -196,19 +186,19 @@ const COPY = {
   en: {
     note: PREVIEW ? `Branch preview · base v${VERSION} · example icons and data` : `v${VERSION} · actual interface · example icons and data`,
     hero: [['Your desktop,', 'calmer.'], 'One beautiful dock for your apps, folders and live widgets. Free and open source for Windows 11.'],
-    widgets: [['Your tools,', 'together.'], 'Live widgets, quick audio controls and a Collector with an explicit download queue.'],
-    island: [['The notch that', 'tells you things.'], 'Claude Code, Codex and Cursor. Their status on your desktop, with local signals and clear indicators.'],
-    groups: [['Find. Move.', 'Make it yours.'], 'Search your groups, change views with Ctrl + wheel and see where every shortcut will land.'],
-    settings: [['Settings you', 'actually enjoy.'], 'Six clear sections for your dock, widgets, apps, plugins and system.'],
+    widgets: [['One click,', 'the whole story.'], 'Every widget opens into its details: the battery of each device, your AI plan with its reset times.'],
+    island: [['The notch that', 'tells you things.'], 'Claude, Codex and Cursor: working, waiting for you or done. Read from local signals only.'],
+    groups: [['Find. Move.', 'Make it yours.'], 'Groups with their own colour and icon. Search inside one and switch icon sizes with Ctrl + wheel.'],
+    settings: [['Settings you', 'actually enjoy.'], 'Clear pages for your dock, notch, widgets and apps, with a live preview of your dock.'],
     dark: [['At home in', 'the dark.'], 'Taskbar, glass or solid. Light or dark. Booki follows Windows.'],
   },
   es: {
     note: PREVIEW ? `Vista previa · base v${VERSION} · iconos y datos de ejemplo` : `v${VERSION} · interfaz real · iconos y datos de ejemplo`,
     hero: [['Tu escritorio,', 'más en calma.'], 'Un dock precioso para tus apps, carpetas y widgets en vivo. Gratis y de código abierto para Windows 11.'],
-    widgets: [['Tus herramientas,', 'reunidas.'], 'Widgets en vivo, controles de audio y un Recolector con una cola clara de descargas.'],
-    island: [['El notch que', 'te cuenta cosas.'], 'Claude Code, Codex y Cursor. Su estado en tu escritorio, con señales locales e indicadores claros.'],
-    groups: [['Busca. Mueve.', 'Hazlo tuyo.'], 'Busca dentro de tus grupos, cambia de vista con Ctrl + rueda y ve dónde caerá cada acceso.'],
-    settings: [['Ajustes que', 'da gusto usar.'], 'Seis secciones para tu dock, widgets, apps, complementos y sistema.'],
+    widgets: [['Un clic,', 'todo el detalle.'], 'Cada widget se abre en su detalle: la batería de cada dispositivo y tu plan de IA con sus reinicios.'],
+    island: [['El notch que', 'te cuenta cosas.'], 'Claude, Codex y Cursor: trabajando, esperándote o listos. Solo con señales locales.'],
+    groups: [['Busca. Mueve.', 'Hazlo tuyo.'], 'Grupos con su color e icono. Busca dentro y cambia el tamaño de los iconos con Ctrl + rueda.'],
+    settings: [['Ajustes que', 'da gusto usar.'], 'Páginas claras para tu dock, notch, widgets y apps, con una vista previa en vivo.'],
     dark: [['Como en casa', 'a oscuras.'], 'Barra de tareas, vidrio o sólido. Claro u oscuro. Booki sigue a Windows.'],
   },
 };
@@ -282,7 +272,7 @@ function compose(name, locale, s) {
         ${dockAt(s.dockDark)}`);
     }
     case 'groups': return page('light', note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme: 'light', align: 'left', width: 540, size: 106 })}</div>${piece(s.group, { left: 800, top: 210, width: 900 })}`);
-    case 'widgets': return page('dark', note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme: 'dark', align: 'left', width: 510, size: locale === 'es' ? 76 : 96 })}</div>${piece(s.hub, { left: 700, top: 185, width: 390 })}${piece(s.collector, { left: 1130, top: 160, width: 610 })}`);
+    case 'widgets': return page('dark', note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme: 'dark', align: 'left', width: 560, size: locale === 'es' ? 84 : 100 })}</div>${piece(s.devices, { left: 760, top: 150, width: 500 })}${piece(s.ai, { left: 1300, top: 230, width: 500 })}`);
     case 'settings': case 'dark': {
       const theme = name === 'widgets' || name === 'dark' ? 'dark' : 'light';
       return page(theme, note, `<div style="position:absolute;left:110px;top:205px">${headline(title, body, { theme, align: 'left', width: 570, size: name === 'dark' ? 98 : 118 })}</div>
@@ -290,6 +280,72 @@ function compose(name, locale, s) {
     }
     default: throw new Error(`Unknown still ${name}`);
   }
+}
+
+/* ── Explainers: the real interface with thin labels, no drawn stand-ins ── */
+
+const LABEL = {
+  en: {
+    anatomy: ['The parts of Booki', 'Everything below is the actual interface.'],
+    notch: ['Notch', 'Music, focus timer, battery and AI agents at a glance.'],
+    panel: ['Widget details', 'One click on a widget opens its panel.'],
+    apps: ['Apps', 'Grow under the pointer.'], groups: ['Groups', 'Your colour and icon.'], widgets: ['Live widgets', 'Right on the bar.'],
+    privacy: ['AI usage stays on your PC', 'Booki reads only what your AI tools already write on this PC.'],
+    reads: 'Reads', never: 'Never',
+    readList: [['file', 'Claude Code and Codex session logs'], ['activity', 'Claude Code status line, if you opt in'], ['zap', 'Agent events: kind only, never the text'], ['clock', 'File size and time for Cursor, the Claude app and others']],
+    neverList: [['lock', 'Sign-ins, tokens or cookies'], ['shield', 'Account or credential files'], ['globe', 'Network requests for AI usage'], ['alert', 'Made-up quota percentages']],
+  },
+  es: {
+    anatomy: ['Las partes de Booki', 'Todo lo de abajo es la interfaz real.'],
+    notch: ['Notch', 'Música, temporizador, batería y agentes de IA de un vistazo.'],
+    panel: ['Detalle de widgets', 'Un clic en un widget abre su panel.'],
+    apps: ['Apps', 'Crecen bajo el cursor.'], groups: ['Grupos', 'Tu color y tu icono.'], widgets: ['Widgets en vivo', 'En la misma barra.'],
+    privacy: ['El uso de IA se queda en tu PC', 'Booki solo lee lo que tus herramientas de IA ya escriben en este PC.'],
+    reads: 'Lee', never: 'Nunca',
+    readList: [['file', 'Registros de sesión de Claude Code y Codex'], ['activity', 'Barra de estado de Claude Code, si lo activas'], ['zap', 'Eventos de agentes: solo el tipo, nunca el texto'], ['clock', 'Tamaño y hora de archivo de Cursor, la app de Claude y otros']],
+    neverList: [['lock', 'Inicios de sesión, tokens o cookies'], ['shield', 'Archivos de cuenta o credenciales'], ['globe', 'Peticiones de red para el uso de IA'], ['alert', 'Porcentajes de cuota inventados']],
+  },
+};
+const callout = ({ x, y, side = 'right', title, text, width = 300 }) => {
+  const right = side === 'right';
+  return `<div style="position:absolute;left:${right ? x : x - width}px;top:${y}px;width:${width}px;text-align:${right ? 'left' : 'right'}">
+    <div style="font-size:22px;font-weight:680;color:#1c1a19;letter-spacing:-.01em">${esc(title)}</div>
+    <div style="margin-top:4px;font-size:17px;line-height:1.4;color:#6b6560">${esc(text)}</div></div>`;
+};
+const line = (x1, y1, x2, y2) => `<svg style="position:absolute;left:0;top:0;overflow:visible" width="1" height="1"><path d="M${x1} ${y1} L${x2} ${y2}" stroke="#1c1a19" stroke-opacity=".28" stroke-width="1.2" fill="none"/><circle cx="${x1}" cy="${y1}" r="4.5" fill="#c98a4d" stroke="#fff" stroke-width="2"/></svg>`;
+
+function anatomy(locale, s) {
+  const c = LABEL[locale];
+  const k = DOCK_WIDTH / s.dockLight.width, dockLeft = (1920 - DOCK_WIDTH) / 2, dockTop = 780;
+  const dockBottom = dockTop + s.dockLight.height * k;
+  const at = (part) => dockLeft + (part.x + part.width / 2) * k;
+  const pill = 170, pillTop = 150, pillLeft = (1920 - pill) / 2;
+  const panelW = 400, panelLeft = 300, panelTop = 268;
+  const parts = [['apps', s.dockLight.parts.apps], ['groups', s.dockLight.parts.groups], ['widgets', s.dockLight.parts.widgets]].filter(([, p]) => p);
+  return page('light', COPY[locale].note, `<div style="position:absolute;left:96px;top:150px;width:560px">
+      <h1 style="margin:0;font-size:58px;line-height:1.02;font-weight:760;letter-spacing:-.03em;color:#16161a">${esc(c.anatomy[0])}</h1>
+      <p style="margin:14px 0 0;font-size:22px;color:#6b6560">${esc(c.anatomy[1])}</p></div>
+    ${piece(s.notch, { left: pillLeft, top: pillTop, width: pill })}
+    ${line(pillLeft + pill + 14, pillTop + 22, pillLeft + pill + 90, pillTop + 22)}${callout({ x: pillLeft + pill + 104, y: pillTop + 2, title: c.notch[0], text: c.notch[1], width: 560 })}
+    ${piece(s.panel, { left: panelLeft, top: panelTop, width: panelW })}
+    ${line(panelLeft + panelW + 14, panelTop + 70, panelLeft + panelW + 90, panelTop + 70)}${callout({ x: panelLeft + panelW + 104, y: panelTop + 48, title: c.panel[0], text: c.panel[1], width: 360 })}
+    ${piece(s.dockLight, { left: dockLeft, top: dockTop, width: DOCK_WIDTH })}
+    ${parts.map(([key, p]) => { const x = at(p); return `${line(x, dockBottom + 10, x, dockBottom + 46)}<div style="position:absolute;left:${x - 160}px;top:${dockBottom + 54}px;width:320px;text-align:center"><span style="font-size:21px;font-weight:680;color:#1c1a19">${esc(c[key][0])}</span><span style="font-size:17px;color:#6b6560"> · ${esc(c[key][1])}</span></div>`; }).join('')}`);
+}
+
+function privacy(locale, s) {
+  const c = LABEL[locale];
+  const row = ([g, text], tone) => `<div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;background:${tone === 'never' ? '#fff5f4' : '#ffffffb8'};border:1px solid ${tone === 'never' ? '#f3d4d0' : '#ffffff'}">
+      <span style="flex:none;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:${tone === 'never' ? '#fbe3e0' : '#f3e7da'};color:${tone === 'never' ? '#b4232f' : '#8b5a2b'}">${glyph(g)}</span>
+      <span style="font-size:19px;line-height:1.3;color:#2a2725">${esc(text)}</span></div>`;
+  const column = (title, list, tone) => `<div style="width:520px"><div style="margin:0 0 14px 4px;font-size:16px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${tone === 'never' ? '#b4232f' : '#8b6a4c'}">${esc(title)}</div>
+      <div style="display:grid;gap:10px">${list.map((item) => row(item, tone)).join('')}</div></div>`;
+  return page('light', COPY[locale].note, `<div style="position:absolute;left:0;right:0;top:150px;text-align:center">
+      <h1 style="margin:0;font-size:64px;line-height:1.02;font-weight:760;letter-spacing:-.03em;color:#16161a">${esc(c.privacy[0])}</h1>
+      <p style="margin:16px 0 0;font-size:24px;color:#6b6560">${esc(c.privacy[1])}</p></div>
+    <div style="position:absolute;left:96px;top:380px">${column(c.reads, c.readList, 'reads')}</div>
+    ${piece(s.ai, { left: 700, top: 360, width: 520 })}
+    <div style="position:absolute;left:1304px;top:380px">${column(c.never, c.neverList, 'never')}</div>`);
 }
 
 async function render(html, file) {
@@ -315,7 +371,7 @@ try {
     const scenes = {
       hero: { dockLight, notch: notchDark }, // the Island reads as dark on any wallpaper
       island: { dockDark, notchDark, notchWaiting, notchDone },
-      widgets: { hub: await shootUtility(locale, 'hub'), collector: await shootUtility(locale, 'collector') },
+      widgets: { devices: await shootPanel(locale, 'devices'), ai: await shootPanel(locale, 'ai') },
       groups: { group: await shootGroup(locale) },
       settings: { window: await shootSettings(locale, 'light', 'home') },
       dark: { window: await shootSettings(locale, 'dark', 'dock') },
@@ -323,6 +379,9 @@ try {
     for (const [name, pieces] of Object.entries(scenes)) {
       await render(compose(name, locale, pieces), resolve(out, `${name}-${locale}.jpg`));
     }
+    // Explainers (not part of the release screenshot set).
+    await render(anatomy(locale, { dockLight, notch: notchDark, panel: await shootPanel(locale, 'devices', 'light') }), resolve(out, `anatomy-${locale}.jpg`));
+    await render(privacy(locale, { ai: await shootPanel(locale, 'ai', 'light') }), resolve(out, `privacy-${locale}.jpg`));
     console.log(`Rendered ${locale} stills`);
   }
 } finally { await browser.close(); srv.close(); }
