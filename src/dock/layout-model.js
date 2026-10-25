@@ -9,7 +9,7 @@ export function widgetSpan(widget, style = {}) {
   const requested = Number(style?.span);
   if ([1, 2, 3].includes(requested)) return requested;
   if (["media", "notes", "clipboard"].includes(type)) return 3;
-  return ["clock", "focus", "calendar", "weather"].includes(type) ? 2 : 1;
+  return ["clock", "focus", "calendar", "weather", "wifi", "bluetooth", "winsettings"].includes(type) ? 2 : 1;
 }
 export function widgetWidth(type, size, gap, style = {}) {
   const span = widgetSpan(type, style);
@@ -21,8 +21,8 @@ export function chooseFitSize(size, natural, usable, mode = "adapt", minimum = 3
 }
 export const LAYOUT_SCENARIOS = [
   { id: "off", icon: "eye", title: "overhaul.fixed", hint: "overhaul.fixedHint", patch: { autoHideMode: "off" } },
-  { id: "smart", icon: "app", title: "overhaul.smart", hint: "overhaul.smartHint", patch: { autoHideMode: "smart", hideInFullscreen: true } },
-  { id: "edge", icon: "eye-off", title: "overhaul.edge", hint: "overhaul.edgeHint", patch: { autoHideMode: "edge", notchTrigger: "hover", hideInFullscreen: true } },
+  { id: "smart", icon: "app", title: "overhaul.smart", hint: "overhaul.smartHint", patch: { autoHideMode: "smart" } },
+  { id: "edge", icon: "eye-off", title: "overhaul.edge", hint: "overhaul.edgeHint", patch: { autoHideMode: "edge" } },
 ];
 export function countContent(items = []) {
   return items.reduce((sum, item) => {

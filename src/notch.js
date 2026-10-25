@@ -30,9 +30,12 @@ const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TA
 const inTauri = !!winApi;
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
+let revealDelay = 300; // like the Windows taskbar: a beat, so brushing past does not open it
 // The live card only exists on a horizontal tab: a vertical one has no room
 // for a line of text.
-let canPeek = false;
+let canPeek = false; // the hover card can open (click trigger, horizontal edge)
+let liveOn = { media: true, timer: true, battery: true, volume: true }; // Settings > Dock > Notch
+let canLive = false; // live activity (music, timer, battery, agents) shows in the notch
 let draggingNotch = false;
 let lastHitSig = "";
 
@@ -57,6 +60,7 @@ async function applyLook() {
     const look = paintedLook(cfg);
     if (look.accent) applyAccent(root, look.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
+    revealDelay = Math.max(0, Math.min(1500, Number(cfg.revealDelay ?? 300) || 0));
     clearTimeout(hoverTimer);
     clearTimeout(cardTimer);
     if (!hoverTrigger && !pill.matches(":focus-visible")) closeCard();
@@ -71,12 +75,16 @@ async function applyLook() {
     document.body.classList.toggle("smart", shape === "smart");
     focusTimers = focusTimersOf(cfg.pinned || []);
     agentsOn = cfg.notchAgents !== false;
+    liveOn = { media: true, timer: true, battery: true, volume: true, ...(cfg.notchLive || {}) };
     if (!agentsOn) clearAgents();
     document.body.classList.remove("edge-top", "edge-bottom", "edge-left", "edge-right");
     document.body.classList.add(`edge-${edge}`);
     // Stacked under a visible dock the card would grow over the bar.
-    canPeek = !hoverTrigger && (edge === "top" || edge === "bottom");
-    document.body.classList.toggle("peekable", canPeek);
+    // Live activity only needs room along the edge; the card additionally
+    // needs the click trigger, since hovering already summons the dock.
+    canLive = edge === "top" || edge === "bottom";
+    canPeek = canLive && !hoverTrigger;
+    document.body.classList.toggle("peekable", canLive);
     if (!canPeek) closeCard();
     pollMedia();
     pollBattery();
@@ -478,7 +486,7 @@ function nextAgentDone(now) {
  *  back to the notice chip, which also covers the tab stepping aside. */
 function agentNotice(state, provider) {
   if (videoForeground || scene === "game" || (screenBusy && scene !== "code" && scene !== "creative")) return;
-  if (canPeek) nudgePresence();
+  if (canLive) nudgePresence();
   else invoke("notch_notice", { title: agentLabel(state, provider), detail: "" }).catch(() => {});
 }
 
@@ -508,7 +516,7 @@ function agentActivity(now = Date.now()) {
 
 onAgentActivity((payload) => applyAgent(payload));
 setInterval(() => {
-  if (canPeek && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
+  if (canLive && !document.hidden && !cardOpen && (agents.size || focusTimers.length)) paintActivity();
 }, AGENT_ROTATE_MS);
 if (inTauri) invoke("agent_activity").then((list) => { for (const a of Array.isArray(list) ? list : []) applyAgent(a, true); }).catch(() => {});
 
@@ -519,32 +527,43 @@ function currentActivity(now = Date.now()) {
   // Over a video or a game the notch stays a dot. The dock still opens from
   // that dot, on hover or on click, whichever is already chosen.
   if ((videoForeground || scene === "game") && !cardOpen) return null;
-  if (screenBusy && scene !== "code" && scene !== "creative") return null;
-  if (volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
+  // Over a maximized app only what needs you now gets through: an agent
+  // waiting or done, a focus block ending, a battery running out, the
+  // charger, or the volume you just changed. Music and progress wait.
+  if (screenBusy && scene !== "code" && scene !== "creative") {
+    const urgent = idleActivity(now);
+    return urgent && BUSY_KINDS.has(urgent.kind) && !(urgent.kind === "battery" && urgent.level > 10) ? urgent : null;
+  }
+  return idleActivity(now);
+}
+
+const BUSY_KINDS = new Set(["volume", "agent-waiting", "agent-error", "agent-done", "charging", "done", "battery"]);
+function idleActivity(now) {
+  if (liveOn.volume && volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
   const agent = agentsOn ? agentActivity(now) : null;
   if (agent?.state === "waiting") return { kind: "agent-waiting", provider: agent.provider, since: agent.since };
   if (agent?.state === "error") return { kind: "agent-error", provider: agent.provider, since: agent.since };
   const done = agentsOn ? nextAgentDone(now) : null;
   if (done) return { kind: "agent-done", provider: done.provider, since: done.since, until: done.until };
-  if (chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
+  if (liveOn.battery && chargeFlash && chargeFlash.until > now) return { kind: "charging", level: chargeFlash.level, until: chargeFlash.until };
   // Music gets a brief introduction, including while an editor is focused.
   // Afterwards it remains available on hover without occupying the capsule.
-  if (media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
-  const timer = focusTimers.find((style) => Number(style.endsAt) > now);
+  if (liveOn.media && media?.playing && mediaPeekUntil > now) return { kind: "media", until: mediaPeekUntil };
+  const timer = liveOn.timer && focusTimers.find((style) => Number(style.endsAt) > now);
   if (timer) {
     if (agent && !cardOpen && Math.floor(now / AGENT_ROTATE_MS) % 2) return { kind: "agent", provider: agent.provider, since: agent.since };
     const total = Math.min(180, Math.max(1, Number(timer.minutes) || 25)) * 60;
     const left = Math.max(0, Math.ceil((Number(timer.endsAt) - now) / 1000));
     return { kind: "timer", left, progress: Math.min(1, left / total) };
   }
-  const ended = focusTimers.find((style) => Number(style.endsAt) <= now && now - Number(style.endsAt) < FOCUS_DONE_MS);
+  const ended = liveOn.timer && focusTimers.find((style) => Number(style.endsAt) <= now && now - Number(style.endsAt) < FOCUS_DONE_MS);
   if (ended) {
     const next = (Array.isArray(ended.tasks) ? ended.tasks : []).find((task) => !task.done)?.text || "";
     return { kind: "done", next, until: Number(ended.endsAt) + FOCUS_DONE_MS };
   }
   // Urgency decides the order: a nearly flat battery outranks the music, a
   // merely low one waits behind it.
-  const low = battery && !battery.charging && battery.level >= 0 ? battery.level : 101;
+  const low = liveOn.battery && battery && !battery.charging && battery.level >= 0 ? battery.level : 101;
   if (low <= 10) return { kind: "battery", level: low };
   if (scene === "code" && agent) return { kind: "agent", provider: agent.provider, since: agent.since };
   // Music opens the notch for a few seconds when it starts or the track
@@ -558,7 +577,7 @@ let lastActivityKind = "";
 const mmss = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 function paintActivity() {
-  const activity = canPeek ? currentActivity() : null;
+  const activity = canLive ? currentActivity() : null;
   const kind = activity?.kind || "";
   // A timer that just ended or a battery that just ran low is worth a glance
   // even while the tab is out of the way.
@@ -614,7 +633,7 @@ function paintActivity() {
 
 const pollBattery = singleFlight(async () => {
   clearTimeout(batteryTimer);
-  if (!canPeek || !inTauri) return;
+  if (!canLive || !inTauri) return;
   const before = battery;
   try {
     const stats = await invoke("system_stats");
@@ -761,7 +780,7 @@ function agentElapsed(since, now = Date.now()) {
 // the WinRT session query is cheap but not free.
 const pollMedia = singleFlight(async () => {
   clearTimeout(mediaTimer);
-  if (!canPeek || !inTauri) {
+  if (!canLive || !inTauri) {
     media = null;
     paintMedia();
     return;
@@ -786,7 +805,7 @@ const pollMedia = singleFlight(async () => {
 // tab while the dock is tucked away. The first reading only sets a baseline.
 let lastVolume = null;
 const readVolume = singleFlight(async () => {
-  if (!canPeek || !inTauri) return;
+  if (!canLive || !inTauri) return;
   let info = null;
   try { info = await invoke("volume_info"); } catch (_) {}
   if (!Array.isArray(info)) return;
@@ -798,7 +817,7 @@ const readVolume = singleFlight(async () => {
   paintActivity();
 });
 
-observeSystem(dockApi, { foreground: pollForeground, media: () => { if (canPeek) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
+observeSystem(dockApi, { foreground: pollForeground, media: () => { if (canLive) pollMedia(); }, volume: readVolume, power: () => pollBattery() }, (support) => { nativeSupport = support; });
 
 // Hit rects must follow the morph while its width/height transition runs.
 function followMorph(ms = 520) { // --dur-spring
@@ -919,7 +938,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => { if (hoverTrigger) invoke("reveal_dock").catch(() => {}); }, 90);
+  hoverTimer = setTimeout(() => { if (hoverTrigger) invoke("reveal_dock").catch(() => {}); }, revealDelay);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 

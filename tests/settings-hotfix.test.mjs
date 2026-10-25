@@ -31,7 +31,7 @@ test('Home and every Settings section accept unstyled native widget records', as
 
 test('the current changelog renders every section icon as SVG', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html');
-  await page.getByRole('navigation').getByRole('button', { name: 'System', exact: true }).click();
+  await page.getByRole('navigation').getByRole('button', { name: 'About', exact: true }).click();
   await page.locator('.about').getByRole('button', { name: "What's new", exact: true }).click();
   await page.locator('.release-section h3').first().waitFor();
   await page.locator('.release-history > summary').click();

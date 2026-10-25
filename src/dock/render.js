@@ -5,13 +5,12 @@ import { dock as dockApi } from "../api.js";
 import { imageSrc } from "../image-src.js";
 import { setTileLabel } from "./tooltip.js";
 import { widgetWidth } from "./layout-model.js";
+import { decorateAppWidget, isAppWidget } from "./app-widgets.js";
 import { icon } from "../icons.js";
 import { isotype } from "../brand-mark.js";
-import { emo } from "../emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "../icon-library.js";
 import { t } from "../i18n.js";
 import {
-  WIDGET_ICONS,
   WIDGET_GLYPHS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
@@ -135,7 +134,7 @@ function appTile(item) {
   el.appendChild(badge);
 
   const addGlyph = () => {
-    if (el.querySelector(".glyph, img")) return;
+    if (el.querySelector(":scope > .glyph, :scope > img")) return;
     const look = pinFallback(item);
     const glyph = document.createElement("span");
     glyph.className = "glyph fallback";
@@ -184,6 +183,8 @@ function appTile(item) {
     deps.removeItem(item.id);
   });
   el.appendChild(rm);
+
+  if (isAppWidget(item)) decorateAppWidget(el, item, { mediaTile: (w) => widgetTile(w, { inFlyout: true }) });
 
   el.addEventListener("contextmenu", (e) => deps.openMenu(e, item));
   el.addEventListener("pointerdown", (e) => deps.onPointerDown(e, el, item));
@@ -243,8 +244,10 @@ function groupTile(item) {
     const mini = document.createElement("span");
     mini.className = "group-mini";
     if (child.kind === "widget") {
-      // A grouped widget previews as its emoji (it only goes live inside the group).
-      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
+      // A grouped widget previews as its glyph in the widget's own colour.
+      mini.classList.add("mini-widget");
+      mini.style.setProperty("--mini-accent", WIDGET_META[child.widget]?.accent || "var(--accent)");
+      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : icon("sparkles");
     } else if (child.kind === "action" && !child.icon) {
       // Booki's Settings pin keeps its gear inside a group.
       mini.innerHTML = icon("settings");

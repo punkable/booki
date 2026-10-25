@@ -22,6 +22,24 @@ import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
+
+// Widgets whose read-out needs the whole row of a widget hub.
+const WIDE_HUB_WIDGETS = new Set(["system", "media", "clipboard", "notes"]);
+// A single ring reads fine in one column; two would leave it floating in space.
+const SMALL_HUB_WIDGETS = new Set(["battery", "volume", "updates", "collector", "devices", "ai"]);
+/** small (1 column), medium (2) or wide (the row): chosen, else by widget type. */
+export function hubSize(child) {
+  const chosen = child.style?.hubSize;
+  if (["small", "medium", "wide"].includes(chosen)) return chosen;
+  return WIDE_HUB_WIDGETS.has(child.widget) ? "wide" : SMALL_HUB_WIDGETS.has(child.widget) ? "small" : "medium";
+}
+/** Re-open the group that is showing so a change to its contents appears. */
+export async function refreshOpenStack(group) {
+  const tile = dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  if (!tile) return;
+  closeStack();
+  await openStack(tile, S.cfg.pinned.find((pin) => pin.id === group.id) || group);
+}
 import { closeProductivityPanel, openSystemPanel, openWidgetHub, openWidget } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
@@ -249,14 +267,24 @@ export async function openStack(tileEl, item) {
       grid.innerHTML = `<div class="stack-empty">${t(isGroup ? "stack.emptyGroup" : "stack.empty")}</div>`;
     }
     let cellIdx = 0;
+    // A group with widgets works as a widget board; items keep the order you
+    // gave them, so a widget can sit between apps.
+    const hasWidgets = isGroup && items.some((it) => it.kind === "widget");
+    grid.classList.toggle("widget-hub-grid", hasWidgets);
     for (const it of items) {
       // A grouped widget renders as its LIVE read-out (only here, inside the open
-      // group — never on the bar). It spans the row so the card gets full width.
+      // group — never on the bar), as a card two columns wide or the full row.
       if (isGroup && it.kind === "widget") {
         const wCell = document.createElement("div");
-        wCell.className = "stack-item stack-widget";
+        const tile = widgetTile(it, { inFlyout: true });
+        const size = hubSize({ ...it, widget: tile.dataset.widget });
+        wCell.className = "stack-item stack-widget " + { wide: "stack-widget-wide", small: "stack-widget-small", medium: "stack-widget-half" }[size];
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
-        wCell.appendChild(widgetTile(it, { inFlyout: true }));
+        wCell.appendChild(tile);
+        const name = document.createElement("span");
+        name.className = "stack-widget-name";
+        name.textContent = it.name || widgetLabel(tile.dataset.widget);
+        wCell.appendChild(name);
         wCell.addEventListener("click", (event) => {
           if (wCell._suppressClick || event.target.closest(".w-controls")) return;
           event.stopPropagation();

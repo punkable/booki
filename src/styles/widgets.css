@@ -128,20 +128,22 @@
 }
 .w-ring-ico {
   position: absolute;
-  top: 19%;
+  /* Anchored to the centre, not the top: on a wide card the ring is
+     narrower than the box and a top offset landed on the stroke. */
+  bottom: calc(50% + var(--size) * 0.07);
   left: 50%;
   transform: translateX(-50%);
   display: grid;
   place-items: center;
   color: var(--w-accent);
 }
-.w-ring-ico svg { position: static; width: calc(var(--size) * 0.18); height: calc(var(--size) * 0.18); transform: none; stroke-width: 2.2; }
-.w-ring-ico img.emo { width: calc(var(--size) * 0.18) !important; height: calc(var(--size) * 0.18) !important; }
+.w-ring-ico svg { position: static; width: calc(var(--size) * 0.15); height: calc(var(--size) * 0.15); transform: none; stroke-width: 2.2; }
+.w-ring-ico img.emo { width: calc(var(--size) * 0.15) !important; height: calc(var(--size) * 0.15) !important; }
 .w-ring-num {
   position: relative;
-  margin-top: calc(var(--size) * 0.12);
+  margin-top: calc(var(--size) * 0.13);
   font-family: var(--font-display);
-  font-size: calc(var(--size) * 0.25);
+  font-size: calc(var(--size) * 0.23);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -272,18 +274,18 @@
 .tile.widget[data-variant="minimal"] .w-card { background: transparent; box-shadow: none; }
 
 /* ── Vertical dock: every widget is a 1×1 tile ─────────────────────────── */
-body.edge-left .tile.widget,
-body.edge-right .tile.widget { width: var(--size); }
-body.edge-left .w-card,
-body.edge-right .w-card { justify-content: center; padding: calc(var(--size) * 0.08); }
-body.edge-left .w-label, body.edge-right .w-label,
-body.edge-left .w-sys-cell ~ .w-sys-cell, body.edge-right .w-sys-cell ~ .w-sys-cell,
-body.edge-left .w-pv-main, body.edge-right .w-pv-main,
-body.edge-left .w-pv-badge, body.edge-right .w-pv-badge,
-body.edge-left .tile.widget.media .w-main, body.edge-right .tile.widget.media .w-main,
-body.edge-left .tile.widget.media .w-controls, body.edge-right .tile.widget.media .w-controls { display: none; }
+body.edge-left .dock .tile.widget,
+body.edge-right .dock .tile.widget { width: var(--size); }
+body.edge-left .dock .w-card,
+body.edge-right .dock .w-card { justify-content: center; padding: calc(var(--size) * 0.08); }
+body.edge-left .dock .w-label, body.edge-right .dock .w-label,
+body.edge-left .dock .w-sys-cell ~ .w-sys-cell, body.edge-right .dock .w-sys-cell ~ .w-sys-cell,
+body.edge-left .dock .w-pv-main, body.edge-right .dock .w-pv-main,
+body.edge-left .dock .w-pv-badge, body.edge-right .dock .w-pv-badge,
+body.edge-left .dock .tile.widget.media .w-main, body.edge-right .dock .tile.widget.media .w-main,
+body.edge-left .dock .tile.widget.media .w-controls, body.edge-right .dock .tile.widget.media .w-controls { display: none; }
 /* The clock keeps its time, smaller; other readouts show their figure. */
-body.edge-left .w-value, body.edge-right .w-value { font-size: calc(var(--size) * 0.26); }
+body.edge-left .dock .w-value, body.edge-right .dock .w-value { font-size: calc(var(--size) * 0.26); }
 
 /* A widget grouped into a folder is shown live inside the flyout at full width. */
 .stack-widget .tile.widget.in-flyout { width: 100%; }
@@ -570,7 +572,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-ring { flex: 0 0 auto; width: calc(var(--size) * 0.8); height: calc(var(--size) * 0.8); }
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: flex; flex: 1 1 auto; }
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-label { order: 0; font-size: calc(var(--size) * 0.21); color: var(--w-ink); white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
+body:is(.edge-left, .edge-right) .dock .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
 /* Lighting reads as a short name, not a giant figure. */
 .tile.widget[data-widget="lighting"] .w-value { font-size: calc(var(--size) * 0.24); font-family: var(--font); font-weight: 600; }
 .system-widget-panel .productivity-section > strong { font-size: 1rem; font-weight: 600; }
@@ -616,6 +618,22 @@ body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [
 .collector-folder { overflow-wrap: anywhere; color: var(--ink-2); font-size: 12px; }
 .download-form textarea, .collector-field select { box-sizing: border-box; width: 100%; font: inherit; color: var(--ink); background: var(--ctrl-fill); border: 1px solid var(--ctrl-stroke); border-bottom-color: var(--ctrl-stroke-bottom); border-radius: var(--r-control); padding: 8px 10px; }
 .download-form textarea { resize: vertical; min-height: 72px; max-height: 160px; }
+
+/* Wi-Fi, Bluetooth and Windows Settings panels. */
+.tile.widget.off .w-value { opacity: .6; }
+.conn-current { margin: 0; font-weight: 600; }
+.conn-list { display: grid; gap: 2px; margin: 4px 0 8px; }
+.conn-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r-control); }
+.conn-row:hover { background: var(--hover); }
+.conn-glyph { display: grid; place-items: center; width: 18px; height: 18px; color: var(--accent); }
+.conn-glyph svg { width: 100%; height: 100%; }
+.conn-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-level { color: var(--ink-2); font-variant-numeric: tabular-nums; font-size: 12px; }
+.conn-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; font-weight: 600; }
+.conn-shortcuts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.conn-shortcut { display: grid; justify-items: center; gap: 6px; padding: 12px 6px; font: inherit; font-size: 12px; color: var(--ink); background: var(--ctrl-fill, transparent); border: 1px solid var(--ctrl-stroke, var(--stroke)); border-radius: var(--r-card, 8px); cursor: pointer; text-align: center; }
+.conn-shortcut:hover { background: var(--hover); }
+.conn-shortcut svg { width: 20px; height: 20px; color: var(--accent); }
 .collector-queue-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 18px 0 8px; }
 .collector-jobs { display: grid; gap: 8px; }
 .collector-job { padding: 10px; border: 1px solid var(--stroke); border-radius: var(--r-card); background: var(--ctrl-fill); }
@@ -778,3 +796,15 @@ body:has(.fluent-select-pop:not(.is-closing)) .fluent-tip { display: none; }
 /* Solid cards are filled with the status colour: their text and glyph stay
    white while charging instead of turning the same green as the fill. */
 .tile.widget[data-variant="solid"].charging .w-ring-num, .tile.widget[data-variant="solid"].charging .w-ring-ico { color: #fff; }
+.conn-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 12px; }
+/* A Windows 11 toggle switch: track with a knob that slides and grows. */
+.productivity-panel input.conn-toggle { appearance: none; position: relative; flex: none; width: 40px; height: 20px; margin: 0; border-radius: 10px; border: 1px solid var(--ink-2); background: transparent; cursor: pointer; transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease); }
+.productivity-panel input.conn-toggle::after { content: ""; position: absolute; top: 3px; left: 4px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-2); transition: left var(--dur-2) var(--ease), width var(--dur-1) var(--ease), background var(--dur-1) var(--ease); }
+.productivity-panel input.conn-toggle:hover::after { width: 14px; height: 14px; top: 2px; }
+.productivity-panel input.conn-toggle:checked { background: var(--accent); border-color: var(--accent); }
+.productivity-panel input.conn-toggle:checked::after { left: 22px; background: var(--on-accent, #fff); }
+.productivity-panel input.conn-toggle:checked:hover::after { left: 20px; }
+.productivity-panel input.conn-toggle:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
+.productivity-panel input.conn-toggle:disabled { opacity: .5; cursor: default; }
+.productivity-panel input.conn-toggle:checked { background-image: none; }
+.productivity-panel input.conn-toggle:checked::after { content: ""; width: 12px; height: 12px; border: 0; transform: none; margin: 0; }

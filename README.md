@@ -4,16 +4,16 @@
 
 <h1 align="center">Booki</h1>
 
-<h3 align="center">Your desktop, calmer.</h3>
+<h3 align="center">Your dock, finally alive.</h3>
 
-<p align="center">A beautiful dock for Windows 11 — apps, folders and live widgets in one calm bar.<br/>Free, private and open source.</p>
+<p align="center">A beautiful dock for Windows 11. Your apps, groups and live widgets in one calm bar:<br/>the song that's playing, your open windows and your day, right where your apps are.<br/>Free, private and open source.</p>
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v0.98.0/Booki_0.98.0_x64-setup.exe"><b>Download for Windows v0.98.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.98.0/Booki_0.98.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v0.98.0/Booki_0.98.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v0.98.0.md">What's new v0.98.0</a>
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_x64-setup.exe"><b>Download for Windows v1.0.0 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v1.0.0.md">What's new v1.0.0</a>
 </p>
 <!-- booki:download:end -->
 
@@ -24,7 +24,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" alt="MIT license" /></a>
 </p>
 
-<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock with example apps, a group, clock, system readings, focus timer and Collector" /></p>
+<p align="center"><img src="docs/presentation/hero-real-en.jpg" width="1000" alt="Booki on a Windows desktop: the dock with a browser and music player shown as live cards and an open group with clock, battery, focus and system widgets" /></p>
 
 <table align="center">
 <tr>
@@ -39,9 +39,23 @@
 
 ---
 
+<h2 align="center">Groups that work like a widget board.</h2>
+
+<p align="center">Put widgets and apps in the same group and it opens like the Windows Widgets board:<br/>live cards in three sizes, apps beside them, in whatever order you drag them.</p>
+
+<p align="center"><img src="docs/presentation/desk-hub.jpg" width="1000" alt="An open Booki group over a browser window: clock, battery, focus timer and system cards next to Notion, Obsidian and GitHub Desktop" /></p>
+
+<h2 align="center">Apps that show what they're doing.</h2>
+
+<p align="center">Turn a pinned app into a live card: your music player shows the song and its controls,<br/>your browser how many windows are open with a button for a new or private one.</p>
+
+<p align="center"><img src="docs/presentation/desk-dark.jpg" width="1000" alt="A dark Booki dock over a code editor: browser card with two windows, music card playing, clock, system and focus widgets" /></p>
+
 <h2 align="center">Smooth at any refresh rate.</h2>
 
 <p align="center">Icons grow under your pointer with time-based motion: just as quick at 60, 144 or 240 Hz, only smoother on faster screens, with no overshoot.<br/>Pick glass (Windows 11 acrylic, light or dark), the taskbar's own look, or solid.</p>
+
+<p align="center"><img src="docs/presentation/hero-en.jpg" width="1000" alt="Booki dock with example apps, a group, clock, system readings, focus timer and Collector" /></p>
 
 <p align="center"><img src="docs/presentation/clip-magnify.webp" width="900" alt="The pointer moves along the Booki dock and the icons grow and settle under it" /></p>
 
@@ -90,21 +104,26 @@
 <p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and, if you opt in, Claude Code's status line and agent hook events; never sign-ins, tokens, credential files or the network" /></p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v0.98.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v1.0.0, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 0.98.0
+## What's new in 1.0.0
 
-Clearer Settings, like Windows 11: each widget and dock item gets its own page, colours use Booki's palette, and the dock no longer blocks clicks on half the screen.
+Booki 1.0: your dock, finally alive. Groups that work as a widget board, apps that show what they're doing and a dynamic notch in every mode.
 
-- Choosing a widget or a dock item opens its own page (Widgets › AI usage), with no narrow columns at any window size.
-- Apps & folders: a command bar (New, Add apps), details as cards and a dialog for adding apps, folders and sites.
-- Background and accent colours as in Windows: a preview, the source in a drop-down and Booki's palette for the background (no free colour or accent fill).
-- After it was shown again, the dock's whole transparent window kept capturing clicks, so programs on the lower half of the screen could not be moved or used until the pointer crossed the bar.
-- Under Real Claude plan usage, Booki says whether Claude Code calls it and sends your plan usage, so you can tell why it does not show.
+- A group with widgets opens like the Windows Widgets board: small, medium or wide cards (right-click), mixed with apps in the order you drag them, with the rest gliding aside as you move one.
+- Show a pinned app as a live card (right-click › Show as widget): your player with the song and its controls, your browser with its windows and new or private window buttons.
+- New Wi‑Fi, Bluetooth and Windows Settings widgets, and a notice when headphones or another device connect or disconnect.
+- Behaviour rebuilt with illustrated cards: when it hides, how it comes back and what stays while hidden, without one option silently changing others. Pointing at the notch waits 0.3 s (adjustable).
+- The dynamic notch (music, timer, battery, volume, agents) now also works with “point at the notch”, you choose what it shows, and over a maximized app it still shows what's urgent.
+- Exceptions: hide in fullscreen and apps the dock always steps aside for.
+- A new About tab with what's new, help, links and support; System keeps the settings.
+- No double border when hovering widgets and groups, rings with icon and number kept apart and lighter catalog buttons.
+- If Windows' media service stalls, widgets no longer freeze: every query has a time limit and the buttons never wait behind it.
+- Fixes: the player card no longer controls another app's music, the exception list applies at once, an open group no longer shows a ghost label behind it and grouped widgets keep their layout with the dock on a side edge.
 
-[Full release notes](docs/releases/v0.98.0.md)
+[Full release notes](docs/releases/v1.0.0.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -120,9 +139,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [0.98.0](docs/releases/v0.98.0.md) | Clearer Settings, like Windows 11: each widget and dock item gets its own page, colours use Booki's palette, and the dock no longer blocks clicks on half the screen. |
 | [0.97.0](docs/releases/v0.97.0.md) | Booki now understands your AI agents better: Claude's real plan usage and exact states for Claude Code, Codex, Gemini CLI and Cursor, plus flicker-free glass and Windows 11 controls. |
 | [0.96.0](docs/releases/v0.96.0.md) | Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates. |
-| [0.95.1](docs/releases/v0.95.1.md) | Clearer settings, consistent click activation and fixes for saving, captures and notices. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->
@@ -188,7 +207,7 @@ npm run tauri:build  # Windows packages
 
 UI changes follow the [visual identity and design system](docs/brand/README.md).
 
-README images and clips are recorded from the real frontend with sample data by [tools/presentation](tools/presentation/README.md) (`stills.mjs`, `clips.mjs`); finished media live in `docs/presentation/`.
+README images and clips are recorded from the real frontend with sample data by [tools/presentation](tools/presentation/README.md) (`stills.mjs`, `clips.mjs`, `desktop.mjs`); finished media live in `docs/presentation/`. Desktop wallpapers are photos from [Unsplash](https://unsplash.com) (Unsplash License); app marks come from [Simple Icons](https://simpleicons.org) and belong to their owners. They illustrate apps Booki can pin and do not imply endorsement.
 
 To audit the current public release without running its installers:
 

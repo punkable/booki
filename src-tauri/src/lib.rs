@@ -13,6 +13,7 @@ mod clipboard_storage;
 mod config;
 mod config_document;
 mod config_transaction;
+mod connectivity;
 mod directory;
 mod dnd;
 mod dock_window;
@@ -676,6 +677,12 @@ fn foreground_is_code() -> bool {
 #[tauri::command]
 fn foreground_is_video() -> bool {
     win::foreground_is_video()
+}
+
+/// Program file name of the foreground window, for per-app auto-hide.
+#[tauri::command]
+fn foreground_exe() -> String {
+    win::foreground_exe()
 }
 
 /// video, creative, code, game, or desk. One look, so the notch does not
@@ -1660,6 +1667,11 @@ pub fn run() {
             foreground_is_code,
             foreground_is_video,
             foreground_place,
+            foreground_exe,
+            connectivity::wifi_status,
+            connectivity::wifi_networks,
+            connectivity::bluetooth_state,
+            connectivity::bluetooth_set,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,

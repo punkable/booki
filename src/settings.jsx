@@ -20,7 +20,7 @@ import { DockPage } from "./settings/pages/dock.jsx";
 import { WidgetsPage } from "./settings/pages/widgets.jsx";
 import { AppsPage } from "./settings/pages/apps.jsx";
 import { PluginsPage } from "./settings/pages/plugins.jsx";
-import { SystemPage } from "./settings/pages/system.jsx";
+import { AboutPage, SystemPage } from "./settings/pages/system.jsx";
 import { enableFluentSelects } from "./fluent-select.js";
 enableFluentSelects();
 import { enableFluentTooltips } from "./fluent-tooltip.js";
@@ -36,10 +36,11 @@ const PAGES = [
   ["apps", "overhaul.appsFolders", "folder", "#ff9a2e"],
   ["plugins", "plugins.title", "sparkles", "#409c91"],
   ["system", "overhaul.system", "settings", "#8d8a93"],
+  ["about", "ab.title", "info", "#6b69d6"],
 ];
 const PAGE_IDS = PAGES.map(([id]) => id);
 /** Pages from older builds (the dock, saved state, search) → where they live now. */
-const MOVED = { appearance: "dock", autohide: "dock", notch: "dock", general: "system", profiles: "system", shortcuts: "system", faq: "system", about: "system", clipboard: "widgets" };
+const MOVED = { appearance: "dock", autohide: "dock", notch: "dock", general: "system", profiles: "system", shortcuts: "system", faq: "about", clipboard: "widgets" };
 const pageOf = (id) => (PAGE_IDS.includes(id) ? id : MOVED[id] || null);
 
 function Search({ onChoose }) {
@@ -217,7 +218,8 @@ function App() {
           {page === "widgets" && <WidgetsPage key={targetVisit} {...pageProps} />}
           {page === "apps" && <AppsPage {...pageProps} />}
           {page === "plugins" && <PluginsPage cfg={cfg} set={set} beforeInstall={store.settled} />}
-          {page === "system" && <SystemPage {...pageProps} version={version} store={store} onWhatsNew={() => setShowChangelog(true)} />}
+          {page === "system" && <SystemPage {...pageProps} store={store} />}
+          {page === "about" && <AboutPage version={version} onWhatsNew={() => setShowChangelog(true)} />}
         </SettingsBoundary>
         </div>
       </div>

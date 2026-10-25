@@ -137,7 +137,7 @@ export function HomePage({ cfg, set, navigate, reveal, onSelect, onWhatsNew }) {
 
     <h2 className="ui-group-title home-subtitle">{t("home.atGlance")}</h2>
     <div className="quick-grid">
-      <QuickTile glyph="eye" hue="#6b69d6" label={t("dock.behavior")} value={t(scenario?.title || "overhaul.smart")} onClick={toDock("dock.behavior")} />
+      <QuickTile glyph="eye" hue="#6b69d6" label={t("dock.behavior")} value={t({ off: "beh.never", smart: "beh.covered", edge: "beh.idle" }[scenario?.id] || "beh.covered")} onClick={toDock("dock.behavior")} />
       <QuickTile glyph="palette" hue="#e3008c" label={t("finish.title")} value={t(`finish.${activeFinish(cfg)}`)} onClick={toDock("tab.appearance")} />
       <QuickTile glyph="sun" hue="#f7630c" label={t("ap.theme")} value={t(`theme.${cfg.theme || "system"}`)} onClick={toDock("ap.theme")} />
       <QuickTile glyph="app" hue="#00b7c3" label={t("be.position")} value={t(`edge.${cfg.edge || "bottom"}`)} onClick={toDock("be.position")} />

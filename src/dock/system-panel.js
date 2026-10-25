@@ -12,7 +12,7 @@ import { persist } from "./config-sync.js";
 import { addWidget } from "./pin-ops.js";
 import { buildCollectorPanel } from "./collector-panel.js";
 import { deviceReading, aiReading, statsReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
-import { refreshUpdates, refreshDevices, paintLighting } from "./live-widgets.js";
+import { refreshUpdates, refreshDevices, paintLighting, refreshConnectivity } from "./live-widgets.js";
 import { notify } from "./notices.js";
 
 function text(tag, value, className = "") {
@@ -383,6 +383,64 @@ export function buildSystemPanel(item, { close }) {
         button(actions, t("rgb.open"), () => api.pluginOpen("openrgb"));
       });
     });
+  }
+  if (item.widget === "wifi") {
+    const now = section(t("w.wifi"));
+    load(now, api.wifiStatus, (w) => {
+      const line = !w?.adapter ? t("conn.noAdapter") : w.connected ? `${w.ssid} · ${w.signal}%` : t("conn.offline");
+      now.append(text("p", line, "conn-current"));
+    });
+    const near = section(t("conn.nearby"));
+    load(near, api.wifiNetworks, (list) => {
+      if (!list?.length) { near.append(text("p", t("conn.noneNearby"))); return; }
+      const rows = document.createElement("div"); rows.className = "conn-list";
+      for (const n of list) {
+        const row = document.createElement("div"); row.className = "conn-row";
+        const glyph = text("span", "", "conn-glyph"); glyph.innerHTML = icon("wifi"); glyph.style.opacity = String(0.35 + (n.signal / 100) * 0.65);
+        row.append(glyph, text("span", n.ssid, "conn-name"), text("span", `${n.signal}%`, "conn-level"));
+        rows.append(row);
+      }
+      near.append(rows);
+    });
+    // Booki never joins a network itself: Windows' own list does that.
+    const wifiActions = document.createElement("div"); wifiActions.className = "conn-actions"; body.append(wifiActions);
+    button(wifiActions, t("conn.connect"), () => api.launch("ms-availablenetworks:", []));
+    button(wifiActions, t("conn.wifiSettings"), () => api.launch("ms-settings:network-wifi", []));
+  }
+  if (item.widget === "bluetooth") {
+    const box = section(t("w.bluetooth"));
+    const paint = (on) => {
+      box.querySelectorAll(".conn-switch").forEach((el) => el.remove());
+      if (on == null) { box.prepend(text("p", t("conn.noAdapter"), "conn-switch")); return; }
+      const row = document.createElement("label"); row.className = "conn-switch";
+      const input = document.createElement("input"); input.type = "checkbox"; input.className = "conn-toggle"; input.setAttribute("role", "switch"); input.setAttribute("aria-label", t("w.bluetooth")); input.checked = on;
+      input.addEventListener("change", async () => {
+        input.disabled = true;
+        const now = await api.bluetoothSet(input.checked).catch(() => null);
+        if (disposed) return;
+        input.disabled = false; input.checked = now === true;
+        refreshConnectivity();
+      });
+      row.append(text("span", t("w.bluetooth")), input);
+      box.prepend(row);
+    };
+    load(box, api.bluetoothState, paint);
+    button(box, t("conn.btSettings"), () => api.launch("ms-settings:bluetooth", []));
+    button(box, t("conn.btAdd"), () => api.launch("ms-settings:connecteddevices", []));
+  }
+  if (item.widget === "winsettings") {
+    const box = section(t("w.winsettings"));
+    const grid = document.createElement("div"); grid.className = "conn-shortcuts";
+    const pages = [["settings", "conn.page.home", "ms-settings:"], ["wifi", "conn.page.network", "ms-settings:network"], ["bluetooth", "conn.page.devices", "ms-settings:bluetooth"],
+      ["sun", "conn.page.display", "ms-settings:display"], ["volume", "conn.page.sound", "ms-settings:sound"], ["palette", "conn.page.personalize", "ms-settings:personalization"],
+      ["app", "conn.page.apps", "ms-settings:appsfeatures"], ["battery", "conn.page.power", "ms-settings:powersleep"], ["refresh", "conn.page.update", "ms-settings:windowsupdate"]];
+    for (const [glyph, label, uri] of pages) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "conn-shortcut";
+      b.innerHTML = icon(glyph); b.append(text("span", t(label)));
+      b.addEventListener("click", () => { api.launch(uri, []).catch(() => {}); close(); });
+      grid.append(b);
+    }
+    box.append(grid);
   }
   const ids = item.widget === "devices" ? ["headsetcontrol"] : item.widget === "system" ? ["librehardwaremonitor"] : [];
   // Devices: support for USB headsets is a one-line offer while it is off,

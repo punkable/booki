@@ -87,6 +87,7 @@ const DEMO_CONFIG = {
 let demoConfig = structuredClone(DEMO_CONFIG);
 let demoTrashItems = 2; // browser demo: pretend the bin has something in it
 let demoVolume = { pct: 55, muted: false };
+let demoBluetooth = true;
 let demoClipboard = [
   { id: 2, text: "https://example.com/informe-final.pdf", ts: Date.now() - 60000 },
   { id: 1, text: "Reunión de equipo — jueves 10:00", ts: Date.now() - 300000 },
@@ -240,6 +241,15 @@ async function mockInvoke(cmd, args) {
       return true;
     case "volume_info":
       return [demoVolume.pct, demoVolume.muted];
+    case "wifi_status":
+      return { adapter: true, connected: true, ssid: "Home", signal: 82 };
+    case "wifi_networks":
+      return [{ ssid: "Home", signal: 82 }, { ssid: "Cafe", signal: 55 }, { ssid: "Office", signal: 31 }];
+    case "bluetooth_state":
+      return demoBluetooth;
+    case "bluetooth_set":
+      demoBluetooth = !!(args && args.on);
+      return demoBluetooth;
     case "volume_set":
       demoVolume.pct = Math.max(0, Math.min(100, (args && args.pct) || 0));
       if (demoVolume.pct > 0) demoVolume.muted = false;
@@ -585,6 +595,15 @@ export const dock = {
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
+  /** Lowercased program file name of the foreground window ("code.exe"). */
+  foregroundExe: () => invoke("foreground_exe"),
+  /** { adapter, connected, ssid, signal } from `netsh wlan`. */
+  wifiStatus: () => invoke("wifi_status"),
+  /** Nearby networks, strongest first: [{ ssid, signal }]. */
+  wifiNetworks: () => invoke("wifi_networks"),
+  /** Bluetooth radio: true/false, or null when the PC has none. */
+  bluetoothState: () => invoke("bluetooth_state"),
+  bluetoothSet: (on) => invoke("bluetooth_set", { on }),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
   toggleWindow: (hwnd) => invoke("toggle_window", { hwnd }),
   closeWindow: (hwnd) => invoke("close_window", { hwnd }),

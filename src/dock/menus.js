@@ -11,6 +11,7 @@ import { reframe } from "./frame.js";
 import { addMenuHead, placeMenu, closeMenu, resetMenu, addMenuSection, openMenuSection } from "./menu-core.js";
 import { render, refreshGroupTile } from "./render.js";
 import { windowsFor } from "./running-windows.js";
+import { appWidgetKind } from "./app-widgets.js";
 import { confirmTrash } from "./popovers.js";
 import { maybeSyncCtxMenu, applyAll, persist } from "./config-sync.js";
 import { FINISH_PRESETS, resolveGlassTint, resolveSurfaceStyle, surfaceAlpha } from "../surface.js";
@@ -29,7 +30,7 @@ import {
   removeItem,
 } from "./pin-ops.js";
 import { openWidgetHub } from "./widget-editors.js";
-import { openStack, openAddPanel, openLauncher } from "./stack.js";
+import { openStack, openAddPanel, openLauncher, hubSize, refreshOpenStack } from "./stack.js";
 import { enterEdit } from "./edit-reorder.js";
 import { ungroup, takeOutChild } from "./group-ops.js";
 
@@ -94,6 +95,13 @@ export function openMenu(e, item) {
   if (item.kind === "app" || item.kind === "folder") addMenuSection(ctxMenu, "pencil", t("refine.customize"), () => openMenuSection(e, menuPinTitle(item), () => openMenu(e, item), ({ add }) => {
     add("pencil", `${t("apps.rename")}…`, () => promptRename(item));
     add("image", t("m.changeIcon"), () => changeIcon(item));
+    if (appWidgetKind(item)) {
+      const wide = item.style?.appWidget === "wide";
+      add(wide ? "app" : "grid", t(wide ? "aw.showIcon" : "aw.showWide"), async () => {
+        item.style = { ...(item.style || {}), appWidget: wide ? "" : "wide" };
+        if (await persist()) { await render(); reframe(); }
+      });
+    }
     if (item.icon) add("undo", t("m.removeIcon"), () => clearIcon(item));
   }));
   if (item.kind !== "separator") addMenuSection(ctxMenu, "grid", t("refine.organize"), () => openMenuSection(e, t("refine.organize"), () => openMenu(e, item), ({ add }) => {
@@ -276,6 +284,15 @@ export function openFileMenu(e, item, parent, openFolder) {
     add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));
     add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));
     if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
+  }
+  if (parent && item.kind === "widget") {
+    // Card size inside the group's widget board: one column, two, or the row.
+    const current = hubSize(item);
+    for (const size of ["small", "medium", "wide"]) add(size === current ? "check" : "grid", t(`hub.size.${size}`), async () => {
+      item.style = { ...(item.style || {}), hubSize: size };
+      if (await persist()) refreshOpenStack(parent);
+    });
+    sep();
   }
   if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
   sep(); add("settings", t("m.settings"), () => item.kind === "widget" ? dockApi.openWidgetSettings(item.id) : dockApi.openSettingsTab("dock"));

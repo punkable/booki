@@ -1,6 +1,6 @@
 /* Shared widget catalog: the dock, the add panel and Settings read it.
 
-   Fifteen widgets. CPU, RAM, disk and network live in one "system" widget that
+   Eighteen widgets. CPU, RAM, disk and network live in one "system" widget that
    shows the metrics you choose; timer and tasks live in "focus". Configs from
    older builds are migrated by the backend (config rev 9); canonicalWidget()
    lets previews of old profiles and backups render before that happens. */
@@ -8,6 +8,7 @@
 export const WIDGET_ORDER = [
   "clock", "calendar", "weather", "system", "battery", "devices",
   "ai", "media", "volume", "notes", "clipboard", "focus", "collector", "updates", "lighting",
+  "wifi", "bluetooth", "winsettings",
 ];
 
 /** Old widget names → the widget that replaced them (null = retired). */
@@ -29,6 +30,7 @@ export const WIDGET_ICONS = {
   clock: "clock", calendar: "clock", weather: "antenna", system: "brain",
   battery: "battery", devices: "battery", ai: "sparkles", media: "notes", volume: "speaker", notes: "memo",
   clipboard: "clipboard", focus: "stopwatch", collector: "folder", updates: "sparkles", cloud: "floppy", lighting: "picture",
+  wifi: "antenna", bluetooth: "antenna", winsettings: "brain",
 };
 
 /** Line glyph (icons.js) drawn in the dock cell and the add panel. */
@@ -36,6 +38,7 @@ export const WIDGET_GLYPHS = {
   clock: "clock", calendar: "calendar", weather: "cloud-sun", system: "cpu",
   battery: "battery", devices: "battery", ai: "sparkles", media: "music", volume: "volume", notes: "note",
   clipboard: "clipboard", focus: "timer", collector: "download", updates: "refresh", lighting: "lightbulb",
+  wifi: "wifi", bluetooth: "bluetooth", winsettings: "settings",
   // Metric glyphs inside the system widget.
   cpu: "cpu", ram: "memory", disk: "disk", net: "activity",
 };
@@ -78,6 +81,9 @@ export const WIDGET_META = {
   collector: { accent: "#0f6cbd", desc: "widget.collectorDesc", category: "tools", plugin: "yt-dlp" },
   updates: { accent: "#30a46c", desc: "widget.updatesDesc", category: "system", plugin: "winget" },
   lighting: { accent: "#e3008c", desc: "widget.lightingDesc", category: "system", plugin: "openrgb" },
+  wifi: { accent: "#0078d4", desc: "widget.wifiDesc", category: "system" },
+  bluetooth: { accent: "#0f6cbd", desc: "widget.bluetoothDesc", category: "system" },
+  winsettings: { accent: "#6b6b75", desc: "widget.winsettingsDesc", category: "system" },
 };
 
 /** Localized display name. Pass t() from i18n. */

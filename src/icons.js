@@ -204,6 +204,7 @@ const iconMap = {
   "ai-claude": () => S(`<path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M5.8 5.8l2.4 2.4M15.8 15.8l2.4 2.4M18.2 5.8l-2.4 2.4M8.2 15.8l-2.4 2.4"/>`),
   "ai-openai": () => S(`<path d="M8 4.5h8L20 12l-4 7.5H8L4 12Z"/>`),
   bluetooth: () => S(`<path d="m7 7 10 10-5 5V2l5 5L7 17"/>`),
+  wifi: () => S(`<path d="M2 8.8a15 15 0 0 1 20 0M5 12.3a10 10 0 0 1 14 0M8.5 15.8a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1"/>`),
   thermometer: () => S(`<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>`),
   "ai-cursor": () => S(`<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 12h6"/>`),
   "agent-working": () => S(`<path d="M12 5a7 7 0 1 1-4.9 2"/>`),

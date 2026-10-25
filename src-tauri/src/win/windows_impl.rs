@@ -936,6 +936,19 @@ fn looks_like_code(exe: &str) -> bool {
 
 /// What the person is doing in the foreground window: video, a creative app,
 /// code, a game, or the desk. Video wins over a creative word in the title.
+/// File name of the foreground window's program, lowercased ("code.exe"),
+/// so the dock can stay tucked away over apps the person listed.
+pub fn foreground_exe() -> String {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return String::new();
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    path.rsplit(['\\', '/']).next().unwrap_or("").to_lowercase()
+}
+
 pub fn foreground_place() -> &'static str {
     let hwnd = unsafe { GetForegroundWindow() };
     if hwnd.0.is_null() {
@@ -1888,6 +1901,8 @@ pub struct MediaSnapshot {
     /// publishes a timeline (many browsers and some players do not).
     pub position_ms: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// App that owns the session (AppUserModelID, lowercased), to match a pinned app.
+    pub source: String,
 }
 
 // Each query owns only its initialization reference; borrowed apartments remain intact.
@@ -1995,6 +2010,10 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         ))
     })();
     let (position_ms, duration_ms) = media_timeline(&session, playing);
+    let source = session
+        .SourceAppUserModelId()
+        .map(|s| s.to_string().to_lowercase())
+        .unwrap_or_default();
     Some(MediaSnapshot {
         title,
         artist,
@@ -2002,7 +2021,25 @@ pub fn media_now_playing() -> Option<MediaSnapshot> {
         thumb,
         position_ms,
         duration_ms,
+        source,
     })
+}
+
+/// The Bluetooth radio's state (Some(true) = on), switching it first when
+/// `set` asks to. None when the PC has no Bluetooth radio.
+pub fn bluetooth_radio(set: Option<bool>) -> Option<bool> {
+    use windows::Devices::Radios::{Radio, RadioKind, RadioState};
+    let _runtime = MediaRuntime::new();
+    let radios = Radio::GetRadiosAsync().ok()?.join().ok()?;
+    let radio = radios
+        .into_iter()
+        .find(|r| r.Kind().is_ok_and(|k| k == RadioKind::Bluetooth))?;
+    if let Some(on) = set {
+        let _ = Radio::RequestAccessAsync().and_then(|op| op.join());
+        let state = if on { RadioState::On } else { RadioState::Off };
+        let _ = radio.SetStateAsync(state).and_then(|op| op.join());
+    }
+    radio.State().ok().map(|s| s == RadioState::On)
 }
 
 /// Toggle play/pause on the current system media session.
