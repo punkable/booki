@@ -2201,11 +2201,6 @@ body.edge-right .stack.open { transform: none; }
 .dock-tip-content { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .dock-tip-content strong { font-weight: 400; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .dock-tip-detail { font-size: 0.6875rem; color: var(--ink-2); margin-top: 2px; }
-.dock-tip-mark { display: none !important; flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
-.dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
-.dock-tip-mark svg { width: 22px; height: 22px; }
-.dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--fb-color); color: var(--fb-ink); font-size: 13px; font-weight: 600; }
-.dock-tip-mark .glyph.fallback svg { width: 16px; height: 16px; }
 .dock-tip.show { opacity: 1; }
 body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; }
 @media (prefers-reduced-motion: reduce) { .dock-tip { transition: none; } }
@@ -2975,3 +2970,21 @@ body.stack-open .dock-tip { opacity: 0 !important; visibility: hidden; }
 .stack-item.stack-widget-small > .tile.widget.in-flyout { --size: 72px !important; }
 .stack-item.stack-widget-small { padding: 6px 4px 8px; }
 .tile.app-wide .aw-media.aw-idle .w-controls { display: none; }
+
+/* Group view drop-down (WinUI ComboBox): the list opens inside the group,
+   exactly as wide as its field, with the chosen size marked by the accent. */
+.group-view-field { position: relative; }
+.group-view-button { flex: 1; min-width: 0; height: 34px; display: flex; align-items: center; gap: 6px; padding: 0; color: var(--ink); background: transparent; border: 0; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+.group-view-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-view-chevron { display: flex; color: var(--ink-2); transition: transform var(--dur-2) var(--ease); }
+.group-view-chevron svg { width: 12px; height: 12px; }
+.group-view-button[aria-expanded="true"] .group-view-chevron { transform: rotate(180deg); }
+.group-view-list { position: fixed; z-index: 2147483000; box-sizing: border-box; padding: 4px; display: grid; gap: 2px; background: var(--layer-strong, var(--bg)); border: 1px solid var(--stroke-flyout, var(--stroke)); border-radius: var(--r-overlay, 8px); box-shadow: var(--shadow-flyout, 0 8px 16px rgba(0, 0, 0, .28)); animation: group-view-in var(--dur-2) var(--ease-out, ease-out); }
+.group-view-list[hidden] { display: none; }
+.group-view-option { position: relative; padding: 7px 10px 7px 14px; font-size: 12px; color: var(--ink); border-radius: var(--r-control, 4px); cursor: pointer; outline: none; }
+.group-view-option:hover, .group-view-option:focus-visible { background: var(--hover); }
+.group-view-option:focus-visible { box-shadow: inset 0 0 0 2px var(--focus-ring, var(--accent)); }
+.group-view-option[aria-selected="true"] { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.group-view-option[aria-selected="true"]::before { content: ""; position: absolute; left: 4px; top: 50%; width: 3px; height: 14px; translate: 0 -50%; border-radius: 2px; background: var(--accent); }
+@keyframes group-view-in { from { opacity: 0; translate: 0 -4px; } }
+@media (prefers-reduced-motion: reduce) { .group-view-list { animation: none; } }

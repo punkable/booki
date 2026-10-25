@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release98(), release97(), release96(), release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release100(), release98(), release97(), release96(), release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -217,6 +217,13 @@ function release97() {
 }
 
 export function currentRelease() {
+  return { version: "1.0.1", date: "2026-10-25", headline: t("release101.headline"), sections: [
+    { icon: "grid", title: t("release100.widgetsTitle"), notes: [t("release101.groups"), t("release101.widgets"), t("release101.media")] },
+    { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release101.editor"), t("release101.ai")] },
+    { icon: "shield", title: t("release100.reliabilityTitle"), notes: [t("release101.volume"), t("release101.fixes")] },
+  ] };
+}
+function release100() {
   return { version: "1.0.0", date: "2026-10-25", headline: t("release100.headline"), sections: [
     { icon: "grid", title: t("release100.widgetsTitle"), notes: [t("release100.board"), t("release100.appCards"), t("release100.connectivity")] },
     { icon: "eye", title: t("release100.behaviorTitle"), notes: [t("release100.behavior"), t("release100.notch"), t("release100.exceptions")] },

@@ -104,14 +104,15 @@ for (const [theme, tint, expected] of [['dark', '#f3f3f3', 'rgb(27, 27, 27)'], [
   test(`group view commands retain readable ink with ${theme} theme and ${tint} glass`, async () => {
     const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ theme, surfaceStyle: 'glass', surfaceColor: tint, pinned: [group] }) });
     await page.locator('[data-id=g]').click();
-    const view = page.locator('.group-toolbar select');
+    const view = page.locator('.group-view-button');
     assert.equal(await view.evaluate(el => getComputedStyle(el).color), expected);
     assert.equal(await view.evaluate(el => getComputedStyle(el).getPropertyValue('--focus-ring').trim()), expected === 'rgb(27, 27, 27)' ? '#1b1b1b' : '#f2f2f2');
-    const option = await view.locator('option').first().evaluate(el => ({ ink: getComputedStyle(el).color, fill: getComputedStyle(el).backgroundColor }));
+    await view.click();
+    const option = await page.locator('.group-view-option').first().evaluate(el => ({ ink: getComputedStyle(el).color, fill: getComputedStyle(el.parentElement).backgroundColor }));
     assert.equal(option.ink, expected); assert.notEqual(option.ink, option.fill);
     assert.notEqual(option.fill, 'rgba(0, 0, 0, 0)');
     await page.keyboard.press('Escape');
-    await page.locator('[data-id=g]').dispatchEvent('contextmenu', { clientX: 400, clientY: 400 });
+    await page.locator('#dock > [data-id=g]').dispatchEvent('contextmenu', { clientX: 400, clientY: 400 });
     await page.getByRole('menuitem', { name: 'Organize', exact: true }).click();
     const buttons = page.locator('#ctx-menu button');
     assert.ok(await buttons.count() > 2);

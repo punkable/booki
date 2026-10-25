@@ -20,10 +20,10 @@ import { reframe, applyFrame } from "./frame.js";
 import { eachWidget, tickProductivity, cacheWidgetEls, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { persist } from "./config-sync.js";
-import { closeStack } from "./stack.js";
+import { closeStack, openStack } from "./stack.js";
 import { closeMenu } from "./menu-core.js";
 
-export function closeProductivityPanel() {
+export function closeProductivityPanel({ back = false } = {}) {
   // Give keyboard focus back to the tile that opened the panel.
   const panel = S.productivityPanel;
   if (panel?._opener?.isConnected && panel.contains(document.activeElement)) panel._opener.focus();
@@ -31,9 +31,19 @@ export function closeProductivityPanel() {
   S.productivityPanel = null; S.pinnedReveal = false;
   cacheWidgetEls(); syncPolls();
   if (!panel) { reframe(); scheduleHide(); return; }
+  const group = panel._returnGroup && S.cfg.pinned.find((pin) => pin.id === panel._returnGroup);
+  const groupTile = group && dockEl.querySelector(`.tile[data-id="${group.id}"]`);
+  if (back && groupTile && !S.hiddenState) {
+    // Back to the group the widget lives in; the group closes on its own terms.
+    dismissFlyout(panel);
+    openStack(groupTile, group);
+    return;
+  }
   // Leave the way a folder flyout leaves, then shrink the window.
   dismissFlyout(panel, () => { reframe(); scheduleHide(); });
 }
+/** Close from the panel itself (× or Escape): back to its group, if any. */
+const closeBack = () => closeProductivityPanel({ back: true });
 /** Fade a flyout out along its entry path, then remove it. */
 function dismissFlyout(panel, done) {
   panel.classList.remove("is-open"); panel.classList.add("is-closing");
@@ -76,7 +86,7 @@ export function openProductivity(item, tile) {
       if (!(await persist({}, { showError: false }))) throw new Error("widget changes could not be saved");
       draft.style = structuredClone(findPinnedById(draft.id)?.style || next);
       tickProductivity();
-    }, weatherSearch: dockApi.weatherSearch, close: closeProductivityPanel,
+    }, weatherSearch: dockApi.weatherSearch, close: closeBack,
   });
   mountWidgetPanel(item, tile, panel);
 }
@@ -84,7 +94,7 @@ export function openSystemPanel(item, tile) {
   // A second click on the tile that opened the panel closes it, as with a folder.
   if (!item.url && S.productivityPanel && S.productivityPanel._opener === tile && S.productivityPanel._itemId === item.id) { closeProductivityPanel(); return; }
   closeProductivityPanel();
-  mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeProductivityPanel }));
+  mountWidgetPanel(item, tile, buildSystemPanel(item, { close: closeBack }));
 }
 export function openWidgetHub() {
   closeProductivityPanel();
@@ -103,7 +113,10 @@ function placeWidgetPanel(panel, tile) {
 }
 function mountWidgetPanel(item, tile, panel) {
   // One flyout at a time: a widget panel replaces an open folder or menu.
+  // Opened from inside a group, closing it goes back to that group.
+  const fromGroup = S.stackOpen && S.cfg.pinned.find((pin) => pin.id === S.stackItemId && pin.kind === "group");
   closeStack(); closeMenu();
+  if (fromGroup) panel._returnGroup = fromGroup.id;
   panel._opener = tile; panel._itemId = item.id; panel.tabIndex = -1;
   if (item.id !== "__widgets") {
     const settings = document.createElement("button"); settings.type = "button"; settings.className = "stack-close widget-settings-action";
@@ -113,7 +126,7 @@ function mountWidgetPanel(item, tile, panel) {
     settings.addEventListener("click", () => dockApi.openWidgetSettings(item.id));
     const head = panel.querySelector(".productivity-head"); head?.insertBefore(settings, head.lastElementChild);
   }
-  panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeProductivityPanel(); });
+  panel.addEventListener("keydown", (event) => { event.stopPropagation(); if (event.key === "Escape") closeBack(); });
   S.productivityPanel = panel; document.body.appendChild(panel); S.pinnedReveal = true; cacheWidgetEls(); syncPolls(); applyFrame();
   const place = () => {
     if (!panel.isConnected) return;

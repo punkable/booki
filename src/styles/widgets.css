@@ -525,15 +525,20 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 @media (prefers-reduced-motion: reduce) { .w-ring-ico.w-glyph-swap { animation: none; } }
 
 .system-widget-panel { width: min(400px, calc(100vw - 24px)); }
-.app-volume-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px auto 20px; gap: 6px 10px; align-items: center; margin: 16px 0; font-size: 12px; }
-.app-volume-row > span:first-child { grid-column: 1 / 3; grid-row: 1; }
+/* Windows 11 mixer row: icon, name over its slider, value, mute, all inside
+   the panel (no column wider than the room, so nothing is cut off). */
+.app-volume-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 40px 28px; gap: 4px 10px; align-items: center; margin: 12px 0; font-size: 12px; min-width: 0; }
+.app-volume-icon { grid-column: 1; grid-row: 1 / 3; display: grid; place-items: center; width: 28px; height: 28px; color: var(--ink-2); }
+.app-volume-icon img, .app-volume-icon svg { width: 24px; height: 24px; object-fit: contain; }
+.app-volume-row .app-volume-name { grid-column: 2 / 4; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-volume-row .mute-toggle { grid-column: 4; grid-row: 1 / 3; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink-2); cursor: pointer; }
 .app-volume-row .mute-toggle:hover { background: var(--hover); color: var(--ink); }
 .app-volume-row .mute-toggle[aria-pressed="true"] { color: var(--danger-text); }
 .app-volume-row .mute-toggle svg { width: 16px; height: 16px; }
-.app-volume-row input[type="range"] { grid-column: 1 / 3; grid-row: 2; padding: 0; border: 0; }
-.app-volume-row output { grid-column: 3; grid-row: 2; text-align: right; font-variant-numeric: tabular-nums; min-width: 4ch; }
-.app-volume-row > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.app-volume-row input[type="range"] { grid-column: 2; grid-row: 2; min-width: 0; padding: 0; border: 0; }
+.app-volume-row output { grid-column: 3; grid-row: 2; text-align: right; font-variant-numeric: tabular-nums; }
+.app-volume-row .plugin-action-error { grid-column: 2 / -1; }
+.system-widget-sections { overflow-x: hidden; }
 .app-volume-row input[type="range"] { width: 100%; height: 4px; appearance: none; -webkit-appearance: none; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--pct, 0%), var(--ctrl-strong-stroke) var(--pct, 0%)); }
 .app-volume-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 4px solid var(--layer-strong, #fff); box-shadow: 0 0 0 1px var(--ctrl-stroke); transition: border-width var(--dur-2) var(--ease); }
 .app-volume-row input[type="range"]:hover::-webkit-slider-thumb { border-width: 3px; }

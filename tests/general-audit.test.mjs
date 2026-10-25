@@ -7,6 +7,8 @@ test.after(async () => { await browser.close(); srv.close(); });
 const group = { id: 'g', kind: 'group', name: 'Work', children: [{ id: 'a', kind: 'app', name: 'Editor', path: 'C:/editor.exe' }] };
 const signal = (page, name, payload = null) => page.evaluate(([name, payload]) => { for (const cb of window.__listeners[name] || []) cb({ payload }); }, [name, payload]);
 
+const pickView = async (page, value) => { await page.locator('.group-view-button').click(); await page.locator(`.group-view-option[data-value="${value}"]`).click(); };
+
 test('a failed placement preview leaves the preference saved and raises no unhandled rejection', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html', { initScript: `
     const old=window.__TAURI__.core.invoke;window.previews=0;
@@ -64,13 +66,12 @@ test('failure of an earlier density save does not discard a newer group view dur
       return old(cmd,args);
     };` });
   await page.locator('[data-id=g]').click();
-  const view = page.locator('.group-toolbar select');
-  await view.selectOption('small');
+  await pickView(page, 'small');
   await waitForAsyncCondition(page, () => !!window.rejectSave);
-  await view.selectOption('large');
+  await pickView(page, 'large');
   await page.evaluate(() => { window.failRead=true; window.rejectSave(new Error('save unavailable')); });
   await waitForAsyncCondition(page, async () => (await window.nativeConfig()).pinned[0].style?.groupView === 'large');
-  assert.equal(await view.inputValue(), 'large');
+  assert.equal(await page.locator('.stack-grid').getAttribute('data-view'), 'large');
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -143,11 +144,10 @@ test('a failed cross-window broadcast does not undo or report a durable group pr
   const { page, errors } = await openPage(browser, port, 'index.html', { cfg: makeConfig({ pinned: [group] }), initScript: `
     window.__TAURI__.event.emit=(name)=>name==='booki://config-changed'?Promise.reject(new Error('event channel unavailable')):Promise.resolve();` });
   await page.locator('[data-id=g]').click();
-  const view = page.locator('.group-toolbar select');
-  await view.selectOption('small');
+  await pickView(page, 'small');
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned[0].style?.groupView === 'small');
   await page.waitForTimeout(150);
-  assert.equal(await view.inputValue(), 'small');
+  assert.equal(await page.locator('.stack-grid').getAttribute('data-view'), 'small');
   assert.equal(await page.locator('#undo-toast:not(.hidden)').count(), 0);
   assert.deepEqual(errors, []); await page.close();
 });

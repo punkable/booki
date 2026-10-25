@@ -140,7 +140,7 @@ test("group search preserves live cells and Ctrl+wheel changes a persisted Explo
   assert.equal(await page.locator("#stack .stack-grid").getAttribute("data-view"), "large");
   await page.keyboard.press("Escape");
   assert.equal(await page.getByRole("searchbox", { name: "Search this group" }).inputValue(), "");
-  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  await page.getByRole("button", { name: "Group view" }).click(); await page.getByRole("option", { name: "List" }).click();
   await page.locator("#stack .stack-head > .stack-close").last().click();
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke("get_config")).pinned[0].style?.groupView === "list");
   await page.locator('#dock > [data-id="group"]').click();
@@ -184,7 +184,7 @@ test("groups retain search across reopening and keyboard navigation follows visi
   await page.locator('#dock > [data-id="group"]').click();
   const search = page.getByRole("searchbox", { name: "Search this group" });
   await search.fill("App 1");
-  await page.getByRole("combobox", { name: "Group view" }).selectOption("list");
+  await page.getByRole("button", { name: "Group view" }).click(); await page.getByRole("option", { name: "List" }).click();
   const first = page.locator('#stack .stack-item:visible').first();
   await first.focus();
   await page.keyboard.press("ArrowDown");

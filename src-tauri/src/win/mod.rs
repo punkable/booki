@@ -82,6 +82,9 @@ pub use stub::{
 pub struct AppVolume {
     pub id: String,
     pub name: String,
+    /// Program path, for its icon (empty for the system sounds session).
+    #[serde(default)]
+    pub path: String,
     pub percent: u32,
     pub muted: bool,
 }

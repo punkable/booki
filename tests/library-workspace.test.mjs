@@ -52,6 +52,7 @@ test('folder navigation stays inside Booki and back restores the previous direct
 test('widget gallery previews a draft and commits its appearance only when added', async () => {
   const { page, errors } = await openPage(browser, port, 'settings.html', { viewport: { width: 520, height: 720 } });
   await page.getByRole('navigation').getByRole('button', { name: 'Widgets', exact: true }).click();
+  await page.getByRole('button', { name: 'Add widget' }).first().click();
   await page.locator('.catalog-card', { hasText: 'Clock' }).first().click();
   assert.equal(await page.locator('.modal[role="dialog"]').count(), 0);
   assert.equal(await page.evaluate(async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length), 0);
@@ -122,7 +123,7 @@ test('dragging in the dock editor makes groups, files apps into them and takes t
   // the strip takes it out of the group.
   await groupPin.locator('button').first().click();
   await page.locator('.library-pin-strip.in-group').waitFor();
-  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-page'), { targetPosition: { x: 200, y: 60 } });
+  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.group-hero-text'));
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 2);
   rows = await pinned();
   assert.deepEqual(rows.map((p) => p.id).slice(1), ['gamma']);
@@ -303,6 +304,7 @@ test('library keeps one compact editable dock, and an item opens as its own page
 test('widget filtering narrows the gallery and a widget opens as its own page', async () => {
   const {page,errors}=await openPage(browser,port,'settings.html',{viewport:{width:1280,height:850}});
   await page.getByRole('navigation').getByRole('button',{name:'Widgets',exact:true}).click();
+  await page.getByRole('button',{name:'Add widget'}).first().click();
   const search=page.getByRole('searchbox',{name:'Search widgets',exact:true});
   await search.fill('focus');
   assert.equal(await page.locator('.catalog-card').count(),1);
@@ -312,7 +314,7 @@ test('widget filtering narrows the gallery and a widget opens as its own page', 
   await page.locator('.inspector').getByRole('button',{name:'Add',exact:true}).click();
   await waitForAsyncCondition(page, async()=>{const cfg=await window.__TAURI__.core.invoke('get_config');return cfg.pinned.some(item=>item.widget==='focus' && item.style.variant==='solid');});
   await page.locator('.ui-breadcrumb-parent').click();
-  await page.locator('.catalog-grid').waitFor();
+  await page.locator('.widgets-on-dock-item').first().waitFor();
   assert.deepEqual(errors,[]);await page.close();
 });
 

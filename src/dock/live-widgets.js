@@ -30,7 +30,7 @@ import {
 import { S } from "./state.js";
 import { dockKeys } from "./dom.js";
 import { widgetLabel, findWidgetPin } from "./helpers.js";
-import { ownsMedia } from "./app-widgets.js";
+import { ownsMedia, mediaSourcePin } from "./app-widgets.js";
 import { fitDock, reframe } from "./frame.js";
 
 // Calls into modules that import this one. dock.js wires them before boot, so
@@ -296,7 +296,10 @@ const PROVIDER_ICON = { claude: "ai-claude", chatgpt: "ai-openai", codex: "ai-op
 function paintAi(providers) {
   eachWidget("ai", (el) => {
     const style = findWidgetPin(el.dataset.id)?.style || {};
-    const available = style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false);
+    const quota = (provider) => !style.quotaOnly || (provider.windows || []).length > 0;
+    // "Only with quota" hides the rest without removing them: one that starts
+    // reporting its plan appears again by itself.
+    const available = (style.provider ? providers.filter((provider) => provider.id === style.provider) : providers.filter((provider) => provider.detected !== false)).filter(quota);
     const urgent = available.filter((provider) => ["waiting", "error"].includes(aiStages.get(provider.id)));
     const working = available.filter((provider) => aiStages.get(provider.id) === "working");
     const shown = urgent.length ? urgent : working.length ? working : available;
@@ -453,8 +456,10 @@ const pollMedia = singleFlight(async () => {
       setMediaToggle(toggle, false);
       return;
     }
-    setMediaText(el, m.artist || t("w.media"), m.title || "—");
-    setTileLabel(el, [m.title, m.artist].filter(Boolean).join(" — ") || t("w.media"));
+    // The standalone widget takes the identity of the app that is playing.
+    const owner = el.dataset.appId ? null : mediaSourcePin(m.source, S.cfg?.pinned || []);
+    setMediaText(el, m.artist || owner?.name || t("w.media"), m.title || "—");
+    setTileLabel(el, [m.title, m.artist, owner?.name].filter(Boolean).join(" — ") || t("w.media"));
     el.classList.toggle("playing", !!m.playing);
     setMediaToggle(toggle, !!m.playing);
     if (art && m.thumb) {
@@ -467,6 +472,13 @@ const pollMedia = singleFlight(async () => {
       }
       art.style.display = "block";
       if (ico) ico.style.display = "none";
+    } else if (art && owner?.path) {
+      // No artwork: show the playing app's own icon rather than a note glyph.
+      const key = `app:${owner.path}`;
+      if (art.dataset.src !== key) {
+        art.dataset.src = key;
+        dockApi.appIcon(owner.path).then((src) => { if (src && art.dataset.src === key) { art.src = src; art.style.opacity = "1"; art.style.display = "block"; if (ico) ico.style.display = "none"; } }).catch(() => {});
+      }
     } else if (art) {
       // Playing something with no artwork → don't leave the previous track's
       // cover showing; fall back to the widget icon.

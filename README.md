@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_x64-setup.exe"><b>Download for Windows v1.0.0 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.0/Booki_1.0.0_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v1.0.0.md">What's new v1.0.0</a>
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.1/Booki_1.0.1_x64-setup.exe"><b>Download for Windows v1.0.1 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.1/Booki_1.0.1_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.1/Booki_1.0.1_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v1.0.1.md">What's new v1.0.1</a>
 </p>
 <!-- booki:download:end -->
 
@@ -104,26 +104,23 @@
 <p align="center"><img src="docs/presentation/diagram-ai-privacy.svg" width="960" alt="AI usage stays on your PC: Booki reads only local session logs and, if you opt in, Claude Code's status line and agent hook events; never sign-ins, tokens, credential files or the network" /></p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v1.0.0, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v1.0.1, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 1.0.0
+## What's new in 1.0.1
 
-Booki 1.0: your dock, finally alive. Groups that work as a widget board, apps that show what they're doing and a dynamic notch in every mode.
+Booki 1.0.1: polish where you spend your day. Groups that stay open, a volume mixer with real names and clearer editors.
 
-- A group with widgets opens like the Windows Widgets board: small, medium or wide cards (right-click), mixed with apps in the order you drag them, with the rest gliding aside as you move one.
-- Show a pinned app as a live card (right-click › Show as widget): your player with the song and its controls, your browser with its windows and new or private window buttons.
-- New Wi‑Fi, Bluetooth and Windows Settings widgets, and a notice when headphones or another device connect or disconnect.
-- Behaviour rebuilt with illustrated cards: when it hides, how it comes back and what stays while hidden, without one option silently changing others. Pointing at the notch waits 0.3 s (adjustable).
-- The dynamic notch (music, timer, battery, volume, agents) now also works with “point at the notch”, you choose what it shows, and over a maximized app it still shows what's urgent.
-- Exceptions: hide in fullscreen and apps the dock always steps aside for.
-- A new About tab with what's new, help, links and support; System keeps the settings.
-- No double border when hovering widgets and groups, rings with icon and number kept apart and lighter catalog buttons.
-- If Windows' media service stalls, widgets no longer freeze: every query has a time limit and the buttons never wait behind it.
-- Fixes: the player card no longer controls another app's music, the exception list applies at once, an open group no longer shows a ghost label behind it and grouped widgets keep their layout with the dock on a side edge.
+- Closing a widget you opened from a group takes you back to the group, and changing the group's icon size no longer closes it; its list matches the button.
+- The Widgets page works like Apps & folders: your widgets as compact cards and the catalog in an “Add widget” dialog.
+- The Media widget takes on the app that's playing when you have it pinned: its name, its icon when there's no artwork and a button to open it.
+- The group editor looks like a Windows 11 folder: a big icon that opens colour and icon, the name edited in the title and actions on the right.
+- AI usage: a “Only those that show a quota” option; the rest come back on their own once they report one. Claude explains that only Claude Code in a terminal shares plan usage.
+- Volume mixer with each app's real name (not its browser engine's), its icon and mute buttons no longer cut off.
+- The hover label no longer builds a hidden icon each time, and the README clips were recorded on a real-looking desktop.
 
-[Full release notes](docs/releases/v1.0.0.md)
+[Full release notes](docs/releases/v1.0.1.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -139,9 +136,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [1.0.0](docs/releases/v1.0.0.md) | Booki 1.0: your dock, finally alive. Groups that work as a widget board, apps that show what they're doing and a dynamic notch in every mode. |
 | [0.98.0](docs/releases/v0.98.0.md) | Clearer Settings, like Windows 11: each widget and dock item gets its own page, colours use Booki's palette, and the dock no longer blocks clicks on half the screen. |
 | [0.97.0](docs/releases/v0.97.0.md) | Booki now understands your AI agents better: Claude's real plan usage and exact states for Claude Code, Codex, Gemini CLI and Cursor, plus flicker-free glass and Windows 11 controls. |
-| [0.96.0](docs/releases/v0.96.0.md) | Windows 11 acrylic glass for each theme, a new widget gallery, smooth motion at any refresh rate and plugin updates. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->

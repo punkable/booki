@@ -32,6 +32,26 @@ export function ownsMedia(item, source) {
   return (!!exe && src.includes(exe)) || (!!name && src.replace(/\s+/g, "").includes(name));
 }
 
+/** The pinned app (groups included) that owns the media session, if any:
+ *  the Media widget becomes that app instead of a generic player. */
+export function mediaSourcePin(source, items = []) {
+  for (const item of items) {
+    if (item?.kind === "app" && ownsMedia(item, source)) return item;
+    const child = item?.children && mediaSourcePin(source, item.children);
+    if (child) return child;
+  }
+  return null;
+}
+
+/** Bring up the app that is playing: its pin, else a Store app by its
+ *  AppUserModelID. false when nothing can be opened. */
+export function openMediaSource(source, items = []) {
+  const pin = mediaSourcePin(source, items);
+  if (pin) { dockApi.launch(pin.path, pin.args || []).catch(() => {}); return true; }
+  if (source && source.includes("!")) { dockApi.launch(`shell:AppsFolder\\${source}`, []).catch(() => {}); return true; }
+  return false;
+}
+
 // Private-window flag per browser, for the card's second button.
 const PRIVATE_FLAGS = [[/msedge/, "--inprivate"], [/firefox|librewolf|waterfox|floorp|zen/, "--private-window"], [/opera/, "--private"], [/chrome|brave|vivaldi/, "--incognito"]];
 export function privateFlag(item) {

@@ -305,8 +305,12 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
   if (selected && !candidate) return <>
     <BreadcrumbHeader parent={t('overhaul.appsFolders')} title={pinLabel(selected)} onBack={backToList} />
     {error && <p role="alert">{error}</p>}
+    {selected.kind === 'group' && <GroupHero item={selected} count={selected.children?.length || 0} moreItems={moreItems}
+      onRename={(name) => set({ pinned: updatePin(latest.current.pinned, selected.id, { name }) })}
+      onLook={(style) => commit(updatePin(latest.current.pinned, selected.id, { style }))}
+      onIcon={() => pickIcon(selected)} onAdd={() => addInto(selected.id)} />}
     {selected.kind === 'group' && openGroup?.id === selected.id && editor}
-    <div className="library-inspector library-page" tabIndex={-1}>
+    {selected.kind !== 'group' && <div className="library-inspector library-page" tabIndex={-1}>
 
           <div className="library-detail-head">
             <PreviewPin item={selected} size={48} gap={6} />
@@ -346,7 +350,7 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
               </div>
             </div>}
           </div>
-    </div>
+    </div>}
     {dialogs}
   </>;
   return <>
@@ -366,6 +370,39 @@ export function LibraryWorkspace({ cfg, set, listInstalled, focusedPin, iconPick
     {editor}
     {dialogs}
   </>;
+}
+
+/** A group's page header, like a folder in Windows 11: its big icon (click
+ *  it for colour and icon), its name edited in place, how many items it
+ *  holds, and its actions. No boxes around each setting. */
+function GroupHero({ item, count, moreItems, onRename, onLook, onIcon, onAdd }) {
+  const [looking, setLooking] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!looking) return undefined;
+    const away = (event) => { if (!ref.current?.contains(event.target)) setLooking(false); };
+    const key = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setLooking(false); ref.current?.querySelector('.group-hero-icon')?.focus(); } };
+    document.addEventListener('pointerdown', away); document.addEventListener('keydown', key, true);
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key, true); };
+  }, [looking]);
+  return <header className="group-hero" ref={ref}>
+    <button type="button" className="group-hero-icon" aria-haspopup="dialog" aria-expanded={looking} aria-label={t('library.appearance')} title={t('library.appearance')} onClick={() => setLooking(!looking)}>
+      <PreviewPin item={item} size={72} gap={8} />
+      <span className="group-hero-edit" aria-hidden="true"><Icon name="pencil" /></span>
+    </button>
+    {looking && <div className="group-hero-look" role="dialog" aria-label={t('library.appearance')}>
+      <GroupLook key={item.id} item={item} onChange={onLook} />
+      {!item.style?.glyph && <button className="button" onClick={() => { setLooking(false); onIcon(); }}><Icon name="palette" />{t('apps.changeIcon')}</button>}
+    </div>}
+    <div className="group-hero-text">
+      <input className="group-hero-name" aria-label={t('apps.rename')} value={item.name || ''} placeholder={t('group.new')} maxLength={80} onChange={(event) => onRename(event.target.value)} />
+      <p>{t('library.groupItems').replace('{n}', () => String(count))}</p>
+    </div>
+    <div className="group-hero-actions">
+      <button type="button" className="button button-accent" onClick={onAdd}><Icon name="plus" />{t('library.addHere')}</button>
+      <Menu label={t('library.more')} icon="more" iconOnly items={moreItems} />
+    </div>
+  </header>;
 }
 
 /** WinUI ContentDialog for adding apps, folders and sites: the catalog no
