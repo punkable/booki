@@ -1,6 +1,5 @@
-/* System: everything that is about Booki rather than the dock's look —
-   language, startup, shortcuts, updates, profiles and backups, privacy,
-   help and about. */
+/* System and About. System: language, startup, shortcuts, updates, profiles,
+   privacy and reset. About: what Booki is, help, links and support. */
 import React, { useEffect, useState } from "react";
 import { dock as dockApi, pickSavePath } from "../../api.js";
 import { t, curLang } from "../../i18n.js";
@@ -75,8 +74,7 @@ function ResetButton({ onReset }) {
   }}>{armed ? t("ab.resetConfirm") : t("act.reset")}</button>;
 }
 
-export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
-  const open = (url) => dockApi.launch(url);
+export function SystemPage({ cfg, set, store }) {
   return <>
     <PageHeader title={t("overhaul.system")}>{t("system.pageHint")}</PageHeader>
 
@@ -117,10 +115,17 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       <Diagnostics />
     </SettingsSection>
 
-    <CollapsibleSection title={t("faq.title")} hint={t("faq.intro")}>
-      {FAQ.map((key) => <details className="faq-item" key={key}><summary>{t(`faq.q.${key}`)}<Icon name="chevron-down" /></summary><p>{t(`faq.a.${key}`)}</p></details>)}
-    </CollapsibleSection>
+    <SettingsSection icon="alert-triangle" title={t("ab.danger")}>
+      <Row label={t("act.reset")} hint={t("ab.resetHint")}><ResetButton onReset={store.reset} /></Row>
+    </SettingsSection>
+  </>;
+}
 
+/** About: what Booki is, what changed, where to get help, and how to support it. */
+export function AboutPage({ version, onWhatsNew }) {
+  const open = (url) => dockApi.launch(url);
+  return <>
+    <PageHeader title={t("ab.title")}>{t("ab.tagline")}</PageHeader>
     <SettingsSection icon="info" title={t("ab.title")}>
       <div className="about">
         <img className="about-logo" src={isotype} alt="" />
@@ -138,10 +143,11 @@ export function SystemPage({ cfg, set, version, store, onWhatsNew }) {
       </div>
     </SettingsSection>
 
+    <CollapsibleSection title={t("faq.title")} hint={t("faq.intro")}>
+      {FAQ.map((key) => <details className="faq-item" key={key}><summary>{t(`faq.q.${key}`)}<Icon name="chevron-down" /></summary><p>{t(`faq.a.${key}`)}</p></details>)}
+    </CollapsibleSection>
+
     <CollapsibleSection title={t("ab.free")} hint={t("ab.donateHint").replace(/\s*[:：]\s*$/, "")}><Donate /></CollapsibleSection>
 
-    <SettingsSection icon="alert-triangle" title={t("ab.danger")}>
-      <Row label={t("act.reset")} hint={t("ab.resetHint")}><ResetButton onReset={store.reset} /></Row>
-    </SettingsSection>
   </>;
 }

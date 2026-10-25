@@ -19,7 +19,7 @@ const SEARCH_INDEX = [
   ["plugins.title", "plugins"], ["tab.widgets", "widgets"], ["overhaul.appsFolders", "apps"],
   ["ap.language", "system"], ["be.autostart", "system"], ["sc.toggle", "system"], ["sc.launcher", "system"], ["autoProf.title", "system"], ["sc.positions", "system"],
   ["ab.updates", "system"], ["tab.profiles", "system"], ["gen.captureVisible", "system"], ["gen.ctxMenu", "system"],
-  ["overhaul.diagnostics", "system"], ["faq.title", "system"], ["ab.title", "system"], ["act.reset", "system"],
+  ["overhaul.diagnostics", "system"], ["faq.title", "about"], ["ab.title", "about"], ["act.reset", "system"],
 ];
 
 // Rows that only show under another setting (auto-hide on, glass finish,
