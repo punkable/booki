@@ -123,7 +123,7 @@ test('dragging in the dock editor makes groups, files apps into them and takes t
   // the strip takes it out of the group.
   await groupPin.locator('button').first().click();
   await page.locator('.library-pin-strip.in-group').waitFor();
-  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.library-page'), { targetPosition: { x: 200, y: 60 } });
+  await page.locator('.library-pin').filter({ hasText: 'Gamma' }).dragTo(page.locator('.group-hero-text'));
   await waitForAsyncCondition(page, async () => (await window.__TAURI__.core.invoke('get_config')).pinned.length === 2);
   rows = await pinned();
   assert.deepEqual(rows.map((p) => p.id).slice(1), ['gamma']);
