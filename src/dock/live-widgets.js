@@ -45,6 +45,7 @@ export function cacheWidgetEls() {
   // Bar widgets always; grouped widgets ONLY while their flyout is actually open.
   // The flyout keeps its DOM after closing (until the next open), so gate on
   // stackOpen — otherwise the poll would keep updating hidden grouped widgets.
+  // Group tiles on the bar carry small live copies of their widgets too.
   const sel = S.stackOpen ? ".dock .tile.widget, #stack .tile.widget" : ".dock .tile.widget";
   document.querySelectorAll(sel + (S.productivityPanel?.classList.contains("widget-hub") ? ", .widget-hub:not(.is-closing) .tile.widget" : "")).forEach((el) => {
     const w = el.dataset.widget || "";

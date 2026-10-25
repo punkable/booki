@@ -936,6 +936,19 @@ fn looks_like_code(exe: &str) -> bool {
 
 /// What the person is doing in the foreground window: video, a creative app,
 /// code, a game, or the desk. Video wins over a creative word in the title.
+/// File name of the foreground window's program, lowercased ("code.exe"),
+/// so the dock can stay tucked away over apps the person listed.
+pub fn foreground_exe() -> String {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return String::new();
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+    let path = unsafe { process_image_path(pid) }.unwrap_or_default();
+    path.rsplit(['\\', '/']).next().unwrap_or("").to_lowercase()
+}
+
 pub fn foreground_place() -> &'static str {
     let hwnd = unsafe { GetForegroundWindow() };
     if hwnd.0.is_null() {

@@ -678,6 +678,12 @@ fn foreground_is_video() -> bool {
     win::foreground_is_video()
 }
 
+/// Program file name of the foreground window, for per-app auto-hide.
+#[tauri::command]
+fn foreground_exe() -> String {
+    win::foreground_exe()
+}
+
 /// video, creative, code, game, or desk. One look, so the notch does not
 /// ask four times.
 #[tauri::command]
@@ -1660,6 +1666,7 @@ pub fn run() {
             foreground_is_code,
             foreground_is_video,
             foreground_place,
+            foreground_exe,
             plugin_catalog,
             plugin_tools::plugin_read,
             plugin_tools::plugin_open,

@@ -7,12 +7,9 @@ import { setTileLabel } from "./tooltip.js";
 import { widgetWidth } from "./layout-model.js";
 import { icon } from "../icons.js";
 import { isotype } from "../brand-mark.js";
-import { emo } from "../emoji.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "../icon-library.js";
 import { t } from "../i18n.js";
 import {
-  WIDGET_ICONS,
-  WIDGET_GLYPHS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   WIDGET_META,
@@ -243,8 +240,14 @@ function groupTile(item) {
     const mini = document.createElement("span");
     mini.className = "group-mini";
     if (child.kind === "widget") {
-      // A grouped widget previews as its emoji (it only goes live inside the group).
-      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : emo(WIDGET_ICONS[child.widget] || "puzzle", 18);
+      // A grouped widget previews its live value: a small copy of its tile that
+      // the widget polls keep current, like the cards inside the group.
+      mini.classList.add("mini-live");
+      const live = widgetTile(child, { inFlyout: true });
+      live.classList.add("in-group-mini");
+      live.tabIndex = -1;
+      live.setAttribute("aria-hidden", "true");
+      mini.appendChild(live);
     } else if (child.kind === "action" && !child.icon) {
       // Booki's Settings pin keeps its gear inside a group.
       mini.innerHTML = icon("settings");

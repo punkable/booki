@@ -183,7 +183,7 @@ function visibilityState() {
     summoned: S.pinnedReveal,
     draggingFile: S.draggingFile,
     pointerInside: S.pointerInside,
-    focusTuck: focusTuckWanted(),
+    focusTuck: focusTuckWanted() || appTuck,
     capturing: !!S.cfg.captureVisible && S.captureActive,
   };
 }
@@ -252,7 +252,7 @@ export function reveal() {
 // Grace period after leaving the dock; the callback re-checks EVERYTHING so a
 // pointer that came back (or an opened menu) simply cancels the hide.
 export function scheduleHide() {
-  if (hideMode() === "off" && !focusTuckWanted()) return;
+  if (hideMode() === "off" && !focusTuckWanted() && !appTuck) return;
   clearTimeout(S.hideTimer);
   S.hideTimer = setTimeout(tryTuck, S.cfg.autoHideDelay ?? 650);
 }
@@ -353,3 +353,20 @@ onFocusDndChange(() => {
   if (tuck) { S.pinnedReveal = false; if (!S.hiddenState) scheduleHide(); }
   else if (S.hiddenState && decideVisible(visibilityState()) === true) setHidden(false);
 });
+
+// Apps the person listed keep the dock tucked away while they are in front,
+// whatever the mode (Settings > Dock > Behaviour > Exceptions).
+let appTuck = false;
+export async function onForegroundApp() {
+  const list = S.cfg.hideForApps || [];
+  let next = false;
+  if (list.length) {
+    const exe = await dockApi.foregroundExe().catch(() => "");
+    next = !!exe && list.includes(exe);
+  }
+  if (next === appTuck) return;
+  appTuck = next;
+  if (next) { S.pinnedReveal = false; if (!S.hiddenState) scheduleHide(); }
+  else if (S.hiddenState && decideVisible(visibilityState()) === true) setHidden(false);
+}
+dockApi.onSystemChange("foreground", () => { if ((S.cfg?.hideForApps || []).length || appTuck) onForegroundApp(); }).catch(() => {});

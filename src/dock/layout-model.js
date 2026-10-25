@@ -21,8 +21,8 @@ export function chooseFitSize(size, natural, usable, mode = "adapt", minimum = 3
 }
 export const LAYOUT_SCENARIOS = [
   { id: "off", icon: "eye", title: "overhaul.fixed", hint: "overhaul.fixedHint", patch: { autoHideMode: "off" } },
-  { id: "smart", icon: "app", title: "overhaul.smart", hint: "overhaul.smartHint", patch: { autoHideMode: "smart", hideInFullscreen: true } },
-  { id: "edge", icon: "eye-off", title: "overhaul.edge", hint: "overhaul.edgeHint", patch: { autoHideMode: "edge", notchTrigger: "hover", hideInFullscreen: true } },
+  { id: "smart", icon: "app", title: "overhaul.smart", hint: "overhaul.smartHint", patch: { autoHideMode: "smart" } },
+  { id: "edge", icon: "eye-off", title: "overhaul.edge", hint: "overhaul.edgeHint", patch: { autoHideMode: "edge" } },
 ];
 export function countContent(items = []) {
   return items.reduce((sum, item) => {

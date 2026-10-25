@@ -22,6 +22,9 @@ import { cacheWidgetEls, widgetPresent, syncPolls } from "./live-widgets.js";
 import { scheduleHide } from "./autohide.js";
 import { closeMenu } from "./menu-core.js";
 import { widgetTile } from "./render.js";
+
+// Widgets whose read-out needs the whole row of a widget hub.
+const WIDE_HUB_WIDGETS = new Set(["system", "media", "clipboard", "notes", "collector"]);
 import { closeProductivityPanel, openSystemPanel, openWidgetHub, openWidget } from "./widget-editors.js";
 import { addWidget, onAddApp, onAddFolder, addPaths, renameGroup } from "./pin-ops.js";
 
@@ -249,14 +252,24 @@ export async function openStack(tileEl, item) {
       grid.innerHTML = `<div class="stack-empty">${t(isGroup ? "stack.emptyGroup" : "stack.empty")}</div>`;
     }
     let cellIdx = 0;
+    // A group with widgets works as a widget hub: live cards first, apps below.
+    const hasWidgets = isGroup && items.some((it) => it.kind === "widget");
+    grid.classList.toggle("widget-hub-grid", hasWidgets);
+    if (hasWidgets) items = [...items.filter((it) => it.kind === "widget"), ...items.filter((it) => it.kind !== "widget")];
     for (const it of items) {
       // A grouped widget renders as its LIVE read-out (only here, inside the open
-      // group — never on the bar). It spans the row so the card gets full width.
+      // group — never on the bar), as a card two columns wide or the full row.
       if (isGroup && it.kind === "widget") {
         const wCell = document.createElement("div");
-        wCell.className = "stack-item stack-widget";
+        const tile = widgetTile(it, { inFlyout: true });
+        const wide = WIDE_HUB_WIDGETS.has(tile.dataset.widget);
+        wCell.className = "stack-item stack-widget " + (wide ? "stack-widget-wide" : "stack-widget-half");
         wCell.style.setProperty("--i", Math.min(cellIdx++, 6));
-        wCell.appendChild(widgetTile(it, { inFlyout: true }));
+        wCell.appendChild(tile);
+        const name = document.createElement("span");
+        name.className = "stack-widget-name";
+        name.textContent = it.name || widgetLabel(tile.dataset.widget);
+        wCell.appendChild(name);
         wCell.addEventListener("click", (event) => {
           if (wCell._suppressClick || event.target.closest(".w-controls")) return;
           event.stopPropagation();

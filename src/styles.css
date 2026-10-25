@@ -2153,18 +2153,29 @@ body.edge-right .stack.open { transform: none; }
   .clip-guide { font-size: 0.6875rem; }
 }
 
-/* A grouped widget shown live inside the flyout: full-width read-out card. */
+/* A group holding widgets works like the Windows Widgets board: a four-column
+   grid where widgets are cards two columns wide (or the whole row for wide
+   read-outs) and apps take one column below them. */
+.stack-grid.widget-hub-grid { grid-template-columns: repeat(4, minmax(72px, 1fr)); }
 .stack-item.stack-widget {
-  grid-column: 1 / -1;
-  flex-direction: row; align-items: center; justify-content: center;
-  padding: 4px; cursor: default;
+  grid-column: span 2;
+  flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px;
+  padding: 10px; cursor: pointer;
+  background: var(--layer, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--stroke-card, rgba(255, 255, 255, 0.08));
+  border-radius: var(--r-card, 8px);
 }
-.stack-item.stack-widget:hover { background: transparent; transform: none; }
+.stack-item.stack-widget-wide { grid-column: 1 / -1; }
+.stack-item.stack-widget:hover { background: var(--layer-hover, rgba(255, 255, 255, 0.08)); transform: none; }
 .stack-widget .tile.widget.in-flyout {
   position: relative; margin: 0; width: 100%; transform: none !important;
   display: flex; align-items: center; justify-content: center;
 }
 .stack-widget .tile.widget.in-flyout .w-card { width: 100%; }
+.stack-widget-name {
+  font-size: 0.75rem; line-height: 1rem; opacity: 0.72; text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ───────────────────────── Tooltip ───────────────────────── */
 /* Booki-styled hover tooltip (replaces the OS one). Positioned via transform
@@ -2908,3 +2919,13 @@ body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { backgr
 /* An open group or folder covers the labels above the bar; through its
    translucent fill they read as ghost text over the grid. */
 body.stack-open .tile > .label { opacity: 0; transition: none; }
+
+/* A widget inside a group tile previews its live read-out, scaled to the mini cell. */
+.tile.group .group-mini.mini-live { position: relative; overflow: hidden; }
+.tile.group .group-mini .tile.widget.in-group-mini {
+  position: absolute; left: 50%; top: 50%; margin: 0;
+  width: var(--size, 48px); height: var(--size, 48px);
+  transform: translate(-50%, -50%) scale(0.42) !important;
+  pointer-events: none; animation: none;
+}
+.tile.group .group-mini .tile.widget.in-group-mini .label { display: none; }

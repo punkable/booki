@@ -585,6 +585,8 @@ export const dock = {
   openSettings: () => invoke("open_settings"),
   quit: () => invoke("quit"),
   listWindows: () => invoke("list_windows"),
+  /** Lowercased program file name of the foreground window ("code.exe"). */
+  foregroundExe: () => invoke("foreground_exe"),
   focusWindow: (hwnd) => invoke("focus_window", { hwnd }),
   toggleWindow: (hwnd) => invoke("toggle_window", { hwnd }),
   closeWindow: (hwnd) => invoke("close_window", { hwnd }),

@@ -12,7 +12,7 @@ test("dashboard applies scenarios without replacing pins and stays inside a smal
   const navigation = await page.locator(".nav-item").evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().toJSON()));
   assert.ok(navigation.every((rect) => rect.y >= 0 && rect.bottom <= 650), "navigation stays on screen");
   await page.getByRole("navigation").getByRole("button", { name: "Dock", exact: true }).click();
-  await page.getByRole("radio", { name: /^Smart Moves/ }).click();
+  await page.getByRole("radio", { name: /^When a window covers it/ }).click();
   await page.waitForTimeout(300);
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
   assert.equal(saved.autoHideMode, "smart"); assert.deepEqual(saved.pinned, cfg.pinned);
@@ -131,9 +131,10 @@ test("settings preserve edits during a delayed save and an external dock update"
     };
   });
   await page.getByRole("navigation").getByRole("button", { name: "Dock", exact: true }).click();
-  await page.getByRole("radio", { name: /^Smart Moves/ }).click();
+  await page.getByRole("radio", { name: /^When a window covers it/ }).click();
   await page.waitForFunction(() => window.__saving);
-  await page.getByRole("radio", { name: /^Reveal at the edge/ }).click();
+  await page.getByRole("radio", { name: /^Whenever you're not using it/ }).click();
+  await page.getByRole("radio", { name: /^Point at the notch/ }).click();
   await page.evaluate(async () => {
     await window.__TAURI__.core.invoke("save_config", { patch: { pinned: [{ id: "external", kind: "app", name: "External", path: "C:/external.exe" }] } });
     for (const cb of window.__listeners["booki://config-changed"] || []) cb({ payload: null });
@@ -145,7 +146,7 @@ test("settings preserve edits during a delayed save and an external dock update"
   const saved = await page.evaluate(() => window.__TAURI__.core.invoke("get_config"));
   assert.equal(saved.autoHideMode, "edge"); assert.equal(saved.notchTrigger, "hover");
   assert.equal(saved.pinned[0].name, "External");
-  assert.equal(await page.getByRole("radio", { name: /^Reveal at the edge/ }).getAttribute("aria-checked"), "true");
+  assert.equal(await page.getByRole("radio", { name: /^Whenever you're not using it/ }).getAttribute("aria-checked"), "true");
   assert.deepEqual(errors, []); await page.close();
 });
 

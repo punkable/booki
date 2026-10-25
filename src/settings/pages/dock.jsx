@@ -9,8 +9,8 @@ import { resolveSurfaceStyle, translucent } from "../../surface.js";
 import { colorSource, surfaceColor } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
-import { AccentPicker, ColorSourcePicker, PositionPicker, ScenarioPicker, SurfaceColorPicker, positionEdges, positionSlots, slotLabel } from "../controls.jsx";
-import { CollapsibleSection, PageHeader, Row, SegmentedControl, Select, SettingsSection, Slider, Toggle } from "../ui.jsx";
+import { AccentPicker, ColorSourcePicker, PositionPicker, SurfaceColorPicker, positionEdges, positionSlots, slotLabel } from "../controls.jsx";
+import { CollapsibleSection, RadioGroup, PageHeader, Row, SegmentedControl, Select, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
 
@@ -32,16 +32,33 @@ export function DockPage({ cfg, set }) {
 
     {/* What most people change, in the order they reach for it. Everything
         else is one disclosure away, so the page reads at a glance. */}
+    {/* Behaviour answers three separate questions (when it hides, how it comes
+        back, what stays while hidden) instead of mixing them into modes. */}
     <SettingsSection icon="eye" title={t("dock.behavior")}>
-      <div className="row-block"><ScenarioPicker cfg={cfg} set={set} /></div>
-      {hides && <Row label={t("be.reveal")} hint={cfg.notchTrigger === "hover" ? t("be.revealHint") : undefined}>
-        <SegmentedControl value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
-          options={[{ value: "click", label: t("be.revealClick") }, { value: "hover", label: t("be.revealHover") }]} />
+      <RadioGroup label={t("beh.hide")} value={cfg.autoHideMode || "smart"} onChange={(v) => set({ autoHideMode: v })}
+        options={[{ value: "off", label: t("beh.never"), hint: t("beh.neverHint") },
+          { value: "smart", label: t("beh.covered"), hint: t("beh.coveredHint") },
+          { value: "edge", label: t("beh.idle"), hint: t("beh.idleHint") }]} />
+      {hides && <RadioGroup label={t("beh.show")} value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
+        options={[{ value: "click", label: t("beh.click"), hint: t("beh.clickHint") },
+          { value: "hover", label: t("beh.hover"), hint: t("beh.hoverHint") }]} />}
+      {hides && cfg.notchTrigger === "hover" && <Row label={t("beh.revealDelay")} hint={t("beh.revealDelayHint")}>
+        <Slider value={cfg.revealDelay ?? 300} min={0} max={1000} step={50} fmt={seconds} onChange={(v) => set({ revealDelay: v })} />
       </Row>}
-      {hides && <Row label={t("be.notchMode")} hint={t({ floating: "be.notchModeFloatingHint", smart: "be.notchModeSmartHint" }[resolveNotchMode(cfg)] || "be.notchModeAttachedHint")}>
-        <SegmentedControl value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
-          options={[{ value: "attached", label: t("be.notchModeAttached") }, { value: "floating", label: t("be.notchModeFloating") }, { value: "smart", label: t("be.notchModeSmart") }]} />
+      {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
+        <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}
+      {hides && <RadioGroup label={t("beh.hidden")} value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
+        options={[{ value: "attached", label: t("beh.attached"), hint: t("beh.attachedHint") },
+          { value: "floating", label: t("beh.floating"), hint: t("beh.floatingHint") },
+          { value: "smart", label: t("beh.autoNotch"), hint: t("beh.autoNotchHint") }]} />}
+      {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
+        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
+    </SettingsSection>
+
+    <SettingsSection icon="shield" title={t("beh.exceptions")}>
+      <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
+      <AppExceptions apps={cfg.hideForApps || []} onChange={(list) => set({ hideForApps: list })} />
     </SettingsSection>
 
     <SettingsSection icon="app" title={t("be.position")}>
@@ -91,13 +108,7 @@ export function DockPage({ cfg, set }) {
     </CollapsibleSection>
 
     <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
-      {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
-        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
       <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
-      {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
-        <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
-      </Row>}
-      <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
       {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
       </Row>}
@@ -135,4 +146,28 @@ export function DockPage({ cfg, set }) {
         checked={cfg.nativeMaterial !== false} onChange={(v) => set({ nativeMaterial: v }, afterSurface)} />}
     </CollapsibleSection>
   </>;
+}
+
+/** Programs that keep the dock tucked away while they are in front. Picked
+ *  from the windows open now, stored as their file name ("code.exe"). */
+function AppExceptions({ apps, onChange }) {
+  const [open, setOpen] = useState([]);
+  const refresh = () => dockApi.listWindows().then((list) => {
+    const names = new Map();
+    for (const w of list || []) {
+      const exe = (w.exe || "").split(/[\\/]/).pop().toLowerCase();
+      if (exe && !apps.includes(exe) && !names.has(exe)) names.set(exe, w.title || exe);
+    }
+    setOpen([...names].map(([value, title]) => ({ value, label: `${title} · ${value}` })));
+  }).catch(() => {});
+  useEffect(() => { refresh(); }, [apps.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <Row label={t("beh.apps")} hint={t("beh.appsHint")} stack>
+    <div className="app-exceptions">
+      {apps.length ? apps.map((exe) => <span className="app-exception" key={exe}>{exe}
+        <button type="button" aria-label={`${t("beh.removeApp")} ${exe}`} title={t("beh.removeApp")} onClick={() => onChange(apps.filter((a) => a !== exe))}>×</button>
+      </span>) : <span className="ui-row-hint">{t("beh.noApps")}</span>}
+    </div>
+    {open.length > 0 && <Select label={t("beh.addApp")} value="" options={[{ value: "", label: t("beh.addApp") }, ...open]}
+      onChange={(v) => v && onChange([...apps, v])} />}
+  </Row>;
 }

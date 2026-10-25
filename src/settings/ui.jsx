@@ -215,6 +215,37 @@ export function Slider({ value, min, max, step, onChange, fmt }) {
   );
 }
 
+/** WinUI RadioButtons: a labelled group of options, each with an optional
+ *  second line. options: [{ value, label, hint? }] */
+export function RadioGroup({ label, value, options, onChange }) {
+  const idx = Math.max(0, options.findIndex((o) => o.value === value));
+  const navigate = (event) => {
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    const next = (idx + step + options.length) % options.length;
+    onChange(options[next].value);
+    event.currentTarget.querySelectorAll('[role="radio"]')[next]?.focus();
+  };
+  return (
+    <div className="ui-radios" data-setting-label={label}>
+      <span className="ui-radios-label" id={`radios-${label}`}>{label}</span>
+      <div role="radiogroup" aria-labelledby={`radios-${label}`} onKeyDown={navigate}>
+        {options.map((o, index) => (
+          <button key={o.value} type="button" role="radio" aria-checked={o.value === value}
+            tabIndex={index === idx ? 0 : -1} className="ui-radio" onClick={() => onChange(o.value)}>
+            <span className="ui-radio-dot" aria-hidden="true" />
+            <span className="ui-radio-text">
+              <span className="ui-radio-name">{o.label}</span>
+              {o.hint ? <span className="ui-radio-hint">{o.hint}</span> : null}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Segmented control. options: [{ value, label, icon? }] */
 export function SegmentedControl({ value, options, onChange, label: ownLabel }) {
   const rowLabel = useContext(RowLabel);

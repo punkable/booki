@@ -30,6 +30,7 @@ const winApi = (typeof window !== "undefined" && window.__TAURI__ && window.__TA
 const inTauri = !!winApi;
 
 let hoverTrigger = false; // reveal the dock when the pill is hovered
+let revealDelay = 300; // like the Windows taskbar: a beat, so brushing past does not open it
 // The live card only exists on a horizontal tab: a vertical one has no room
 // for a line of text.
 let canPeek = false;
@@ -57,6 +58,7 @@ async function applyLook() {
     const look = paintedLook(cfg);
     if (look.accent) applyAccent(root, look.accent);
     hoverTrigger = cfg.notchTrigger === "hover";
+    revealDelay = Math.max(0, Math.min(1500, Number(cfg.revealDelay ?? 300) || 0));
     clearTimeout(hoverTimer);
     clearTimeout(cardTimer);
     if (!hoverTrigger && !pill.matches(":focus-visible")) closeCard();
@@ -919,7 +921,7 @@ let hoverTimer = null;
 pill.addEventListener("pointerenter", () => {
   if (!hoverTrigger) return;
   clearTimeout(hoverTimer);
-  hoverTimer = setTimeout(() => { if (hoverTrigger) invoke("reveal_dock").catch(() => {}); }, 90);
+  hoverTimer = setTimeout(() => { if (hoverTrigger) invoke("reveal_dock").catch(() => {}); }, revealDelay);
 });
 pill.addEventListener("pointerleave", () => clearTimeout(hoverTimer));
 
