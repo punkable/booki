@@ -18,12 +18,10 @@ for (const edge of ['bottom', 'top', 'left', 'right']) {
     await tile.hover();
     await page.locator('.dock-tip.show').waitFor();
     assert.equal(await page.locator('.dock-tip strong').textContent(), app.name);
-    assert.equal(await page.locator('.dock-tip-mark svg').count(), 0, 'the Remove control is not an app icon');
-    assert.equal(await page.locator('.dock-tip-mark').textContent(), 'A');
     assert.equal(await tile.locator('.label').evaluate(el => getComputedStyle(el).opacity), '0');
     // A Windows tooltip: just the name, no 'Open app' line and no icon.
     assert.equal(await page.locator('.dock-tip-detail').isHidden(), true);
-    assert.equal(await page.locator('.dock-tip-mark').isHidden(), true);
+    assert.equal(await page.locator('.dock-tip svg, .dock-tip img').count(), 0);
     const r = await page.locator('.dock-tip').boundingBox();
     assert.ok(r.x >= 0 && r.y >= 0 && r.x + r.width <= 520 && r.y + r.height <= 600);
     assert.equal(await tile.getAttribute('aria-describedby'), 'booki-dock-tooltip');

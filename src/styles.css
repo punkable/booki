@@ -2201,11 +2201,6 @@ body.edge-right .stack.open { transform: none; }
 .dock-tip-content { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
 .dock-tip-content strong { font-weight: 400; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
 .dock-tip-detail { font-size: 0.6875rem; color: var(--ink-2); margin-top: 2px; }
-.dock-tip-mark { display: none !important; flex: 0 0 28px; width: 28px; height: 28px; display: grid; place-items: center; font-weight: 600; color: var(--ink-2); }
-.dock-tip-mark img { width: 28px; height: 28px; object-fit: contain; }
-.dock-tip-mark svg { width: 22px; height: 22px; }
-.dock-tip-mark .glyph.fallback { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--fb-color); color: var(--fb-ink); font-size: 13px; font-weight: 600; }
-.dock-tip-mark .glyph.fallback svg { width: 16px; height: 16px; }
 .dock-tip.show { opacity: 1; }
 body.show-labels .tile[data-hint-open] > .label { opacity: 0; transition: none; }
 @media (prefers-reduced-motion: reduce) { .dock-tip { transition: none; } }

@@ -25,7 +25,7 @@ For an approved release, first update versions and changelog, then run `npm run 
 
 ## Realistic desktop and social images
 
-`desktop.mjs` runs the real built dock over an Unsplash photo wallpaper (Unsplash License, downloaded into the ignored `public/stills/` at capture time) with mock app windows behind it and brand icons from Simple Icons (CC0 data; the marks belong to their owners). It writes `desk-hub.jpg`, `desk-dark.jpg`, the laptop hero `hero-real-{en,es}.jpg` and social formats `social-square-*` (1080×1080) and `social-story-*` (1080×1350). Run `npm run build` at the root, then `node tools/presentation/desktop.mjs`.
+`desktop.mjs` and `clips.mjs` share `desk-kit.mjs` (wallpapers, brand icons, drawn pointer). `desktop.mjs` runs the real built dock over an Unsplash photo wallpaper (Unsplash License, downloaded into the ignored `public/stills/` at capture time) with mock app windows behind it and brand icons from Simple Icons (CC0 data; the marks belong to their owners). It writes `desk-hub.jpg`, `desk-dark.jpg`, the laptop hero `hero-real-{en,es}.jpg` and social formats `social-square-*` (1080×1080) and `social-story-*` (1080×1350). Run `npm run build` at the root, then `node tools/presentation/desktop.mjs`.
 
 ## Film scenes
 

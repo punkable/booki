@@ -14,6 +14,7 @@ import { buildCollectorPanel } from "./collector-panel.js";
 import { deviceReading, aiReading, statsReading, tokenText, updatesReading, shownUpdates, matchDevice, batteryTone, usageTone } from "./readings.js";
 import { refreshUpdates, refreshDevices, paintLighting, refreshConnectivity } from "./live-widgets.js";
 import { notify } from "./notices.js";
+import { mediaSourcePin, openMediaSource } from "./app-widgets.js";
 
 function text(tag, value, className = "") {
   const el = document.createElement(tag); el.textContent = value; el.className = className; return el;
@@ -151,6 +152,10 @@ export function buildSystemPanel(item, { close }) {
     load(now, api.mediaInfo, (media) => {
       if (!media?.title) { now.append(text("p", t("w.mediaIdle"))); return; }
       now.append(text("strong", media.title)); if (media.artist) now.append(text("small", media.artist));
+      // The panel is the playing app's: its name and a way to open it.
+      const pin = mediaSourcePin(media.source, S.cfg?.pinned || []);
+      if (pin) now.append(text("small", pin.name, "media-source"));
+      if (pin || String(media.source || "").includes("!")) headAction("external", t("aw.openApp"), () => { openMediaSource(media.source, S.cfg?.pinned || []); });
     });
     const controls = document.createElement("div"); controls.className = "media-transport"; transport.append(controls);
     for (const [glyph, action] of [["chevron-left", api.mediaPrev], ["play", api.mediaToggle], ["chevron-right", api.mediaNext]]) {

@@ -14,9 +14,8 @@ export function createDockTooltip(root, { edge, describe, blocked, dismiss = (ac
   tip.setAttribute('role', 'tooltip'); tip.setAttribute('aria-hidden', 'true');
   const name = document.createElement('strong');
   const detail = document.createElement('span'); detail.className = 'dock-tip-detail';
-  const mark = document.createElement('span'); mark.className = 'dock-tip-mark'; mark.setAttribute('aria-hidden', 'true');
   const content = document.createElement('span'); content.className = 'dock-tip-content';
-  content.append(name, detail); tip.append(mark, content); document.body.append(tip);
+  content.append(name, detail); tip.append(content); document.body.append(tip);
   let anchor = null, timer = 0;
   let warmUntil = 0;
   function hide() {
@@ -47,17 +46,6 @@ export function createDockTooltip(root, { edge, describe, blocked, dismiss = (ac
     const info = describe(anchor);
     if (!info?.name) { hide(); return; }
     name.textContent = info.name; detail.textContent = info.detail || ''; detail.hidden = !info.detail;
-    mark.replaceChildren();
-    const source = anchor.querySelector('img');
-    const fallback = anchor.querySelector(':scope > .glyph.fallback');
-    if (source?.src) {
-      const img = document.createElement('img'); img.src = source.src; img.alt = ''; mark.append(img);
-    } else if (fallback) {
-      mark.append(fallback.cloneNode(true));
-    } else {
-      const svg = [...anchor.querySelectorAll('svg')].find(element => !element.closest('.rm, .w-controls, .w-media-controls'));
-      if (svg) mark.append(svg.cloneNode(true)); else mark.textContent = info.name.slice(0, 1);
-    }
     position(); if (!anchor) return;
     const ids = new Set((anchor.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean)); ids.add(tip.id);
     anchor.setAttribute('aria-describedby', [...ids].join(' '));
