@@ -32,7 +32,7 @@ function stabilityRelease() {
   ] };
 }
 
-export function previousReleases() { return [release97(), release96(), release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
+export function previousReleases() { return [release98(), release97(), release96(), release951(), release95(), release94(), release93(), release92(), release91(), release90(), release89(), release881(), release88(), release871(), release87(), release86(), release85(), release84(), release83(), release82(), release81(), overhaul80Release(), workspaceRelease(), libraryRelease(), surfaceRelease(), stabilityRelease(), overhaulRelease()]; }
 function surfaceRelease() {
   return { version: "0.70.2", date: "2026-10-05", headline: t("surfaces.headline"), sections: [
     { icon: "sparkles", title: t("surfaces.design"), notes: [t("surfaces.unified"), t("surfaces.opacity"), t("surfaces.motion")] },
@@ -217,6 +217,14 @@ function release97() {
 }
 
 export function currentRelease() {
+  return { version: "1.0.0", date: "2026-10-25", headline: t("release100.headline"), sections: [
+    { icon: "grid", title: t("release100.widgetsTitle"), notes: [t("release100.board"), t("release100.appCards"), t("release100.connectivity")] },
+    { icon: "eye", title: t("release100.behaviorTitle"), notes: [t("release100.behavior"), t("release100.notch"), t("release100.exceptions")] },
+    { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release100.about"), t("release100.visual")] },
+    { icon: "shield", title: t("release100.reliabilityTitle"), notes: [t("release100.media"), t("release100.fixes")] },
+  ] };
+}
+function release98() {
   return { version: "0.98.0", date: "2026-10-25", headline: t("release98.headline"), sections: [
     { icon: "settings", title: t("release80.settingsTitle"), notes: [t("release98.pages"), t("release98.apps"), t("release98.colors")] },
     { icon: "sparkles", title: t("release97.everydayTitle"), notes: [t("release971.clicks"), t("release971.claude")] },
