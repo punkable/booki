@@ -230,10 +230,11 @@ export function RadioGroup({ label, value, options, onChange }) {
   return (
     <div className="ui-radios" data-setting-label={label}>
       <span className="ui-radios-label" id={`radios-${label}`}>{label}</span>
-      <div role="radiogroup" aria-labelledby={`radios-${label}`} onKeyDown={navigate}>
+      <div role="radiogroup" className={options.some((o) => o.art) ? "ui-radio-cards" : undefined} aria-labelledby={`radios-${label}`} onKeyDown={navigate}>
         {options.map((o, index) => (
           <button key={o.value} type="button" role="radio" aria-checked={o.value === value}
-            tabIndex={index === idx ? 0 : -1} className="ui-radio" onClick={() => onChange(o.value)}>
+            tabIndex={index === idx ? 0 : -1} className={"ui-radio" + (o.art ? " ui-radio-card" : "")} onClick={() => onChange(o.value)}>
+            {o.art ? <span className="ui-radio-art" aria-hidden="true">{o.art}</span> : null}
             <span className="ui-radio-dot" aria-hidden="true" />
             <span className="ui-radio-text">
               <span className="ui-radio-name">{o.label}</span>
@@ -244,6 +245,17 @@ export function RadioGroup({ label, value, options, onChange }) {
       </div>
     </div>
   );
+}
+
+/** A tiny desktop that shows a dock behaviour: an app window, the dock, the
+ *  notch it leaves behind and the pointer. Purely illustrative. */
+export function DockScene({ windowed = false, dock = true, notch = null, cursor = null }) {
+  return <span className={"dock-scene" + (windowed ? " has-window" : "")} data-notch={notch || "none"} data-cursor={cursor || "none"}>
+    {windowed && <span className="scene-window"><span className="scene-titlebar" /></span>}
+    {dock && <span className="scene-dock"><i /><i /><i /><i /></span>}
+    {notch && <span className="scene-notch" />}
+    {cursor && <span className="scene-cursor" />}
+  </span>;
 }
 
 /** Segmented control. options: [{ value, label, icon? }] */

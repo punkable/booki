@@ -272,18 +272,18 @@
 .tile.widget[data-variant="minimal"] .w-card { background: transparent; box-shadow: none; }
 
 /* ── Vertical dock: every widget is a 1×1 tile ─────────────────────────── */
-body.edge-left .tile.widget,
-body.edge-right .tile.widget { width: var(--size); }
-body.edge-left .w-card,
-body.edge-right .w-card { justify-content: center; padding: calc(var(--size) * 0.08); }
-body.edge-left .w-label, body.edge-right .w-label,
-body.edge-left .w-sys-cell ~ .w-sys-cell, body.edge-right .w-sys-cell ~ .w-sys-cell,
-body.edge-left .w-pv-main, body.edge-right .w-pv-main,
-body.edge-left .w-pv-badge, body.edge-right .w-pv-badge,
-body.edge-left .tile.widget.media .w-main, body.edge-right .tile.widget.media .w-main,
-body.edge-left .tile.widget.media .w-controls, body.edge-right .tile.widget.media .w-controls { display: none; }
+body.edge-left .dock .tile.widget,
+body.edge-right .dock .tile.widget { width: var(--size); }
+body.edge-left .dock .w-card,
+body.edge-right .dock .w-card { justify-content: center; padding: calc(var(--size) * 0.08); }
+body.edge-left .dock .w-label, body.edge-right .dock .w-label,
+body.edge-left .dock .w-sys-cell ~ .w-sys-cell, body.edge-right .dock .w-sys-cell ~ .w-sys-cell,
+body.edge-left .dock .w-pv-main, body.edge-right .dock .w-pv-main,
+body.edge-left .dock .w-pv-badge, body.edge-right .dock .w-pv-badge,
+body.edge-left .dock .tile.widget.media .w-main, body.edge-right .dock .tile.widget.media .w-main,
+body.edge-left .dock .tile.widget.media .w-controls, body.edge-right .dock .tile.widget.media .w-controls { display: none; }
 /* The clock keeps its time, smaller; other readouts show their figure. */
-body.edge-left .w-value, body.edge-right .w-value { font-size: calc(var(--size) * 0.26); }
+body.edge-left .dock .w-value, body.edge-right .dock .w-value { font-size: calc(var(--size) * 0.26); }
 
 /* A widget grouped into a folder is shown live inside the flyout at full width. */
 .stack-widget .tile.widget.in-flyout { width: 100%; }
@@ -570,7 +570,7 @@ body:not(.surface-glass) :is(.productivity-panel, .note-editor.note-workspace) {
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-ring { flex: 0 0 auto; width: calc(var(--size) * 0.8); height: calc(var(--size) * 0.8); }
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: flex; flex: 1 1 auto; }
 .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-label { order: 0; font-size: calc(var(--size) * 0.21); color: var(--w-ink); white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-body:is(.edge-left, .edge-right) .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
+body:is(.edge-left, .edge-right) .dock .tile.widget:has(.w-ring):is([data-span="2"], [data-span="3"]) .w-main { display: none; }
 /* Lighting reads as a short name, not a giant figure. */
 .tile.widget[data-widget="lighting"] .w-value { font-size: calc(var(--size) * 0.24); font-family: var(--font); font-weight: 600; }
 .system-widget-panel .productivity-section > strong { font-size: 1rem; font-weight: 600; }

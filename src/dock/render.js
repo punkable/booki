@@ -10,6 +10,7 @@ import { isotype } from "../brand-mark.js";
 import { isLibIcon, resolveLibIcon, libGlyphSVG } from "../icon-library.js";
 import { t } from "../i18n.js";
 import {
+  WIDGET_GLYPHS,
   PREVIEW_WIDGETS,
   RING_DEFAULTS,
   WIDGET_META,
@@ -240,14 +241,10 @@ function groupTile(item) {
     const mini = document.createElement("span");
     mini.className = "group-mini";
     if (child.kind === "widget") {
-      // A grouped widget previews its live value: a small copy of its tile that
-      // the widget polls keep current, like the cards inside the group.
-      mini.classList.add("mini-live");
-      const live = widgetTile(child, { inFlyout: true });
-      live.classList.add("in-group-mini");
-      live.tabIndex = -1;
-      live.setAttribute("aria-hidden", "true");
-      mini.appendChild(live);
+      // A grouped widget previews as its glyph in the widget's own colour.
+      mini.classList.add("mini-widget");
+      mini.style.setProperty("--mini-accent", WIDGET_META[child.widget]?.accent || "var(--accent)");
+      mini.innerHTML = WIDGET_GLYPHS[child.widget] ? icon(WIDGET_GLYPHS[child.widget]) : icon("sparkles");
     } else if (child.kind === "action" && !child.icon) {
       // Booki's Settings pin keeps its gear inside a group.
       mini.innerHTML = icon("settings");

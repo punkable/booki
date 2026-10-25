@@ -58,7 +58,7 @@ function CatalogCard({ widget, count, selected, style, onInspect, onAdd }) {
     <footer className="catalog-foot">
       {pinned
         ? <button type="button" className="button catalog-action" onClick={onInspect}><Icon name="settings" />{t("gallery.configure")}</button>
-        : <button type="button" className="button button-accent catalog-action" aria-label={t("widgetFlow.addNamed").replace("{name}", () => name(widget))} onClick={onAdd}><Icon name="plus" />{t("widget.add")}</button>}
+        : <button type="button" className="button catalog-action" aria-label={t("widgetFlow.addNamed").replace("{name}", () => name(widget))} onClick={onAdd}><Icon name="plus" />{t("widget.add")}</button>}
     </footer>
   </article>;
 }

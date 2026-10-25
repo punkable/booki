@@ -2156,11 +2156,12 @@ body.edge-right .stack.open { transform: none; }
 /* A group holding widgets works like the Windows Widgets board: a four-column
    grid where widgets are cards two columns wide (or the whole row for wide
    read-outs) and apps take one column below them. */
-.stack-grid.widget-hub-grid { grid-template-columns: repeat(4, minmax(72px, 1fr)); }
+.group-stack .stack-grid.widget-hub-grid, .stack-grid.widget-hub-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.group-stack .stack-grid.widget-hub-grid[data-view="list"] .stack-item:not(.stack-widget) { grid-column: 1 / -1; }
 .stack-item.stack-widget {
   grid-column: span 2;
-  flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 6px;
-  padding: 10px; cursor: pointer;
+  flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px;
+  min-height: 112px; padding: 8px 10px 12px; cursor: pointer;
   background: var(--layer, rgba(255, 255, 255, 0.05));
   border: 1px solid var(--stroke-card, rgba(255, 255, 255, 0.08));
   border-radius: var(--r-card, 8px);
@@ -2169,11 +2170,13 @@ body.edge-right .stack.open { transform: none; }
 .stack-item.stack-widget:hover { background: var(--layer-hover, rgba(255, 255, 255, 0.08)); transform: none; }
 .stack-widget .tile.widget.in-flyout {
   position: relative; margin: 0; width: 100%; transform: none !important;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; flex: 1;
 }
+.stack-item.stack-widget > .tile.widget.in-flyout { width: 100% !important; max-width: 100%; height: var(--size); }
 .stack-widget .tile.widget.in-flyout .w-card { width: 100%; }
+/* Like a Windows widget: its name small at the top, the read-out centred. */
 .stack-widget-name {
-  font-size: 0.75rem; line-height: 1rem; opacity: 0.72; text-align: left;
+  order: -1; font-size: 0.75rem; line-height: 1rem; opacity: 0.72; text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -2920,12 +2923,9 @@ body.notch-body.surface-glass.native-material.card .notch-pill.mat-wait { backgr
    translucent fill they read as ghost text over the grid. */
 body.stack-open .tile > .label { opacity: 0; transition: none; }
 
-/* A widget inside a group tile previews its live read-out, scaled to the mini cell. */
-.tile.group .group-mini.mini-live { position: relative; overflow: hidden; }
-.tile.group .group-mini .tile.widget.in-group-mini {
-  position: absolute; left: 50%; top: 50%; margin: 0;
-  width: var(--size, 48px); height: var(--size, 48px);
-  transform: translate(-50%, -50%) scale(0.42) !important;
-  pointer-events: none; animation: none;
-}
-.tile.group .group-mini .tile.widget.in-group-mini .label { display: none; }
+/* A widget inside a group tile: its glyph on a tint of its own colour. */
+.tile.group .group-mini.mini-widget { background: color-mix(in srgb, var(--mini-accent) 22%, transparent); color: var(--mini-accent); }
+.tile.group .group-mini.mini-widget svg { width: 70%; height: 70%; }
+/* A card never lets its read-out spill into the next one. */
+.stack-widget .tile.widget.in-flyout, .stack-widget .tile.widget.in-flyout .w-card { min-width: 0; overflow: hidden; }
+.stack-widget .tile.widget.in-flyout :is(.w-label, .w-value, .w-sub) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

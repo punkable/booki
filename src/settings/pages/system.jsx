@@ -23,7 +23,7 @@ const FAQ = ["what", "data", "where", "smartscreen", "updates", "resources", "op
 function Autostart({ cfg, set }) {
   const [on, setOn] = useState(!!cfg.autostart);
   useEffect(() => { dockApi.getAutostart().then((v) => setOn(!!v)).catch(() => {}); }, []);
-  return <Toggle label={t("be.autostart")} checked={on} onChange={async (value) => {
+  return <Toggle label={t("be.autostart")} hint={t("beh.autostartHint")} checked={on} onChange={async (value) => {
     setOn(value);
     await dockApi.setAutostart(value).catch(() => {});
     // Trust the registry, not our optimism.

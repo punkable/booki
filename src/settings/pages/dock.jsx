@@ -10,7 +10,7 @@ import { colorSource, surfaceColor } from "../../system-look.js";
 import { DockPreview } from "../dock-preview.jsx";
 import { FinishPicker } from "../finish-picker.jsx";
 import { AccentPicker, ColorSourcePicker, PositionPicker, SurfaceColorPicker, positionEdges, positionSlots, slotLabel } from "../controls.jsx";
-import { CollapsibleSection, RadioGroup, PageHeader, Row, SegmentedControl, Select, SettingsSection, Slider, Toggle } from "../ui.jsx";
+import { CollapsibleSection, DockScene, RadioGroup, PageHeader, Row, SegmentedControl, Select, SettingsSection, Slider, Toggle } from "../ui.jsx";
 
 const seconds = (ms) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : ms % 100 === 0 ? 1 : 2)} s`;
 
@@ -22,6 +22,7 @@ export function DockPage({ cfg, set }) {
   const afterPlacement = { flush: true, afterSave: () => dockApi.notchPreview() };
   const afterSurface = { flush: true, afterSave: () => dockApi.notchPreview() };
   const hides = (cfg.autoHideMode || "smart") !== "off";
+  const vertical = cfg.edge === "left" || cfg.edge === "right";
   const style = resolveSurfaceStyle(cfg);
   const seeThrough = translucent(cfg);
 
@@ -36,12 +37,12 @@ export function DockPage({ cfg, set }) {
         back, what stays while hidden) instead of mixing them into modes. */}
     <SettingsSection icon="eye" title={t("dock.behavior")}>
       <RadioGroup label={t("beh.hide")} value={cfg.autoHideMode || "smart"} onChange={(v) => set({ autoHideMode: v })}
-        options={[{ value: "off", label: t("beh.never"), hint: t("beh.neverHint") },
-          { value: "smart", label: t("beh.covered"), hint: t("beh.coveredHint") },
-          { value: "edge", label: t("beh.idle"), hint: t("beh.idleHint") }]} />
+        options={[{ value: "off", label: t("beh.never"), hint: t("beh.neverHint"), art: <DockScene windowed /> },
+          { value: "smart", label: t("beh.covered"), hint: t("beh.coveredHint"), art: <DockScene windowed dock={false} notch="attached" /> },
+          { value: "edge", label: t("beh.idle"), hint: t("beh.idleHint"), art: <DockScene dock={false} notch="attached" /> }]} />
       {hides && <RadioGroup label={t("beh.show")} value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
-        options={[{ value: "click", label: t("beh.click"), hint: t("beh.clickHint") },
-          { value: "hover", label: t("beh.hover"), hint: t("beh.hoverHint") }]} />}
+        options={[{ value: "click", label: t("beh.click"), hint: t("beh.clickHint"), art: <DockScene dock={false} notch="attached" cursor="click" /> },
+          { value: "hover", label: t("beh.hover"), hint: t("beh.hoverHint"), art: <DockScene dock={false} notch="attached" cursor="hover" /> }]} />}
       {hides && cfg.notchTrigger === "hover" && <Row label={t("beh.revealDelay")} hint={t("beh.revealDelayHint")}>
         <Slider value={cfg.revealDelay ?? 300} min={0} max={1000} step={50} fmt={seconds} onChange={(v) => set({ revealDelay: v })} />
       </Row>}
@@ -49,9 +50,16 @@ export function DockPage({ cfg, set }) {
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}
       {hides && <RadioGroup label={t("beh.hidden")} value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
-        options={[{ value: "attached", label: t("beh.attached"), hint: t("beh.attachedHint") },
-          { value: "floating", label: t("beh.floating"), hint: t("beh.floatingHint") },
-          { value: "smart", label: t("beh.autoNotch"), hint: t("beh.autoNotchHint") }]} />}
+        options={[{ value: "attached", label: t("beh.attached"), hint: t("beh.attachedHint"), art: <DockScene dock={false} notch="attached" /> },
+          { value: "floating", label: t("beh.floating"), hint: t("beh.floatingHint"), art: <DockScene dock={false} notch="floating" /> },
+          { value: "smart", label: t("beh.dot"), hint: t("beh.dotHint"), art: <DockScene dock={false} notch="dot" /> }]} />}
+      {hides && <Row label={t("beh.live")} hint={vertical ? t("beh.liveSide") : t("beh.liveHint")} stack>
+        <div className="live-toggles">
+          {["media", "timer", "battery", "volume"].map((key) => <Toggle key={key} label={t(`beh.live${key[0].toUpperCase()}${key.slice(1)}`)}
+            checked={(cfg.notchLive || {})[key] !== false} onChange={(v) => set({ notchLive: { ...(cfg.notchLive || {}), [key]: v } })} />)}
+          <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
+        </div>
+      </Row>}
       {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
         onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
     </SettingsSection>
@@ -108,7 +116,6 @@ export function DockPage({ cfg, set }) {
     </CollapsibleSection>
 
     <CollapsibleSection title={t("dock.more")} hint={t("dock.interactionHint")}>
-      <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
       {style === "glass" && seeThrough && <Row label={t("dock.intensity")} hint={t("dock.intensityHint")}>
         <Slider value={cfg.materialStrength ?? 60} min={0} max={100} step={1} fmt={(v) => `${v}%`} onChange={(v) => set({ materialStrength: v }, afterSurface)} />
       </Row>}
