@@ -993,7 +993,7 @@ body.notch-body.act-agent-waiting .nl-state { color: #e8a317; }
 .nl-dots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes nl-dots { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 @keyframes nl-agent-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-body.notch-body.agent-claude { --agent-tint: #D97757; }
+body.notch-body:is(.agent-claude, .agent-claude-app) { --agent-tint: #D97757; }
 body.notch-body.agent-codex { --agent-tint: #10a37f; }
 body.notch-body.agent-cursor { --agent-tint: #7c6aef; }
 body.notch-body.agent-opencode { --agent-tint: #3dbeb3; }

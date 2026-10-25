@@ -446,11 +446,11 @@ function focusTimersOf(items = []) {
 // lasts; a finished turn is a 5 s notice, several queue up one by one.
 const AGENT_NAMES = {
   claude: "Claude", codex: "Codex", cursor: "Cursor", opencode: "OpenCode",
-  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue",
+  gemini: "Gemini", windsurf: "Windsurf", goose: "Goose", cline: "Cline", continue: "Continue", "claude-app": "Claude",
 };
 const AGENT_ICONS = {
   claude: "ai-claude", codex: "ai-openai", cursor: "ai-cursor", opencode: "ai-opencode",
-  gemini: "ai-gemini", windsurf: "ai-windsurf", goose: "ai-goose", cline: "ai-cline", continue: "ai-continue",
+  gemini: "ai-gemini", windsurf: "ai-windsurf", goose: "ai-goose", cline: "ai-cline", continue: "ai-continue", "claude-app": "ai-claude",
 };
 const AGENT_DONE_MS = 5000;
 // Several live states take turns at this pace; one waiting on you stays put.

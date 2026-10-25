@@ -33,6 +33,9 @@
 //! - Quiet end: HEURISTIC fallback for transcripts whose last reply carries
 //!   no stop reason — no pending tool and `QUIET_DONE_MS` of silence after a
 //!   reply counts as done.
+//! - Claude desktop app: size only, its claude.ai IndexedDB log. Growth
+//!   while it answers means working; HEURISTIC, as other writes there
+//!   (opening a chat) also count.
 //! - Cursor, OpenCode, Gemini CLI, Windsurf, Goose, Cline and Continue: size
 //!   only. The file is never opened. Growth means working; a pause means
 //!   waiting; a longer quiet means done. Auth, account and settings files
@@ -89,6 +92,10 @@ pub enum Provider {
     Cline,
     /// Continue. Size of a file under `~/.continue/sessions`.
     Continue,
+    /// The Claude desktop app. It keeps no activity log, but while it
+    /// answers its claude.ai IndexedDB write-ahead log grows. Size only; the
+    /// file is never opened.
+    ClaudeApp,
 }
 
 impl Provider {
@@ -103,6 +110,7 @@ impl Provider {
             Provider::Goose => "goose",
             Provider::Cline => "cline",
             Provider::Continue => "continue",
+            Provider::ClaudeApp => "claude-app",
         }
     }
 
@@ -188,7 +196,8 @@ impl Machine {
             | Provider::Windsurf
             | Provider::Goose
             | Provider::Cline
-            | Provider::Continue => {}
+            | Provider::Continue
+            | Provider::ClaudeApp => {}
         }
     }
 
@@ -467,12 +476,13 @@ impl Watch {
             Provider::Continue => dirs::home_dir()
                 .map(|h| vec![h.join(".continue").join("sessions")])
                 .unwrap_or_default(),
+            Provider::ClaudeApp => claude_app_logs(),
         }
     }
 
     /// Switches to the most recently written file, if it changed.
     fn discover(&mut self, now: i64) {
-        if self.provider == Provider::OpenCode {
+        if matches!(self.provider, Provider::OpenCode | Provider::ClaudeApp) {
             self.discover_files(now);
             return;
         }
@@ -510,7 +520,9 @@ impl Watch {
         // Older releases write one folder per session under storage/message.
         // The folder's own timestamp moves when a message lands in it, so the
         // newest folder is watched by metadata, without listing its files.
-        let legacy = crate::ai_usage::opencode_data_dirs()
+        let legacy = (self.provider == Provider::OpenCode)
+            .then(crate::ai_usage::opencode_data_dirs)
+            .unwrap_or_default()
             .into_iter()
             .filter_map(|base| newest_child_dir(&base.join("storage").join("message")))
             .max_by_key(|(_, modified)| *modified);
@@ -713,6 +725,26 @@ impl Watch {
     fn has_file(&self) -> bool {
         self.path.is_some()
     }
+}
+
+/// The Claude app's claude.ai IndexedDB write-ahead logs (`*.log`). LevelDB
+/// rotates them, so every current one is a candidate; Local Storage and the
+/// blobs beside them are left alone.
+fn claude_app_logs() -> Vec<PathBuf> {
+    let Some(dir) = dirs::config_dir().map(|c| {
+        c.join("Claude")
+            .join("IndexedDB")
+            .join("https_claude.ai_0.indexeddb.leveldb")
+    }) else {
+        return Vec::new();
+    };
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    read.flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|e| e == "log"))
+        .collect()
 }
 
 fn goose_roots() -> Vec<PathBuf> {
@@ -928,6 +960,7 @@ pub fn start(
             Watch::new(Provider::Goose),
             Watch::new(Provider::Cline),
             Watch::new(Provider::Continue),
+            Watch::new(Provider::ClaudeApp),
         ];
         let mut tick: u32 = 0;
         // Windows tells us when something under a log folder changes, so an
