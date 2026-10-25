@@ -40,33 +40,40 @@ export function DockPage({ cfg, set }) {
         options={[{ value: "off", label: t("beh.never"), hint: t("beh.neverHint"), art: <DockScene windowed /> },
           { value: "smart", label: t("beh.covered"), hint: t("beh.coveredHint"), art: <DockScene windowed dock={false} notch="attached" /> },
           { value: "edge", label: t("beh.idle"), hint: t("beh.idleHint"), art: <DockScene dock={false} notch="attached" /> }]} />
-      {hides && <RadioGroup label={t("beh.show")} value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
-        options={[{ value: "click", label: t("beh.click"), hint: t("beh.clickHint"), art: <DockScene dock={false} notch="attached" cursor="click" /> },
-          { value: "hover", label: t("beh.hover"), hint: t("beh.hoverHint"), art: <DockScene dock={false} notch="attached" cursor="hover" /> }]} />}
-      {hides && cfg.notchTrigger === "hover" && <Row label={t("beh.revealDelay")} hint={t("beh.revealDelayHint")}>
-        <Slider value={cfg.revealDelay ?? 300} min={0} max={1000} step={50} fmt={seconds} onChange={(v) => set({ revealDelay: v })} />
-      </Row>}
       {hides && <Row label={t("be.hideDelay")} hint={t("be.hideDelayHint")}>
         <Slider value={cfg.autoHideDelay ?? 650} min={0} max={2500} step={50} fmt={seconds} onChange={(v) => set({ autoHideDelay: v })} />
       </Row>}
-      {hides && <RadioGroup label={t("beh.hidden")} value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
+    </SettingsSection>
+
+    {/* The notch is where a hidden dock lives: how it looks, how it opens
+        and what it tells you, in one place. */}
+    {hides && <SettingsSection icon="sparkles" title={t("notch.section")}>
+      <RadioGroup label={t("beh.hidden")} value={resolveNotchMode(cfg)} onChange={(v) => set({ notchMode: v }, afterPlacement)}
         options={[{ value: "attached", label: t("beh.attached"), hint: t("beh.attachedHint"), art: <DockScene dock={false} notch="attached" /> },
           { value: "floating", label: t("beh.floating"), hint: t("beh.floatingHint"), art: <DockScene dock={false} notch="floating" /> },
-          { value: "smart", label: t("beh.dot"), hint: t("beh.dotHint"), art: <DockScene dock={false} notch="dot" /> }]} />}
-      {hides && <Row label={t("beh.live")} hint={vertical ? t("beh.liveSide") : t("beh.liveHint")} stack>
+          { value: "smart", label: t("beh.dot"), hint: t("beh.dotHint"), art: <DockScene dock={false} notch="dot" /> }]} />
+      <RadioGroup label={t("beh.show")} value={cfg.notchTrigger || "click"} onChange={(v) => set({ notchTrigger: v })}
+        options={[{ value: "click", label: t("beh.click"), hint: t("beh.clickHint"), art: <DockScene dock={false} notch="attached" cursor="click" /> },
+          { value: "hover", label: t("beh.hover"), hint: t("beh.hoverHint"), art: <DockScene dock={false} notch="attached" cursor="hover" /> }]} />
+      {cfg.notchTrigger === "hover" && <Row label={t("beh.revealDelay")} hint={t("beh.revealDelayHint")}>
+        <Slider value={cfg.revealDelay ?? 300} min={0} max={1000} step={50} fmt={seconds} onChange={(v) => set({ revealDelay: v })} />
+      </Row>}
+      <Row label={t("beh.live")} hint={vertical ? t("beh.liveSide") : t("beh.liveHint")} stack>
         <div className="live-toggles">
-          {["media", "timer", "battery", "volume"].map((key) => <Toggle key={key} label={t(`beh.live${key[0].toUpperCase()}${key.slice(1)}`)}
-            checked={(cfg.notchLive || {})[key] !== false} onChange={(v) => set({ notchLive: { ...(cfg.notchLive || {}), [key]: v } })} />)}
-          {(cfg.notchLive || {}).media !== false && <Row label={t("notch.music")} hint={t(cfg.notchMusic === "playing" ? "notch.musicPlayingHint" : "notch.musicBriefHint")}>
-            <SegmentedControl value={cfg.notchMusic === "playing" ? "playing" : "brief"} onChange={(v) => set({ notchMusic: v })}
-              options={[{ value: "brief", label: t("notch.musicBrief") }, { value: "playing", label: t("notch.musicPlaying") }]} />
-          </Row>}
+          {["media", "timer", "battery", "volume"].map((key) => <React.Fragment key={key}>
+            <Toggle label={t(`beh.live${key[0].toUpperCase()}${key.slice(1)}`)}
+              checked={(cfg.notchLive || {})[key] !== false} onChange={(v) => set({ notchLive: { ...(cfg.notchLive || {}), [key]: v } })} />
+            {key === "media" && (cfg.notchLive || {}).media !== false && <Row label={t("notch.music")} hint={t(cfg.notchMusic === "playing" ? "notch.musicPlayingHint" : "notch.musicBriefHint")}>
+              <SegmentedControl value={cfg.notchMusic === "playing" ? "playing" : "brief"} onChange={(v) => set({ notchMusic: v })}
+                options={[{ value: "brief", label: t("notch.musicBrief") }, { value: "playing", label: t("notch.musicPlaying") }]} />
+            </Row>}
+          </React.Fragment>)}
           <Toggle label={t("be.notchAgents")} hint={t("be.notchAgentsHint")} checked={cfg.notchAgents !== false} onChange={(v) => set({ notchAgents: v })} />
         </div>
-      </Row>}
-      {hides && <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
-        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />}
-    </SettingsSection>
+      </Row>
+      <Toggle label={t("be.notchPresence")} hint={t("be.notchPresenceHint")} checked={cfg.notchVisibility !== "always"}
+        onChange={(v) => set({ notchVisibility: v ? "auto" : "always" })} />
+    </SettingsSection>}
 
     <SettingsSection icon="shield" title={t("beh.exceptions")}>
       <Toggle label={t("be.hideInFullscreen")} hint={t("be.hideInFullscreenHint")} checked={cfg.hideInFullscreen !== false} onChange={(v) => set({ hideInFullscreen: v })} />
