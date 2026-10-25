@@ -185,7 +185,7 @@ export function wireStackDragOut(cell, group, child) {
     if (out !== st.out) {
       st.out = out;
       st.clone.dataset.outside = String(out);
-      if (out) clearDropHint();
+      if (out) { clearDropHint(); if (st.home) { st.reparentAt = performance.now(); glide(() => goHome(st)); try { cell.setPointerCapture(st.pointerId); } catch (_) {} st.home = null; } }
     }
     if (out) {
       st.beforeId = undefined;
@@ -218,18 +218,35 @@ export function wireStackDragOut(cell, group, child) {
         break;
       }
     }
-    if (!target) return;
+    if (!target || performance.now() < (st.settleUntil || 0)) return;
     const r = target.getBoundingClientRect();
     const before = stackEl.querySelector(".stack-grid")?.dataset.view === "list" ? e.clientY < r.top + r.height / 2 : e.clientX < r.left + r.width / 2;
-    target.classList.add(before ? "drop-before" : "drop-after");
-    const tid = target.dataset.childId;
-    if (before) st.beforeId = tid;
-    else {
-      const kids = group.children || [];
-      const idx = kids.findIndex((c) => c.id === tid);
-      st.beforeId = idx >= 0 && idx + 1 < kids.length ? kids[idx + 1].id : null;
+    // The others step aside: the dragged cell itself is the gap, moved in the
+    // grid and the rest glide to their new places (FLIP).
+    const place = before ? target : target.nextSibling;
+    if (place !== cell && cell.nextSibling !== place) {
+      if (!st.home) st.home = { parent: cell.parentNode, next: cell.nextSibling };
+      st.reparentAt = performance.now();
+      glide(() => target.parentNode.insertBefore(cell, place));
+      try { cell.setPointerCapture(st.pointerId); } catch (_) {}
+      st.settleUntil = performance.now() + 180;
     }
+    const next = cell.nextElementSibling?.closest?.("[data-child-id]");
+    st.beforeId = next ? next.dataset.childId : null;
   });
+  // Animate every sibling from where it was to where the change put it.
+  const glide = (change) => {
+    const sibs = [...stackEl.querySelectorAll(".stack-item[data-child-id]")].filter((n) => n !== cell);
+    const first = new Map(sibs.map((n) => [n, n.getBoundingClientRect()]));
+    change();
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const n of sibs) {
+      const a = first.get(n), b = n.getBoundingClientRect();
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (dx || dy) n.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" });
+    }
+  };
+  const goHome = (s) => { if (s?.home) s.home.parent.insertBefore(cell, s.home.next); };
   const finish = async () => {
     if (!st) return;
     const s = st;
@@ -239,6 +256,8 @@ export function wireStackDragOut(cell, group, child) {
     try { cell.releasePointerCapture(s.pointerId); } catch (_) {}
     cell.classList.remove("dragging");
     clearDropHint();
+    // Where the gap ended up is the drop position.
+    if (s.home && !s.out) s.beforeId = cell.nextElementSibling?.closest?.("[data-child-id]")?.dataset.childId ?? null;
     if (!s.moved) return;
     cell._suppressClick = true;
     setTimeout(() => { cell._suppressClick = false; }, 0);
@@ -270,12 +289,17 @@ export function wireStackDragOut(cell, group, child) {
     try { cell.releasePointerCapture(cancelled.pointerId); } catch (_) {}
     cell.classList.remove("dragging");
     cancelled.clone?.remove();
+    goHome(cancelled);
     clearDropHint();
     cell._suppressClick = true;
     scheduleHitReport();
   };
   cell.addEventListener("pointercancel", cancel);
-  cell.addEventListener("lostpointercapture", cancel);
+  // Moving the cell to open the gap drops pointer capture; take it back.
+  cell.addEventListener("lostpointercapture", () => {
+    if (st && performance.now() - (st.reparentAt || 0) < 250) { try { cell.setPointerCapture(st.pointerId); return; } catch (_) {} }
+    cancel();
+  });
 }
 
 // Add an app or folder into a group from its open flyout, then reopen it so

@@ -30,7 +30,7 @@ import {
   removeItem,
 } from "./pin-ops.js";
 import { openWidgetHub } from "./widget-editors.js";
-import { openStack, openAddPanel, openLauncher } from "./stack.js";
+import { openStack, openAddPanel, openLauncher, hubSize, refreshOpenStack } from "./stack.js";
 import { enterEdit } from "./edit-reorder.js";
 import { ungroup, takeOutChild } from "./group-ops.js";
 
@@ -284,6 +284,15 @@ export function openFileMenu(e, item, parent, openFolder) {
     add("copy", t("stack.copyPath"), () => dockApi.copyText(item.path));
     add("folder", t("stack.showInExplorer"), () => dockApi.openLocation(item.path));
     if (!parent && !item.is_dir) add("app", t("stack.openWith"), () => dockApi.openWith(item.path));
+  }
+  if (parent && item.kind === "widget") {
+    // Card size inside the group's widget board: one column, two, or the row.
+    const current = hubSize(item);
+    for (const size of ["small", "medium", "wide"]) add(size === current ? "check" : "grid", t(`hub.size.${size}`), async () => {
+      item.style = { ...(item.style || {}), hubSize: size };
+      if (await persist()) refreshOpenStack(parent);
+    });
+    sep();
   }
   if (parent) add("take-out", t("group.takeOut"), () => takeOutChild(parent, item.id));
   sep(); add("settings", t("m.settings"), () => item.kind === "widget" ? dockApi.openWidgetSettings(item.id) : dockApi.openSettingsTab("dock"));
