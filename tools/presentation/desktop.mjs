@@ -11,7 +11,7 @@
 
    Run `npm run build` at the repository root first, then
    `node tools/presentation/desktop.mjs`. Writes docs/presentation/desk-*.jpg. */
-/* global document, window */
+/* global document */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
