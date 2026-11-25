@@ -1078,12 +1078,29 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
 /// The smart notch steps aside for these instead of sitting over a browser
 /// or an editor. The desktop, the shell and Booki's own windows never count.
 /// Like `foreground_maximized`, only for the monitor `notch` is on (0 = any).
+/// The window that really owns the foreground: a browser's menu, extension
+/// flyout or download bubble is its own top-level popup, but it belongs to
+/// the (possibly maximized) browser window behind it. Without this, opening
+/// one of those popups made the notch flip between hidden and visible (#145).
+unsafe fn foreground_root() -> HWND {
+    let hwnd = GetForegroundWindow();
+    if hwnd.0.is_null() {
+        return hwnd;
+    }
+    let root = GetAncestor(hwnd, GA_ROOTOWNER);
+    if root.0.is_null() {
+        hwnd
+    } else {
+        root
+    }
+}
+
 pub fn foreground_maximized_on(notch: isize) -> bool {
     let notch_mon = (notch != 0)
         .then(|| unsafe { MonitorFromWindow(HWND(notch as *mut _), MONITOR_DEFAULTTONEAREST) });
     use windows::Win32::UI::WindowsAndMessaging::IsZoomed;
     unsafe {
-        let hwnd = GetForegroundWindow();
+        let hwnd = foreground_root();
         if hwnd.0.is_null() {
             return false;
         }
@@ -1177,14 +1194,14 @@ pub fn is_fullscreen_on(dock: isize) -> bool {
             // Intentionally ignore QUNS_BUSY — Windows uses it for many
             // non-fullscreen "quiet" moments and it caused false Booki blackouts.
             if (state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE)
-                && on_dock_screen(GetForegroundWindow())
+                && on_dock_screen(foreground_root())
             {
                 return true;
             }
         }
         // 2) Fallback: the foreground window covers the WHOLE monitor (borderless
         // fullscreen video like YouTube/VLC). Ignore the desktop and the shell.
-        let hwnd = GetForegroundWindow();
+        let hwnd = foreground_root();
         if hwnd.0.is_null() {
             return false;
         }
