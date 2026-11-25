@@ -10,10 +10,10 @@
 
 <!-- booki:download:start -->
 <p align="center">
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.2/Booki_1.0.2_x64-setup.exe"><b>Download for Windows v1.0.2 (x64)</b></a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.2/Booki_1.0.2_arm64-setup.exe">ARM64</a> ·
-  <a href="https://github.com/punkable/booki/releases/download/v1.0.2/Booki_1.0.2_x64_en-US.msi">MSI x64</a> ·
-  <a href="docs/releases/v1.0.2.md">What's new v1.0.2</a>
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.3/Booki_1.0.3_x64-setup.exe"><b>Download for Windows v1.0.3 (x64)</b></a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.3/Booki_1.0.3_arm64-setup.exe">ARM64</a> ·
+  <a href="https://github.com/punkable/booki/releases/download/v1.0.3/Booki_1.0.3_x64_en-US.msi">MSI x64</a> ·
+  <a href="docs/releases/v1.0.3.md">What's new v1.0.3</a>
 </p>
 <!-- booki:download:end -->
 
@@ -104,22 +104,20 @@
 <p align="center"><img src="docs/presentation/privacy-en.jpg" width="1000" alt="AI usage stays on your PC: Booki reads only local session logs, Claude Code's status line if you opt in, agent event kinds and file sizes; never sign-ins, tokens, credential files, the network or made-up quotas. The actual AI usage panel sits in the middle." /></p>
 
 <!-- booki:media:start -->
-<p align="center"><sub>Source frontend captures for v1.0.2, with example data. Native Windows blur requires an in-app check.</sub></p>
+<p align="center"><sub>Source frontend captures for v1.0.3, with example data. Native Windows blur requires an in-app check.</sub></p>
 <!-- booki:media:end -->
 
 <!-- booki:news:start -->
-## What's new in 1.0.2
+## What's new in 1.0.3
 
-Booki 1.0.2: a notch that keeps you company on any monitor and simpler settings.
+Booki 1.0.3: a notch that stays with you while you browse.
 
-- A video or game on another monitor no longer silences the main notch: music and agents keep showing.
-- Music in the notch: Brief (a few seconds per song) or While playing.
-- The Claude desktop app shows in the notch while it answers. Booki only watches a local file's size; it never reads your conversations.
-- What the notch shows, its hover delay and the Exceptions apps are now kept after a restart.
-- The notch gets its own section in Settings, and the Dock page drops repeated options: opacity sits under Glass and presets are buttons beside the style.
-- Buttons that appear on hover no longer cover text (clipboard, files in groups, position picker).
+- Over a maximized window the notch stays, smaller and dimmed, and keeps showing music, battery and agents. It only steps aside in fullscreen.
+- Browser menus (extensions, history, downloads) no longer make the notch flicker in and out.
+- A dock item with no path shows a clear error, and Booki keeps working if one internal part fails.
+- Dependencies updated with security fixes.
 
-[Full release notes](docs/releases/v1.0.2.md)
+[Full release notes](docs/releases/v1.0.3.md)
 <!-- booki:news:end -->
 
 ## Get started
@@ -135,9 +133,9 @@ Booki needs Windows 10 or 11. The installer isn't Authenticode-signed yet, so Sm
 
 | Version | What changed |
 |---|---|
+| [1.0.2](docs/releases/v1.0.2.md) | Booki 1.0.2: a notch that keeps you company on any monitor and simpler settings. |
 | [1.0.1](docs/releases/v1.0.1.md) | Booki 1.0.1: polish where you spend your day. Groups that stay open, a volume mixer with real names and clearer editors. |
 | [1.0.0](docs/releases/v1.0.0.md) | Booki 1.0: your dock, finally alive. Groups that work as a widget board, apps that show what they're doing and a dynamic notch in every mode. |
-| [0.98.0](docs/releases/v0.98.0.md) | Clearer Settings, like Windows 11: each widget and dock item gets its own page, colours use Booki's palette, and the dock no longer blocks clicks on half the screen. |
 
 [All published releases](https://github.com/punkable/booki/releases)
 <!-- booki:history:end -->

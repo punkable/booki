@@ -2499,3 +2499,22 @@ mod apartment_tests {
         .unwrap();
     }
 }
+
+#[cfg(test)]
+mod shell_class_tests {
+    use super::is_shell_class;
+
+    #[test]
+    fn task_switching_overlays_and_the_desktop_are_never_an_app() {
+        for class in [
+            "Progman",
+            "WorkerW",
+            "Shell_TrayWnd",
+            "MultitaskingViewFrame",
+            "XamlExplorerHostIslandWindow",
+        ] {
+            assert!(is_shell_class(class), "{class}");
+        }
+        assert!(!is_shell_class("Chrome_WidgetWin_1"));
+    }
+}

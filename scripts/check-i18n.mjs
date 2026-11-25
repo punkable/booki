@@ -17,13 +17,9 @@ import { pathToFileURL } from "node:url";
 const ROOT = process.cwd();
 const REFERENCE = "en"; // the language t() ultimately falls back to
 
-const { DICT } = await import(pathToFileURL(path.join(ROOT, "src/i18n.js")).href);
-const { EXTRA } = await import(pathToFileURL(path.join(ROOT, "src/i18n-extra.js")).href);
-
-const { STRINGS } = await import(pathToFileURL(path.join(ROOT, "src/strings.js")).href);
-// Mirror the runtime merge in i18n.js: overhaul strings win over older packs.
-const dicts = { ...DICT };
-for (const [l, strings] of Object.entries(EXTRA)) dicts[l] = { ...strings, ...STRINGS[l] };
+const { LANGS } = await import(pathToFileURL(path.join(ROOT, "src/i18n.js")).href);
+const dicts = {};
+for (const l of LANGS) dicts[l] = (await import(pathToFileURL(path.join(ROOT, `src/locales/${l}.js`)).href)).default;
 const langs = Object.keys(dicts).sort();
 if (!dicts[REFERENCE]) {
   console.error(`i18n check failed: no "${REFERENCE}" dictionary`);

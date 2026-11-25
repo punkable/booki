@@ -689,7 +689,7 @@ export function startPolls() {
   deps.startRunningPoll(); // running-app indicators + trash badge (independent of widgets)
   const k = pollKinds();
   clearInterval(connTimer); connTimer = null;
-  if (k.conn) { pollConnectivity(); connTimer = setInterval(pollConnectivity, 15000); }
+  if (k.conn) { pollConnectivity(); connTimer = setInterval(() => { if (!S.hiddenState && !S.displayOff) pollConnectivity(); }, 15000); }
   if (k.winsettings) paintSettingsWidget();
   pollKey = JSON.stringify(k);
   pollsActive = true;

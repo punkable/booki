@@ -640,7 +640,7 @@ function paintActivity() {
   // repaints once when it runs out.
   clearInterval(activityTick);
   clearTimeout(activityExpiry);
-  activityTick = kind === "timer" ? setInterval(() => { paintActivity(); if (cardOpen) paintCard(); }, 1000)
+  activityTick = kind === "timer" ? setInterval(() => { if (document.hidden) return; paintActivity(); if (cardOpen) paintCard(); }, 1000)
     // An agent's card shows how long it has been at it; refresh that slowly.
     : kind.startsWith("agent") ? setInterval(() => { if (cardOpen) paintCard(); }, 30000) : null;
   activityExpiry = activity?.until ? setTimeout(paintActivity, Math.max(50, activity.until - Date.now() + 20)) : null;
