@@ -10,6 +10,15 @@ fn validate_launch_target(path: &str) -> Result<&str, String> {
     if path.is_empty() || path.contains('\0') {
         return Err("invalid launch path".into());
     }
+    // A pin whose path lost its name ("//", "\\") made Windows answer
+    // "cannot find the file //". Say what is wrong instead.
+    if path
+        .trim_matches(|c| c == '/' || c == '\\')
+        .trim()
+        .is_empty()
+    {
+        return Err("this pin has no file or app path".into());
+    }
     let lower = path.to_ascii_lowercase();
     // Block script / remote-code schemes; allow http(s), file paths, shell:,
     // ms-settings:, and other Windows protocol handlers users pin intentionally.
@@ -192,4 +201,18 @@ fn shell_open(path: &str, args: &[String]) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|e| format!("failed to open {path}: {e}"))
+}
+
+#[cfg(test)]
+mod launch_target_tests {
+    use super::validate_launch_target;
+
+    #[test]
+    fn a_path_of_only_slashes_is_rejected_with_a_clear_reason() {
+        for bad in ["//", "\\\\", " / ", ""] {
+            assert!(validate_launch_target(bad).is_err(), "{bad:?}");
+        }
+        assert_eq!(validate_launch_target("C:/Apps/a.exe"), Ok("C:/Apps/a.exe"));
+        assert!(validate_launch_target("javascript:alert(1)").is_err());
+    }
 }

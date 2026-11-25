@@ -1078,6 +1078,23 @@ pub fn foreground_occludes(dl: i32, dt: i32, dr: i32, db: i32, self_hwnd: isize)
 /// The smart notch steps aside for these instead of sitting over a browser
 /// or an editor. The desktop, the shell and Booki's own windows never count.
 /// Like `foreground_maximized`, only for the monitor `notch` is on (0 = any).
+/// The desktop, the taskbar and the Alt-Tab / Task View / Snap-layout
+/// overlays. The overlays are borderless, cover the whole monitor and become
+/// the foreground window for a moment while the user switches apps; they are
+/// never a maximized app or a fullscreen game, and counting them flashed the
+/// "Booki hid itself" blackout on every switch.
+fn is_shell_class(class: &str) -> bool {
+    matches!(
+        class,
+        "Progman"
+            | "WorkerW"
+            | "Shell_TrayWnd"
+            | "Shell_SecondaryTrayWnd"
+            | "MultitaskingViewFrame"
+            | "XamlExplorerHostIslandWindow"
+    )
+}
+
 /// The window that really owns the foreground: a browser's menu, extension
 /// flyout or download bubble is its own top-level popup, but it belongs to
 /// the (possibly maximized) browser window behind it. Without this, opening
@@ -1112,15 +1129,7 @@ pub fn foreground_maximized_on(notch: isize) -> bool {
         let mut buf = [0u16; 64];
         let n = GetClassNameW(hwnd, &mut buf);
         let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
-        if matches!(
-            class.as_str(),
-            "Progman"
-                | "WorkerW"
-                | "Shell_TrayWnd"
-                | "Shell_SecondaryTrayWnd"
-                | "MultitaskingViewFrame"
-                | "XamlExplorerHostIslandWindow"
-        ) {
+        if is_shell_class(&class) {
             return false;
         }
         if IsIconic(hwnd).as_bool() || !IsWindowVisible(hwnd).as_bool() {
@@ -1208,18 +1217,7 @@ pub fn is_fullscreen_on(dock: isize) -> bool {
         let mut buf = [0u16; 64];
         let n = GetClassNameW(hwnd, &mut buf);
         let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
-        if class == "Progman"
-            || class == "WorkerW"
-            || class == "Shell_TrayWnd"
-            || class == "Shell_SecondaryTrayWnd"
-            // Alt-Tab / Task View / Snap-layout overlays: borderless, cover the
-            // whole monitor, and briefly become the foreground window while the
-            // user is just switching between apps — not an actual fullscreen
-            // game or movie. Without this, moving between windows could flash
-            // the "Booki hid itself" blackout+toast on every switch.
-            || class == "MultitaskingViewFrame"
-            || class == "XamlExplorerHostIslandWindow"
-        {
+        if is_shell_class(&class) {
             return false;
         }
         if !on_dock_screen(hwnd) {

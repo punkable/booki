@@ -800,6 +800,12 @@ export async function onScreenBusy(cb) {
   return T.event.listen("booki://screen-busy", (e) => cb(!!e.payload));
 }
 
+/** A true fullscreen app (game, movie, presentation) is in front. */
+export async function onScreenFull(cb) {
+  if (!(T && T.event && T.event.listen)) return () => {};
+  return T.event.listen("booki://screen-full", (e) => cb(!!e.payload));
+}
+
 /** The pointer came near the notch (or left), even while it is out of sight. */
 export async function onNotchNear(cb) {
   if (!(T && T.event && T.event.listen)) return () => {};

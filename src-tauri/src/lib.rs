@@ -951,7 +951,7 @@ fn take_pending_changelog() -> bool {
 /// Open settings directly on a specific tab (e.g. "apps").
 #[tauri::command]
 async fn open_settings_tab(app: AppHandle, tab: String) {
-    *PENDING_TAB.lock().unwrap() = Some(tab);
+    *PENDING_TAB.lock().unwrap_or_else(|e| e.into_inner()) = Some(tab);
     if let Some(w) = app.get_webview_window("settings") {
         let _ = app.emit("booki://show-tab", ());
         bring_settings_forward(&w);
@@ -963,7 +963,7 @@ async fn open_settings_tab(app: AppHandle, tab: String) {
 /// Read-and-clear the tab settings should show (asked on mount / on signal).
 #[tauri::command]
 fn take_pending_tab() -> Option<String> {
-    PENDING_TAB.lock().unwrap().take()
+    PENDING_TAB.lock().unwrap_or_else(|e| e.into_inner()).take()
 }
 
 /// Export the current config to a JSON file the user picked.
@@ -1726,6 +1726,7 @@ pub fn run() {
             notch_reveal,
             notch_reveal_for_menu,
             notch_screen_busy,
+            notch_screen_full,
             notch_toast,
             notch_toast_dismiss,
             notch_notice,
@@ -2026,6 +2027,7 @@ pub fn run() {
                         // the rest) and "the pointer is near the notch" (raw, so
                         // the notch answers an approach within one tick).
                         let mut busy = (false, false, 0u8);
+                        let mut full = (false, false, 0u8);
                         let mut near_last = false;
                         let mut capture_last = false;
                         fn n_scale(w: Option<&tauri::WebviewWindow>) -> f64 {
@@ -2144,6 +2146,13 @@ pub fn run() {
                                         win::foreground_maximized_on(notch_hwnd),
                                     ) {
                                         let _ = handle.emit("booki://screen-busy", v);
+                                    }
+                                    // Maximized only dims the notch; true
+                                    // fullscreen (game, movie) sends it away.
+                                    if let Some(v) =
+                                        debounce(&mut full, win::is_fullscreen_on(notch_hwnd))
+                                    {
+                                        let _ = handle.emit("booki://screen-full", v);
                                     }
                                     let near = notch
                                         .as_ref()

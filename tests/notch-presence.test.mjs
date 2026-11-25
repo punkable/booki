@@ -19,19 +19,40 @@ const event = (page, name, payload) => page.evaluate(([name, payload]) => {
 const away = (page) => page.evaluate(() => document.body.classList.contains("away"));
 const app = (id, name) => ({ id, kind: "app", name, path: `C:/${id}.exe`, args: [] });
 
-test("automatic notch steps aside over a maximized app and returns on approach", async () => {
+const slim = (page) => page.evaluate(() => document.body.classList.contains("slim"));
+
+test("automatic notch dims over a maximized app instead of vanishing (#145)", async () => {
   const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "auto" }) });
   await page.waitForTimeout(200);
   assert.equal(await away(page), false, "visible over the desktop");
+  assert.equal(await slim(page), false);
   await event(page, "booki://screen-busy", true);
-  assert.equal(await away(page), true, "out of the way over a maximized app");
+  assert.equal(await away(page), false, "a maximized browser keeps the notch");
+  assert.equal(await slim(page), true, "but quieter");
+  await event(page, "booki://notch-near", true);
+  assert.equal(await slim(page), false, "full strength under the pointer");
+  await event(page, "booki://notch-near", false);
+  await waitForAsyncCondition(page, () => document.body.classList.contains("slim"));
+  await event(page, "booki://screen-busy", false);
+  assert.equal(await slim(page), false);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("automatic notch steps aside for true fullscreen and returns on approach", async () => {
+  const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "auto" }) });
+  await page.waitForTimeout(200);
+  await event(page, "booki://screen-busy", true);
+  await event(page, "booki://screen-full", true);
+  assert.equal(await away(page), true, "out of the way over a fullscreen app");
   await event(page, "booki://notch-near", true);
   assert.equal(await away(page), false, "the pointer nearing the edge brings it back");
   await event(page, "booki://notch-near", false);
   assert.equal(await away(page), false, "leaving by a few pixels does not blink it away");
   await waitForAsyncCondition(page, () => document.body.classList.contains("away"));
-  await event(page, "booki://screen-busy", false);
-  assert.equal(await away(page), false);
+  await event(page, "booki://screen-full", false);
+  assert.equal(await away(page), false, "back to a dimmed notch over the maximized window");
+  assert.equal(await slim(page), true);
   assert.deepEqual(errors, []);
   await page.close();
 });
@@ -57,7 +78,9 @@ test("a new song shows the hidden notch for a moment", async () => {
 test("always keeps the notch on screen", async () => {
   const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "always" }) });
   await event(page, "booki://screen-busy", true);
+  await event(page, "booki://screen-full", true);
   assert.equal(await away(page), false);
+  assert.equal(await slim(page), false);
   assert.deepEqual(errors, []);
   await page.close();
 });

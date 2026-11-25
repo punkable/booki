@@ -19,7 +19,7 @@ const fire = (page, name, payload = null) => page.evaluate(([name, payload]) => 
 const app = (id, name) => ({ id, kind: "app", name, path: `C:/${id}.exe`, args: [] });
 const pins = [app("a", "Alpha"), app("b", "Beta"), app("c", "Gamma")];
 
-test("a playing notch hides completely over a maximized app, never cut in half", async () => {
+test("a playing notch hides completely over a fullscreen app, never cut in half", async () => {
   for (const notchMode of ["attached", "floating", "smart"]) {
     const { page, errors } = await openPage(browser, port, "notch.html", { cfg: makeConfig({ notchVisibility: "auto", notchMode }), viewport: { width: 320, height: 68 } });
     await page.evaluate(() => {
@@ -32,6 +32,7 @@ test("a playing notch hides completely over a maximized app, never cut in half",
     // The window is shown again: the entrance animation runs, then ends.
     await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
     await fire(page, "booki://screen-busy", true);
+    await fire(page, "booki://screen-full", true);
     await waitForAsyncCondition(page, () => {
       const cs = getComputedStyle(document.querySelector(".notch-pill"));
       return document.body.classList.contains("away") && cs.opacity === "0" && cs.visibility === "hidden";

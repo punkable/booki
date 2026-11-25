@@ -678,6 +678,21 @@ body.notch-body.away.edge-right .notch-pill { translate: 70% 0; }
 @media (prefers-reduced-motion: reduce) {
   body.notch-body.away .notch-pill { translate: none; }
 }
+/* Over a maximized window (notch.js wantsSlim): the tab stays where it is,
+   smaller and dimmed, so it never covers a browser's tabs yet the battery
+   and the song are still a glance away. Full strength under the pointer. */
+body.notch-body.slim .notch-pill {
+  opacity: 0.6;
+  scale: 0.82;
+  transition: opacity var(--dur-3) var(--ease-out), scale var(--dur-3) var(--ease-out);
+}
+body.notch-body.slim.edge-top .notch-pill { transform-origin: 50% 0; }
+body.notch-body.slim.edge-bottom .notch-pill { transform-origin: 50% 100%; }
+body.notch-body.slim.edge-left .notch-pill { transform-origin: 0 50%; }
+body.notch-body.slim.edge-right .notch-pill { transform-origin: 100% 50%; }
+@media (prefers-reduced-motion: reduce) {
+  body.notch-body.slim .notch-pill { scale: none; transition: opacity var(--dur-3) linear; }
+}
 @media (hover: hover) and (pointer: fine) {
   .notch-pill:hover { scale: var(--pill-gx) var(--pill-gy); }
 }

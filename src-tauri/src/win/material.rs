@@ -371,7 +371,7 @@ pub fn apply(
     shapes: &[crate::surface_geometry::MaterialShape],
     dpr: f64,
 ) -> bool {
-    let mut map = surfaces().lock().unwrap();
+    let mut map = surfaces().lock().unwrap_or_else(|e| e.into_inner());
     let surface = map.entry(key.to_string()).or_insert_with(|| Surface {
         owner_at: None,
         owner,

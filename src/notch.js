@@ -8,7 +8,7 @@
    so we report the pill (or toast) rect to the backend; a watcher toggles
    ignore_cursor_events — same contract as the dock stage. */
 
-import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy } from "./api.js";
+import { config as configApi, dock as dockApi, emitNoticeAction, emitNotchMenu, emitNotchShape, invoke, onAgentActivity, onConfigChanged, onFileDrop, onNotchNear, onNotchToast, onNotchToastOut, onScreenBusy, onScreenFull } from "./api.js";
 import { singleFlight } from "./dock/async-cache.js";
 import { icon } from "./icons.js";
 import { imageSrc } from "./image-src.js";
@@ -249,12 +249,15 @@ document.addEventListener("visibilitychange", () => {
 
 // ─── Presence: out of the way while you work ──────────────────────────────
 // "always" keeps the tab on screen whenever the dock is tucked away. "auto"
-// (the default) lets it step aside while an app is maximized or fullscreen,
+// (the default) dims it to a quiet sliver over a maximized window (#145: a
+// maximized browser is where people spend the day, so the notch must not
+// vanish there) and lets it step aside only for a true fullscreen app,
 // "edge" keeps it out of sight everywhere. Either way it comes back when the
 // pointer nears the edge, while its card is open or dragged, and for a few
 // seconds when something new happens (the next song, a timer ending).
 let presenceMode = "auto";
 let screenBusy = false;
+let screenFull = false;
 let scene = "desk";
 let codeForeground = false;
 let videoForeground = false;
@@ -277,15 +280,25 @@ function wantsAway(now = Date.now()) {
   if (place === "creative") return false;
   if (presenceMode === "always") return false;
   if (document.body.classList.contains("toast") || now < nudgeUntil) return false;
-  return presenceMode === "edge" || screenBusy;
+  return presenceMode === "edge" || screenFull;
+}
+
+/** Over a maximized window the notch stays, but quiet: smaller and dimmed,
+ *  full strength again under the pointer, with its card or a new event. */
+function wantsSlim(now = Date.now()) {
+  if (presenceMode === "always" || scene !== "busy") return false;
+  if (pointerNear || cardOpen || drag || draggingNotch) return false;
+  return !document.body.classList.contains("toast") && now >= nudgeUntil;
 }
 
 function paintPresence() {
   const away = wantsAway();
   const preparing = !away && (videoForeground || scene === "game") && !cardOpen;
+  const slim = !away && wantsSlim();
   const changed = document.body.classList.contains("away") !== away
     || document.body.classList.contains("preparing") !== preparing;
   document.body.classList.toggle("away", away);
+  document.body.classList.toggle("slim", slim);
   document.body.classList.toggle("preparing", preparing);
   if (changed) scheduleHitReport();
 }
@@ -296,14 +309,17 @@ function paintScene() {
   // window, steps aside. Music on the desktop is not a video scene.
   const watching = place === "video";
   const creative = place === "creative";
-  const game = place === "game" || (screenBusy && !watching && !creative && !codeForeground);
-  const next = watching ? "video" : game ? "game" : creative ? "creative" : codeForeground ? "code" : "desk";
+  const others = !watching && !creative && !codeForeground;
+  const game = place === "game" || (screenFull && others);
+  const busy = !game && screenBusy && others;
+  const next = watching ? "video" : game ? "game" : busy ? "busy" : creative ? "creative" : codeForeground ? "code" : "desk";
   const changed = next !== scene;
   scene = next;
   document.body.classList.toggle("scene-game", scene === "game");
   document.body.classList.toggle("scene-video", scene === "video");
   document.body.classList.toggle("scene-code", scene === "code");
   document.body.classList.toggle("scene-creative", scene === "creative");
+  document.body.classList.toggle("scene-busy", scene === "busy");
   // A video that just came forward should not keep a card open over the picture
   // unless the pointer is already there to use it.
   if ((watching || game) && !pointerNear && cardOpen) closeCard();
@@ -344,7 +360,10 @@ function nudgePresence(ms = NUDGE_MS) {
 onScreenBusy((value) => {
   screenBusy = value;
   paintScene();
-  paintPresence();
+});
+onScreenFull((value) => {
+  screenFull = value;
+  paintScene();
 });
 onNotchNear((value) => {
   clearTimeout(nearLinger);
@@ -369,9 +388,10 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
   if (presenceMode === "always" || !inTauri) return;
-  invoke("notch_screen_busy").then((value) => {
-    screenBusy = !!value;
-    paintPresence();
+  Promise.all([invoke("notch_screen_busy"), invoke("notch_screen_full")]).then(([busy, full]) => {
+    screenBusy = !!busy;
+    screenFull = !!full;
+    paintScene();
   }).catch(() => {});
 });
 
@@ -487,7 +507,7 @@ function nextAgentDone(now) {
 /** The notch itself cannot show it (vertical edge, hover trigger): fall
  *  back to the notice chip, which also covers the tab stepping aside. */
 function agentNotice(state, provider) {
-  if (videoForeground || scene === "game" || (screenBusy && scene !== "code" && scene !== "creative")) return;
+  if (videoForeground || scene === "game") return;
   if (canLive) nudgePresence();
   else invoke("notch_notice", { title: agentLabel(state, provider), detail: "" }).catch(() => {});
 }
@@ -529,17 +549,11 @@ function currentActivity(now = Date.now()) {
   // Over a video or a game the notch stays a dot. The dock still opens from
   // that dot, on hover or on click, whichever is already chosen.
   if ((videoForeground || scene === "game") && !cardOpen) return null;
-  // Over a maximized app only what needs you now gets through: an agent
-  // waiting or done, a focus block ending, a battery running out, the
-  // charger, or the volume you just changed. Music and progress wait.
-  if (screenBusy && scene !== "code" && scene !== "creative") {
-    const urgent = idleActivity(now);
-    return urgent && BUSY_KINDS.has(urgent.kind) && !(urgent.kind === "battery" && urgent.level > 10) ? urgent : null;
-  }
+  // Over a maximized app the notch keeps showing what is live (music,
+  // battery, timers, agents), only quieter: the `slim` style dims it.
   return idleActivity(now);
 }
 
-const BUSY_KINDS = new Set(["volume", "agent-waiting", "agent-error", "agent-done", "charging", "done", "battery"]);
 function idleActivity(now) {
   if (liveOn.volume && volumeFlash && volumeFlash.until > now) return { kind: "volume", level: volumeFlash.level, muted: volumeFlash.muted, until: volumeFlash.until };
   const agent = agentsOn ? agentActivity(now) : null;
@@ -665,7 +679,7 @@ let lastTrack = "";
 function paintMedia() {
   // A new song is worth a glance even when the tab is out of the way.
   const track = media?.playing ? `${media.title || ""}\u0000${media.artist || ""}` : "";
-  if (track && lastTrack && track !== lastTrack && !screenBusy && !videoForeground) nudgePresence();
+  if (track && lastTrack && track !== lastTrack && scene !== "game" && !videoForeground) nudgePresence();
   if (track) lastTrack = track;
   const art = imageSrc((media && media.thumb) || "");
   for (const img of [lArt, cArt]) {

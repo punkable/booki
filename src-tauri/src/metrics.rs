@@ -33,7 +33,7 @@ pub(crate) async fn app_usage() -> Result<AppUsage, String> {
 
 pub(crate) fn collect_app_usage() -> AppUsage {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate};
-    let mut guard = OWN_PROCS.lock().unwrap();
+    let mut guard = OWN_PROCS.lock().unwrap_or_else(|e| e.into_inner());
     let sys = guard.get_or_insert_with(sysinfo::System::new);
     sys.refresh_processes_specifics(
         ProcessesToUpdate::All,
@@ -101,7 +101,7 @@ pub(crate) async fn system_stats() -> Result<SystemStats, String> {
 }
 
 pub(crate) fn collect_system_stats() -> SystemStats {
-    let mut guard = SYS.lock().unwrap();
+    let mut guard = SYS.lock().unwrap_or_else(|e| e.into_inner());
     let sys = guard.get_or_insert_with(sysinfo::System::new);
     sys.refresh_cpu_usage();
     sys.refresh_memory();
@@ -110,7 +110,7 @@ pub(crate) fn collect_system_stats() -> SystemStats {
     let used = sys.used_memory();
     let mem = (used as f64 / total as f64 * 100.0) as f32;
 
-    let mut nguard = NETS.lock().unwrap();
+    let mut nguard = NETS.lock().unwrap_or_else(|e| e.into_inner());
     let entry = nguard.get_or_insert_with(|| {
         (
             sysinfo::Networks::new_with_refreshed_list(),
@@ -128,7 +128,7 @@ pub(crate) fn collect_system_stats() -> SystemStats {
     // Disk usage (aggregate across mounted disks) + system uptime. Keep the disk
     // list cached and just refresh its figures each poll — re-enumerating every
     // volume (opening handles) on every tick was needless work.
-    let mut dguard = DISKS.lock().unwrap();
+    let mut dguard = DISKS.lock().unwrap_or_else(|e| e.into_inner());
     let disks = dguard.get_or_insert_with(sysinfo::Disks::new_with_refreshed_list);
     for disk in disks.list_mut() {
         disk.refresh_specifics(sysinfo::DiskRefreshKind::nothing().with_storage());

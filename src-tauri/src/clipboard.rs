@@ -99,7 +99,10 @@ static CLIP_PERSIST: Mutex<()> = Mutex::new(());
 /// readers of the list (save_config takes it on the UI thread).
 pub(crate) fn clip_persist(cfg: &Config) {
     let _write = CLIP_PERSIST.lock().unwrap_or_else(|e| e.into_inner());
-    let snapshot = CLIP_HISTORY.lock().unwrap().clone();
+    let snapshot = CLIP_HISTORY
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     clip_write_disk(&snapshot, cfg);
 }
 
@@ -155,7 +158,10 @@ pub(crate) fn clip_parse_disk(bytes: &[u8]) -> Option<Vec<ClipEntry>> {
 }
 
 pub(crate) fn clip_apply_config(cfg: &Config) {
-    clip_prune_locked(&mut CLIP_HISTORY.lock().unwrap(), cfg);
+    clip_prune_locked(
+        &mut CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner()),
+        cfg,
+    );
     clip_persist(cfg);
 }
 
@@ -188,7 +194,7 @@ pub(crate) fn clip_load_from_disk() {
         .unwrap_or(0)
         .saturating_add(1);
     CLIP_NEXT_ID.store(next_id.max(1), Ordering::Relaxed);
-    *CLIP_HISTORY.lock().unwrap() = hist;
+    *CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner()) = hist;
     if !unreadable && (loaded_legacy || cfg.clipboard_persist) {
         clip_persist(&cfg);
     }
@@ -196,7 +202,10 @@ pub(crate) fn clip_load_from_disk() {
 
 pub(crate) fn clip_enforce_current_policy() {
     let cfg = config::load();
-    let changed = clip_prune_locked(&mut CLIP_HISTORY.lock().unwrap(), &cfg);
+    let changed = clip_prune_locked(
+        &mut CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner()),
+        &cfg,
+    );
     if changed || !cfg.clipboard_persist {
         clip_persist(&cfg);
     }
@@ -264,7 +273,7 @@ pub(crate) fn clip_remember(text: &str) {
         return;
     }
     let should_write = {
-        let mut hist = CLIP_HISTORY.lock().unwrap();
+        let mut hist = CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner());
         let pruned = clip_prune_locked(&mut hist, &cfg);
         if hist.first().map(|e| e.text == text).unwrap_or(false) {
             // Already the most recent entry — nothing changed.
@@ -323,7 +332,7 @@ pub(crate) async fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
         clip_enforce_current_policy();
         let cfg = config::load();
         let cap = limit.unwrap_or(CLIP_HISTORY_MAX).min(clip_limit(&cfg));
-        let hist = CLIP_HISTORY.lock().unwrap();
+        let hist = CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner());
         hist.iter().take(cap).cloned().collect()
     })
     .await
@@ -335,7 +344,7 @@ pub(crate) async fn clipboard_history(limit: Option<usize>) -> Vec<ClipEntry> {
 pub(crate) async fn clipboard_count() -> usize {
     util::blocking(|| {
         clip_enforce_current_policy();
-        CLIP_HISTORY.lock().unwrap().len()
+        CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner()).len()
     })
     .await
     .unwrap_or_default()
@@ -353,7 +362,7 @@ pub(crate) struct ClipSummary {
 pub(crate) async fn clipboard_summary() -> ClipSummary {
     util::blocking(|| {
         clip_enforce_current_policy();
-        let hist = CLIP_HISTORY.lock().unwrap();
+        let hist = CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner());
         ClipSummary {
             count: hist.len(),
             preview: hist.first().map(|e| e.text.clone()),
@@ -383,7 +392,10 @@ pub(crate) async fn clipboard_copy(text: String) -> bool {
 async fn clip_edit(edit: impl FnOnce(&mut Vec<ClipEntry>, &Config) + Send + 'static) {
     let _ = util::blocking(move || {
         let cfg = config::load();
-        edit(&mut CLIP_HISTORY.lock().unwrap(), &cfg);
+        edit(
+            &mut CLIP_HISTORY.lock().unwrap_or_else(|e| e.into_inner()),
+            &cfg,
+        );
         clip_persist(&cfg);
     })
     .await;

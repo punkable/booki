@@ -335,9 +335,27 @@ pub(crate) fn notch_screen_busy(app: AppHandle) -> bool {
     win::foreground_maximized_on(notch) || win::is_fullscreen_on(notch)
 }
 
+/// Is a true fullscreen app (game, movie, presentation) in front? The notch
+/// only leaves for these; over a maximized window it stays, dimmed.
+#[tauri::command]
+pub(crate) fn notch_screen_full(app: AppHandle) -> bool {
+    #[cfg(windows)]
+    let notch = app
+        .get_webview_window("notch")
+        .and_then(|n| n.hwnd().ok())
+        .map(|h| h.0 as isize)
+        .unwrap_or(0);
+    #[cfg(not(windows))]
+    let notch = {
+        let _ = &app;
+        0
+    };
+    win::is_fullscreen_on(notch)
+}
+
 /// Interactive regions of the notch window (window-relative CSS px). Same
 /// click-through contract as `set_hit_rects`, scoped to the notch.
 #[tauri::command]
 pub(crate) fn set_notch_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
-    *NOTCH_HIT_RECTS.lock().unwrap() = (rects, all);
+    *NOTCH_HIT_RECTS.lock().unwrap_or_else(|e| e.into_inner()) = (rects, all);
 }

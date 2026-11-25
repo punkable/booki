@@ -98,7 +98,7 @@ pub(crate) fn start_monitor_follow(app: AppHandle) {
             let Some(name) = monitor_name_at_cursor(&dock) else {
                 continue;
             };
-            if *FOLLOWED.lock().unwrap() == name {
+            if *FOLLOWED.lock().unwrap_or_else(|e| e.into_inner()) == name {
                 candidate.clear();
                 continue;
             }
@@ -110,7 +110,7 @@ pub(crate) fn start_monitor_follow(app: AppHandle) {
             if since.elapsed() < std::time::Duration::from_millis(900) {
                 continue;
             }
-            *FOLLOWED.lock().unwrap() = candidate.clone();
+            *FOLLOWED.lock().unwrap_or_else(|e| e.into_inner()) = candidate.clone();
             let _ = position_dock(&dock, &cfg.edge);
             let _ = app.emit("booki://dock-monitor-changed", candidate.clone());
         }
@@ -121,7 +121,7 @@ pub(crate) fn start_monitor_follow(app: AppHandle) {
 pub(crate) fn pick_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
     let cfg = config::load();
     if cfg.monitor == FOLLOW_POINTER {
-        let followed = FOLLOWED.lock().unwrap().clone();
+        let followed = FOLLOWED.lock().unwrap_or_else(|e| e.into_inner()).clone();
         if let Ok(mons) = window.available_monitors() {
             if let Some(m) = mons
                 .iter()
@@ -208,14 +208,14 @@ pub(crate) fn position_dock(window: &WebviewWindow, edge: &str) -> Result<(), St
     let (x, y) = dock_xy(window, edge, wsize.width as i32, wsize.height as i32)?;
     // The occlusion rect is the painted bar that set_dock_frame recorded, not
     // this whole window (flyout room, or the tucked strip). Re-anchor it here.
-    let (hw, hh) = *DOCK_HOME_SIZE.lock().unwrap();
+    let (hw, hh) = *DOCK_HOME_SIZE.lock().unwrap_or_else(|e| e.into_inner());
     let (hw, hh) = if hw > 0 && hh > 0 {
         (hw, hh)
     } else {
         (wsize.width as i32, wsize.height as i32)
     };
     let (hx, hy) = dock_xy(window, edge, hw, hh).unwrap_or((x, y));
-    *DOCK_HOME_RECT.lock().unwrap() = (hx, hy, hx + hw, hy + hh);
+    *DOCK_HOME_RECT.lock().unwrap_or_else(|e| e.into_inner()) = (hx, hy, hx + hw, hy + hh);
     window
         .set_position(PhysicalPosition::new(x, y))
         .map_err(|e| e.to_string())
@@ -269,8 +269,9 @@ pub(crate) fn set_dock_frame(
         let hw = home_width.unwrap_or(w).max(8);
         let hh = home_height.unwrap_or(h).max(8);
         let (hx, hy) = dock_xy(&window, &edge, hw as i32, hh as i32).unwrap_or((x, y));
-        *DOCK_HOME_RECT.lock().unwrap() = (hx, hy, hx + hw as i32, hy + hh as i32);
-        *DOCK_HOME_SIZE.lock().unwrap() = (hw as i32, hh as i32);
+        *DOCK_HOME_RECT.lock().unwrap_or_else(|e| e.into_inner()) =
+            (hx, hy, hx + hw as i32, hy + hh as i32);
+        *DOCK_HOME_SIZE.lock().unwrap_or_else(|e| e.into_inner()) = (hw as i32, hh as i32);
     }
     // Resize + reposition in ONE SetWindowPos: the old set_size-then-set_position
     // pair painted an intermediate frame (resized but not yet moved), which read
@@ -325,7 +326,7 @@ pub(crate) fn dock_cover_workarea(window: WebviewWindow) -> Result<(f64, f64), S
 /// transparent window never blocks clicks meant for the apps behind it.
 #[tauri::command]
 pub(crate) fn set_hit_rects(rects: Vec<(f64, f64, f64, f64)>, all: bool) {
-    *HIT_RECTS.lock().unwrap() = (rects, all);
+    *HIT_RECTS.lock().unwrap_or_else(|e| e.into_inner()) = (rects, all);
 }
 
 /// Hide the dock into the notch: show the small always-on, click-reliable notch
